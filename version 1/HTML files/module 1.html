@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iPOMS Presentation</title>
+    <style>
+        body {
+            background-color: #e9ecef;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 40px;
+        }
+
+        /* Slide Container */
+        .slide {
+            width: 960px;
+            height: 540px; /* 16:9 Aspect Ratio */
+            background-color: #ffffff;
+            box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Slide 1 - Title Slide */
+        .slide-title-bg {
+            background: linear-gradient(135deg, #0b2e59 0%, #175496 100%);
+            color: #ffffff;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 50px;
+        }
+        .slide-title-bg h1 {
+            font-size: 3.2em;
+            margin: 0 0 15px 0;
+            color: #64b5f6;
+            letter-spacing: 2px;
+        }
+        .slide-title-bg h2 {
+            font-size: 1.8em;
+            font-weight: 400;
+            margin: 0 0 20px 0;
+        }
+        .slide-title-bg h3 {
+            font-size: 1.4em;
+            font-weight: 300;
+            color: #b0bec5;
+            margin-bottom: 50px;
+        }
+        .footer-text {
+            font-size: 1em;
+            color: #90caf9;
+            border-top: 1px solid #42a5f5;
+            padding-top: 20px;
+            width: 80%;
+        }
+
+        /* Standard Slide Layout */
+        .slide-header {
+            background-color: #0b2e59;
+            color: #ffffff;
+            padding: 25px 40px;
+            font-size: 2em;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .slide-header span.slide-num {
+            font-size: 0.5em;
+            color: #90caf9;
+            background: rgba(255,255,255,0.1);
+            padding: 5px 15px;
+            border-radius: 20px;
+        }
+        .slide-content {
+            padding: 40px;
+            flex-grow: 1;
+            font-size: 1.3em;
+            color: #333333;
+        }
+        
+        /* Bullet Points */
+        ul.custom-bullets {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        ul.custom-bullets li {
+            margin-bottom: 25px;
+            padding-left: 40px;
+            position: relative;
+            line-height: 1.5;
+        }
+        ul.custom-bullets li::before {
+            content: "■";
+            color: #175496;
+            position: absolute;
+            left: 0;
+            top: 2px;
+            font-size: 1.2em;
+        }
+
+        /* Grid Layout for Roles */
+        .grid-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+        }
+        .card {
+            background-color: #f8f9fa;
+            border-left: 6px solid #175496;
+            padding: 20px;
+            border-radius: 6px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .card h4 {
+            margin: 0 0 10px 0;
+            color: #0b2e59;
+            font-size: 1.1em;
+        }
+        .card p {
+            margin: 0;
+            font-size: 0.85em;
+            color: #555;
+            line-height: 1.4;
+        }
+
+        /* Citation styling */
+        .citation {
+            font-size: 0.6em;
+            color: #888;
+            vertical-align: super;
+            font-weight: normal;
+        }
+        .slide-title-bg .citation {
+            color: rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Slide 1: Title -->
+    <div class="slide slide-title-bg">
+        <h1>AMR COORDINATOR PORTAL <span class="citation">[cite: 1]</span></h1>
+        <h2>Placement Operations Management System (POMS) <span class="citation">[cite: 1]</span></h2>
+        <h3>Module 01 - User Management Specification <span class="citation">[cite: 1]</span></h3>
+        <div class="footer-text">
+            Prepared for: Infoziant <span class="citation">[cite: 1]</span> | Document Version: v1.0 <span class="citation">[cite: 1]</span>
+        </div>
+    </div>
+
+    <!-- Slide 2: Purpose & Scope -->
+    <div class="slide">
+        <div class="slide-header">
+            Purpose & Scope
+            <span class="slide-num">Slide 2</span>
+        </div>
+        <div class="slide-content">
+            <ul class="custom-bullets">
+                <li>Provides a secure, role-based authentication and authorization system for the Placement Operations Management System (POMS) <span class="citation">[cite: 1]</span>.</li>
+                <li>Ensures every user accesses only the modules and features required for their responsibilities while maintaining data security <span class="citation">[cite: 1]</span>.</li>
+                <li>Authenticates all users securely and provides strict role-based access control (RBAC) across all modules <span class="citation">[cite: 1]</span>.</li>
+                <li>Maintains accurate, auditable user information and tracks login activity and session history <span class="citation">[cite: 1]</span>.</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Slide 3: User Roles & Responsibilities -->
+    <div class="slide">
+        <div class="slide-header">
+            User Roles & Responsibilities
+            <span class="slide-num">Slide 3</span>
+        </div>
+        <div class="slide-content">
+            <div class="grid-container">
+                <!-- Role 1 -->
+                <div class="card">
+                    <h4>Placement Coordinator <span class="citation">[cite: 1]</span></h4>
+                    <p>Operational user responsible for company outreach and daily placement activities <span class="citation">[cite: 1]</span>. Maintains the daily tracker and manages positive leads <span class="citation">[cite: 1]</span>.</p>
+                </div>
+                <!-- Role 2 -->
+                <div class="card">
+                    <h4>Team Leader <span class="citation">[cite: 1]</span></h4>
+                    <p>Operational supervisor responsible for monitoring multiple coordinators <span class="citation">[cite: 1]</span>. Verifies data, manages the company database, and monitors reports <span class="citation">[cite: 1]</span>.</p>
+                </div>
+                <!-- Role 3 -->
+                <div class="card">
+                    <h4>Administrator (CEO / Director) <span class="citation">[cite: 1]</span></h4>
+                    <p>System owner with unrestricted administrative privileges <span class="citation">[cite: 1]</span>. Handles user management, system configuration, and data security <span class="citation">[cite: 1]</span>.</p>
+                </div>
+                <!-- Role 4 -->
+                <div class="card">
+                    <h4>Training & Placement Officer (TPO) <span class="citation">[cite: 1]</span></h4>
+                    <p>Read-only external stakeholder responsible for monitoring placement activities <span class="citation">[cite: 1]</span>. Views placement statistics, weekly reports, and dashboards <span class="citation">[cite: 1]</span>.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 4: Key Security & Data Architecture -->
+    <div class="slide">
+        <div class="slide-header">
+            Key Architecture & Security Rules
+            <span class="slide-num">Slide 4</span>
+        </div>
+        <div class="slide-content">
+            <ul class="custom-bullets">
+                <li><strong>Unified Login:</strong> A single login screen serves all roles, automatically redirecting the user to their respective dashboard after authentication <span class="citation">[cite: 1]</span>.</li>
+                <li><strong>Data Classification:</strong> Company data is securely split into <em>Protected Master Information</em> (editable by Admins/TLs) and <em>Operational Contact Information</em> (editable by Coordinators) <span class="citation">[cite: 1]</span>.</li>
+                <li><strong>Account Lifecycle:</strong> Accounts hold exactly one status at a time: Active, Inactive, On Leave, or Resigned <span class="citation">[cite: 1]</span>. Historical data is retained for audit continuity <span class="citation">[cite: 1]</span>.</li>
+                <li><strong>Security Matrix:</strong> Passwords are encrypted at rest, role-based authorization is enforced on every request, and every login attempt is recorded <span class="citation">[cite: 1]</span>.</li>
+            </ul>
+        </div>
+    </div>
+
+</body>
+</html>

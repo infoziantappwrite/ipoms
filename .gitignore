@@ -1,0 +1,33 @@
+# ===========================
+# iPOMS .gitignore
+# ===========================
+
+# --- IDE & Editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- OS Files ---
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# --- Large Binary Files (keep on OneDrive instead) ---
+# Uncomment the lines below if you want to exclude them:
+# version 1/Presentations/*.pptx
+# version 1/Prompt Sources/*.docx
+# version 1/Module Workflow/*.docx
+
+# --- Sensitive / Business Documents ---
+# Uncomment if you don't want quotation/pricing files on GitHub:
+# approval documents/iPOMS Quotation.pdf
+
+# --- Empty directories ---
+version 1/PDF/
+
+# --- Temporary / Build files ---
+*.tmp
+*.log
+*.bak
