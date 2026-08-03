@@ -267,31 +267,32 @@ Final decision: Response 1 is renamed Call Outcome and is the only outcome field
 
 Intelligent filtering still applies within Call Outcome selection where relevant statuses depend on context, but no Response 2 value is captured or stored in Module 03.
 
-# 13\. Submit Day - Validation Rules
+# 13\. Validation Rules & Real-Time Progress Flow
 
-Validation before Submit Day is intentionally soft - it warns, but never blocks, submission:
+Validation before Save Progress is intentionally soft - it warns, but never blocks:
 
 - Start Time and End Time must be present for every worked row (enforced at the row level per Section 10.6).
 - Call Outcome must be selected for every worked row.
 - Comments are always optional.
-- If Call Outcome = Invite Mail but the Email ID is missing, the coordinator may still submit the day. The system carries this forward as a soft reminder the next time the coordinator logs in, prompting them to supply the missing Email ID (one prompt/chance is given).
+- If Call Outcome = Invite Mail but the Email ID is missing, the coordinator may still save progress. The system carries this forward as a soft reminder the next time the coordinator logs in, prompting them to supply the missing Email ID (one prompt/chance is given).
 
 Example confirmation dialog:
 
-- "68 rows completed. 2 companies require Email ID. You can submit now - these records will appear tomorrow as Pending Information." with Submit Anyway and Go Back options.
+- "68 rows completed. 2 companies require Email ID. Progress saved - these records will appear tomorrow as Pending Information." with Save Anyway and Go Back options.
 
-# 14\. Auto-Save, Manual Save & Submit Day
+# 14\. Auto-Save, Save Progress & Midnight Auto-Finalization
 
-- Each row auto-saves as soon as it is completed (Call Outcome selected).
-- A manual Save control (and Ctrl+S) is also available at any time.
-- Submit Day is a distinct, final action performed once at the end of the working day, after all rows are saved.
-- The bottom status bar always shows Auto Saved / Last Saved timestamp, row count, and current progress percentage, giving the coordinator confidence their work is not lost.
+- **Real-Time Auto-Save & Status Indicator:** Each row auto-saves as soon as it is completed. A Google Docs / Notion style status indicator in the header displays live sync state: `● All changes saved`, `● Saving...`, or `● Saved at 5:42 PM`.
+- **Save Progress Button (Primary Action):** Replaces the old "Submit Day" concept. Coordinators click **Save Progress** (or press `Ctrl + S`) whenever they want to push intermediate progress to live dashboards and reports. Unlimited saves are permitted throughout the day without locking editing.
+- **Midnight Auto-Finalization (11:59:59 PM):** At 11:59:59 PM, the system automatically saves all pending changes, marks today's tracker entries as finalized/read-only (`is_finalized = true`), and archives the day's record for management reporting. No manual end-of-day submission is required.
 
-# 15\. Carry-Forward of Incomplete Contacts
+# 15\. Fresh Daily Start & Calendar History Navigation (No Forced Carry-Forward)
 
-- No Response and Follow Up contacts are not force-closed at Submit Day.
-- When the coordinator opens the next day's tracker, these contacts are available to optionally continue.
-- The coordinator may delete them from the new day's list or continue working them, entirely at their discretion, before adding fresh contacts for the new day.
+- **Fresh Daily Start:** Every morning begins as a **clean notebook page**. Yesterday's completed calls do not clog today's active workspace. Unworked or follow-up companies remain safely in the Master Company Database (`company_metadata`) or `assignments` to be intentionally selected when needed.
+- **Unified Single Collection Architecture:** All daily logs remain stored permanently inside the single `daily_tracker` collection — no separate archive table or data moving is used.
+- **Interactive Calendar History View:** The Daily Tracker header features an interactive **Calendar Picker** with visual activity dots (`●` indicating days with recorded calls). 
+  - **Today's Date:** Fully active and editable.
+  - **Past Dates (Yesterday / Last Month):** Opens in a clean, read-only History View for coordinators, team leaders, directors, and administrators to review past performance instantly.
 
 # 16\. Daily Tracker UI Design
 
