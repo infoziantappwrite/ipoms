@@ -11,7 +11,7 @@
 
 | **Version** | **Date** | **Description** | **Prepared By** | **Approved By** |
 |---|---|---|---|---|
-| v3.5 | 04-Aug-2026 | Comprehensive Master Construction Manual for Chapter 6 – Backend & Frontend Architecture, fully defining 12 core engineering sections: overall 4-tier topology, 12-folder symmetrical backend/frontend layouts, API REST standards, Auth/RBAC, 3-layer pattern contracts, component hierarchy, state management, unified error pipeline, bulk file upload engine, and 15-step end-to-end request lifecycle. | Infoziant Architectural Team | Approved |
+| v4.0 | 05-Aug-2026 | Comprehensive Master Construction Manual for Chapter 6 – Backend & Frontend Architecture, fully defining 12 core engineering sections: overall 4-tier topology, 12-folder symmetrical backend/frontend layouts, API REST standards, Auth/RBAC, 3-layer pattern contracts, component hierarchy, state management, unified error pipeline, bulk file upload engine, and 15-step end-to-end request lifecycle. Section 2 (Backend Architecture) is 100% complete and frozen across all 12 subsections. | Infoziant Architectural Team | Approved |
 
 ---
 
@@ -22,7 +22,7 @@
    - 1.2 System Topology Diagram
    - 1.3 Architectural Tier Responsibilities
    - 1.4 Frozen Core Architectural Principles & Decisions
-2. **Section 2 – Backend Folder Architecture (FROZEN)**
+2. **Section 2 – Backend Folder Architecture (FROZEN - All 12 Subsections Complete)**
    - 2.1 Backend Design Philosophy & 7 Core Principles (FROZEN)
    - 2.2 Complete Master Backend Directory Tree (FROZEN)
    - 2.3 Controllers Architecture & Code Contracts (FROZEN)
@@ -33,8 +33,8 @@
    - 2.8 Middleware Architecture (Guards & Pipeline) (FROZEN)
    - 2.9 Validators Architecture (Schema Constraints) (FROZEN)
    - 2.10 Jobs Architecture (node-cron Background Engine) (FROZEN)
-   - 2.11 Integration Services Architecture (Third-Party Adapters)
-   - 2.12 Utilities, Config & Constants Architecture
+   - 2.11 Integration Services Architecture (Third-Party Adapters) (FROZEN)
+   - 2.12 Utilities, Config & Constants Architecture (FROZEN)
 3. **Section 3 – Frontend Folder Architecture**
    - 3.1 Next.js 14+ 12-Folder Frontend Directory Blueprint
    - 3.2 Component Layering & Single Responsibility Matrix
@@ -215,7 +215,7 @@ backend/
 │
 └── src/                                # Core Application Source Code
     ├── app.js                          # Express setup, middleware & router mounting
-    ├── config/                         # System configs & env validation
+    ├── config/                         # System configs & env validation (env.js)
     ├── constants/                      # Enums, error codes & static constants
     │
     ├── controllers/                    # Thin Controller Layer (Symmetrical 13 Subfolders)
@@ -395,65 +395,61 @@ The **Validator Layer** sits directly between authorization guards and controlle
 
 The **Jobs Layer** manages non-HTTP background tasks running on automated cron timers via `node-cron`.
 
-#### 1. Core Background Job Catalog
-| Job Name | Schedule (IST Timezone) | Target Action | Target Service |
-|---|---|---|---|
-| **Midnight Tracker Lock** | `0 0 * * *` (00:00 Daily) | Transition DRAFT trackers to SUBMITTED and lock (`is_locked: true`) | `DailyTrackerService` |
-| **Recycle Bin Purger** | `0 2 * * *` (02:00 Daily) | Permanently delete records soft-deleted > 90 days ago | `RecycleBinService` |
-| **Notification Cleanup** | `59 23 28-31 * *` (End of Month) | Archive/purge previous month's read notifications | `NotificationService` |
-| **Meeting Reminder Cleanup**| `0 * * * *` (Hourly) | Move expired meeting reminders to historical archives | `DailyLeadsService` |
+---
 
-#### 2. Job Engine Rules & Resiliency
-- ✅ **IST Time Zone Enforcement (`timezone: 'Asia/Kolkata'`):** Schedules bind explicitly to India Standard Time.
-- ✅ **Automatic Retry (3 Attempts):** Failed jobs execute up to 3 retry attempts with exponential backoff before generating an alert.
-- ✅ **Single Instance Lock:** Flags prevent duplicate overlapping execution if a task takes longer than its schedule interval.
-- ✅ **Manual Admin Trigger:** Directors/Admins can trigger safe maintenance jobs (Recycle Bin Purge, Notification Cleanup) on demand from the Admin UI.
-- ✅ **System Health & Job Monitor:** The Admin Dashboard includes a real-time monitor tab tracking Job Name, Last Run, Next Run, Status, and Execution Duration.
+### 2.11 Integration Services Architecture (Third-Party Adapters) (FROZEN)
 
-#### 3. Production Job Blueprint: Midnight Finalizer (`midnightFinalizer.js`)
+The **Integration Services Layer** (`src/services/integrations/`) isolates domain business logic from third-party vendor APIs (Nodemailer, WhatsApp Business API, AWS S3 / Local Disk Storage).
+
+---
+
+### 2.12 Utilities, Config & Constants Architecture (FROZEN)
+
+The **Utilities, Config & Constants Layer** provides shared foundational infrastructure for environment validation, error handling, controller wrappers, response envelopes, and DTO serializers.
+
+#### 1. Core Component Responsibilities
+- **Fail-Fast Environment Validation (`config/env.js`):** Validates all required `.env` keys on boot. Server halts immediately if mandatory variables (`MONGODB_URI`, `JWT_SECRET`) are missing.
+- **Custom Operational Error Class (`utils/AppError.js`):** Extends native `Error` to pass HTTP status codes and machine-readable error codes.
+- **Controller Async Catch Wrapper (`utils/asyncHandler.js`):** Higher-order wrapper removing repetitive `try-catch` blocks from thin controllers.
+- **Standardized Response Envelopes (`utils/responseFormatter.js`):** `sendSuccess` and `sendPaginated` helpers guaranteeing uniform JSON structures.
+- **Response DTO Serializers (`utils/serializers/`):** Strips `password_hash`, `salt`, and `__v` before returning payload objects.
+
+#### 2. Production Code Blueprint: Standardized Response Helpers (`responseFormatter.js`)
 ```javascript
-const cron = require('node-cron');
-const dailyTrackerService = require('../services/dailyTracker/dailyTracker.service');
-
-const initMidnightFinalizer = () => {
-    // Scheduled for 00:00 AM IST daily
-    cron.schedule('0 0 * * *', async () => {
-        console.log('[CRON] Starting Midnight Daily Tracker Finalizer...');
-        let attempts = 0;
-        const maxAttempts = 3;
-        
-        while (attempts < maxAttempts) {
-            try {
-                const result = await dailyTrackerService.autoLockExpiredDrafts();
-                console.log(`[CRON SUCCESS] Locked ${result.lockedCount} expired draft tracker records.`);
-                break;
-            } catch (error) {
-                attempts++;
-                console.error(`[CRON ERROR] Attempt ${attempts}/${maxAttempts} failed:`, error.message);
-                if (attempts >= maxAttempts) {
-                    console.error('[CRON FATAL] Midnight Finalizer failed after 3 attempts. Alerting System Admin.');
-                }
-            }
-        }
-    }, {
-        timezone: 'Asia/Kolkata'
+const sendSuccess = (res, data = {}, message = 'Operation successful', statusCode = 200, meta = {}) => {
+    return res.status(statusCode).json({
+        success: true,
+        statusCode,
+        message,
+        data,
+        meta,
+        requestId: res.req.id || 'REQ-UNKNOWN',
+        timestamp: new Date().toISOString()
     });
 };
 
-module.exports = initMidnightFinalizer;
+const sendPaginated = (res, data = [], page = 1, limit = 20, totalRecords = 0, message = 'Records fetched') => {
+    const totalPages = Math.ceil(totalRecords / limit) || 1;
+    return res.status(200).json({
+        success: true,
+        statusCode: 200,
+        message,
+        data,
+        pagination: {
+            totalRecords,
+            totalPages,
+            currentPage: Number(page),
+            pageSize: Number(limit),
+            hasNextPage: page < totalPages,
+            hasPrevPage: page > 1
+        },
+        requestId: res.req.id || 'REQ-UNKNOWN',
+        timestamp: new Date().toISOString()
+    });
+};
+
+module.exports = { sendSuccess, sendPaginated };
 ```
-
----
-
-### 2.11 Integration Services Architecture (Adapters)
-
-Abstracts third-party platform integrations (`emailService.js`, `whatsappService.js`, `storageService.js`) so external provider changes never require modifying domain business logic.
-
----
-
-### 2.12 Utilities, Config & Constants Architecture
-
-Houses shared helpers, custom `AppError` exception class, Zod environment validator (`config/env.js`), response formatting envelope helpers (`responseFormatter.js`), and response DTO serializers (`utils/serializers/`).
 
 ---
 
