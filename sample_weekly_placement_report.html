@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>iPOMS - Weekly Placement Progress Report (Module 06 Spec)</title>
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --primary-light: #eff6ff;
+      --primary-border: #bfdbfe;
+      --secondary: #0f172a;
+      --text: #334155;
+      --text-light: #64748b;
+      --success-bg: #dcfce7;
+      --success-text: #166534;
+      --warning-bg: #fef9c3;
+      --warning-text: #854d0e;
+      --purple-bg: #faf5ff;
+      --purple-border: #9333ea;
+      --purple-text: #581c87;
+    }
+
+    body {
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 30px;
+      background-color: #f1f5f9;
+      color: var(--text);
+    }
+
+    .paper {
+      max-width: 960px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 45px 50px;
+      border-radius: 8px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+      border: 1px solid #cbd5e1;
+    }
+
+    /* BRANDING HEADER */
+    .branding-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 3px solid var(--primary);
+      padding-bottom: 18px;
+      margin-bottom: 25px;
+    }
+
+    .logo-infoziant h2 {
+      margin: 0;
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--primary);
+      letter-spacing: 1.5px;
+    }
+
+    .logo-infoziant p {
+      margin: 2px 0 0 0;
+      font-size: 11px;
+      color: var(--text-light);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .logo-college {
+      text-align: right;
+    }
+
+    .logo-college h3 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--secondary);
+    }
+
+    .logo-college p {
+      margin: 3px 0 0 0;
+      font-size: 12px;
+      color: var(--text-light);
+    }
+
+    /* TITLE BAR */
+    .report-banner {
+      background: var(--primary-light);
+      border: 1px solid var(--primary-border);
+      border-radius: 6px;
+      padding: 16px 20px;
+      text-align: center;
+      margin-bottom: 25px;
+    }
+
+    .report-banner h1 {
+      margin: 0;
+      font-size: 20px;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 700;
+    }
+
+    .meta-table {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px 20px;
+      margin-top: 12px;
+      font-size: 13px;
+      color: #1e293b;
+      text-align: left;
+    }
+
+    .meta-item strong {
+      color: var(--primary);
+    }
+
+    /* KPI SUMMARY GRID */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+      margin-bottom: 30px;
+    }
+
+    .kpi-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-top: 3px solid var(--primary);
+      border-radius: 6px;
+      padding: 12px 8px;
+      text-align: center;
+    }
+
+    .kpi-num {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .kpi-lbl {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-light);
+      margin-top: 4px;
+      line-height: 1.2;
+    }
+
+    /* SECTIONS */
+    .section-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--secondary);
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 6px;
+      margin-top: 30px;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .section-title span.count-tag {
+      font-size: 12px;
+      background: #e2e8f0;
+      color: #334155;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+    }
+
+    /* TABLES */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+      margin-bottom: 15px;
+    }
+
+    th {
+      background-color: var(--primary);
+      color: #ffffff;
+      text-align: left;
+      padding: 9px 12px;
+      font-weight: 600;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+    }
+
+    td {
+      padding: 9px 12px;
+      border-bottom: 1px solid #e2e8f0;
+      color: #334155;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+
+    .badge-success {
+      background: var(--success-bg);
+      color: var(--success-text);
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .badge-warning {
+      background: var(--warning-bg);
+      color: var(--warning-text);
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    /* INSIGHTS PANEL */
+    .insights-panel {
+      background: var(--purple-bg);
+      border: 1px solid var(--purple-border);
+      border-left: 5px solid var(--purple-border);
+      border-radius: 6px;
+      padding: 18px 22px;
+      margin-top: 25px;
+    }
+
+    .insights-panel h4 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: var(--purple-text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .insights-panel ul {
+      margin: 0;
+      padding-left: 20px;
+      color: #4c1d95;
+      font-size: 13px;
+    }
+
+    .insights-panel li {
+      margin-bottom: 6px;
+    }
+
+    /* REMARKS BOX */
+    .remarks-panel {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-left: 5px solid #16a34a;
+      border-radius: 6px;
+      padding: 16px 20px;
+      margin-top: 20px;
+      font-size: 13px;
+      color: #14532d;
+    }
+
+    .remarks-panel h4 {
+      margin: 0 0 6px 0;
+      font-size: 13px;
+      color: #15803d;
+    }
+
+    /* FOOTER */
+    .report-footer {
+      margin-top: 40px;
+      border-top: 1px solid #cbd5e1;
+      padding-top: 15px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-light);
+    }
+  </style>
+</head>
+<body>
+
+<div class="paper">
+
+  <!-- BRANDING HEADER (Module 06 - Section 11) -->
+  <div class="branding-header">
+    <div class="logo-infoziant">
+      <h2>INFOZIANT</h2>
+      <p>Secure. Scalable. Innovative.</p>
+    </div>
+    <div class="logo-college">
+      <h3>KPR Institute of Engineering & Technology</h3>
+      <p>Coimbatore, Tamil Nadu | TPO Department</p>
+    </div>
+  </div>
+
+  <!-- REPORT BANNER & METADATA (Module 06 - Section 8.3 & 9.4) -->
+  <div class="report-banner">
+    <h1>Weekly Placement Progress Report</h1>
+    <div class="meta-table">
+      <div class="meta-item"><strong>Report Period:</strong> July 27, 2026 – July 31, 2026 (Week 31)</div>
+      <div class="meta-item"><strong>Target College:</strong> KPR Institute of Engg & Tech</div>
+      <div class="meta-item"><strong>Prepared By:</strong> Priya Sharma (Placement Coordinator)</div>
+      <div class="meta-item"><strong>Prepared For:</strong> Dr. S. Ramesh (Training & Placement Officer)</div>
+    </div>
+  </div>
+
+  <!-- KPI SUMMARY (Module 06 - Section 7.2 & 9.6) -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-num">142</div>
+      <div class="kpi-lbl">Total Calls</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-num">48</div>
+      <div class="kpi-lbl">Companies Contacted</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-num">12</div>
+      <div class="kpi-lbl">Positive Responses</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-num">04</div>
+      <div class="kpi-lbl">JDs Received</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-num">15</div>
+      <div class="kpi-lbl">Follow-ups Done</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-num">18</div>
+      <div class="kpi-lbl">Offers Released</div>
+    </div>
+  </div>
+
+  <!-- SECTION 1: COMPLETED COMPANIES (Module 06 - Section 8.3) -->
+  <div class="section-title">
+    <span>🏆 1. Completed Recruitment Drives & Offers Released</span>
+    <span class="count-tag">2 Drives</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 5%;">S.No</th>
+        <th style="width: 25%;">Company Name</th>
+        <th style="width: 25%;">Job Roles Offered</th>
+        <th style="width: 15%;">Package (CTC)</th>
+        <th style="width: 12%;">Offers</th>
+        <th style="width: 18%;">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>01</td>
+        <td><strong>Infosys Limited</strong></td>
+        <td>Software Engineer</td>
+        <td>6.50 LPA</td>
+        <td><strong>08</strong></td>
+        <td><span class="badge-success">Drive Completed</span></td>
+      </tr>
+      <tr>
+        <td>02</td>
+        <td><strong>TCS Digital</strong></td>
+        <td>System Engineer & Ninja</td>
+        <td>7.00 LPA</td>
+        <td><strong>10</strong></td>
+        <td><span class="badge-success">Drive Completed</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- SECTION 2: IN PROGRESS DRIVES (Module 06 - Section 8.3) -->
+  <div class="section-title">
+    <span>⚡ 2. Active Recruitment Drives In Progress</span>
+    <span class="count-tag">3 Companies</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 5%;">S.No</th>
+        <th style="width: 22%;">Company Name</th>
+        <th style="width: 22%;">Target Roles</th>
+        <th style="width: 13%;">Package</th>
+        <th style="width: 13%;">Drive Date</th>
+        <th style="width: 25%;">Current Stage / Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>01</td>
+        <td><strong>Zoho Corporation</strong></td>
+        <td>Member Technical Staff</td>
+        <td>8.40 LPA</td>
+        <td>Aug 05, 2026</td>
+        <td><span class="badge-warning">Tech Round 2 Scheduled</span></td>
+      </tr>
+      <tr>
+        <td>02</td>
+        <td><strong>Wipro Technologies</strong></td>
+        <td>Project Engineer</td>
+        <td>5.50 LPA</td>
+        <td>Aug 10, 2026</td>
+        <td>JD Received; Student DB Shared</td>
+      </tr>
+      <tr>
+        <td>03</td>
+        <td><strong>L&T Technology Services</strong></td>
+        <td>Graduate Engineer Trainee</td>
+        <td>6.00 LPA</td>
+        <td>Aug 14, 2026</td>
+        <td>Shortlisting Awaited from HR</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- SECTION 3: PIPELINE DRIVES (Module 06 - Section 8.3) -->
+  <div class="section-title">
+    <span>🚀 3. Positive Opportunities Pipeline & Upcoming Calls</span>
+    <span class="count-tag">2 Opportunities</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 5%;">S.No</th>
+        <th style="width: 25%;">Company Name</th>
+        <th style="width: 25%;">Discussed Roles</th>
+        <th style="width: 15%;">Expected CTC</th>
+        <th style="width: 15%;">Next Action</th>
+        <th style="width: 15%;">Follow-up Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>01</td>
+        <td><strong>Cognizant (GenC)</strong></td>
+        <td>Programmer Analyst</td>
+        <td>5.40 LPA</td>
+        <td>Review Batch Profile</td>
+        <td>Aug 03, 2026</td>
+      </tr>
+      <tr>
+        <td>02</td>
+        <td><strong>Accenture India</strong></td>
+        <td>Advanced Application Dev</td>
+        <td>6.50 LPA</td>
+        <td>Follow-up Call with HR</td>
+        <td>Aug 04, 2026</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- SYSTEM INSIGHTS PANEL (Module 06 - Section 7.5 & 16) -->
+  <div class="insights-panel">
+    <h4>💡 Rule-Based System Insights & Operational Observations</h4>
+    <ul>
+      <li><strong>Trend Insight:</strong> Call-to-positive response conversion rate improved by <strong>14%</strong> compared to previous week.</li>
+      <li><strong>Company Insight:</strong> IT and Software Engineering sectors account for <strong>85%</strong> of total active placement opportunities this week.</li>
+      <li><strong>College Performance Insight:</strong> 18 students placed this week with packages up to 7.00 LPA across Infosys and TCS Digital.</li>
+    </ul>
+  </div>
+
+  <!-- COORDINATOR REMARKS (Module 06 - Section 9.6 & 10.3) -->
+  <div class="remarks-panel">
+    <h4>📝 Coordinator Operational Notes & Remarks:</h4>
+    <div>"Student database for Wipro and L&T has been verified and delivered to campus recruiters. Zoho Technical Round 2 confirmation sent to all 42 eligible CSE & IT candidates."</div>
+  </div>
+
+  <!-- REPORT FOOTER (Module 06 - Section 11 & 19) -->
+  <div class="report-footer">
+    <div>Confidential – Prepared exclusively for KPR Institute of Engineering & Technology by Infoziant IT Solutions</div>
+    <div>Generated on: Aug 01, 2026 | Page 1 of 1 | iPOMS v1.0</div>
+  </div>
+
+</div>
+
+</body>
+</html>
