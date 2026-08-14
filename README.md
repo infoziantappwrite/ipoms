@@ -118,7 +118,7 @@ TIMEZONE=Asia/Kolkata
 ## 🏢 Organization & Author
 
 * **Project:** iPOMS (Infoziant Placement Operations Management System)
-* **Organization:** Infoziant Systems
+* **Organization:** Infoziant
 * **Repository:** [https://github.com/mohanaradha-13/ipoms](https://github.com/mohanaradha-13/ipoms)
 
 ---
