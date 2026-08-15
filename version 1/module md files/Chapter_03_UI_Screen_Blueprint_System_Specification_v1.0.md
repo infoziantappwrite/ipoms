@@ -52,24 +52,28 @@ Rather than a lengthy "Backend Requirements" section per screen, each blueprint 
 
 Each screen blueprint closes with a short Development Notes checklist: three to five reminders (e.g. "reuse the standard Button System", "preserve search state when returning") so that Claude Code or Cursor AI does not inadvertently redesign a standard already frozen in Chapters 1 and 2.
 
-# 3\. Screen Directory & Status Overview
+# 3. Screen Directory & Status Overview (Version 1 Reconciled)
 
-Fifteen major screens were originally scoped for iPOMS. This document covers the first ten, which form the core functional architecture; the remaining screens (Notifications, Profile, Settings, and System Management) reuse the same design system, interaction model, and architectural foundation established here.
+Per `V1_DECISIONS.md`, all 14 functional areas are accounted for in Version 1. Ten screens have their detailed step-by-step visual blueprint frozen in this chapter, and the remaining four areas have their architectures and data contracts fully defined in Chapters 4–7:
 
-| **#** | **Screen**                           | **Status** |
-| ----- | ------------------------------------ | ---------- |
-| 1     | Authentication (Login)               | Frozen     |
-| 2     | Forgot Password                      | Frozen     |
-| 3     | Placement Coordinator Dashboard      | Frozen     |
-| 4     | Team Leader Dashboard                | Frozen     |
-| 5     | Executive Dashboard (Director / CEO) | Frozen     |
-| 6     | Daily Tracker                        | Frozen     |
-| 7     | Weekly Tracker                       | Frozen     |
-| 8     | Daily Leads                          | Frozen     |
-| 9     | Master Company Database              | Frozen     |
-| 10    | Reports & Analytics                  | Frozen     |
+| **#** | **Screen / Functional Area** | **Status** | **Specification Reference** |
+|:---:|---|---|---|
+| 1 | Authentication (Login) | 🔒 **Frozen** | Chapter 3, Screen 1 |
+| 2 | Forgot Password | 🔒 **Frozen** | Chapter 3, Screen 2 |
+| 3 | Placement Coordinator Dashboard | 🔒 **Frozen** | Chapter 3, Screen 3 |
+| 4 | Team Leader Dashboard | 🔒 **Frozen** | Chapter 3, Screen 4 |
+| 5 | Executive Dashboard (Director / CEO) | 🔒 **Frozen** | Chapter 3, Screen 5 |
+| 6 | Daily Tracker | 🔒 **Frozen** | Chapter 3, Screen 6 |
+| 7 | Weekly Tracker | 🔒 **Frozen** | Chapter 3, Screen 7 (7 Sections per `V1_DECISIONS.md`) |
+| 8 | Daily Leads | 🔒 **Frozen** | Chapter 3, Screen 8 |
+| 9 | Master Company Database | 🔒 **Frozen** | Chapter 3, Screen 9 |
+| 10 | Reports & Analytics | 🔒 **Frozen** | Chapter 3, Screen 10 |
+| 11 | Notifications Drawer & Center | 🔒 **Architecture Defined** | Chapter 4/5, Module 08 |
+| 12 | User Profile & Security Settings | 🔒 **Architecture Defined** | Chapter 5, Module 01/08 |
+| 13 | Global Settings & Configuration | 🔒 **Architecture Defined** | Chapter 5, Module 09 |
+| 14 | System Admin, RBAC & Audit Logs | 🔒 **Architecture Defined** | Chapter 4/5, Module 10 |
 
-Overall UI Foundation status: Chapter 1 (Visual Identity) 100% complete, Chapter 2 (Component Library) 100% complete, Chapter 3 (Screen Blueprints) 10 of 15 screens frozen. Chapter 4 (Technical Architecture) has not yet begun.
+Overall UI Foundation status: Chapters 1, 2, and 3 are 100% complete and frozen. Technical specifications are fully detailed in Chapters 4, 5, 6, and 7.
 
 # 4\. Screen 1 - Authentication (Login)
 
@@ -444,30 +448,25 @@ Every operational and analytical screen (Daily Tracker, Weekly Tracker, Daily Le
 - The Weekly Tracker places every company into one of seven sections automatically, based on status - never through manual drag-and-drop.
 - Daily Leads is an independent manual register with no automatic synchronization to the Weekly Tracker.
 - The Master Company Database is the single source of truth for company/HR data; deletions go to a Recycle Bin, restorable only by Team Leader or Administrator, with permanent deletion Administrator-only.
-- Reports & Analytics never stores a generated report - only the Report Builder configuration is saved, and every report regenerates from live operational data.
-- No Action column appears in the Daily Tracker, Weekly Tracker, or Daily Leads - every row is directly inline-editable.
+- Reports & Analytics: Builder configurations are saved in `report_library`; generated reports are interactively editable in presentation mode, exported on-demand in PDF, Excel, or PNG, and logged in `audit_logs`.
+- No traditional CRUD Action column cluttering table width; tables utilize direct inline cell editing with a subtle row-level Quick Action menu (Insert row, duplicate, move section, soft delete, pin).
 
-# 16\. Deferred / Out of Scope for v1.0
+# 16. Deferred / Out of Scope for v1.0
 
-- The remaining five of fifteen planned screens - Notifications, Profile, Settings, and System Management - are not covered in this document; they reuse the design system and architectural foundation established here and will be frozen in a follow-up blueprint pass.
 - SMS/WhatsApp OTP for Forgot Password (Official Email OTP only in v1.0, per Module 08).
-- PDF export for the Weekly Tracker (Excel and CSV only in v1.0).
 - Pagination for Daily Leads (not required while daily volume stays well under 100 records).
-- Bulk-paste import and merge-duplicates tooling for the Master Company Database (Excel import only in v1.0, Administrator-run).
-- Detailed technical diagnostics on any business-facing dashboard - these remain fully deferred to the System Management module.
-- Full MongoDB collection design, authentication mechanism, and API contracts - explicitly deferred to Chapter 4.
+- Bulk-paste import and merge-duplicates tooling for the Master Company Database (Excel import only in v1.0, Administrator/TL run).
+- Detailed technical diagnostics on business-facing dashboards (surfaced in System Information & Administration).
 
-# 17\. Conclusion
+# 17. Conclusion
 
-Ten of the fifteen planned iPOMS screens are now frozen: Authentication, Forgot Password, the three role-based dashboards, Daily Tracker, Weekly Tracker, Daily Leads, Master Company Database, and Reports & Analytics. Together they define every button, table, workflow, navigation path, business rule, validation, error state, and permission needed to build the core of iPOMS without further design guesswork. Combined with the Chapter 1 Visual Identity System and the Chapter 2 Enterprise Component Library, the application is now essentially fully designed even though no code has yet been written.
+All 14 functional application areas are now fully specified and frozen per `V1_DECISIONS.md`. Together with Chapter 1 (Visual Identity), Chapter 2 (Component Library), Chapters 4–5 (Database & API Specifications), Chapter 6 (Backend + Frontend Layering), and Chapter 7 (Development & Quality Standards), the entire UI, backend, database, and operational architecture is 100% frozen and ready for code implementation.
 
-# 18\. Next Steps
+# 18. Next Steps & Implementation Gateway
 
-Remaining screen blueprints - Notifications, Profile, Settings, and System Management - will be completed following the same five-step review process (Blueprint → Recommendations → Review → Final Screen → Freeze) established in this chapter, reusing the interaction patterns already frozen for the ten screens above.
+With Chapters 1 through 7 completed and frozen, the project advances directly through the **Master Implementation Checklist** and **Development Order** to begin project scaffolding and code construction.
 
-After all fifteen screens are frozen, the project moves to Chapter 4 - MongoDB & Technical Architecture: database collections, authentication, APIs, search optimization, Excel import, indexes, performance, security, and backend workflows. Only after Chapters 1-4 are complete does development begin with Claude Code and Cursor AI.
-
-# 19\. Approval Sheet
+# 19. Approval Sheet
 
 This document requires review and sign-off before Chapter 3 (Screens 1-10) is considered finalized and committed to development.
 

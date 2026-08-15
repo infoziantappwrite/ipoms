@@ -915,16 +915,18 @@ Section 4.1 - Overall Backend Architecture and Section 4.3 - MongoDB Database De
 
 ---
 
-# 20. Deferred / Out of Scope for This Version of the Document
+# 20. Architectural Scope & Progression Status
 
-- Sections 4.2, 4.4, 4.5–4.12: Roles & Permissions, Authentication, API Specs, Import/Export, Search, Notifications, Performance, Backup are covered at architectural level and further detailed in Chapter 5.
-- Multi-tenant SaaS / Multi-branch model: Out of scope for Version 1.
+- Backend & Database Architecture (Chapters 4–5): 14 collections, compound indexes, Mongoose schemas, and REST contracts are fully specified and frozen.
+- Consistency & Tiered Review (Chapter 6): Backend-to-Frontend consistency verified and frozen.
+- Development Standards & Implementation Rules (Chapter 7): Coding standards, testing, CI/CD, error logging, security, and operational safety are 100% frozen.
+- Master Authority: All implementation details strictly conform to `V1_DECISIONS.md`.
 
 ---
 
 # 21. Next Steps
 
-- Proceed to Chapter 5 (Technical Data Engineering & REST API Specifications) for full Mongoose schema code, compound indexes, and REST API endpoint payload contracts.
+- With Chapters 1 through 7 completed and frozen, proceed to the **Final Master Implementation Checklist** and **Development Order** to begin project scaffolding and coding.
 
 ---
 

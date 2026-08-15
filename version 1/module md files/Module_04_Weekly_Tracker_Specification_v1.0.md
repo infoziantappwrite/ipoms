@@ -129,170 +129,172 @@ A history log of every status change was also proposed and explicitly deferred -
 - Multiple roles are typed into the single Role cell, comma-separated - e.g. "Software Engineer, Data Analyst, Full Stack Developer, AI Engineer".
 - Company Name and Role are otherwise fully editable, alongside every other column.
 
-# 7\. Section Definitions
+# 7. Section Definitions (Weekly Tracker Operational Sections)
+
+The Weekly Tracker operational board organizes placement activities into the following operational sections:
 
 ## 7.1 Companies in Pipeline
-
-Companies where the invite email has been sent (or is yet to be sent) and no Job Description (JD) has been received yet.
+Companies where the invite email has been sent (or is slated to be sent) and no Job Description (JD) has been received yet.
 
 ## 7.2 Companies In Progress
-
-Companies that have received the JD and are progressing - student database sharing, awaiting drive scheduling, drive date confirmation, or interview rounds (technical round, aptitude round, group discussion, HR round) in progress or awaiting results.
+Companies where the JD has been received and active operations are progressing (student database sharing, drive scheduling, interview rounds in progress or awaiting results).
 
 ## 7.3 Companies Completed
-
-Once all interview rounds are finished, the status becomes Drive Completed and the Offers field is filled with the count of students placed (e.g. 4, 5, 10). The record then automatically moves from Companies In Progress to Companies Completed.
+Companies where all interview rounds are finished (Status: "Drive Completed", `Offers` count recorded).
 
 ## 7.4 Top Companies
+A curated shortlist of priority hiring partners, combining automatic qualification (CTC ≥ 3.5 LPA in technical/software roles while in Pipeline or In Progress) and manual override (`Pin to Top Companies` via row menu).
 
-A curated shortlist of the most promising companies, combining two mechanisms:
+## 7.5 Rejected by HR
+Companies where the employer/corporate HR declined to proceed with the hiring process.
 
-- Automatic qualification: CTC ≥ 3-4 LPA (final threshold to be confirmed at implementation), a technical/software-type role, and status still in Pipeline or In Progress (not rejected).
-- Manual override: any record can be pinned via Pin to Top Companies regardless of the automatic rule, and unpinned the same way.
+## 7.6 Rejected by College
+Companies where the college/TPO declined to proceed.
 
-Company Insights (reviews from sites such as Glassdoor/AmbitionBox, website verification, hiring trends) were requested as a future capability - explicitly deferred to a later version, not part of Version 1.0.
+---
 
-## 7.5 Rejected by HR / Rejected by College
+# 8. Automatic Section Placement & Movement Rules
 
-Filled in manually by coordinators or Team Leaders when a company or college declines to proceed. Kept as two distinct sections (not merged) per the team's existing process.
+The system reads each record's Status/Offers and places it in the correct operational section automatically:
 
-# 8\. Automatic Section Placement Rules
+| **Condition** | **Target Operational Section** |
+|---|---|
+| Status contains "Invite sent" / no JD yet / newly added with no other signal | **Companies in Pipeline** |
+| Status contains "JD received" / "Student DB shared" / "Drive scheduled" / interview rounds | **Companies In Progress** |
+| Status contains "Drive Completed" and Offers field is filled | **Companies Completed** |
+| Status marked "Rejected" by HR | **Rejected by HR** |
+| Status marked "Rejected" by College / TPO | **Rejected by College** |
+| CTC ≥ 3.5 LPA in technical role (while in Pipeline/In Progress) OR Manually Pinned | **Top Companies** |
 
-The system reads each record's Status/Offers and places it in the correct section without the user choosing a destination:
+---
 
-| **Condition**                                                                                                                                                     | **Section the Record Moves To** |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| Status contains "Invite sent" / no JD yet / newly added with no other signal                                                                                      | Companies in Pipeline           |
-| Status contains "JD received" / "Student DB shared" / "Drive scheduled" / interview-round progress                                                                | Companies in Progress           |
-| Status contains "Drive Completed" and the Offers field is filled                                                                                                  | Companies Completed             |
-| Status marked "Rejected" by HR                                                                                                                                    | Rejected by HR                  |
-| Status marked "Rejected" by College / TPO                                                                                                                         | Rejected by College             |
-| Manually pinned by a coordinator or Team Leader (Pin to Top Companies), or CTC ≥ 3-4 LPA in a technical role while still in Pipeline/In Progress and not rejected | Top Companies                   |
+# 9. Adding New Companies
 
-# 9\. Adding New Companies
-
-Two combined methods are supported, per final decision:
+Two combined methods are supported:
 
 ## 9.1 Toolbar - "+ Add Company"
-
-Opens a popup requesting: Company Name, Role, CDC, Company Type, CTC, Follow-up Date, Status, and Section (Pipeline / In Progress / Completed / Top Companies / Rejected by HR / Rejected by College). The user explicitly chooses the section on manual entry; on save, the record is appended to the end of the chosen section and the section immediately re-sorts by Follow-up Date (ascending).
+Opens a popup requesting: Company Name, Role, CDC, Company Type, CTC, Follow-up Date, Status, and Section (Pipeline / In Progress / Completed / Top Companies / Rejected by HR / Rejected by College). The record is appended and sorted by Follow-up Date (ascending).
 
 ## 9.2 Quick Action Menu - Insert Row Above / Below
+Available from the menu on any existing row, for fast Excel-like row insertion within the current section.
 
-Available from the menu on any existing row, for fast Excel-like row insertion within a section already open. A permanent visible "+" button on every row (or a single "+" in the table header) was considered and explicitly rejected in the final round - the Quick Action menu alone was judged sufficient and cleaner.
+---
 
-# 10\. Sorting & Filtering
+# 10. Sorting & Filtering
 
-- Default sort within every section: Follow-up Date (ascending), then Company Name where dates are equal.
-- Manual sort also available by CTC, Company Name, Role, CDC, and Company Type.
-- Filters available by College, Company Type, Date, and Coordinator.
+- **Default Sort:** Follow-up Date (ascending), then Company Name where dates are equal.
+- **Manual Sort:** CTC, Company Name, Role, CDC, and Company Type.
+- **Filters:** College, Company Type, Date Range, and Coordinator.
 
-Rationale: sorting by the nearest Follow-up Date lets a coordinator open the tracker each morning and immediately see who to contact first, without scanning the whole sheet.
+---
 
-# 11\. KPI Cards
+# 11. KPI Cards
 
-Displayed at the top of the Weekly Tracker; each card is clickable and filters straight to its section:
+Displayed at the top of the Weekly Tracker, clickable to filter directly to that section:
 
-| **KPI Card**         | **Calculation**                                                       |
-| -------------------- | --------------------------------------------------------------------- |
-| Pipeline             | Count of records currently in Companies in Pipeline.                  |
-| In Progress          | Count of records currently in Companies In Progress.                  |
-| Completed            | Count of records in Companies Completed; total Offers also tracked.   |
-| Rejected             | Combined count across Rejected by HR and Rejected by College.         |
-| Follow-ups Due Today | Count of records whose Follow-up Date is today or overdue.            |
-| Top Companies        | Count of records currently pinned or auto-qualified as Top Companies. |
+| **KPI Card** | **Calculation** |
+|---|---|
+| **Pipeline** | Count of records currently in Companies in Pipeline |
+| **In Progress** | Count of records currently in Companies In Progress |
+| **Completed** | Count of records in Companies Completed + total Offers count |
+| **Rejected** | Combined count across Rejected by HR and Rejected by College |
+| **Follow-ups Due Today** | Count of records whose Follow-up Date is today or overdue |
+| **Top Companies** | Count of records currently pinned or auto-qualified as Top Companies |
 
-# 12\. Final Section Order
+---
 
-This order is maintained consistently throughout the module and reflects the actual order in which a coordinator works through their day:
+# 12. Final Section Display Order
 
-| **Order** | **Section**           |
-| --------- | --------------------- |
-| 1         | Follow-up Due Today   |
-| 2         | Companies Completed   |
-| 3         | Companies In Progress |
-| 4         | Companies In Pipeline |
-| 5         | Top Companies         |
-| 6         | Rejected by HR        |
-| 7         | Rejected by College   |
+The Weekly Tracker operational board renders its sections in the following consistent order:
 
-Per-section summary line (shown below each section title): record count plus one relevant metric - e.g. "9 Companies • Last Updated: 10:42 AM" (In Progress), "15 Companies • Total Offers: 84" (Completed), "18 Companies • 6 Follow-ups Due This Week" (Pipeline), "10 Companies • Avg CTC: 7.2 LPA" (Top Companies).
+| **Order** | **Section** | **Per-Section Header Summary Metric** |
+|:---:|---|---|
+| **1** | **Follow-up Due Today** | Urgent Follow-ups • Action Required Today |
+| **2** | **Companies Completed** | Total Companies • Total Offers Placed |
+| **3** | **Companies In Progress** | Active Companies • Drives Scheduled |
+| **4** | **Companies in Pipeline** | Total Companies • Follow-ups Due This Week |
+| **5** | **Top Companies** | Priority Companies • Average CTC |
+| **6** | **Rejected by HR** | Employer Declines |
+| **7** | **Rejected by College** | Institutional Declines |
+*(Note: In Reports & Analytics, the Weekly Placement Report aggregates this operational data into the 7 approved report presentation sections: Completed, In Progress, Pipeline, Top Companies, Companies on Hold by TPO, Companies on Hold by HR, Rejected Companies).*
 
-# 13\. Follow-up Indicator
+---
 
-Each row displays a colour indicator based on how close its Follow-up Date is:
+# 13. Follow-up Indicator
 
-- Green - more than 7 days away
-- Yellow - within the next 3 days
-- Red - due today or overdue
+Each row displays a clear colour indicator based on Follow-up Date proximity:
+- **Green:** > 7 days away
+- **Yellow:** Within next 3 days
+- **Red:** Due today or overdue
 
-This lets a coordinator identify urgent follow-ups without opening the Status text.
+---
 
-# 14\. Week Selector (Final)
+# 14. Week Selector (Final)
 
-The Week Selector does not use a rolling 7-day calculation from any arbitrary start date. It follows the organization's actual reporting cycle: Friday to the following Friday.
+Follows the official organization reporting cycle: **Friday to Thursday / Friday to Friday**.  
+Example: `◀ Previous Week | 18 Jul 2026 – 24 Jul 2026 (Week 30) | Next Week ▶`.
 
-Display example: "◀ Previous Week - 18 Jul 2026 - 24 Jul 2026 - Next Week ▶", optionally labelled with a week number (e.g. "Week 30"). Coordinators and Team Leaders can review and update any previous week's tracker without leaving the module.
+---
 
-# 15\. Toolbar & Quick Actions
+# 15. Toolbar, Quick Actions & Unified Export
 
-Toolbar: Weekly Tracker title, Week Selector, Search, Filter, Sort, Export, Refresh, + Add Company.
+### Toolbar
+- Title, Week Selector, Search, Filter, Sort, **Export (PDF / Excel / CSV)**, Refresh, `+ Add Company`.
 
-Every row's Quick Action menu:
+### Row-Level Quick Action Menu
+Contextual menu on each row (no traditional cluttering Action column):
+- **Edit:** Inline or focused edit.
+- **Insert Row Above / Below:** Adds adjacent blank row.
+- **Duplicate:** Copies company data for another role.
+- **Move to Section:** Manually overrides section destination.
+- **Delete:** Soft-deletes record to `recycle_bin`.
+- **Pin / Unpin Top Companies:** Toggles Top Companies override.
 
-| **Action (Quick Action Menu)** | **Behaviour**                                                                                                                  |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| Edit                           | Opens the row for editing (all columns are editable).                                                                          |
-| Insert Row Above / Below       | Adds a new blank editable row adjacent to the selected one - replaces the earlier idea of a permanent "+" button on every row. |
-| Duplicate                      | Copies the row, e.g. when the same company recruits for another role.                                                          |
-| Move                           | Moves the record to a different section (e.g. Pipeline → In Progress) when the automatic rule hasn't been triggered yet.       |
-| Delete                         | Removes the row from the tracker.                                                                                              |
-| Pin to Top Companies           | Manually forces the record into the Top Companies section regardless of the automatic CTC/role rule.                           |
+---
 
-# 16\. Sticky Section Headers
+# 16. Sticky Section Headers
+Section headers remain pinned to the top of the viewport during scrolling.
 
-As the user scrolls within a section, that section's header remains visible at the top of the viewport (e.g. "Companies In Progress" stays pinned while scrolling through its rows). This keeps long sections - which may eventually contain dozens of companies - easy to navigate.
+---
 
-# 17\. Editing & Permissions
+# 17. Editing & Permissions
+- **Coordinators & Team Leaders:** Full inline editing of all columns for assigned colleges.
+- **Administrators:** Full system-wide visibility and editing.
+- **TPO Role:** Restricted read-only access to own institution's weekly placement summaries.
 
-- Every column is fully editable by both the Placement Coordinator and the Team Leader - this was reaffirmed as the most important rule for this module.
-- Administrators can view and edit everything across all coordinators' trackers.
-- Completed companies remain editable in Version 1.0 - no automatic lock is applied after Drive Completed status is set (an earlier proposal to lock Completed records was not adopted).
-- Deletion, duplication, moving between sections, and pinning to Top Companies are all available to Coordinators and Team Leaders via the Quick Action menu.
+---
 
-# 18\. Business Rules Summary
+# 18. Business Rules Summary
+- Single master dataset dynamically rendered across the **7 finalized sections**.
+- Status is a rich, natural free-text field; Follow-up Date is tracked in its own dedicated column.
+- Multiple roles per company are stored comma-separated in the single `Role` field.
+- Full soft-delete integration with the `recycle_bin` collection.
+- Unified exports in **PDF, Excel, and CSV**.
 
-- A company has one row per Weekly Tracker record; multiple simultaneous roles are stored comma-separated in the single Role cell, not as separate rows.
-- Status is a single free-text field; there is no separate dropdown "Current Stage" and no per-change history log in Version 1.0.
-- Section placement (Pipeline / In Progress / Completed / Rejected) is automatic, driven by Status and the Offers field, per Section 8 - the user is not asked to choose a destination when a record is created via the Daily Tracker.
-- Manually created records do require the user to choose an initial Section at creation time, via the Add Company popup.
-- Top Companies combines an automatic CTC/role rule with a manual Pin override.
-- Sections always sort by Follow-up Date ascending by default.
-- Rejected by HR and Rejected by College are kept as two distinct sections.
+---
 
-# 19\. Deferred / Out of Scope for v1.0
+# 19. Deferred / Out of Scope for v1.0
+- Per-keystroke status audit history log (deferred; current Status and Follow-up Date retained).
+- Live external company review scrapers (Glassdoor/AmbitionBox) — deferred to V2.
+- Permanent "+" column button — replaced by Quick Action menu.
 
-- Per-change history log of status transitions - deferred; may be added in a future version.
-- Company Insights panel (Glassdoor/AmbitionBox ratings, website verification, hiring trends, news) - deferred to a future (Version 2) release.
-- Locking Completed records against further edits - not adopted; everything remains editable in v1.0.
-- A permanent "+" button on every row - rejected in favour of the Quick Action menu.
-- Renaming the module to "Placement Pipeline" - considered, but the existing name "Weekly Tracker" is retained since the team already uses and understands it.
+---
 
-# 20\. Integration With Other Modules
+# 20. Integration With Other Modules
+- **Master Company Database (Module 02):** Provides underlying company & HR metadata.
+- **Daily Tracker (Module 03):** Feeds positive Call Outcomes directly into Section 3 (Pipeline).
+- **Daily Leads (Module 05):** Synchronizes JD Received milestones.
+- **Reports & Analytics (Module 06):** Feeds live data into the Weekly Placement Report.
 
-- Master Company Database (Module 02): supplies the underlying company/HR data referenced by Weekly Tracker records.
-- Daily Tracker (Module 03): the primary automatic source of new Weekly Tracker entries, via positive Call Outcomes at Submit Day.
-- Monthly Tracker (Module 05, next): will consolidate Daily and Weekly Tracker outcomes into monthly summaries, trends, and performance insights, rather than redefining any workflow already established here.
+---
 
-Confirmed data flow: Master Company Database → Daily Tracker → Weekly Tracker → (future) Monthly Tracker → Dashboard & Reports.
+# 21. Conclusion
+Module 04 organizes the placement pipeline into 7 automated sections with Friday-to-Friday week tracking, inline auto-save, and unified exports.
 
-# 21\. Conclusion
+---
 
-Module 04 is considered functionally complete (Business Design Version 1.0). It replaces six manually-copied Excel tables with a single master dataset that automatically organizes itself into the same familiar sections coordinators already use, while adding Follow-up Date sorting, colour-coded urgency indicators, a Friday-to-Friday week selector, sticky section headers, and per-row quick actions. Coordinators and Team Leaders continue to work exactly as they do today - the software adapts to their process rather than the other way around.
-
-# 22\. Next Module
-
-Module 05 - Monthly Tracker: will consolidate the outcomes of the Daily Tracker and Weekly Tracker into monthly summaries, trends, and performance insights for management reporting.
+# 22. Precedence Notice
+Per `V1_DECISIONS.md`, the 7-section pipeline and rules in this document represent the authoritative Version 1 standard.
 
 # 23\. Approval Sheet
 
