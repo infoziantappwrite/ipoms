@@ -21,22 +21,22 @@ export function DashboardHeader({ role, onRoleChange, greetingData }: Props) {
   ];
 
   return (
-    <div className="glass-panel border-b border-slate-800 px-6 py-5 flex items-center justify-between flex-wrap gap-4">
+    <div className="glass-panel border-b border-border px-6 py-5 flex items-center justify-between flex-wrap gap-4">
       {/* Time-Aware Greeting (Spec Section 7.1) */}
       <div>
-        <h1 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+        <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
           <span>{greetingData?.icon || '👋'}</span>
           <span>{greetingData?.greeting || 'Welcome to iPOMS Operations'}</span>
         </h1>
-        <p className="text-xs text-slate-400 mt-1">
+        <p className="text-xs text-fg-subtle mt-1">
           {greetingData?.subtext || 'Central Operational Command Center & Intelligent Workflow Navigation'}
         </p>
       </div>
 
       {/* Role Switcher Pill Bar + Notification Bell */}
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1.5 bg-slate-900/80 border border-slate-800 p-1.5 rounded-xl">
-          <span className="text-[10px] font-semibold text-slate-400 px-2 uppercase tracking-wider hidden sm:inline">
+        <div className="flex items-center gap-1.5 bg-background/80 border border-border p-1.5 rounded-xl">
+          <span className="text-micro font-semibold text-fg-subtle px-2 uppercase tracking-wider hidden sm:inline">
             View As:
           </span>
           {roles.map((r) => (
@@ -45,8 +45,8 @@ export function DashboardHeader({ role, onRoleChange, greetingData }: Props) {
               onClick={() => onRoleChange(r.id)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 role === r.id
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                  ? 'bg-primary text-white shadow-md'
+                  : 'text-fg-subtle hover:text-fg hover:bg-surface/60'
               }`}
             >
               <span>{r.icon}</span>

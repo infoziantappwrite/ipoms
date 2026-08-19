@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { Download } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -106,39 +107,39 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="glass-panel rounded-2xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col
-                      border border-slate-700 shadow-2xl">
+                      border border-border-strong shadow-2xl">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border-strong">
           <div>
-            <h2 className="text-lg font-semibold text-white">📥 Load Today's Contacts</h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <h2 className="text-lg font-semibold text-white"><Download size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}Load Today's Contacts</h2>
+            <p className="text-xs text-fg-subtle mt-0.5">
               Read-only view — Add/Edit/Delete available in Master Company Database only
             </p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-xl transition-colors">✕</button>
+          <button onClick={onClose} className="text-fg-subtle hover:text-white text-xl transition-colors">✕</button>
         </div>
 
         {/* Search bar */}
-        <div className="px-6 py-3 border-b border-slate-800">
+        <div className="px-6 py-3 border-b border-border">
           <input
             ref={searchRef}
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by company name, HR name, mobile, or email…"
-            className="w-full bg-slate-800 border border-slate-700 text-slate-200 px-4 py-2.5 rounded-lg
-                       focus:outline-none focus:border-blue-500 placeholder-slate-500 text-sm"
+            className="w-full bg-surface border border-border-strong text-fg px-4 py-2.5 rounded-lg
+                       placeholder-fg-subtle text-sm"
           />
-          <div className="flex items-center justify-between mt-2 text-xs text-slate-400">
+          <div className="flex items-center justify-between mt-2 text-xs text-fg-subtle">
             <span>
               {loading ? 'Searching…' : `${total.toLocaleString()} companies found`}
             </span>
             <div className="flex gap-3">
-              <button onClick={handleSelectAll} className="text-blue-400 hover:text-blue-300 transition-colors">
+              <button onClick={handleSelectAll} className="text-primary hover:text-primary transition-colors">
                 Select All on Page ({companies.length})
               </button>
-              <button onClick={handleDeselectAll} className="text-slate-500 hover:text-slate-300 transition-colors">
+              <button onClick={handleDeselectAll} className="text-fg-subtle hover:text-fg-muted transition-colors">
                 Deselect Page
               </button>
             </div>
@@ -148,17 +149,17 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
         {/* Company list */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <div className="flex items-center justify-center py-12 text-slate-500">
+            <div className="flex items-center justify-center py-12 text-fg-subtle">
               <div className="animate-spin text-2xl mr-3">⟳</div> Loading…
             </div>
           ) : companies.length === 0 ? (
-            <div className="flex items-center justify-center py-12 text-slate-600">
+            <div className="flex items-center justify-center py-12 text-fg-muted">
               No companies found matching your search.
             </div>
           ) : (
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-slate-500 uppercase tracking-wide bg-slate-900/50 border-b border-slate-800">
+                <tr className="text-fg-subtle uppercase tracking-wide bg-background/50 border-b border-border">
                   <th className="w-10 px-3 py-2 text-left">☑</th>
                   <th className="px-3 py-2 text-left">Company Name</th>
                   <th className="px-3 py-2 text-left">HR Name</th>
@@ -167,13 +168,13 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
                   <th className="px-3 py-2 text-left">Type</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/50">
+              <tbody className="divide-y divide-border/50">
                 {companies.map((c) => (
                   <tr
                     key={c._id}
                     onClick={() => toggleSelect(c._id)}
-                    className={`cursor-pointer transition-colors hover:bg-slate-800/40
-                                ${selected.has(c._id) ? 'bg-blue-950/30 border-blue-500/20' : ''}`}
+                    className={`cursor-pointer transition-colors hover:bg-surface/40
+                                ${selected.has(c._id) ? 'bg-primary/30 border-primary/20' : ''}`}
                   >
                     <td className="px-3 py-2">
                       <input
@@ -181,14 +182,14 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
                         checked={selected.has(c._id)}
                         onChange={() => toggleSelect(c._id)}
                         onClick={(e) => e.stopPropagation()}
-                        className="accent-blue-500 w-4 h-4 cursor-pointer"
+                        className="accent-primary w-4 h-4 cursor-pointer"
                       />
                     </td>
-                    <td className="px-3 py-2 text-slate-200 font-medium">{c.company_name}</td>
-                    <td className="px-3 py-2 text-slate-300">{c.hr_name}</td>
-                    <td className="px-3 py-2 text-slate-300 font-mono">{c.primary_mobile}</td>
-                    <td className="px-3 py-2 text-slate-400">{c.primary_email || '—'}</td>
-                    <td className="px-3 py-2 text-slate-500">{c.company_type || '—'}</td>
+                    <td className="px-3 py-2 text-fg font-medium">{c.company_name}</td>
+                    <td className="px-3 py-2 text-fg-muted">{c.hr_name}</td>
+                    <td className="px-3 py-2 text-fg-muted font-mono">{c.primary_mobile}</td>
+                    <td className="px-3 py-2 text-fg-subtle">{c.primary_email || '—'}</td>
+                    <td className="px-3 py-2 text-fg-subtle">{c.company_type || '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -198,11 +199,11 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-3 px-6 py-2 border-t border-slate-800 text-xs text-slate-400">
+          <div className="flex items-center justify-center gap-3 px-6 py-2 border-t border-border text-xs text-fg-subtle">
             <button
               disabled={page === 1}
               onClick={() => setPage((p) => p - 1)}
-              className="disabled:opacity-30 hover:text-white transition-colors px-3 py-1 rounded hover:bg-slate-800"
+              className="disabled:opacity-30 hover:text-white transition-colors px-3 py-1 rounded hover:bg-surface"
             >
               ← Prev
             </button>
@@ -210,7 +211,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
             <button
               disabled={page === totalPages}
               onClick={() => setPage((p) => p + 1)}
-              className="disabled:opacity-30 hover:text-white transition-colors px-3 py-1 rounded hover:bg-slate-800"
+              className="disabled:opacity-30 hover:text-white transition-colors px-3 py-1 rounded hover:bg-surface"
             >
               Next →
             </button>
@@ -218,21 +219,21 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
         )}
 
         {/* Footer: Load Selected */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-700">
-          <p className="text-sm text-slate-400">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-border-strong">
+          <p className="text-sm text-fg-subtle">
             <strong className="text-white">{selected.size}</strong> contact(s) selected
           </p>
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-lg text-sm transition-colors"
+              className="bg-surface-raised hover:bg-surface-raised text-fg px-4 py-2 rounded-lg text-sm transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleLoad}
               disabled={selected.size === 0}
-              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white px-5 py-2 rounded-lg text-sm font-semibold transition-colors"
+              className="bg-primary hover:bg-primary disabled:opacity-40 text-white px-5 py-2 rounded-lg text-sm font-semibold transition-colors"
             >
               Load {selected.size > 0 ? selected.size : ''} Selected →
             </button>

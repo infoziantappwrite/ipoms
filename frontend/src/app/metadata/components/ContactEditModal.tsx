@@ -106,15 +106,15 @@ export function ContactEditModal({
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="glass-panel rounded-2xl w-full max-w-xl border border-slate-700 shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div className="glass-panel rounded-2xl w-full max-w-xl border border-border-strong shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
 
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="flex items-center justify-between border-b border-border pb-3">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
             <span>{isEditing ? '✏️' : '➕'}</span>
             {isEditing ? 'Edit Company & HR Contact' : 'Add New Company & HR Contact'}
           </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-base">
+          <button onClick={onClose} className="text-fg-subtle hover:text-white text-base">
             ✕
           </button>
         </div>
@@ -124,23 +124,23 @@ export function ContactEditModal({
           {/* Company Name & Type Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Company Name *</label>
+              <label className="block text-fg-muted font-semibold mb-1">Company Name *</label>
               <input
                 type="text"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 placeholder="e.g. Infosys, TCS, Microsoft"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
                 required
               />
             </div>
 
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Company Industry Type</label>
+              <label className="block text-fg-muted font-semibold mb-1">Company Industry Type</label>
               <select
                 value={companyType}
                 onChange={(e) => setCompanyType(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
+                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg cursor-pointer"
               >
                 {companyTypes.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -154,24 +154,24 @@ export function ContactEditModal({
           {/* HR Name & Designation Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">HR Contact Person Name</label>
+              <label className="block text-fg-muted font-semibold mb-1">HR Contact Person Name</label>
               <input
                 type="text"
                 value={hrName}
                 onChange={(e) => setHrName(e.target.value)}
                 placeholder="e.g. Rajesh Sharma"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
               />
             </div>
 
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">HR Designation</label>
+              <label className="block text-fg-muted font-semibold mb-1">HR Designation</label>
               <input
                 type="text"
                 value={hrDesignation}
                 onChange={(e) => setHrDesignation(e.target.value)}
                 placeholder="e.g. Lead Campus Recruiter"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
               />
             </div>
           </div>
@@ -179,31 +179,31 @@ export function ContactEditModal({
           {/* Mobile & Email Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Primary Mobile Number</label>
+              <label className="block text-fg-muted font-semibold mb-1">Primary Mobile Number</label>
               <input
                 type="text"
                 value={primaryMobile}
                 onChange={(e) => setPrimaryMobile(e.target.value)}
                 placeholder="e.g. 9876543210"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 font-mono"
+                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg font-mono"
               />
             </div>
 
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Primary Official Email</label>
+              <label className="block text-fg-muted font-semibold mb-1">Primary Official Email</label>
               <input
                 type="email"
                 value={primaryEmail}
                 onChange={(e) => setPrimaryEmail(e.target.value)}
                 placeholder="e.g. hr@company.com"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 font-mono"
+                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg font-mono"
               />
             </div>
           </div>
 
           {/* Additional Mobile Numbers */}
           <div>
-            <label className="block text-slate-300 font-semibold mb-1">
+            <label className="block text-fg-muted font-semibold mb-1">
               Alternate Phone Numbers (Comma-separated)
             </label>
             <input
@@ -211,35 +211,35 @@ export function ContactEditModal({
               value={altMobiles}
               onChange={(e) => setAltMobiles(e.target.value)}
               placeholder="e.g. 9876543211, 044-28282828"
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 font-mono text-[11px]"
+              className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg font-mono text-micro"
             />
           </div>
 
           {/* Notes */}
           <div>
-            <label className="block text-slate-300 font-semibold mb-1">Calling Notes & Intelligence</label>
+            <label className="block text-fg-muted font-semibold mb-1">Calling Notes & Intelligence</label>
             <textarea
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Notes on hiring seasons, previous hiring batches, preferred colleges..."
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+              className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
             />
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium"
+              className="px-4 py-2 bg-surface hover:bg-surface-raised text-fg-muted rounded-xl font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-md transition-colors"
+              className="px-5 py-2 bg-primary hover:bg-primary text-white rounded-xl font-bold shadow-md transition-colors"
             >
               {loading ? 'Saving…' : isEditing ? 'Save Changes' : 'Create Contact 🏢'}
             </button>

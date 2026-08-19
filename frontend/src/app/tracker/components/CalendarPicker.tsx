@@ -73,20 +73,20 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="glass-panel rounded-2xl w-80 border border-slate-700 shadow-2xl">
+      <div className="glass-panel rounded-2xl w-80 border border-border-strong shadow-2xl">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700">
-          <button onClick={prevMonth} className="text-slate-400 hover:text-white px-2 py-1 rounded transition-colors">←</button>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border-strong">
+          <button onClick={prevMonth} className="text-fg-subtle hover:text-white px-2 py-1 rounded transition-colors">←</button>
           <div className="text-center">
             <p className="text-sm font-semibold text-white">{MONTHS[viewMonth - 1]} {viewYear}</p>
-            {loadingDots && <p className="text-xs text-slate-500 animate-pulse">Loading activity…</p>}
+            {loadingDots && <p className="text-xs text-fg-subtle animate-pulse">Loading activity…</p>}
           </div>
-          <button onClick={nextMonth} className="text-slate-400 hover:text-white px-2 py-1 rounded transition-colors">→</button>
+          <button onClick={nextMonth} className="text-fg-subtle hover:text-white px-2 py-1 rounded transition-colors">→</button>
         </div>
 
         {/* Day headers */}
-        <div className="grid grid-cols-7 text-center text-xs text-slate-500 px-3 pt-3 pb-1">
+        <div className="grid grid-cols-7 text-center text-xs text-fg-subtle px-3 pt-3 pb-1">
           {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
             <div key={d} className="py-1">{d}</div>
           ))}
@@ -113,17 +113,17 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
                 disabled={isFuture}
                 className={`
                   relative py-1.5 rounded-lg text-xs transition-colors
-                  ${isFuture ? 'text-slate-700 cursor-default' : 'cursor-pointer hover:bg-slate-700'}
-                  ${isToday ? 'bg-blue-600 text-white font-bold' : ''}
+                  ${isFuture ? 'text-fg-muted cursor-default' : 'cursor-pointer hover:bg-surface-raised'}
+                  ${isToday ? 'bg-primary text-white font-bold' : ''}
                   ${hasActivity && !isToday ? 'text-white font-semibold' : ''}
-                  ${!hasActivity && !isToday && !isFuture ? 'text-slate-500' : ''}
+                  ${!hasActivity && !isToday && !isFuture ? 'text-fg-subtle' : ''}
                 `}
               >
                 {day}
                 {/* Activity dot — Spec Section 15 */}
                 {hasActivity && (
                   <span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full
-                                    ${isToday ? 'bg-white' : 'bg-blue-400'}`} />
+                                    ${isToday ? 'bg-white' : 'bg-primary'}`} />
                 )}
               </button>
             );
@@ -131,16 +131,16 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
         </div>
 
         {/* Legend */}
-        <div className="flex items-center justify-center gap-4 px-5 py-3 border-t border-slate-700 text-xs text-slate-500">
+        <div className="flex items-center justify-center gap-4 px-5 py-3 border-t border-border-strong text-xs text-fg-subtle">
           <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-blue-400" />
+            <span className="w-2 h-2 rounded-full bg-primary" />
             <span>Has calls</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-4 h-4 rounded-lg bg-blue-600 inline-flex items-center justify-center text-white text-xs">T</span>
+            <span className="w-4 h-4 rounded-lg bg-primary inline-flex items-center justify-center text-white text-xs">T</span>
             <span>Today</span>
           </div>
-          <button onClick={onClose} className="ml-auto text-slate-500 hover:text-white transition-colors">Close</button>
+          <button onClick={onClose} className="ml-auto text-fg-subtle hover:text-white transition-colors">Close</button>
         </div>
       </div>
     </div>

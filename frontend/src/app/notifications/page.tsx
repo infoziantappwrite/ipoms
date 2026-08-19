@@ -107,7 +107,7 @@ export default function NotificationsPage() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
 
       {/* ── Top Header Bar ────────────────────────────────────────────────── */}
       <NotificationsHeader
@@ -128,14 +128,14 @@ export default function NotificationsPage() {
       {/* ── Notifications Grid / Feed ─────────────────────────────────────── */}
       <div className="p-6 max-w-5xl mx-auto w-full space-y-4 flex-1">
         {loading ? (
-          <div className="p-12 text-center text-slate-500 italic text-xs">
+          <div className="p-12 text-center text-fg-subtle italic text-xs">
             Loading notifications…
           </div>
         ) : filteredNotifications.length === 0 ? (
-          <div className="glass-panel rounded-2xl border border-slate-800 p-12 text-center text-slate-500 space-y-2">
+          <div className="glass-panel rounded-2xl border border-border p-12 text-center text-fg-subtle space-y-2">
             <span className="text-3xl block">📬</span>
-            <p className="text-xs font-semibold text-slate-400">No notifications found in this view.</p>
-            <p className="text-[11px] text-slate-600">
+            <p className="text-xs font-semibold text-fg-subtle">No notifications found in this view.</p>
+            <p className="text-micro text-fg-muted">
               When management broadcasts alerts or meeting invites, they will appear here.
             </p>
           </div>

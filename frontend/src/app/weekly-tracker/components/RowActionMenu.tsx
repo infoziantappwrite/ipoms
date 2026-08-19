@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { Trash2 } from 'lucide-react';
 
 interface Props {
   isPinned: boolean;
@@ -45,14 +46,14 @@ export function RowActionMenu({
     <div className="relative inline-block text-left" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+        className="p-1 rounded text-fg-subtle hover:text-white hover:bg-surface-raised transition-colors"
         title="Actions"
       >
         ⋮
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-1 w-48 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl z-50 py-1 text-xs text-slate-200">
+        <div className="absolute right-0 mt-1 w-48 rounded-xl bg-background border border-border-strong shadow-2xl z-50 py-1 text-xs text-fg">
 
           {/* Toggle Pin Top */}
           <button
@@ -60,7 +61,7 @@ export function RowActionMenu({
               onTogglePin();
               setIsOpen(false);
             }}
-            className="w-full text-left px-3 py-2 hover:bg-slate-800 flex items-center gap-2 transition-colors"
+            className="w-full text-left px-3 py-2 hover:bg-surface flex items-center gap-2 transition-colors"
           >
             <span>{isPinned ? '★' : '☆'}</span>
             <span>{isPinned ? 'Unpin from Top' : 'Pin to Top Companies'}</span>
@@ -70,14 +71,14 @@ export function RowActionMenu({
           <div className="relative">
             <button
               onClick={() => setShowMoveSubmenu(!showMoveSubmenu)}
-              className="w-full text-left px-3 py-2 hover:bg-slate-800 flex items-center justify-between transition-colors"
+              className="w-full text-left px-3 py-2 hover:bg-surface flex items-center justify-between transition-colors"
             >
               <span>📂 Move Section</span>
               <span>▸</span>
             </button>
 
             {showMoveSubmenu && (
-              <div className="absolute left-full top-0 ml-1 w-48 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl py-1">
+              <div className="absolute left-full top-0 ml-1 w-48 rounded-xl bg-background border border-border-strong shadow-2xl py-1">
                 {SECTIONS.map((s) => (
                   <button
                     key={s.key}
@@ -86,8 +87,8 @@ export function RowActionMenu({
                       setIsOpen(false);
                       setShowMoveSubmenu(false);
                     }}
-                    className={`w-full text-left px-3 py-1.5 hover:bg-slate-800 transition-colors text-xs
-                                ${currentSection === s.key ? 'text-blue-400 font-semibold' : ''}`}
+                    className={`w-full text-left px-3 py-1.5 hover:bg-surface transition-colors text-xs
+                                ${currentSection === s.key ? 'text-primary font-semibold' : ''}`}
                   >
                     {s.label}
                   </button>
@@ -96,7 +97,7 @@ export function RowActionMenu({
             )}
           </div>
 
-          <div className="h-px bg-slate-800 my-1" />
+          <div className="h-px bg-surface my-1" />
 
           {/* Delete */}
           <button
@@ -106,9 +107,9 @@ export function RowActionMenu({
                 setIsOpen(false);
               }
             }}
-            className="w-full text-left px-3 py-2 hover:bg-red-950/40 text-red-400 flex items-center gap-2 transition-colors"
+            className="w-full text-left px-3 py-2 hover:bg-destructive/40 text-destructive flex items-center gap-2 transition-colors"
           >
-            <span>🗑️</span>
+            <Trash2 size={14} strokeWidth={2} aria-hidden />
             <span>Move to Recycle Bin</span>
           </button>
 

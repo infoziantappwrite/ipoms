@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { FileSpreadsheet, PenLine, Printer } from 'lucide-react';
 
 interface Props {
   reportData: any;
@@ -20,11 +21,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
 
   if (!report) {
     return (
-      <div className="p-12 text-center text-slate-500">
+      <div className="p-12 text-center text-fg-subtle">
         <p className="text-sm">No report loaded in editor.</p>
         <button
           onClick={onBackToBuilder}
-          className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-xs"
+          className="mt-3 px-4 py-2 bg-primary text-white rounded-lg text-xs"
         >
           Open Builder Wizard →
         </button>
@@ -119,14 +120,14 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
 
   const themeColors = {
     blue: {
-      accent: 'border-blue-600 text-blue-400 bg-blue-950/30',
-      headerBg: 'bg-blue-900/40 text-blue-300',
-      badge: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+      accent: 'border-primary text-primary bg-primary/30',
+      headerBg: 'bg-primary/40 text-primary',
+      badge: 'bg-primary/20 text-primary border-primary/30',
     },
     green: {
-      accent: 'border-emerald-600 text-emerald-400 bg-emerald-950/30',
-      headerBg: 'bg-emerald-900/40 text-emerald-300',
-      badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+      accent: 'border-success text-success bg-success/30',
+      headerBg: 'bg-success/40 text-success',
+      badge: 'bg-success/20 text-success border-success/30',
     },
     purple: {
       accent: 'border-purple-600 text-purple-400 bg-purple-950/30',
@@ -139,24 +140,24 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
       badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
     },
   }[theme as 'blue' | 'green' | 'purple' | 'college_branded'] || {
-    accent: 'border-blue-600 text-blue-400 bg-blue-950/30',
-    headerBg: 'bg-blue-900/40 text-blue-300',
-    badge: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+    accent: 'border-primary text-primary bg-primary/30',
+    headerBg: 'bg-primary/40 text-primary',
+    badge: 'bg-primary/20 text-primary border-primary/30',
   };
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
 
       {/* Editor Action Toolbar (Sticky Top) */}
-      <div className="glass-panel sticky top-4 z-30 p-4 rounded-2xl border border-slate-700 shadow-2xl flex items-center justify-between flex-wrap gap-4 backdrop-blur-xl">
+      <div className="glass-panel sticky top-4 z-30 p-4 rounded-2xl border border-border-strong shadow-2xl flex items-center justify-between flex-wrap gap-4 backdrop-blur-xl">
         <div className="flex items-center gap-3">
           <button
             onClick={onBackToBuilder}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-surface hover:bg-surface-raised text-fg-muted rounded-lg text-xs font-semibold transition-colors"
           >
             ← Builder Settings
           </button>
-          <span className="text-xs text-slate-400 font-medium hidden sm:inline">
+          <span className="text-xs text-fg-subtle font-medium hidden sm:inline">
             Interactive Presentation Canvas (Click cells to edit)
           </span>
         </div>
@@ -164,13 +165,13 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
         {/* Theme Switcher & Exporters */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Color theme switcher */}
-          <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 p-1 rounded-lg">
+          <div className="flex items-center gap-1 bg-background border border-border p-1 rounded-lg">
             {(['blue', 'green', 'purple', 'college_branded'] as const).map((th) => (
               <button
                 key={th}
                 onClick={() => setTheme(th)}
-                className={`px-2 py-1 rounded text-[10px] font-semibold capitalize transition-colors ${
-                  theme === th ? 'bg-slate-800 text-white shadow' : 'text-slate-500 hover:text-slate-300'
+                className={`px-2 py-1 rounded text-micro font-semibold capitalize transition-colors ${
+                  theme === th ? 'bg-surface text-white shadow' : 'text-fg-subtle hover:text-fg-muted'
                 }`}
               >
                 {th === 'college_branded' ? 'College' : th}
@@ -180,35 +181,35 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
 
           <button
             onClick={handleExportCsv}
-            className="flex items-center gap-1 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 bg-success hover:bg-success text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
           >
-            <span>📑</span> Excel / CSV
+            <FileSpreadsheet size={14} strokeWidth={2} aria-hidden /> Excel / CSV
           </button>
 
           <button
             onClick={handlePrintPdf}
-            className="flex items-center gap-1 px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold shadow-sm transition-colors"
+            className="flex items-center gap-1 px-4 py-1.5 bg-primary hover:bg-primary text-white rounded-lg text-xs font-bold shadow-sm transition-colors"
           >
-            <span>🖨️</span> Print / Save PDF
+            <Printer size={14} strokeWidth={2} aria-hidden /> Print / Save PDF
           </button>
         </div>
       </div>
 
       {/* Pre-Export Quality Checklist (Spec Section 14) */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 space-y-2">
+      <div className="bg-background/60 border border-border rounded-xl p-4 space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+          <span className="text-xs font-bold text-fg flex items-center gap-1.5">
             <span>✅</span> Pre-Export Report Quality Verification Checklist
           </span>
-          <span className="text-[10px] text-emerald-400 font-semibold">Ready for Sharing</span>
+          <span className="text-micro text-success font-semibold">Ready for Sharing</span>
         </div>
-        <div className="flex flex-wrap gap-4 text-xs text-slate-400 pt-1">
+        <div className="flex flex-wrap gap-4 text-xs text-fg-subtle pt-1">
           <label className="flex items-center gap-1.5 cursor-pointer">
             <input
               type="checkbox"
               checked={checklist.brandingHeader}
               onChange={(e) => setChecklist({ ...checklist, brandingHeader: e.target.checked })}
-              className="rounded bg-slate-800 border-slate-700 text-blue-500"
+              className="rounded bg-surface border-border-strong text-primary"
             />
             <span>Infoziant Header Branding</span>
           </label>
@@ -217,7 +218,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
               type="checkbox"
               checked={checklist.logoVerified}
               onChange={(e) => setChecklist({ ...checklist, logoVerified: e.target.checked })}
-              className="rounded bg-slate-800 border-slate-700 text-blue-500"
+              className="rounded bg-surface border-border-strong text-primary"
             />
             <span>Institutional Profile Verified</span>
           </label>
@@ -226,7 +227,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
               type="checkbox"
               checked={checklist.titlePeriod}
               onChange={(e) => setChecklist({ ...checklist, titlePeriod: e.target.checked })}
-              className="rounded bg-slate-800 border-slate-700 text-blue-500"
+              className="rounded bg-surface border-border-strong text-primary"
             />
             <span>Period & Generated By Stamped</span>
           </label>
@@ -235,7 +236,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
               type="checkbox"
               checked={checklist.figuresVerified}
               onChange={(e) => setChecklist({ ...checklist, figuresVerified: e.target.checked })}
-              className="rounded bg-slate-800 border-slate-700 text-blue-500"
+              className="rounded bg-surface border-border-strong text-primary"
             />
             <span>Placement Figures Checked</span>
           </label>
@@ -243,27 +244,27 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
       </div>
 
       {/* ── Document Canvas (Printable Page) ────────────────────────────────── */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-8 space-y-6 text-slate-100 print:bg-white print:text-black print:p-0 print:border-none print:shadow-none">
+      <div className="bg-background border border-border rounded-2xl shadow-2xl p-8 space-y-6 text-fg print:bg-white print:text-black print:p-0 print:border-none print:shadow-none">
 
         {/* 1. Header Branding Strip */}
-        <div className="flex items-center justify-between border-b-2 border-slate-800 pb-4">
+        <div className="flex items-center justify-between border-b-2 border-border pb-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xl font-black text-blue-400 print:text-blue-700 tracking-wider">
+              <span className="text-xl font-bold text-primary print:text-primary tracking-wider">
                 INFOZIANT
               </span>
-              <span className="text-xs text-slate-400 font-mono">| iPOMS Operations</span>
+              <span className="text-xs text-fg-subtle font-mono">| iPOMS Operations</span>
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-micro text-fg-subtle mt-0.5">
               Placement Operations Management System • SOC 2 & ISO 27001 Certified
             </p>
           </div>
 
           <div className="text-right">
-            <h3 className="text-xs font-bold text-slate-200 print:text-black uppercase tracking-wider">
+            <h3 className="text-xs font-bold text-fg print:text-black uppercase tracking-wider">
               {report.branding.college_name}
             </h3>
-            <span className="text-[10px] text-slate-400 font-mono">
+            <span className="text-micro text-fg-subtle font-mono">
               Code: [{report.branding.college_code}]
             </span>
           </div>
@@ -275,45 +276,45 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
             type="text"
             value={report.report_title}
             onChange={(e) => setReport({ ...report, report_title: e.target.value })}
-            className="text-lg font-bold text-white print:text-black bg-transparent w-full border-b border-transparent hover:border-slate-700 focus:border-blue-500 outline-none pb-1"
+            className="text-lg font-bold text-white print:text-black bg-transparent w-full border-b border-transparent hover:border-border-strong pb-1"
           />
-          <div className="flex items-center justify-between flex-wrap gap-2 text-xs text-slate-400 print:text-slate-600">
-            <span>Period: <strong className="text-slate-200 print:text-black">{report.report_period}</strong></span>
-            <span>Generated Date: <strong className="text-slate-200 print:text-black">{report.generated_date}</strong></span>
-            <span>Prepared By: <strong className="text-slate-200 print:text-black">{report.generated_by}</strong></span>
+          <div className="flex items-center justify-between flex-wrap gap-2 text-xs text-fg-subtle print:text-fg-muted">
+            <span>Period: <strong className="text-fg print:text-black">{report.report_period}</strong></span>
+            <span>Generated Date: <strong className="text-fg print:text-black">{report.generated_date}</strong></span>
+            <span>Prepared By: <strong className="text-fg print:text-black">{report.generated_by}</strong></span>
           </div>
         </div>
 
         {/* 3. Live KPI Summary Strip */}
         {report.included_sections.kpi_summary && report.kpi_summary && (
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 pt-1">
-            <div className="bg-slate-800/80 print:bg-slate-100 p-2.5 rounded-xl border border-slate-700 text-center">
-              <span className="text-[10px] text-slate-400 uppercase block">Calls Made</span>
-              <span className="text-base font-bold text-blue-400 tabular-nums">{report.kpi_summary.total_calls}</span>
+            <div className="bg-surface/80 print:bg-surface-sunken p-2.5 rounded-xl border border-border-strong text-center">
+              <span className="text-micro text-fg-subtle uppercase block">Calls Made</span>
+              <span className="text-base font-bold text-primary tabular-nums">{report.kpi_summary.total_calls}</span>
             </div>
-            <div className="bg-slate-800/80 print:bg-slate-100 p-2.5 rounded-xl border border-slate-700 text-center">
-              <span className="text-[10px] text-slate-400 uppercase block">Positives</span>
-              <span className="text-base font-bold text-emerald-400 tabular-nums">{report.kpi_summary.positive_responses}</span>
+            <div className="bg-surface/80 print:bg-surface-sunken p-2.5 rounded-xl border border-border-strong text-center">
+              <span className="text-micro text-fg-subtle uppercase block">Positives</span>
+              <span className="text-base font-bold text-success tabular-nums">{report.kpi_summary.positive_responses}</span>
             </div>
-            <div className="bg-slate-800/80 print:bg-slate-100 p-2.5 rounded-xl border border-slate-700 text-center">
-              <span className="text-[10px] text-slate-400 uppercase block">JDs Received</span>
+            <div className="bg-surface/80 print:bg-surface-sunken p-2.5 rounded-xl border border-border-strong text-center">
+              <span className="text-micro text-fg-subtle uppercase block">JDs Received</span>
               <span className="text-base font-bold text-cyan-400 tabular-nums">{report.kpi_summary.jds_received}</span>
             </div>
-            <div className="bg-slate-800/80 print:bg-slate-100 p-2.5 rounded-xl border border-slate-700 text-center">
-              <span className="text-[10px] text-slate-400 uppercase block">Completed</span>
-              <span className="text-base font-bold text-amber-400 tabular-nums">{report.kpi_summary.drives_completed}</span>
+            <div className="bg-surface/80 print:bg-surface-sunken p-2.5 rounded-xl border border-border-strong text-center">
+              <span className="text-micro text-fg-subtle uppercase block">Completed</span>
+              <span className="text-base font-bold text-warning tabular-nums">{report.kpi_summary.drives_completed}</span>
             </div>
-            <div className="bg-slate-800/80 print:bg-slate-100 p-2.5 rounded-xl border border-slate-700 text-center">
-              <span className="text-[10px] text-slate-400 uppercase block">In Progress</span>
+            <div className="bg-surface/80 print:bg-surface-sunken p-2.5 rounded-xl border border-border-strong text-center">
+              <span className="text-micro text-fg-subtle uppercase block">In Progress</span>
               <span className="text-base font-bold text-purple-400 tabular-nums">{report.kpi_summary.drives_in_progress}</span>
             </div>
-            <div className="bg-slate-800/80 print:bg-slate-100 p-2.5 rounded-xl border border-slate-700 text-center">
-              <span className="text-[10px] text-slate-400 uppercase block">Pipeline</span>
-              <span className="text-base font-bold text-slate-300 tabular-nums">{report.kpi_summary.pipeline_leads}</span>
+            <div className="bg-surface/80 print:bg-surface-sunken p-2.5 rounded-xl border border-border-strong text-center">
+              <span className="text-micro text-fg-subtle uppercase block">Pipeline</span>
+              <span className="text-base font-bold text-fg-muted tabular-nums">{report.kpi_summary.pipeline_leads}</span>
             </div>
-            <div className="bg-slate-800/80 print:bg-slate-100 p-2.5 rounded-xl border border-slate-700 text-center">
-              <span className="text-[10px] text-slate-400 uppercase block">Offers Placed</span>
-              <span className="text-base font-bold text-emerald-400 tabular-nums">{report.kpi_summary.total_offers}</span>
+            <div className="bg-surface/80 print:bg-surface-sunken p-2.5 rounded-xl border border-border-strong text-center">
+              <span className="text-micro text-fg-subtle uppercase block">Offers Placed</span>
+              <span className="text-base font-bold text-success tabular-nums">{report.kpi_summary.total_offers}</span>
             </div>
           </div>
         )}
@@ -327,12 +328,12 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
             </div>
 
             {report.sections.completed_companies.length === 0 ? (
-              <p className="text-xs text-slate-500 italic py-2">No completed drives in this period.</p>
+              <p className="text-xs text-fg-subtle italic py-2">No completed drives in this period.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left">
                   <thead>
-                    <tr className="bg-slate-800/90 text-slate-400 font-semibold border-b border-slate-700 text-[11px]">
+                    <tr className="bg-surface/90 text-fg-subtle font-semibold border-b border-border-strong text-micro">
                       <th className="py-2 px-2 w-8 text-center">#</th>
                       <th className="py-2 px-3">Company Name</th>
                       <th className="py-2 px-3">Role(s)</th>
@@ -342,50 +343,50 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
                       <th className="py-2 px-3">Status Notes</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800 font-normal">
+                  <tbody className="divide-y divide-border font-normal">
                     {report.sections.completed_companies.map((r: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-800/30">
-                        <td className="py-2 px-2 text-center text-slate-500">{r.s_no}</td>
-                        <td className="py-2 px-3 font-semibold text-slate-200">
+                      <tr key={idx} className="hover:bg-surface/30">
+                        <td className="py-2 px-2 text-center text-fg-subtle">{r.s_no}</td>
+                        <td className="py-2 px-3 font-semibold text-fg">
                           <input
                             type="text"
                             value={r.company_name}
                             onChange={(e) =>
                               handleUpdateCell('completed_companies', idx, 'company_name', e.target.value)
                             }
-                            className="bg-transparent w-full outline-none focus:bg-slate-800 rounded px-1"
+                            className="bg-transparent w-full focus:bg-surface rounded px-1"
                           />
                         </td>
-                        <td className="py-2 px-3 text-slate-300">
+                        <td className="py-2 px-3 text-fg-muted">
                           <input
                             type="text"
                             value={r.job_role}
                             onChange={(e) =>
                               handleUpdateCell('completed_companies', idx, 'job_role', e.target.value)
                             }
-                            className="bg-transparent w-full outline-none focus:bg-slate-800 rounded px-1"
+                            className="bg-transparent w-full focus:bg-surface rounded px-1"
                           />
                         </td>
-                        <td className="py-2 px-3 text-slate-400">{r.company_type}</td>
-                        <td className="py-2 px-3 text-emerald-400 font-medium">{r.ctc_lpa}</td>
-                        <td className="py-2 px-3 text-center font-bold text-emerald-400">
+                        <td className="py-2 px-3 text-fg-subtle">{r.company_type}</td>
+                        <td className="py-2 px-3 text-success font-medium">{r.ctc_lpa}</td>
+                        <td className="py-2 px-3 text-center font-bold text-success">
                           <input
                             type="number"
                             value={r.selected_count}
                             onChange={(e) =>
                               handleUpdateCell('completed_companies', idx, 'selected_count', Number(e.target.value))
                             }
-                            className="bg-transparent w-14 text-center outline-none focus:bg-slate-800 rounded px-1 font-bold text-emerald-400"
+                            className="bg-transparent w-14 text-center focus:bg-surface rounded px-1 font-bold text-success"
                           />
                         </td>
-                        <td className="py-2 px-3 text-slate-400">
+                        <td className="py-2 px-3 text-fg-subtle">
                           <input
                             type="text"
                             value={r.current_status_text}
                             onChange={(e) =>
                               handleUpdateCell('completed_companies', idx, 'current_status_text', e.target.value)
                             }
-                            className="bg-transparent w-full outline-none focus:bg-slate-800 rounded px-1"
+                            className="bg-transparent w-full focus:bg-surface rounded px-1"
                           />
                         </td>
                       </tr>
@@ -406,12 +407,12 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
             </div>
 
             {report.sections.in_progress.length === 0 ? (
-              <p className="text-xs text-slate-500 italic py-2">No active drives currently in progress.</p>
+              <p className="text-xs text-fg-subtle italic py-2">No active drives currently in progress.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left">
                   <thead>
-                    <tr className="bg-slate-800/90 text-slate-400 font-semibold border-b border-slate-700 text-[11px]">
+                    <tr className="bg-surface/90 text-fg-subtle font-semibold border-b border-border-strong text-micro">
                       <th className="py-2 px-2 w-8 text-center">#</th>
                       <th className="py-2 px-3">Company Name</th>
                       <th className="py-2 px-3">Role(s)</th>
@@ -420,24 +421,24 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
                       <th className="py-2 px-3">Status Remarks</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800 font-normal">
+                  <tbody className="divide-y divide-border font-normal">
                     {report.sections.in_progress.map((r: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-800/30">
-                        <td className="py-2 px-2 text-center text-slate-500">{r.s_no}</td>
-                        <td className="py-2 px-3 font-semibold text-slate-200">
+                      <tr key={idx} className="hover:bg-surface/30">
+                        <td className="py-2 px-2 text-center text-fg-subtle">{r.s_no}</td>
+                        <td className="py-2 px-3 font-semibold text-fg">
                           <input
                             type="text"
                             value={r.company_name}
                             onChange={(e) =>
                               handleUpdateCell('in_progress', idx, 'company_name', e.target.value)
                             }
-                            className="bg-transparent w-full outline-none focus:bg-slate-800 rounded px-1"
+                            className="bg-transparent w-full focus:bg-surface rounded px-1"
                           />
                         </td>
-                        <td className="py-2 px-3 text-slate-300">{r.job_role}</td>
-                        <td className="py-2 px-3 text-slate-400">{r.company_type}</td>
-                        <td className="py-2 px-3 text-emerald-400">{r.ctc_lpa}</td>
-                        <td className="py-2 px-3 text-slate-400">{r.current_status_text}</td>
+                        <td className="py-2 px-3 text-fg-muted">{r.job_role}</td>
+                        <td className="py-2 px-3 text-fg-subtle">{r.company_type}</td>
+                        <td className="py-2 px-3 text-success">{r.ctc_lpa}</td>
+                        <td className="py-2 px-3 text-fg-subtle">{r.current_status_text}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -456,12 +457,12 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
             </div>
 
             {report.sections.pipeline.length === 0 ? (
-              <p className="text-xs text-slate-500 italic py-2">No pipeline leads recorded.</p>
+              <p className="text-xs text-fg-subtle italic py-2">No pipeline leads recorded.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left">
                   <thead>
-                    <tr className="bg-slate-800/90 text-slate-400 font-semibold border-b border-slate-700 text-[11px]">
+                    <tr className="bg-surface/90 text-fg-subtle font-semibold border-b border-border-strong text-micro">
                       <th className="py-2 px-2 w-8 text-center">#</th>
                       <th className="py-2 px-3">Company Name</th>
                       <th className="py-2 px-3">Role(s)</th>
@@ -469,14 +470,14 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
                       <th className="py-2 px-3">Current Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800 font-normal">
+                  <tbody className="divide-y divide-border font-normal">
                     {report.sections.pipeline.map((r: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-800/30">
-                        <td className="py-2 px-2 text-center text-slate-500">{r.s_no}</td>
-                        <td className="py-2 px-3 font-semibold text-slate-200">{r.company_name}</td>
-                        <td className="py-2 px-3 text-slate-300">{r.job_role}</td>
-                        <td className="py-2 px-3 text-slate-400">{r.company_type}</td>
-                        <td className="py-2 px-3 text-slate-400">{r.current_status_text}</td>
+                      <tr key={idx} className="hover:bg-surface/30">
+                        <td className="py-2 px-2 text-center text-fg-subtle">{r.s_no}</td>
+                        <td className="py-2 px-3 font-semibold text-fg">{r.company_name}</td>
+                        <td className="py-2 px-3 text-fg-muted">{r.job_role}</td>
+                        <td className="py-2 px-3 text-fg-subtle">{r.company_type}</td>
+                        <td className="py-2 px-3 text-fg-subtle">{r.current_status_text}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -489,20 +490,20 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
         {/* 7. Key Operational Observations & Remarks */}
         {report.included_sections.remarks && (
           <div className="space-y-2 pt-2">
-            <div className="font-bold text-xs text-slate-300 flex items-center gap-1.5">
-              <span>📝</span> Coordinator Remarks & Observations
+            <div className="font-bold text-xs text-fg-muted flex items-center gap-1.5">
+              <PenLine size={14} strokeWidth={2} aria-hidden /> Coordinator Remarks & Observations
             </div>
             <textarea
               rows={3}
               value={report.remarks}
               onChange={(e) => setReport({ ...report, remarks: e.target.value })}
-              className="w-full bg-slate-800/60 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 outline-none focus:border-blue-500"
+              className="w-full bg-surface/60 border border-border-strong rounded-xl p-3 text-xs text-fg "
             />
           </div>
         )}
 
         {/* 8. Confidential Footer */}
-        <div className="border-t border-slate-800 pt-4 text-center text-[10px] text-slate-500">
+        <div className="border-t border-border pt-4 text-center text-micro text-fg-subtle">
           <p>{report.branding.confidential_notice}</p>
           <p className="mt-0.5">© 2026 Infoziant IT Solutions Inc. All rights reserved.</p>
         </div>

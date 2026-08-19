@@ -196,7 +196,7 @@ export default function DailyLeadsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
 
       {/* ── Top Header ────────────────────────────────────────────────────── */}
       <LeadsHeader
@@ -234,7 +234,7 @@ export default function DailyLeadsPage() {
 
       {/* ── Table Workspace ───────────────────────────────────────────────── */}
       <div className="flex-1 px-6 py-4">
-        <div className="rounded-xl border border-slate-800 bg-slate-900/30 overflow-hidden shadow-lg">
+        <div className="rounded-xl border border-border bg-background/30 overflow-hidden shadow-lg">
           <LeadsTable
             rows={leads}
             activeTab={activeTab}

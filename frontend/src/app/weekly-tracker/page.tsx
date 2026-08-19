@@ -238,7 +238,7 @@ export default function WeeklyTrackerPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
 
       {/* ── Top Header ────────────────────────────────────────────────────── */}
       <WeeklyHeader
@@ -282,10 +282,10 @@ export default function WeeklyTrackerPage() {
 
       {/* ── Empty State when no college is selected ──────────────────────── */}
       {!selectedCollegeId && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-500 py-24">
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-fg-subtle py-24">
           <div className="text-6xl">📊</div>
-          <p className="text-xl font-semibold text-slate-300">Select a College to View Weekly Tracker</p>
-          <p className="text-sm text-slate-500 max-w-md text-center">
+          <p className="text-xl font-semibold text-fg-muted">Select a College to View Weekly Tracker</p>
+          <p className="text-sm text-fg-subtle max-w-md text-center">
             Choose a partner institution from the header dropdown to view ongoing recruitment drives across all 7 operational pipeline sections.
           </p>
         </div>

@@ -26,8 +26,8 @@ export function AutoSaveBadge({ status, lastSavedAt }: Props) {
 
   if (status === 'saving') {
     return (
-      <div className="flex items-center gap-1.5 text-xs text-amber-400">
-        <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+      <div className="flex items-center gap-1.5 text-xs text-warning">
+        <span className="w-2 h-2 rounded-full bg-warning animate-pulse" />
         <span>Saving…</span>
       </div>
     );
@@ -35,8 +35,8 @@ export function AutoSaveBadge({ status, lastSavedAt }: Props) {
 
   if (status === 'saved' && lastSavedAt) {
     return (
-      <div className="flex items-center gap-1.5 text-xs text-emerald-400">
-        <span className="w-2 h-2 rounded-full bg-emerald-400" />
+      <div className="flex items-center gap-1.5 text-xs text-success">
+        <span className="w-2 h-2 rounded-full bg-success" />
         <span>Saved at {timeStr}</span>
       </div>
     );
@@ -44,16 +44,16 @@ export function AutoSaveBadge({ status, lastSavedAt }: Props) {
 
   if (status === 'saved' && !lastSavedAt) {
     return (
-      <div className="flex items-center gap-1.5 text-xs text-emerald-400">
-        <span className="w-2 h-2 rounded-full bg-emerald-400" />
+      <div className="flex items-center gap-1.5 text-xs text-success">
+        <span className="w-2 h-2 rounded-full bg-success" />
         <span>All changes saved</span>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-1.5 text-xs text-slate-500">
-      <span className="w-2 h-2 rounded-full bg-slate-600" />
+    <div className="flex items-center gap-1.5 text-xs text-fg-subtle">
+      <span className="w-2 h-2 rounded-full bg-surface-raised" />
       <span>Auto-save active</span>
     </div>
   );

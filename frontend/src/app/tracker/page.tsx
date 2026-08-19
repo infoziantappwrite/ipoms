@@ -7,6 +7,7 @@ import { ContactPickerModal } from './components/ContactPickerModal';
 import { TrackerGrid } from './components/TrackerGrid';
 import { CalendarPicker } from './components/CalendarPicker';
 import { AutoSaveBadge } from './components/AutoSaveBadge';
+import { AlertTriangle, CalendarDays, Download, RefreshCw, Save } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -263,10 +264,10 @@ export default function DailyTrackerPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col">
+    <div className="min-h-screen bg-background text-fg flex flex-col">
 
       {/* ── Top Section ───────────────────────────────────────────────────── */}
-      <header className="glass-panel border-b border-slate-800 px-6 py-4">
+      <header className="glass-panel border-b border-border px-6 py-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
 
           {/* Left: Tracker title + date */}
@@ -275,7 +276,7 @@ export default function DailyTrackerPage() {
               {isHistoryMode && (
                 <button
                   onClick={() => setIsHistoryMode(false)}
-                  className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2 py-1 rounded-md transition-colors"
+                  className="text-xs bg-surface-raised hover:bg-surface-raised text-fg-muted px-2 py-1 rounded-md transition-colors"
                 >
                   ← Back to Today
                 </button>
@@ -286,12 +287,12 @@ export default function DailyTrackerPage() {
                   : `📋 ${trackerTitle}`}
               </h1>
               {isHistoryMode && (
-                <span className="text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                <span className="text-xs bg-warning/20 text-warning border border-warning/30 px-2 py-0.5 rounded-full">
                   Read-Only
                 </span>
               )}
             </div>
-            <p className="text-sm text-slate-400 mt-0.5">{todayDisplay}</p>
+            <p className="text-sm text-fg-subtle mt-0.5">{todayDisplay}</p>
           </div>
 
           {/* Centre: College selector */}
@@ -309,8 +310,8 @@ export default function DailyTrackerPage() {
           {/* Right: Auto-save badge + Call count */}
           <div className="flex items-center gap-4">
             <div className="text-center">
-              <p className="text-2xl font-bold text-blue-400">{kpi?.total_loaded ?? 0}</p>
-              <p className="text-xs text-slate-400">Loaded Today</p>
+              <p className="text-2xl font-bold text-primary">{kpi?.total_loaded ?? 0}</p>
+              <p className="text-xs text-fg-subtle">Loaded Today</p>
             </div>
             <AutoSaveBadge status={saveStatus} lastSavedAt={lastSavedAt} />
           </div>
@@ -319,49 +320,49 @@ export default function DailyTrackerPage() {
 
       {/* ── Toolbar ───────────────────────────────────────────────────────── */}
       {!isHistoryMode && (
-        <div className="flex items-center gap-2 px-6 py-3 bg-slate-900/50 border-b border-slate-800 flex-wrap">
+        <div className="flex items-center gap-2 px-6 py-3 bg-background/50 border-b border-border flex-wrap">
           {/* Load Contacts */}
           <button
             onClick={() => selectedCollegeId ? setIsPickerOpen(true) : alert('Please select a college first')}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            className="flex items-center gap-2 bg-primary hover:bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           >
-            <span>📥</span> Load Contacts
+            <Download size={14} strokeWidth={2} aria-hidden /> Load Contacts
           </button>
 
           {/* Save Progress (Ctrl+S) */}
           <button
             onClick={handleSaveProgress}
             disabled={!selectedCollegeId}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            className="flex items-center gap-2 bg-success hover:bg-success disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
           >
-            <span>💾</span> Save Progress
-            <kbd className="text-xs bg-emerald-800 px-1 py-0.5 rounded">Ctrl+S</kbd>
+            <Save size={14} strokeWidth={2} aria-hidden /> Save Progress
+            <kbd className="text-xs bg-success px-1 py-0.5 rounded">Ctrl+S</kbd>
           </button>
 
           {/* Refresh */}
           <button
             onClick={() => { loadTodayRows(); loadKpi(); }}
-            className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm transition-colors"
+            className="flex items-center gap-2 bg-surface-raised hover:bg-surface-raised text-fg px-3 py-2 rounded-lg text-sm transition-colors"
           >
-            <span>🔄</span> Refresh
+            <RefreshCw size={14} strokeWidth={2} aria-hidden /> Refresh
           </button>
 
           {/* History / Calendar */}
           <button
             onClick={() => setIsCalendarOpen(true)}
-            className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm transition-colors"
+            className="flex items-center gap-2 bg-surface-raised hover:bg-surface-raised text-fg px-3 py-2 rounded-lg text-sm transition-colors"
           >
-            <span>📅</span> History
+            <CalendarDays size={14} strokeWidth={2} aria-hidden /> History
           </button>
 
           {/* Divider */}
-          <div className="h-6 w-px bg-slate-700 mx-1" />
+          <div className="h-6 w-px bg-surface-raised mx-1" />
 
           {/* Filter by outcome */}
           <select
             value={outcomeFilter}
             onChange={(e) => setOutcomeFilter(e.target.value as CallOutcome | 'all')}
-            className="bg-slate-800 border border-slate-700 text-slate-200 text-sm px-3 py-2 rounded-lg focus:outline-none focus:border-blue-500"
+            className="bg-surface border border-border-strong text-fg text-sm px-3 py-2 rounded-lg "
           >
             <option value="all">All Outcomes</option>
             <option value="no_response">No Response</option>
@@ -382,12 +383,12 @@ export default function DailyTrackerPage() {
               placeholder="Search company, HR, mobile…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-sm px-3 py-2 rounded-lg focus:outline-none focus:border-blue-500 placeholder-slate-500"
+              className="w-full bg-surface border border-border-strong text-fg text-sm px-3 py-2 rounded-lg placeholder-fg-subtle"
             />
           </div>
 
           {/* Row count */}
-          <span className="ml-auto text-xs text-slate-400">
+          <span className="ml-auto text-xs text-fg-subtle">
             Showing {displayRows.length} / {rows.length} rows
           </span>
         </div>
@@ -402,9 +403,9 @@ export default function DailyTrackerPage() {
 
       {/* ── No College Selected state ──────────────────────────────────────── */}
       {!selectedCollegeId && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-500">
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-fg-subtle">
           <div className="text-6xl">📋</div>
-          <p className="text-xl font-semibold text-slate-400">Select a College to Begin</p>
+          <p className="text-xl font-semibold text-fg-subtle">Select a College to Begin</p>
           <p className="text-sm">Choose a college from the dropdown above, then load contacts to start logging calls.</p>
         </div>
       )}
@@ -422,11 +423,11 @@ export default function DailyTrackerPage() {
       )}
 
       {/* ── Bottom Status Bar ─────────────────────────────────────────────── */}
-      <footer className="glass-panel border-t border-slate-800 px-6 py-2 flex items-center gap-6 text-xs text-slate-400">
-        <span>Total: <strong className="text-slate-200">{rows.length}</strong> rows</span>
-        <span>Completed: <strong className="text-emerald-400">{kpi?.completed ?? 0}</strong></span>
-        <span>Pending: <strong className="text-amber-400">{kpi?.pending ?? 0}</strong></span>
-        <span>Positive: <strong className="text-blue-400">{kpi?.positive ?? 0}</strong></span>
+      <footer className="glass-panel border-t border-border px-6 py-2 flex items-center gap-6 text-xs text-fg-subtle">
+        <span>Total: <strong className="text-fg">{rows.length}</strong> rows</span>
+        <span>Completed: <strong className="text-success">{kpi?.completed ?? 0}</strong></span>
+        <span>Pending: <strong className="text-warning">{kpi?.pending ?? 0}</strong></span>
+        <span>Positive: <strong className="text-primary">{kpi?.positive ?? 0}</strong></span>
         {kpi && kpi.total_loaded > 0 && (
           <span>
             Progress:{' '}
@@ -436,11 +437,11 @@ export default function DailyTrackerPage() {
           </span>
         )}
         {isHistoryMode && (
-          <span className="ml-auto text-amber-400">📖 Viewing history — {historyDate} — Read-Only</span>
+          <span className="ml-auto text-warning">📖 Viewing history — {historyDate} — Read-Only</span>
         )}
         {lastSavedAt && !isHistoryMode && (
           <span className="ml-auto">
-            Last saved: <strong className="text-slate-300">{lastSavedAt.toLocaleTimeString('en-IN')}</strong>
+            Last saved: <strong className="text-fg-muted">{lastSavedAt.toLocaleTimeString('en-IN')}</strong>
           </span>
         )}
       </footer>
@@ -464,25 +465,25 @@ export default function DailyTrackerPage() {
       {/* ── Missing Email Warning Dialog ───────────────────────────────────── */}
       {showEmailWarning && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="glass-panel rounded-2xl p-6 max-w-md w-full mx-4 border border-amber-500/30">
-            <h3 className="text-lg font-semibold text-amber-400 mb-3">⚠️ Missing Email IDs</h3>
-            <p className="text-sm text-slate-300 mb-3">
+          <div className="glass-panel rounded-2xl p-6 max-w-md w-full mx-4 border border-warning/30">
+            <h3 className="text-lg font-semibold text-warning mb-3"><AlertTriangle size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}Missing Email IDs</h3>
+            <p className="text-sm text-fg-muted mb-3">
               <strong>{missingEmailRows.length}</strong> company(s) with "Invite Mail" outcome are missing Email ID.
               Progress will be saved — these will appear tomorrow as Pending Information.
             </p>
-            <ul className="text-xs text-slate-400 mb-4 list-disc list-inside">
+            <ul className="text-xs text-fg-subtle mb-4 list-disc list-inside">
               {missingEmailRows.map((name) => <li key={name}>{name}</li>)}
             </ul>
             <div className="flex gap-3">
               <button
                 onClick={doSaveProgress}
-                className="flex-1 bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                className="flex-1 bg-warning hover:bg-warning text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
               >
                 Save Anyway
               </button>
               <button
                 onClick={() => setShowEmailWarning(false)}
-                className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2 rounded-lg text-sm transition-colors"
+                className="flex-1 bg-surface-raised hover:bg-surface-raised text-fg px-4 py-2 rounded-lg text-sm transition-colors"
               >
                 Go Back
               </button>

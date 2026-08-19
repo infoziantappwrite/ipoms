@@ -8,6 +8,7 @@ import { UserModal } from './components/UserModal';
 import { RoleMatrixTab } from './components/RoleMatrixTab';
 import { SystemConfigTab } from './components/SystemConfigTab';
 import { SystemInfoTab } from './components/SystemInfoTab';
+import { Settings } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -110,20 +111,20 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
 
       {/* ── Top Header Bar ────────────────────────────────────────────────── */}
-      <div className="glass-panel border-b border-slate-800 px-6 py-5 flex items-center justify-between flex-wrap gap-4">
+      <div className="glass-panel border-b border-border px-6 py-5 flex items-center justify-between flex-wrap gap-4">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-              <span>⚙️</span> Settings & System Administration
+              <Settings size={14} strokeWidth={2} aria-hidden /> Settings & System Administration
             </h1>
-            <span className="text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2.5 py-0.5 rounded-full font-semibold">
+            <span className="text-xs bg-primary/20 text-primary border border-primary/30 px-2.5 py-0.5 rounded-full font-semibold">
               Modules 01 & 09 • Governance
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-fg-subtle mt-1">
             Personal Profile, User Accounts, Role Permissions (RBAC) & Global Season Configuration
           </p>
         </div>
@@ -142,7 +143,7 @@ export default function SettingsPage() {
         {/* Content Pane */}
         <div className="flex-1">
           {loading ? (
-            <div className="p-12 text-center text-slate-500 italic text-xs">
+            <div className="p-12 text-center text-fg-subtle italic text-xs">
               Loading settings…
             </div>
           ) : (

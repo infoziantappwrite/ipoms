@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Building2, CalendarDays, Settings } from 'lucide-react';
 
 interface Props {
   settingsData: any;
@@ -61,113 +62,113 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
     <form onSubmit={handleSubmit} className="space-y-6 text-xs max-w-4xl">
 
       {/* Season & Daily Target Configuration (Spec Section 2) */}
-      <div className="glass-panel rounded-2xl border border-slate-800 p-6 space-y-4 shadow-xl">
-        <div className="border-b border-slate-800 pb-3">
+      <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-xl">
+        <div className="border-b border-border pb-3">
           <h3 className="text-xs font-bold text-white flex items-center gap-2">
-            <span>📅</span> Placement Season & Operational Targets
+            <CalendarDays size={14} strokeWidth={2} aria-hidden /> Placement Season & Operational Targets
           </h3>
-          <p className="text-[11px] text-slate-400 mt-0.5">
+          <p className="text-micro text-fg-subtle mt-0.5">
             Configure active academic year and daily baseline targets for coordinators
           </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label className="block text-slate-300 font-semibold mb-1">Academic Year</label>
+            <label className="block text-fg-muted font-semibold mb-1">Academic Year</label>
             <input
               type="text"
               value={academicYear}
               onChange={(e) => setAcademicYear(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 font-mono"
+              className="w-full bg-background border border-border-strong rounded-lg px-3 py-2 text-fg font-mono"
             />
           </div>
 
           <div>
-            <label className="block text-slate-300 font-semibold mb-1">Season Name</label>
+            <label className="block text-fg-muted font-semibold mb-1">Season Name</label>
             <input
               type="text"
               value={seasonName}
               onChange={(e) => setSeasonName(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+              className="w-full bg-background border border-border-strong rounded-lg px-3 py-2 text-fg "
             />
           </div>
 
           <div>
-            <label className="block text-slate-300 font-semibold mb-1">Daily Calling Target (Calls)</label>
+            <label className="block text-fg-muted font-semibold mb-1">Daily Calling Target (Calls)</label>
             <input
               type="number"
               min={10}
               max={100}
               value={dailyTarget}
               onChange={(e) => setDailyTarget(Number(e.target.value))}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 font-mono"
+              className="w-full bg-background border border-border-strong rounded-lg px-3 py-2 text-fg font-mono"
             />
           </div>
         </div>
       </div>
 
       {/* Organization Branding & Support (Spec Section 12) */}
-      <div className="glass-panel rounded-2xl border border-slate-800 p-6 space-y-4 shadow-xl">
-        <div className="border-b border-slate-800 pb-3">
+      <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-xl">
+        <div className="border-b border-border pb-3">
           <h3 className="text-xs font-bold text-white flex items-center gap-2">
-            <span>🏢</span> Organization Branding & Support
+            <Building2 size={14} strokeWidth={2} aria-hidden /> Organization Branding & Support
           </h3>
-          <p className="text-[11px] text-slate-400 mt-0.5">
+          <p className="text-micro text-fg-subtle mt-0.5">
             Default company brand name and support contacts for exported reports
           </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label className="block text-slate-300 font-semibold mb-1">Organization Name</label>
+            <label className="block text-fg-muted font-semibold mb-1">Organization Name</label>
             <input
               type="text"
               value={orgName}
               onChange={(e) => setOrgName(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+              className="w-full bg-background border border-border-strong rounded-lg px-3 py-2 text-fg "
             />
           </div>
 
           <div>
-            <label className="block text-slate-300 font-semibold mb-1">Support Email</label>
+            <label className="block text-fg-muted font-semibold mb-1">Support Email</label>
             <input
               type="email"
               value={supportEmail}
               onChange={(e) => setSupportEmail(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 font-mono"
+              className="w-full bg-background border border-border-strong rounded-lg px-3 py-2 text-fg font-mono"
             />
           </div>
 
           <div>
-            <label className="block text-slate-300 font-semibold mb-1">Support Phone</label>
+            <label className="block text-fg-muted font-semibold mb-1">Support Phone</label>
             <input
               type="text"
               value={supportPhone}
               onChange={(e) => setSupportPhone(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 font-mono"
+              className="w-full bg-background border border-border-strong rounded-lg px-3 py-2 text-fg font-mono"
             />
           </div>
         </div>
       </div>
 
       {/* Preferences & Notifications (Spec Section 10 & 11) */}
-      <div className="glass-panel rounded-2xl border border-slate-800 p-6 space-y-4 shadow-xl">
-        <div className="border-b border-slate-800 pb-3">
+      <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-xl">
+        <div className="border-b border-border pb-3">
           <h3 className="text-xs font-bold text-white flex items-center gap-2">
-            <span>⚙️</span> Application Delivery & Preferences
+            <Settings size={14} strokeWidth={2} aria-hidden /> Application Delivery & Preferences
           </h3>
-          <p className="text-[11px] text-slate-400 mt-0.5">
+          <p className="text-micro text-fg-subtle mt-0.5">
             Default landing page, UI theme, and notification delivery channels
           </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-slate-300 font-semibold mb-1">Default Landing Screen</label>
+            <label className="block text-fg-muted font-semibold mb-1">Default Landing Screen</label>
             <select
               value={landingPage}
               onChange={(e) => setLandingPage(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
+              className="w-full bg-background border border-border-strong rounded-lg px-3 py-2 text-fg cursor-pointer"
             >
               <option value="/dashboard">Role-Based Dashboard (/dashboard)</option>
               <option value="/tracker">Daily Call Tracker (/tracker)</option>
@@ -178,11 +179,11 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
           </div>
 
           <div>
-            <label className="block text-slate-300 font-semibold mb-1">Default Theme Style</label>
+            <label className="block text-fg-muted font-semibold mb-1">Default Theme Style</label>
             <select
               value={themeDefault}
               onChange={(e) => setThemeDefault(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
+              className="w-full bg-background border border-border-strong rounded-lg px-3 py-2 text-fg cursor-pointer"
             >
               <option value="dark">Dark Theme (Standard Executive Slate)</option>
               <option value="light">Light Theme</option>
@@ -192,15 +193,15 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
         </div>
 
         {/* Notification Switches */}
-        <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-slate-800/80">
+        <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-border/80">
           <label className="flex items-center gap-2 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={emailNotifs}
               onChange={(e) => setEmailNotifs(e.target.checked)}
-              className="rounded bg-slate-800 border-slate-700 text-blue-500 focus:ring-0"
+              className="rounded bg-surface border-border-strong text-primary "
             />
-            <span className="text-slate-300 font-semibold">Email Alerts Active</span>
+            <span className="text-fg-muted font-semibold">Email Alerts Active</span>
           </label>
 
           <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -208,9 +209,9 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
               type="checkbox"
               checked={systemNotifs}
               onChange={(e) => setSystemNotifs(e.target.checked)}
-              className="rounded bg-slate-800 border-slate-700 text-blue-500 focus:ring-0"
+              className="rounded bg-surface border-border-strong text-primary "
             />
-            <span className="text-slate-300 font-semibold">In-App Notifications</span>
+            <span className="text-fg-muted font-semibold">In-App Notifications</span>
           </label>
 
           <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -218,9 +219,9 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
               type="checkbox"
               checked={dashboardPopups}
               onChange={(e) => setDashboardPopups(e.target.checked)}
-              className="rounded bg-slate-800 border-slate-700 text-blue-500 focus:ring-0"
+              className="rounded bg-surface border-border-strong text-primary "
             />
-            <span className="text-slate-300 font-semibold">Dashboard Popups</span>
+            <span className="text-fg-muted font-semibold">Dashboard Popups</span>
           </label>
         </div>
       </div>
@@ -229,7 +230,7 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
       <div className="flex justify-end pt-2">
         <button
           type="submit"
-          className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-lg transition-colors text-xs"
+          className="px-6 py-2.5 bg-primary hover:bg-primary text-white rounded-xl font-bold shadow-lg transition-colors text-xs"
         >
           Save System Configuration ⚙️
         </button>

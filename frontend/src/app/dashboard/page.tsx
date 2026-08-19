@@ -75,7 +75,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
 
       {/* ── Top Header & Role Switcher ────────────────────────────────────── */}
       <DashboardHeader

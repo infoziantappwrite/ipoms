@@ -34,7 +34,7 @@ export function CollegeSelector({ selectedCollegeId, onSelect }: Props) {
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs text-slate-400 font-medium whitespace-nowrap">College:</span>
+      <span className="text-xs text-fg-subtle font-medium whitespace-nowrap">College:</span>
       <select
         value={selectedCollegeId}
         onChange={(e) => {
@@ -42,8 +42,8 @@ export function CollegeSelector({ selectedCollegeId, onSelect }: Props) {
           if (college) onSelect(college._id, college.college_name);
         }}
         disabled={loading}
-        className="bg-slate-800 border border-slate-700 text-slate-200 text-sm px-3 py-2 rounded-lg 
-                   focus:outline-none focus:border-blue-500 min-w-[220px] cursor-pointer
+        className="bg-surface border border-border-strong text-fg text-sm px-3 py-2 rounded-lg 
+                   min-w-[220px] cursor-pointer
                    disabled:opacity-50"
       >
         <option value="">
@@ -56,7 +56,7 @@ export function CollegeSelector({ selectedCollegeId, onSelect }: Props) {
         ))}
       </select>
       {selected && (
-        <span className="text-xs text-slate-500 hidden lg:inline">
+        <span className="text-xs text-fg-subtle hidden lg:inline">
           {selected.location}
         </span>
       )}

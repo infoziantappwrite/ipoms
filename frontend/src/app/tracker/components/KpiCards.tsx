@@ -44,7 +44,7 @@ function KpiCard({
         <span className="text-lg">{icon}</span>
         <span className={`text-2xl font-bold ${color} tabular-nums`}>{value}</span>
       </div>
-      <p className="text-xs text-slate-400 font-medium mt-1">{label}</p>
+      <p className="text-xs text-fg-subtle font-medium mt-1">{label}</p>
     </div>
   );
 }
@@ -55,43 +55,43 @@ export function KpiCards({ kpi }: Props) {
     {
       label: 'Completed',
       value: kpi.completed,
-      color: 'text-emerald-400',
-      ring: 'border-emerald-500/20 hover:border-emerald-500/40',
+      color: 'text-success',
+      ring: 'border-success/20 hover:border-success/40',
       icon: '✅',
     },
     {
       label: 'Pending',
       value: kpi.pending,
-      color: 'text-amber-400',
-      ring: 'border-amber-500/20 hover:border-amber-500/40',
+      color: 'text-warning',
+      ring: 'border-warning/20 hover:border-warning/40',
       icon: '⏳',
     },
     {
       label: 'Positive',
       value: kpi.positive,
-      color: 'text-blue-400',
-      ring: 'border-blue-500/20 hover:border-blue-500/40',
+      color: 'text-primary',
+      ring: 'border-primary/20 hover:border-primary/40',
       icon: '🎯',
     },
     {
       label: 'No Response',
       value: kpi.no_response,
-      color: 'text-red-400',
-      ring: 'border-red-500/20 hover:border-red-500/40',
+      color: 'text-destructive',
+      ring: 'border-destructive/20 hover:border-destructive/40',
       icon: '📵',
     },
     {
       label: 'Follow Up',
       value: kpi.follow_up,
-      color: 'text-orange-400',
-      ring: 'border-orange-500/20 hover:border-orange-500/40',
+      color: 'text-warning',
+      ring: 'border-warning/20 hover:border-warning/40',
       icon: '🔁',
     },
     {
       label: 'Skipped',
       value: kpi.skipped,
-      color: 'text-slate-400',
-      ring: 'border-slate-600/30 hover:border-slate-500/40',
+      color: 'text-fg-subtle',
+      ring: 'border-border-strong/30 hover:border-border-strong/40',
       icon: '⏭️',
     },
   ];

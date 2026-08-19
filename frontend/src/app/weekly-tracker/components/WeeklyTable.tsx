@@ -48,26 +48,26 @@ function getFollowUpBadge(dateStr?: string) {
   if (diffDays < 0) {
     return {
       text: `${formattedDate} (Overdue)`,
-      badgeClass: 'bg-red-500/20 text-red-400 border border-red-500/30',
-      dotClass: 'bg-red-400',
+      badgeClass: 'bg-destructive/20 text-destructive border border-destructive/30',
+      dotClass: 'bg-destructive',
     };
   } else if (diffDays === 0) {
     return {
       text: `${formattedDate} (Today)`,
-      badgeClass: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
-      dotClass: 'bg-amber-400 animate-pulse',
+      badgeClass: 'bg-warning/20 text-warning border border-warning/30',
+      dotClass: 'bg-warning animate-pulse',
     };
   } else if (diffDays <= 3) {
     return {
       text: `${formattedDate} (${diffDays}d)`,
-      badgeClass: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30',
-      dotClass: 'bg-yellow-400',
+      badgeClass: 'bg-warning/20 text-warning border border-warning/30',
+      dotClass: 'bg-warning',
     };
   } else {
     return {
       text: formattedDate,
-      badgeClass: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
-      dotClass: 'bg-emerald-400',
+      badgeClass: 'bg-success/20 text-success border border-success/30',
+      dotClass: 'bg-success',
     };
   }
 }
@@ -84,7 +84,7 @@ export function WeeklyTable({
 
   if (rows.length === 0) {
     return (
-      <div className="py-6 text-center text-xs text-slate-600 italic">
+      <div className="py-6 text-center text-xs text-fg-muted italic">
         No companies in this section
       </div>
     );
@@ -94,7 +94,7 @@ export function WeeklyTable({
     <div className="overflow-x-auto">
       <table className="w-full text-xs text-left">
         <thead>
-          <tr className="bg-slate-900/80 text-slate-400 font-semibold border-b border-slate-800 uppercase tracking-wider text-[11px]">
+          <tr className="bg-background/80 text-fg-subtle font-semibold border-b border-border uppercase tracking-wider text-micro">
             <th className="py-2.5 px-3 w-10 text-center">#</th>
             <th className="py-2.5 px-3 min-w-[170px]">Company Name</th>
             <th className="py-2.5 px-3 min-w-[200px]">Role(s)</th>
@@ -109,7 +109,7 @@ export function WeeklyTable({
             <th className="py-2.5 px-3 w-12 text-center"></th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-800/60 font-normal">
+        <tbody className="divide-y divide-border/60 font-normal">
           {rows.map((row, idx) => (
             <TableRow
               key={row._id}
@@ -171,15 +171,15 @@ function TableRow({
   const followUpBadge = getFollowUpBadge(row.follow_up_date);
 
   return (
-    <tr className="hover:bg-slate-800/30 transition-colors group">
+    <tr className="hover:bg-surface/30 transition-colors group">
       {/* S.No */}
-      <td className="py-2.5 px-3 text-center text-slate-500 font-mono">{index}</td>
+      <td className="py-2.5 px-3 text-center text-fg-subtle font-mono">{index}</td>
 
       {/* Company Name */}
-      <td className="py-2.5 px-3 font-semibold text-slate-200">
+      <td className="py-2.5 px-3 font-semibold text-fg">
         <div className="flex items-center gap-1.5">
           {row.is_pinned_top && (
-            <span className="text-amber-400 text-xs" title="Pinned to Top Companies">★</span>
+            <span className="text-warning text-xs" title="Pinned to Top Companies">★</span>
           )}
           {editingField === 'company_name' ? (
             <input
@@ -189,12 +189,12 @@ function TableRow({
               onBlur={() => commitEdit('company_name')}
               onKeyDown={(e) => handleKeyDown(e, 'company_name')}
               autoFocus
-              className="bg-slate-800 border border-blue-500 rounded px-1.5 py-0.5 text-xs text-white outline-none w-full"
+              className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white w-full"
             />
           ) : (
             <span
               onClick={() => startEdit('company_name', row.company_name)}
-              className="cursor-pointer hover:text-blue-400 transition-colors"
+              className="cursor-pointer hover:text-primary transition-colors"
             >
               {row.company_name}
             </span>
@@ -203,7 +203,7 @@ function TableRow({
       </td>
 
       {/* Role (Comma-separated multi-roles per Spec Section 6) */}
-      <td className="py-2.5 px-3 text-slate-300">
+      <td className="py-2.5 px-3 text-fg-muted">
         {editingField === 'job_role' ? (
           <input
             type="text"
@@ -212,17 +212,17 @@ function TableRow({
             onBlur={() => commitEdit('job_role')}
             onKeyDown={(e) => handleKeyDown(e, 'job_role')}
             autoFocus
-            className="bg-slate-800 border border-blue-500 rounded px-1.5 py-0.5 text-xs text-white outline-none w-full"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white w-full"
           />
         ) : (
           <div
             onClick={() => startEdit('job_role', row.job_role)}
-            className="cursor-pointer hover:text-blue-400 transition-colors flex flex-wrap gap-1"
+            className="cursor-pointer hover:text-primary transition-colors flex flex-wrap gap-1"
           >
             {row.job_role.split(',').map((r, i) => (
               <span
                 key={i}
-                className="bg-slate-800 border border-slate-700 text-slate-300 px-1.5 py-0.5 rounded text-[11px]"
+                className="bg-surface border border-border-strong text-fg-muted px-1.5 py-0.5 rounded text-micro"
               >
                 {r.trim()}
               </span>
@@ -232,7 +232,7 @@ function TableRow({
       </td>
 
       {/* CDC Reference */}
-      <td className="py-2.5 px-3 text-slate-400">
+      <td className="py-2.5 px-3 text-fg-subtle">
         {editingField === 'cdc_reference' ? (
           <input
             type="text"
@@ -241,20 +241,20 @@ function TableRow({
             onBlur={() => commitEdit('cdc_reference')}
             onKeyDown={(e) => handleKeyDown(e, 'cdc_reference')}
             autoFocus
-            className="bg-slate-800 border border-blue-500 rounded px-1.5 py-0.5 text-xs text-white outline-none w-full"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white w-full"
           />
         ) : (
           <span
             onClick={() => startEdit('cdc_reference', row.cdc_reference)}
-            className="cursor-pointer hover:text-blue-400 transition-colors"
+            className="cursor-pointer hover:text-primary transition-colors"
           >
-            {row.cdc_reference || <span className="text-slate-600 italic">—</span>}
+            {row.cdc_reference || <span className="text-fg-muted italic">—</span>}
           </span>
         )}
       </td>
 
       {/* Company Type */}
-      <td className="py-2.5 px-3 text-slate-400">
+      <td className="py-2.5 px-3 text-fg-subtle">
         {editingField === 'company_type' ? (
           <input
             type="text"
@@ -263,20 +263,20 @@ function TableRow({
             onBlur={() => commitEdit('company_type')}
             onKeyDown={(e) => handleKeyDown(e, 'company_type')}
             autoFocus
-            className="bg-slate-800 border border-blue-500 rounded px-1.5 py-0.5 text-xs text-white outline-none w-full"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white w-full"
           />
         ) : (
           <span
             onClick={() => startEdit('company_type', row.company_type)}
-            className="cursor-pointer hover:text-blue-400 transition-colors text-slate-400"
+            className="cursor-pointer hover:text-primary transition-colors text-fg-subtle"
           >
-            {row.company_type || <span className="text-slate-600 italic">—</span>}
+            {row.company_type || <span className="text-fg-muted italic">—</span>}
           </span>
         )}
       </td>
 
       {/* CTC */}
-      <td className="py-2.5 px-3 text-emerald-400 font-medium">
+      <td className="py-2.5 px-3 text-success font-medium">
         {editingField === 'ctc_lpa' ? (
           <input
             type="text"
@@ -285,14 +285,14 @@ function TableRow({
             onBlur={() => commitEdit('ctc_lpa')}
             onKeyDown={(e) => handleKeyDown(e, 'ctc_lpa')}
             autoFocus
-            className="bg-slate-800 border border-blue-500 rounded px-1.5 py-0.5 text-xs text-white outline-none w-full"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white w-full"
           />
         ) : (
           <span
             onClick={() => startEdit('ctc_lpa', row.ctc_lpa)}
-            className="cursor-pointer hover:text-blue-400 transition-colors"
+            className="cursor-pointer hover:text-primary transition-colors"
           >
-            {row.ctc_lpa || <span className="text-slate-600 italic">—</span>}
+            {row.ctc_lpa || <span className="text-fg-muted italic">—</span>}
           </span>
         )}
       </td>
@@ -307,7 +307,7 @@ function TableRow({
             onBlur={() => commitEdit('follow_up_date')}
             onKeyDown={(e) => handleKeyDown(e, 'follow_up_date')}
             autoFocus
-            className="bg-slate-800 border border-blue-500 rounded px-1.5 py-0.5 text-xs text-white outline-none"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white "
           />
         ) : (
           <div
@@ -315,19 +315,19 @@ function TableRow({
             className="cursor-pointer flex items-center gap-1.5"
           >
             {followUpBadge ? (
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${followUpBadge.badgeClass}`}>
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-micro font-medium ${followUpBadge.badgeClass}`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${followUpBadge.dotClass}`} />
                 {followUpBadge.text}
               </span>
             ) : (
-              <span className="text-slate-600 italic text-[11px] hover:text-blue-400">+ Add Date</span>
+              <span className="text-fg-muted italic text-micro hover:text-primary">+ Add Date</span>
             )}
           </div>
         )}
       </td>
 
       {/* Current Status Notes (Rich Natural Free-Text per Spec Section 5) */}
-      <td className="py-2.5 px-3 text-slate-300">
+      <td className="py-2.5 px-3 text-fg-muted">
         {editingField === 'current_status_text' ? (
           <input
             type="text"
@@ -336,22 +336,22 @@ function TableRow({
             onBlur={() => commitEdit('current_status_text')}
             onKeyDown={(e) => handleKeyDown(e, 'current_status_text')}
             autoFocus
-            className="bg-slate-800 border border-blue-500 rounded px-1.5 py-0.5 text-xs text-white outline-none w-full"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white w-full"
           />
         ) : (
           <span
             onClick={() => startEdit('current_status_text', row.current_status_text)}
-            className="cursor-pointer hover:text-blue-400 transition-colors line-clamp-2"
+            className="cursor-pointer hover:text-primary transition-colors line-clamp-2"
             title={row.current_status_text}
           >
-            {row.current_status_text || <span className="text-slate-600 italic">—</span>}
+            {row.current_status_text || <span className="text-fg-muted italic">—</span>}
           </span>
         )}
       </td>
 
       {/* Offers (Completed Section Only per Spec Section 5) */}
       {isCompletedSection && (
-        <td className="py-2.5 px-3 text-center font-bold text-emerald-400">
+        <td className="py-2.5 px-3 text-center font-bold text-success">
           {editingField === 'selected_count' ? (
             <input
               type="number"
@@ -361,7 +361,7 @@ function TableRow({
               onBlur={() => commitEdit('selected_count')}
               onKeyDown={(e) => handleKeyDown(e, 'selected_count')}
               autoFocus
-              className="bg-slate-800 border border-blue-500 rounded px-1.5 py-0.5 text-xs text-white text-center outline-none w-16"
+              className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white text-center w-16"
             />
           ) : (
             <span

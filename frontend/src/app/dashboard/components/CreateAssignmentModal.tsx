@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Plus } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -85,14 +86,14 @@ export function CreateAssignmentModal({ onClose, onSuccess }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="glass-panel rounded-2xl w-full max-w-xl border border-slate-700 shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div className="glass-panel rounded-2xl w-full max-w-xl border border-border-strong shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
 
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="flex items-center justify-between border-b border-border pb-3">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <span>➕</span> Assign Operational Task to Coordinator
+            <Plus size={14} strokeWidth={2} aria-hidden /> Assign Operational Task to Coordinator
           </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-base">
+          <button onClick={onClose} className="text-fg-subtle hover:text-white text-base">
             ✕
           </button>
         </div>
@@ -102,13 +103,13 @@ export function CreateAssignmentModal({ onClose, onSuccess }: Props) {
           {/* Coordinator & College Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">
+              <label className="block text-fg-muted font-semibold mb-1">
                 Target Coordinator *
               </label>
               <select
                 value={coordinatorId}
                 onChange={(e) => setCoordinatorId(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
               >
                 {coordinators.map((c) => (
                   <option key={c._id} value={c._id}>
@@ -119,13 +120,13 @@ export function CreateAssignmentModal({ onClose, onSuccess }: Props) {
             </div>
 
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">
+              <label className="block text-fg-muted font-semibold mb-1">
                 Assigned College *
               </label>
               <select
                 value={collegeId}
                 onChange={(e) => setCollegeId(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
               >
                 {colleges.map((c) => (
                   <option key={c._id} value={c._id}>
@@ -139,23 +140,23 @@ export function CreateAssignmentModal({ onClose, onSuccess }: Props) {
           {/* Company & Priority */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="md:col-span-2">
-              <label className="block text-slate-300 font-semibold mb-1">Company Name *</label>
+              <label className="block text-fg-muted font-semibold mb-1">Company Name *</label>
               <input
                 type="text"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 placeholder="e.g. Cisco Systems"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
                 required
               />
             </div>
 
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Priority</label>
+              <label className="block text-fg-muted font-semibold mb-1">Priority</label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as any)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
               >
                 <option value="high">🔴 High Priority</option>
                 <option value="medium">🟠 Medium</option>
@@ -165,8 +166,8 @@ export function CreateAssignmentModal({ onClose, onSuccess }: Props) {
           </div>
 
           {/* HR Contact Details (Optional) */}
-          <div className="bg-slate-900/60 p-3 rounded-xl border border-slate-800 space-y-3">
-            <span className="font-semibold text-slate-300 block text-[11px] uppercase tracking-wider">
+          <div className="bg-background/60 p-3 rounded-xl border border-border space-y-3">
+            <span className="font-semibold text-fg-muted block text-micro uppercase tracking-wider">
               Corporate HR Contact (For Metadata Merge)
             </span>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -175,28 +176,28 @@ export function CreateAssignmentModal({ onClose, onSuccess }: Props) {
                 placeholder="HR Contact Name"
                 value={hrName}
                 onChange={(e) => setHrName(e.target.value)}
-                className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-blue-500"
+                className="bg-surface border border-border-strong rounded-lg px-2.5 py-1.5 text-fg "
               />
               <input
                 type="text"
                 placeholder="HR Phone (10-Digit)"
                 value={hrMobile}
                 onChange={(e) => setHrMobile(e.target.value)}
-                className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-blue-500"
+                className="bg-surface border border-border-strong rounded-lg px-2.5 py-1.5 text-fg "
               />
               <input
                 type="email"
                 placeholder="HR Official Email"
                 value={hrEmail}
                 onChange={(e) => setHrEmail(e.target.value)}
-                className="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-blue-500"
+                className="bg-surface border border-border-strong rounded-lg px-2.5 py-1.5 text-fg "
               />
             </div>
           </div>
 
           {/* Task Instructions */}
           <div>
-            <label className="block text-slate-300 font-semibold mb-1">
+            <label className="block text-fg-muted font-semibold mb-1">
               Task Instructions *
             </label>
             <textarea
@@ -204,24 +205,24 @@ export function CreateAssignmentModal({ onClose, onSuccess }: Props) {
               value={taskDescription}
               onChange={(e) => setTaskDescription(e.target.value)}
               placeholder="e.g. Call HR to confirm online technical assessment timing and student registration link."
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+              className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
               required
             />
           </div>
 
           {/* Submit */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium"
+              className="px-4 py-2 bg-surface hover:bg-surface-raised text-fg-muted rounded-xl font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-md transition-colors"
+              className="px-5 py-2 bg-primary hover:bg-primary text-white rounded-xl font-bold shadow-md transition-colors"
             >
               {loading ? 'Dispatching…' : 'Dispatch Assignment →'}
             </button>

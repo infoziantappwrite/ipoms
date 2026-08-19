@@ -1,50 +1,267 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   iPOMS DESIGN TOKENS — Layer 2 (Semantic)
+   ───────────────────────────────────────────────────────────────────────────
+   Values are space-separated RGB channels so Tailwind can apply opacity
+   modifiers: bg-primary/20, border-border/60, bg-overlay/55.
+
+   RULE: components reference SEMANTIC tokens only (bg-surface, text-fg-subtle).
+         Never reference a raw palette value (e.g. a bare slate/blue shade) here.
+
+   Naming follows the shadcn/ui contract so `npx shadcn add` drops in with zero
+   remapping, plus iPOMS extensions for dashboard surface depth and status.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 :root {
-  --font-sans: 'Inter', sans-serif;
+  /* ── Typography ─────────────────────────────────────────────────────── */
+  /* IBM Plex Sans — engineered for dense UI: open apertures at small sizes,
+     true tabular figures, and a mono sibling that shares its skeleton. */
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* ── Surfaces ───────────────────────────────────────────────────────── */
+  --background:      248 250 252;  /* #F8FAFC  page canvas                  */
+  --surface:         255 255 255;  /* #FFFFFF  cards, tables, modals        */
+  --surface-raised:  255 255 255;  /* #FFFFFF  dropdowns, hover (+elevation)*/
+  --surface-sunken:  241 245 249;  /* #F1F5F9  table headers, toolbars      */
+  --overlay:          15  23  42;  /* #0F172A  modal scrim (use /55)        */
+
+  /* shadcn aliases */
+  --card:            255 255 255;
+  --popover:         255 255 255;
+
+  /* ── Foreground ─────────────────────────────────────────────────────── */
+  --foreground:       15  23  42;  /* #0F172A  17.9:1 AAA  primary text     */
+  --fg-muted:         71  85 105;  /* #475569   7.6:1 AAA  secondary        */
+  --fg-subtle:       100 116 139;  /* #64748B   4.8:1 AA   meta / labels    */
+  --fg-disabled:     148 163 184;  /* #94A3B8   decorative only, never text */
+
+  /* shadcn aliases */
+  --card-foreground:  15  23  42;
+  --muted:           241 245 249;
+  --muted-foreground:100 116 139;
+
+  /* ── Brand ──────────────────────────────────────────────────────────── */
+  --primary:          30  58 138;  /* #1E3A8A  Infoziant Navy — 10.4:1      */
+  --primary-hover:    30  64 175;  /* #1E40AF                               */
+  --primary-subtle:  239 246 255;  /* #EFF6FF  tint background              */
+  --primary-foreground: 255 255 255;
+  --accent:           37  99 235;  /* #2563EB  interactive blue — 5.2:1     */
+  --accent-foreground: 255 255 255;
+
+  /* ── Status (all AA-verified against --surface) ─────────────────────── */
+  --success:           4 120  87;  /* #047857  4.9:1                        */
+  --success-subtle:  236 253 245;  /* #ECFDF5                               */
+  --success-foreground: 255 255 255;
+
+  --warning:         180  83   9;  /* #B45309  4.6:1                        */
+  --warning-subtle:  255 251 235;  /* #FFFBEB                               */
+  --warning-foreground: 255 255 255;
+
+  --destructive:     185  28  28;  /* #B91C1C  6.4:1                        */
+  --destructive-subtle: 254 242 242;
+  --destructive-foreground: 255 255 255;
+
+  --info:             29  78 216;  /* #1D4ED8  6.3:1                        */
+  --info-subtle:     239 246 255;
+  --info-foreground: 255 255 255;
+
+  /* ── Lines & focus ──────────────────────────────────────────────────── */
+  --border:          226 232 240;  /* #E2E8F0                               */
+  --border-strong:   203 213 225;  /* #CBD5E1                               */
+  --input:           203 213 225;
+  --ring:             37  99 235;  /* #2563EB  focus indicator              */
+
+  /* ── Categorical ramp ───────────────────────────────────────────────── */
+  /* Module identity + chart series. This is CATEGORICAL colour, not status
+     colour -- it carries no good/bad meaning, so it must never be folded into
+     success/warning/destructive. Always pair with an icon or label: colour is
+     the secondary identifier, never the only one (WCAG 1.4.1).
+     Use the hue directly for text/icons and /10 -- /20 for chips and borders. */
+  --module-1:  29  78 216;  /* #1D4ED8  blue    Dashboard      */
+  --module-2:  15 118 110;  /* #0F766E  teal    Daily Tracker  */
+  --module-3: 124  58 237;  /* #7C3AED  violet  Weekly Tracker */
+  --module-4: 180  83   9;  /* #B45309  amber   Daily Leads    */
+  --module-5: 190  18  60;  /* #BE123C  rose    Company DB     */
+  --module-6:  14 116 144;  /* #0E7490  cyan    Reports        */
+  --module-7:  77 124  15;  /* #4D7C0F  olive   Alerts         */
+  --module-8:  71  85 105;  /* #475569  slate   Settings       */
+
+  /* ── Elevation ──────────────────────────────────────────────────────── */
+  --elevation-1: 0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.06);
+  --elevation-2: 0 4px 6px -1px rgb(15 23 42 / 0.07), 0 2px 4px -2px rgb(15 23 42 / 0.06);
+  --elevation-3: 0 10px 15px -3px rgb(15 23 42 / 0.08), 0 4px 6px -4px rgb(15 23 42 / 0.06);
+  --elevation-4: 0 20px 25px -5px rgb(15 23 42 / 0.12), 0 8px 10px -6px rgb(15 23 42 / 0.08);
 }
 
-body {
-  font-family: var(--font-sans);
-  background-color: #0F172A;
-  color: #F8FAFC;
-  overflow-x: hidden;
+.dark {
+  --background:       15  23  42;  /* #0F172A */
+  --surface:          30  41  59;  /* #1E293B */
+  --surface-raised:   51  65  85;  /* #334155 */
+  --surface-sunken:   15  23  42;  /* #0F172A */
+  --overlay:           2   6  23;  /* #020617 */
+
+  --card:             30  41  59;
+  --popover:          30  41  59;
+
+  --foreground:      248 250 252;  /* #F8FAFC */
+  --fg-muted:        203 213 225;  /* #CBD5E1 */
+  --fg-subtle:       148 163 184;  /* #94A3B8 */
+  --fg-disabled:     100 116 139;  /* #64748B */
+
+  --card-foreground: 248 250 252;
+  --muted:            30  41  59;
+  --muted-foreground:148 163 184;
+
+  --primary:          59 130 246;  /* #3B82F6 */
+  --primary-hover:    96 165 250;  /* #60A5FA */
+  --primary-subtle:   30  58 138;  /* #1E3A8A */
+  --primary-foreground: 255 255 255;
+  --accent:           96 165 250;
+  --accent-foreground: 15  23  42;
+
+  --success:          52 211 153;  /* #34D399 */
+  --success-subtle:    6  78  59;  /* #064E3B */
+  --success-foreground: 15  23  42;
+
+  --warning:         251 191  36;  /* #FBBF24 */
+  --warning-subtle:  120  53  15;  /* #78350F */
+  --warning-foreground: 15  23  42;
+
+  --destructive:     248 113 113;  /* #F87171 */
+  --destructive-subtle: 127  29  29;
+  --destructive-foreground: 15  23  42;
+
+  --info:             96 165 250;
+  --info-subtle:      30  58 138;
+  --info-foreground:  15  23  42;
+
+  --border:           51  65  85;  /* #334155 */
+  --border-strong:    71  85 105;  /* #475569 */
+  --input:            71  85 105;
+  --ring:             96 165 250;  /* #60A5FA */
+
+  /* Lighter, desaturated tints -- dark mode never inverts categorical hue. */
+  --module-1:  96 165 250;  /* #60A5FA */
+  --module-2:  45 212 191;  /* #2DD4BF */
+  --module-3: 167 139 250;  /* #A78BFA */
+  --module-4: 251 191  36;  /* #FBBF24 */
+  --module-5: 251 113 133;  /* #FB7185 */
+  --module-6:  34 211 238;  /* #22D3EE */
+  --module-7: 163 230  53;  /* #A3E635 */
+  --module-8: 148 163 184;  /* #94A3B8 */
+
+  --elevation-1: 0 1px 3px 0 rgb(0 0 0 / 0.40);
+  --elevation-2: 0 4px 6px -1px rgb(0 0 0 / 0.45);
+  --elevation-3: 0 10px 15px -3px rgb(0 0 0 / 0.50);
+  --elevation-4: 0 20px 25px -5px rgb(0 0 0 / 0.60);
 }
 
-/* Custom Smooth Enterprise Scrollbar */
+/* ═══════════════════════════════════════════════════════════════════════════
+   BASE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    background-color: rgb(var(--background));
+    color: rgb(var(--foreground));
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Numeric columns: aligned digits, no width jitter as values change. */
+  .tabular,
+  td.num,
+  th.num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPONENT UTILITIES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  /* Retained for compatibility — 50 and 25 call sites respectively. Now
+     token-driven, so they follow the theme instead of hard-coding one mode. */
+  .glass-panel {
+    background-color: rgb(var(--surface));
+    border: 1px solid rgb(var(--border));
+    box-shadow: var(--elevation-1);
+  }
+
+  .glass-card {
+    background-color: rgb(var(--surface));
+    border: 1px solid rgb(var(--border));
+    box-shadow: var(--elevation-2);
+  }
+
+  /* Modal scrim — strong enough to isolate foreground (40–60% per HIG/MD). */
+  .scrim {
+    background-color: rgb(var(--overlay) / 0.55);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FOCUS INDICATOR
+   ---------------------------------------------------------------------------
+   Deliberately OUTSIDE @layer base: this replaces the 222 removed outline /
+   focus-border utilities, and must not lose the cascade to a utility class.
+   Longhand (not the `outline` shorthand) so a bad colour cannot invalidate the
+   whole declaration. focus-visible keeps the ring off mouse clicks.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:focus-visible,
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline-style: solid;
+  outline-width: 2px;
+  outline-color: rgb(var(--ring));
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SCROLLBAR
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0F172A;
+  background: rgb(var(--surface-sunken));
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: rgb(var(--border-strong));
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
-}
-
-/* Glassmorphism utility */
-.glass-panel {
-  background: rgba(30, 41, 59, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.glass-card {
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgb(var(--fg-disabled));
 }

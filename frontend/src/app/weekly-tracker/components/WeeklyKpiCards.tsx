@@ -23,9 +23,9 @@ export function WeeklyKpiCards({ kpi, activeSectionFilter, onFilterSection }: Pr
       label: 'Follow-ups Due Today',
       value: kpi.follow_ups_due_today,
       subValue: 'Urgent Action',
-      color: 'text-amber-400',
-      border: 'border-amber-500/30 hover:border-amber-500/60',
-      activeBorder: 'border-amber-500 bg-amber-950/20',
+      color: 'text-warning',
+      border: 'border-warning/30 hover:border-warning/60',
+      activeBorder: 'border-warning bg-warning/20',
       icon: '⏰',
     },
     {
@@ -33,9 +33,9 @@ export function WeeklyKpiCards({ kpi, activeSectionFilter, onFilterSection }: Pr
       label: 'Companies Completed',
       value: kpi.completed,
       subValue: `${kpi.total_offers} Offers Placed`,
-      color: 'text-emerald-400',
-      border: 'border-emerald-500/30 hover:border-emerald-500/60',
-      activeBorder: 'border-emerald-500 bg-emerald-950/20',
+      color: 'text-success',
+      border: 'border-success/30 hover:border-success/60',
+      activeBorder: 'border-success bg-success/20',
       icon: '🏆',
     },
     {
@@ -43,9 +43,9 @@ export function WeeklyKpiCards({ kpi, activeSectionFilter, onFilterSection }: Pr
       label: 'Companies In Progress',
       value: kpi.in_progress,
       subValue: 'Active Drives',
-      color: 'text-blue-400',
-      border: 'border-blue-500/30 hover:border-blue-500/60',
-      activeBorder: 'border-blue-500 bg-blue-950/20',
+      color: 'text-primary',
+      border: 'border-primary/30 hover:border-primary/60',
+      activeBorder: 'border-primary bg-primary/20',
       icon: '🚀',
     },
     {
@@ -73,9 +73,9 @@ export function WeeklyKpiCards({ kpi, activeSectionFilter, onFilterSection }: Pr
       label: 'Rejected Companies',
       value: kpi.rejected,
       subValue: 'HR / TPO Declines',
-      color: 'text-slate-400',
-      border: 'border-slate-700 hover:border-slate-500',
-      activeBorder: 'border-slate-400 bg-slate-800/40',
+      color: 'text-fg-subtle',
+      border: 'border-border-strong hover:border-border-strong',
+      activeBorder: 'border-border-strong bg-surface/40',
       icon: '🚫',
     },
   ];
@@ -93,10 +93,10 @@ export function WeeklyKpiCards({ kpi, activeSectionFilter, onFilterSection }: Pr
           >
             <div className="flex items-center justify-between">
               <span className="text-lg">{c.icon}</span>
-              <span className={`text-2xl font-extrabold ${c.color} tabular-nums`}>{c.value}</span>
+              <span className={`text-2xl font-bold ${c.color} tabular-nums`}>{c.value}</span>
             </div>
-            <p className="text-xs font-semibold text-slate-200 mt-2 truncate">{c.label}</p>
-            <p className="text-[11px] text-slate-400 font-medium mt-0.5">{c.subValue}</p>
+            <p className="text-xs font-semibold text-fg mt-2 truncate">{c.label}</p>
+            <p className="text-micro text-fg-subtle font-medium mt-0.5">{c.subValue}</p>
           </button>
         );
       })}

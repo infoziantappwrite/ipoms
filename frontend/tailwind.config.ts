@@ -1,5 +1,19 @@
 import type { Config } from 'tailwindcss';
 
+/**
+ * iPOMS Design System — Tailwind bridge.
+ *
+ * Layer 1 (primitive) lives in Tailwind's default palette — slate-*, blue-* etc.
+ * Layer 2 (semantic) is defined as CSS variables in src/app/globals.css and
+ * surfaced here as utilities: bg-surface, text-fg-subtle, border-border.
+ * Layer 3 (component) is the height/width scale at the bottom of this file.
+ *
+ * Components must only ever use Layer 2 and Layer 3.
+ */
+
+/** Wraps a channel-triplet CSS var so `bg-primary/20` keeps working. */
+const token = (name: string) => `rgb(var(--${name}) / <alpha-value>)`;
+
 const config: Config = {
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
@@ -10,41 +24,144 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        brand: {
-          50: '#F0F5FF',
-          100: '#E0EAFF',
-          200: '#C7D7FE',
-          300: '#A4BCFD',
-          400: '#8098F8',
-          500: '#6172F3',
-          600: '#444CE7',
-          700: '#3538CD',
-          800: '#1E3A8A', // Infoziant Primary Navy
-          900: '#0F172A', // Infoziant Deep Slate
-          950: '#080C1A',
-        },
+        /* ── Surfaces ─────────────────────────────────────────────────── */
+        background: token('background'),
         surface: {
-          DEFAULT: '#FFFFFF',
-          50: '#F8FAFC',
-          100: '#F1F5F9',
-          200: '#E2E8F0',
-          300: '#CBD5E1',
-          400: '#94A3B8',
-          500: '#64748B',
-          600: '#475569',
-          700: '#334155',
-          800: '#1E293B',
-          900: '#0F172A',
+          DEFAULT: token('surface'),
+          raised: token('surface-raised'),
+          sunken: token('surface-sunken'),
+        },
+        overlay: token('overlay'),
+
+        /* ── Foreground ───────────────────────────────────────────────── */
+        foreground: token('foreground'),
+        fg: {
+          DEFAULT: token('foreground'),
+          muted: token('fg-muted'),
+          subtle: token('fg-subtle'),
+          disabled: token('fg-disabled'),
+        },
+
+        /* ── Brand ────────────────────────────────────────────────────── */
+        primary: {
+          DEFAULT: token('primary'),
+          hover: token('primary-hover'),
+          subtle: token('primary-subtle'),
+          foreground: token('primary-foreground'),
+        },
+        accent: {
+          DEFAULT: token('accent'),
+          foreground: token('accent-foreground'),
+        },
+
+        /* ── Status ───────────────────────────────────────────────────── */
+        success: {
+          DEFAULT: token('success'),
+          subtle: token('success-subtle'),
+          foreground: token('success-foreground'),
+        },
+        warning: {
+          DEFAULT: token('warning'),
+          subtle: token('warning-subtle'),
+          foreground: token('warning-foreground'),
+        },
+        destructive: {
+          DEFAULT: token('destructive'),
+          subtle: token('destructive-subtle'),
+          foreground: token('destructive-foreground'),
+        },
+        info: {
+          DEFAULT: token('info'),
+          subtle: token('info-subtle'),
+          foreground: token('info-foreground'),
+        },
+
+        /* ── Categorical (module identity + chart series) ─────────────── */
+        module: {
+          1: token('module-1'),
+          2: token('module-2'),
+          3: token('module-3'),
+          4: token('module-4'),
+          5: token('module-5'),
+          6: token('module-6'),
+          7: token('module-7'),
+          8: token('module-8'),
+        },
+
+        /* ── Lines ────────────────────────────────────────────────────── */
+        border: {
+          DEFAULT: token('border'),
+          strong: token('border-strong'),
+        },
+        input: token('input'),
+        ring: token('ring'),
+
+        /* ── shadcn/ui compatibility aliases ──────────────────────────── */
+        card: {
+          DEFAULT: token('card'),
+          foreground: token('card-foreground'),
+        },
+        popover: {
+          DEFAULT: token('popover'),
+          foreground: token('card-foreground'),
+        },
+        muted: {
+          DEFAULT: token('muted'),
+          foreground: token('muted-foreground'),
         },
       },
+
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        sans: ['IBM Plex Sans', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        mono: ['IBM Plex Mono', 'ui-monospace', 'SF Mono', 'Menlo', 'monospace'],
       },
+
+      /**
+       * Four-step scale with a hard 12px floor.
+       * Replaces text-[10px] (114 uses) and text-[11px] (91 uses).
+       */
+      fontSize: {
+        micro: ['0.75rem', { lineHeight: '1rem', letterSpacing: '0.01em' }],   // 12 — badges, meta
+        body: ['0.875rem', { lineHeight: '1.25rem' }],                          // 14 — cells, inputs
+        title: ['1rem', { lineHeight: '1.5rem' }],                              // 16 — card titles
+        display: ['1.25rem', { lineHeight: '1.75rem', letterSpacing: '-0.01em' }], // 20 — page titles
+        'display-lg': ['1.5rem', { lineHeight: '2rem', letterSpacing: '-0.02em' }], // 24 — KPI numbers
+      },
+
+      /** Three radii. Current usage is already 72% concentrated in two. */
+      borderRadius: {
+        control: '0.375rem', // 6px  — inputs, buttons, badges
+        panel: '0.625rem',   // 10px — cards, modals, tables
+      },
+
+      /** Elevation via tokens so dark mode gets its own shadow ramp. */
       boxShadow: {
-        card: '0 1px 3px 0 rgba(15, 23, 42, 0.08), 0 1px 2px -1px rgba(15, 23, 42, 0.08)',
-        dropdown: '0 10px 15px -3px rgba(15, 23, 42, 0.1), 0 4px 6px -4px rgba(15, 23, 42, 0.1)',
-        modal: '0 20px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.15)',
-        glow: '0 0 20px rgba(59, 130, 246, 0.35)',
+        1: 'var(--elevation-1)',
+        2: 'var(--elevation-2)',
+        3: 'var(--elevation-3)',
+        4: 'var(--elevation-4)',
+      },
+
+      /** Layer 3 — component dimensions. */
+      spacing: {
+        control: '2.25rem', // 36px — button / input height
+        row: '2.5rem',      // 40px — data table row
+        toolbar: '3rem',    // 48px — table toolbar
+        header: '4rem',     // 64px — app header
+      },
+
+      transitionDuration: {
+        DEFAULT: '150ms',
+      },
+
+      zIndex: {
+        base: '0',
+        raised: '10',
+        sticky: '20',
+        header: '30',
+        overlay: '40',
+        modal: '50',
+        toast: '60',
       },
     },
   },

@@ -1,5 +1,7 @@
 'use client';
 
+import { AlertTriangle, Bell, CalendarDays, Check, Megaphone } from 'lucide-react';
+
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 
@@ -90,12 +92,12 @@ export function NotificationBellDropdown({ userId = '6a84719afa3bf51271bc1548' }
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white transition-all"
+        className="relative p-2 rounded-xl bg-surface-sunken border border-border hover:bg-surface-sunken/80 text-fg-muted hover:text-fg transition-all cursor-pointer"
         title="Notifications & Alerts"
       >
-        <span className="text-base">🔔</span>
+        <Bell size={18} strokeWidth={2} aria-hidden />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center animate-pulse">
+          <span className="absolute -top-1 -right-1 bg-destructive text-white text-micro font-bold w-4 h-4 rounded-full flex items-center justify-center shadow-xs animate-pulse">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
@@ -103,13 +105,13 @@ export function NotificationBellDropdown({ userId = '6a84719afa3bf51271bc1548' }
 
       {/* Top 100 Bell Dropdown Panel (Spec Section 5.2.8.5) */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 glass-panel rounded-2xl border border-slate-700 shadow-2xl z-50 overflow-hidden backdrop-blur-2xl">
+        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl border border-border shadow-xl z-50 overflow-hidden">
           {/* Header */}
-          <div className="p-3.5 border-b border-slate-800 bg-slate-900/80 flex items-center justify-between">
+          <div className="p-3.5 border-b border-border bg-background flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-white">Notifications</span>
+              <span className="text-xs font-bold text-fg">Notifications</span>
               {unreadCount > 0 && (
-                <span className="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded-full font-bold">
+                <span className="text-micro bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5 rounded-full font-bold">
                   {unreadCount} Unread
                 </span>
               )}
@@ -117,7 +119,7 @@ export function NotificationBellDropdown({ userId = '6a84719afa3bf51271bc1548' }
             {unreadCount > 0 && (
               <button
                 onClick={handleMarkAllRead}
-                className="text-[11px] text-blue-400 hover:text-blue-300 font-semibold"
+                className="text-micro text-primary hover:text-primary font-semibold"
               >
                 Mark all read
               </button>
@@ -125,32 +127,36 @@ export function NotificationBellDropdown({ userId = '6a84719afa3bf51271bc1548' }
           </div>
 
           {/* Notifications List (Top 100 max) */}
-          <div className="max-h-80 overflow-y-auto divide-y divide-slate-800/60">
+          <div className="max-h-80 overflow-y-auto divide-y divide-border">
             {notifications.length === 0 ? (
-              <div className="p-6 text-center text-slate-500 italic text-xs">
+              <div className="p-6 text-center text-fg-subtle italic text-xs">
                 No active notifications
               </div>
             ) : (
               notifications.slice(0, 100).map((n) => (
                 <div
                   key={n._id}
-                  className={`p-3.5 hover:bg-slate-800/40 transition-colors space-y-1.5 ${
-                    !n.is_read ? 'bg-blue-950/20' : ''
+                  className={`p-3.5 hover:bg-background transition-colors space-y-1.5 ${
+                    !n.is_read ? 'bg-primary-subtle/40' : ''
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-1.5">
                       <span className="text-sm">
-                        {n.notification_type === 'meeting' ? '📅' : n.priority === 'high' ? '🚨' : '📢'}
+                        {n.notification_type === 'meeting'
+                          ? <CalendarDays size={14} strokeWidth={2} aria-hidden />
+                          : n.priority === 'high'
+                            ? <AlertTriangle size={14} strokeWidth={2} className="text-destructive" aria-hidden />
+                            : <Megaphone size={14} strokeWidth={2} aria-hidden />}
                       </span>
-                      <span className="text-xs font-bold text-white line-clamp-1">{n.title}</span>
+                      <span className="text-xs font-bold text-fg line-clamp-1">{n.title}</span>
                     </div>
-                    <span className="text-[9px] text-slate-500 font-mono shrink-0">
+                    <span className="text-micro text-fg-subtle font-mono shrink-0">
                       {new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
 
-                  <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
+                  <p className="text-micro text-fg-muted line-clamp-2 leading-relaxed font-normal">
                     {n.message}
                   </p>
 
@@ -160,41 +166,42 @@ export function NotificationBellDropdown({ userId = '6a84719afa3bf51271bc1548' }
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={() => handleAcknowledge(n._id, 'will_attend')}
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+                          className={`px-2 py-0.5 rounded text-micro font-bold border transition-colors ${
                             n.user_response === 'will_attend'
-                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                              : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-emerald-950/40 hover:text-emerald-400'
+                              ? 'bg-success-subtle text-success border-success'
+                              : 'bg-surface-sunken text-fg-muted border-border hover:bg-success-subtle hover:text-success'
                           }`}
                         >
-                          ✓ Will Attend
+                          <Check size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}Will Attend
                         </button>
                         <button
                           onClick={() => handleAcknowledge(n._id, 'cannot_attend')}
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors ${
+                          className={`px-2 py-0.5 rounded text-micro font-bold border transition-colors ${
                             n.user_response === 'cannot_attend'
-                              ? 'bg-red-500/20 text-red-300 border-red-500/40'
-                              : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-red-950/40 hover:text-red-400'
+                              ? 'bg-destructive-subtle text-destructive border-destructive'
+                              : 'bg-surface-sunken text-fg-muted border-border hover:bg-destructive-subtle hover:text-destructive'
                           }`}
                         >
                           ✗ Cannot
                         </button>
                       </div>
-                    ) : n.requires_acknowledgment && !n.user_response ? (
+                    ) : n.requires_acknowledgment && !n.is_read ? (
                       <button
-                        onClick={() => handleAcknowledge(n._id, 'acknowledged')}
-                        className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-600/20 text-blue-300 border border-blue-500/30 hover:bg-blue-600/40"
+                        onClick={() => handleMarkRead(n._id)}
+                        className="px-2 py-0.5 bg-primary-subtle hover:bg-primary-subtle text-primary border border-primary-subtle rounded text-micro font-semibold transition-colors"
                       >
-                        ✓ Acknowledge
+                        <Check size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}Acknowledge
                       </button>
                     ) : null}
 
-                    {!n.is_read && (
-                      <button
-                        onClick={() => handleMarkRead(n._id)}
-                        className="text-[10px] text-slate-400 hover:text-slate-200 ml-auto"
+                    {n.action_url && (
+                      <Link
+                        href={n.action_url}
+                        onClick={() => setIsOpen(false)}
+                        className="text-micro text-primary hover:underline font-semibold ml-auto"
                       >
-                        Mark read
-                      </button>
+                        View Details →
+                      </Link>
                     )}
                   </div>
                 </div>
@@ -202,12 +209,12 @@ export function NotificationBellDropdown({ userId = '6a84719afa3bf51271bc1548' }
             )}
           </div>
 
-          {/* Footer View All Link */}
-          <div className="p-2.5 bg-slate-900/90 border-t border-slate-800 text-center">
+          {/* Footer View All */}
+          <div className="p-2.5 bg-background border-t border-border text-center">
             <Link
               href="/notifications"
               onClick={() => setIsOpen(false)}
-              className="text-xs font-bold text-blue-400 hover:text-blue-300 transition-colors"
+              className="text-xs text-fg-muted hover:text-primary font-bold block"
             >
               Open Full Notifications Center →
             </Link>

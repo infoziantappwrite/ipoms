@@ -2652,6 +2652,7 @@ app.get('/api/v1/metadata', async (req, res) => {
             if (isPhone) {
                 filter.$or = [
                     { primary_mobile: { $regex: queryStr, $options: 'i' } },
+                    { contact_numbers: { $regex: queryStr, $options: 'i' } },
                     { mobile_numbers: { $regex: queryStr, $options: 'i' } },
                 ];
             }
@@ -2661,7 +2662,9 @@ app.get('/api/v1/metadata', async (req, res) => {
                 const containsRegex = new RegExp(queryStr, 'i');
                 filter.$or = [
                     { company_name: startsWithRegex },
+                    { hr_contact_name: containsRegex },
                     { hr_name: containsRegex },
+                    { email_ids: containsRegex },
                     { primary_email: containsRegex },
                 ];
             }

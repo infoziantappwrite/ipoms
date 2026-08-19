@@ -1,0 +1,26 @@
+{
+  "name": "ipoms-monorepo",
+  "version": "1.0.0",
+  "description": "Infoziant Placement Operations Management System (iPOMS)",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"blue,green\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "build:frontend": "npm run build --prefix frontend",
+    "build:backend": "npm run build --prefix backend",
+    "build": "npm run build:backend && npm run build:frontend",
+    "start:backend": "npm run start --prefix backend",
+    "start:frontend": "npm run start --prefix frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "ipoms",
+    "placement-operations",
+    "infoziant"
+  ],
+  "author": "Infoziant",
+  "license": "ISC"
+}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { AlertTriangle, CalendarDays, Globe, Landmark, Megaphone, PenLine } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -76,14 +77,14 @@ export function BroadcastModal({ onClose, onSuccess }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="glass-panel rounded-2xl w-full max-w-xl border border-slate-700 shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div className="glass-panel rounded-2xl w-full max-w-xl border border-border-strong shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
 
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="flex items-center justify-between border-b border-border pb-3">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <span>📢</span> Dispatch Broadcast Announcement / Meeting
+            <Megaphone size={14} strokeWidth={2} aria-hidden /> Dispatch Broadcast Announcement / Meeting
           </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-base">
+          <button onClick={onClose} className="text-fg-subtle hover:text-white text-base">
             ✕
           </button>
         </div>
@@ -93,28 +94,28 @@ export function BroadcastModal({ onClose, onSuccess }: Props) {
           {/* Type & Priority Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">
+              <label className="block text-fg-muted font-semibold mb-1">
                 Notification Category *
               </label>
               <select
                 value={notificationType}
                 onChange={(e) => setNotificationType(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
+                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg cursor-pointer"
               >
-                <option value="announcement">📢 Announcement / Policy</option>
-                <option value="meeting">📅 Meeting Invitation</option>
+                <option value="announcement"><Megaphone size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}Announcement / Policy</option>
+                <option value="meeting"><CalendarDays size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}Meeting Invitation</option>
                 <option value="reminder">⏰ Operational Reminder</option>
-                <option value="system_alert">⚠️ System Alert</option>
-                <option value="assignment">📝 Task Assignment</option>
+                <option value="system_alert"><AlertTriangle size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}System Alert</option>
+                <option value="assignment"><PenLine size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}Task Assignment</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Priority Level</label>
+              <label className="block text-fg-muted font-semibold mb-1">Priority Level</label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as any)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
+                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg cursor-pointer"
               >
                 <option value="high">🔴 High Priority (Immediate Notice)</option>
                 <option value="medium">🟠 Medium Priority</option>
@@ -126,24 +127,24 @@ export function BroadcastModal({ onClose, onSuccess }: Props) {
           {/* Audience Targeting (Spec Section 5.2.8.4) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Target Audience *</label>
+              <label className="block text-fg-muted font-semibold mb-1">Target Audience *</label>
               <select
                 value={audienceType}
                 onChange={(e) => setAudienceType(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
+                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg cursor-pointer"
               >
-                <option value="everyone">🌐 Everyone (All Portal Users)</option>
-                <option value="college_group">🏛️ College Group (Assigned Coordinators)</option>
+                <option value="everyone"><Globe size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}Everyone (All Portal Users)</option>
+                <option value="college_group"><Landmark size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}College Group (Assigned Coordinators)</option>
               </select>
             </div>
 
             {audienceType === 'college_group' && (
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Select College *</label>
+                <label className="block text-fg-muted font-semibold mb-1">Select College *</label>
                 <select
                   value={targetCollegeId}
                   onChange={(e) => setTargetCollegeId(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
+                  className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg cursor-pointer"
                 >
                   <option value="all">Select institution</option>
                   {colleges.map((c) => (
@@ -158,26 +159,26 @@ export function BroadcastModal({ onClose, onSuccess }: Props) {
 
           {/* Title */}
           <div>
-            <label className="block text-slate-300 font-semibold mb-1">Alert Title *</label>
+            <label className="block text-fg-muted font-semibold mb-1">Alert Title *</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Mandatory Placement Operations Review at 5 PM"
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+              className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
               required
             />
           </div>
 
           {/* Message Body */}
           <div>
-            <label className="block text-slate-300 font-semibold mb-1">Detailed Message Body *</label>
+            <label className="block text-fg-muted font-semibold mb-1">Detailed Message Body *</label>
             <textarea
               rows={3}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Detailed description or agenda for the team..."
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+              className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
               required
             />
           </div>
@@ -185,13 +186,13 @@ export function BroadcastModal({ onClose, onSuccess }: Props) {
           {/* Action Link & Acknowledgment checkbox */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">1-Click Module Link</label>
+              <label className="block text-fg-muted font-semibold mb-1">1-Click Module Link</label>
               <input
                 type="text"
                 value={actionUrl}
                 onChange={(e) => setActionUrl(e.target.value)}
                 placeholder="e.g. /reports or /tracker"
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 focus:outline-none focus:border-blue-500"
+                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
               />
             </div>
 
@@ -201,9 +202,9 @@ export function BroadcastModal({ onClose, onSuccess }: Props) {
                   type="checkbox"
                   checked={requiresAck}
                   onChange={(e) => setRequiresAck(e.target.checked)}
-                  className="rounded bg-slate-800 border-slate-700 text-blue-500 focus:ring-0"
+                  className="rounded bg-surface border-border-strong text-primary "
                 />
-                <span className="text-slate-300 font-semibold">
+                <span className="text-fg-muted font-semibold">
                   Requires User Acknowledgment
                 </span>
               </label>
@@ -211,18 +212,18 @@ export function BroadcastModal({ onClose, onSuccess }: Props) {
           </div>
 
           {/* Submit Action */}
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium"
+              className="px-4 py-2 bg-surface hover:bg-surface-raised text-fg-muted rounded-xl font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-md transition-colors"
+              className="px-5 py-2 bg-primary hover:bg-primary text-white rounded-xl font-bold shadow-md transition-colors"
             >
               {loading ? 'Dispatching…' : 'Send Broadcast 📢'}
             </button>

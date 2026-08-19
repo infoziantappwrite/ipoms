@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { ClipboardList, Search } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -60,24 +61,24 @@ export function BulkPasteModal({ onClose, onSuccess }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="glass-panel rounded-2xl w-full max-w-2xl border border-slate-700 shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div className="glass-panel rounded-2xl w-full max-w-2xl border border-border-strong shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
 
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="flex items-center justify-between border-b border-border pb-3">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <span>📋</span> Bulk Paste Excel Contacts (Fast Importer)
+            <ClipboardList size={14} strokeWidth={2} aria-hidden /> Bulk Paste Excel Contacts (Fast Importer)
           </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-base">
+          <button onClick={onClose} className="text-fg-subtle hover:text-white text-base">
             ✕
           </button>
         </div>
 
         {/* Instructions */}
-        <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 text-[11px] text-slate-300 space-y-1">
-          <p className="font-semibold text-blue-400">💡 Excel Copy-Paste Instructions:</p>
+        <div className="p-3 bg-background/60 rounded-xl border border-border text-micro text-fg-muted space-y-1">
+          <p className="font-semibold text-primary">💡 Excel Copy-Paste Instructions:</p>
           <p>
             Copy rows directly from your Excel sheet and paste below. Expected columns:
-            <code className="text-slate-200 bg-slate-800 px-1 py-0.5 rounded font-mono ml-1">
+            <code className="text-fg bg-surface px-1 py-0.5 rounded font-mono ml-1">
               Company Name | HR Name | Mobile Number | Email ID | Industry
             </code>
           </p>
@@ -87,7 +88,7 @@ export function BulkPasteModal({ onClose, onSuccess }: Props) {
           <>
             {/* Raw Text Input */}
             <div>
-              <label className="block text-slate-300 font-semibold mb-1 text-xs">
+              <label className="block text-fg-muted font-semibold mb-1 text-xs">
                 Paste Excel Rows Here:
               </label>
               <textarea
@@ -99,7 +100,7 @@ export function BulkPasteModal({ onClose, onSuccess }: Props) {
                 }}
                 placeholder="Google	Sundar Pichai	9876543210	hr@google.com	software
 Amazon	Andy Jassy	9876543211	hr@amazon.com	software"
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-xs text-slate-200 font-mono focus:outline-none focus:border-blue-500"
+                className="w-full bg-background border border-border-strong rounded-xl p-3 text-xs text-fg font-mono "
               />
             </div>
 
@@ -107,9 +108,9 @@ Amazon	Andy Jassy	9876543211	hr@amazon.com	software"
               <button
                 type="button"
                 onClick={handleParse}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-blue-400 border border-blue-500/30 rounded-xl text-xs font-semibold"
+                className="px-4 py-2 bg-surface hover:bg-surface-raised text-primary border border-primary/30 rounded-xl text-xs font-semibold"
               >
-                🔍 Parse & Preview Rows ({rawText.trim().split('\n').length})
+                <Search size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}Parse & Preview Rows ({rawText.trim().split('\n').length})
               </button>
             )}
 
@@ -117,7 +118,7 @@ Amazon	Andy Jassy	9876543211	hr@amazon.com	software"
             {parsedRows.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-200">
+                  <span className="text-xs font-bold text-fg">
                     Preview: {parsedRows.length} Valid Row(s)
                   </span>
                   <button
@@ -125,15 +126,15 @@ Amazon	Andy Jassy	9876543211	hr@amazon.com	software"
                       setParsedRows([]);
                       setRawText('');
                     }}
-                    className="text-[11px] text-slate-400 hover:text-white"
+                    className="text-micro text-fg-subtle hover:text-white"
                   >
                     Clear
                   </button>
                 </div>
 
-                <div className="max-h-48 overflow-y-auto border border-slate-800 rounded-xl overflow-hidden">
-                  <table className="w-full text-[11px] text-left">
-                    <thead className="bg-slate-900 text-slate-400 border-b border-slate-800">
+                <div className="max-h-48 overflow-y-auto border border-border rounded-xl overflow-hidden">
+                  <table className="w-full text-micro text-left">
+                    <thead className="bg-background text-fg-subtle border-b border-border">
                       <tr>
                         <th className="py-2 px-3">#</th>
                         <th className="py-2 px-3">Company</th>
@@ -142,10 +143,10 @@ Amazon	Andy Jassy	9876543211	hr@amazon.com	software"
                         <th className="py-2 px-3">Email</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60 text-slate-300 font-mono">
+                    <tbody className="divide-y divide-border/60 text-fg-muted font-mono">
                       {parsedRows.map((r, idx) => (
-                        <tr key={idx} className="hover:bg-slate-800/30">
-                          <td className="py-1.5 px-3 text-slate-500">{idx + 1}</td>
+                        <tr key={idx} className="hover:bg-surface/30">
+                          <td className="py-1.5 px-3 text-fg-subtle">{idx + 1}</td>
                           <td className="py-1.5 px-3 font-sans font-semibold text-white">{r.company_name}</td>
                           <td className="py-1.5 px-3 font-sans">{r.hr_name || '—'}</td>
                           <td className="py-1.5 px-3">{r.primary_mobile || '—'}</td>
@@ -159,11 +160,11 @@ Amazon	Andy Jassy	9876543211	hr@amazon.com	software"
             )}
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium"
+                className="px-4 py-2 bg-surface hover:bg-surface-raised text-fg-muted rounded-xl text-xs font-medium"
               >
                 Cancel
               </button>
@@ -171,7 +172,7 @@ Amazon	Andy Jassy	9876543211	hr@amazon.com	software"
                 type="button"
                 disabled={parsedRows.length === 0 || loading}
                 onClick={handleImport}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-xl text-xs font-bold shadow-md transition-colors"
+                className="px-5 py-2 bg-primary hover:bg-primary disabled:opacity-40 text-white rounded-xl text-xs font-bold shadow-md transition-colors"
               >
                 {loading ? 'Importing…' : `Import ${parsedRows.length} Contacts 🚀`}
               </button>
@@ -180,15 +181,15 @@ Amazon	Andy Jassy	9876543211	hr@amazon.com	software"
         ) : (
           /* Import Results Screen */
           <div className="space-y-4 text-xs">
-            <div className="p-4 bg-emerald-950/20 border border-emerald-500/40 rounded-xl space-y-1">
-              <h4 className="font-bold text-emerald-300 text-sm flex items-center gap-1.5">
+            <div className="p-4 bg-success/20 border border-success/40 rounded-xl space-y-1">
+              <h4 className="font-bold text-success text-sm flex items-center gap-1.5">
                 <span>🎉</span> Bulk Import Finished!
               </h4>
-              <p className="text-slate-300">
-                Successfully imported <strong className="text-emerald-400">{importResult.imported_count}</strong> new corporate contacts.
+              <p className="text-fg-muted">
+                Successfully imported <strong className="text-success">{importResult.imported_count}</strong> new corporate contacts.
               </p>
               {importResult.skipped_count > 0 && (
-                <p className="text-amber-400">
+                <p className="text-warning">
                   Skipped {importResult.skipped_count} row(s) due to missing company names or exact duplicates.
                 </p>
               )}
@@ -196,11 +197,11 @@ Amazon	Andy Jassy	9876543211	hr@amazon.com	software"
 
             {importResult.errors?.length > 0 && (
               <div className="space-y-1.5">
-                <span className="font-bold text-slate-300">Skipped Rows Details:</span>
-                <div className="max-h-36 overflow-y-auto bg-slate-950 p-3 rounded-xl border border-slate-800 font-mono text-[11px] text-slate-400 space-y-1">
+                <span className="font-bold text-fg-muted">Skipped Rows Details:</span>
+                <div className="max-h-36 overflow-y-auto bg-background p-3 rounded-xl border border-border font-mono text-micro text-fg-subtle space-y-1">
                   {importResult.errors.map((e: any, i: number) => (
                     <div key={i}>
-                      Row #{e.row_number} [{e.company_name}]: <span className="text-red-400">{e.reason}</span>
+                      Row #{e.row_number} [{e.company_name}]: <span className="text-destructive">{e.reason}</span>
                     </div>
                   ))}
                 </div>
@@ -211,7 +212,7 @@ Amazon	Andy Jassy	9876543211	hr@amazon.com	software"
               <button
                 type="button"
                 onClick={onClose}
-                className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs"
+                className="px-5 py-2 bg-primary hover:bg-primary text-white rounded-xl font-bold text-xs"
               >
                 Done & Close
               </button>

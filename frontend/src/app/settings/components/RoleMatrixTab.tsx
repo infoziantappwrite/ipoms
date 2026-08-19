@@ -22,12 +22,12 @@ export function RoleMatrixTab() {
 
   return (
     <div className="space-y-4">
-      <div className="glass-panel rounded-2xl border border-slate-800 p-5 shadow-xl">
-        <div className="border-b border-slate-800 pb-3 mb-4">
+      <div className="glass-panel rounded-2xl border border-border p-5 shadow-xl">
+        <div className="border-b border-border pb-3 mb-4">
           <h3 className="text-xs font-bold text-white flex items-center gap-2">
             <span>🛡️</span> Role-Based Access Control (RBAC) Permissions Matrix
           </h3>
-          <p className="text-[11px] text-slate-400 mt-0.5">
+          <p className="text-micro text-fg-subtle mt-0.5">
             Operational and governance permissions frozen per Section 8 of Module 01 User Management Specification
           </p>
         </div>
@@ -35,7 +35,7 @@ export function RoleMatrixTab() {
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead>
-              <tr className="bg-slate-900/90 text-slate-400 font-semibold border-b border-slate-800 text-[11px] uppercase">
+              <tr className="bg-background/90 text-fg-subtle font-semibold border-b border-border text-micro uppercase">
                 <th className="py-3 px-4">System Feature / Capability</th>
                 <th className="py-3 px-3 text-center">Placement Coordinator</th>
                 <th className="py-3 px-3 text-center">Team Leader</th>
@@ -43,31 +43,31 @@ export function RoleMatrixTab() {
                 <th className="py-3 px-3 text-center">TPO Officer</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50">
+            <tbody className="divide-y divide-border/50">
               {matrix.map((m, idx) => (
-                <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="py-2.5 px-4 font-semibold text-slate-200">{m.feature}</td>
+                <tr key={idx} className="hover:bg-surface/30 transition-colors">
+                  <td className="py-2.5 px-4 font-semibold text-fg">{m.feature}</td>
 
                   <td className="py-2.5 px-3 text-center">
-                    <span className={m.coord ? 'text-emerald-400 font-bold' : 'text-slate-600'}>
+                    <span className={m.coord ? 'text-success font-bold' : 'text-fg-muted'}>
                       {m.coord ? '✓ Allowed' : '—'}
                     </span>
                   </td>
 
                   <td className="py-2.5 px-3 text-center">
-                    <span className={m.tl ? 'text-emerald-400 font-bold' : 'text-slate-600'}>
+                    <span className={m.tl ? 'text-success font-bold' : 'text-fg-muted'}>
                       {m.tl ? '✓ Allowed' : '—'}
                     </span>
                   </td>
 
                   <td className="py-2.5 px-3 text-center">
-                    <span className={m.admin ? 'text-emerald-400 font-bold' : 'text-slate-600'}>
+                    <span className={m.admin ? 'text-success font-bold' : 'text-fg-muted'}>
                       {m.admin ? '✓ Allowed' : '—'}
                     </span>
                   </td>
 
                   <td className="py-2.5 px-3 text-center">
-                    <span className={m.tpo ? 'text-emerald-400 font-bold' : 'text-slate-600'}>
+                    <span className={m.tpo ? 'text-success font-bold' : 'text-fg-muted'}>
                       {m.tpo ? '✓ Allowed' : '—'}
                     </span>
                   </td>

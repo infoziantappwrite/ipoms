@@ -182,7 +182,7 @@ export default function MetadataPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 flex flex-col selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
 
       {/* ── Top Header Bar ────────────────────────────────────────────────── */}
       <MetadataHeader
@@ -201,7 +201,7 @@ export default function MetadataPage() {
       {/* ── Main Working Table View ───────────────────────────────────────── */}
       <div className="p-6 max-w-7xl mx-auto w-full space-y-4 flex-1">
         {loading ? (
-          <div className="p-12 text-center text-slate-500 italic text-xs">
+          <div className="p-12 text-center text-fg-subtle italic text-xs">
             Loading corporate metadata database…
           </div>
         ) : (
@@ -217,7 +217,7 @@ export default function MetadataPage() {
 
         {/* Pagination Bar */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-2 pt-2 text-xs text-slate-400">
+          <div className="flex items-center justify-between px-2 pt-2 text-xs text-fg-subtle">
             <span>
               Showing Page <strong>{page}</strong> of <strong>{totalPages}</strong> ({totalCount} total contacts)
             </span>
@@ -225,14 +225,14 @@ export default function MetadataPage() {
               <button
                 disabled={page <= 1}
                 onClick={() => setPage(page - 1)}
-                className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 disabled:opacity-40 rounded-lg"
+                className="px-3 py-1.5 bg-background border border-border hover:bg-surface disabled:opacity-40 rounded-lg"
               >
                 ← Previous
               </button>
               <button
                 disabled={page >= totalPages}
                 onClick={() => setPage(page + 1)}
-                className="px-3 py-1.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 disabled:opacity-40 rounded-lg"
+                className="px-3 py-1.5 bg-background border border-border hover:bg-surface disabled:opacity-40 rounded-lg"
               >
                 Next →
               </button>

@@ -20,16 +20,16 @@ export function LeadsSummaryStrip({ summary, activeTab, onTabChange }: Props) {
       <div
         onClick={() => onTabChange('positive')}
         className={`glass-card rounded-xl p-4 flex items-center justify-between border cursor-pointer transition-all duration-200
-                    ${activeTab === 'positive' ? 'border-emerald-500 bg-emerald-950/20' : 'border-slate-800 hover:border-slate-700'}`}
+                    ${activeTab === 'positive' ? 'border-success bg-success/20' : 'border-border hover:border-border-strong'}`}
       >
         <div>
-          <p className="text-xs text-slate-400 font-medium">Today's Positives</p>
-          <p className="text-2xl font-black text-emerald-400 mt-1 tabular-nums">
+          <p className="text-xs text-fg-subtle font-medium">Today's Positives</p>
+          <p className="text-2xl font-bold text-success mt-1 tabular-nums">
             {summary.positives_count}
           </p>
-          <p className="text-[11px] text-emerald-500/80 mt-0.5">Opportunities Generated</p>
+          <p className="text-micro text-success/80 mt-0.5">Opportunities Generated</p>
         </div>
-        <div className="text-3xl p-2.5 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+        <div className="text-3xl p-2.5 bg-success/10 rounded-xl border border-success/20">
           ✨
         </div>
       </div>
@@ -38,28 +38,28 @@ export function LeadsSummaryStrip({ summary, activeTab, onTabChange }: Props) {
       <div
         onClick={() => onTabChange('jd_received')}
         className={`glass-card rounded-xl p-4 flex items-center justify-between border cursor-pointer transition-all duration-200
-                    ${activeTab === 'jd_received' ? 'border-blue-500 bg-blue-950/20' : 'border-slate-800 hover:border-slate-700'}`}
+                    ${activeTab === 'jd_received' ? 'border-primary bg-primary/20' : 'border-border hover:border-border-strong'}`}
       >
         <div>
-          <p className="text-xs text-slate-400 font-medium">Today's JD Received</p>
-          <p className="text-2xl font-black text-blue-400 mt-1 tabular-nums">
+          <p className="text-xs text-fg-subtle font-medium">Today's JD Received</p>
+          <p className="text-2xl font-bold text-primary mt-1 tabular-nums">
             {summary.jd_received_count}
           </p>
-          <p className="text-[11px] text-blue-500/80 mt-0.5">Job Descriptions In Hand</p>
+          <p className="text-micro text-primary/80 mt-0.5">Job Descriptions In Hand</p>
         </div>
-        <div className="text-3xl p-2.5 bg-blue-500/10 rounded-xl border border-blue-500/20">
+        <div className="text-3xl p-2.5 bg-primary/10 rounded-xl border border-primary/20">
           📋
         </div>
       </div>
 
       {/* Card 3: Active Colleges */}
-      <div className="glass-card rounded-xl p-4 flex items-center justify-between border border-slate-800">
+      <div className="glass-card rounded-xl p-4 flex items-center justify-between border border-border">
         <div>
-          <p className="text-xs text-slate-400 font-medium">Active Colleges Today</p>
-          <p className="text-2xl font-black text-purple-400 mt-1 tabular-nums">
+          <p className="text-xs text-fg-subtle font-medium">Active Colleges Today</p>
+          <p className="text-2xl font-bold text-purple-400 mt-1 tabular-nums">
             {summary.active_colleges_count}
           </p>
-          <p className="text-[11px] text-purple-500/80 mt-0.5">Institutions with Daily Activity</p>
+          <p className="text-micro text-purple-500/80 mt-0.5">Institutions with Daily Activity</p>
         </div>
         <div className="text-3xl p-2.5 bg-purple-500/10 rounded-xl border border-purple-500/20">
           🏛️

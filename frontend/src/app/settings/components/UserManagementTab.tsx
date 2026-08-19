@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Pencil, Plus, Search } from 'lucide-react';
 
 interface Props {
   users: any[];
@@ -33,9 +34,9 @@ export function UserManagementTab({
 
   const roleStyles: any = {
     ADMINISTRATOR: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-    TEAM_LEADER: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-    COORDINATOR: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-    TPO: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+    TEAM_LEADER: 'bg-warning/20 text-warning border-warning/30',
+    COORDINATOR: 'bg-primary/20 text-primary border-primary/30',
+    TPO: 'bg-success/20 text-success border-success/30',
   };
 
   return (
@@ -46,13 +47,13 @@ export function UserManagementTab({
         <div className="flex items-center gap-2 flex-wrap">
           {/* Search */}
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
+            <Search size={14} strokeWidth={2} aria-hidden />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name or email…"
-              className="bg-slate-900 border border-slate-800 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500 w-56 sm:w-64"
+              className="bg-background border border-border rounded-xl pl-8 pr-3 py-2 text-xs text-fg w-56 sm:w-64"
             />
           </div>
 
@@ -60,7 +61,7 @@ export function UserManagementTab({
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
-            className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer"
+            className="bg-background border border-border rounded-xl px-3 py-2 text-xs text-fg cursor-pointer"
           >
             <option value="all">All Roles</option>
             <option value="COORDINATOR">Placement Coordinators</option>
@@ -72,18 +73,18 @@ export function UserManagementTab({
 
         <button
           onClick={onOpenAddUser}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-lg transition-colors flex items-center gap-1.5"
+          className="px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold shadow-lg transition-colors flex items-center gap-1.5"
         >
-          <span>➕</span> Add New User
+          <Plus size={14} strokeWidth={2} aria-hidden /> Add New User
         </button>
       </div>
 
       {/* User Directory Table */}
-      <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
+      <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead>
-              <tr className="bg-slate-900/90 text-slate-400 font-semibold border-b border-slate-800 text-[11px] uppercase tracking-wider">
+              <tr className="bg-background/90 text-fg-subtle font-semibold border-b border-border text-micro uppercase tracking-wider">
                 <th className="py-3.5 px-5">User / Full Name</th>
                 <th className="py-3.5 px-4">Contact Info</th>
                 <th className="py-3.5 px-4 text-center">Assigned Role</th>
@@ -92,10 +93,10 @@ export function UserManagementTab({
                 <th className="py-3.5 px-5 text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-border/60">
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-500 italic">
+                  <td colSpan={6} className="py-12 text-center text-fg-subtle italic">
                     No matching users found in directory
                   </td>
                 </tr>
@@ -103,30 +104,30 @@ export function UserManagementTab({
                 filteredUsers.map((u) => {
                   const primaryRole = u.role_codes?.[0] || 'COORDINATOR';
                   return (
-                    <tr key={u._id} className="hover:bg-slate-800/30 transition-colors">
+                    <tr key={u._id} className="hover:bg-surface/30 transition-colors">
                       {/* Name & Username */}
                       <td className="py-3 px-5">
                         <div className="font-bold text-white flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center text-xs text-blue-400 font-bold border border-slate-700">
+                          <div className="w-7 h-7 rounded-lg bg-surface flex items-center justify-center text-xs text-primary font-bold border border-border-strong">
                             {u.full_name?.charAt(0) || 'U'}
                           </div>
                           <div>
                             <div>{u.full_name}</div>
-                            <span className="text-[10px] text-slate-500 font-mono">@{u.username}</span>
+                            <span className="text-micro text-fg-subtle font-mono">@{u.username}</span>
                           </div>
                         </div>
                       </td>
 
                       {/* Contact */}
-                      <td className="py-3 px-4 font-mono text-[11px]">
-                        <div className="text-slate-300">{u.official_email}</div>
-                        <div className="text-slate-500 text-[10px]">{u.primary_mobile || '—'}</div>
+                      <td className="py-3 px-4 font-mono text-micro">
+                        <div className="text-fg-muted">{u.official_email}</div>
+                        <div className="text-fg-subtle text-micro">{u.primary_mobile || '—'}</div>
                       </td>
 
                       {/* Role Badge */}
                       <td className="py-3 px-4 text-center">
                         <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
+                          className={`text-micro font-bold px-2 py-0.5 rounded border uppercase ${
                             roleStyles[primaryRole] || roleStyles.COORDINATOR
                           }`}
                         >
@@ -135,30 +136,30 @@ export function UserManagementTab({
                       </td>
 
                       {/* Assigned Colleges */}
-                      <td className="py-3 px-4 text-[11px]">
+                      <td className="py-3 px-4 text-micro">
                         {u.assigned_college_ids && u.assigned_college_ids.length > 0 ? (
                           <div className="flex flex-wrap gap-1 max-w-xs">
                             {u.assigned_college_ids.map((c: any, i: number) => (
                               <span
                                 key={i}
-                                className="bg-slate-800 text-blue-300 px-1.5 py-0.5 rounded text-[10px] font-mono border border-slate-700"
+                                className="bg-surface text-primary px-1.5 py-0.5 rounded text-micro font-mono border border-border-strong"
                               >
                                 {c.college_code || c.college_name || 'College'}
                               </span>
                             ))}
                           </div>
                         ) : (
-                          <span className="text-slate-500 italic text-[10px]">All Institutions</span>
+                          <span className="text-fg-subtle italic text-micro">All Institutions</span>
                         )}
                       </td>
 
                       {/* Status */}
                       <td className="py-3 px-4 text-center">
                         <span
-                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize ${
+                          className={`text-micro font-semibold px-2 py-0.5 rounded-full capitalize ${
                             u.account_status === 'active'
-                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                              ? 'bg-success/20 text-success border border-success/30'
+                              : 'bg-destructive/20 text-destructive border border-destructive/30'
                           }`}
                         >
                           {u.account_status || 'active'}
@@ -171,14 +172,14 @@ export function UserManagementTab({
                           <button
                             type="button"
                             onClick={() => onEditUser(u)}
-                            className="bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 px-2.5 py-1 rounded text-[11px] font-semibold transition-colors"
+                            className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 px-2.5 py-1 rounded text-micro font-semibold transition-colors"
                           >
-                            ✏️ Edit
+                            <Pencil size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}Edit
                           </button>
                           <button
                             type="button"
                             onClick={() => onDeactivateUser(u._id, u.full_name)}
-                            className="bg-red-600/10 hover:bg-red-600/20 text-red-400 border border-red-500/20 px-2 py-1 rounded text-[11px] font-semibold transition-colors"
+                            className="bg-destructive/10 hover:bg-destructive/20 text-destructive border border-destructive/20 px-2 py-1 rounded text-micro font-semibold transition-colors"
                             title="Deactivate User"
                           >
                             🚫

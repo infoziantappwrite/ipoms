@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { CalendarDays, FileSpreadsheet, Globe, Plus, Target } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -47,20 +48,20 @@ export function LeadsHeader({
   }, []);
 
   return (
-    <header className="glass-panel border-b border-slate-800 px-6 py-4">
+    <header className="glass-panel border-b border-border px-6 py-4">
       <div className="flex items-center justify-between flex-wrap gap-4">
 
         {/* Left: Title & Subtitle */}
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-              <span>🎯</span> Daily Leads Register
+              <Target size={14} strokeWidth={2} aria-hidden /> Daily Leads Register
             </h1>
-            <span className="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-semibold">
+            <span className="text-xs bg-success/20 text-success border border-success/30 px-2.5 py-0.5 rounded-full font-semibold">
               Live Daily Tracker
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-fg-subtle mt-1">
             Manual Timestamped Register • Positives & JD Received Tracking
           </p>
         </div>
@@ -69,13 +70,13 @@ export function LeadsHeader({
         <div className="flex items-center gap-3 flex-wrap">
 
           {/* Date Picker */}
-          <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5">
-            <span className="text-xs text-slate-400">📅</span>
+          <div className="flex items-center gap-1.5 bg-background border border-border rounded-lg px-2.5 py-1.5">
+            <CalendarDays size={14} strokeWidth={2} aria-hidden />
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => onDateChange(e.target.value)}
-              className="bg-transparent text-xs text-slate-200 outline-none cursor-pointer"
+              className="bg-transparent text-xs text-fg cursor-pointer"
             />
           </div>
 
@@ -88,10 +89,10 @@ export function LeadsHeader({
               onCollegeChange(val, col ? col.college_name : 'All Colleges');
             }}
             disabled={loading}
-            className="bg-slate-800 border border-slate-700 text-slate-200 text-xs px-3 py-2 rounded-lg 
-                       focus:outline-none focus:border-blue-500 min-w-[200px] cursor-pointer"
+            className="bg-surface border border-border-strong text-fg text-xs px-3 py-2 rounded-lg 
+                       min-w-[200px] cursor-pointer"
           >
-            <option value="all">🌐 All Colleges</option>
+            <option value="all"><Globe size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}All Colleges</option>
             {colleges.map((c) => (
               <option key={c._id} value={c._id}>
                 [{c.college_code}] {c.college_name}
@@ -106,15 +107,15 @@ export function LeadsHeader({
               placeholder="Search company, role, remarks…"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs px-3.5 py-2 rounded-lg 
-                         focus:outline-none focus:border-blue-500 placeholder-slate-500"
+              className="w-full bg-surface border border-border-strong text-fg text-xs px-3.5 py-2 rounded-lg 
+                         placeholder-fg-subtle"
             />
           </div>
 
           {/* Actions */}
           <button
             onClick={onRefresh}
-            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs transition-colors"
+            className="p-2 bg-surface hover:bg-surface-raised text-fg rounded-lg text-xs transition-colors"
             title="Refresh"
           >
             🔄
@@ -122,16 +123,16 @@ export function LeadsHeader({
 
           <button
             onClick={onExportCsv}
-            className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+            className="flex items-center gap-1.5 bg-success hover:bg-success text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors"
           >
-            <span>📑</span> Export CSV
+            <FileSpreadsheet size={14} strokeWidth={2} aria-hidden /> Export CSV
           </button>
 
           <button
             onClick={onOpenAddModal}
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow-sm transition-colors"
+            className="flex items-center gap-1.5 bg-primary hover:bg-primary text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow-sm transition-colors"
           >
-            <span>➕</span> Add Entry
+            <Plus size={14} strokeWidth={2} aria-hidden /> Add Entry
           </button>
 
         </div>

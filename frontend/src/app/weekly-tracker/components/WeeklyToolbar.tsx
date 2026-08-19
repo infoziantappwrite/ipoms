@@ -1,5 +1,6 @@
 'use client';
 
+import { Download, FileSpreadsheet, Plus, RefreshCw } from 'lucide-react';
 interface Props {
   searchQuery: string;
   onSearchChange: (q: string) => void;
@@ -36,15 +37,15 @@ export function WeeklyToolbar({
   totalRecords,
 }: Props) {
   return (
-    <div className="flex items-center justify-between gap-3 px-6 py-3 bg-slate-900/60 border-b border-slate-800 flex-wrap">
+    <div className="flex items-center justify-between gap-3 px-6 py-3 bg-background/60 border-b border-border flex-wrap">
 
       {/* Left: Actions */}
       <div className="flex items-center gap-2 flex-wrap">
         <button
           onClick={onOpenAddModal}
-          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow-sm transition-colors"
+          className="flex items-center gap-1.5 bg-primary hover:bg-primary text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow-sm transition-colors"
         >
-          <span>➕</span> Add Company
+          <Plus size={14} strokeWidth={2} aria-hidden /> Add Company
         </button>
 
         <button
@@ -52,21 +53,21 @@ export function WeeklyToolbar({
           className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors"
           title="Import newly flagged positive calls from Daily Tracker"
         >
-          <span>📥</span> Sync Daily Positives
+          <Download size={14} strokeWidth={2} aria-hidden /> Sync Daily Positives
         </button>
 
         <button
           onClick={onRefresh}
-          className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs transition-colors"
+          className="flex items-center gap-1.5 bg-surface hover:bg-surface-raised text-fg px-3 py-2 rounded-lg text-xs transition-colors"
         >
-          <span>🔄</span> Refresh
+          <RefreshCw size={14} strokeWidth={2} aria-hidden /> Refresh
         </button>
 
         <button
           onClick={onExportCsv}
-          className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors"
+          className="flex items-center gap-1.5 bg-success hover:bg-success text-white px-3 py-2 rounded-lg text-xs font-medium transition-colors"
         >
-          <span>📑</span> Export CSV
+          <FileSpreadsheet size={14} strokeWidth={2} aria-hidden /> Export CSV
         </button>
       </div>
 
@@ -76,8 +77,8 @@ export function WeeklyToolbar({
         <select
           value={companyTypeFilter}
           onChange={(e) => onCompanyTypeChange(e.target.value)}
-          className="bg-slate-800 border border-slate-700 text-slate-200 text-xs px-3 py-2 rounded-lg 
-                     focus:outline-none focus:border-blue-500 cursor-pointer"
+          className="bg-surface border border-border-strong text-fg text-xs px-3 py-2 rounded-lg 
+                     cursor-pointer"
         >
           {COMPANY_TYPES.map((t) => (
             <option key={t} value={t === 'All Types' ? 'all' : t}>
@@ -93,12 +94,12 @@ export function WeeklyToolbar({
             placeholder="Search company, role, CDC, status…"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-xs px-3.5 py-2 rounded-lg 
-                       focus:outline-none focus:border-blue-500 placeholder-slate-500"
+            className="w-full bg-surface border border-border-strong text-fg text-xs px-3.5 py-2 rounded-lg 
+                       placeholder-fg-subtle"
           />
         </div>
 
-        <span className="text-xs text-slate-400 font-mono">
+        <span className="text-xs text-fg-subtle font-mono">
           {totalRecords} record(s)
         </span>
       </div>
