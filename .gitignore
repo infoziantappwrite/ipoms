@@ -31,3 +31,8 @@ version 1/PDF/
 *.tmp
 *.log
 *.bak
+
+# Dependencies
+node_modules/
+.next/
+*.node
