@@ -19,6 +19,12 @@ export interface IUser extends Document {
   must_change_password: boolean;
   last_login_at?: Date | null;
   last_password_changed_at?: Date | null;
+  // Lockout + OTP reset state (see server.ts auth routes)
+  failed_login_attempts: number;
+  locked_at?: Date | null;
+  reset_otp_hash?: string | null;
+  reset_otp_expires_at?: Date | null;
+  reset_otp_attempts: number;
   is_deleted: boolean;
   deleted_at?: Date | null;
   created_at: Date;
@@ -123,6 +129,35 @@ const UserSchema: Schema<IUser> = new Schema(
     last_password_changed_at: {
       type: Date,
       default: null,
+    },
+
+    /* ── Lockout & OTP reset ───────────────────────────────────────────────
+       Counts consecutive failures; reset to 0 on any successful sign-in.
+       Reaching the limit sets account_status='blocked' and stamps locked_at. */
+    failed_login_attempts: {
+      type: Number,
+      default: 0,
+    },
+    locked_at: {
+      type: Date,
+      default: null,
+    },
+    /* The OTP is stored hashed, never in clear text: a database read must not
+       hand an attacker a working reset code. */
+    reset_otp_hash: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    reset_otp_expires_at: {
+      type: Date,
+      default: null,
+    },
+    /* Caps guesses against the OTP itself, so a 6-digit code cannot be
+       brute-forced once issued. */
+    reset_otp_attempts: {
+      type: Number,
+      default: 0,
     },
     is_deleted: {
       type: Boolean,

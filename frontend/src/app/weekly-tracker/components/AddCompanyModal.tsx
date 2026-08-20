@@ -115,8 +115,8 @@ export function AddCompanyModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="glass-panel rounded-2xl w-full max-w-lg border border-border-strong shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 scrim flex items-center justify-center z-50 p-4">
+      <div className="glass-panel rounded-2xl w-full max-w-lg border border-border-strong shadow-4 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-background/50">
           <div>
@@ -151,7 +151,7 @@ export function AddCompanyModal({
               className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg placeholder-fg-subtle text-xs"
             />
             {showSuggestions && suggestions.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-background border border-border-strong rounded-lg shadow-2xl z-50 overflow-hidden">
+              <div className="absolute left-0 right-0 top-full mt-1 bg-background border border-border-strong rounded-lg shadow-4 z-50 overflow-hidden">
                 {suggestions.map((s) => (
                   <div
                     key={s._id}
@@ -276,7 +276,7 @@ export function AddCompanyModal({
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 bg-primary hover:bg-primary disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow-md transition-colors flex items-center gap-1.5"
+              className="px-5 py-2 bg-primary hover:bg-primary disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow-2 transition-colors flex items-center gap-1.5"
             >
               {loading ? 'Adding…' : 'Add Drive →'}
             </button>

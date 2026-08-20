@@ -53,7 +53,7 @@ export function RowActionMenu({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-1 w-48 rounded-xl bg-background border border-border-strong shadow-2xl z-50 py-1 text-xs text-fg">
+        <div className="absolute right-0 mt-1 w-48 rounded-xl bg-background border border-border-strong shadow-4 z-50 py-1 text-xs text-fg">
 
           {/* Toggle Pin Top */}
           <button
@@ -78,7 +78,7 @@ export function RowActionMenu({
             </button>
 
             {showMoveSubmenu && (
-              <div className="absolute left-full top-0 ml-1 w-48 rounded-xl bg-background border border-border-strong shadow-2xl py-1">
+              <div className="absolute left-full top-0 ml-1 w-48 rounded-xl bg-background border border-border-strong shadow-4 py-1">
                 {SECTIONS.map((s) => (
                   <button
                     key={s.key}

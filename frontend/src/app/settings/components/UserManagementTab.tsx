@@ -73,14 +73,14 @@ export function UserManagementTab({
 
         <button
           onClick={onOpenAddUser}
-          className="px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold shadow-lg transition-colors flex items-center gap-1.5"
+          className="px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold shadow-3 transition-colors flex items-center gap-1.5"
         >
           <Plus size={14} strokeWidth={2} aria-hidden /> Add New User
         </button>
       </div>
 
       {/* User Directory Table */}
-      <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-xl">
+      <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-4">
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead>

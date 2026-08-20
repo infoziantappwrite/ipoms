@@ -41,7 +41,7 @@ export function SettingsNav({ activeSection, onSectionChange, userCount }: Props
           className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left whitespace-nowrap md:whitespace-normal w-full
             ${
               activeSection === s.id
-                ? 'bg-primary text-white shadow-md'
+                ? 'bg-primary text-white shadow-2'
                 : 'text-fg-subtle hover:text-fg hover:bg-background/60'
             }`}
         >

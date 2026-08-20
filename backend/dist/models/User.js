@@ -133,6 +133,34 @@ const UserSchema = new mongoose_1.Schema({
         type: Date,
         default: null,
     },
+    /* ── Lockout & OTP reset ───────────────────────────────────────────────
+       Counts consecutive failures; reset to 0 on any successful sign-in.
+       Reaching the limit sets account_status='blocked' and stamps locked_at. */
+    failed_login_attempts: {
+        type: Number,
+        default: 0,
+    },
+    locked_at: {
+        type: Date,
+        default: null,
+    },
+    /* The OTP is stored hashed, never in clear text: a database read must not
+       hand an attacker a working reset code. */
+    reset_otp_hash: {
+        type: String,
+        default: null,
+        select: false,
+    },
+    reset_otp_expires_at: {
+        type: Date,
+        default: null,
+    },
+    /* Caps guesses against the OTP itself, so a 6-digit code cannot be
+       brute-forced once issued. */
+    reset_otp_attempts: {
+        type: Number,
+        default: 0,
+    },
     is_deleted: {
         type: Boolean,
         default: false,

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { AppNavigation } from '@/components/AppNavigation';
+import { AppShell } from '@/components/AppShell';
 import { ToastProvider } from '@/components/ui/Toast';
 
 export const metadata: Metadata = {
@@ -23,10 +23,7 @@ export default function RootLayout({
           Skip to main content
         </a>
         <ToastProvider>
-          <AppNavigation />
-          <main id="main" className="flex-1 flex flex-col">
-            {children}
-          </main>
+          <AppShell>{children}</AppShell>
         </ToastProvider>
       </body>
     </html>

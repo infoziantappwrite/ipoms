@@ -62,7 +62,7 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
     <form onSubmit={handleSubmit} className="space-y-6 text-xs max-w-4xl">
 
       {/* Season & Daily Target Configuration (Spec Section 2) */}
-      <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-xl">
+      <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-4">
         <div className="border-b border-border pb-3">
           <h3 className="text-xs font-bold text-white flex items-center gap-2">
             <CalendarDays size={14} strokeWidth={2} aria-hidden /> Placement Season & Operational Targets
@@ -108,7 +108,7 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
       </div>
 
       {/* Organization Branding & Support (Spec Section 12) */}
-      <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-xl">
+      <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-4">
         <div className="border-b border-border pb-3">
           <h3 className="text-xs font-bold text-white flex items-center gap-2">
             <Building2 size={14} strokeWidth={2} aria-hidden /> Organization Branding & Support
@@ -152,7 +152,7 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
       </div>
 
       {/* Preferences & Notifications (Spec Section 10 & 11) */}
-      <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-xl">
+      <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-4">
         <div className="border-b border-border pb-3">
           <h3 className="text-xs font-bold text-white flex items-center gap-2">
             <Settings size={14} strokeWidth={2} aria-hidden /> Application Delivery & Preferences
@@ -230,7 +230,7 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
       <div className="flex justify-end pt-2">
         <button
           type="submit"
-          className="px-6 py-2.5 bg-primary hover:bg-primary text-white rounded-xl font-bold shadow-lg transition-colors text-xs"
+          className="px-6 py-2.5 bg-primary hover:bg-primary text-white rounded-xl font-bold shadow-3 transition-colors text-xs"
         >
           Save System Configuration ⚙️
         </button>

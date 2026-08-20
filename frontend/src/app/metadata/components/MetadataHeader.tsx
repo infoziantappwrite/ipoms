@@ -92,7 +92,7 @@ export function MetadataHeader({
           onClick={onToggleRecycleBin}
           className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 ${
             isRecycleBin
-              ? 'bg-destructive text-white border-destructive shadow-md'
+              ? 'bg-destructive text-white border-destructive shadow-2'
               : 'bg-background hover:bg-surface text-fg-muted border-border'
           }`}
           title="Toggle Recycle Bin"
@@ -121,7 +121,7 @@ export function MetadataHeader({
             {/* Add Contact Button */}
             <button
               onClick={onOpenAddModal}
-              className="px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold shadow-lg transition-colors flex items-center gap-1.5"
+              className="px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold shadow-3 transition-colors flex items-center gap-1.5"
             >
               <Plus size={14} strokeWidth={2} aria-hidden /> Add Contact
             </button>

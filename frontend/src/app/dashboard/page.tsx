@@ -10,6 +10,21 @@ const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
 export default function DashboardPage() {
   const [role, setRole] = useState<DashboardRole>('coordinator');
+
+  // Derive role from stored user object on first render
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const stored = localStorage.getItem('ipoms_user');
+      if (!stored) return;
+      const user = JSON.parse(stored);
+      const codes: string[] = user.role_codes ?? [];
+      if (codes.includes('ADMINISTRATOR') || codes.includes('ADMIN')) setRole('admin');
+      else if (codes.includes('TEAM_LEADER')) setRole('team_leader');
+      else setRole('coordinator');
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -79,8 +94,6 @@ export default function DashboardPage() {
 
       {/* ── Top Header & Role Switcher ────────────────────────────────────── */}
       <DashboardHeader
-        role={role}
-        onRoleChange={setRole}
         greetingData={dashboardData?.greeting}
       />
 

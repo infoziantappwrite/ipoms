@@ -124,7 +124,7 @@ export function Modal({
             type="button"
             onClick={onClose}
             aria-label="Close dialog"
-            className="shrink-0 rounded-control p-1.5 text-fg-subtle hover:bg-surface-sunken hover:text-fg transition-colors"
+            className="shrink-0 rounded-control p-1.5 text-fg-subtle hover:bg-surface-sunken hover:text-fg active:shadow-inset-1 transition-[background-color,box-shadow,color] duration-150"
           >
             <X size={18} strokeWidth={2} aria-hidden />
           </button>

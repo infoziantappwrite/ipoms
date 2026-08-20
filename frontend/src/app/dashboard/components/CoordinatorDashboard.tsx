@@ -20,7 +20,7 @@ export function CoordinatorDashboard({ data, onLoadToMetadata, onMarkComplete }:
 
       {/* 1. Priority Notification Alert Banner (Spec Section 7.2) */}
       {priority_notification && (
-        <div className="bg-gradient-to-r from-primary/80 via-indigo-950/60 to-background border border-primary/40 rounded-2xl p-4 shadow-lg flex items-start justify-between gap-4">
+        <div className="bg-gradient-to-r from-primary/80 via-indigo-950/60 to-background border border-primary/40 rounded-2xl p-4 shadow-3 flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <Megaphone size={14} strokeWidth={2} aria-hidden />
             <div>
@@ -39,7 +39,7 @@ export function CoordinatorDashboard({ data, onLoadToMetadata, onMarkComplete }:
 
           <Link
             href="/tracker"
-            className="px-3.5 py-1.5 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold shrink-0 transition-colors shadow-sm hidden sm:inline-block"
+            className="px-3.5 py-1.5 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold shrink-0 transition-colors shadow-1 hidden sm:inline-block"
           >
             Open Daily Tracker →
           </Link>
@@ -58,7 +58,7 @@ export function CoordinatorDashboard({ data, onLoadToMetadata, onMarkComplete }:
 
         {/* Priority College Widget (Spec Section 7.4) */}
         {priority_college && (
-          <div className="glass-panel rounded-2xl border border-border p-5 shadow-lg flex flex-col justify-between space-y-4">
+          <div className="glass-panel rounded-2xl border border-border p-5 shadow-3 flex flex-col justify-between space-y-4">
             <div>
               <div className="flex items-center justify-between border-b border-border pb-3">
                 <h3 className="text-xs font-bold text-white flex items-center gap-2">
@@ -108,7 +108,7 @@ export function CoordinatorDashboard({ data, onLoadToMetadata, onMarkComplete }:
         )}
 
         {/* Today's 3 Tasks (Spec Section 7.5) */}
-        <div className="glass-panel rounded-2xl border border-border p-5 shadow-lg space-y-4">
+        <div className="glass-panel rounded-2xl border border-border p-5 shadow-3 space-y-4">
           <div className="flex items-center justify-between border-b border-border pb-3">
             <h3 className="text-xs font-bold text-white flex items-center gap-2">
               <Target size={14} strokeWidth={2} aria-hidden /> Today's Action Checklist (Max 3 Tasks)
@@ -189,7 +189,7 @@ export function CoordinatorDashboard({ data, onLoadToMetadata, onMarkComplete }:
       )}
 
       {/* 5. Quick Navigation Shortcut Cards (Spec Section 7.7) */}
-      <div className="glass-panel rounded-2xl border border-border p-5 shadow-lg space-y-4">
+      <div className="glass-panel rounded-2xl border border-border p-5 shadow-3 space-y-4">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <h3 className="text-xs font-bold text-white flex items-center gap-2">
             <Zap size={14} strokeWidth={2} aria-hidden /> Quick Workflow Navigation Hub
@@ -207,7 +207,7 @@ export function CoordinatorDashboard({ data, onLoadToMetadata, onMarkComplete }:
             <Link
               key={nav.title}
               href={nav.href}
-              className={`bg-background/60 border border-border rounded-xl p-3.5 transition-all group ${nav.color} block shadow-sm`}
+              className={`bg-background/60 border border-border rounded-xl p-3.5 transition-all group ${nav.color} block shadow-1`}
             >
               <span className="text-2xl">{nav.icon}</span>
               <h4 className="text-xs font-bold text-white mt-2 group-hover:text-primary transition-colors">

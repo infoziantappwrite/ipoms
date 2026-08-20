@@ -50,7 +50,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
     <div className="space-y-6">
 
       {/* ── Personal Profile Card ────────────────────────────────────────── */}
-      <div className="glass-panel rounded-2xl border border-border p-6 space-y-5 shadow-xl">
+      <div className="glass-panel rounded-2xl border border-border p-6 space-y-5 shadow-4">
         <div className="flex items-center gap-3 border-b border-border pb-4">
           <div className="w-12 h-12 rounded-2xl bg-primary/20 border border-primary/30 flex items-center justify-center text-xl font-bold text-primary">
             {currentUser?.full_name?.charAt(0) || 'U'}
@@ -128,7 +128,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
           <div className="flex justify-end">
             <button
               type="submit"
-              className="px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl font-bold shadow-md transition-colors text-xs"
+              className="px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl font-bold shadow-2 transition-colors text-xs"
             >
               Update Profile Contacts
             </button>
@@ -137,7 +137,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
       </div>
 
       {/* ── Security & Change Password Card (Spec Section 7) ─────────────── */}
-      <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-xl">
+      <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-4">
         <div className="border-b border-border pb-3">
           <h3 className="text-xs font-bold text-white flex items-center gap-2">
             <Lock size={14} strokeWidth={2} aria-hidden /> Change Account Password

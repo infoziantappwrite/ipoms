@@ -22,7 +22,7 @@ export function RoleMatrixTab() {
 
   return (
     <div className="space-y-4">
-      <div className="glass-panel rounded-2xl border border-border p-5 shadow-xl">
+      <div className="glass-panel rounded-2xl border border-border p-5 shadow-4">
         <div className="border-b border-border pb-3 mb-4">
           <h3 className="text-xs font-bold text-white flex items-center gap-2">
             <span>🛡️</span> Role-Based Access Control (RBAC) Permissions Matrix

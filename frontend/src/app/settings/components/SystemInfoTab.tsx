@@ -28,7 +28,7 @@ export function SystemInfoTab({ summaryData }: Props) {
       </div>
 
       {/* Database Summary Telemetry (Spec Section 13.2) */}
-      <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-xl">
+      <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-4">
         <div className="border-b border-border pb-3">
           <h3 className="text-xs font-bold text-white flex items-center gap-2">
             <BarChart3 size={14} strokeWidth={2} aria-hidden /> System Database Summary (Read-Only)
@@ -66,7 +66,7 @@ export function SystemInfoTab({ summaryData }: Props) {
       </div>
 
       {/* Application Version & Environment (Spec Section 13.1) */}
-      <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-xl">
+      <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-4">
         <div className="border-b border-border pb-3">
           <h3 className="text-xs font-bold text-white flex items-center gap-2">
             <span>ℹ️</span> Application Build & Environment

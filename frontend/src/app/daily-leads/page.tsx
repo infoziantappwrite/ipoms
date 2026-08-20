@@ -234,7 +234,7 @@ export default function DailyLeadsPage() {
 
       {/* ── Table Workspace ───────────────────────────────────────────────── */}
       <div className="flex-1 px-6 py-4">
-        <div className="rounded-xl border border-border bg-background/30 overflow-hidden shadow-lg">
+        <div className="rounded-xl border border-border bg-background/30 overflow-hidden shadow-3">
           <LeadsTable
             rows={leads}
             activeTab={activeTab}

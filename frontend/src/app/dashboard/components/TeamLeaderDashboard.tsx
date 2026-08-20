@@ -26,7 +26,7 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
 
       {/* Top Action Bar */}
-      <div className="glass-panel rounded-2xl border border-border p-5 shadow-lg flex items-center justify-between flex-wrap gap-4">
+      <div className="glass-panel rounded-2xl border border-border p-5 shadow-3 flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-base font-bold text-white flex items-center gap-2">
             <span>👔</span> Placement Team Activity & Operations
@@ -38,7 +38,7 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
 
         <button
           onClick={() => setShowCreateModal(true)}
-          className="px-4 py-2.5 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold shadow-lg transition-colors flex items-center gap-2"
+          className="px-4 py-2.5 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold shadow-3 transition-colors flex items-center gap-2"
         >
           <Plus size={14} strokeWidth={2} aria-hidden /> Assign Work to Coordinator
         </button>
@@ -74,7 +74,7 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
       )}
 
       {/* Team Coordinator Live Activity Matrix (Spec Section 5.2) */}
-      <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-xl">
+      <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-4">
         <div className="px-5 py-4 border-b border-border bg-background/60 flex items-center justify-between">
           <div>
             <h3 className="text-xs font-bold text-white flex items-center gap-2">

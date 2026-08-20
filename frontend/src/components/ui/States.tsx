@@ -12,7 +12,7 @@ export function Skeleton({ className }: { className?: string }) {
   return (
     <div
       aria-hidden
-      className={cn('animate-pulse rounded-control bg-surface-sunken', className)}
+      className={cn('animate-pulse rounded-control bg-surface-sunken shadow-inset-1', className)}
     />
   );
 }
@@ -42,7 +42,7 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center text-center gap-2 py-14 px-6">
-      <div className="rounded-full bg-surface-sunken p-3 text-fg-subtle">
+      <div className="rounded-full bg-surface-sunken shadow-inset-1 p-3 text-fg-subtle">
         <Inbox size={22} strokeWidth={1.75} aria-hidden />
       </div>
       <h3 className="text-title font-semibold text-fg">{title}</h3>
@@ -70,7 +70,7 @@ export function ErrorState({
       role="alert"
       className="flex flex-col items-center justify-center text-center gap-2 py-14 px-6"
     >
-      <div className="rounded-full bg-destructive-subtle p-3 text-destructive">
+      <div className="rounded-full bg-destructive-subtle shadow-inset-1 p-3 text-destructive">
         <AlertCircle size={22} strokeWidth={1.75} aria-hidden />
       </div>
       <h3 className="text-title font-semibold text-fg">{title}</h3>

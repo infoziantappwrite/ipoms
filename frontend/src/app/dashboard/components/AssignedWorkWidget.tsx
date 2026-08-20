@@ -23,7 +23,7 @@ interface Props {
 export function AssignedWorkWidget({ assignments, onLoadToMetadata, onMarkComplete }: Props) {
   if (assignments.length === 0) {
     return (
-      <div className="glass-panel rounded-2xl border border-border p-5 shadow-lg space-y-3">
+      <div className="glass-panel rounded-2xl border border-border p-5 shadow-3 space-y-3">
         <div className="flex items-center justify-between border-b border-border pb-3">
           <h2 className="text-sm font-bold text-white flex items-center gap-2">
             <Download size={14} strokeWidth={2} aria-hidden /> Assigned Work from Team Leader
@@ -46,7 +46,7 @@ export function AssignedWorkWidget({ assignments, onLoadToMetadata, onMarkComple
   };
 
   return (
-    <div className="glass-panel rounded-2xl border border-border p-5 shadow-xl space-y-4">
+    <div className="glass-panel rounded-2xl border border-border p-5 shadow-4 space-y-4">
       {/* Widget Title Header */}
       <div className="flex items-center justify-between border-b border-border pb-3">
         <div>
@@ -122,7 +122,7 @@ export function AssignedWorkWidget({ assignments, onLoadToMetadata, onMarkComple
               <button
                 type="button"
                 onClick={() => onMarkComplete(item._id)}
-                className="py-1.5 px-3 bg-success hover:bg-success text-white rounded-lg text-xs font-semibold shadow-sm transition-colors flex items-center gap-1 shrink-0"
+                className="py-1.5 px-3 bg-success hover:bg-success text-white rounded-lg text-xs font-semibold shadow-1 transition-colors flex items-center gap-1 shrink-0"
               >
                 <Check size={14} strokeWidth={2} aria-hidden /> Mark Done
               </button>

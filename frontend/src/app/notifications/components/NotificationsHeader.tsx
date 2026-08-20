@@ -56,7 +56,7 @@ export function NotificationsHeader({
 
         <button
           onClick={onOpenBroadcast}
-          className="px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold shadow-lg transition-colors flex items-center gap-1.5"
+          className="px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold shadow-3 transition-colors flex items-center gap-1.5"
         >
           <Plus size={14} strokeWidth={2} aria-hidden /> Broadcast Announcement
         </button>

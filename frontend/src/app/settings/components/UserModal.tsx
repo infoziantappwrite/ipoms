@@ -99,8 +99,8 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="glass-panel rounded-2xl w-full max-w-xl border border-border-strong shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 scrim flex items-center justify-center z-50 p-4">
+      <div className="glass-panel rounded-2xl w-full max-w-xl border border-border-strong shadow-4 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
 
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-border pb-3">
@@ -255,7 +255,7 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 bg-primary hover:bg-primary text-white rounded-xl font-bold shadow-md transition-colors"
+              className="px-5 py-2 bg-primary hover:bg-primary text-white rounded-xl font-bold shadow-2 transition-colors"
             >
               {loading ? 'Saving…' : isEditing ? 'Save User' : 'Create User Account 👥'}
             </button>

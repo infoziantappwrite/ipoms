@@ -134,8 +134,8 @@ export function AddLeadModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="glass-panel rounded-2xl w-full max-w-lg border border-border-strong shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 scrim flex items-center justify-center z-50 p-4">
+      <div className="glass-panel rounded-2xl w-full max-w-lg border border-border-strong shadow-4 overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-background/60">
@@ -366,7 +366,7 @@ export function AddLeadModal({
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 bg-primary hover:bg-primary disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow-md transition-colors flex items-center gap-1.5"
+              className="px-5 py-2 bg-primary hover:bg-primary disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow-2 transition-colors flex items-center gap-1.5"
             >
               {loading ? 'Saving…' : 'Save Entry →'}
             </button>

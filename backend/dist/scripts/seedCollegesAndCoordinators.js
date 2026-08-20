@@ -160,7 +160,7 @@ async function seedCollegesAndCoordinators() {
         const rawCoordinators = xlsx.utils.sheet_to_json(coordinatorSheet, { defval: '' });
         console.log(`\n👥 [Coordinators] Found ${rawCoordinators.length} coordinators in Excel sheet...`);
         const coordinatorRole = await Role_1.Role.findOne({ role_code: 'PLACEMENT_COORDINATOR' });
-        const defaultPasswordHash = await bcryptjs_1.default.hash('Ipoms@123', 12);
+        const defaultPasswordHash = await bcryptjs_1.default.hash('iPOMS@123', 12);
         let coordCount = 0;
         for (const row of rawCoordinators) {
             const fullName = sanitize(row['Coordinator Name']);

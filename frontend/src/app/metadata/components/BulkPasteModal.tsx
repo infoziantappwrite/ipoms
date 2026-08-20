@@ -60,8 +60,8 @@ export function BulkPasteModal({ onClose, onSuccess }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="glass-panel rounded-2xl w-full max-w-2xl border border-border-strong shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 scrim flex items-center justify-center z-50 p-4">
+      <div className="glass-panel rounded-2xl w-full max-w-2xl border border-border-strong shadow-4 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
 
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-border pb-3">
@@ -172,7 +172,7 @@ Amazon	Andy Jassy	9876543211	hr@amazon.com	software"
                 type="button"
                 disabled={parsedRows.length === 0 || loading}
                 onClick={handleImport}
-                className="px-5 py-2 bg-primary hover:bg-primary disabled:opacity-40 text-white rounded-xl text-xs font-bold shadow-md transition-colors"
+                className="px-5 py-2 bg-primary hover:bg-primary disabled:opacity-40 text-white rounded-xl text-xs font-bold shadow-2 transition-colors"
               >
                 {loading ? 'Importing…' : `Import ${parsedRows.length} Contacts 🚀`}
               </button>

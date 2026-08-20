@@ -128,18 +128,43 @@ const config: Config = {
         'display-lg': ['1.5rem', { lineHeight: '2rem', letterSpacing: '-0.02em' }], // 24 — KPI numbers
       },
 
-      /** Three radii. Current usage is already 72% concentrated in two. */
+      /**
+       * Mild clay radius scale — chunkier than the old flat-design 6/10px,
+       * short of the 32-50px "toy" scale claymorphism uses at full strength.
+       * Dense tables keep `control`; anything that reads as a raised surface
+       * (cards, modals, KPI tiles) gets `panel`.
+       */
       borderRadius: {
-        control: '0.375rem', // 6px  — inputs, buttons, badges
-        panel: '0.625rem',   // 10px — cards, modals, tables
+        control: '0.625rem', // 10px — inputs, buttons, badges, table cells
+        panel: '1.125rem',   // 18px — cards, modals, KPI tiles, dropdowns
+
+        /**
+         * Scale-level clay bump. ~650 existing `rounded-lg`/`xl`/`2xl` calls
+         * across the app inherit this automatically — no component file was
+         * touched. Deltas are deliberately mild: Tailwind's stock lg/xl/2xl
+         * (8/12/16px) become 12/16/22px, nowhere near the 32-50px "toy" scale
+         * full-strength claymorphism uses. rounded-full/md/3xl are untouched
+         * (Tailwind defaults), since pills, avatars and tiny chips need their
+         * own radius, not the panel-scale bump.
+         */
+        lg: '0.75rem',    // was 0.5rem  (8px)  -> 12px
+        xl: '1rem',       // was 0.75rem (12px) -> 16px
+        '2xl': '1.375rem', // was 1rem   (16px) -> 22px
       },
 
-      /** Elevation via tokens so dark mode gets its own shadow ramp. */
+      /**
+       * Neumorphic / mild-claymorphism elevation. Each step is a dual-tone
+       * soft shadow (see globals.css --elevation-*), not a flat drop-shadow —
+       * that pairing is what reads as "soft UI" rather than material design.
+       * `inset-1`/`inset-2` are the debossed/pressed counterparts.
+       */
       boxShadow: {
         1: 'var(--elevation-1)',
         2: 'var(--elevation-2)',
         3: 'var(--elevation-3)',
         4: 'var(--elevation-4)',
+        'inset-1': 'var(--elevation-inset-1)',
+        'inset-2': 'var(--elevation-inset-2)',
       },
 
       /** Layer 3 — component dimensions. */
@@ -152,6 +177,38 @@ const config: Config = {
 
       transitionDuration: {
         DEFAULT: '150ms',
+      },
+
+      /**
+       * Drawer easing. Heavily front-loaded (0.72 on the first control point)
+       * so the panel leaves its resting width immediately and decelerates into
+       * the new one — a linear or symmetric ease reads as the panel being
+       * dragged rather than released.
+       */
+      transitionTimingFunction: {
+        nav: 'cubic-bezier(0.32, 0.72, 0, 1)',
+      },
+
+      keyframes: {
+        /** Indeterminate loading bar (splash screen). */
+        indeterminate: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(400%)' },
+        },
+        /**
+         * Auth form enter. Transform + opacity only (compositor-friendly, no
+         * layout thrash). 6px of travel — enough to read as motion, short of
+         * anything that feels like a page slide.
+         */
+        'form-in': {
+          '0%': { opacity: '0', transform: 'translateY(6px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        indeterminate: 'indeterminate 1.1s ease-in-out infinite',
+        // 220ms sits inside the 150-300ms micro-interaction band.
+        'form-in': 'form-in 220ms ease-out both',
       },
 
       zIndex: {

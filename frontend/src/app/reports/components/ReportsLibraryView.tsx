@@ -71,7 +71,7 @@ export function ReportsLibraryView({ onSelectTemplate, onLoadPreset }: Props) {
           {templates.map((t) => (
             <div
               key={t.id}
-              className="glass-panel rounded-2xl border border-border p-5 flex flex-col justify-between hover:border-primary/60 transition-all group shadow-md"
+              className="glass-panel rounded-2xl border border-border p-5 flex flex-col justify-between hover:border-primary/60 transition-all group shadow-2"
             >
               <div>
                 <div className="flex items-center justify-between">
@@ -110,7 +110,7 @@ export function ReportsLibraryView({ onSelectTemplate, onLoadPreset }: Props) {
 
               <button
                 onClick={() => onSelectTemplate(t.id)}
-                className="w-full mt-4 bg-primary hover:bg-primary text-white py-2 rounded-xl text-xs font-semibold shadow-sm transition-colors flex items-center justify-center gap-1.5"
+                className="w-full mt-4 bg-primary hover:bg-primary text-white py-2 rounded-xl text-xs font-semibold shadow-1 transition-colors flex items-center justify-center gap-1.5"
               >
                 <span>🛠️</span> Build This Report →
               </button>
@@ -120,7 +120,7 @@ export function ReportsLibraryView({ onSelectTemplate, onLoadPreset }: Props) {
       </div>
 
       {/* Saved Report Presets Section (Spec Section 12) */}
-      <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-lg">
+      <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-3">
         <div className="px-5 py-4 border-b border-border bg-background/60 flex items-center justify-between">
           <div>
             <h3 className="text-xs font-bold text-white flex items-center gap-2">

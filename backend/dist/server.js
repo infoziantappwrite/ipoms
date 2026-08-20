@@ -9,7 +9,6 @@ const helmet_1 = __importDefault(require("helmet"));
 const morgan_1 = __importDefault(require("morgan"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
-const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const database_1 = require("./config/database");
 const CompanyMetadata_1 = require("./models/CompanyMetadata");
 const User_1 = require("./models/User");
@@ -24,6 +23,8 @@ const Notification_1 = require("./models/Notification");
 const SystemSettings_1 = require("./models/SystemSettings");
 const mongoose_1 = require("mongoose");
 const finalizeDailyTracker_1 = require("./jobs/finalizeDailyTracker");
+const authRoutes_1 = require("./lib/authRoutes");
+const authMiddleware_1 = require("./lib/authMiddleware");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
@@ -71,77 +72,15 @@ app.get('/api/v1/health', (req, res) => {
     });
 });
 // 2. Authentication Login Endpoint
-app.post('/api/v1/auth/login', async (req, res) => {
-    try {
-        const { email, password } = req.body;
-        if (!email || !password) {
-            return res.status(400).json({
-                success: false,
-                error: {
-                    code: 'VALIDATION_ERROR',
-                    message: 'Official email and password are required',
-                },
-            });
-        }
-        const user = await User_1.User.findOne({
-            official_email: email.toLowerCase().trim(),
-            account_status: 'active',
-            is_deleted: false,
-        }).populate('role_ids');
-        if (!user) {
-            return res.status(401).json({
-                success: false,
-                error: {
-                    code: 'INVALID_CREDENTIALS',
-                    message: 'Invalid email or password',
-                },
-            });
-        }
-        const isMatch = await bcryptjs_1.default.compare(password, user.password_hash);
-        if (!isMatch) {
-            return res.status(401).json({
-                success: false,
-                error: {
-                    code: 'INVALID_CREDENTIALS',
-                    message: 'Invalid email or password',
-                },
-            });
-        }
-        // Update last login
-        user.last_login_at = new Date();
-        await user.save();
-        // Generate Access Token (15m)
-        const token = jsonwebtoken_1.default.sign({
-            userId: user._id,
-            email: user.official_email,
-            roles: user.role_codes,
-            fullName: user.full_name,
-        }, JWT_ACCESS_SECRET, { expiresIn: '15m' });
-        return res.status(200).json({
-            success: true,
-            message: 'Login successful',
-            data: {
-                token,
-                user: {
-                    id: user._id,
-                    fullName: user.full_name,
-                    email: user.official_email,
-                    username: user.username,
-                    roles: user.role_codes,
-                    mustChangePassword: user.must_change_password,
-                },
-            },
-        });
+// Auth routes (sign-in, lockout, OTP reset) live in lib/authRoutes.ts
+(0, authRoutes_1.registerAuthRoutes)(app);
+// ── Authentication & RBAC Middleware ──────────────────────────────────────────
+// Protect all /api/v1 routes except /health and /auth/* with JWT verification
+app.use('/api/v1', (req, res, next) => {
+    if (req.path === '/health' || req.path.startsWith('/auth')) {
+        return next();
     }
-    catch (error) {
-        return res.status(500).json({
-            success: false,
-            error: {
-                code: 'INTERNAL_SERVER_ERROR',
-                message: error.message || 'An unexpected error occurred',
-            },
-        });
-    }
+    return (0, authMiddleware_1.authenticateJWT)(req, res, next);
 });
 // 3. High-Speed Company Search Endpoint (Searches across 3,550+ companies in < 10ms)
 app.get('/api/v1/companies/search', async (req, res) => {
@@ -2779,7 +2718,7 @@ app.post('/api/v1/metadata', async (req, res) => {
 });
 // ── MD-3: PATCH /api/v1/metadata/:id
 // Update company / HR contact details
-app.patch('/api/v1/metadata/:id', async (req, res) => {
+app.patch('/api/v1/metadata/:id', authMiddleware_1.authenticateJWT, (0, authMiddleware_1.authorizeRoles)('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER'), async (req, res) => {
     try {
         const { id } = req.params;
         const { company_name, hr_name, hr_designation, primary_mobile, mobile_numbers, primary_email, email_ids, company_type, notes, } = req.body;
@@ -2823,8 +2762,8 @@ app.patch('/api/v1/metadata/:id', async (req, res) => {
     }
 });
 // ── MD-4: DELETE /api/v1/metadata/:id
-// Soft delete record to Recycle Bin (Spec Section 12)
-app.delete('/api/v1/metadata/:id', async (req, res) => {
+// Soft delete record to Recycle Bin (Spec Section 17)
+app.delete('/api/v1/metadata/:id', authMiddleware_1.authenticateJWT, (0, authMiddleware_1.authorizeRoles)('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER'), async (req, res) => {
     try {
         const { id } = req.params;
         const record = await CompanyMetadata_1.CompanyMetadata.findById(id);
@@ -2850,8 +2789,8 @@ app.delete('/api/v1/metadata/:id', async (req, res) => {
     }
 });
 // ── MD-5: POST /api/v1/metadata/:id/restore
-// Restore record from Recycle Bin (Spec Section 12 & 17)
-app.post('/api/v1/metadata/:id/restore', async (req, res) => {
+// Restore record from Recycle Bin (Spec Section 17)
+app.post('/api/v1/metadata/:id/restore', authMiddleware_1.authenticateJWT, (0, authMiddleware_1.authorizeRoles)('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER'), async (req, res) => {
     try {
         const { id } = req.params;
         const record = await CompanyMetadata_1.CompanyMetadata.findById(id);
@@ -2879,7 +2818,7 @@ app.post('/api/v1/metadata/:id/restore', async (req, res) => {
 });
 // ── MD-6: DELETE /api/v1/metadata/:id/purge
 // Permanently purge record from database (Spec Section 17)
-app.delete('/api/v1/metadata/:id/purge', async (req, res) => {
+app.delete('/api/v1/metadata/:id/purge', authMiddleware_1.authenticateJWT, (0, authMiddleware_1.authorizeRoles)('ADMINISTRATOR', 'ADMIN'), async (req, res) => {
     try {
         const { id } = req.params;
         const record = await CompanyMetadata_1.CompanyMetadata.findByIdAndDelete(id);
@@ -2903,7 +2842,7 @@ app.delete('/api/v1/metadata/:id/purge', async (req, res) => {
 });
 // ── MD-7: POST /api/v1/metadata/bulk-import
 // Bulk paste / Excel import endpoint with row-by-row validation & duplicate reporting (Spec Section 16)
-app.post('/api/v1/metadata/bulk-import', async (req, res) => {
+app.post('/api/v1/metadata/bulk-import', authMiddleware_1.authenticateJWT, (0, authMiddleware_1.authorizeRoles)('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER'), async (req, res) => {
     try {
         const { rows = [] } = req.body;
         if (!Array.isArray(rows) || rows.length === 0) {
@@ -2978,7 +2917,7 @@ app.post('/api/v1/metadata/bulk-import', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // ── US-1: GET /api/v1/users
 // List users with search, role filtering, pagination and populated colleges
-app.get('/api/v1/users', async (req, res) => {
+app.get('/api/v1/users', authMiddleware_1.authenticateJWT, async (req, res) => {
     try {
         const { q, role, status, page = 1, limit = 50 } = req.query;
         const pageNum = Math.max(1, parseInt(String(page), 10) || 1);
@@ -3029,7 +2968,7 @@ app.get('/api/v1/users', async (req, res) => {
 });
 // ── US-2: POST /api/v1/users
 // Create new user (with bcrypt password hashing & role association)
-app.post('/api/v1/users', async (req, res) => {
+app.post('/api/v1/users', authMiddleware_1.authenticateJWT, (0, authMiddleware_1.authorizeRoles)('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER'), async (req, res) => {
     try {
         const { full_name, username, official_email, personal_email = '', password = 'Password@123', role_codes = ['COORDINATOR'], assigned_college_ids = [], primary_mobile = '', employee_id = '', account_status = 'active', } = req.body;
         if (!full_name || !username || !official_email) {
@@ -3093,7 +3032,7 @@ app.post('/api/v1/users', async (req, res) => {
 });
 // ── US-3: PATCH /api/v1/users/:id
 // Update user profile, password, role, assigned colleges, or account status
-app.patch('/api/v1/users/:id', async (req, res) => {
+app.patch('/api/v1/users/:id', authMiddleware_1.authenticateJWT, (0, authMiddleware_1.authorizeRoles)('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER'), async (req, res) => {
     try {
         const { id } = req.params;
         const { full_name, personal_email, primary_mobile, secondary_mobile, assigned_college_ids, role_codes, account_status, presence_status, password, } = req.body;
@@ -3149,7 +3088,7 @@ app.patch('/api/v1/users/:id', async (req, res) => {
 });
 // ── US-4: DELETE /api/v1/users/:id
 // Soft delete user
-app.delete('/api/v1/users/:id', async (req, res) => {
+app.delete('/api/v1/users/:id', authMiddleware_1.authenticateJWT, (0, authMiddleware_1.authorizeRoles)('ADMINISTRATOR', 'ADMIN'), async (req, res) => {
     try {
         const { id } = req.params;
         const user = await User_1.User.findById(id);
@@ -3177,7 +3116,7 @@ app.delete('/api/v1/users/:id', async (req, res) => {
 });
 // ── RO-1: GET /api/v1/roles
 // List all system roles and permissions matrix (Spec Section 8)
-app.get('/api/v1/roles', async (req, res) => {
+app.get('/api/v1/roles', authMiddleware_1.authenticateJWT, async (req, res) => {
     try {
         const roles = await Role_1.Role.find({ status: 'active' }).sort({ role_code: 1 });
         return res.status(200).json({
@@ -3197,7 +3136,7 @@ app.get('/api/v1/roles', async (req, res) => {
 });
 // ── RO-2: PATCH /api/v1/roles/:id
 // Update role permissions
-app.patch('/api/v1/roles/:id', async (req, res) => {
+app.patch('/api/v1/roles/:id', authMiddleware_1.authenticateJWT, (0, authMiddleware_1.authorizeRoles)('ADMINISTRATOR', 'ADMIN'), async (req, res) => {
     try {
         const { id } = req.params;
         const { permissions, description } = req.body;
@@ -3228,7 +3167,7 @@ app.patch('/api/v1/roles/:id', async (req, res) => {
 });
 // ── ST-1: GET /api/v1/settings
 // Fetch global system settings (creates default if none exist)
-app.get('/api/v1/settings', async (req, res) => {
+app.get('/api/v1/settings', authMiddleware_1.authenticateJWT, async (req, res) => {
     try {
         let settings = await SystemSettings_1.SystemSettings.findOne({});
         if (!settings) {
@@ -3279,7 +3218,7 @@ app.get('/api/v1/settings', async (req, res) => {
 });
 // ── ST-2: PATCH /api/v1/settings
 // Update global system settings
-app.patch('/api/v1/settings', async (req, res) => {
+app.patch('/api/v1/settings', authMiddleware_1.authenticateJWT, (0, authMiddleware_1.authorizeRoles)('ADMINISTRATOR', 'ADMIN'), async (req, res) => {
     try {
         const { academic_year, season_name, daily_calling_target, working_days, org_name, org_support_email, org_support_phone, theme_default, default_landing_page, enable_email_notifications, enable_system_notifications, enable_dashboard_popups, system_announcement_banner, } = req.body;
         let settings = await SystemSettings_1.SystemSettings.findOne({});

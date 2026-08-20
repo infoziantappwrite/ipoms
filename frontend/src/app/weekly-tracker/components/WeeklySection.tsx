@@ -72,11 +72,11 @@ export function WeeklySection({
   };
 
   return (
-    <div className="rounded-xl border border-border overflow-hidden shadow-md transition-all">
+    <div className="rounded-xl border border-border overflow-hidden shadow-2 transition-all">
       {/* Sticky Section Header per Spec Section 16 */}
       <div
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className={`sticky top-0 z-20 flex items-center justify-between px-4 py-2.5 border-b backdrop-blur-md cursor-pointer select-none transition-colors ${config.headerBg}`}
+        className={`sticky top-0 z-20 flex items-center justify-between px-4 py-2.5 border-b cursor-pointer select-none transition-colors ${config.headerBg}`}
       >
         <div className="flex items-center gap-2.5">
           <span className="text-base">{config.icon}</span>

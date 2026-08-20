@@ -92,12 +92,12 @@ export function NotificationBellDropdown({ userId = '6a84719afa3bf51271bc1548' }
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-xl bg-surface-sunken border border-border hover:bg-surface-sunken/80 text-fg-muted hover:text-fg transition-all cursor-pointer"
+        className="relative p-2 rounded-control bg-surface shadow-1 active:shadow-inset-1 border border-border hover:text-fg text-fg-muted transition-[box-shadow,color] duration-150 cursor-pointer"
         title="Notifications & Alerts"
       >
         <Bell size={18} strokeWidth={2} aria-hidden />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-destructive text-white text-micro font-bold w-4 h-4 rounded-full flex items-center justify-center shadow-xs animate-pulse">
+          <span className="absolute -top-1 -right-1 bg-destructive text-white text-micro font-bold w-4 h-4 rounded-full flex items-center justify-center shadow-1 animate-pulse">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
@@ -105,7 +105,7 @@ export function NotificationBellDropdown({ userId = '6a84719afa3bf51271bc1548' }
 
       {/* Top 100 Bell Dropdown Panel (Spec Section 5.2.8.5) */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl border border-border shadow-xl z-50 overflow-hidden">
+        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-surface rounded-panel border border-border shadow-3 z-modal overflow-hidden">
           {/* Header */}
           <div className="p-3.5 border-b border-border bg-background flex items-center justify-between">
             <div className="flex items-center gap-2">

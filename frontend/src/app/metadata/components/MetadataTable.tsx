@@ -24,7 +24,7 @@ export function MetadataTable({
   };
 
   return (
-    <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-2xl">
+    <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-4">
       <div className="overflow-x-auto">
         <table className="w-full text-xs text-left">
           <thead>

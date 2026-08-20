@@ -123,7 +123,7 @@ export function ReportBuilderWizard({
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
 
-      <div className="glass-panel rounded-2xl border border-border p-6 shadow-xl space-y-6">
+      <div className="glass-panel rounded-2xl border border-border p-6 shadow-4 space-y-6">
 
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border pb-4">
@@ -163,7 +163,7 @@ export function ReportBuilderWizard({
                 className={`p-3 rounded-xl border text-xs font-semibold flex flex-col items-center gap-1.5 transition-all text-center
                             ${
                               templateType === t.id
-                                ? 'bg-primary/30 border-primary text-white shadow-md'
+                                ? 'bg-primary/30 border-primary text-white shadow-2'
                                 : 'bg-background/60 border-border text-fg-subtle hover:border-border-strong'
                             }`}
               >
@@ -264,7 +264,7 @@ export function ReportBuilderWizard({
                 className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all
                             ${
                               theme === th.id
-                                ? 'border-white bg-surface text-white shadow-md'
+                                ? 'border-white bg-surface text-white shadow-2'
                                 : 'border-border bg-background/40 text-fg-subtle'
                             }`}
               >
@@ -294,7 +294,7 @@ export function ReportBuilderWizard({
             type="button"
             onClick={handleGenerate}
             disabled={loading}
-            className="px-6 py-2.5 bg-primary hover:bg-primary disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-lg transition-colors flex items-center gap-2"
+            className="px-6 py-2.5 bg-primary hover:bg-primary disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-3 transition-colors flex items-center gap-2"
           >
             <Sparkles size={14} strokeWidth={2} aria-hidden /> {loading ? 'Aggregating Live Data…' : 'Generate Live Report & Open Editor →'}
           </button>
@@ -304,8 +304,8 @@ export function ReportBuilderWizard({
 
       {/* Modal: Save Preset */}
       {showSavePresetModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="glass-panel rounded-2xl w-full max-w-md border border-border-strong shadow-2xl p-6 space-y-4">
+        <div className="fixed inset-0 scrim flex items-center justify-center z-50 p-4">
+          <div className="glass-panel rounded-2xl w-full max-w-md border border-border-strong shadow-4 p-6 space-y-4">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
               <Save size={14} strokeWidth={2} aria-hidden /> Save Preset to Report Library
             </h3>

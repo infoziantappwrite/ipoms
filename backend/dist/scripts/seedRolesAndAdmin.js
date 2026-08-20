@@ -105,7 +105,7 @@ async function seedRolesAndAdmin() {
         }
         // 2. Seed Master Admin User
         const adminEmail = 'Placement_Management@infoziant.com';
-        const rawPassword = 'Ipoms@123';
+        const rawPassword = 'iPOMS@123';
         const adminRoleDoc = await Role_1.Role.findOne({ role_code: 'ADMINISTRATOR' });
         console.log(`\n👑 [Admin] Seeding Master Administrator account (${adminEmail})...`);
         // Salt and hash the password

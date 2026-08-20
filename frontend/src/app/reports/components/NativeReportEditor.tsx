@@ -149,7 +149,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
 
       {/* Editor Action Toolbar (Sticky Top) */}
-      <div className="glass-panel sticky top-4 z-30 p-4 rounded-2xl border border-border-strong shadow-2xl flex items-center justify-between flex-wrap gap-4 backdrop-blur-xl">
+      <div className="glass-panel sticky top-4 z-30 p-4 rounded-2xl border border-border-strong shadow-4 flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
           <button
             onClick={onBackToBuilder}
@@ -181,14 +181,14 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
 
           <button
             onClick={handleExportCsv}
-            className="flex items-center gap-1 px-3 py-1.5 bg-success hover:bg-success text-white rounded-lg text-xs font-semibold shadow-sm transition-colors"
+            className="flex items-center gap-1 px-3 py-1.5 bg-success hover:bg-success text-white rounded-lg text-xs font-semibold shadow-1 transition-colors"
           >
             <FileSpreadsheet size={14} strokeWidth={2} aria-hidden /> Excel / CSV
           </button>
 
           <button
             onClick={handlePrintPdf}
-            className="flex items-center gap-1 px-4 py-1.5 bg-primary hover:bg-primary text-white rounded-lg text-xs font-bold shadow-sm transition-colors"
+            className="flex items-center gap-1 px-4 py-1.5 bg-primary hover:bg-primary text-white rounded-lg text-xs font-bold shadow-1 transition-colors"
           >
             <Printer size={14} strokeWidth={2} aria-hidden /> Print / Save PDF
           </button>
@@ -244,7 +244,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
       </div>
 
       {/* ── Document Canvas (Printable Page) ────────────────────────────────── */}
-      <div className="bg-background border border-border rounded-2xl shadow-2xl p-8 space-y-6 text-fg print:bg-white print:text-black print:p-0 print:border-none print:shadow-none">
+      <div className="bg-background border border-border rounded-2xl shadow-4 p-8 space-y-6 text-fg print:bg-white print:text-black print:p-0 print:border-none print:shadow-none">
 
         {/* 1. Header Branding Strip */}
         <div className="flex items-center justify-between border-b-2 border-border pb-4">

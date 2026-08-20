@@ -72,8 +72,8 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="glass-panel rounded-2xl w-80 border border-border-strong shadow-2xl">
+    <div className="fixed inset-0 scrim flex items-center justify-center z-50">
+      <div className="glass-panel rounded-2xl w-80 border border-border-strong shadow-4">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-strong">

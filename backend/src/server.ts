@@ -19,6 +19,8 @@ import { Notification, NOTIFICATION_TYPES, NotificationType, AUDIENCE_TYPES, Aud
 import { SystemSettings } from './models/SystemSettings';
 import { Types } from 'mongoose';
 import { startFinalizationJob } from './jobs/finalizeDailyTracker';
+import { registerAuthRoutes } from './lib/authRoutes';
+import { authenticateJWT, authorizeRoles } from './lib/authMiddleware';
 
 dotenv.config();
 
@@ -79,87 +81,16 @@ app.get('/api/v1/health', (req: Request, res: Response) => {
 });
 
 // 2. Authentication Login Endpoint
-app.post('/api/v1/auth/login', async (req: Request, res: Response) => {
-  try {
-    const { email, password } = req.body;
+// Auth routes (sign-in, lockout, OTP reset) live in lib/authRoutes.ts
+registerAuthRoutes(app);
 
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Official email and password are required',
-        },
-      });
-    }
-
-    const user = await User.findOne({
-      official_email: email.toLowerCase().trim(),
-      account_status: 'active',
-      is_deleted: false,
-    }).populate('role_ids');
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        error: {
-          code: 'INVALID_CREDENTIALS',
-          message: 'Invalid email or password',
-        },
-      });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) {
-      return res.status(401).json({
-        success: false,
-        error: {
-          code: 'INVALID_CREDENTIALS',
-          message: 'Invalid email or password',
-        },
-      });
-    }
-
-    // Update last login
-    user.last_login_at = new Date();
-    await user.save();
-
-    // Generate Access Token (15m)
-    const token = jwt.sign(
-      {
-        userId: user._id,
-        email: user.official_email,
-        roles: user.role_codes,
-        fullName: user.full_name,
-      },
-      JWT_ACCESS_SECRET,
-      { expiresIn: '15m' }
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: 'Login successful',
-      data: {
-        token,
-        user: {
-          id: user._id,
-          fullName: user.full_name,
-          email: user.official_email,
-          username: user.username,
-          roles: user.role_codes,
-          mustChangePassword: user.must_change_password,
-        },
-      },
-    });
-  } catch (error: any) {
-    return res.status(500).json({
-      success: false,
-      error: {
-        code: 'INTERNAL_SERVER_ERROR',
-        message: error.message || 'An unexpected error occurred',
-      },
-    });
+// ── Authentication & RBAC Middleware ──────────────────────────────────────────
+// Protect all /api/v1 routes except /health and /auth/* with JWT verification
+app.use('/api/v1', (req: Request, res: Response, next: NextFunction) => {
+  if (req.path === '/health' || req.path.startsWith('/auth')) {
+    return next();
   }
+  return authenticateJWT(req, res, next);
 });
 
 // 3. High-Speed Company Search Endpoint (Searches across 3,550+ companies in < 10ms)
@@ -3187,7 +3118,7 @@ app.post('/api/v1/metadata', async (req: Request, res: Response) => {
 
 // ── MD-3: PATCH /api/v1/metadata/:id
 // Update company / HR contact details
-app.patch('/api/v1/metadata/:id', async (req: Request, res: Response) => {
+app.patch('/api/v1/metadata/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const {
@@ -3240,8 +3171,8 @@ app.patch('/api/v1/metadata/:id', async (req: Request, res: Response) => {
 });
 
 // ── MD-4: DELETE /api/v1/metadata/:id
-// Soft delete record to Recycle Bin (Spec Section 12)
-app.delete('/api/v1/metadata/:id', async (req: Request, res: Response) => {
+// Soft delete record to Recycle Bin (Spec Section 17)
+app.delete('/api/v1/metadata/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const record = await CompanyMetadata.findById(id);
@@ -3270,8 +3201,8 @@ app.delete('/api/v1/metadata/:id', async (req: Request, res: Response) => {
 });
 
 // ── MD-5: POST /api/v1/metadata/:id/restore
-// Restore record from Recycle Bin (Spec Section 12 & 17)
-app.post('/api/v1/metadata/:id/restore', async (req: Request, res: Response) => {
+// Restore record from Recycle Bin (Spec Section 17)
+app.post('/api/v1/metadata/:id/restore', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const record = await CompanyMetadata.findById(id);
@@ -3302,7 +3233,7 @@ app.post('/api/v1/metadata/:id/restore', async (req: Request, res: Response) => 
 
 // ── MD-6: DELETE /api/v1/metadata/:id/purge
 // Permanently purge record from database (Spec Section 17)
-app.delete('/api/v1/metadata/:id/purge', async (req: Request, res: Response) => {
+app.delete('/api/v1/metadata/:id/purge', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const record = await CompanyMetadata.findByIdAndDelete(id);
@@ -3328,7 +3259,7 @@ app.delete('/api/v1/metadata/:id/purge', async (req: Request, res: Response) => 
 
 // ── MD-7: POST /api/v1/metadata/bulk-import
 // Bulk paste / Excel import endpoint with row-by-row validation & duplicate reporting (Spec Section 16)
-app.post('/api/v1/metadata/bulk-import', async (req: Request, res: Response) => {
+app.post('/api/v1/metadata/bulk-import', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER'), async (req: Request, res: Response) => {
   try {
     const { rows = [] } = req.body;
 
@@ -3413,7 +3344,7 @@ app.post('/api/v1/metadata/bulk-import', async (req: Request, res: Response) => 
 
 // ── US-1: GET /api/v1/users
 // List users with search, role filtering, pagination and populated colleges
-app.get('/api/v1/users', async (req: Request, res: Response) => {
+app.get('/api/v1/users', authenticateJWT, async (req: Request, res: Response) => {
   try {
     const { q, role, status, page = 1, limit = 50 } = req.query;
 
@@ -3471,7 +3402,7 @@ app.get('/api/v1/users', async (req: Request, res: Response) => {
 
 // ── US-2: POST /api/v1/users
 // Create new user (with bcrypt password hashing & role association)
-app.post('/api/v1/users', async (req: Request, res: Response) => {
+app.post('/api/v1/users', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER'), async (req: Request, res: Response) => {
   try {
     const {
       full_name,
@@ -3554,7 +3485,7 @@ app.post('/api/v1/users', async (req: Request, res: Response) => {
 
 // ── US-3: PATCH /api/v1/users/:id
 // Update user profile, password, role, assigned colleges, or account status
-app.patch('/api/v1/users/:id', async (req: Request, res: Response) => {
+app.patch('/api/v1/users/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const {
@@ -3622,7 +3553,7 @@ app.patch('/api/v1/users/:id', async (req: Request, res: Response) => {
 
 // ── US-4: DELETE /api/v1/users/:id
 // Soft delete user
-app.delete('/api/v1/users/:id', async (req: Request, res: Response) => {
+app.delete('/api/v1/users/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const user = await User.findById(id);
@@ -3653,7 +3584,7 @@ app.delete('/api/v1/users/:id', async (req: Request, res: Response) => {
 
 // ── RO-1: GET /api/v1/roles
 // List all system roles and permissions matrix (Spec Section 8)
-app.get('/api/v1/roles', async (req: Request, res: Response) => {
+app.get('/api/v1/roles', authenticateJWT, async (req: Request, res: Response) => {
   try {
     const roles = await Role.find({ status: 'active' }).sort({ role_code: 1 });
     return res.status(200).json({
@@ -3673,7 +3604,7 @@ app.get('/api/v1/roles', async (req: Request, res: Response) => {
 
 // ── RO-2: PATCH /api/v1/roles/:id
 // Update role permissions
-app.patch('/api/v1/roles/:id', async (req: Request, res: Response) => {
+app.patch('/api/v1/roles/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { permissions, description } = req.body;
@@ -3706,7 +3637,7 @@ app.patch('/api/v1/roles/:id', async (req: Request, res: Response) => {
 
 // ── ST-1: GET /api/v1/settings
 // Fetch global system settings (creates default if none exist)
-app.get('/api/v1/settings', async (req: Request, res: Response) => {
+app.get('/api/v1/settings', authenticateJWT, async (req: Request, res: Response) => {
   try {
     let settings = await SystemSettings.findOne({});
     if (!settings) {
@@ -3759,7 +3690,7 @@ app.get('/api/v1/settings', async (req: Request, res: Response) => {
 
 // ── ST-2: PATCH /api/v1/settings
 // Update global system settings
-app.patch('/api/v1/settings', async (req: Request, res: Response) => {
+app.patch('/api/v1/settings', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN'), async (req: Request, res: Response) => {
   try {
     const {
       academic_year,

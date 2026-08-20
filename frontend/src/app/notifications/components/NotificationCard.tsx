@@ -39,7 +39,7 @@ export function NotificationCard({
     <div
       className={`glass-panel rounded-2xl border transition-all p-5 flex flex-col justify-between space-y-3.5 ${
         !n.is_read
-          ? 'border-primary/40 bg-background/90 shadow-lg ring-1 ring-ring/20'
+          ? 'border-primary/40 bg-background/90 shadow-3 ring-1 ring-ring/20'
           : 'border-border bg-background/50 hover:border-border-strong'
       }`}
     >

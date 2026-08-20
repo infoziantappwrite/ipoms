@@ -135,7 +135,7 @@ async function seedCollegesAndCoordinators() {
     console.log(`\n👥 [Coordinators] Found ${rawCoordinators.length} coordinators in Excel sheet...`);
 
     const coordinatorRole = await Role.findOne({ role_code: 'PLACEMENT_COORDINATOR' });
-    const defaultPasswordHash = await bcrypt.hash('Ipoms@123', 12);
+    const defaultPasswordHash = await bcrypt.hash('iPOMS@123', 12);
 
     let coordCount = 0;
     for (const row of rawCoordinators) {

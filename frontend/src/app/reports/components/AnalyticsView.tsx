@@ -224,7 +224,7 @@ export function AnalyticsView({ selectedCollegeId, onSelectCollege }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Table 1: College Comparative Performance */}
-        <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-lg">
+        <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-3">
           <div className="px-4 py-3 border-b border-border bg-background/50 flex items-center justify-between">
             <h3 className="text-xs font-bold text-white flex items-center gap-2">
               <Landmark size={14} strokeWidth={2} aria-hidden /> Institutional Performance Comparison
@@ -262,7 +262,7 @@ export function AnalyticsView({ selectedCollegeId, onSelectCollege }: Props) {
         </div>
 
         {/* Table 2: Industry & Responsiveness Breakdown */}
-        <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-lg">
+        <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-3">
           <div className="px-4 py-3 border-b border-border bg-background/50 flex items-center justify-between">
             <h3 className="text-xs font-bold text-white flex items-center gap-2">
               <Building2 size={14} strokeWidth={2} aria-hidden /> Industry & Corporate Domain Breakdown

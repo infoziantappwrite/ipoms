@@ -105,9 +105,9 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+    <div className="fixed inset-0 scrim flex items-center justify-center z-50">
       <div className="glass-panel rounded-2xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col
-                      border border-border-strong shadow-2xl">
+                      border border-border-strong shadow-4">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border-strong">
