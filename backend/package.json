@@ -9,7 +9,9 @@
     "start": "node dist/server.js",
     "seed:meta": "ts-node src/scripts/seedMetaDatabase.ts",
     "seed:admin": "ts-node src/scripts/seedRolesAndAdmin.ts",
-    "unlock": "ts-node src/scripts/unlockUser.ts"
+    "unlock": "ts-node src/scripts/unlockUser.ts",
+    "verify:policy": "ts-node src/scripts/verifyRoutePolicy.ts",
+    "fix:roles": "ts-node src/scripts/fixRoleCodes.ts"
   },
   "keywords": [
     "ipoms",

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, PhoneCall, CalendarDays, Target, Building2,
-  TrendingUp, Bell, Settings, PanelLeftClose, X,
+  TrendingUp, Bell, UserCheck, User, PanelLeftClose, X, LogOut,
 } from 'lucide-react';
 
 import { InfoziantMark } from '@/components/InfoziantMark';
@@ -20,7 +20,14 @@ import {
 /** How long the drawer stays open after sign-in before settling to the rail. */
 const INTRO_HOLD_MS = 5000;
 
-const NAV = [
+interface NavItem {
+  href: string;
+  label: string;
+  Icon: any;
+  roles?: RoleKey[];
+}
+
+const NAV: NavItem[] = [
   { href: '/dashboard',      label: 'Dashboard',      Icon: LayoutDashboard },
   { href: '/tracker',        label: 'Daily Tracker',  Icon: PhoneCall },
   { href: '/weekly-tracker', label: 'Weekly Tracker', Icon: CalendarDays },
@@ -28,7 +35,7 @@ const NAV = [
   { href: '/metadata',       label: 'Metadata DB',    Icon: Building2 },
   { href: '/reports',        label: 'Reports & BI',   Icon: TrendingUp },
   { href: '/notifications',  label: 'Alerts',         Icon: Bell },
-  { href: '/settings',       label: 'Settings',       Icon: Settings, roles: ['admin', 'team_leader'] as RoleKey[] },
+  { href: '/settings',       label: 'Profile',        Icon: User },
 ];
 
 interface Props {
@@ -246,12 +253,13 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
 
         {/* ── Signed-in identity ────────────────────────────────────────── */}
         <div className="shrink-0 border-t border-border px-[18px] py-3">
-          <div
-            className="flex items-center gap-3"
-            onMouseEnter={(e) => showLabel(e.currentTarget, `${name} · Online`)}
+          <Link
+            href="/settings"
+            className="flex items-center gap-3 group/id hover:opacity-90 transition-opacity"
+            onMouseEnter={(e) => showLabel(e.currentTarget, `${name} · View Profile`)}
             onMouseLeave={() => setHovered(null)}
           >
-            <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-control border border-primary-subtle bg-primary-subtle text-body font-bold tracking-tight text-primary">
+            <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-control border border-primary-subtle bg-primary-subtle text-body font-bold tracking-tight text-primary group-hover/id:border-primary">
               {initials}
               <span
                 aria-hidden
@@ -260,13 +268,13 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
             </span>
 
             <div className={`min-w-0 ${mounted ? 'transition-opacity duration-200' : ''} ${collapsed ? 'opacity-100 lg:opacity-0' : 'opacity-100'}`}>
-              <div className="truncate whitespace-nowrap text-body font-semibold leading-tight text-fg">{name}</div>
+              <div className="truncate whitespace-nowrap text-body font-semibold leading-tight text-fg group-hover/id:text-primary transition-colors">{name}</div>
               <div className="mt-0.5 flex items-center gap-1.5 whitespace-nowrap text-micro font-medium text-success">
                 Online
                 <span className="text-fg-subtle">· {ROLE_LABEL[role]}</span>
               </div>
             </div>
-          </div>
+          </Link>
         </div>
 
       </aside>

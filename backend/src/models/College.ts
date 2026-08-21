@@ -5,6 +5,7 @@ export interface ICollege extends Document {
   college_code: string;
   location?: string;
   college_website?: string;
+  logo_url?: string;
   tpo_name?: string;
   tpo_email?: string;
   tpo_contact_mobile?: string;
@@ -40,6 +41,11 @@ const CollegeSchema: Schema<ICollege> = new Schema(
       default: 'Tamil Nadu, India',
     },
     college_website: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    logo_url: {
       type: String,
       trim: true,
       default: '',

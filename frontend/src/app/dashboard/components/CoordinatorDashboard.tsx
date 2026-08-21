@@ -1,8 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import {
+  ArrowRight, CalendarDays, Check, Landmark, Lightbulb, Megaphone,
+  PhoneCall, Target, TrendingUp, type LucideIcon,
+} from 'lucide-react';
+
 import { AssignedWorkWidget } from './AssignedWorkWidget';
-import { Landmark, Megaphone, Target, Zap } from 'lucide-react';
+import { CompanyFunnel } from './CompanyFunnel';
 
 interface Props {
   data: any;
@@ -10,229 +15,238 @@ interface Props {
   onMarkComplete: (id: string) => void;
 }
 
+/** Quick navigation — hue matches each module's identity in the sidebar. */
+const QUICK_NAV: { title: string; desc: string; href: string; Icon: LucideIcon; tone: string; tint: string }[] = [
+  { title: 'Daily Tracker', desc: 'Call logging & HR contacts', href: '/tracker', Icon: PhoneCall, tone: 'text-module-2', tint: 'bg-module-2/10' },
+  { title: 'Weekly Tracker', desc: 'Placement pipeline board', href: '/weekly-tracker', Icon: CalendarDays, tone: 'text-module-3', tint: 'bg-module-3/10' },
+  { title: 'Daily Leads', desc: 'Positive responses & JDs', href: '/daily-leads', Icon: Target, tone: 'text-module-4', tint: 'bg-module-4/10' },
+  { title: 'Reports & BI', desc: 'Live analytics & templates', href: '/reports', Icon: TrendingUp, tone: 'text-module-6', tint: 'bg-module-6/10' },
+];
+
 export function CoordinatorDashboard({ data, onLoadToMetadata, onMarkComplete }: Props) {
   if (!data) return null;
 
-  const { priority_notification, assigned_work, priority_college, today_tasks, kpi_summary, insights } = data;
+  const {
+    priority_notification, assigned_work, priority_college,
+    today_tasks, kpi_summary, insights,
+  } = data;
 
+  // AppShell already owns the <main id="main"> landmark for every route, so
+  // this surface contributes a plain container rather than a second one.
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="mx-auto w-full max-w-7xl space-y-6 p-6">
 
-      {/* 1. Priority Notification Alert Banner (Spec Section 7.2) */}
+      {/* ── Directive ───────────────────────────────────────────────────────
+          A tinted band, not a gradient hero. This is a message to read once
+          and act on; competing with the funnel for attention would cost the
+          coordinator the one number they actually steer by. */}
       {priority_notification && (
-        <div className="bg-gradient-to-r from-primary/80 via-indigo-950/60 to-background border border-primary/40 rounded-2xl p-4 shadow-3 flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <Megaphone size={14} strokeWidth={2} aria-hidden />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-primary uppercase tracking-wider">
+        <section
+          aria-labelledby="directive-heading"
+          className="rounded-panel border border-info/30 bg-info-subtle p-4"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+            <div className="flex min-w-0 gap-3">
+              <span
+                aria-hidden
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-control bg-info/10 text-info"
+              >
+                <Megaphone size={16} strokeWidth={2} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-micro font-semibold uppercase tracking-wide text-info">
                   {priority_notification.sender_name}
-                </span>
-                <span className="text-micro bg-destructive/20 text-destructive border border-destructive/30 px-2 py-0.5 rounded-full font-bold">
-                  HIGH PRIORITY
-                </span>
+                </p>
+                <h2 id="directive-heading" className="mt-0.5 text-body font-bold text-fg">
+                  {priority_notification.title}
+                </h2>
+                <p className="mt-1 text-micro leading-relaxed text-fg-muted">
+                  {priority_notification.message}
+                </p>
               </div>
-              <h3 className="text-sm font-bold text-white mt-0.5">{priority_notification.title}</h3>
-              <p className="text-xs text-fg-muted mt-1 leading-relaxed">{priority_notification.message}</p>
             </div>
-          </div>
 
-          <Link
-            href="/tracker"
-            className="px-3.5 py-1.5 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold shrink-0 transition-colors shadow-1 hidden sm:inline-block"
-          >
-            Open Daily Tracker →
-          </Link>
-        </div>
+            <Link
+              href="/tracker"
+              className="flex shrink-0 items-center gap-1.5 rounded-control border border-border bg-surface px-3 py-1.5 text-micro font-semibold text-primary shadow-1 transition-[box-shadow,color] duration-200 hover:text-primary-hover active:shadow-inset-1"
+            >
+              Open Daily Tracker
+              <ArrowRight size={13} strokeWidth={2} aria-hidden />
+            </Link>
+          </div>
+        </section>
       )}
 
-      {/* 2. Assigned Work Widget (Signature Feature — Spec Section 7.3 & 8-10) */}
+      {/* ── Company funnel — the headline ─────────────────────────────────── */}
+      <CompanyFunnel kpi={kpi_summary} />
+
+      {/* ── Assigned work (signature feature) ─────────────────────────────── */}
       <AssignedWorkWidget
         assignments={assigned_work || []}
         onLoadToMetadata={onLoadToMetadata}
         onMarkComplete={onMarkComplete}
       />
 
-      {/* 3. Mid Grid: Priority College & Today's 3 Tasks (Spec Section 7.4 & 7.5) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* ── Priority college & today's three tasks ────────────────────────── */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
 
-        {/* Priority College Widget (Spec Section 7.4) */}
         {priority_college && (
-          <div className="glass-panel rounded-2xl border border-border p-5 shadow-3 flex flex-col justify-between space-y-4">
-            <div>
-              <div className="flex items-center justify-between border-b border-border pb-3">
-                <h3 className="text-xs font-bold text-white flex items-center gap-2">
-                  <Landmark size={14} strokeWidth={2} aria-hidden /> Assigned Priority Institution
-                </h3>
-                <span className="text-micro bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full font-semibold">
-                  Today's Primary Focus
+          <section
+            aria-labelledby="college-heading"
+            className="flex flex-col rounded-panel border border-border bg-surface p-5 shadow-2 lg:col-span-2"
+          >
+            <div className="flex items-center gap-2 border-b border-border pb-3">
+              <Landmark size={15} strokeWidth={2} className="shrink-0 text-fg-subtle" aria-hidden />
+              <h2 id="college-heading" className="text-title font-bold tracking-tight text-fg">
+                Priority college
+              </h2>
+            </div>
+
+            <div className="mt-3.5 flex-1">
+              <div className="flex items-baseline gap-2">
+                <span className="rounded-control bg-primary-subtle px-1.5 py-0.5 font-mono text-micro font-bold text-primary">
+                  {priority_college.code}
                 </span>
               </div>
+              <h3 className="mt-1.5 text-body font-bold leading-snug text-fg">
+                {priority_college.name}
+              </h3>
+              <p className="mt-0.5 text-micro text-fg-subtle">
+                Active campus partner &middot; 2026 placement season
+              </p>
 
-              <div className="mt-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-primary font-mono">
-                    [{priority_college.code}]
-                  </span>
-                  <h4 className="text-sm font-bold text-white">{priority_college.name}</h4>
+              <dl className="mt-4 grid grid-cols-2 gap-3">
+                <div className="rounded-panel border border-border bg-surface-sunken p-3">
+                  <dt className="text-micro font-medium text-fg-subtle">Calls today</dt>
+                  <dd className="mt-0.5 text-display-lg font-bold tabular-nums leading-none text-fg">
+                    {priority_college.calls_today}
+                  </dd>
                 </div>
-                <p className="text-xs text-fg-subtle mt-1">
-                  Active campus partner • 2026 Batch Placement Season
-                </p>
-              </div>
-
-              {/* Mini metric counters */}
-              <div className="grid grid-cols-2 gap-3 mt-4">
-                <div className="bg-background/60 p-3 rounded-xl border border-border">
-                  <span className="text-micro text-fg-subtle uppercase">Today's Call Outreach</span>
-                  <p className="text-lg font-bold text-primary mt-0.5 tabular-nums">
-                    {priority_college.calls_today} Calls
-                  </p>
+                <div className="rounded-panel border border-border bg-surface-sunken p-3">
+                  <dt className="text-micro font-medium text-fg-subtle">Follow-ups due</dt>
+                  <dd
+                    className={`mt-0.5 text-display-lg font-bold tabular-nums leading-none ${
+                      priority_college.pending_follow_ups > 0 ? 'text-warning' : 'text-fg'
+                    }`}
+                  >
+                    {priority_college.pending_follow_ups}
+                  </dd>
                 </div>
-                <div className="bg-background/60 p-3 rounded-xl border border-border">
-                  <span className="text-micro text-fg-subtle uppercase">Pending Follow-Ups</span>
-                  <p className="text-lg font-bold text-warning mt-0.5 tabular-nums">
-                    {priority_college.pending_follow_ups} Follow-ups
-                  </p>
-                </div>
-              </div>
+              </dl>
             </div>
 
             <Link
               href="/tracker"
-              className="w-full py-2 bg-surface hover:bg-surface-raised text-primary border border-primary/20 rounded-xl text-xs font-semibold text-center transition-colors block"
+              className="mt-4 flex items-center justify-center gap-1.5 rounded-control border border-border bg-surface px-3 py-2 text-micro font-semibold text-primary shadow-1 transition-[box-shadow,color] duration-200 hover:text-primary-hover active:shadow-inset-1"
             >
-              Open Daily Tracker for {priority_college.code} →
+              Open tracker for {priority_college.code}
+              <ArrowRight size={13} strokeWidth={2} aria-hidden />
             </Link>
-          </div>
+          </section>
         )}
 
-        {/* Today's 3 Tasks (Spec Section 7.5) */}
-        <div className="glass-panel rounded-2xl border border-border p-5 shadow-3 space-y-4">
-          <div className="flex items-center justify-between border-b border-border pb-3">
-            <h3 className="text-xs font-bold text-white flex items-center gap-2">
-              <Target size={14} strokeWidth={2} aria-hidden /> Today's Action Checklist (Max 3 Tasks)
-            </h3>
-            <span className="text-micro text-fg-subtle">Strictly Focused</span>
+        <section
+          aria-labelledby="tasks-heading"
+          className="rounded-panel border border-border bg-surface p-5 shadow-2 lg:col-span-3"
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-border pb-3">
+            <h2 id="tasks-heading" className="text-title font-bold tracking-tight text-fg">
+              Today
+            </h2>
+            <p className="text-micro text-fg-subtle">Three things, deliberately</p>
           </div>
 
-          <div className="space-y-2.5">
+          <ol className="mt-3.5 space-y-2.5">
             {today_tasks?.map((t: any) => (
-              <Link
-                key={t.id}
-                href={t.target_route}
-                className="bg-background/60 hover:bg-surface/80 border border-border rounded-xl p-3 flex items-center justify-between transition-all group block"
-              >
-                <div className="flex items-center gap-3">
+              <li key={t.id}>
+                <Link
+                  href={t.target_route}
+                  className="group flex items-center gap-3 rounded-panel border border-border bg-surface-sunken p-3 transition-shadow duration-200 hover:shadow-1"
+                >
                   <span
-                    className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold border ${
+                    aria-hidden
+                    className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border ${
                       t.completed
-                        ? 'bg-success/20 text-success border-success/40'
-                        : 'bg-surface text-fg-subtle border-border-strong'
+                        ? 'border-transparent bg-success text-success-foreground'
+                        : 'border-border-strong bg-surface'
                     }`}
                   >
-                    {t.completed ? '✓' : '•'}
+                    {t.completed && <Check size={13} strokeWidth={3} />}
                   </span>
-                  <div>
-                    <p className="text-xs font-semibold text-fg group-hover:text-primary transition-colors">
+
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={`text-body font-semibold leading-snug ${
+                        t.completed ? 'text-fg-subtle line-through' : 'text-fg'
+                      }`}
+                    >
                       {t.title}
                     </p>
-                    <p className="text-micro text-fg-subtle mt-0.5">{t.progress}</p>
+                    <p className="mt-0.5 text-micro tabular-nums text-fg-subtle">{t.progress}</p>
                   </div>
-                </div>
 
-                <span className="text-xs text-fg-subtle group-hover:text-fg-muted transition-colors">
-                  →
-                </span>
-              </Link>
+                  <ArrowRight
+                    size={15}
+                    strokeWidth={2}
+                    aria-hidden
+                    className="shrink-0 text-fg-subtle transition-colors duration-200 group-hover:text-primary"
+                  />
+                  <span className="sr-only">{t.completed ? 'Complete' : 'Not complete'}</span>
+                </Link>
+              </li>
             ))}
-          </div>
-        </div>
-
+          </ol>
+        </section>
       </div>
 
-      {/* 4. Today's KPI Summary Strip (Spec Section 7.6) */}
-      {kpi_summary && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="glass-card rounded-xl p-3.5 border border-border">
-            <span className="text-micro text-fg-subtle uppercase font-semibold">Assigned Outreach</span>
-            <p className="text-xl font-bold text-fg-muted mt-1 tabular-nums">
-              {kpi_summary.calls_assigned} Target
-            </p>
-            <p className="text-micro text-fg-subtle mt-0.5">30 Call Target Benchmark</p>
-          </div>
+      {/* ── Quick navigation ──────────────────────────────────────────────── */}
+      <nav aria-label="Module shortcuts" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {QUICK_NAV.map(({ title, desc, href, Icon, tone, tint }) => (
+          <Link
+            key={href}
+            href={href}
+            className="group flex items-center gap-3 rounded-panel border border-border bg-surface p-4 shadow-1 transition-shadow duration-200 hover:shadow-3"
+          >
+            <span aria-hidden className={`grid h-10 w-10 shrink-0 place-items-center rounded-panel ${tint} ${tone}`}>
+              <Icon size={19} strokeWidth={2} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate text-body font-bold text-fg">{title}</h3>
+              <p className="truncate text-micro text-fg-subtle">{desc}</p>
+            </div>
+            <ArrowRight
+              size={15}
+              strokeWidth={2}
+              aria-hidden
+              className="shrink-0 text-fg-subtle transition-colors duration-200 group-hover:text-primary"
+            />
+          </Link>
+        ))}
+      </nav>
 
-          <div className="glass-card rounded-xl p-3.5 border border-border">
-            <span className="text-micro text-fg-subtle uppercase font-semibold">Calls Logged Today</span>
-            <p className="text-xl font-bold text-primary mt-1 tabular-nums">
-              {kpi_summary.calls_completed} Completed
-            </p>
-            <p className="text-micro text-primary/80 mt-0.5">Daily Tracker Engine</p>
-          </div>
-
-          <div className="glass-card rounded-xl p-3.5 border border-border">
-            <span className="text-micro text-fg-subtle uppercase font-semibold">Positive Opportunities</span>
-            <p className="text-xl font-bold text-success mt-1 tabular-nums">
-              {kpi_summary.positive_responses} Positives
-            </p>
-            <p className="text-micro text-success/80 mt-0.5">Hot Corporate Leads</p>
-          </div>
-
-          <div className="glass-card rounded-xl p-3.5 border border-border">
-            <span className="text-micro text-fg-subtle uppercase font-semibold">Job Descriptions</span>
-            <p className="text-xl font-bold text-cyan-400 mt-1 tabular-nums">
-              {kpi_summary.jds_received} JDs Secured
-            </p>
-            <p className="text-micro text-cyan-500/80 mt-0.5">Confirmed Campus Roles</p>
-          </div>
-        </div>
-      )}
-
-      {/* 5. Quick Navigation Shortcut Cards (Spec Section 7.7) */}
-      <div className="glass-panel rounded-2xl border border-border p-5 shadow-3 space-y-4">
-        <div className="flex items-center justify-between border-b border-border pb-3">
-          <h3 className="text-xs font-bold text-white flex items-center gap-2">
-            <Zap size={14} strokeWidth={2} aria-hidden /> Quick Workflow Navigation Hub
-          </h3>
-          <span className="text-micro text-fg-subtle">1-Click Module Routing</span>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { title: 'Daily Tracker', desc: 'Call logging & HR contact picker', icon: '📋', href: '/tracker', color: 'hover:border-primary' },
-            { title: 'Weekly Tracker', desc: '7-section placement pipeline board', icon: '📊', href: '/weekly-tracker', color: 'hover:border-purple-500' },
-            { title: 'Daily Leads', desc: 'Dual-tab positive & JD registers', icon: '📥', href: '/daily-leads', color: 'hover:border-success' },
-            { title: 'Reports Center', desc: 'Live BI & 4 template builders', icon: '📈', href: '/reports', color: 'hover:border-cyan-500' },
-          ].map((nav) => (
-            <Link
-              key={nav.title}
-              href={nav.href}
-              className={`bg-background/60 border border-border rounded-xl p-3.5 transition-all group ${nav.color} block shadow-1`}
-            >
-              <span className="text-2xl">{nav.icon}</span>
-              <h4 className="text-xs font-bold text-white mt-2 group-hover:text-primary transition-colors">
-                {nav.title}
-              </h4>
-              <p className="text-micro text-fg-subtle mt-0.5">{nav.desc}</p>
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {/* 6. Operational Insights (Spec Section 7.8) */}
-      {insights && (
-        <div className="bg-background/60 border border-border rounded-xl p-4 space-y-2">
-          <span className="text-xs font-bold text-fg-muted flex items-center gap-1.5">
-            <span>💡</span> Operational Observations
-          </span>
-          <ul className="text-xs text-fg-subtle space-y-1 pl-4 list-disc">
+      {/* ── Insights ──────────────────────────────────────────────────────── */}
+      {insights?.length > 0 && (
+        <section
+          aria-labelledby="insights-heading"
+          className="rounded-panel border border-border bg-surface-sunken p-4"
+        >
+          <h2
+            id="insights-heading"
+            className="flex items-center gap-2 text-micro font-bold uppercase tracking-wide text-fg-muted"
+          >
+            <Lightbulb size={14} strokeWidth={2} className="shrink-0 text-fg-subtle" aria-hidden />
+            Observations
+          </h2>
+          <ul className="mt-2.5 space-y-1.5">
             {insights.map((ins: string, i: number) => (
-              <li key={i}>{ins}</li>
+              <li key={i} className="flex gap-2.5 text-micro leading-relaxed text-fg-muted">
+                <span aria-hidden className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-fg-disabled" />
+                {ins}
+              </li>
             ))}
           </ul>
-        </div>
+        </section>
       )}
-
     </div>
   );
 }

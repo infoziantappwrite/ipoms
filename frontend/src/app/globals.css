@@ -38,7 +38,13 @@
   /* ── Foreground ─────────────────────────────────────────────────────── */
   --foreground:       15  23  42;  /* #0F172A  17.9:1 AAA  primary text     */
   --fg-muted:         71  85 105;  /* #475569   7.6:1 AAA  secondary        */
-  --fg-subtle:       100 116 139;  /* #64748B   4.8:1 AA   meta / labels    */
+  /* Contrast ratios below are stated against --surface-sunken (#F1F5F9), the
+     DARKEST surface these tokens land on, not against white. Measuring against
+     white is what let the previous #64748B ship: it reads 4.76:1 on a card but
+     only 4.34:1 on a sunken panel, so every label inside a toolbar, table
+     header, or inset tile silently failed AA. Judge foreground tokens by their
+     worst surface, never their best. */
+  --fg-subtle:        93 107 128;  /* #5D6B80   4.9:1 AA on sunken, 5.4:1 on surface */
   --fg-disabled:     148 163 184;  /* #94A3B8   decorative only, never text */
 
   /* shadcn aliases */

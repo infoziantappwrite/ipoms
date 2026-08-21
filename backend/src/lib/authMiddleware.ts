@@ -10,14 +10,8 @@ export interface AuthUserPayload {
   fullName: string;
 }
 
-// Extend Express Request interface to include user payload
-declare global {
-  namespace Express {
-    interface Request {
-      user?: AuthUserPayload;
-    }
-  }
-}
+// The Express Request augmentation for `req.user` lives in src/types/express.d.ts
+// so that modules compiled in isolation still see it.
 
 /**
  * Middleware to authenticate requests using JWT Bearer Token.

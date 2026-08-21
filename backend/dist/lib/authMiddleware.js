@@ -7,6 +7,8 @@ exports.authenticateJWT = authenticateJWT;
 exports.authorizeRoles = authorizeRoles;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'ipoms_dev_access_secret_super_secure_key_2026';
+// The Express Request augmentation for `req.user` lives in src/types/express.d.ts
+// so that modules compiled in isolation still see it.
 /**
  * Middleware to authenticate requests using JWT Bearer Token.
  */

@@ -8,6 +8,7 @@ interface Props {
   onOpenAddUser: () => void;
   onEditUser: (user: any) => void;
   onDeactivateUser: (id: string, name: string) => void;
+  onUnlockProfile?: (id: string, name: string) => void;
 }
 
 export function UserManagementTab({
@@ -15,6 +16,7 @@ export function UserManagementTab({
   onOpenAddUser,
   onEditUser,
   onDeactivateUser,
+  onUnlockProfile,
 }: Props) {
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -153,29 +155,55 @@ export function UserManagementTab({
                         )}
                       </td>
 
-                      {/* Status */}
-                      <td className="py-3 px-4 text-center">
-                        <span
-                          className={`text-micro font-semibold px-2 py-0.5 rounded-full capitalize ${
-                            u.account_status === 'active'
-                              ? 'bg-success/20 text-success border border-success/30'
-                              : 'bg-destructive/20 text-destructive border border-destructive/30'
-                          }`}
-                        >
-                          {u.account_status || 'active'}
-                        </span>
+                      {/* Status & Lock Badges */}
+                      <td className="py-3 px-4 text-center space-y-1">
+                        <div>
+                          <span
+                            className={`text-micro font-semibold px-2 py-0.5 rounded-full capitalize ${
+                              u.account_status === 'active'
+                                ? 'bg-success/20 text-success border border-success/30'
+                                : 'bg-destructive/20 text-destructive border border-destructive/30'
+                            }`}
+                          >
+                            {u.account_status || 'active'}
+                          </span>
+                        </div>
+                        {u.is_profile_locked && (
+                          <div>
+                            <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
+                              🔒 Profile Locked
+                            </span>
+                          </div>
+                        )}
+                        {(u.is_password_locked || u.account_status === 'blocked') && (
+                          <div>
+                            <span className="text-[10px] font-bold text-danger bg-danger/15 border border-danger/30 px-1.5 py-0.5 rounded font-mono">
+                              🚨 Pwd Limit Exceeded
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Actions */}
                       <td className="py-3 px-5 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
+                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
                           <button
                             type="button"
                             onClick={() => onEditUser(u)}
                             className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 px-2.5 py-1 rounded text-micro font-semibold transition-colors"
                           >
-                            <Pencil size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}Edit
+                            <Pencil size={12} className="inline shrink-0" /> Edit
                           </button>
+                          {(u.is_profile_locked || u.is_password_locked || u.account_status === 'blocked') && onUnlockProfile && (
+                            <button
+                              type="button"
+                              onClick={() => onUnlockProfile(u._id, u.full_name)}
+                              className="bg-warning/20 hover:bg-warning/30 text-warning border border-warning/30 px-2.5 py-1 rounded text-micro font-bold transition-colors cursor-pointer"
+                              title="Unlock profile & reset password limits for this user"
+                            >
+                              🔓 Unlock
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => onDeactivateUser(u._id, u.full_name)}

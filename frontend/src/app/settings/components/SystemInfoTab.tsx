@@ -1,6 +1,9 @@
-'use client';
+import Link from 'next/link';
+import {
+  BarChart3, LayoutDashboard, PhoneCall, CalendarDays, Target,
+  Building2, TrendingUp, Bell, Settings, ExternalLink
+} from 'lucide-react';
 
-import { BarChart3 } from 'lucide-react';
 interface Props {
   summaryData: any;
 }
@@ -8,10 +11,85 @@ interface Props {
 export function SystemInfoTab({ summaryData }: Props) {
   const summary = summaryData || {};
 
+  const modules = [
+    {
+      title: 'Role-Based Dashboard',
+      code: 'Module 07',
+      Icon: LayoutDashboard,
+      desc: 'Real-time daily KPI scorecards, interactive task dispatching, priority college alerts, and institutional placement leaderboards.',
+      href: '/dashboard',
+      badge: 'Operational Hub',
+      color: 'border-blue-500/30 text-blue-400 bg-blue-500/10',
+    },
+    {
+      title: 'Daily Call Tracker',
+      code: 'Module 03',
+      Icon: PhoneCall,
+      desc: 'Lightning-fast 30-call daily logging grid with auto-save debounce, instant contact picker, and keyboard-driven efficiency.',
+      href: '/tracker',
+      badge: 'Core Engine',
+      color: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
+    },
+    {
+      title: 'Weekly Tracker Lifecycle',
+      code: 'Module 04',
+      Icon: CalendarDays,
+      desc: '7-stage placement pipeline board with follow-up proximity tracking, multi-role salary ranges, and institutional filtering.',
+      href: '/weekly-tracker',
+      badge: 'Pipeline CRM',
+      color: 'border-purple-500/30 text-purple-400 bg-purple-500/10',
+    },
+    {
+      title: 'Daily Leads Register',
+      code: 'Module 05',
+      Icon: Target,
+      desc: 'Timestamped register of qualified hiring opportunities, JD receipts, and student submission tracking.',
+      href: '/daily-leads',
+      badge: 'Lead Registry',
+      color: 'border-amber-500/30 text-amber-400 bg-amber-500/10',
+    },
+    {
+      title: 'Master Metadata Database',
+      code: 'Module 02',
+      Icon: Building2,
+      desc: 'Centralized directory of 3,500+ verified corporate contacts, HR directories, phone starts-with indexing, and 30-day soft-delete bin.',
+      href: '/metadata',
+      badge: 'Intelligence Repository',
+      color: 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10',
+    },
+    {
+      title: 'Reports & Analytics Center',
+      code: 'Module 06',
+      Icon: TrendingUp,
+      desc: 'Cross-tab operational BI, 4 downloadable report presets, student eligible filters, and document report editor.',
+      href: '/reports',
+      badge: 'Executive BI',
+      color: 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10',
+    },
+    {
+      title: 'Notifications & Broadcasts',
+      code: 'Module 08',
+      Icon: Bell,
+      desc: 'Targeted broadcast engine, policy circulars, urgent drive alerts, and automated call-reminder notifications.',
+      href: '/notifications',
+      badge: 'Alerts Engine',
+      color: 'border-rose-500/30 text-rose-400 bg-rose-500/10',
+    },
+    {
+      title: 'System Settings & RBAC',
+      code: 'Module 01 & 09',
+      Icon: Settings,
+      desc: 'Personal profile, user account provisioning, role permissions matrix, audit logs, and global season configuration.',
+      href: '/settings',
+      badge: 'Governance',
+      color: 'border-primary/30 text-primary bg-primary/10',
+    },
+  ];
+
   return (
     <div className="space-y-5 max-w-4xl">
 
-      {/* Reassurance Health Panel (Spec Section 14) */}
+      {/* Reassurance Health Panel */}
       <div className="glass-panel rounded-2xl border border-success/30 bg-success/20 p-5 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <span className="text-2xl p-2 bg-success/50 rounded-xl border border-success/30">🟢</span>
@@ -27,7 +105,7 @@ export function SystemInfoTab({ summaryData }: Props) {
         </span>
       </div>
 
-      {/* Database Summary Telemetry (Spec Section 13.2) */}
+      {/* Database Summary Telemetry */}
       <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-4">
         <div className="border-b border-border pb-3">
           <h3 className="text-xs font-bold text-white flex items-center gap-2">
@@ -65,7 +143,55 @@ export function SystemInfoTab({ summaryData }: Props) {
         </div>
       </div>
 
-      {/* Application Version & Environment (Spec Section 13.1) */}
+      {/* Enterprise Module Directory & Architecture Hub */}
+      <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-4">
+        <div className="border-b border-border pb-3">
+          <h3 className="text-xs font-bold text-white flex items-center gap-2">
+            <span>🏛️</span> Enterprise Module Directory & Architecture Hub
+          </h3>
+          <p className="text-micro text-fg-subtle mt-0.5">
+            Operational navigation and governance directory across all 8 integrated modules
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+          {modules.map((m) => (
+            <Link
+              key={m.code}
+              href={m.href}
+              className="p-4 rounded-xl border border-border bg-background/60 hover:bg-surface-raised hover:border-primary/40 transition-all group flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-surface border border-border text-fg group-hover:text-primary transition-colors">
+                      <m.Icon size={16} strokeWidth={2} />
+                    </span>
+                    <span className="text-xs font-bold text-fg group-hover:text-primary transition-colors">
+                      {m.title}
+                    </span>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${m.color}`}>
+                    {m.code}
+                  </span>
+                </div>
+                <p className="text-[11px] text-fg-subtle leading-relaxed line-clamp-2">
+                  {m.desc}
+                </p>
+              </div>
+
+              <div className="mt-3 pt-2 border-t border-border/50 flex items-center justify-between text-[10px] text-fg-subtle group-hover:text-primary font-semibold">
+                <span>{m.badge}</span>
+                <span className="flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                  Open Module <ExternalLink size={11} strokeWidth={2} />
+                </span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Application Version & Environment */}
       <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-4">
         <div className="border-b border-border pb-3">
           <h3 className="text-xs font-bold text-white flex items-center gap-2">

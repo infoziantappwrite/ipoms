@@ -1,4 +1,8 @@
 {
+  "/reports/page": "app/reports/page.js",
+  "/tracker/page": "app/tracker/page.js",
+  "/settings/page": "app/settings/page.js",
   "/login/page": "app/login/page.js",
-  "/dashboard/page": "app/dashboard/page.js"
+  "/daily-leads/page": "app/daily-leads/page.js",
+  "/weekly-tracker/page": "app/weekly-tracker/page.js"
 }

@@ -61,6 +61,11 @@ const CollegeSchema = new mongoose_1.Schema({
         trim: true,
         default: '',
     },
+    logo_url: {
+        type: String,
+        trim: true,
+        default: '',
+    },
     tpo_name: {
         type: String,
         trim: true,

@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { apiFetch } from '@/lib/api';
 
 interface Props {
   initialData?: any | null;
@@ -21,7 +20,7 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
   const [officialEmail, setOfficialEmail] = useState(initialData?.official_email || '');
   const [employeeId, setEmployeeId] = useState(initialData?.employee_id || '');
   const [primaryMobile, setPrimaryMobile] = useState(initialData?.primary_mobile || '');
-  const [selectedRole, setSelectedRole] = useState(initialData?.role_codes?.[0] || 'COORDINATOR');
+  const [selectedRole, setSelectedRole] = useState(initialData?.role_codes?.[0] || 'PLACEMENT_COORDINATOR');
   const [selectedColleges, setSelectedColleges] = useState<string[]>(
     initialData?.assigned_college_ids?.map((c: any) => (typeof c === 'object' ? c._id : c)) || []
   );
@@ -32,8 +31,8 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
   useEffect(() => {
     // Fetch colleges and roles
     Promise.all([
-      fetch(`${API}/colleges`).then((r) => r.json()),
-      fetch(`${API}/roles`).then((r) => r.json()),
+      apiFetch('/colleges'),
+      apiFetch('/roles'),
     ])
       .then(([colData, roleData]) => {
         if (colData.success) setColleges(colData.data.colleges);
@@ -74,22 +73,20 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
         payload.password = password;
       }
 
-      const url = isEditing ? `${API}/users/${initialData._id}` : `${API}/users`;
+      const url = isEditing ? `/users/${initialData._id}` : '/users';
       const method = isEditing ? 'PATCH' : 'POST';
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
-      if (data.success) {
+      if (res.success) {
         alert(isEditing ? 'User profile updated!' : 'New user account created successfully!');
         onSuccess();
         onClose();
       } else {
-        alert(data.error?.message || 'Operation failed');
+        alert(res.error?.message || 'Operation failed');
       }
     } catch (err) {
       console.error('User save error:', err);
@@ -179,7 +176,7 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
                 onChange={(e) => setSelectedRole(e.target.value)}
                 className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg cursor-pointer"
               >
-                <option value="COORDINATOR">Placement Coordinator</option>
+                <option value="PLACEMENT_COORDINATOR">Placement Coordinator</option>
                 <option value="TEAM_LEADER">Team Leader</option>
                 <option value="ADMINISTRATOR">Administrator (CEO / Director)</option>
                 <option value="TPO">Training & Placement Officer (TPO)</option>

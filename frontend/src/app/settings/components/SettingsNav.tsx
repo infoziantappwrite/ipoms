@@ -12,22 +12,28 @@ interface Props {
   activeSection: SettingsSection;
   onSectionChange: (section: SettingsSection) => void;
   userCount?: number;
+  userRole?: string;
 }
 
-export function SettingsNav({ activeSection, onSectionChange, userCount }: Props) {
-  const sections = [
-    { id: 'profile' as SettingsSection, label: 'My Profile & Security', icon: '👤', badge: 'Personal' },
+export function SettingsNav({ activeSection, onSectionChange, userCount, userRole = 'COORDINATOR' }: Props) {
+  const isCoordinator = userRole.toUpperCase().includes('COORDINATOR');
+
+  const allSections = [
+    { id: 'profile' as SettingsSection, label: 'My Profile & Security', icon: '👤', badge: 'Personal', forCoordinator: true },
     {
       id: 'users' as SettingsSection,
-      label: 'User & Coordinator Management',
+      label: 'User Management',
       icon: '👥',
       badge: userCount ? `${userCount} Users` : 'Admin',
+      forCoordinator: false,
     },
-    { id: 'roles' as SettingsSection, label: 'Role Permissions Matrix', icon: '🛡️', badge: 'RBAC' },
-    { id: 'config' as SettingsSection, label: 'Application & Season Settings', icon: '⚙️', badge: 'Global' },
-    { id: 'org' as SettingsSection, label: 'Organization Branding', icon: '🏢', badge: 'Director' },
-    { id: 'system_info' as SettingsSection, label: 'System Telemetry & Health', icon: 'ℹ️', badge: 'Status' },
+    { id: 'roles' as SettingsSection, label: 'Role Permissions Matrix', icon: '🛡️', badge: 'RBAC', forCoordinator: false },
+    { id: 'config' as SettingsSection, label: 'Season & System Settings', icon: '⚙️', badge: 'Global', forCoordinator: false },
+    { id: 'org' as SettingsSection, label: 'Organization Branding', icon: '🏢', badge: 'Director', forCoordinator: false },
+    { id: 'system_info' as SettingsSection, label: 'System Health & Modules', icon: 'ℹ️', badge: 'Status', forCoordinator: true },
   ];
+
+  const sections = isCoordinator ? allSections.filter((s) => s.forCoordinator) : allSections;
 
   return (
     <div className="w-full md:w-64 glass-panel rounded-2xl border border-border p-3 flex md:flex-col gap-1.5 overflow-x-auto shrink-0">

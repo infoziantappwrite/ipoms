@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -62,6 +95,75 @@ function publicUser(user) {
     };
 }
 function registerAuthRoutes(app) {
+    /* ── Staff Self-Registration / Sign Up ────────────────────────────────── */
+    app.post('/api/v1/auth/signup', async (req, res) => {
+        try {
+            const { full_name = '', username = '', official_email = '', primary_mobile = '', role_codes = ['COORDINATOR'], password = '', } = req.body;
+            const email = String(official_email).trim().toLowerCase();
+            const uname = String(username).trim().toLowerCase();
+            const name = String(full_name).trim();
+            if (!name || !uname || !email || !password) {
+                return fail(res, 400, 'FIELDS_REQUIRED', 'Please complete all required fields.');
+            }
+            if (!email.endsWith(`@${STAFF_DOMAIN}`)) {
+                return fail(res, 400, 'INVALID_DOMAIN', `Only @${STAFF_DOMAIN} email addresses are permitted.`);
+            }
+            if (!(0, passwordPolicy_1.isPasswordValid)(password)) {
+                return fail(res, 400, 'PASSWORD_POLICY', (0, passwordPolicy_1.firstPasswordError)(password) || 'Password does not meet the policy.');
+            }
+            // Check if this email or username already exists in the database
+            const existingUser = await User_1.User.findOne({
+                $or: [
+                    { official_email: email },
+                    { username: uname },
+                ],
+            });
+            if (existingUser) {
+                const isSameEmail = existingUser.official_email.toLowerCase() === email;
+                return fail(res, 409, 'ACCOUNT_ALREADY_EXISTS', isSameEmail
+                    ? `An account with ${email} already exists. You cannot create a new account with an existing email ID. Please sign in or reset your password.`
+                    : `The username "${uname}" is already taken. Please choose a different username.`);
+            }
+            const { Role } = await Promise.resolve().then(() => __importStar(require('../models/Role')));
+            const roles = await Role.find({ role_code: { $in: role_codes } });
+            const roleIds = roles.map((r) => r._id);
+            const salt = await bcryptjs_1.default.genSalt(12);
+            const password_hash = await bcryptjs_1.default.hash(password, salt);
+            const user = await User_1.User.create({
+                full_name: name,
+                username: uname,
+                official_email: email,
+                password_hash,
+                role_codes,
+                role_ids: roleIds,
+                primary_mobile: String(primary_mobile).trim(),
+                account_status: 'active',
+                presence_status: 'available',
+                is_deleted: false,
+            });
+            await (0, audit_1.writeAudit)({
+                action: 'CREATE',
+                result: 'SUCCESS',
+                entityType: 'users',
+                entityId: user._id,
+                performedBy: user._id,
+                performedByRole: role_codes[0] || 'COORDINATOR',
+                performedByEmail: email,
+                module: 'Security & Audit',
+                severity: 'info',
+                summary: `Self-registered new account for ${name} (${email})`,
+                req,
+            });
+            return res.status(201).json({
+                success: true,
+                message: `Account created successfully for ${name}. You can sign in now.`,
+                data: { user: publicUser(user) },
+            });
+        }
+        catch (error) {
+            return fail(res, 500, 'INTERNAL_SERVER_ERROR', error?.message || 'Unexpected error');
+        }
+    });
     /* ── Sign in ──────────────────────────────────────────────────────────── */
     app.post('/api/v1/auth/login', async (req, res) => {
         try {
@@ -176,6 +278,15 @@ function registerAuthRoutes(app) {
                 req,
             });
             if (!delivery.delivered) {
+                if (delivery.reason === 'SMTP is not configured on the server') {
+                    // In development mode without SMTP, allow the frontend to proceed to the OTP entry screen
+                    // and provide the code directly for local testing
+                    return res.status(200).json({
+                        success: true,
+                        message: `Verification code generated: ${code}`,
+                        data: { expiresInMinutes: OTP_TTL_MINUTES, devMode: true, devCode: code },
+                    });
+                }
                 return fail(res, 502, 'EMAIL_NOT_SENT', `Could not send the verification email. ${delivery.reason}. Contact your administrator.`);
             }
             return res.status(200).json({
@@ -188,7 +299,46 @@ function registerAuthRoutes(app) {
             return fail(res, 500, 'INTERNAL_SERVER_ERROR', error?.message || 'Unexpected error');
         }
     });
-    /* ── Verify OTP and set the new password ──────────────────────────────── */
+    /* ── Step 1: Verify OTP (Unlock Step) ────────────────────────────────── */
+    app.post('/api/v1/auth/verify-otp', async (req, res) => {
+        try {
+            const email = String(req.body?.email ?? '').trim().toLowerCase();
+            const otp = String(req.body?.otp ?? '').trim();
+            const user = await User_1.User.findOne({ official_email: email, is_deleted: false }).select('+reset_otp_hash');
+            if (!user)
+                return fail(res, 404, 'ACCOUNT_NOT_FOUND', 'No iPOMS account exists for this email address.');
+            if (!user.reset_otp_hash || !user.reset_otp_expires_at) {
+                return fail(res, 400, 'NO_OTP_PENDING', 'No verification code has been requested for this account.');
+            }
+            if (user.reset_otp_expires_at.getTime() < Date.now()) {
+                return fail(res, 410, 'OTP_EXPIRED', 'That verification code has expired. Request a new one.');
+            }
+            if ((user.reset_otp_attempts ?? 0) >= OTP_MAX_ATTEMPTS) {
+                return fail(res, 429, 'OTP_ATTEMPTS_EXCEEDED', 'Too many incorrect codes. Request a new one.');
+            }
+            const otpOk = await bcryptjs_1.default.compare(otp, user.reset_otp_hash);
+            if (!otpOk) {
+                user.reset_otp_attempts = (user.reset_otp_attempts ?? 0) + 1;
+                await user.save();
+                await (0, audit_1.writeAudit)({
+                    action: 'OTP_FAILED', result: 'FAILED', entityType: 'users', entityId: user._id,
+                    performedBy: user._id, performedByRole: user.role_codes?.[0] ?? 'unknown',
+                    performedByEmail: user.official_email, module: 'Security & Audit', severity: 'critical',
+                    summary: `Incorrect verification code (attempt ${user.reset_otp_attempts} of ${OTP_MAX_ATTEMPTS})`, req,
+                });
+                const left = OTP_MAX_ATTEMPTS - user.reset_otp_attempts;
+                return fail(res, 401, 'OTP_INVALID', `Incorrect verification code. ${Math.max(left, 0)} attempt${left === 1 ? '' : 's'} remaining.`);
+            }
+            return res.status(200).json({
+                success: true,
+                message: 'Account unlocked! Please set your new password.',
+            });
+        }
+        catch (error) {
+            return fail(res, 500, 'INTERNAL_SERVER_ERROR', error?.message || 'Unexpected error');
+        }
+    });
+    /* ── Step 2: Verify OTP and set the new password ──────────────────────── */
     app.post('/api/v1/auth/reset-password', async (req, res) => {
         try {
             const email = String(req.body?.email ?? '').trim().toLowerCase();
@@ -245,10 +395,11 @@ function registerAuthRoutes(app) {
                 module: 'Security & Audit', severity: 'warning',
                 summary: 'Password reset via email verification; account unlocked', req,
             });
+            const token = signToken(user);
             return res.status(200).json({
                 success: true,
-                message: 'Password updated. You can sign in with your new password.',
-                data: { user: publicUser(user) },
+                message: 'Password updated successfully! Welcome back.',
+                data: { token, user: publicUser(user) },
             });
         }
         catch (error) {

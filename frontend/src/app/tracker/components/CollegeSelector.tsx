@@ -4,19 +4,21 @@ import { useEffect, useState } from 'react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
-interface College {
+export interface College {
   _id: string;
   college_name: string;
   college_code: string;
   location?: string;
+  logo_url?: string;
 }
 
 interface Props {
   selectedCollegeId: string;
   onSelect: (id: string, name: string) => void;
+  onSelectCollege?: (col: College) => void;
 }
 
-export function CollegeSelector({ selectedCollegeId, onSelect }: Props) {
+export function CollegeSelector({ selectedCollegeId, onSelect, onSelectCollege }: Props) {
   const [colleges, setColleges] = useState<College[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,7 +26,9 @@ export function CollegeSelector({ selectedCollegeId, onSelect }: Props) {
     fetch(`${API}/colleges`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.success) setColleges(data.data.colleges);
+        if (data.success && Array.isArray(data.data?.colleges)) {
+          setColleges(data.data.colleges);
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -39,12 +43,14 @@ export function CollegeSelector({ selectedCollegeId, onSelect }: Props) {
         value={selectedCollegeId}
         onChange={(e) => {
           const college = colleges.find((c) => c._id === e.target.value);
-          if (college) onSelect(college._id, college.college_name);
+          if (college) {
+            onSelect(college._id, college.college_name);
+            if (onSelectCollege) onSelectCollege(college);
+          }
         }}
         disabled={loading}
-        className="bg-surface border border-border-strong text-fg text-sm px-3 py-2 rounded-lg 
-                   min-w-[220px] cursor-pointer
-                   disabled:opacity-50"
+        className="bg-surface border border-border-strong text-fg text-xs sm:text-sm px-3 py-2 rounded-xl 
+                   min-w-[220px] cursor-pointer disabled:opacity-50"
       >
         <option value="">
           {loading ? 'Loading colleges…' : '— Select College —'}
@@ -63,3 +69,4 @@ export function CollegeSelector({ selectedCollegeId, onSelect }: Props) {
     </div>
   );
 }
+

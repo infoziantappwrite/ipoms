@@ -11,7 +11,9 @@
     "build:backend": "npm run build --prefix backend",
     "build": "npm run build:backend && npm run build:frontend",
     "start:backend": "npm run start --prefix backend",
-    "start:frontend": "npm run start --prefix frontend"
+    "start:frontend": "npm run start --prefix frontend",
+    "verify:policy": "npm run verify:policy --prefix backend",
+    "fix:roles": "npm run fix:roles --prefix backend"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

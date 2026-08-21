@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { BarChart3 } from 'lucide-react';
+import { UserSignOutButton } from '@/components/UserSignOutButton';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -10,6 +11,7 @@ interface College {
   college_name: string;
   college_code: string;
   location?: string;
+  logo_url?: string;
 }
 
 interface Props {
@@ -66,28 +68,63 @@ export function WeeklyHeader({
       .finally(() => setLoading(false));
   }, []);
 
+  const selectedCollege = colleges.find((c) => c._id === selectedCollegeId);
   const weekInfo = formatWeekDisplay(weekOffset);
 
   return (
-    <header className="glass-panel border-b border-border px-6 py-4">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-
-        {/* Left: Title & Season */}
+    <header className="glass-panel border-b border-border px-6 py-4 space-y-3">
+      {/* ── Top Row: Title & Top-Right Sign Out ────────────────────────── */}
+      <div className="flex items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-              <BarChart3 size={14} strokeWidth={2} aria-hidden /> Weekly Placement Tracker
+              <BarChart3 size={18} strokeWidth={2} className="text-primary" /> Weekly Tracker
             </h1>
             <span className="text-xs bg-primary/20 text-primary border border-primary/30 px-2.5 py-0.5 rounded-full font-semibold">
-              2026 Academic Season
+              2026 Season
             </span>
           </div>
-          <p className="text-xs text-fg-subtle mt-1">
+          <p className="text-xs text-fg-subtle mt-0.5">
             Continuous Operational Pipeline • Friday-to-Friday Reporting Cycle
           </p>
         </div>
 
-        {/* Centre: Friday-to-Friday Week Selector */}
+        {/* Pin Selected College Logo & Sign Out to Absolute Top Right */}
+        <div className="flex items-center gap-3 shrink-0">
+          {selectedCollege && (
+            <div className="flex items-center gap-2 bg-surface/90 border border-border/80 px-2.5 py-1 rounded-xl shadow-sm animate-fadeIn">
+              {selectedCollege.logo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={selectedCollege.logo_url}
+                  alt={selectedCollege.college_name}
+                  className="w-7 h-7 object-contain rounded-md bg-white/95 p-0.5 shadow-sm border border-border/50"
+                />
+              ) : (
+                <span className="w-7 h-7 rounded-md bg-primary/20 text-primary font-bold text-xs flex items-center justify-center font-mono">
+                  {selectedCollege.college_code?.slice(0, 2) || 'CL'}
+                </span>
+              )}
+              <div className="hidden sm:block text-left">
+                <div className="text-xs font-bold text-fg leading-none font-mono">
+                  {selectedCollege.college_code}
+                </div>
+                <div className="text-[10px] text-fg-subtle truncate max-w-[130px] leading-tight mt-0.5">
+                  {selectedCollege.college_name}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="shrink-0">
+            <UserSignOutButton />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Bottom Controls Row: Friday-to-Friday Week Selector & College Filter ── */}
+      <div className="flex items-center justify-between gap-4 flex-wrap pt-2 border-t border-border/40">
+        {/* Friday-to-Friday Week Selector */}
         <div className="flex items-center gap-2 bg-background border border-border rounded-xl px-3 py-1.5 shadow-inner">
           <button
             onClick={() => onWeekChange(weekOffset - 1)}
@@ -127,8 +164,8 @@ export function WeeklyHeader({
           )}
         </div>
 
-        {/* Right: College selector */}
-        <div className="flex items-center gap-2">
+        {/* College Selector */}
+        <div className="flex items-center gap-2.5">
           <span className="text-xs text-fg-subtle font-medium">College:</span>
           <select
             value={selectedCollegeId}
@@ -137,8 +174,7 @@ export function WeeklyHeader({
               if (col) onSelectCollege(col._id, col.college_name);
             }}
             disabled={loading}
-            className="bg-surface border border-border-strong text-fg text-xs px-3 py-2 rounded-lg 
-                       min-w-[220px] cursor-pointer"
+            className="bg-surface border border-border-strong text-fg text-xs px-3.5 py-2 rounded-xl min-w-[220px] cursor-pointer"
           >
             <option value="">{loading ? 'Loading colleges…' : '— Select College —'}</option>
             {colleges.map((c) => (
@@ -148,7 +184,6 @@ export function WeeklyHeader({
             ))}
           </select>
         </div>
-
       </div>
     </header>
   );

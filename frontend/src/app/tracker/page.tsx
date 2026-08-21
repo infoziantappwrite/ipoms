@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { KpiCards } from './components/KpiCards';
-import { CollegeSelector } from './components/CollegeSelector';
+import { CollegeSelector, College } from './components/CollegeSelector';
 import { ContactPickerModal } from './components/ContactPickerModal';
 import { TrackerGrid } from './components/TrackerGrid';
 import { CalendarPicker } from './components/CalendarPicker';
 import { AutoSaveBadge } from './components/AutoSaveBadge';
+import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { AlertTriangle, CalendarDays, Download, RefreshCw, Save } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
@@ -51,6 +52,7 @@ export default function DailyTrackerPage() {
   // ── State
   const [selectedCollegeId, setSelectedCollegeId] = useState<string>('');
   const [selectedCollegeName, setSelectedCollegeName] = useState<string>('');
+  const [selectedCollegeObj, setSelectedCollegeObj] = useState<College | null>(null);
   const [rows, setRows] = useState<TrackerRow[]>([]);
   const [kpi, setKpi] = useState<KpiData | null>(null);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -266,10 +268,9 @@ export default function DailyTrackerPage() {
   return (
     <div className="min-h-screen bg-background text-fg flex flex-col">
 
-      {/* ── Top Section ───────────────────────────────────────────────────── */}
-      <header className="glass-panel border-b border-border px-6 py-4">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-
+      {/* ── Top Section: Title & Top-Right Sign Out ───────────────────────── */}
+      <header className="glass-panel border-b border-border px-6 py-4 space-y-3">
+        <div className="flex items-center justify-between gap-4">
           {/* Left: Tracker title + date */}
           <div>
             <div className="flex items-center gap-2">
@@ -281,10 +282,11 @@ export default function DailyTrackerPage() {
                   ← Back to Today
                 </button>
               )}
-              <h1 className="text-xl font-bold text-white">
-                {isHistoryMode
-                  ? `📅 History — ${new Date(historyDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}`
-                  : `📋 ${trackerTitle}`}
+              <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                <span>📋 Daily Tracker</span>
+                <span className="text-xs bg-primary/20 text-primary border border-primary/30 px-2.5 py-0.5 rounded-full font-semibold">
+                  {monthName} {yearStr}
+                </span>
               </h1>
               {isHistoryMode && (
                 <span className="text-xs bg-warning/20 text-warning border border-warning/30 px-2 py-0.5 rounded-full">
@@ -292,10 +294,45 @@ export default function DailyTrackerPage() {
                 </span>
               )}
             </div>
-            <p className="text-sm text-fg-subtle mt-0.5">{todayDisplay}</p>
+            <p className="text-xs text-fg-subtle mt-0.5">{todayDisplay}</p>
           </div>
 
-          {/* Centre: College selector */}
+          {/* Right: Selected College Logo Badge + Auto-save status + Top-Right Sign Out */}
+          <div className="flex items-center gap-3">
+            {selectedCollegeObj && (
+              <div className="flex items-center gap-2 bg-surface/90 border border-border/80 px-2.5 py-1 rounded-xl shadow-sm animate-fadeIn">
+                {selectedCollegeObj.logo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={selectedCollegeObj.logo_url}
+                    alt={selectedCollegeObj.college_name}
+                    className="w-7 h-7 object-contain rounded-md bg-white/95 p-0.5 shadow-sm border border-border/50"
+                  />
+                ) : (
+                  <span className="w-7 h-7 rounded-md bg-primary/20 text-primary font-bold text-xs flex items-center justify-center font-mono">
+                    {selectedCollegeObj.college_code?.slice(0, 2) || 'CL'}
+                  </span>
+                )}
+                <div className="hidden sm:block text-left">
+                  <div className="text-xs font-bold text-fg leading-none font-mono">
+                    {selectedCollegeObj.college_code}
+                  </div>
+                  <div className="text-[10px] text-fg-subtle truncate max-w-[130px] leading-tight mt-0.5">
+                    {selectedCollegeObj.college_name}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <AutoSaveBadge status={saveStatus} lastSavedAt={lastSavedAt} />
+            <div className="shrink-0">
+              <UserSignOutButton />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Sub-bar: College Selector & Outreach Loaded Summary ── */}
+        <div className="flex items-center justify-between gap-4 flex-wrap pt-2 border-t border-border/40">
           <div className="flex items-center gap-3">
             <CollegeSelector
               selectedCollegeId={selectedCollegeId}
@@ -304,16 +341,15 @@ export default function DailyTrackerPage() {
                 setSelectedCollegeName(name);
                 setIsHistoryMode(false);
               }}
+              onSelectCollege={(col) => {
+                setSelectedCollegeObj(col);
+              }}
             />
           </div>
 
-          {/* Right: Auto-save badge + Call count */}
-          <div className="flex items-center gap-4">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-primary">{kpi?.total_loaded ?? 0}</p>
-              <p className="text-xs text-fg-subtle">Loaded Today</p>
-            </div>
-            <AutoSaveBadge status={saveStatus} lastSavedAt={lastSavedAt} />
+          <div className="flex items-center gap-2 text-xs text-fg-muted">
+            <span>Calls Loaded Today:</span>
+            <span className="text-sm font-bold text-primary tabular-nums font-mono">{kpi?.total_loaded ?? 0}</span>
           </div>
         </div>
       </header>

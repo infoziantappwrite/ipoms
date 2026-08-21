@@ -1,124 +1,108 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+
 import { DashboardHeader, DashboardRole } from './components/DashboardHeader';
 import { CoordinatorDashboard } from './components/CoordinatorDashboard';
 import { TeamLeaderDashboard } from './components/TeamLeaderDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { DashboardSkeleton } from './components/DashboardSkeleton';
+import { apiFetch } from '@/lib/api';
+import { readSessionUser, roleOf } from '@/lib/session';
+import { useToast } from '@/components/ui/Toast';
 
 export default function DashboardPage() {
-  const [role, setRole] = useState<DashboardRole>('coordinator');
+  const { toast } = useToast();
 
-  // Derive role from stored user object on first render
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const stored = localStorage.getItem('ipoms_user');
-      if (!stored) return;
-      const user = JSON.parse(stored);
-      const codes: string[] = user.role_codes ?? [];
-      if (codes.includes('ADMINISTRATOR') || codes.includes('ADMIN')) setRole('admin');
-      else if (codes.includes('TEAM_LEADER')) setRole('team_leader');
-      else setRole('coordinator');
-    } catch { /* ignore */ }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const [role, setRole] = useState<DashboardRole>('coordinator');
+  const [coordinatorId, setCoordinatorId] = useState<string | null>(null);
+  const [sessionRead, setSessionRead] = useState(false);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Default Coordinator ID (will come from JWT session)
-  const COORDINATOR_ID = '6a84719afa3bf51271bc1548';
+  // Identity comes from the signed-in session, not a hardcoded id: two
+  // coordinators on the same machine must never see each other's work.
+  useEffect(() => {
+    const user = readSessionUser();
+    setRole(roleOf(user));
+    setCoordinatorId(user?._id ?? null);
+    setSessionRead(true);
+  }, []);
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
     try {
-      let endpoint = `${API}/dashboard/coordinator?coordinator_id=${COORDINATOR_ID}`;
-      if (role === 'team_leader') endpoint = `${API}/dashboard/team-leader`;
-      if (role === 'admin') endpoint = `${API}/dashboard/admin`;
+      const endpoint =
+        role === 'team_leader'
+          ? '/dashboard/team-leader'
+          : role === 'admin'
+          ? '/dashboard/admin'
+          : `/dashboard/coordinator${coordinatorId ? `?coordinator_id=${coordinatorId}` : ''}`;
 
-      const res = await fetch(endpoint);
-      const data = await res.json();
-      if (data.success) {
-        setDashboardData(data.data);
+      const res = await apiFetch(endpoint);
+      if (res.success) {
+        setDashboardData(res.data);
+      } else {
+        toast(res.error?.message || 'Could not load your dashboard.', 'error');
       }
-    } catch (err) {
-      console.error('Failed to load dashboard data:', err);
     } finally {
       setLoading(false);
     }
-  }, [role]);
+  }, [role, coordinatorId, toast]);
 
+  // Waits for the session read so the first request already carries the right
+  // identity — firing early would fetch one dashboard and then replace it.
   useEffect(() => {
-    loadDashboard();
-  }, [loadDashboard]);
+    if (sessionRead) loadDashboard();
+  }, [sessionRead, loadDashboard]);
 
-  // Signature Feature: Metadata Merge Engine (Spec Section 12)
+  /** Signature feature: Metadata Merge Engine (Spec Section 12). */
   const handleLoadToMetadata = async (assignmentId: string) => {
-    try {
-      const res = await fetch(`${API}/assigned-work/${assignmentId}/load-to-metadata`, {
-        method: 'POST',
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert(`⚡ Contact successfully merged into Metadata Database! (${data.message})`);
-        loadDashboard();
-      } else {
-        alert(data.error?.message || 'Metadata merge failed');
-      }
-    } catch (err) {
-      console.error('Load to metadata error:', err);
+    const res = await apiFetch(`/assigned-work/${assignmentId}/load-to-metadata`, { method: 'POST' });
+    if (res.success) {
+      toast(res.message || 'Contact merged into the Metadata Database.', 'success');
+      loadDashboard();
+    } else {
+      toast(res.error?.message || 'Metadata merge failed.', 'error');
     }
   };
 
-  // Mark Assignment Completed (Spec Section 9 & 10)
+  /** Mark assignment completed (Spec Sections 9 & 10). */
   const handleMarkComplete = async (assignmentId: string) => {
-    try {
-      const res = await fetch(`${API}/assigned-work/${assignmentId}/complete`, {
-        method: 'PATCH',
-      });
-      const data = await res.json();
-      if (data.success) {
-        loadDashboard();
-      } else {
-        alert(data.error?.message || 'Failed to complete assignment');
-      }
-    } catch (err) {
-      console.error('Complete assignment error:', err);
+    const res = await apiFetch(`/assigned-work/${assignmentId}/complete`, { method: 'PATCH' });
+    if (res.success) {
+      toast('Assignment marked done.', 'success');
+      loadDashboard();
+    } else {
+      toast(res.error?.message || 'Could not complete the assignment.', 'error');
     }
   };
 
   return (
-    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
-
-      {/* ── Top Header & Role Switcher ────────────────────────────────────── */}
+    <div className="flex min-h-screen flex-col bg-background text-fg">
       <DashboardHeader
         greetingData={dashboardData?.greeting}
+        callsCompleted={dashboardData?.kpi_summary?.calls_completed}
+        callsTarget={dashboardData?.kpi_summary?.calls_assigned}
       />
 
-      {/* ── Role Views ────────────────────────────────────────────────────── */}
-      {role === 'coordinator' && (
-        <CoordinatorDashboard
-          data={dashboardData}
-          onLoadToMetadata={handleLoadToMetadata}
-          onMarkComplete={handleMarkComplete}
-        />
+      {loading && !dashboardData ? (
+        <DashboardSkeleton />
+      ) : (
+        <>
+          {role === 'coordinator' && (
+            <CoordinatorDashboard
+              data={dashboardData}
+              onLoadToMetadata={handleLoadToMetadata}
+              onMarkComplete={handleMarkComplete}
+            />
+          )}
+          {role === 'team_leader' && (
+            <TeamLeaderDashboard data={dashboardData} onRefresh={loadDashboard} />
+          )}
+          {role === 'admin' && <AdminDashboard data={dashboardData} />}
+        </>
       )}
-
-      {role === 'team_leader' && (
-        <TeamLeaderDashboard
-          data={dashboardData}
-          onRefresh={loadDashboard}
-        />
-      )}
-
-      {role === 'admin' && (
-        <AdminDashboard
-          data={dashboardData}
-        />
-      )}
-
     </div>
   );
 }

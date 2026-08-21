@@ -9,7 +9,18 @@ export interface IUser extends Document {
   password_hash: string;
   primary_mobile?: string;
   secondary_mobile?: string;
+  alternate_mobile?: string;
+  residential_address?: string;
+  date_of_birth?: Date | null;
+  date_of_joining?: Date | null;
   profile_photo_url?: string;
+  photo_last_updated_at?: Date | null;
+  is_profile_locked: boolean;
+  profile_locked_at?: Date | null;
+  monthly_password_changes_count: number;
+  last_password_change_month?: string;
+  is_password_locked: boolean;
+  password_locked_at?: Date | null;
   account_status: 'active' | 'inactive' | 'blocked' | 'deactivated';
   presence_status: 'available' | 'busy' | 'be_right_back' | 'away' | 'appear_offline' | 'out_of_office';
   role_ids: Types.ObjectId[];
@@ -79,9 +90,57 @@ const UserSchema: Schema<IUser> = new Schema(
       trim: true,
       default: '',
     },
+    alternate_mobile: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    residential_address: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    date_of_birth: {
+      type: Date,
+      default: null,
+    },
+    date_of_joining: {
+      type: Date,
+      default: null,
+    },
     profile_photo_url: {
       type: String,
       default: '',
+    },
+    photo_last_updated_at: {
+      type: Date,
+      default: null,
+    },
+    is_profile_locked: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    profile_locked_at: {
+      type: Date,
+      default: null,
+    },
+    monthly_password_changes_count: {
+      type: Number,
+      default: 0,
+    },
+    last_password_change_month: {
+      type: String,
+      default: '',
+    },
+    is_password_locked: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    password_locked_at: {
+      type: Date,
+      default: null,
     },
     account_status: {
       type: String,

@@ -2,22 +2,20 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { InfoziantMark } from '@/components/InfoziantMark';
 import { PasswordChecklist } from '@/components/auth/PasswordChecklist';
-import { AlertTriangle, CheckCircle2, LockKeyhole, LogIn, PenLine, ShieldAlert } from 'lucide-react';
+import {
+  AlertTriangle, CheckCircle2, LockKeyhole, LogIn, PenLine,
+  ShieldAlert, Lock, Unlock, RotateCcw, KeyRound, Eye, EyeOff, Sparkles
+} from 'lucide-react';
 import { armNavIntro } from '@/lib/session';
 import { isPasswordValid } from '@/lib/passwordPolicy';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 const STAFF_DOMAIN = 'infoziant.com';
 
-type Mode = 'login' | 'signup' | 'forgot' | 'reset';
+type Mode = 'login' | 'signup' | 'forgot' | 'verify_otp' | 'set_new_password';
 
-/**
- * Everyone signs in with an @infoziant.com address, so typing the domain is
- * pure friction. Leaving the field with a bare name completes it.
- */
 function completeEmail(raw: string): string {
   const v = raw.trim();
   if (!v || v.includes('@')) return v;
@@ -32,6 +30,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
   // Sign-up
@@ -40,20 +40,24 @@ export default function LoginPage() {
   const [mobile, setMobile] = useState('');
   const [roleCode, setRoleCode] = useState('COORDINATOR');
 
-  // OTP reset
+  // OTP reset flow (2 steps)
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isUnlocked, setIsUnlocked] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  /** Set when the account is locked, so the UI can explain rather than just refuse. */
   const [locked, setLocked] = useState(false);
 
   const clearFeedback = () => { setErrorMsg(''); setSuccessMsg(''); };
 
-  const goTo = (next: Mode) => { setMode(next); clearFeedback(); };
+  const goTo = (next: Mode) => {
+    setMode(next);
+    clearFeedback();
+    setIsUnlocked(false);
+  };
 
   /** Asks the server to email a code. Shared by the lockout path and "Forgot password". */
   const requestOtp = async (addr: string): Promise<boolean> => {
@@ -94,13 +98,11 @@ export default function LoginPage() {
         const err = data.error ?? {};
         setErrorMsg(err.message || 'Sign-in failed.');
 
-        // Locked accounts go straight into recovery rather than making the user
-        // find the "forgot password" link after being told they are locked out.
         if (err.code === 'ACCOUNT_LOCKED') {
           setLocked(true);
           if (err.requiresReset) {
             const sent = await requestOtp(addr);
-            if (sent) { setMode('reset'); setErrorMsg(''); }
+            if (sent) { setMode('verify_otp'); setErrorMsg(''); }
           }
         }
         return;
@@ -135,7 +137,7 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API}/users`, {
+      const res = await fetch(`${API}/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -169,31 +171,89 @@ export default function LoginPage() {
     const addr = completeEmail(email);
     setEmail(addr);
     const sent = await requestOtp(addr);
-    if (sent) setMode('reset');
+    if (sent) setMode('verify_otp');
     setLoading(false);
   };
 
-  const handleReset = async (e: React.FormEvent) => {
+  /** Step 1: Verify OTP and trigger unlock animation */
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     clearFeedback();
 
-    if (newPassword !== confirmPassword) { setErrorMsg('The two passwords do not match.'); return; }
-    if (!isPasswordValid(newPassword)) { setErrorMsg('The new password does not meet the policy shown below.'); return; }
+    if (!otp || otp.trim().length !== 6) {
+      setErrorMsg('Please enter the full 6-digit verification code.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${API}/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: completeEmail(email), otp: otp.trim() }),
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        setErrorMsg(data.error?.message || 'Invalid verification code.');
+        setLoading(false);
+        return;
+      }
+
+      setIsUnlocked(true);
+      setSuccessMsg('Account unlocked! Please set your new password.');
+      setLoading(false);
+
+      setTimeout(() => {
+        setMode('set_new_password');
+        clearFeedback();
+      }, 850);
+    } catch {
+      setErrorMsg('Cannot reach the iPOMS server. Check your connection and try again.');
+      setLoading(false);
+    }
+  };
+
+  /** Step 2: Save New Password and Sign in directly */
+  const handleSaveAndSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    clearFeedback();
+
+    if (newPassword !== confirmPassword) {
+      setErrorMsg('The two passwords do not match.');
+      return;
+    }
+    if (!isPasswordValid(newPassword)) {
+      setErrorMsg('The new password does not meet the policy shown below.');
+      return;
+    }
 
     setLoading(true);
     try {
       const res = await fetch(`${API}/auth/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: completeEmail(email), otp, newPassword, confirmPassword }),
+        body: JSON.stringify({ email: completeEmail(email), otp: otp.trim(), newPassword, confirmPassword }),
       });
       const data = await res.json();
-      if (!data.success) { setErrorMsg(data.error?.message || 'Could not reset the password.'); return; }
 
-      setSuccessMsg('Password updated. Sign in with your new password.');
-      setOtp(''); setNewPassword(''); setConfirmPassword(''); setPassword('');
-      setLocked(false);
-      setMode('login');
+      if (!data.success) {
+        setErrorMsg(data.error?.message || 'Could not save the new password.');
+        return;
+      }
+
+      if (data.data?.token && data.data?.user) {
+        localStorage.setItem('ipoms_user', JSON.stringify(data.data.user));
+        localStorage.setItem('ipoms_token', data.data.token);
+        armNavIntro();
+        setSuccessMsg(`Password saved successfully! Welcome back, ${data.data.user.full_name}. Entering dashboard…`);
+        setTimeout(() => router.push('/dashboard'), 750);
+      } else {
+        setSuccessMsg('Password updated! You can now sign in with your new password.');
+        setOtp(''); setNewPassword(''); setConfirmPassword(''); setPassword('');
+        setLocked(false);
+        setMode('login');
+      }
     } catch {
       setErrorMsg('Cannot reach the iPOMS server. Check your connection and try again.');
     } finally {
@@ -208,42 +268,46 @@ export default function LoginPage() {
     mode === 'login' ? 'Sign in to iPOMS'
     : mode === 'signup' ? 'Create iPOMS Staff Account'
     : mode === 'forgot' ? 'Reset your password'
-    : 'Verify and set a new password';
+    : mode === 'verify_otp' ? 'Verify & Unlock Account'
+    : 'Set New Password';
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 sm:p-6 lg:p-8">
       <div className="w-full max-w-xl bg-white border border-border rounded-3xl shadow-4 p-8 sm:p-10 space-y-6">
 
-        <div className="text-center space-y-2 flex flex-col items-center">
-          <InfoziantMark size={104} />
-          <h1 key={mode} className="text-2xl font-bold text-fg tracking-tight mt-3 animate-form-in">
-            {heading}
-          </h1>
-          <p className="text-xs text-fg-subtle max-w-sm">
+        <div className="text-center space-y-2">
+          <div className="inline-flex items-center justify-center">
+            <InfoziantMark size={104} />
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-fg">{heading}</h1>
+          <p className="text-xs text-fg-subtle">
             Infoziant Placement Operations Management System
           </p>
         </div>
 
-        {/* Tabs are only meaningful for the two entry modes. */}
         {(mode === 'login' || mode === 'signup') && (
-          <div className="flex items-center p-1 bg-surface-sunken rounded-2xl text-xs font-bold text-fg-muted">
+          <div className="grid grid-cols-2 gap-2 bg-surface-sunken p-1 rounded-2xl border border-border">
             <button
               type="button"
               onClick={() => goTo('login')}
-              className={`flex-1 py-2 rounded-xl transition-all ${
-                mode === 'login' ? 'bg-white text-primary shadow-1' : 'hover:text-fg'
+              className={`py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                mode === 'login'
+                  ? 'bg-white text-fg shadow-1 border border-border/50'
+                  : 'text-fg-subtle hover:text-fg'
               }`}
             >
-              <LogIn size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{' '}Sign In
+              <LogIn size={14} strokeWidth={2} aria-hidden /> Sign In
             </button>
             <button
               type="button"
               onClick={() => goTo('signup')}
-              className={`flex-1 py-2 rounded-xl transition-all ${
-                mode === 'signup' ? 'bg-white text-primary shadow-1' : 'hover:text-fg'
+              className={`py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                mode === 'signup'
+                  ? 'bg-white text-fg shadow-1 border border-border/50'
+                  : 'text-fg-subtle hover:text-fg'
               }`}
             >
-              <PenLine size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{' '}Create Account
+              <PenLine size={14} strokeWidth={2} aria-hidden /> Create Account
             </button>
           </div>
         )}
@@ -251,32 +315,32 @@ export default function LoginPage() {
         {errorMsg && (
           <div
             role="alert"
-            className={`p-3.5 rounded-2xl text-xs font-semibold flex items-start gap-2 ${
-              locked
-                ? 'bg-warning-subtle border border-warning text-warning'
-                : 'bg-destructive-subtle border border-destructive text-destructive'
-            }`}
+            className="flex items-start gap-2.5 rounded-2xl border border-destructive-subtle bg-destructive-subtle p-3.5 text-xs text-destructive font-medium animate-feedback-in"
           >
-            {locked
-              ? <ShieldAlert size={15} strokeWidth={2} className="mt-px shrink-0" aria-hidden />
-              : <AlertTriangle size={15} strokeWidth={2} className="mt-px shrink-0" aria-hidden />}
-            <span>{errorMsg}</span>
-          </div>
-        )}
-        {successMsg && (
-          <div role="status" className="p-3.5 bg-success-subtle border border-success rounded-2xl text-success text-xs font-semibold flex items-start gap-2">
-            <CheckCircle2 size={15} strokeWidth={2} className="mt-px shrink-0" aria-hidden />
-            <span>{successMsg}</span>
+            {locked ? (
+              <ShieldAlert size={16} strokeWidth={2} className="mt-px shrink-0" aria-hidden />
+            ) : (
+              <AlertTriangle size={16} strokeWidth={2} className="mt-px shrink-0" aria-hidden />
+            )}
+            <span className="leading-relaxed">{errorMsg}</span>
           </div>
         )}
 
-        {/* ── Sign in ──────────────────────────────────────────────────────── */}
+        {successMsg && (
+          <div
+            role="status"
+            className="flex items-start gap-2.5 rounded-2xl border border-success-subtle bg-success-subtle p-3.5 text-xs text-success font-medium animate-feedback-in"
+          >
+            <CheckCircle2 size={16} strokeWidth={2} className="mt-px shrink-0" aria-hidden />
+            <span className="leading-relaxed">{successMsg}</span>
+          </div>
+        )}
+
         {mode === 'login' && (
           <form onSubmit={handleLogin} className="space-y-4 text-xs animate-form-in">
             <div>
-              <label htmlFor="email" className="block text-fg-muted font-bold mb-1">Official Email Address</label>
+              <label className="block text-fg-muted font-bold mb-1">Official Email Address</label>
               <input
-                id="email"
                 type="text"
                 inputMode="email"
                 value={email}
@@ -294,39 +358,41 @@ export default function LoginPage() {
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label htmlFor="password" className="text-fg-muted font-bold">Password</label>
-                <button type="button" onClick={() => goTo('forgot')} className="text-primary hover:underline text-micro font-medium">
+                <label className="text-fg-muted font-bold">Password</label>
+                <button
+                  type="button"
+                  onClick={() => goTo('forgot')}
+                  className="text-primary hover:underline font-semibold"
+                >
                   Forgot password?
                 </button>
               </div>
               <div className="relative">
                 <input
-                  id="password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   autoComplete="current-password"
                   required
-                  className={`${inputClass} font-mono pr-16`}
+                  className={`${inputClass} pr-14`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg-muted text-xs"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-micro font-semibold text-fg-subtle hover:text-fg"
                 >
                   {showPassword ? 'Hide' : 'Show'}
                 </button>
               </div>
             </div>
 
-            <label className="flex items-center gap-2 cursor-pointer select-none text-fg-muted pt-1">
+            <label className="flex items-center gap-2 text-fg-muted cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="rounded border-border-strong text-primary"
+                className="rounded border-border-strong text-primary focus:ring-primary"
               />
               <span>Remember this device for 30 days</span>
             </label>
@@ -334,14 +400,13 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-primary hover:bg-primary-hover disabled:opacity-60 text-primary-foreground rounded-xl font-bold shadow-2 transition-colors text-xs"
+              className="w-full py-3 bg-primary hover:bg-primary-hover disabled:opacity-60 text-primary-foreground rounded-xl font-bold shadow-2 transition-all active:scale-[0.99] text-xs cursor-pointer"
             >
-              {loading ? 'Verifying…' : 'Sign In to Operations Portal →'}
+              {loading ? 'Authenticating…' : 'Sign In to Operations Portal →'}
             </button>
           </form>
         )}
 
-        {/* ── Create account ───────────────────────────────────────────────── */}
         {mode === 'signup' && (
           <form onSubmit={handleSignUp} className="space-y-4 text-xs animate-form-in">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -389,13 +454,12 @@ export default function LoginPage() {
             </div>
 
             <button type="submit" disabled={loading}
-              className="w-full py-3 bg-primary hover:bg-primary-hover disabled:opacity-60 text-primary-foreground rounded-xl font-bold shadow-2 transition-colors text-xs">
+              className="w-full py-3 bg-primary hover:bg-primary-hover disabled:opacity-60 text-primary-foreground rounded-xl font-bold shadow-2 transition-colors text-xs cursor-pointer">
               {loading ? 'Creating account…' : 'Register New Account'}
             </button>
           </form>
         )}
 
-        {/* ── Forgot password ──────────────────────────────────────────────── */}
         {mode === 'forgot' && (
           <form onSubmit={handleForgot} className="space-y-4 text-xs animate-form-in">
             <p className="text-fg-muted leading-relaxed">
@@ -412,7 +476,7 @@ export default function LoginPage() {
             </div>
 
             <button type="submit" disabled={loading}
-              className="w-full py-3 bg-primary hover:bg-primary-hover disabled:opacity-60 text-primary-foreground rounded-xl font-bold shadow-2 transition-colors text-xs">
+              className="w-full py-3 bg-primary hover:bg-primary-hover disabled:opacity-60 text-primary-foreground rounded-xl font-bold shadow-2 transition-colors text-xs cursor-pointer">
               {loading ? 'Sending…' : 'Send Verification Code'}
             </button>
 
@@ -424,19 +488,20 @@ export default function LoginPage() {
           </form>
         )}
 
-        {/* ── Verify OTP and set a new password ────────────────────────────── */}
-        {mode === 'reset' && (
-          <form onSubmit={handleReset} className="space-y-4 text-xs animate-form-in">
-            <div className="flex items-start gap-2 rounded-2xl border border-border bg-surface-sunken p-3.5 text-fg-muted">
-              <LockKeyhole size={15} strokeWidth={2} className="mt-px shrink-0" aria-hidden />
-              <span>
-                Check <span className="font-semibold text-fg">{email}</span> for a 6-digit code.
-                It expires in 10 minutes. Nobody from Infoziant will ever ask you for it.
+        {mode === 'verify_otp' && (
+          <form onSubmit={handleVerifyOtp} className="space-y-5 text-xs animate-form-in">
+            <div className="flex items-start gap-2.5 rounded-2xl border border-border bg-surface-sunken p-3.5 text-fg-muted">
+              <LockKeyhole size={16} strokeWidth={2} className="mt-px shrink-0 text-primary" aria-hidden />
+              <span className="leading-relaxed">
+                Check <span className="font-semibold text-fg">{email}</span> for a 6-digit verification code.
+                It expires in 10 minutes.
               </span>
             </div>
 
             <div>
-              <label htmlFor="otp" className="block text-fg-muted font-bold mb-1">Verification Code</label>
+              <label htmlFor="otp" className="block text-fg font-bold mb-1.5 text-center text-xs">
+                Enter 6-Digit Verification Code
+              </label>
               <input
                 id="otp"
                 type="text"
@@ -445,50 +510,131 @@ export default function LoginPage() {
                 maxLength={6}
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                placeholder="000000"
+                placeholder="0 0 0 0 0 0"
                 autoComplete="one-time-code"
                 required
-                className={`${inputClass} font-mono text-center text-display tracking-[0.5em]`}
+                className={`${inputClass} font-mono text-center text-2xl font-bold tracking-[0.4em] py-3.5 text-primary bg-surface-sunken/40 focus:bg-white`}
               />
             </div>
 
-            <div>
-              <label className="block text-fg-muted font-bold mb-1">New Password</label>
-              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
-                autoComplete="new-password" required className={inputClass} />
-              <PasswordChecklist password={newPassword} />
-            </div>
-
-            <div>
-              <label className="block text-fg-muted font-bold mb-1">Re-enter New Password</label>
-              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-                autoComplete="new-password" required className={inputClass} />
-              {confirmPassword.length > 0 && confirmPassword !== newPassword && (
-                <p className="mt-1 text-micro font-semibold text-destructive">The two passwords do not match.</p>
+            <button
+              type="submit"
+              disabled={loading || otp.length !== 6}
+              className={`w-full py-3.5 rounded-xl font-bold text-xs transition-all shadow-2 flex items-center justify-center gap-2 select-none cursor-pointer ${
+                isUnlocked
+                  ? 'bg-emerald-600 text-white scale-[1.02] shadow-emerald-500/25 ring-2 ring-emerald-400'
+                  : 'bg-primary hover:bg-primary-hover disabled:opacity-50 text-white active:scale-[0.99]'
+              }`}
+            >
+              {isUnlocked ? (
+                <>
+                  <Unlock size={17} strokeWidth={2.5} className="text-white animate-pulse" />
+                  <span>Account Unlocked!</span>
+                </>
+              ) : (
+                <>
+                  <Lock size={17} strokeWidth={2.5} className="transition-transform duration-300 group-hover:scale-110" />
+                  <span>{loading ? 'Verifying Code…' : 'Unlock Account'}</span>
+                </>
               )}
-            </div>
-
-            <button type="submit" disabled={loading}
-              className="w-full py-3 bg-primary hover:bg-primary-hover disabled:opacity-60 text-primary-foreground rounded-xl font-bold shadow-2 transition-colors text-xs">
-              {loading ? 'Verifying…' : 'Set New Password & Unlock Account'}
             </button>
 
-            <div className="flex items-center justify-between pt-1">
-              <button type="button" onClick={() => requestOtp(completeEmail(email))} className="text-primary hover:underline font-semibold">
-                Resend code
+            <div className="flex items-center justify-between pt-2 border-t border-border/60">
+              <button
+                type="button"
+                onClick={() => requestOtp(completeEmail(email))}
+                className="flex items-center gap-1.5 text-primary hover:underline font-bold"
+              >
+                <RotateCcw size={13} strokeWidth={2} /> Resend OTP
               </button>
-              <button type="button" onClick={() => goTo('login')} className="text-fg-subtle hover:text-fg font-semibold">
-                Back to sign in
+              <button
+                type="button"
+                onClick={() => goTo('login')}
+                className="text-fg-subtle hover:text-fg font-semibold"
+              >
+                ← Back to sign in
               </button>
             </div>
           </form>
         )}
 
-        <div className="border-t border-border pt-4 text-center">
-          <Link href="/home" className="text-xs text-fg-subtle hover:text-primary font-semibold transition-colors">
-            ← Return to Executive Gateway
-          </Link>
-        </div>
+        {mode === 'set_new_password' && (
+          <form onSubmit={handleSaveAndSignIn} className="space-y-4 text-xs animate-form-in">
+            <div className="flex items-center gap-2 p-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 font-medium">
+              <Sparkles size={16} strokeWidth={2} className="shrink-0 text-emerald-600" />
+              <span>Identity verified! Create your new secure password below.</span>
+            </div>
+
+            <div>
+              <label className="block text-fg-muted font-bold mb-1">New Password</label>
+              <div className="relative">
+                <input
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Minimum 9 characters"
+                  autoComplete="new-password"
+                  required
+                  className={`${inputClass} pr-12`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg"
+                >
+                  {showNewPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+              <PasswordChecklist password={newPassword} />
+            </div>
+
+            <div>
+              <label className="block text-fg-muted font-bold mb-1">Re-enter New Password</label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repeat new password"
+                  autoComplete="new-password"
+                  required
+                  className={`${inputClass} pr-12`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg"
+                >
+                  {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
+              {confirmPassword.length > 0 && confirmPassword !== newPassword && (
+                <p className="mt-1 text-micro font-semibold text-destructive">
+                  The two passwords do not match.
+                </p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading || !newPassword || newPassword !== confirmPassword || !isPasswordValid(newPassword)}
+              className="w-full py-3.5 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white rounded-xl font-bold shadow-2 transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-[0.99]"
+            >
+              <KeyRound size={16} strokeWidth={2} />
+              <span>{loading ? 'Saving & Authenticating…' : 'Save & Sign In →'}</span>
+            </button>
+
+            <div className="text-center pt-1">
+              <button
+                type="button"
+                onClick={() => goTo('login')}
+                className="text-fg-subtle hover:text-fg font-semibold"
+              >
+                Cancel and return to sign in
+              </button>
+            </div>
+          </form>
+        )}
 
       </div>
     </div>

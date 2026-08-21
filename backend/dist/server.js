@@ -25,6 +25,7 @@ const mongoose_1 = require("mongoose");
 const finalizeDailyTracker_1 = require("./jobs/finalizeDailyTracker");
 const authRoutes_1 = require("./lib/authRoutes");
 const authMiddleware_1 = require("./lib/authMiddleware");
+const routePolicy_1 = require("./lib/routePolicy");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
@@ -75,13 +76,21 @@ app.get('/api/v1/health', (req, res) => {
 // Auth routes (sign-in, lockout, OTP reset) live in lib/authRoutes.ts
 (0, authRoutes_1.registerAuthRoutes)(app);
 // ── Authentication & RBAC Middleware ──────────────────────────────────────────
-// Protect all /api/v1 routes except /health and /auth/* with JWT verification
+// Two distinct gates, in order:
+//   1. authenticateJWT  — WHO are you?   (401 if unproven)
+//   2. authorizeRoute   — MAY you do it? (403 if your role is not permitted)
+// Step 2 is default-deny: an endpoint with no entry in the policy table is
+// refused, so a route added without a policy fails closed instead of silently
+// being open to every logged-in user.
+// Per-record ownership ("may you see THIS row?") is separate again — see
+// scopeToSelf() at the handlers that take a coordinator_id.
 app.use('/api/v1', (req, res, next) => {
     if (req.path === '/health' || req.path.startsWith('/auth')) {
         return next();
     }
     return (0, authMiddleware_1.authenticateJWT)(req, res, next);
 });
+app.use('/api/v1', routePolicy_1.authorizeRoute);
 // 3. High-Speed Company Search Endpoint (Searches across 3,550+ companies in < 10ms)
 app.get('/api/v1/companies/search', async (req, res) => {
     try {
@@ -176,6 +185,43 @@ app.get('/api/v1/coordinators', async (req, res) => {
                 code: 'INTERNAL_SERVER_ERROR',
                 message: error.message || 'Failed to fetch coordinators',
             },
+        });
+    }
+});
+// ─────────────────────────────────────────────────────────────────────────────
+// COLLEGES DIRECTORY ENDPOINTS
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/api/v1/colleges', async (req, res) => {
+    try {
+        let colleges = await College_1.College.find({ status: { $ne: 'inactive' } }).sort({ college_name: 1 });
+        if (colleges.length === 0) {
+            const defaultColleges = [
+                { college_name: 'Chennai Institute of Technology', college_code: 'CIT', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'IT', 'AI & DS', 'ECE', 'MECH'] },
+                { college_name: 'Anna University - CEG Campus', college_code: 'AU-CEG', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'IT', 'ECE', 'EEE', 'CIVIL'] },
+                { college_name: 'PSG College of Technology', college_code: 'PSG', location: 'Coimbatore, Tamil Nadu', departments: ['CSE', 'IT', 'Robotics', 'ECE', 'EEE'] },
+                { college_name: 'Sri Krishna College of Engineering & Technology', college_code: 'SKCET', location: 'Coimbatore, Tamil Nadu', departments: ['CSE', 'IT', 'AI & DS', 'ECE'] },
+                { college_name: 'SSN College of Engineering', college_code: 'SSN', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'IT', 'ECE', 'EEE', 'BME'] },
+                { college_name: 'Rajalakshmi Engineering College', college_code: 'REC', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'IT', 'AI & ML', 'ECE', 'MECH'] },
+                { college_name: 'Kumaraguru College of Technology', college_code: 'KCT', location: 'Coimbatore, Tamil Nadu', departments: ['CSE', 'IT', 'ECE', 'MECH', 'AERO'] },
+                { college_name: 'Vel Tech Rangarajan Dr. Sagunthala R&D Institute', college_code: 'VELTECH', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'AI & DS', 'IT', 'ECE'] },
+                { college_name: 'Thiagarajar College of Engineering', college_code: 'TCE', location: 'Madurai, Tamil Nadu', departments: ['CSE', 'IT', 'ECE', 'EEE', 'CIVIL'] },
+                { college_name: 'Kongu Engineering College', college_code: 'KEC', location: 'Perundurai, Erode', departments: ['CSE', 'IT', 'ECE', 'MECH', 'CHEMICAL'] },
+            ];
+            await College_1.College.insertMany(defaultColleges);
+            colleges = await College_1.College.find({ status: { $ne: 'inactive' } }).sort({ college_name: 1 });
+        }
+        return res.status(200).json({
+            success: true,
+            data: {
+                total: colleges.length,
+                colleges,
+            },
+        });
+    }
+    catch (error) {
+        return res.status(500).json({
+            success: false,
+            error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to fetch colleges' },
         });
     }
 });
@@ -1787,40 +1833,35 @@ app.delete('/api/v1/reports/presets/:id', async (req, res) => {
         });
     }
 });
-// ─────────────────────────────────────────────────────────────────────────────
-// MODULE 07 — ROLE-BASED DASHBOARD & ASSIGNED WORK ENDPOINTS
-// Spec: Module_07_Role_Based_Dashboard_Specification_v1.0.md
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper: Time-Aware Personalized Greeting (Spec Section 7.1)
 function getTimeGreeting(fullName) {
     const hour = new Date().getHours();
     const firstName = fullName.split(' ')[0] || fullName;
     if (hour >= 5 && hour < 12) {
         return {
-            greeting: `Good Morning, ${firstName} 👋`,
-            icon: '🌅',
-            subtext: 'Ready for today\'s placement operations? Let\'s make an impact!',
+            greeting: `Good morning, ${firstName}`,
+            period: 'morning',
+            subtext: 'Here is where today stands across your colleges.',
         };
     }
     else if (hour >= 12 && hour < 17) {
         return {
-            greeting: `Good Afternoon, ${firstName} ☀️`,
-            icon: '☀️',
-            subtext: 'Tracking mid-day corporate follow-ups and drive schedules.',
+            greeting: `Good afternoon, ${firstName}`,
+            period: 'afternoon',
+            subtext: 'Mid-day corporate follow-ups and drive schedules.',
         };
     }
     else if (hour >= 17 && hour < 20) {
         return {
-            greeting: `Good Evening, ${firstName} 🌇`,
-            icon: '🌇',
-            subtext: 'Wrapping up today\'s call logs and finalized daily leads.',
+            greeting: `Good evening, ${firstName}`,
+            period: 'evening',
+            subtext: 'Wrapping up today\'s call logs and daily leads.',
         };
     }
     else {
         return {
-            greeting: `Burning the midnight oil? Thanks for your dedication, ${firstName} 🌙`,
-            icon: '🌙',
-            subtext: 'Night operational review — remember to submit all finalized sheets.',
+            greeting: `Working late, ${firstName}`,
+            period: 'night',
+            subtext: 'Night operational review — remember to submit finalized sheets.',
         };
     }
 }
@@ -1828,10 +1869,14 @@ function getTimeGreeting(fullName) {
 // Coordinator Dashboard (Spec Section 5.1 & 7) — "What should I do today?"
 app.get('/api/v1/dashboard/coordinator', async (req, res) => {
     try {
-        const { coordinator_id } = req.query;
+        // Ownership scoping: a coordinator is pinned to their own id no matter what
+        // the query string asks for. Only a Team Leader / Administrator may name
+        // someone else. Trusting `?coordinator_id=` outright let any coordinator
+        // read any other's dashboard, which Module 07 §11 explicitly forbids.
+        const coordinatorId = (0, routePolicy_1.scopeToSelf)(req, req.query.coordinator_id);
         let coordinator = null;
-        if (coordinator_id) {
-            coordinator = await User_1.User.findById(coordinator_id);
+        if (coordinatorId) {
+            coordinator = await User_1.User.findById(coordinatorId);
         }
         if (!coordinator) {
             coordinator = await User_1.User.findOne({ role_code: 'placement_coordinator' }) || {
@@ -1864,6 +1909,15 @@ app.get('/api/v1/dashboard/coordinator', async (req, res) => {
         const priorityCollege = await College_1.College.findOne({ status: 'active' });
         // Today's Date Filter
         const today = getTodayDate();
+        // Company pipeline stage counts. WeeklyTracker.pipeline_section is the
+        // single source of truth for where a company sits in the funnel — the same
+        // field the Weekly Placement Report groups by, so the dashboard headline
+        // and the report a coordinator exports can never disagree.
+        const pipelineFilter = { coordinator_id: coordinator._id, is_deleted: false };
+        const dayStart = new Date(today);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(today);
+        dayEnd.setHours(23, 59, 59, 999);
         const [todayCalls, todayPositives, todayJds, pendingFollowUps] = await Promise.all([
             DailyTracker_1.DailyTracker.countDocuments({
                 coordinator_id: coordinator._id,
@@ -1893,6 +1947,19 @@ app.get('/api/v1/dashboard/coordinator', async (req, res) => {
                     $lt: new Date(new Date().setHours(23, 59, 59, 999)),
                 },
             }),
+        ]);
+        // Company funnel — "how many companies are at each stage, and how many did
+        // I actually speak to today". `companies_talked_today` counts DISTINCT
+        // companies, not call rows: three calls chasing one HR is one company
+        // reached, and counting rows would flatter the number.
+        const [companiesCompleted, companiesInProgress, companiesPipeline, companiesTalkedToday] = await Promise.all([
+            WeeklyTracker_1.WeeklyTracker.countDocuments({ ...pipelineFilter, pipeline_section: 'completed' }),
+            WeeklyTracker_1.WeeklyTracker.countDocuments({ ...pipelineFilter, pipeline_section: 'in_progress' }),
+            WeeklyTracker_1.WeeklyTracker.countDocuments({ ...pipelineFilter, pipeline_section: 'pipeline' }),
+            DailyTracker_1.DailyTracker.distinct('company_name', {
+                coordinator_id: coordinator._id,
+                call_date: { $gte: dayStart, $lt: dayEnd },
+            }).then((names) => names.filter(Boolean).length),
         ]);
         // Top 3 Focused Tasks for Today (Spec Section 7.5)
         const todayTasks = [
@@ -1946,6 +2013,12 @@ app.get('/api/v1/dashboard/coordinator', async (req, res) => {
                     : null,
                 today_tasks: todayTasks,
                 kpi_summary: {
+                    // Company funnel — the coordinator's headline numbers.
+                    companies_completed: companiesCompleted,
+                    companies_in_progress: companiesInProgress,
+                    companies_pipeline: companiesPipeline,
+                    companies_talked_today: companiesTalkedToday,
+                    // Call-level activity, retained for the day-progress rail.
                     calls_assigned: 30,
                     calls_completed: todayCalls,
                     positive_responses: todayPositives,
@@ -3083,6 +3156,199 @@ app.patch('/api/v1/users/:id', authMiddleware_1.authenticateJWT, (0, authMiddlew
         return res.status(500).json({
             success: false,
             error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to update user' },
+        });
+    }
+});
+/**
+ * Guards a `/:id`-addressed personal record. Returns true when the request has
+ * already been refused, so the caller should stop.
+ *
+ * The route policy only proves the caller is staff; it cannot know that :id is
+ * meant to be *their own* id. Without this, any coordinator could read or edit
+ * another's profile — including their mobile number and personal email.
+ */
+function refuseForeignProfile(req, res, id) {
+    if ((0, routePolicy_1.isSupervisor)(req) || req.user?.userId === id)
+        return false;
+    res.status(403).json({
+        success: false,
+        error: {
+            code: 'FORBIDDEN_NOT_OWNER',
+            message: 'You can only access your own profile.',
+        },
+    });
+    return true;
+}
+// ── GET /api/v1/profile/:id — Fetch personal profile
+app.get('/api/v1/profile/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (refuseForeignProfile(req, res, id))
+            return;
+        const user = await User_1.User.findById(id)
+            .select('-password_hash')
+            .populate('assigned_college_ids', 'college_name college_code')
+            .populate('role_ids', 'role_name role_code');
+        if (!user || user.is_deleted) {
+            return res.status(404).json({
+                success: false,
+                error: { code: 'NOT_FOUND', message: 'User not found' },
+            });
+        }
+        return res.status(200).json({
+            success: true,
+            data: user,
+        });
+    }
+    catch (error) {
+        return res.status(500).json({
+            success: false,
+            error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to load profile' },
+        });
+    }
+});
+// ── PATCH /api/v1/profile/:id — Self-service profile update with 30-day photo change rule
+app.patch('/api/v1/profile/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        if (refuseForeignProfile(req, res, id))
+            return;
+        const { primary_mobile, secondary_mobile, alternate_mobile, personal_email, residential_address, date_of_birth, date_of_joining, profile_photo_url, password, } = req.body;
+        const user = await User_1.User.findById(id);
+        if (!user || user.is_deleted) {
+            return res.status(404).json({
+                success: false,
+                error: { code: 'NOT_FOUND', message: 'User not found' },
+            });
+        }
+        // Editable fields
+        if (primary_mobile !== undefined)
+            user.primary_mobile = String(primary_mobile).trim();
+        if (alternate_mobile !== undefined) {
+            user.alternate_mobile = String(alternate_mobile).trim();
+            user.secondary_mobile = String(alternate_mobile).trim();
+        }
+        else if (secondary_mobile !== undefined) {
+            user.secondary_mobile = String(secondary_mobile).trim();
+            user.alternate_mobile = String(secondary_mobile).trim();
+        }
+        if (personal_email !== undefined)
+            user.personal_email = String(personal_email).trim().toLowerCase();
+        if (residential_address !== undefined)
+            user.residential_address = String(residential_address).trim();
+        if (date_of_birth !== undefined)
+            user.date_of_birth = date_of_birth ? new Date(date_of_birth) : null;
+        if (date_of_joining !== undefined)
+            user.date_of_joining = date_of_joining ? new Date(date_of_joining) : null;
+        // Monthly Profile Photo Update Rule: 1 change allowed per 30 days
+        if (profile_photo_url !== undefined && profile_photo_url !== user.profile_photo_url && profile_photo_url !== '') {
+            if (user.photo_last_updated_at) {
+                const lastUpdated = new Date(user.photo_last_updated_at).getTime();
+                const diffMs = Date.now() - lastUpdated;
+                const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+                if (diffMs < thirtyDaysMs) {
+                    const daysRemaining = Math.ceil((thirtyDaysMs - diffMs) / (24 * 60 * 60 * 1000));
+                    return res.status(400).json({
+                        success: false,
+                        error: {
+                            code: 'PHOTO_MONTHLY_LIMIT',
+                            message: `Profile picture can only be changed once per month. You can update your photo again in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}.`,
+                            daysRemaining,
+                        },
+                    });
+                }
+            }
+            user.profile_photo_url = profile_photo_url;
+            user.photo_last_updated_at = new Date();
+        }
+        // 2-Per-Month Password Update Rule (3rd attempt locks profile)
+        const now = new Date();
+        const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        if (user.last_password_change_month !== currentMonthStr) {
+            user.monthly_password_changes_count = 0;
+            user.last_password_change_month = currentMonthStr;
+        }
+        if (password && String(password).trim()) {
+            if (user.is_password_locked || user.account_status === 'blocked') {
+                return res.status(403).json({
+                    success: false,
+                    is_locked: true,
+                    error: {
+                        code: 'ACCOUNT_LOCKED',
+                        message: 'Your account is locked due to exceeding monthly password update limits. Please contact your Administrator to release your account.',
+                    },
+                });
+            }
+            // Check if user has already used their 2 allowed password changes this month
+            if ((user.monthly_password_changes_count || 0) >= 2) {
+                user.is_password_locked = true;
+                user.account_status = 'blocked';
+                user.password_locked_at = new Date();
+                await user.save();
+                return res.status(403).json({
+                    success: false,
+                    is_locked: true,
+                    error: {
+                        code: 'PASSWORD_MONTHLY_LIMIT_EXCEEDED',
+                        message: 'Security Alert: You have exceeded the maximum limit of 2 password changes for this month (3rd attempt). Your profile and account are now locked. An Administrator must release your account from the admin dashboard.',
+                    },
+                });
+            }
+            const salt = await bcryptjs_1.default.genSalt(12);
+            user.password_hash = await bcryptjs_1.default.hash(String(password).trim(), salt);
+            user.last_password_changed_at = new Date();
+            user.monthly_password_changes_count = (user.monthly_password_changes_count || 0) + 1;
+            user.last_password_change_month = currentMonthStr;
+        }
+        // Lock profile once updated so fields become read-only proof of update
+        user.is_profile_locked = true;
+        user.profile_locked_at = new Date();
+        await user.save();
+        const populated = await User_1.User.findById(user._id)
+            .select('-password_hash')
+            .populate('assigned_college_ids', 'college_name college_code')
+            .populate('role_ids', 'role_name role_code');
+        return res.status(200).json({
+            success: true,
+            message: 'Profile updated and locked successfully!',
+            data: populated,
+        });
+    }
+    catch (error) {
+        return res.status(500).json({
+            success: false,
+            error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to update profile' },
+        });
+    }
+});
+// ── PATCH /api/v1/users/:id/unlock-profile — Administrator unlocks coordinator's profile
+app.patch('/api/v1/users/:id/unlock-profile', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const user = await User_1.User.findById(id);
+        if (!user || user.is_deleted) {
+            return res.status(404).json({
+                success: false,
+                error: { code: 'NOT_FOUND', message: 'User not found' },
+            });
+        }
+        user.is_profile_locked = false;
+        user.profile_locked_at = null;
+        user.is_password_locked = false;
+        user.password_locked_at = null;
+        user.account_status = 'active';
+        user.monthly_password_changes_count = 0;
+        await user.save();
+        return res.status(200).json({
+            success: true,
+            message: `Profile and password editing unlocked for ${user.full_name}. Their account status is active and monthly limit reset.`,
+            data: user,
+        });
+    }
+    catch (error) {
+        return res.status(500).json({
+            success: false,
+            error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to unlock profile' },
         });
     }
 });

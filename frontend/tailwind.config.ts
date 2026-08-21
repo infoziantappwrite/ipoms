@@ -204,11 +204,25 @@ const config: Config = {
           '0%': { opacity: '0', transform: 'translateY(6px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
+        /**
+         * Funnel bar reveal. Scales the fill horizontally rather than
+         * animating `width`, so the whole thing runs on the compositor with no
+         * layout pass — and, unlike a JS state flip gated on
+         * requestAnimationFrame, it cannot get stuck at zero in a background
+         * tab where rAF never fires. The bar's real width stays in the style
+         * attribute; only the transform is animated.
+         */
+        'funnel-fill': {
+          '0%': { transform: 'scaleX(0)' },
+          '100%': { transform: 'scaleX(1)' },
+        },
       },
       animation: {
         indeterminate: 'indeterminate 1.1s ease-in-out infinite',
         // 220ms sits inside the 150-300ms micro-interaction band.
         'form-in': 'form-in 220ms ease-out both',
+        // Front-loaded ease-out: the bar leaves zero immediately and settles.
+        'funnel-fill': 'funnel-fill 700ms cubic-bezier(0.32, 0.72, 0, 1) both',
       },
 
       zIndex: {
