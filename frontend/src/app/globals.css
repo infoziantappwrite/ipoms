@@ -337,3 +337,26 @@ textarea:focus-visible,
 ::-webkit-scrollbar-thumb:hover {
   background: rgb(var(--fg-disabled));
 }
+
+/* Invisible / hidden scrollbar utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Thin subtle scrollbar */
+.subtle-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.subtle-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.subtle-scrollbar::-webkit-scrollbar-thumb {
+  background: rgb(var(--border-strong));
+  border-radius: 9999px;
+}
+

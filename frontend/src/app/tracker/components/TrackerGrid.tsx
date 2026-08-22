@@ -29,14 +29,20 @@ const COLUMN_HEADERS = [
 export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onSkip }: Props) {
   if (rows.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 text-fg-muted py-16">
-        <ClipboardList size={44} strokeWidth={1.5} aria-hidden />
-        <p className="text-lg font-semibold text-fg-subtle">
-          {isReadOnly ? 'No calls recorded on this date.' : "No contacts loaded yet."}
-        </p>
-        {!isReadOnly && (
-          <p className="text-sm text-fg-muted">Click <strong className="text-primary"><Download size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}Load Contacts</strong> to get started.</p>
-        )}
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200/80 shadow-xs flex items-center justify-center text-slate-400">
+          <ClipboardList size={26} strokeWidth={1.75} className="text-primary" />
+        </div>
+        <div>
+          <p className="text-sm font-bold text-slate-800">
+            {isReadOnly ? 'No Calls Logged on this Date' : 'Daily Calling Register Ready'}
+          </p>
+          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            {isReadOnly
+              ? 'There are no call records for the selected date.'
+              : 'Click "Load Contacts" in the toolbar to populate your target company contacts for today.'}
+          </p>
+        </div>
       </div>
     );
   }

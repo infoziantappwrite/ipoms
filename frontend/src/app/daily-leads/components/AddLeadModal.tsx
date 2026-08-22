@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ClipboardList, Plus, Sparkles, Zap } from 'lucide-react';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { ClipboardList, Plus, Sparkles, Zap, X } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 
 interface College {
   _id: string;
@@ -51,28 +50,27 @@ export function AddLeadModal({
   const [dtLoading, setDtLoading] = useState(false);
 
   useEffect(() => {
-    fetch(`${API}/colleges`)
-      .then((r) => r.json())
+    apiFetch('/colleges')
       .then((data) => {
-        if (data.success) {
-          setColleges(data.data.colleges);
-          if (!collegeId && data.data.colleges.length > 0) {
-            setCollegeId(data.data.colleges[0]._id);
+        if (data.success && Array.isArray((data.data as any)?.colleges)) {
+          const list = (data.data as any).colleges;
+          setColleges(list);
+          if (!collegeId && list.length > 0) {
+            setCollegeId(list[0]._id);
           }
         }
       })
       .catch(console.error);
-  }, []);
+  }, [collegeId]);
 
   // Fetch Daily Tracker positives for Copy Shortcut
   const handleOpenDtDrawer = () => {
     setShowDtDrawer(true);
     setDtLoading(true);
-    fetch(`${API}/daily-leads/daily-tracker-positives?date=${leadDate}&coordinator_id=${coordinatorId}`)
-      .then((r) => r.json())
+    apiFetch(`/daily-leads/daily-tracker-positives?date=${leadDate}&coordinator_id=${coordinatorId}`)
       .then((data) => {
-        if (data.success) {
-          setDtPositives(data.data.positives);
+        if (data.success && (data.data as any)?.positives) {
+          setDtPositives((data.data as any).positives);
         }
       })
       .catch(console.error)
@@ -101,9 +99,8 @@ export function AddLeadModal({
 
     setLoading(true);
     try {
-      const res = await fetch(`${API}/daily-leads`, {
+      const res = await apiFetch('/daily-leads', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           lead_type: leadType,
           college_id: collegeId,
@@ -118,12 +115,11 @@ export function AddLeadModal({
           remarks: remarks.trim(),
         }),
       });
-      const data = await res.json();
-      if (data.success) {
+      if (res.success) {
         onAdded();
         onClose();
       } else {
-        alert(data.error?.message || 'Failed to create daily lead');
+        alert(res.error?.message || 'Failed to create daily lead');
       }
     } catch (err: any) {
       console.error('Submit lead error:', err);
@@ -134,107 +130,112 @@ export function AddLeadModal({
   };
 
   return (
-    <div className="fixed inset-0 scrim flex items-center justify-center z-50 p-4">
-      <div className="glass-panel rounded-2xl w-full max-w-lg border border-border-strong shadow-4 overflow-hidden">
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4">
+      <div className="bg-white rounded-2xl w-full max-w-lg border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fadeIn">
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-background/60">
+        {/* ── Fixed Modal Header ────────────────────────────────────────── */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/90 shrink-0">
           <div>
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <Plus size={14} strokeWidth={2} aria-hidden /> Add Daily Opportunity Entry
+            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Plus size={16} strokeWidth={2.5} className="text-primary" />
+              <span>Add Daily Opportunity Entry</span>
             </h2>
-            <p className="text-xs text-fg-subtle mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               Log phone, email, WhatsApp, or TPO opportunity
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-fg-subtle hover:text-white text-lg transition-colors"
+            className="text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 p-1.5 rounded-lg transition-colors cursor-pointer"
+            title="Close"
           >
-            ✕
+            <X size={16} />
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
+        {/* ── Scrollable Form Body (Invisible scrollbar) ───────────────── */}
+        <form id="add-lead-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 text-xs no-scrollbar">
 
           {/* Type Selector: Positives vs JD Received (Spec Section 11) */}
           <div>
-            <label className="block text-fg-muted font-semibold mb-1.5">Register Target</label>
-            <div className="grid grid-cols-2 gap-2">
+            <label className="block text-slate-700 font-semibold mb-1.5">Register Target</label>
+            <div className="grid grid-cols-2 gap-2.5">
               <button
                 type="button"
                 onClick={() => setLeadType('positive')}
-                className={`py-2 px-3 rounded-lg border font-semibold transition-colors flex items-center justify-center gap-1.5
+                className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer
                             ${
                               leadType === 'positive'
-                                ? 'bg-success/30 border-success text-success'
-                                : 'bg-surface border-border-strong text-fg-subtle'
+                                ? 'bg-emerald-50 border-emerald-500 text-emerald-800 shadow-xs ring-1 ring-emerald-400/30'
+                                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                             }`}
               >
-                <Sparkles size={14} strokeWidth={2} aria-hidden /> Tab 1: Positive Lead
+                <Sparkles size={14} strokeWidth={2} className={leadType === 'positive' ? 'text-emerald-600' : 'text-slate-400'} />
+                <span>Tab 1: Positive Lead</span>
               </button>
               <button
                 type="button"
                 onClick={() => setLeadType('jd_received')}
-                className={`py-2 px-3 rounded-lg border font-semibold transition-colors flex items-center justify-center gap-1.5
+                className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer
                             ${
                               leadType === 'jd_received'
-                                ? 'bg-primary/30 border-primary text-primary'
-                                : 'bg-surface border-border-strong text-fg-subtle'
+                                ? 'bg-blue-50 border-blue-500 text-blue-800 shadow-xs ring-1 ring-blue-400/30'
+                                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                             }`}
               >
-                <ClipboardList size={14} strokeWidth={2} aria-hidden /> Tab 2: JD Received
+                <ClipboardList size={14} strokeWidth={2} className={leadType === 'jd_received' ? 'text-blue-600' : 'text-slate-400'} />
+                <span>Tab 2: JD Received</span>
               </button>
             </div>
           </div>
 
           {/* Copy Shortcut Header Button (Spec Section 11) */}
-          <div className="flex items-center justify-between bg-background border border-border rounded-lg p-2.5">
-            <span className="text-micro text-fg-subtle">
+          <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl p-2.5">
+            <span className="text-micro text-slate-600">
               Have you already logged this call in Daily Tracker?
             </span>
             <button
               type="button"
               onClick={handleOpenDtDrawer}
-              className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 px-2.5 py-1 rounded text-micro font-semibold transition-colors flex items-center gap-1"
+              className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg text-micro font-semibold transition-colors flex items-center gap-1 cursor-pointer"
             >
-              <Zap size={14} strokeWidth={2} aria-hidden /> Copy from Daily Tracker
+              <Zap size={13} strokeWidth={2} />
+              <span>Copy from Daily Tracker</span>
             </button>
           </div>
 
           {/* Drawer for Copy shortcut */}
           {showDtDrawer && (
-            <div className="bg-background/90 border border-primary/40 rounded-xl p-3 space-y-2">
+            <div className="bg-slate-50 border border-blue-200 rounded-xl p-3 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-primary text-micro">Select Positive Call from Daily Tracker</span>
+                <span className="font-bold text-blue-900 text-micro">Select Positive Call from Daily Tracker</span>
                 <button
                   type="button"
                   onClick={() => setShowDtDrawer(false)}
-                  className="text-fg-subtle hover:text-white text-xs"
+                  className="text-slate-400 hover:text-slate-700 text-xs p-1"
                 >
                   ✕
                 </button>
               </div>
               {dtLoading ? (
-                <p className="text-fg-subtle italic py-2">Loading Daily Tracker positive calls…</p>
+                <p className="text-slate-500 italic py-2">Loading Daily Tracker positive calls…</p>
               ) : dtPositives.length === 0 ? (
-                <p className="text-fg-subtle italic py-2">No positive calls found in Daily Tracker for {leadDate}.</p>
+                <p className="text-slate-500 italic py-2">No positive calls found in Daily Tracker for {leadDate}.</p>
               ) : (
-                <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 no-scrollbar">
                   {dtPositives.map((p) => (
                     <div
                       key={p._id}
                       onClick={() => handleSelectDtPositive(p)}
-                      className="p-2 bg-surface hover:bg-surface-raised/80 rounded-lg cursor-pointer flex items-center justify-between transition-colors"
+                      className="p-2 bg-white hover:bg-blue-50/70 border border-slate-200 rounded-lg cursor-pointer flex items-center justify-between transition-colors shadow-xs"
                     >
                       <div>
-                        <p className="font-semibold text-fg">{p.company_name}</p>
-                        <p className="text-micro text-fg-subtle">
+                        <p className="font-semibold text-slate-900">{p.company_name}</p>
+                        <p className="text-micro text-slate-500">
                           {p.college_id?.college_name || 'College'} • {p.contact_person_name}
                         </p>
                       </div>
-                      <span className="text-micro bg-success/20 text-success px-2 py-0.5 rounded-full">
+                      <span className="text-micro bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
                         {p.outcome_status}
                       </span>
                     </div>
@@ -246,8 +247,8 @@ export function AddLeadModal({
 
           {/* Company Name */}
           <div>
-            <label className="block text-fg-muted font-semibold mb-1">
-              Company Name <span className="text-destructive">*</span>
+            <label className="block text-slate-700 font-semibold mb-1">
+              Company Name <span className="text-rose-500">*</span>
             </label>
             <input
               type="text"
@@ -255,21 +256,22 @@ export function AddLeadModal({
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
               placeholder="e.g. TCS, Cognizant, Infosys…"
-              className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg placeholder-fg-subtle text-xs"
+              className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 placeholder:text-slate-400 text-xs transition-colors shadow-xs"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* College */}
             <div>
-              <label className="block text-fg-muted font-semibold mb-1">
-                College <span className="text-destructive">*</span>
+              <label className="block text-slate-700 font-semibold mb-1">
+                College <span className="text-rose-500">*</span>
               </label>
               <select
                 value={collegeId}
                 onChange={(e) => setCollegeId(e.target.value)}
-                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg text-xs cursor-pointer"
+                className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 text-xs cursor-pointer shadow-xs"
               >
+                <option value="">— Select College —</option>
                 {colleges.map((c) => (
                   <option key={c._id} value={c._id}>
                     [{c.college_code}] {c.college_name}
@@ -280,99 +282,101 @@ export function AddLeadModal({
 
             {/* Role Offered */}
             <div>
-              <label className="block text-fg-muted font-semibold mb-1">Role Offered</label>
+              <label className="block text-slate-700 font-semibold mb-1">Role Offered</label>
               <input
                 type="text"
                 value={jobRole}
                 onChange={(e) => setJobRole(e.target.value)}
                 placeholder="e.g. Software Engineer"
-                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg placeholder-fg-subtle text-xs"
+                className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 placeholder:text-slate-400 text-xs transition-colors shadow-xs"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* CTC */}
             <div>
-              <label className="block text-fg-muted font-semibold mb-1">CTC Offered</label>
+              <label className="block text-slate-700 font-semibold mb-1">CTC Offered</label>
               <input
                 type="text"
                 value={ctc}
                 onChange={(e) => setCtc(e.target.value)}
                 placeholder="e.g. 5.5 - 7.5 LPA"
-                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg placeholder-fg-subtle text-xs"
+                className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 placeholder:text-slate-400 text-xs transition-colors shadow-xs"
               />
             </div>
 
             {/* Eligible Batch */}
             <div>
-              <label className="block text-fg-muted font-semibold mb-1">Eligible Batch</label>
+              <label className="block text-slate-700 font-semibold mb-1">Eligible Batch</label>
               <input
                 type="text"
                 value={eligibleBatch}
                 onChange={(e) => setEligibleBatch(e.target.value)}
                 placeholder="e.g. 2026 Batch"
-                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg placeholder-fg-subtle text-xs"
+                className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 placeholder:text-slate-400 text-xs transition-colors shadow-xs"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Time (Separate from Date per Spec Section 10) */}
             <div>
-              <label className="block text-fg-muted font-semibold mb-1">Time Logged</label>
+              <label className="block text-slate-700 font-semibold mb-1">Time Logged</label>
               <input
                 type="text"
                 value={eventTime}
                 onChange={(e) => setEventTime(e.target.value)}
                 placeholder="e.g. 10:30 AM"
-                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg text-xs"
+                className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 text-xs transition-colors shadow-xs"
               />
             </div>
 
             {/* Date */}
             <div>
-              <label className="block text-fg-muted font-semibold mb-1">Date</label>
+              <label className="block text-slate-700 font-semibold mb-1">Date</label>
               <input
                 type="date"
                 value={leadDate}
                 onChange={(e) => setLeadDate(e.target.value)}
-                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg text-xs"
+                className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 text-xs transition-colors shadow-xs"
               />
             </div>
           </div>
 
           {/* Remarks */}
           <div>
-            <label className="block text-fg-muted font-semibold mb-1">Remarks & Details</label>
+            <label className="block text-slate-700 font-semibold mb-1">Remarks & Details</label>
             <textarea
               rows={2}
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
               placeholder="e.g. Positive response from campus HR. Assessment planned for next week."
-              className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg placeholder-fg-subtle text-xs"
+              className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 placeholder:text-slate-400 text-xs transition-colors shadow-xs"
             />
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-surface hover:bg-surface-raised text-fg-muted rounded-lg text-xs transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-5 py-2 bg-primary hover:bg-primary disabled:opacity-50 text-white rounded-lg text-xs font-semibold shadow-2 transition-colors flex items-center gap-1.5"
-            >
-              {loading ? 'Saving…' : 'Save Entry →'}
-            </button>
-          </div>
-
         </form>
+
+        {/* ── Fixed Sticky Actions Footer ───────────────────────────────── */}
+        <div className="flex items-center justify-end gap-3 px-6 py-3.5 border-t border-slate-100 bg-slate-50/90 shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="add-lead-form"
+            disabled={loading}
+            className="px-5 py-2 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            {loading ? 'Saving…' : 'Save Entry →'}
+          </button>
+        </div>
+
       </div>
     </div>
   );

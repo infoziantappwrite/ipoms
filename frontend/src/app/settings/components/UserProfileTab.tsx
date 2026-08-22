@@ -356,30 +356,6 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
     <>
       <div className="space-y-6">
 
-        {/* ── Section Header ────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between flex-wrap gap-4 pb-4 border-b border-border">
-          <div>
-            <h1 className="text-xl font-bold text-fg flex items-center gap-2.5">
-              <span>Account & Profile Settings</span>
-              {isPersonalLocked && (
-                <span className="text-[11px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                  <Lock size={12} /> DOB & Joining Locked
-                </span>
-              )}
-            </h1>
-            <p className="text-xs text-fg-muted mt-0.5">
-              Manage your identity, personal contact channels, security credentials, and organization profile.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface border border-border text-xs font-mono text-fg-muted">
-              <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
-              <span>Presence: Active</span>
-            </span>
-          </div>
-        </div>
-
         {/* Global Feedback Notifications */}
         {successMsg && (
           <div className="p-4 bg-success/15 border border-success/30 rounded-xl text-success text-xs font-semibold flex items-center gap-2 animate-fadeIn">

@@ -6,8 +6,8 @@ import { LeadsSummaryStrip, LeadsSummaryData } from './components/LeadsSummarySt
 import { LeadsTabBar } from './components/LeadsTabBar';
 import { LeadsTable, DailyLeadRow } from './components/LeadsTable';
 import { AddLeadModal } from './components/AddLeadModal';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { apiFetch } from '@/lib/api';
+import { readSessionUser } from '@/lib/session';
 
 export default function DailyLeadsPage() {
   // Date State (Defaults to today in YYYY-MM-DD)
@@ -34,9 +34,12 @@ export default function DailyLeadsPage() {
   });
   const [loading, setLoading] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [coordinatorId, setCoordinatorId] = useState<string>('');
 
-  // Default Coordinator ID (will come from JWT session in production)
-  const COORDINATOR_ID = '6a84719afa3bf51271bc1548';
+  useEffect(() => {
+    const user = readSessionUser();
+    if (user?._id) setCoordinatorId(user._id);
+  }, []);
 
   // ── Load Last Active Tab from localStorage on mount (Spec Section 6.4)
   useEffect(() => {
@@ -70,10 +73,9 @@ export default function DailyLeadsPage() {
       if (selectedCollegeId !== 'all') params.set('college_id', selectedCollegeId);
       if (searchQuery.trim()) params.set('search', searchQuery.trim());
 
-      const res = await fetch(`${API}/daily-leads?${params.toString()}`);
-      const data = await res.json();
-      if (data.success) {
-        setLeads(data.data.leads);
+      const res = await apiFetch(`/daily-leads?${params.toString()}`);
+      if (res.success && res.data) {
+        setLeads((res.data as any).leads);
       }
     } catch (err) {
       console.error('Failed to load daily leads:', err);
@@ -88,10 +90,9 @@ export default function DailyLeadsPage() {
       const params = new URLSearchParams({ date: selectedDate });
       if (selectedCollegeId !== 'all') params.set('college_id', selectedCollegeId);
 
-      const res = await fetch(`${API}/daily-leads/summary?${params.toString()}`);
-      const data = await res.json();
-      if (data.success) {
-        setSummary(data.data.summary);
+      const res = await apiFetch(`/daily-leads/summary?${params.toString()}`);
+      if (res.success && res.data) {
+        setSummary((res.data as any).summary);
       }
     } catch (err) {
       console.error('Failed to load leads summary:', err);
@@ -106,13 +107,11 @@ export default function DailyLeadsPage() {
   // ── Row Patch (Inline Edit)
   const handleUpdateRow = async (rowId: string, patch: Partial<DailyLeadRow>) => {
     try {
-      const res = await fetch(`${API}/daily-leads/${rowId}`, {
+      const res = await apiFetch(`/daily-leads/${rowId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
       });
-      const data = await res.json();
-      if (data.success) {
+      if (res.success) {
         await loadLeads();
         await loadSummary();
       }
@@ -124,11 +123,10 @@ export default function DailyLeadsPage() {
   // ── 1-Click Move to JD Received (Spec Section 6.3 & 11)
   const handleMoveToJd = async (rowId: string) => {
     try {
-      const res = await fetch(`${API}/daily-leads/${rowId}/move-to-jd`, {
+      const res = await apiFetch(`/daily-leads/${rowId}/move-to-jd`, {
         method: 'POST',
       });
-      const data = await res.json();
-      if (data.success) {
+      if (res.success) {
         await loadLeads();
         await loadSummary();
       }
@@ -140,11 +138,10 @@ export default function DailyLeadsPage() {
   // ── Delete Row (Soft Delete)
   const handleDeleteRow = async (rowId: string) => {
     try {
-      const res = await fetch(`${API}/daily-leads/${rowId}`, {
+      const res = await apiFetch(`/daily-leads/${rowId}`, {
         method: 'DELETE',
       });
-      const data = await res.json();
-      if (data.success) {
+      if (res.success) {
         await loadLeads();
         await loadSummary();
       }
@@ -251,7 +248,7 @@ export default function DailyLeadsPage() {
           initialLeadType={activeTab}
           initialCollegeId={selectedCollegeId}
           initialDate={selectedDate}
-          coordinatorId={COORDINATOR_ID}
+          coordinatorId={coordinatorId}
           onClose={() => setIsAddModalOpen(false)}
           onAdded={() => {
             loadLeads();

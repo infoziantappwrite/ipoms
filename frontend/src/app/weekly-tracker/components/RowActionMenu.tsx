@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Star, FolderInput, ChevronRight, MoreVertical } from 'lucide-react';
 
 interface Props {
   isPinned: boolean;
@@ -12,12 +12,12 @@ interface Props {
 }
 
 const SECTIONS = [
-  { key: 'pipeline', label: '📥 Companies in Pipeline' },
-  { key: 'in_progress', label: '🚀 Companies In Progress' },
-  { key: 'completed', label: '🏆 Companies Completed' },
-  { key: 'top_companies', label: '⭐ Top Companies' },
-  { key: 'rejected_by_hr', label: '🚫 Rejected by HR' },
-  { key: 'rejected_by_college', label: '🚫 Rejected by College' },
+  { key: 'pipeline', label: 'Companies in Pipeline' },
+  { key: 'in_progress', label: 'Companies In Progress' },
+  { key: 'completed', label: 'Companies Completed' },
+  { key: 'top_companies', label: 'Top Companies' },
+  { key: 'rejected_by_hr', label: 'Rejected by HR' },
+  { key: 'rejected_by_college', label: 'Rejected by College' },
 ];
 
 export function RowActionMenu({
@@ -46,14 +46,14 @@ export function RowActionMenu({
     <div className="relative inline-block text-left" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="p-1 rounded text-fg-subtle hover:text-white hover:bg-surface-raised transition-colors"
+        className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
         title="Actions"
       >
-        ⋮
+        <MoreVertical size={15} />
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-1 w-48 rounded-xl bg-background border border-border-strong shadow-4 z-50 py-1 text-xs text-fg">
+        <div className="absolute right-0 mt-1 w-52 rounded-xl bg-white border border-slate-200 shadow-xl z-50 py-1 text-xs text-slate-700">
 
           {/* Toggle Pin Top */}
           <button
@@ -61,9 +61,9 @@ export function RowActionMenu({
               onTogglePin();
               setIsOpen(false);
             }}
-            className="w-full text-left px-3 py-2 hover:bg-surface flex items-center gap-2 transition-colors"
+            className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 transition-colors cursor-pointer"
           >
-            <span>{isPinned ? '★' : '☆'}</span>
+            <Star size={14} className={isPinned ? 'fill-amber-400 text-amber-500' : 'text-slate-400'} />
             <span>{isPinned ? 'Unpin from Top' : 'Pin to Top Companies'}</span>
           </button>
 
@@ -71,14 +71,17 @@ export function RowActionMenu({
           <div className="relative">
             <button
               onClick={() => setShowMoveSubmenu(!showMoveSubmenu)}
-              className="w-full text-left px-3 py-2 hover:bg-surface flex items-center justify-between transition-colors"
+              className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center justify-between transition-colors cursor-pointer"
             >
-              <span>📂 Move Section</span>
-              <span>▸</span>
+              <div className="flex items-center gap-2">
+                <FolderInput size={14} className="text-slate-400" />
+                <span>Move Section</span>
+              </div>
+              <ChevronRight size={13} className="text-slate-400" />
             </button>
 
             {showMoveSubmenu && (
-              <div className="absolute left-full top-0 ml-1 w-48 rounded-xl bg-background border border-border-strong shadow-4 py-1">
+              <div className="absolute left-full top-0 ml-1 w-52 rounded-xl bg-white border border-slate-200 shadow-xl py-1">
                 {SECTIONS.map((s) => (
                   <button
                     key={s.key}
@@ -87,8 +90,8 @@ export function RowActionMenu({
                       setIsOpen(false);
                       setShowMoveSubmenu(false);
                     }}
-                    className={`w-full text-left px-3 py-1.5 hover:bg-surface transition-colors text-xs
-                                ${currentSection === s.key ? 'text-primary font-semibold' : ''}`}
+                    className={`w-full text-left px-3 py-1.5 hover:bg-slate-50 transition-colors text-xs cursor-pointer
+                                ${currentSection === s.key ? 'text-primary font-bold bg-primary-subtle' : 'text-slate-700'}`}
                   >
                     {s.label}
                   </button>
@@ -97,7 +100,7 @@ export function RowActionMenu({
             )}
           </div>
 
-          <div className="h-px bg-surface my-1" />
+          <div className="h-px bg-slate-100 my-1" />
 
           {/* Delete */}
           <button
@@ -107,9 +110,9 @@ export function RowActionMenu({
                 setIsOpen(false);
               }
             }}
-            className="w-full text-left px-3 py-2 hover:bg-destructive/40 text-destructive flex items-center gap-2 transition-colors"
+            className="w-full text-left px-3 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2 transition-colors cursor-pointer"
           >
-            <Trash2 size={14} strokeWidth={2} aria-hidden />
+            <Trash2 size={14} strokeWidth={2} />
             <span>Move to Recycle Bin</span>
           </button>
 

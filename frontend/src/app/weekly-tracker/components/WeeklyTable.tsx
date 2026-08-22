@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { FolderOpen } from 'lucide-react';
 import { RowActionMenu } from './RowActionMenu';
 
 export interface WeeklyRow {
@@ -84,8 +85,11 @@ export function WeeklyTable({
 
   if (rows.length === 0) {
     return (
-      <div className="py-6 text-center text-xs text-fg-muted italic">
-        No companies in this section
+      <div className="py-8 text-center flex flex-col items-center justify-center gap-2">
+        <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center justify-center text-slate-400">
+          <FolderOpen size={18} strokeWidth={1.75} />
+        </div>
+        <p className="text-xs text-slate-500 font-medium">No companies in this section</p>
       </div>
     );
   }

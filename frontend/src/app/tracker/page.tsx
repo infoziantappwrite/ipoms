@@ -354,28 +354,24 @@ export default function DailyTrackerPage() {
 
           {/* Right: Selected College Logo Badge + Auto-save status + Top-Right Sign Out */}
           <div className="flex items-center gap-3">
+            {/* Selected College Logo Badge */}
             {selectedCollegeObj && (
-              <div className="flex items-center gap-2 bg-surface/90 border border-border/80 px-2.5 py-1 rounded-xl shadow-sm animate-fadeIn">
+              <div
+                title={`${selectedCollegeObj.college_name} (${selectedCollegeObj.college_code})`}
+                className="flex items-center justify-center bg-surface/90 border border-border/80 p-1 rounded-xl shadow-sm animate-fadeIn"
+              >
                 {selectedCollegeObj.logo_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={selectedCollegeObj.logo_url}
                     alt={selectedCollegeObj.college_name}
-                    className="w-7 h-7 object-contain rounded-md bg-white/95 p-0.5 shadow-sm border border-border/50"
+                    className="w-8 h-8 object-contain rounded-lg bg-white/95 p-0.5 shadow-sm border border-border/50"
                   />
                 ) : (
-                  <span className="w-7 h-7 rounded-md bg-primary/20 text-primary font-bold text-xs flex items-center justify-center font-mono">
+                  <span className="w-8 h-8 rounded-lg bg-primary/20 text-primary font-bold text-xs flex items-center justify-center font-mono">
                     {selectedCollegeObj.college_code?.slice(0, 2) || 'CL'}
                   </span>
                 )}
-                <div className="hidden sm:block text-left">
-                  <div className="text-xs font-bold text-fg leading-none font-mono">
-                    {selectedCollegeObj.college_code}
-                  </div>
-                  <div className="text-[10px] text-fg-subtle truncate max-w-[130px] leading-tight mt-0.5">
-                    {selectedCollegeObj.college_name}
-                  </div>
-                </div>
               </div>
             )}
 

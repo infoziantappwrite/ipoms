@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { Inbox } from 'lucide-react';
 import { NotificationsHeader } from './components/NotificationsHeader';
 import { NotificationsTabBar, NotificationFilterTab } from './components/NotificationsTabBar';
 import { NotificationCard } from './components/NotificationCard';
 import { BroadcastModal } from './components/BroadcastModal';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { apiFetch } from '@/lib/api';
+import { readSessionUser } from '@/lib/session';
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -15,26 +16,28 @@ export default function NotificationsPage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showBroadcastModal, setShowBroadcastModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+  const [userId, setUserId] = useState<string>('');
 
-  // Default Coordinator ID (will come from JWT session)
-  const USER_ID = '6a84719afa3bf51271bc1548';
+  useEffect(() => {
+    const user = readSessionUser();
+    if (user?._id) setUserId(user._id);
+  }, []);
 
   const loadNotifications = useCallback(async () => {
     setLoading(true);
     try {
-      let url = `${API}/notifications?user_id=${USER_ID}&tab=${activeTab}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      if (data.success) {
-        setNotifications(data.data.notifications);
-        setUnreadCount(data.data.unread_count);
+      const url = `/notifications?${userId ? `user_id=${userId}&` : ''}tab=${activeTab}`;
+      const res = await apiFetch(url);
+      if (res.success && res.data) {
+        setNotifications((res.data as any).notifications || []);
+        setUnreadCount((res.data as any).unread_count || 0);
       }
     } catch (err) {
       console.error('Failed to load notifications:', err);
     } finally {
       setLoading(false);
     }
-  }, [activeTab]);
+  }, [activeTab, userId]);
 
   useEffect(() => {
     loadNotifications();
@@ -42,10 +45,9 @@ export default function NotificationsPage() {
 
   const handleMarkRead = async (id: string) => {
     try {
-      await fetch(`${API}/notifications/${id}/read`, {
+      await apiFetch(`/notifications/${id}/read`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: USER_ID }),
+        body: JSON.stringify({ user_id: userId }),
       });
       loadNotifications();
     } catch (err) {
@@ -55,10 +57,9 @@ export default function NotificationsPage() {
 
   const handleMarkAllRead = async () => {
     try {
-      await fetch(`${API}/notifications/mark-all-read`, {
+      await apiFetch('/notifications/mark-all-read', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: USER_ID }),
+        body: JSON.stringify({ user_id: userId }),
       });
       loadNotifications();
     } catch (err) {
@@ -68,13 +69,11 @@ export default function NotificationsPage() {
 
   const handleAcknowledge = async (id: string, response: string) => {
     try {
-      const res = await fetch(`${API}/notifications/${id}/acknowledge`, {
+      const res = await apiFetch(`/notifications/${id}/acknowledge`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: USER_ID, response }),
+        body: JSON.stringify({ user_id: userId, response }),
       });
-      const data = await res.json();
-      if (data.success) {
+      if (res.success) {
         loadNotifications();
       }
     } catch (err) {
@@ -85,9 +84,8 @@ export default function NotificationsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this notification?')) return;
     try {
-      const res = await fetch(`${API}/notifications/${id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (data.success) {
+      const res = await apiFetch(`/notifications/${id}`, { method: 'DELETE' });
+      if (res.success) {
         loadNotifications();
       }
     } catch (err) {
@@ -132,19 +130,23 @@ export default function NotificationsPage() {
             Loading notifications…
           </div>
         ) : filteredNotifications.length === 0 ? (
-          <div className="glass-panel rounded-2xl border border-border p-12 text-center text-fg-subtle space-y-2">
-            <span className="text-3xl block">📬</span>
-            <p className="text-xs font-semibold text-fg-subtle">No notifications found in this view.</p>
-            <p className="text-micro text-fg-muted">
-              When management broadcasts alerts or meeting invites, they will appear here.
-            </p>
+          <div className="rounded-2xl border border-border bg-surface p-12 text-center text-fg-subtle flex flex-col items-center justify-center gap-3">
+            <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200/80 shadow-xs flex items-center justify-center text-slate-400">
+              <Inbox size={26} strokeWidth={1.75} className="text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-800">No notifications found in this view</p>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                When management broadcasts alerts, announcements, or meeting invites, they will appear here.
+              </p>
+            </div>
           </div>
         ) : (
           filteredNotifications.map((notification) => (
             <NotificationCard
               key={notification._id}
               notification={notification}
-              currentUserId={USER_ID}
+              currentUserId={userId}
               onMarkRead={handleMarkRead}
               onAcknowledge={handleAcknowledge}
               onDelete={handleDelete}

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { InfoziantLogo } from '@/components/InfoziantLogo';
 import {
-  LayoutDashboard, PhoneCall, CalendarDays, Target, Building2,
+  LayoutDashboard, PhoneCall, CalendarDays, Target, Database,
   TrendingUp, Bell, Settings, ArrowRight, LogIn, Zap,
 } from 'lucide-react';
 
@@ -69,7 +69,7 @@ export default function ModuleLauncherPage() {
     {
       title: 'Master Company Metadata',
       code: 'Module 02',
-      Icon: Building2,
+      Icon: Database,
       desc: 'Centralized directory of 3,550+ corporate accounts with intelligent duplicate detection, bulk Excel import, and 90-day recycle bin.',
       href: '/metadata',
       badge: '3,550+ Records',

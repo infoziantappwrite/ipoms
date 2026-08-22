@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { CalendarDays } from 'lucide-react';
 import { WeeklyHeader } from './components/WeeklyHeader';
 import { WeeklyKpiCards, WeeklyKpiData } from './components/WeeklyKpiCards';
 import { WeeklyToolbar } from './components/WeeklyToolbar';
 import { WeeklySection } from './components/WeeklySection';
 import { AddCompanyModal } from './components/AddCompanyModal';
 import type { WeeklyRow } from './components/WeeklyTable';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { apiFetch } from '@/lib/api';
+import { readSessionUser } from '@/lib/session';
 
 interface SectionData {
   title: string;
@@ -39,9 +40,12 @@ export default function WeeklyTrackerPage() {
   const [companyTypeFilter, setCompanyTypeFilter] = useState('all');
   const [activeSectionFilter, setActiveSectionFilter] = useState<string>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [coordinatorId, setCoordinatorId] = useState<string | null>(null);
 
-  // Default Coordinator ID (will come from JWT session in production)
-  const COORDINATOR_ID = '6a84719afa3bf51271bc1548';
+  useEffect(() => {
+    const user = readSessionUser();
+    if (user?._id) setCoordinatorId(user._id);
+  }, []);
 
   // ── Load Weekly Tracker Sections
   const loadWeeklyTracker = useCallback(async () => {
@@ -55,11 +59,10 @@ export default function WeeklyTrackerPage() {
       if (searchQuery.trim()) params.set('search', searchQuery.trim());
       if (companyTypeFilter !== 'all') params.set('company_type', companyTypeFilter);
 
-      const res = await fetch(`${API}/weekly-tracker?${params.toString()}`);
-      const data = await res.json();
-      if (data.success) {
-        setSections(data.data.sections);
-        setTotalRecords(data.data.total_records);
+      const res = await apiFetch(`/weekly-tracker?${params.toString()}`);
+      if (res.success && res.data) {
+        setSections((res.data as any).sections);
+        setTotalRecords((res.data as any).total_records);
       }
     } catch (err) {
       console.error('Failed to load weekly tracker:', err);
@@ -72,10 +75,9 @@ export default function WeeklyTrackerPage() {
   const loadKpi = useCallback(async () => {
     if (!selectedCollegeId) return;
     try {
-      const res = await fetch(`${API}/weekly-tracker/kpi?college_id=${selectedCollegeId}&academic_year=2026`);
-      const data = await res.json();
-      if (data.success) {
-        setKpi(data.data.kpi);
+      const res = await apiFetch(`/weekly-tracker/kpi?college_id=${selectedCollegeId}&academic_year=2026`);
+      if (res.success && res.data) {
+        setKpi((res.data as any).kpi);
       }
     } catch (err) {
       console.error('Failed to load weekly KPI:', err);
@@ -93,13 +95,11 @@ export default function WeeklyTrackerPage() {
   // ── Row Patch (Inline Edit)
   const handleUpdateRow = async (rowId: string, patch: Partial<WeeklyRow>) => {
     try {
-      const res = await fetch(`${API}/weekly-tracker/${rowId}`, {
+      const res = await apiFetch(`/weekly-tracker/${rowId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
       });
-      const data = await res.json();
-      if (data.success) {
+      if (res.success) {
         await loadWeeklyTracker();
         await loadKpi();
       }
@@ -111,13 +111,11 @@ export default function WeeklyTrackerPage() {
   // ── Move Section
   const handleMoveSection = async (rowId: string, newSection: string) => {
     try {
-      const res = await fetch(`${API}/weekly-tracker/${rowId}/section`, {
+      const res = await apiFetch(`/weekly-tracker/${rowId}/section`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pipeline_section: newSection }),
       });
-      const data = await res.json();
-      if (data.success) {
+      if (res.success) {
         await loadWeeklyTracker();
         await loadKpi();
       }
@@ -129,11 +127,10 @@ export default function WeeklyTrackerPage() {
   // ── Toggle Pin Top Companies
   const handleTogglePin = async (rowId: string) => {
     try {
-      const res = await fetch(`${API}/weekly-tracker/${rowId}/pin`, {
+      const res = await apiFetch(`/weekly-tracker/${rowId}/pin`, {
         method: 'PATCH',
       });
-      const data = await res.json();
-      if (data.success) {
+      if (res.success) {
         await loadWeeklyTracker();
         await loadKpi();
       }
@@ -145,11 +142,10 @@ export default function WeeklyTrackerPage() {
   // ── Delete Row (Soft delete)
   const handleDeleteRow = async (rowId: string) => {
     try {
-      const res = await fetch(`${API}/weekly-tracker/${rowId}`, {
+      const res = await apiFetch(`/weekly-tracker/${rowId}`, {
         method: 'DELETE',
       });
-      const data = await res.json();
-      if (data.success) {
+      if (res.success) {
         await loadWeeklyTracker();
         await loadKpi();
       }
@@ -162,17 +158,15 @@ export default function WeeklyTrackerPage() {
   const handleSyncDailyPositives = async () => {
     if (!selectedCollegeId) return;
     try {
-      const res = await fetch(`${API}/weekly-tracker/sync-daily-positives`, {
+      const res = await apiFetch('/weekly-tracker/sync-daily-positives', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           college_id: selectedCollegeId,
-          coordinator_id: COORDINATOR_ID,
+          coordinator_id: coordinatorId,
         }),
       });
-      const data = await res.json();
-      if (data.success) {
-        alert(data.message);
+      if (res.success) {
+        alert(res.message);
         await loadWeeklyTracker();
         await loadKpi();
       }
@@ -282,12 +276,16 @@ export default function WeeklyTrackerPage() {
 
       {/* ── Empty State when no college is selected ──────────────────────── */}
       {!selectedCollegeId && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-fg-subtle py-24">
-          <div className="text-6xl">📊</div>
-          <p className="text-xl font-semibold text-fg-muted">Select a College to View Weekly Tracker</p>
-          <p className="text-sm text-fg-subtle max-w-md text-center">
-            Choose a partner institution from the header dropdown to view ongoing recruitment drives across all 7 operational pipeline sections.
-          </p>
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 py-24 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-200/80 shadow-xs flex items-center justify-center text-slate-400">
+            <CalendarDays size={32} strokeWidth={1.75} className="text-primary" />
+          </div>
+          <div>
+            <p className="text-base font-bold text-slate-800">Select a College to View Weekly Tracker</p>
+            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
+              Choose a partner institution from the header dropdown to view ongoing recruitment drives across all 7 operational pipeline sections.
+            </p>
+          </div>
         </div>
       )}
 
@@ -405,7 +403,7 @@ export default function WeeklyTrackerPage() {
       {isAddModalOpen && selectedCollegeId && (
         <AddCompanyModal
           collegeId={selectedCollegeId}
-          coordinatorId={COORDINATOR_ID}
+          coordinatorId={coordinatorId ?? ''}
           onClose={() => setIsAddModalOpen(false)}
           onAdded={() => {
             loadWeeklyTracker();

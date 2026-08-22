@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Plus } from 'lucide-react';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { apiFetch } from '@/lib/api';
 
 interface Props {
   collegeId: string;
@@ -56,11 +55,10 @@ export function AddCompanyModal({
   useEffect(() => {
     if (companyName.trim().length >= 2) {
       const timer = setTimeout(() => {
-        fetch(`${API}/companies/search?q=${encodeURIComponent(companyName)}&limit=5`)
-          .then((r) => r.json())
+        apiFetch(`/companies/search?q=${encodeURIComponent(companyName)}&limit=5`)
           .then((data) => {
-            if (data.success) {
-              setSuggestions(data.data.companies);
+            if (data.success && (data.data as any)?.companies) {
+              setSuggestions((data.data as any).companies);
               setShowSuggestions(true);
             }
           })
@@ -82,9 +80,8 @@ export function AddCompanyModal({
 
     setLoading(true);
     try {
-      const res = await fetch(`${API}/weekly-tracker`, {
+      const res = await apiFetch('/weekly-tracker', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           college_id: collegeId,
           coordinator_id: coordinatorId,
@@ -99,12 +96,11 @@ export function AddCompanyModal({
           current_status_text: currentStatusText.trim(),
         }),
       });
-      const data = await res.json();
-      if (data.success) {
+      if (res.success) {
         onAdded();
         onClose();
       } else {
-        alert(data.error?.message || 'Failed to add company');
+        alert(res.error?.message || 'Failed to add company');
       }
     } catch (err: any) {
       console.error('Add company error:', err);

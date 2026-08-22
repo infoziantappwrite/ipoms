@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ReportsNavigation, ReportsTab } from './components/ReportsNavigation';
 import { AnalyticsView } from './components/AnalyticsView';
 import { ReportsLibraryView } from './components/ReportsLibraryView';
 import { ReportBuilderWizard } from './components/ReportBuilderWizard';
 import { NativeReportEditor } from './components/NativeReportEditor';
+import { readSessionUser } from '@/lib/session';
 
 export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<ReportsTab>('analytics');
@@ -13,9 +14,11 @@ export default function ReportsPage() {
   const [selectedTemplateType, setSelectedTemplateType] = useState<string>('weekly_placement');
   const [generatedReport, setGeneratedReport] = useState<any>(null);
   const [isEditingReport, setIsEditingReport] = useState<boolean>(false);
+  const [coordinatorId, setCoordinatorId] = useState<string>('');
 
-  // Default Coordinator ID (will come from JWT session in production)
-  const COORDINATOR_ID = '6a84719afa3bf51271bc1548';
+  useEffect(() => {
+    setCoordinatorId(readSessionUser()?._id ?? '');
+  }, []);
 
   const handleSelectTemplate = (templateId: string) => {
     setSelectedTemplateType(templateId);
@@ -75,7 +78,7 @@ export default function ReportsPage() {
             <ReportBuilderWizard
               initialTemplateType={selectedTemplateType}
               initialCollegeId={selectedCollegeId}
-              coordinatorId={COORDINATOR_ID}
+              coordinatorId={coordinatorId}
               onReportGenerated={handleReportGenerated}
             />
           )}

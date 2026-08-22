@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import { CalendarDays, FileSpreadsheet, Globe, Plus, Target } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { apiFetch } from '@/lib/api';
 
 interface College {
   _id: string;
@@ -40,10 +39,11 @@ export function LeadsHeader({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API}/colleges`)
-      .then((r) => r.json())
+    apiFetch('/colleges')
       .then((data) => {
-        if (data.success) setColleges(data.data.colleges);
+        if (data.success && Array.isArray((data.data as any)?.colleges)) {
+          setColleges((data.data as any).colleges);
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -68,27 +68,22 @@ export function LeadsHeader({
         {/* Pin Selected College Logo & Sign Out to Absolute Top Right */}
         <div className="flex items-center gap-3 shrink-0">
           {selectedCollege && (
-            <div className="flex items-center gap-2 bg-surface/90 border border-border/80 px-2.5 py-1 rounded-xl shadow-sm animate-fadeIn">
+            <div
+              title={`${selectedCollege.college_name} (${selectedCollege.college_code})`}
+              className="flex items-center justify-center bg-surface/90 border border-border/80 p-1 rounded-xl shadow-sm animate-fadeIn"
+            >
               {selectedCollege.logo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={selectedCollege.logo_url}
                   alt={selectedCollege.college_name}
-                  className="w-7 h-7 object-contain rounded-md bg-white/95 p-0.5 shadow-sm border border-border/50"
+                  className="w-8 h-8 object-contain rounded-lg bg-white/95 p-0.5 shadow-sm border border-border/50"
                 />
               ) : (
-                <span className="w-7 h-7 rounded-md bg-primary/20 text-primary font-bold text-xs flex items-center justify-center font-mono">
+                <span className="w-8 h-8 rounded-lg bg-primary/20 text-primary font-bold text-xs flex items-center justify-center font-mono">
                   {selectedCollege.college_code?.slice(0, 2) || 'CL'}
                 </span>
               )}
-              <div className="hidden sm:block text-left">
-                <div className="text-xs font-bold text-fg leading-none font-mono">
-                  {selectedCollege.college_code}
-                </div>
-                <div className="text-[10px] text-fg-subtle truncate max-w-[130px] leading-tight mt-0.5">
-                  {selectedCollege.college_name}
-                </div>
-              </div>
             </div>
           )}
 
@@ -123,7 +118,7 @@ export function LeadsHeader({
             disabled={loading}
             className="bg-surface border border-border-strong text-fg text-xs px-3 py-2 rounded-xl min-w-[200px] cursor-pointer"
           >
-            <option value="all">🌐 All Colleges</option>
+            <option value="all">All Colleges</option>
             {colleges.map((c) => (
               <option key={c._id} value={c._id}>
                 [{c.college_code}] {c.college_name}

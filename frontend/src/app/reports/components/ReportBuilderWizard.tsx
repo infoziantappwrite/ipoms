@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Globe, Save, Sparkles } from 'lucide-react';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { Globe, Save, Sparkles, Wrench, BarChart3, TrendingUp, GraduationCap, UserCheck } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 
 interface College {
   _id: string;
@@ -128,8 +127,9 @@ export function ReportBuilderWizard({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border pb-4">
           <div>
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <span>🛠️</span> Guided Report Builder Wizard
+            <h2 className="text-base font-bold text-fg flex items-center gap-2">
+              <Wrench size={16} strokeWidth={2} className="text-primary" />
+              <span>Guided Report Builder Wizard</span>
             </h2>
             <p className="text-xs text-fg-subtle mt-0.5">
               Configure parameters, select sections, and generate an interactive live report
@@ -138,7 +138,7 @@ export function ReportBuilderWizard({
           <button
             type="button"
             onClick={() => setShowSavePresetModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-surface hover:bg-surface-raised text-primary border border-primary/30 rounded-lg text-xs font-semibold transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-surface hover:bg-surface-raised text-primary border border-primary/30 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
           >
             <Save size={14} strokeWidth={2} aria-hidden /> Save as Preset
           </button>
@@ -151,26 +151,30 @@ export function ReportBuilderWizard({
           </label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
             {[
-              { id: 'weekly_placement', label: 'Weekly Placement', icon: '📊' },
-              { id: 'monthly_placement', label: 'Monthly Placement', icon: '📈' },
-              { id: 'college_performance', label: 'College Deep-Dive', icon: '🏛️' },
-              { id: 'coordinator_performance', label: 'Coordinator Activity', icon: '👤' },
-            ].map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTemplateType(t.id)}
-                className={`p-3 rounded-xl border text-xs font-semibold flex flex-col items-center gap-1.5 transition-all text-center
-                            ${
-                              templateType === t.id
-                                ? 'bg-primary/30 border-primary text-white shadow-2'
-                                : 'bg-background/60 border-border text-fg-subtle hover:border-border-strong'
-                            }`}
-              >
-                <span className="text-xl">{t.icon}</span>
-                <span>{t.label}</span>
-              </button>
-            ))}
+              { id: 'weekly_placement', label: 'Weekly Placement', Icon: BarChart3 },
+              { id: 'monthly_placement', label: 'Monthly Placement', Icon: TrendingUp },
+              { id: 'college_performance', label: 'College Deep-Dive', Icon: GraduationCap },
+              { id: 'coordinator_performance', label: 'Coordinator Activity', Icon: UserCheck },
+            ].map((t) => {
+              const IconComponent = t.Icon;
+              const isSelected = templateType === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTemplateType(t.id)}
+                  className={`p-3 rounded-xl border text-xs font-semibold flex flex-col items-center gap-2 transition-all text-center cursor-pointer
+                              ${
+                                isSelected
+                                  ? 'bg-primary text-white border-primary shadow-xs'
+                                  : 'bg-surface border-border text-fg-subtle hover:border-border-strong hover:text-fg'
+                              }`}
+                >
+                  <IconComponent size={20} strokeWidth={isSelected ? 2.25 : 1.75} className={isSelected ? 'text-white' : 'text-slate-500'} />
+                  <span>{t.label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 

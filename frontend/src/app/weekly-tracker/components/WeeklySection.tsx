@@ -1,6 +1,15 @@
-'use client';
-
 import { useState } from 'react';
+import {
+  Clock,
+  Trophy,
+  Rocket,
+  Inbox,
+  Star,
+  XCircle,
+  Folder,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 import { WeeklyTable, WeeklyRow } from './WeeklyTable';
 
 interface Props {
@@ -15,41 +24,48 @@ interface Props {
   onDeleteRow: (rowId: string) => Promise<void>;
 }
 
-const SECTION_CONFIGS: Record<string, { icon: string; headerBg: string; badgeClass: string }> = {
+const SECTION_CONFIGS: Record<string, { Icon: any; headerBg: string; badgeClass: string; iconClass: string }> = {
   follow_ups_due_today: {
-    icon: '⏰',
-    headerBg: 'bg-warning/30 border-warning/30',
-    badgeClass: 'bg-warning/20 text-warning border-warning/40',
+    Icon: Clock,
+    headerBg: 'bg-amber-50/80 border-amber-200 text-amber-900',
+    badgeClass: 'bg-amber-100 text-amber-800 border-amber-300',
+    iconClass: 'text-amber-600',
   },
   completed: {
-    icon: '🏆',
-    headerBg: 'bg-success/30 border-success/30',
-    badgeClass: 'bg-success/20 text-success border-success/40',
+    Icon: Trophy,
+    headerBg: 'bg-emerald-50/80 border-emerald-200 text-emerald-900',
+    badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+    iconClass: 'text-emerald-600',
   },
   in_progress: {
-    icon: '🚀',
-    headerBg: 'bg-primary/30 border-primary/30',
-    badgeClass: 'bg-primary/20 text-primary border-primary/40',
+    Icon: Rocket,
+    headerBg: 'bg-blue-50/80 border-blue-200 text-blue-900',
+    badgeClass: 'bg-blue-100 text-blue-800 border-blue-300',
+    iconClass: 'text-blue-600',
   },
   pipeline: {
-    icon: '📥',
-    headerBg: 'bg-cyan-950/30 border-cyan-500/30',
-    badgeClass: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
+    Icon: Inbox,
+    headerBg: 'bg-cyan-50/80 border-cyan-200 text-cyan-900',
+    badgeClass: 'bg-cyan-100 text-cyan-800 border-cyan-300',
+    iconClass: 'text-cyan-600',
   },
   top_companies: {
-    icon: '⭐',
-    headerBg: 'bg-purple-950/30 border-purple-500/30',
-    badgeClass: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
+    Icon: Star,
+    headerBg: 'bg-purple-50/80 border-purple-200 text-purple-900',
+    badgeClass: 'bg-purple-100 text-purple-800 border-purple-300',
+    iconClass: 'text-purple-600',
   },
   rejected_by_hr: {
-    icon: '🚫',
-    headerBg: 'bg-background/60 border-border-strong',
-    badgeClass: 'bg-surface text-fg-muted border-border-strong',
+    Icon: XCircle,
+    headerBg: 'bg-slate-50/80 border-slate-200 text-slate-700',
+    badgeClass: 'bg-slate-100 text-slate-700 border-slate-300',
+    iconClass: 'text-slate-500',
   },
   rejected_by_college: {
-    icon: '🚫',
-    headerBg: 'bg-background/60 border-border-strong',
-    badgeClass: 'bg-surface text-fg-muted border-border-strong',
+    Icon: XCircle,
+    headerBg: 'bg-slate-50/80 border-slate-200 text-slate-700',
+    badgeClass: 'bg-slate-100 text-slate-700 border-slate-300',
+    iconClass: 'text-slate-500',
   },
 };
 
@@ -66,23 +82,27 @@ export function WeeklySection({
 }: Props) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const config = SECTION_CONFIGS[sectionKey] || {
-    icon: '📂',
-    headerBg: 'bg-background border-border',
-    badgeClass: 'bg-surface text-fg-muted border-border-strong',
+    Icon: Folder,
+    headerBg: 'bg-slate-50 border-slate-200 text-slate-800',
+    badgeClass: 'bg-slate-100 text-slate-700 border-slate-300',
+    iconClass: 'text-slate-500',
   };
 
+  const IconComponent = config.Icon;
+
   return (
-    <div className="rounded-xl border border-border overflow-hidden shadow-2 transition-all">
+    <div className="rounded-xl border border-border overflow-hidden shadow-xs transition-all bg-white">
       {/* Sticky Section Header per Spec Section 16 */}
       <div
         onClick={() => setIsCollapsed(!isCollapsed)}
         className={`sticky top-0 z-20 flex items-center justify-between px-4 py-2.5 border-b cursor-pointer select-none transition-colors ${config.headerBg}`}
       >
         <div className="flex items-center gap-2.5">
-          <span className="text-base">{config.icon}</span>
-          <span className="text-xs font-bold text-fg tracking-wide uppercase">
+          <IconComponent size={15} strokeWidth={2} className={config.iconClass} />
+          <span className="text-xs font-bold tracking-wide uppercase">
             {order}. {title}
           </span>
+        </div>
           <span className={`text-micro px-2 py-0.5 rounded-full border font-semibold ${config.badgeClass}`}>
             {rows.length}
           </span>

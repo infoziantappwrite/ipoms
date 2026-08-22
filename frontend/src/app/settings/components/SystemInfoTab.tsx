@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import {
   BarChart3, LayoutDashboard, PhoneCall, CalendarDays, Target,
-  Building2, TrendingUp, Bell, Settings, ExternalLink
+  Database, TrendingUp, Bell, Settings, ExternalLink
 } from 'lucide-react';
 
 interface Props {
@@ -51,7 +51,7 @@ export function SystemInfoTab({ summaryData }: Props) {
     {
       title: 'Master Metadata Database',
       code: 'Module 02',
-      Icon: Building2,
+      Icon: Database,
       desc: 'Centralized directory of 3,500+ verified corporate contacts, HR directories, phone starts-with indexing, and 30-day soft-delete bin.',
       href: '/metadata',
       badge: 'Intelligence Repository',

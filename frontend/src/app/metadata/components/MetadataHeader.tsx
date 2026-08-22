@@ -1,6 +1,6 @@
 'use client';
 
-import { Building2, ClipboardList, FileSpreadsheet, Plus, Search, Trash2 } from 'lucide-react';
+import { Database, ClipboardList, FileSpreadsheet, Plus, Search, Trash2 } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 interface Props {
   searchQuery: string;
@@ -48,7 +48,7 @@ export function MetadataHeader({
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold text-fg tracking-tight flex items-center gap-2">
-              <Building2 size={18} strokeWidth={2} className="text-primary" />
+              <Database size={18} strokeWidth={2} className="text-primary" />
               <span>Master Metadata Directory</span>
             </h1>
             {isRecycleBin && (

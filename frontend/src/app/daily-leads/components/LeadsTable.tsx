@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Rocket } from 'lucide-react';
+import { Rocket, Sparkles, FileSpreadsheet, PlusCircle } from 'lucide-react';
 
 export interface DailyLeadRow {
   _id: string;
@@ -43,14 +43,22 @@ export function LeadsTable({
 }: Props) {
   if (rows.length === 0) {
     return (
-      <div className="py-16 text-center text-fg-subtle flex flex-col items-center justify-center gap-2">
-        <span className="text-4xl">{activeTab === 'positive' ? '✨' : '📋'}</span>
-        <p className="text-sm font-semibold text-fg-subtle">
-          No {activeTab === 'positive' ? 'Positive Opportunities' : 'JDs Received'} recorded for this date & college.
-        </p>
-        <p className="text-xs text-fg-muted">
-          Click <span className="text-primary font-semibold">+ Add Entry</span> above to log a new opportunity.
-        </p>
+      <div className="py-16 text-center flex flex-col items-center justify-center gap-3">
+        <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200/80 shadow-xs flex items-center justify-center text-slate-400">
+          {activeTab === 'positive' ? (
+            <Sparkles size={26} strokeWidth={1.75} className="text-emerald-500" />
+          ) : (
+            <FileSpreadsheet size={26} strokeWidth={1.75} className="text-blue-500" />
+          )}
+        </div>
+        <div>
+          <p className="text-sm font-bold text-slate-800">
+            No {activeTab === 'positive' ? 'Positive Leads' : 'JDs Received'} Logged
+          </p>
+          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+            No opportunities recorded for this college and date filter. Click <span className="text-primary font-semibold font-mono">+ Add Entry</span> in the header to register new activity.
+          </p>
+        </div>
       </div>
     );
   }

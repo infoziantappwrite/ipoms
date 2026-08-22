@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, PhoneCall, CalendarDays, Target, Building2,
+  LayoutDashboard, PhoneCall, CalendarDays, Target, Database,
   TrendingUp, Bell, UserCheck, User, PanelLeftClose, X, LogOut,
 } from 'lucide-react';
 
@@ -16,6 +16,7 @@ import {
   NAV_INTRO_KEY, NAV_COLLAPSED_KEY,
   type SessionUser, type RoleKey,
 } from '@/lib/session';
+import { apiFetch } from '@/lib/api';
 
 /** How long the drawer stays open after sign-in before settling to the rail. */
 const INTRO_HOLD_MS = 5000;
@@ -32,7 +33,7 @@ const NAV: NavItem[] = [
   { href: '/tracker',        label: 'Daily Tracker',  Icon: PhoneCall },
   { href: '/weekly-tracker', label: 'Weekly Tracker', Icon: CalendarDays },
   { href: '/daily-leads',    label: 'Daily Leads',    Icon: Target },
-  { href: '/metadata',       label: 'Metadata DB',    Icon: Building2 },
+  { href: '/metadata',       label: 'Metadata DB',    Icon: Database },
   { href: '/reports',        label: 'Reports & BI',   Icon: TrendingUp },
   { href: '/notifications',  label: 'Alerts',         Icon: Bell },
   { href: '/settings',       label: 'Profile',        Icon: User },
@@ -96,11 +97,9 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
 
   // Roster is only needed to disambiguate avatar initials (MO vs MU).
   useEffect(() => {
-    const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
-    fetch(`${API}/users`)
-      .then((r) => r.json())
+    apiFetch('/users')
       .then((d) => {
-        const names = d?.data?.users?.map((u: any) => u.full_name).filter(Boolean);
+        const names = (d?.data as any)?.users?.map((u: any) => u.full_name).filter(Boolean);
         if (Array.isArray(names)) setRoster(names);
       })
       .catch(() => { /* initials fall back to the 2-letter default */ });

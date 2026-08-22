@@ -170,8 +170,12 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        {/* User Profile & Sign Out Button (Always Top-Right Corner) */}
-        <div className="shrink-0">
+        {/* User Presence Badge & Sign Out Button (Top-Right Corner) */}
+        <div className="shrink-0 flex items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface border border-border text-xs font-mono text-fg-muted shadow-sm select-none">
+            <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+            <span>Presence: Active</span>
+          </span>
           <UserSignOutButton />
         </div>
       </div>

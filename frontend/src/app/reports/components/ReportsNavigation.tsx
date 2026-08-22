@@ -1,6 +1,6 @@
 'use client';
 
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, BarChart3, FileSpreadsheet, Wrench } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 export type ReportsTab = 'analytics' | 'library' | 'builder';
 
@@ -14,19 +14,19 @@ export function ReportsNavigation({ activeTab, onTabChange }: Props) {
     {
       id: 'analytics' as ReportsTab,
       label: 'Live Analytics & BI',
-      icon: '📊',
+      Icon: BarChart3,
       badge: 'Real-Time Insights',
     },
     {
       id: 'library' as ReportsTab,
       label: 'Reports Library',
-      icon: '📑',
+      Icon: FileSpreadsheet,
       badge: '4 Templates',
     },
     {
       id: 'builder' as ReportsTab,
       label: 'Report Builder & Editor',
-      icon: '🛠️',
+      Icon: Wrench,
       badge: 'Interactive Canvas',
     },
   ];
@@ -52,31 +52,37 @@ export function ReportsNavigation({ activeTab, onTabChange }: Props) {
       </div>
 
       {/* ── Bottom Row: Excel-Style Navigation Tabs ───────────────────── */}
-      <div className="flex items-center gap-1 overflow-x-auto border-t border-border/40 pt-1">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => onTabChange(t.id)}
-            className={`flex items-center gap-2 px-5 py-3 text-xs font-bold transition-all relative select-none border-b-2
-              ${
-                activeTab === t.id
-                  ? 'text-primary border-primary bg-primary-subtle'
-                  : 'text-fg-subtle hover:text-fg border-transparent hover:bg-background/30'
-              }`}
-          >
-            <span className="text-sm">{t.icon}</span>
-            <span>{t.label}</span>
-            <span
-              className={`text-micro px-2 py-0.5 rounded-full font-bold ${
-                activeTab === t.id
-                  ? 'bg-primary/20 text-primary border border-primary/40'
-                  : 'bg-surface text-fg-subtle'
-              }`}
+      <div className="flex items-center gap-1 overflow-x-auto border-t border-border/40 pt-1 no-scrollbar">
+        {tabs.map((t) => {
+          const IconComponent = t.Icon;
+          const isActive = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => onTabChange(t.id)}
+              className={`flex items-center gap-2 px-5 py-3 text-xs font-bold transition-all relative select-none border-b-2 cursor-pointer
+                ${
+                  isActive
+                    ? 'text-primary border-primary bg-primary-subtle'
+                    : 'text-fg-subtle hover:text-fg border-transparent hover:bg-background/20'
+                }`}
             >
-              {t.badge}
-            </span>
-          </button>
-        ))}
+              <IconComponent size={15} strokeWidth={isActive ? 2.25 : 1.75} className={isActive ? 'text-primary' : 'text-fg-subtle'} />
+              <span>{t.label}</span>
+              {t.badge && (
+                <span
+                  className={`text-micro px-1.5 py-0.5 rounded font-mono hidden sm:inline ${
+                    isActive
+                      ? 'bg-primary/20 text-primary font-bold'
+                      : 'bg-surface text-fg-subtle border border-border-strong'
+                  }`}
+                >
+                  {t.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
     </header>
   );
