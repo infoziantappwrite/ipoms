@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { InfoziantMark } from '@/components/InfoziantMark';
+import GradientWaves from '@/components/effects/GradientWaves/GradientWaves';
 import { PasswordChecklist } from '@/components/auth/PasswordChecklist';
 import {
   AlertTriangle, CheckCircle2, LockKeyhole, LogIn, PenLine,
@@ -90,7 +91,8 @@ export default function LoginPage() {
       const res = await fetch(`${API}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: addr, password }),
+        credentials: 'include',
+        body: JSON.stringify({ email: addr, password, remember_me: rememberMe }),
       });
       const data = await res.json();
 
@@ -272,8 +274,33 @@ export default function LoginPage() {
     : 'Set New Password';
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4 sm:p-6 lg:p-8">
-      <div className="w-full max-w-xl bg-white border border-border rounded-3xl shadow-4 p-8 sm:p-10 space-y-6">
+    <div className="min-h-screen bg-background relative flex items-center justify-center p-4 sm:p-6 lg:p-8 overflow-hidden">
+      <div className="absolute inset-0 z-0">
+        <GradientWaves
+          horizonColor="#7edbee"
+          waveColor="#a1bcc1"
+          crestColor="#90e0ed"
+          speed={0.4}
+          amplitude={2.45}
+          waveScale={0.6}
+          waveRatio={1.15}
+          swell={37}
+          turbulence={20.5}
+          tilt={1.05}
+          zoom={0.75}
+          height={5.6}
+          fogDepth={17}
+          detail="medium"
+          brightness={1.05}
+          opacity={1}
+          grain
+          grainIntensity={0.05}
+          mouseInteraction
+          parallaxStrength={0.37}
+        />
+      </div>
+
+      <div className="relative z-10 w-full max-w-xl bg-white border border-border rounded-3xl shadow-4 p-8 sm:p-10 space-y-6">
 
         <div className="text-center space-y-2">
           <div className="inline-flex items-center justify-center">
@@ -621,7 +648,7 @@ export default function LoginPage() {
               className="w-full py-3.5 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white rounded-xl font-bold shadow-2 transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-[0.99]"
             >
               <KeyRound size={16} strokeWidth={2} />
-              <span>{loading ? 'Saving & Authenticating…' : 'Save & Sign In →'}</span>
+              <span>{loading ? 'Saving & Authenticating…' : 'Save & Sign In'}</span>
             </button>
 
             <div className="text-center pt-1">

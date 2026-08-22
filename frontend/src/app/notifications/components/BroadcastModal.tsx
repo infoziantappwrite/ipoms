@@ -239,9 +239,9 @@ export function BroadcastModal({ onClose, onSuccess }: Props) {
             type="submit"
             form="broadcast-form"
             disabled={loading}
-            className="px-5 py-2 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-[4px_4px_10px_rgba(37,99,235,0.35),-2px_-2px_6px_#ffffff] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.3)] transition-all flex items-center justify-center cursor-pointer"
           >
-            {loading ? 'Broadcasting…' : 'Dispatch Broadcast →'}
+            {loading ? 'Broadcasting…' : 'Dispatch Broadcast'}
           </button>
         </div>
 

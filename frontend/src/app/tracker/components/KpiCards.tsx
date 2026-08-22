@@ -18,11 +18,16 @@ interface Props {
   kpi: KpiData;
 }
 
-// ── Individual KPI Card
+// ── Individual Compact KPI Card (Slim Profile)
 function KpiCard({
-  label, value, color, Icon, ring,
+  label, value, textColor, bgLight, borderCol, Icon,
 }: {
-  label: string; value: number; color: string; Icon: LucideIcon; ring: string;
+  label: string;
+  value: number;
+  textColor: string;
+  bgLight: string;
+  borderCol: string;
+  Icon: LucideIcon;
 }) {
   const prevRef = useRef(value);
   const [bump, setBump] = useState(false);
@@ -38,67 +43,80 @@ function KpiCard({
 
   return (
     <div
-      className={`glass-card rounded-xl p-4 flex flex-col gap-1 border ${ring}
-                  transition-all duration-300 ${bump ? 'scale-105' : 'scale-100'}`}
+      className={`flex-1 min-w-0 bg-white border ${borderCol} rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2 shadow-2xs transition-all duration-200 ${
+        bump ? 'scale-102 ring-2 ring-primary/20' : 'scale-100'
+      }`}
     >
-      <div className="flex items-center justify-between">
-        <Icon size={17} strokeWidth={2} className={color} aria-hidden />
-        <span className={`text-2xl font-bold ${color} tabular-nums`}>{value}</span>
+      <div className="flex items-center gap-1.5 min-w-0">
+        <div className={`w-5 h-5 rounded-md ${bgLight} flex items-center justify-center shrink-0`}>
+          <Icon size={12} strokeWidth={2.5} className={textColor} aria-hidden />
+        </div>
+        <span className="text-micro font-semibold text-slate-600 truncate">
+          {label}
+        </span>
       </div>
-      <p className="text-xs text-fg-subtle font-medium mt-1">{label}</p>
+      <span className={`text-xs font-bold font-mono tabular-nums ${textColor} shrink-0`}>
+        {value}
+      </span>
     </div>
   );
 }
 
-// ── KpiCards Component
+// ── KpiCards Component (Single Row Compact)
 export function KpiCards({ kpi }: Props) {
   const cards = [
     {
       label: 'Completed',
       value: kpi.completed,
-      color: 'text-success',
-      ring: 'border-success/20 hover:border-success/40',
+      textColor: 'text-emerald-700',
+      bgLight: 'bg-emerald-50',
+      borderCol: 'border-emerald-200/80 hover:border-emerald-300',
       Icon: CheckCircle2,
     },
     {
       label: 'Pending',
       value: kpi.pending,
-      color: 'text-warning',
-      ring: 'border-warning/20 hover:border-warning/40',
+      textColor: 'text-amber-700',
+      bgLight: 'bg-amber-50',
+      borderCol: 'border-amber-200/80 hover:border-amber-300',
       Icon: Clock,
     },
     {
       label: 'Positive',
       value: kpi.positive,
-      color: 'text-primary',
-      ring: 'border-primary/20 hover:border-primary/40',
+      textColor: 'text-blue-700',
+      bgLight: 'bg-blue-50',
+      borderCol: 'border-blue-200/80 hover:border-blue-300',
       Icon: Target,
     },
     {
       label: 'No Response',
       value: kpi.no_response,
-      color: 'text-destructive',
-      ring: 'border-destructive/20 hover:border-destructive/40',
+      textColor: 'text-rose-700',
+      bgLight: 'bg-rose-50',
+      borderCol: 'border-rose-200/80 hover:border-rose-300',
       Icon: PhoneOff,
     },
     {
       label: 'Follow Up',
       value: kpi.follow_up,
-      color: 'text-warning',
-      ring: 'border-warning/20 hover:border-warning/40',
+      textColor: 'text-indigo-700',
+      bgLight: 'bg-indigo-50',
+      borderCol: 'border-indigo-200/80 hover:border-indigo-300',
       Icon: Repeat,
     },
     {
       label: 'Skipped',
       value: kpi.skipped,
-      color: 'text-fg-subtle',
-      ring: 'border-border-strong/30 hover:border-border-strong/40',
+      textColor: 'text-slate-600',
+      bgLight: 'bg-slate-100',
+      borderCol: 'border-slate-200 hover:border-slate-300',
       Icon: SkipForward,
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 w-full">
       {cards.map((card) => (
         <KpiCard key={card.label} {...card} />
       ))}

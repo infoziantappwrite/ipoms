@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Plus, Pencil, X, Building2 } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -110,12 +111,16 @@ export function ContactEditModal({
 
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border pb-3">
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <span>{isEditing ? '✏️' : '➕'}</span>
+          <h3 className="text-sm font-bold text-fg flex items-center gap-2">
+            {isEditing ? (
+              <Pencil size={16} strokeWidth={2} className="text-primary" aria-hidden />
+            ) : (
+              <Plus size={16} strokeWidth={2} className="text-primary" aria-hidden />
+            )}
             {isEditing ? 'Edit Company & HR Contact' : 'Add New Company & HR Contact'}
           </h3>
-          <button onClick={onClose} className="text-fg-subtle hover:text-white text-base">
-            ✕
+          <button onClick={onClose} aria-label="Close" className="text-fg-subtle hover:text-fg transition-colors">
+            <X size={16} strokeWidth={2} />
           </button>
         </div>
 
@@ -239,9 +244,13 @@ export function ContactEditModal({
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 bg-primary hover:bg-primary text-white rounded-xl font-bold shadow-2 transition-colors"
+              className="px-5 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl font-bold shadow-2 transition-colors flex items-center gap-1.5"
             >
-              {loading ? 'Saving…' : isEditing ? 'Save Changes' : 'Create Contact 🏢'}
+              {loading ? 'Saving…' : isEditing ? 'Save Changes' : (
+                <>
+                  Create Contact <Building2 size={14} strokeWidth={2} aria-hidden />
+                </>
+              )}
             </button>
           </div>
 

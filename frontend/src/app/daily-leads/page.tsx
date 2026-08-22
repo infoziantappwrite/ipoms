@@ -36,10 +36,18 @@ export default function DailyLeadsPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [coordinatorId, setCoordinatorId] = useState<string>('');
 
+  // Multi-Selection State for Bulk Deletion
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
   useEffect(() => {
     const user = readSessionUser();
     if (user?._id) setCoordinatorId(user._id);
   }, []);
+
+  // Clear selection whenever filters or tab change
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [selectedDate, selectedCollegeId, activeTab, searchQuery]);
 
   // ── Load Last Active Tab from localStorage on mount (Spec Section 6.4)
   useEffect(() => {
@@ -55,6 +63,7 @@ export default function DailyLeadsPage() {
 
   const handleTabChange = (tab: 'positive' | 'jd_received') => {
     setActiveTab(tab);
+    setSelectedIds([]);
     try {
       localStorage.setItem('ipoms_daily_leads_active_tab', tab);
     } catch {
@@ -135,18 +144,65 @@ export default function DailyLeadsPage() {
     }
   };
 
-  // ── Delete Row (Soft Delete)
+  // ── Delete Single Row (Soft Delete)
   const handleDeleteRow = async (rowId: string) => {
     try {
       const res = await apiFetch(`/daily-leads/${rowId}`, {
         method: 'DELETE',
       });
       if (res.success) {
+        setSelectedIds((prev) => prev.filter((id) => id !== rowId));
         await loadLeads();
         await loadSummary();
       }
     } catch (err) {
       console.error('Failed to delete lead:', err);
+    }
+  };
+
+  // ── Multi-Select Handlers
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedIds.length === leads.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(leads.map((l) => l._id));
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedIds([]);
+  };
+
+  // ── Bulk Delete Selected Rows
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    if (
+      !confirm(
+        `Are you sure you want to move ${selectedIds.length} selected ${
+          selectedIds.length === 1 ? 'entry' : 'entries'
+        } to Recycle Bin?`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await Promise.all(
+        selectedIds.map((id) =>
+          apiFetch(`/daily-leads/${id}`, { method: 'DELETE' })
+        )
+      );
+      setSelectedIds([]);
+      await loadLeads();
+      await loadSummary();
+    } catch (err) {
+      console.error('Failed to bulk delete leads:', err);
     }
   };
 
@@ -231,10 +287,15 @@ export default function DailyLeadsPage() {
 
       {/* ── Table Workspace ───────────────────────────────────────────────── */}
       <div className="flex-1 px-6 py-4">
-        <div className="rounded-xl border border-border bg-background/30 overflow-hidden shadow-3">
+        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
           <LeadsTable
             rows={leads}
             activeTab={activeTab}
+            selectedIds={selectedIds}
+            onToggleSelect={handleToggleSelect}
+            onToggleSelectAll={handleToggleSelectAll}
+            onClearSelection={handleClearSelection}
+            onBulkDelete={handleBulkDelete}
             onUpdateRow={handleUpdateRow}
             onMoveToJd={handleMoveToJd}
             onDeleteRow={handleDeleteRow}

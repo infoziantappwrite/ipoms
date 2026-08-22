@@ -1,17 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, ChevronLeft, ChevronRight } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
+import { CollegeSelector, College } from '@/components/CollegeSelector';
 import { apiFetch } from '@/lib/api';
-
-interface College {
-  _id: string;
-  college_name: string;
-  college_code: string;
-  location?: string;
-  logo_url?: string;
-}
 
 interface Props {
   selectedCollegeId: string;
@@ -20,7 +13,7 @@ interface Props {
   onWeekChange: (offset: number) => void;
 }
 
-// Format Friday-to-Friday week display: e.g. "Week 30: 18 Jul 2026 – 24 Jul 2026"
+// Calculate Month-wise Friday-to-Friday week display (e.g., "August 2026 • Week 3: 21 Aug 2026 – 27 Aug 2026")
 function formatWeekDisplay(offset: number) {
   const d = new Date();
   d.setDate(d.getDate() + offset * 7);
@@ -33,16 +26,28 @@ function formatWeekDisplay(offset: number) {
   const endThursday = new Date(startFriday);
   endThursday.setDate(startFriday.getDate() + 6);
 
-  const startOfYear = new Date(d.getFullYear(), 0, 1);
-  const pastDaysOfYear = (d.getTime() - startOfYear.getTime()) / 86400000;
-  const weekNumber = Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
+  // Monthly Week Calculation: Count how many Fridays occurred in this month up to startFriday
+  let fridayCount = 0;
+  const cur = new Date(startFriday.getFullYear(), startFriday.getMonth(), 1);
+  while (cur <= startFriday) {
+    if (cur.getDay() === 5) {
+      fridayCount++;
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+  const monthlyWeekNumber = fridayCount > 0 ? fridayCount : 1;
+
+  const monthName = startFriday.toLocaleDateString('en-IN', { month: 'long' });
+  const year = startFriday.getFullYear();
 
   const opt: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' };
   const startStr = startFriday.toLocaleDateString('en-IN', opt);
   const endStr = endThursday.toLocaleDateString('en-IN', opt);
 
   return {
-    weekNumber,
+    monthlyWeekNumber,
+    monthName,
+    year,
     rangeStr: `${startStr} – ${endStr}`,
     isCurrent: offset === 0,
   };
@@ -54,34 +59,36 @@ export function WeeklyHeader({
   weekOffset,
   onWeekChange,
 }: Props) {
-  const [colleges, setColleges] = useState<College[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [selectedCollegeObj, setSelectedCollegeObj] = useState<College | null>(null);
 
   useEffect(() => {
-    apiFetch('/colleges')
-      .then((data) => {
-        if (data.success && Array.isArray((data.data as any)?.colleges)) {
-          setColleges((data.data as any).colleges);
-        }
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+    if (!selectedCollegeId) {
+      setSelectedCollegeObj(null);
+      return;
+    }
+    apiFetch('/colleges').then((data) => {
+      if (data.success && Array.isArray((data.data as any)?.colleges)) {
+        const found = (data.data as any).colleges.find((c: College) => c._id === selectedCollegeId);
+        if (found) setSelectedCollegeObj(found);
+      }
+    }).catch(console.error);
+  }, [selectedCollegeId]);
 
-  const selectedCollege = colleges.find((c) => c._id === selectedCollegeId);
   const weekInfo = formatWeekDisplay(weekOffset);
 
   return (
-    <header className="glass-panel border-b border-border px-6 py-4 space-y-3">
+    <header className="bg-white border-b border-slate-200 px-6 py-4 space-y-3 shadow-xs">
       {/* ── Top Row: Title & Top-Right Sign Out ────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-fg tracking-tight flex items-center gap-2">
-              <BarChart3 size={18} strokeWidth={2} className="text-primary" />
-              <span>Weekly Tracker</span>
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-primary">
+              <BarChart3 size={18} strokeWidth={2.5} />
+            </div>
+            <h1 className="text-base font-bold text-slate-900 tracking-tight">
+              Weekly Tracker
             </h1>
-            <span className="text-xs bg-primary/20 text-primary border border-primary/30 px-2.5 py-0.5 rounded-full font-semibold">
+            <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full font-semibold">
               2026 Season
             </span>
           </div>
@@ -89,21 +96,21 @@ export function WeeklyHeader({
 
         {/* Pin Selected College Logo & Sign Out to Absolute Top Right */}
         <div className="flex items-center gap-3 shrink-0">
-          {selectedCollege && (
+          {selectedCollegeObj && (
             <div
-              title={`${selectedCollege.college_name} (${selectedCollege.college_code})`}
-              className="flex items-center justify-center bg-surface/90 border border-border/80 p-1 rounded-xl shadow-sm animate-fadeIn"
+              title={`${selectedCollegeObj.college_name} (${selectedCollegeObj.college_code})`}
+              className="flex items-center justify-center bg-white border border-slate-200 px-2.5 py-1 rounded-xl shadow-xs h-9 max-w-[160px] shrink-0"
             >
-              {selectedCollege.logo_url ? (
+              {selectedCollegeObj.logo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={selectedCollege.logo_url}
-                  alt={selectedCollege.college_name}
-                  className="w-8 h-8 object-contain rounded-lg bg-white/95 p-0.5 shadow-sm border border-border/50"
+                  src={selectedCollegeObj.logo_url}
+                  alt={selectedCollegeObj.college_name}
+                  className="max-h-7 max-w-full w-auto h-auto object-contain rounded"
                 />
               ) : (
-                <span className="w-8 h-8 rounded-lg bg-primary/20 text-primary font-bold text-xs flex items-center justify-center font-mono">
-                  {selectedCollege.college_code?.slice(0, 2) || 'CL'}
+                <span className="w-7 h-7 rounded-lg bg-blue-100 text-primary font-bold text-xs flex items-center justify-center font-mono">
+                  {selectedCollegeObj.college_code?.slice(0, 2) || 'CL'}
                 </span>
               )}
             </div>
@@ -115,68 +122,67 @@ export function WeeklyHeader({
         </div>
       </div>
 
-      {/* ── Bottom Controls Row: Friday-to-Friday Week Selector & College Filter ── */}
-      <div className="flex items-center justify-between gap-4 flex-wrap pt-2 border-t border-border/40">
-        {/* Friday-to-Friday Week Selector */}
-        <div className="flex items-center gap-2 bg-background border border-border rounded-xl px-3 py-1.5 shadow-inner">
+      {/* ── Bottom Controls Row: Monthly-wise Week Selector & College Filter ── */}
+      <div className="flex items-center justify-between gap-4 flex-wrap pt-2 border-t border-slate-100">
+        
+        {/* Month-wise Friday-to-Friday Week Selector */}
+        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-xs">
           <button
             onClick={() => onWeekChange(weekOffset - 1)}
-            className="p-1 text-fg-subtle hover:text-white hover:bg-surface rounded-lg transition-colors"
+            className="w-7 h-7 text-slate-500 hover:text-slate-900 hover:bg-slate-200/70 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
             title="Previous Week"
           >
-            ◀
+            <ChevronLeft size={16} strokeWidth={2.5} />
           </button>
 
-          <div className="text-center px-3">
-            <div className="text-xs font-bold text-fg">
-              Week {weekInfo.weekNumber}
+          <div className="text-center px-2">
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-xs font-bold text-slate-800">
+                {weekInfo.monthName} {weekInfo.year}
+              </span>
+              <span className="text-xs font-bold text-blue-700 bg-blue-100/80 border border-blue-300 px-2 py-0.5 rounded-full">
+                Week {weekInfo.monthlyWeekNumber}
+              </span>
               {weekInfo.isCurrent && (
-                <span className="ml-1.5 text-micro bg-success/20 text-success border border-success/30 px-1.5 py-0.2 rounded font-normal">
+                <span className="text-micro bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded-md font-semibold">
                   Current
                 </span>
               )}
             </div>
-            <div className="text-micro text-fg-subtle font-mono">{weekInfo.rangeStr}</div>
+            <div className="text-micro text-slate-500 font-mono mt-0.5">
+              {weekInfo.rangeStr}
+            </div>
           </div>
 
           <button
             onClick={() => onWeekChange(weekOffset + 1)}
-            className="p-1 text-fg-subtle hover:text-white hover:bg-surface rounded-lg transition-colors"
+            className="w-7 h-7 text-slate-500 hover:text-slate-900 hover:bg-slate-200/70 rounded-lg flex items-center justify-center transition-colors cursor-pointer"
             title="Next Week"
           >
-            ▶
+            <ChevronRight size={16} strokeWidth={2.5} />
           </button>
 
           {weekOffset !== 0 && (
             <button
               onClick={() => onWeekChange(0)}
-              className="text-micro bg-surface hover:bg-surface-raised text-fg-muted px-2 py-1 rounded ml-1 transition-colors"
+              className="text-micro bg-white hover:bg-slate-100 text-slate-700 font-semibold px-2 py-1 rounded-lg ml-1 transition-colors cursor-pointer border border-slate-300 shadow-xs"
             >
-              Today
+              Current
             </button>
           )}
         </div>
 
-        {/* College Selector */}
-        <div className="flex items-center gap-2.5">
-          <span className="text-xs text-fg-subtle font-medium">College:</span>
-          <select
-            value={selectedCollegeId}
-            onChange={(e) => {
-              const col = colleges.find((c) => c._id === e.target.value);
-              if (col) onSelectCollege(col._id, col.college_name);
-            }}
-            disabled={loading}
-            className="bg-surface border border-border-strong text-fg text-xs px-3.5 py-2 rounded-xl min-w-[220px] cursor-pointer"
-          >
-            <option value="">{loading ? 'Loading colleges…' : '— Select College —'}</option>
-            {colleges.map((c) => (
-              <option key={c._id} value={c._id}>
-                [{c.college_code}] {c.college_name}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Smart Auto-Shrinking College Selector */}
+        <CollegeSelector
+          selectedCollegeId={selectedCollegeId}
+          onSelect={(id, name) => {
+            onSelectCollege(id, name);
+          }}
+          onSelectCollege={(col) => {
+            setSelectedCollegeObj(col);
+          }}
+          align="right"
+        />
       </div>
     </header>
   );

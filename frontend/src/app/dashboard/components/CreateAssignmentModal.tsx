@@ -222,9 +222,9 @@ export function CreateAssignmentModal({ onClose, onSuccess }: Props) {
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 bg-primary hover:bg-primary text-white rounded-xl font-bold shadow-2 transition-colors"
+              className="px-5 py-2 bg-primary hover:bg-blue-700 text-white rounded-xl font-bold shadow-xs transition-colors cursor-pointer"
             >
-              {loading ? 'Dispatching…' : 'Dispatch Assignment →'}
+              {loading ? 'Dispatching…' : 'Dispatch Assignment'}
             </button>
           </div>
 

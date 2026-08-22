@@ -76,7 +76,6 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onSkip }: Props) {
       {!isReadOnly && (
         <div className="sticky bottom-0 bg-background/90 border-t border-border px-4 py-1.5
                         flex items-center gap-4 text-xs text-fg-muted">
-          <span><kbd className="bg-surface px-1 py-0.5 rounded text-fg-subtle">Space</kbd> Fill Start Time</span>
           <span><kbd className="bg-surface px-1 py-0.5 rounded text-fg-subtle">Tab</kbd> Next cell</span>
           <span><kbd className="bg-surface px-1 py-0.5 rounded text-fg-subtle">Enter</kbd> Save row</span>
           <span><kbd className="bg-surface px-1 py-0.5 rounded text-fg-subtle">Ctrl+S</kbd> Save all</span>

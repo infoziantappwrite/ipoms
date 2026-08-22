@@ -200,7 +200,7 @@ export function NotificationBellDropdown({ userId = '6a84719afa3bf51271bc1548' }
                         onClick={() => setIsOpen(false)}
                         className="text-micro text-primary hover:underline font-semibold ml-auto"
                       >
-                        View Details →
+                        View Details
                       </Link>
                     )}
                   </div>
@@ -216,7 +216,7 @@ export function NotificationBellDropdown({ userId = '6a84719afa3bf51271bc1548' }
               onClick={() => setIsOpen(false)}
               className="text-xs text-fg-muted hover:text-primary font-bold block"
             >
-              Open Full Notifications Center →
+              Open Full Notifications Center
             </Link>
           </div>
         </div>

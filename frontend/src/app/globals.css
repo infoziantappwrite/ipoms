@@ -360,3 +360,79 @@ textarea:focus-visible,
   border-radius: 9999px;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRINT STYLES — A4 ORIENTATION FOR NATIVE REPORT CANVAS
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm;
+  }
+
+  /* Hide entire application chrome, sidebars, headers, floating toolbars, and buttons */
+  html, body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  aside,
+  nav,
+  header,
+  footer,
+  .print\:hidden,
+  [role="navigation"],
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Reset main app layout wrappers */
+  .min-h-screen,
+  main,
+  #main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    display: block !important;
+  }
+
+  /* Report Canvas takes exact 100% A4 printable area */
+  .printable-report-canvas {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+
+  /* Editable input fields render as clean plain text during print */
+  .printable-report-canvas input,
+  .printable-report-canvas textarea {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    color: inherit !important;
+    font-size: inherit !important;
+    font-weight: inherit !important;
+    outline: none !important;
+    resize: none !important;
+  }
+
+  /* Avoid awkward page cuts inside rows or sections */
+  tr,
+  .avoid-break {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
+

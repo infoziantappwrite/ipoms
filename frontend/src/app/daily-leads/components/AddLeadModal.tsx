@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { ClipboardList, Plus, Sparkles, Zap, X } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
+const BATCH_YEARS = ['2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030', '2031', '2032'];
+
 interface College {
   _id: string;
   college_name: string;
@@ -32,7 +34,8 @@ export function AddLeadModal({
   const [companyName, setCompanyName] = useState('');
   const [jobRole, setJobRole] = useState('Graduate Trainee');
   const [ctc, setCtc] = useState('');
-  const [eligibleBatch, setEligibleBatch] = useState('2026 Batch');
+  const [ctcUnit, setCtcUnit] = useState<'LPA' | '/ Month'>('LPA');
+  const [eligibleBatch, setEligibleBatch] = useState('2026');
   const [eventTime, setEventTime] = useState(() =>
     new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
   );
@@ -55,13 +58,10 @@ export function AddLeadModal({
         if (data.success && Array.isArray((data.data as any)?.colleges)) {
           const list = (data.data as any).colleges;
           setColleges(list);
-          if (!collegeId && list.length > 0) {
-            setCollegeId(list[0]._id);
-          }
         }
       })
       .catch(console.error);
-  }, [collegeId]);
+  }, []);
 
   // Fetch Daily Tracker positives for Copy Shortcut
   const handleOpenDtDrawer = () => {
@@ -93,9 +93,15 @@ export function AddLeadModal({
       return;
     }
     if (!collegeId) {
-      alert('Please select a college');
+      alert('Please select a college to proceed.');
       return;
     }
+
+    const formattedCtc = ctc.trim()
+      ? (ctc.includes('LPA') || ctc.toLowerCase().includes('month')
+          ? ctc.trim()
+          : `${ctc.trim()} ${ctcUnit}`)
+      : '';
 
     setLoading(true);
     try {
@@ -108,7 +114,7 @@ export function AddLeadModal({
           daily_tracker_id: dailyTrackerId,
           company_name: companyName.trim(),
           job_role: jobRole.trim(),
-          ctc: ctc.trim(),
+          ctc: formattedCtc,
           eligible_batch: eligibleBatch.trim(),
           event_time: eventTime.trim(),
           lead_date: leadDate,
@@ -130,83 +136,88 @@ export function AddLeadModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4">
-      <div className="bg-white rounded-2xl w-full max-w-lg border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fadeIn">
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 animate-fadeIn">
+      {/* Modern Flat 2.0 Clean Modal Card */}
+      <div className="w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
-        {/* ── Fixed Modal Header ────────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/90 shrink-0">
-          <div>
-            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Plus size={16} strokeWidth={2.5} className="text-primary" />
-              <span>Add Daily Opportunity Entry</span>
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Log phone, email, WhatsApp, or TPO opportunity
-            </p>
+        {/* ── Modern Flat Header ─────────────────────────────────────────── */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/75 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-primary border border-blue-200 flex items-center justify-center">
+              <Plus size={18} strokeWidth={2.5} />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+                Add Daily Opportunity Entry
+              </h2>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                Log phone, email, WhatsApp, or TPO opportunity
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 p-1.5 rounded-lg transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 flex items-center justify-center transition-colors cursor-pointer"
             title="Close"
           >
-            <X size={16} />
+            <X size={16} strokeWidth={2} />
           </button>
         </div>
 
-        {/* ── Scrollable Form Body (Invisible scrollbar) ───────────────── */}
-        <form id="add-lead-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 text-xs no-scrollbar">
+        {/* ── Modern Flat Form Body (Clean flat inputs) ──────────────────── */}
+        <form id="add-lead-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 text-xs no-scrollbar bg-white">
 
-          {/* Type Selector: Positives vs JD Received (Spec Section 11) */}
+          {/* Type Selector: Positives vs JD Received */}
           <div>
             <label className="block text-slate-700 font-semibold mb-1.5">Register Target</label>
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setLeadType('positive')}
-                className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer
+                className={`py-2.5 px-3.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer
                             ${
                               leadType === 'positive'
-                                ? 'bg-emerald-50 border-emerald-500 text-emerald-800 shadow-xs ring-1 ring-emerald-400/30'
-                                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                                ? 'bg-emerald-50 border-emerald-400 text-emerald-800'
+                                : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'
                             }`}
               >
-                <Sparkles size={14} strokeWidth={2} className={leadType === 'positive' ? 'text-emerald-600' : 'text-slate-400'} />
-                <span>Tab 1: Positive Lead</span>
+                <Sparkles size={14} strokeWidth={2.5} className={leadType === 'positive' ? 'text-emerald-600' : 'text-slate-400'} />
+                <span>Positive Lead</span>
               </button>
               <button
                 type="button"
                 onClick={() => setLeadType('jd_received')}
-                className={`py-2 px-3 rounded-xl border text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer
+                className={`py-2.5 px-3.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer
                             ${
                               leadType === 'jd_received'
-                                ? 'bg-blue-50 border-blue-500 text-blue-800 shadow-xs ring-1 ring-blue-400/30'
-                                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                                ? 'bg-blue-50 border-blue-400 text-blue-800'
+                                : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'
                             }`}
               >
-                <ClipboardList size={14} strokeWidth={2} className={leadType === 'jd_received' ? 'text-blue-600' : 'text-slate-400'} />
-                <span>Tab 2: JD Received</span>
+                <ClipboardList size={14} strokeWidth={2.5} className={leadType === 'jd_received' ? 'text-blue-600' : 'text-slate-400'} />
+                <span>JD Received</span>
               </button>
             </div>
           </div>
 
-          {/* Copy Shortcut Header Button (Spec Section 11) */}
-          <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl p-2.5">
-            <span className="text-micro text-slate-600">
+          {/* Copy Shortcut Header Button */}
+          <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl p-3">
+            <span className="text-micro text-slate-600 font-medium">
               Have you already logged this call in Daily Tracker?
             </span>
             <button
               type="button"
               onClick={handleOpenDtDrawer}
-              className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg text-micro font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+              className="bg-white hover:bg-blue-50 text-primary border border-blue-200 px-3 py-1.5 rounded-lg text-micro font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              <Zap size={13} strokeWidth={2} />
+              <Zap size={13} strokeWidth={2.5} />
               <span>Copy from Daily Tracker</span>
             </button>
           </div>
 
           {/* Drawer for Copy shortcut */}
           {showDtDrawer && (
-            <div className="bg-slate-50 border border-blue-200 rounded-xl p-3 space-y-2">
+            <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-3.5 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-blue-900 text-micro">Select Positive Call from Daily Tracker</span>
                 <button
@@ -222,20 +233,20 @@ export function AddLeadModal({
               ) : dtPositives.length === 0 ? (
                 <p className="text-slate-500 italic py-2">No positive calls found in Daily Tracker for {leadDate}.</p>
               ) : (
-                <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 no-scrollbar">
+                <div className="max-h-36 overflow-y-auto space-y-2 pr-1 no-scrollbar">
                   {dtPositives.map((p) => (
                     <div
                       key={p._id}
                       onClick={() => handleSelectDtPositive(p)}
-                      className="p-2 bg-white hover:bg-blue-50/70 border border-slate-200 rounded-lg cursor-pointer flex items-center justify-between transition-colors shadow-xs"
+                      className="p-2.5 bg-white hover:bg-blue-50 border border-slate-200 rounded-xl cursor-pointer flex items-center justify-between transition-colors shadow-xs"
                     >
                       <div>
-                        <p className="font-semibold text-slate-900">{p.company_name}</p>
+                        <p className="font-bold text-slate-800">{p.company_name}</p>
                         <p className="text-micro text-slate-500">
                           {p.college_id?.college_name || 'College'} • {p.contact_person_name}
                         </p>
                       </div>
-                      <span className="text-micro bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-medium">
+                      <span className="text-micro bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-bold">
                         {p.outcome_status}
                       </span>
                     </div>
@@ -247,7 +258,7 @@ export function AddLeadModal({
 
           {/* Company Name */}
           <div>
-            <label className="block text-slate-700 font-semibold mb-1">
+            <label className="block text-slate-700 font-semibold mb-1.5">
               Company Name <span className="text-rose-500">*</span>
             </label>
             <input
@@ -256,22 +267,25 @@ export function AddLeadModal({
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
               placeholder="e.g. TCS, Cognizant, Infosys…"
-              className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 placeholder:text-slate-400 text-xs transition-colors shadow-xs"
+              className="w-full bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder:text-slate-400 text-xs transition-all outline-none"
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {/* College */}
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">
+              <label className="block text-slate-700 font-semibold mb-1.5">
                 College <span className="text-rose-500">*</span>
               </label>
               <select
+                required
                 value={collegeId}
                 onChange={(e) => setCollegeId(e.target.value)}
-                className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 text-xs cursor-pointer shadow-xs"
+                className={`w-full bg-white border ${
+                  !collegeId ? 'border-amber-400' : 'border-slate-300'
+                } focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-slate-900 text-xs transition-all cursor-pointer outline-none font-medium`}
               >
-                <option value="">— Select College —</option>
+                <option value="">— Select College (Required) —</option>
                 {colleges.map((c) => (
                   <option key={c._id} value={c._id}>
                     [{c.college_code}] {c.college_name}
@@ -282,88 +296,118 @@ export function AddLeadModal({
 
             {/* Role Offered */}
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">Role Offered</label>
+              <label className="block text-slate-700 font-semibold mb-1.5">Role Offered</label>
               <input
                 type="text"
                 value={jobRole}
                 onChange={(e) => setJobRole(e.target.value)}
                 placeholder="e.g. Software Engineer"
-                className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 placeholder:text-slate-400 text-xs transition-colors shadow-xs"
+                className="w-full bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder:text-slate-400 text-xs transition-all outline-none"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {/* CTC */}
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">CTC Offered</label>
-              <input
-                type="text"
-                value={ctc}
-                onChange={(e) => setCtc(e.target.value)}
-                placeholder="e.g. 5.5 - 7.5 LPA"
-                className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 placeholder:text-slate-400 text-xs transition-colors shadow-xs"
-              />
+              <label className="block text-slate-700 font-semibold mb-1.5">CTC Offered</label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={ctc}
+                  onChange={(e) => setCtc(e.target.value)}
+                  placeholder={ctcUnit === 'LPA' ? 'e.g. 5 or 6.5' : 'e.g. 10,000 or 12k'}
+                  className="flex-1 min-w-0 bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder:text-slate-400 text-xs transition-all outline-none"
+                />
+                <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-300 shrink-0 gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setCtcUnit('LPA')}
+                    className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                      ctcUnit === 'LPA'
+                        ? 'bg-primary text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                    }`}
+                  >
+                    LPA
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCtcUnit('/ Month')}
+                    className={`px-2.5 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                      ctcUnit === '/ Month'
+                        ? 'bg-primary text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                    }`}
+                  >
+                    / Mo
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Eligible Batch */}
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">Eligible Batch</label>
-              <input
-                type="text"
+              <label className="block text-slate-700 font-semibold mb-1.5">Eligible Batch (Year)</label>
+              <select
                 value={eligibleBatch}
                 onChange={(e) => setEligibleBatch(e.target.value)}
-                placeholder="e.g. 2026 Batch"
-                className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 placeholder:text-slate-400 text-xs transition-colors shadow-xs"
-              />
+                className="w-full bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-slate-900 text-xs transition-all cursor-pointer outline-none font-medium"
+              >
+                {BATCH_YEARS.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Time (Separate from Date per Spec Section 10) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {/* Time */}
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">Time Logged</label>
+              <label className="block text-slate-700 font-semibold mb-1.5">Time Logged</label>
               <input
                 type="text"
                 value={eventTime}
                 onChange={(e) => setEventTime(e.target.value)}
                 placeholder="e.g. 10:30 AM"
-                className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 text-xs transition-colors shadow-xs"
+                className="w-full bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-slate-900 text-xs transition-all outline-none"
               />
             </div>
 
             {/* Date */}
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">Date</label>
+              <label className="block text-slate-700 font-semibold mb-1.5">Date</label>
               <input
                 type="date"
                 value={leadDate}
                 onChange={(e) => setLeadDate(e.target.value)}
-                className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 text-xs transition-colors shadow-xs"
+                className="w-full bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-slate-900 text-xs transition-all cursor-pointer outline-none"
               />
             </div>
           </div>
 
           {/* Remarks */}
           <div>
-            <label className="block text-slate-700 font-semibold mb-1">Remarks & Details</label>
+            <label className="block text-slate-700 font-semibold mb-1.5">Remarks & Details</label>
             <textarea
               rows={2}
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
               placeholder="e.g. Positive response from campus HR. Assessment planned for next week."
-              className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 placeholder:text-slate-400 text-xs transition-colors shadow-xs"
+              className="w-full bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-slate-900 placeholder:text-slate-400 text-xs transition-all outline-none"
             />
           </div>
 
         </form>
 
-        {/* ── Fixed Sticky Actions Footer ───────────────────────────────── */}
-        <div className="flex items-center justify-end gap-3 px-6 py-3.5 border-t border-slate-100 bg-slate-50/90 shrink-0">
+        {/* ── Modern Flat Sticky Footer ──────────────────────────────────── */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50/80 shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+            className="px-4 py-2.5 bg-white hover:bg-slate-100 text-slate-700 font-semibold rounded-xl text-xs border border-slate-300 transition-colors cursor-pointer shadow-xs"
           >
             Cancel
           </button>
@@ -371,9 +415,9 @@ export function AddLeadModal({
             type="submit"
             form="add-lead-form"
             disabled={loading}
-            className="px-5 py-2 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white rounded-xl text-xs font-semibold shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center cursor-pointer"
           >
-            {loading ? 'Saving…' : 'Save Entry →'}
+            {loading ? 'Saving…' : 'Save Entry'}
           </button>
         </div>
 

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Building2, Globe, Landmark, RefreshCw, TrendingUp, User } from 'lucide-react';
+import { Building2, Globe, Landmark, RefreshCw, TrendingUp, User, PhoneCall, Sparkles, FileText, CheckCircle2, Trophy } from 'lucide-react';
+import { CollegeSelector } from '@/components/CollegeSelector';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -67,79 +68,95 @@ export function AnalyticsView({ selectedCollegeId, onSelectCollege }: Props) {
   }, [loadAnalytics]);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-4">
 
       {/* Filter Row */}
-      <div className="flex items-center justify-between flex-wrap gap-4 bg-background/60 p-4 rounded-xl border border-border">
+      <div className="flex items-center justify-between flex-wrap gap-4 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
         <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold text-fg-muted">Target Institution:</span>
-          <select
-            value={selectedCollegeId}
-            onChange={(e) => onSelectCollege(e.target.value)}
-            className="bg-surface border border-border-strong text-fg text-xs px-3 py-1.5 rounded-lg cursor-pointer min-w-[220px]"
-          >
-            <option value="all"><Globe size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}All Partner Colleges (Consolidated)</option>
-            {colleges.map((c) => (
-              <option key={c._id} value={c._id}>
-                [{c.college_code}] {c.college_name}
-              </option>
-            ))}
-          </select>
+          <CollegeSelector
+            selectedCollegeId={selectedCollegeId}
+            allowAll={true}
+            allLabel="All Partner Colleges (Consolidated)"
+            label="Target Institution:"
+            onSelect={(id) => onSelectCollege(id)}
+          />
         </div>
 
         <button
           onClick={loadAnalytics}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-surface hover:bg-surface-raised text-fg-muted rounded-lg text-xs font-medium transition-colors"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#FEF3C7] hover:bg-[#FDE68A] text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
         >
           <RefreshCw size={14} strokeWidth={2} aria-hidden /> Refresh Live BI
         </button>
       </div>
 
-      {/* 6 Live KPI Cards */}
+      {/* 6 Live KPI Cards (Slim Single-Row Profile) */}
       {kpi && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 w-full">
           {/* Card 1: Total Calls */}
-          <div className="glass-card rounded-xl p-3.5 border border-border">
-            <p className="text-micro text-fg-subtle font-medium">Total Calls Logged</p>
-            <p className="text-xl font-bold text-primary mt-1 tabular-nums">{kpi.total_calls}</p>
-            <p className="text-micro text-fg-subtle mt-0.5">Daily Tracker Outreach</p>
+          <div className="bg-white border border-blue-200/80 rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div className="w-5 h-5 rounded-md bg-blue-50 flex items-center justify-center shrink-0">
+                <PhoneCall size={12} strokeWidth={2.5} className="text-blue-700" />
+              </div>
+              <span className="text-micro font-semibold text-slate-700 truncate">Total Calls</span>
+            </div>
+            <span className="text-xs font-bold font-mono text-blue-700 tabular-nums shrink-0">{kpi.total_calls}</span>
           </div>
 
           {/* Card 2: Positive Rate */}
-          <div className="glass-card rounded-xl p-3.5 border border-border">
-            <p className="text-micro text-fg-subtle font-medium">Positive Outreach</p>
-            <p className="text-xl font-bold text-success mt-1 tabular-nums">
-              {kpi.positive_rate_pct}%
-            </p>
-            <p className="text-micro text-success/80 mt-0.5">{kpi.positive_responses} Opportunities</p>
+          <div className="bg-white border border-emerald-200/80 rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div className="w-5 h-5 rounded-md bg-emerald-50 flex items-center justify-center shrink-0">
+                <Sparkles size={12} strokeWidth={2.5} className="text-emerald-700" />
+              </div>
+              <span className="text-micro font-semibold text-slate-700 truncate">Positive Rate</span>
+            </div>
+            <span className="text-xs font-bold font-mono text-emerald-700 tabular-nums shrink-0">{kpi.positive_rate_pct}%</span>
           </div>
 
           {/* Card 3: Companies Contacted */}
-          <div className="glass-card rounded-xl p-3.5 border border-border">
-            <p className="text-micro text-fg-subtle font-medium">Companies Contacted</p>
-            <p className="text-xl font-bold text-purple-400 mt-1 tabular-nums">{kpi.companies_contacted}</p>
-            <p className="text-micro text-purple-500/80 mt-0.5">Unique Corporate Leads</p>
+          <div className="bg-white border border-purple-200/80 rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div className="w-5 h-5 rounded-md bg-purple-50 flex items-center justify-center shrink-0">
+                <Building2 size={12} strokeWidth={2.5} className="text-purple-700" />
+              </div>
+              <span className="text-micro font-semibold text-slate-700 truncate">Companies</span>
+            </div>
+            <span className="text-xs font-bold font-mono text-purple-700 tabular-nums shrink-0">{kpi.companies_contacted}</span>
           </div>
 
           {/* Card 4: JDs Received */}
-          <div className="glass-card rounded-xl p-3.5 border border-border">
-            <p className="text-micro text-fg-subtle font-medium">JDs Received</p>
-            <p className="text-xl font-bold text-cyan-400 mt-1 tabular-nums">{kpi.jd_received}</p>
-            <p className="text-micro text-cyan-500/80 mt-0.5">Daily Leads Register</p>
+          <div className="bg-white border border-cyan-200/80 rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div className="w-5 h-5 rounded-md bg-cyan-50 flex items-center justify-center shrink-0">
+                <FileText size={12} strokeWidth={2.5} className="text-cyan-700" />
+              </div>
+              <span className="text-micro font-semibold text-slate-700 truncate">JDs Received</span>
+            </div>
+            <span className="text-xs font-bold font-mono text-cyan-700 tabular-nums shrink-0">{kpi.jd_received}</span>
           </div>
 
           {/* Card 5: Drives Completed */}
-          <div className="glass-card rounded-xl p-3.5 border border-border">
-            <p className="text-micro text-fg-subtle font-medium">Drives Completed</p>
-            <p className="text-xl font-bold text-warning mt-1 tabular-nums">{kpi.drives_completed}</p>
-            <p className="text-micro text-warning/80 mt-0.5">{kpi.drives_in_progress} In Progress</p>
+          <div className="bg-white border border-amber-200/80 rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div className="w-5 h-5 rounded-md bg-amber-50 flex items-center justify-center shrink-0">
+                <CheckCircle2 size={12} strokeWidth={2.5} className="text-amber-700" />
+              </div>
+              <span className="text-micro font-semibold text-slate-700 truncate">Completed</span>
+            </div>
+            <span className="text-xs font-bold font-mono text-amber-700 tabular-nums shrink-0">{kpi.drives_completed}</span>
           </div>
 
           {/* Card 6: Total Offers */}
-          <div className="glass-card rounded-xl p-3.5 border border-border">
-            <p className="text-micro text-fg-subtle font-medium">Total Student Offers</p>
-            <p className="text-xl font-bold text-success mt-1 tabular-nums">{kpi.total_offers}</p>
-            <p className="text-micro text-success/80 mt-0.5">2026 Batch Placements</p>
+          <div className="bg-white border border-emerald-200/80 rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2 shadow-2xs">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div className="w-5 h-5 rounded-md bg-emerald-50 flex items-center justify-center shrink-0">
+                <Trophy size={12} strokeWidth={2.5} className="text-emerald-700" />
+              </div>
+              <span className="text-micro font-semibold text-slate-700 truncate">Total Offers</span>
+            </div>
+            <span className="text-xs font-bold font-mono text-emerald-700 tabular-nums shrink-0">{kpi.total_offers}</span>
           </div>
         </div>
       )}

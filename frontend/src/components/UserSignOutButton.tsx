@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import { readSessionUser, type SessionUser } from '@/lib/session';
+import { apiFetch } from '@/lib/api';
 
 export function UserSignOutButton() {
   const router = useRouter();
@@ -14,9 +15,18 @@ export function UserSignOutButton() {
     setUser(readSessionUser());
   }, []);
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     if (isSigningOut) return;
     setIsSigningOut(true);
+
+    // Best-effort: clears the httpOnly "remember me" cookie server-side so
+    // this device can't silently refresh a new session after sign-out.
+    // Local storage is cleared regardless, even if this call fails.
+    try {
+      await apiFetch('/auth/logout', { method: 'POST' });
+    } catch {
+      /* network error — proceed with local sign-out anyway */
+    }
 
     try {
       if (typeof window !== 'undefined') {

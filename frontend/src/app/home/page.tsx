@@ -131,7 +131,6 @@ export default function ModuleLauncherPage() {
                 className="px-6 py-3 bg-primary hover:bg-primary text-white rounded-xl font-bold shadow-2 shadow-primary/20 transition-all text-xs flex items-center gap-2"
               >
                 <span>Launch Executive Dashboard</span>
-                <span>→</span>
               </Link>
               <Link
                 href="/tracker"
@@ -191,7 +190,7 @@ export default function ModuleLauncherPage() {
                     {m.badge}
                   </span>
                   <span className="text-fg-subtle group-hover:text-primary font-bold transition-colors">
-                    Open →
+                    Open Module
                   </span>
                 </div>
               </Link>

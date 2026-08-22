@@ -32,12 +32,55 @@ import { isPasswordValid, firstPasswordError } from './passwordPolicy';
  */
 
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'ipoms_dev_access_secret_super_secure_key_2026';
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'ipoms_dev_refresh_secret_super_secure_key_2026';
 
 /** Consecutive failures allowed. The next failure locks the account. */
 const MAX_FAILED_ATTEMPTS = 3;
 const OTP_TTL_MINUTES = 10;
 const OTP_MAX_ATTEMPTS = 5;
 const STAFF_DOMAIN = 'infoziant.com';
+
+/**
+ * "Remember this device" support. The access token stays a short-lived
+ * (8h) bearer token used on every request; a long-lived refresh token
+ * rides in an httpOnly cookie instead, so it's invisible to JS/XSS and
+ * only ever sent to the one endpoint that needs it. Scoped to
+ * `/api/v1/auth` via cookie Path so it isn't attached to every ordinary
+ * API call, only to /auth/refresh and /auth/logout.
+ *
+ * This is stateless (no DB-backed session/revocation list) — matches the
+ * rest of the project's auth (the 8h access token isn't blacklistable
+ * either). Practical effect: "sign out" clears the cookie so this
+ * browser stops being able to silently refresh, but a copy of the raw
+ * refresh token taken before sign-out would still work until it expires.
+ * Acceptable for an internal staff tool; revisit if that ever changes.
+ */
+const REFRESH_TOKEN_COOKIE = 'ipoms_refresh';
+const REFRESH_TOKEN_TTL_DAYS = 30;
+const REFRESH_TOKEN_MAX_AGE_MS = REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
+const REFRESH_COOKIE_PATH = '/api/v1/auth';
+
+function signRefreshToken(user: any) {
+  return jwt.sign({ userId: user._id }, JWT_REFRESH_SECRET, { expiresIn: `${REFRESH_TOKEN_TTL_DAYS}d` });
+}
+
+function refreshCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    path: REFRESH_COOKIE_PATH,
+    maxAge: REFRESH_TOKEN_MAX_AGE_MS,
+  };
+}
+
+function setRefreshCookie(res: Response, user: any) {
+  res.cookie(REFRESH_TOKEN_COOKIE, signRefreshToken(user), refreshCookieOptions());
+}
+
+function clearRefreshCookie(res: Response) {
+  res.clearCookie(REFRESH_TOKEN_COOKIE, { path: REFRESH_COOKIE_PATH });
+}
 
 /**
  * The only role self-registration is permitted to create (Module 08 §12/§16:
@@ -181,6 +224,7 @@ export function registerAuthRoutes(app: Express) {
     try {
       const rawEmail = String(req.body?.email ?? '').trim().toLowerCase();
       const password = String(req.body?.password ?? '');
+      const rememberMe = Boolean(req.body?.remember_me);
 
       if (!rawEmail) return fail(res, 400, 'EMAIL_REQUIRED', 'Enter your official email address.');
       if (!password) return fail(res, 400, 'PASSWORD_REQUIRED', 'Enter your password.');
@@ -272,6 +316,14 @@ export function registerAuthRoutes(app: Express) {
         module: 'Security & Audit', severity: 'info', summary: 'Signed in successfully', req,
       });
 
+      if (rememberMe) {
+        setRefreshCookie(res, user);
+      } else {
+        // Guards against a stale 30-day cookie surviving a login where the
+        // user deliberately unchecked "remember me" this time.
+        clearRefreshCookie(res);
+      }
+
       return res.status(200).json({
         success: true,
         message: 'Login successful',
@@ -280,6 +332,51 @@ export function registerAuthRoutes(app: Express) {
     } catch (error: any) {
       return fail(res, 500, 'INTERNAL_SERVER_ERROR', error?.message || 'Unexpected error');
     }
+  });
+
+  /* ── Refresh: exchange the httpOnly "remember me" cookie for a fresh
+     8h access token, without re-entering a password. Silent-called by
+     the frontend when a request comes back 401 (access token expired). */
+  app.post('/api/v1/auth/refresh', async (req: Request, res: Response) => {
+    try {
+      const rawToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
+      if (!rawToken) {
+        return fail(res, 401, 'NO_REFRESH_TOKEN', 'No remembered session for this device.');
+      }
+
+      let decoded: { userId: string };
+      try {
+        decoded = jwt.verify(rawToken, JWT_REFRESH_SECRET) as { userId: string };
+      } catch {
+        clearRefreshCookie(res);
+        return fail(res, 401, 'REFRESH_INVALID', 'Your remembered session has expired. Please sign in again.');
+      }
+
+      const user = await User.findOne({ _id: decoded.userId, is_deleted: false });
+      if (!user || user.account_status !== 'active') {
+        clearRefreshCookie(res);
+        return fail(res, 401, 'REFRESH_INVALID', 'Your remembered session is no longer valid. Please sign in again.');
+      }
+
+      // Sliding window: a device that's actually in use stays remembered
+      // for a full 30 days from its last activity, not just from login.
+      setRefreshCookie(res, user);
+
+      return res.status(200).json({
+        success: true,
+        data: { token: signToken(user), user: publicUser(user) },
+      });
+    } catch (error: any) {
+      return fail(res, 500, 'INTERNAL_SERVER_ERROR', error?.message || 'Unexpected error');
+    }
+  });
+
+  /* ── Sign out: clear the remember-me cookie server-side. Access token
+     revocation itself is out of scope (stateless 8h tokens, same as the
+     rest of the app) — this only stops this device from silently refreshing. */
+  app.post('/api/v1/auth/logout', async (req: Request, res: Response) => {
+    clearRefreshCookie(res);
+    return res.status(200).json({ success: true, message: 'Signed out.' });
   });
 
   /* ── Request an OTP ───────────────────────────────────────────────────── */

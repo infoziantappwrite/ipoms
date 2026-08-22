@@ -28,13 +28,47 @@ export function getAuthHeaders(customHeaders: HeadersInit = {}): HeadersInit {
 }
 
 /**
+ * Silently exchanges the httpOnly "remember me" refresh cookie (if any)
+ * for a fresh 8h access token. Deduped so concurrent 401s from several
+ * in-flight requests trigger exactly one refresh call, not one each.
+ */
+let refreshInFlight: Promise<boolean> | null = null;
+
+function refreshAccessToken(): Promise<boolean> {
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data?.success && data?.data?.token) {
+          localStorage.setItem('ipoms_token', data.data.token);
+          if (data.data.user) localStorage.setItem('ipoms_user', JSON.stringify(data.data.user));
+          return true;
+        }
+        return false;
+      } catch {
+        return false;
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+  }
+  return refreshInFlight;
+}
+
+/**
  * Enhanced fetch wrapper with automatic JWT authorization and 401 handling.
  */
 export async function apiFetch<T = any>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  _isRetry = false
 ): Promise<{ success: boolean; data?: T; message?: string; error?: { code: string; message: string } }> {
   const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+  const isAuthEndpoint = /\/auth\/(login|refresh|logout)$/.test(url);
 
   const headers = getAuthHeaders(options.headers || {});
 
@@ -42,12 +76,21 @@ export async function apiFetch<T = any>(
     const response = await fetch(url, {
       ...options,
       headers,
+      credentials: 'include',
     });
 
     const data = await response.json().catch(() => ({}));
 
-    // If session expired or unauthorized on protected route, clear storage and bounce to login
     if (response.status === 401 && typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      // A remembered device gets one silent retry via the refresh cookie
+      // before we treat this as a real session expiry.
+      if (!isAuthEndpoint && !_isRetry) {
+        const refreshed = await refreshAccessToken();
+        if (refreshed) {
+          return apiFetch<T>(endpoint, options, true);
+        }
+      }
+
       console.warn('[apiClient] 401 Unauthorized — Session expired or token invalid.');
       localStorage.removeItem('ipoms_token');
       localStorage.removeItem('ipoms_user');

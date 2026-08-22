@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Rocket, Sparkles, FileSpreadsheet, PlusCircle } from 'lucide-react';
+import { Rocket, Sparkles, FileSpreadsheet, Trash2, CheckSquare, Square } from 'lucide-react';
+
+const BATCH_YEARS = ['2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030', '2031', '2032'];
 
 export interface DailyLeadRow {
   _id: string;
@@ -29,6 +31,11 @@ export interface DailyLeadRow {
 interface Props {
   rows: DailyLeadRow[];
   activeTab: 'positive' | 'jd_received';
+  selectedIds: string[];
+  onToggleSelect: (id: string) => void;
+  onToggleSelectAll: () => void;
+  onClearSelection: () => void;
+  onBulkDelete: () => Promise<void>;
   onUpdateRow: (rowId: string, patch: Partial<DailyLeadRow>) => Promise<void>;
   onMoveToJd: (rowId: string) => Promise<void>;
   onDeleteRow: (rowId: string) => Promise<void>;
@@ -37,10 +44,18 @@ interface Props {
 export function LeadsTable({
   rows,
   activeTab,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
+  onClearSelection,
+  onBulkDelete,
   onUpdateRow,
   onMoveToJd,
   onDeleteRow,
 }: Props) {
+  const isAllSelected = rows.length > 0 && selectedIds.length === rows.length;
+  const isSomeSelected = selectedIds.length > 0 && selectedIds.length < rows.length;
+
   if (rows.length === 0) {
     return (
       <div className="py-16 text-center flex flex-col items-center justify-center gap-3">
@@ -64,36 +79,86 @@ export function LeadsTable({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs text-left">
-        <thead>
-          <tr className="bg-background/90 text-fg-subtle font-semibold border-b border-border uppercase tracking-wider text-micro">
-            <th className="py-3 px-3 w-10 text-center">#</th>
-            <th className="py-3 px-3 min-w-[90px]">Time</th>
-            <th className="py-3 px-3 min-w-[100px]">Date</th>
-            <th className="py-3 px-3 min-w-[170px]">Company Name</th>
-            <th className="py-3 px-3 min-w-[170px]">Role Offered</th>
-            <th className="py-3 px-3 min-w-[110px]">CTC</th>
-            <th className="py-3 px-3 min-w-[160px]">College</th>
-            <th className="py-3 px-3 min-w-[110px]">Batch</th>
-            <th className="py-3 px-3 min-w-[220px]">Remarks & Notes</th>
-            <th className="py-3 px-3 w-28 text-center">Action</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border/60 font-normal">
-          {rows.map((row, idx) => (
-            <TableRow
-              key={row._id}
-              row={row}
-              index={idx + 1}
-              activeTab={activeTab}
-              onUpdateRow={onUpdateRow}
-              onMoveToJd={onMoveToJd}
-              onDeleteRow={onDeleteRow}
-            />
-          ))}
-        </tbody>
-      </table>
+    <div className="overflow-hidden">
+      {/* ── Top Bulk Actions Floating Banner ────────────────────────────── */}
+      {selectedIds.length > 0 && (
+        <div className="bg-gradient-to-r from-rose-50 via-red-50 to-orange-50 border-b border-rose-200 px-4 py-2.5 flex items-center justify-between animate-fadeIn">
+          <div className="flex items-center gap-2.5">
+            <span className="w-5 h-5 rounded-full bg-rose-600 text-white text-micro font-bold flex items-center justify-center shadow-xs">
+              {selectedIds.length}
+            </span>
+            <span className="text-xs font-bold text-slate-800">
+              {selectedIds.length} {selectedIds.length === 1 ? 'entry' : 'entries'} selected
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClearSelection}
+              className="px-3 py-1 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer"
+            >
+              Clear Selection
+            </button>
+            <button
+              onClick={onBulkDelete}
+              className="px-3.5 py-1 bg-gradient-to-b from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white text-xs font-bold rounded-lg shadow-xs border border-rose-700 flex items-center gap-1.5 active:translate-y-[1px] transition-all cursor-pointer"
+            >
+              <Trash2 size={13} strokeWidth={2.2} />
+              <span>Delete Selected ({selectedIds.length})</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Table Container ─────────────────────────────────────────────── */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs text-left">
+          <thead>
+            <tr className="bg-slate-50/90 text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider text-micro select-none">
+              {/* Multi-Select Header Checkbox */}
+              <th className="py-3 px-3 w-10 text-center">
+                <input
+                  type="checkbox"
+                  checked={isAllSelected}
+                  ref={(input) => {
+                    if (input) input.indeterminate = isSomeSelected;
+                  }}
+                  onChange={onToggleSelectAll}
+                  className="rounded border-slate-300 text-primary focus:ring-primary w-4 h-4 cursor-pointer align-middle"
+                  title="Select All"
+                />
+              </th>
+              <th className="py-3 px-2 w-10 text-center">#</th>
+              <th className="py-3 px-3 min-w-[90px]">Time</th>
+              <th className="py-3 px-3 min-w-[100px]">Date</th>
+              <th className="py-3 px-3 min-w-[170px]">Company Name</th>
+              <th className="py-3 px-3 min-w-[170px]">Role Offered</th>
+              <th className="py-3 px-3 min-w-[110px]">CTC</th>
+              <th className="py-3 px-3 min-w-[160px]">College</th>
+              <th className="py-3 px-3 min-w-[110px]">Batch</th>
+              <th className="py-3 px-3 min-w-[220px]">Remarks & Notes</th>
+              <th className="py-3 px-3 w-28 text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 font-normal bg-white">
+            {rows.map((row, idx) => {
+              const isSelected = selectedIds.includes(row._id);
+              return (
+                <TableRow
+                  key={row._id}
+                  row={row}
+                  index={idx + 1}
+                  activeTab={activeTab}
+                  isSelected={isSelected}
+                  onToggleSelect={() => onToggleSelect(row._id)}
+                  onUpdateRow={onUpdateRow}
+                  onMoveToJd={onMoveToJd}
+                  onDeleteRow={onDeleteRow}
+                />
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -102,6 +167,8 @@ function TableRow({
   row,
   index,
   activeTab,
+  isSelected,
+  onToggleSelect,
   onUpdateRow,
   onMoveToJd,
   onDeleteRow,
@@ -109,6 +176,8 @@ function TableRow({
   row: DailyLeadRow;
   index: number;
   activeTab: 'positive' | 'jd_received';
+  isSelected: boolean;
+  onToggleSelect: () => void;
   onUpdateRow: (rowId: string, patch: Partial<DailyLeadRow>) => Promise<void>;
   onMoveToJd: (rowId: string) => Promise<void>;
   onDeleteRow: (rowId: string) => Promise<void>;
@@ -136,19 +205,25 @@ function TableRow({
     }
   };
 
-  const formattedDate = new Date(row.lead_date).toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-
   return (
-    <tr className="hover:bg-surface/30 transition-colors group">
-      {/* S.No */}
-      <td className="py-3 px-3 text-center text-fg-subtle font-mono">{index}</td>
+    <tr className={`transition-colors ${isSelected ? 'bg-blue-50/50 hover:bg-blue-50/70' : 'hover:bg-slate-50/80'}`}>
+      {/* Row Selection Checkbox */}
+      <td className="py-3 px-3 text-center">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={onToggleSelect}
+          className="rounded border-slate-300 text-primary focus:ring-primary w-4 h-4 cursor-pointer align-middle"
+        />
+      </td>
 
-      {/* Time (Separate column per Spec Section 10) */}
-      <td className="py-3 px-3 text-fg-muted font-mono">
+      {/* Row Index */}
+      <td className="py-3 px-2 text-center text-slate-400 font-mono text-micro">
+        {index}
+      </td>
+
+      {/* Time */}
+      <td className="py-3 px-3 text-slate-500 whitespace-nowrap font-mono text-micro">
         {editingField === 'event_time' ? (
           <input
             type="text"
@@ -157,23 +232,50 @@ function TableRow({
             onBlur={() => commitEdit('event_time')}
             onKeyDown={(e) => handleKeyDown(e, 'event_time')}
             autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white w-20"
+            className="bg-white border border-primary rounded px-1.5 py-0.5 text-xs text-slate-900 w-20 shadow-xs outline-none"
           />
         ) : (
           <span
             onClick={() => startEdit('event_time', row.event_time)}
             className="cursor-pointer hover:text-primary transition-colors"
+            title="Click to edit time"
           >
-            {row.event_time}
+            {row.event_time || '—'}
           </span>
         )}
       </td>
 
       {/* Date */}
-      <td className="py-3 px-3 text-fg-subtle whitespace-nowrap">{formattedDate}</td>
+      <td className="py-3 px-3 text-slate-600 whitespace-nowrap font-mono text-micro">
+        {editingField === 'lead_date' ? (
+          <input
+            type="date"
+            value={tempValue}
+            onChange={(e) => setTempValue(e.target.value)}
+            onBlur={() => commitEdit('lead_date')}
+            onKeyDown={(e) => handleKeyDown(e, 'lead_date')}
+            autoFocus
+            className="bg-white border border-primary rounded px-1.5 py-0.5 text-xs text-slate-900 shadow-xs outline-none"
+          />
+        ) : (
+          <span
+            onClick={() =>
+              startEdit('lead_date', new Date(row.lead_date).toISOString().split('T')[0])
+            }
+            className="cursor-pointer hover:text-primary transition-colors"
+            title="Click to edit date"
+          >
+            {new Date(row.lead_date).toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+            })}
+          </span>
+        )}
+      </td>
 
       {/* Company Name */}
-      <td className="py-3 px-3 font-semibold text-fg">
+      <td className="py-3 px-3 font-bold text-slate-900 whitespace-nowrap">
         {editingField === 'company_name' ? (
           <input
             type="text"
@@ -182,20 +284,21 @@ function TableRow({
             onBlur={() => commitEdit('company_name')}
             onKeyDown={(e) => handleKeyDown(e, 'company_name')}
             autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white w-full"
+            className="bg-white border border-primary rounded px-1.5 py-0.5 text-xs text-slate-900 w-full shadow-xs outline-none"
           />
         ) : (
           <span
             onClick={() => startEdit('company_name', row.company_name)}
             className="cursor-pointer hover:text-primary transition-colors"
+            title="Click to edit company name"
           >
             {row.company_name}
           </span>
         )}
       </td>
 
-      {/* Role */}
-      <td className="py-3 px-3 text-fg-muted">
+      {/* Job Role */}
+      <td className="py-3 px-3 text-slate-700 whitespace-nowrap">
         {editingField === 'job_role' ? (
           <input
             type="text"
@@ -204,20 +307,21 @@ function TableRow({
             onBlur={() => commitEdit('job_role')}
             onKeyDown={(e) => handleKeyDown(e, 'job_role')}
             autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white w-full"
+            className="bg-white border border-primary rounded px-1.5 py-0.5 text-xs text-slate-900 w-full shadow-xs outline-none"
           />
         ) : (
           <span
             onClick={() => startEdit('job_role', row.job_role)}
             className="cursor-pointer hover:text-primary transition-colors"
+            title="Click to edit job role"
           >
-            {row.job_role}
+            {row.job_role || '—'}
           </span>
         )}
       </td>
 
       {/* CTC */}
-      <td className="py-3 px-3 text-success font-medium whitespace-nowrap">
+      <td className="py-3 px-3 whitespace-nowrap font-mono text-micro font-bold text-emerald-600">
         {editingField === 'ctc' ? (
           <input
             type="text"
@@ -226,41 +330,49 @@ function TableRow({
             onBlur={() => commitEdit('ctc')}
             onKeyDown={(e) => handleKeyDown(e, 'ctc')}
             autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white w-full"
+            className="bg-white border border-primary rounded px-1.5 py-0.5 text-xs text-slate-900 w-20 shadow-xs outline-none"
           />
         ) : (
           <span
             onClick={() => startEdit('ctc', row.ctc)}
-            className="cursor-pointer hover:text-primary transition-colors"
+            className="cursor-pointer hover:underline transition-colors"
+            title="Click to edit CTC"
           >
-            {row.ctc || <span className="text-fg-muted italic">—</span>}
+            {row.ctc || <span className="text-slate-400 italic font-normal">—</span>}
           </span>
         )}
       </td>
 
-      {/* College */}
-      <td className="py-3 px-3 text-fg-muted">
-        <span className="bg-surface border border-border-strong text-fg-muted px-2 py-0.5 rounded text-micro">
-          {row.college_id?.college_code || 'COLLEGE'}
+      {/* College Code Badge */}
+      <td className="py-3 px-3 whitespace-nowrap">
+        <span className="inline-block px-2 py-0.5 rounded-md text-micro font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs">
+          {row.college_id?.college_code || 'N/A'}
         </span>
       </td>
 
       {/* Batch */}
-      <td className="py-3 px-3 text-fg-subtle whitespace-nowrap">
+      <td className="py-3 px-3 text-slate-700 whitespace-nowrap">
         {editingField === 'eligible_batch' ? (
-          <input
-            type="text"
+          <select
             value={tempValue}
-            onChange={(e) => setTempValue(e.target.value)}
+            onChange={(e) => {
+              setTempValue(e.target.value);
+            }}
             onBlur={() => commitEdit('eligible_batch')}
-            onKeyDown={(e) => handleKeyDown(e, 'eligible_batch')}
             autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white w-20"
-          />
+            className="bg-white border border-primary rounded-lg px-2 py-1 text-xs text-slate-900 shadow-xs cursor-pointer outline-none font-medium"
+          >
+            {BATCH_YEARS.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
         ) : (
           <span
             onClick={() => startEdit('eligible_batch', row.eligible_batch)}
-            className="cursor-pointer hover:text-primary transition-colors"
+            className="cursor-pointer hover:text-primary transition-colors font-mono font-medium px-2 py-0.5 rounded bg-slate-50 border border-slate-200"
+            title="Click to change year"
           >
             {row.eligible_batch}
           </span>
@@ -268,7 +380,7 @@ function TableRow({
       </td>
 
       {/* Remarks */}
-      <td className="py-3 px-3 text-fg-muted">
+      <td className="py-3 px-3 text-slate-600">
         {editingField === 'remarks' ? (
           <input
             type="text"
@@ -277,7 +389,7 @@ function TableRow({
             onBlur={() => commitEdit('remarks')}
             onKeyDown={(e) => handleKeyDown(e, 'remarks')}
             autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white w-full"
+            className="bg-white border border-primary rounded px-1.5 py-0.5 text-xs text-slate-900 w-full shadow-xs outline-none"
           />
         ) : (
           <span
@@ -285,21 +397,22 @@ function TableRow({
             className="cursor-pointer hover:text-primary transition-colors line-clamp-1"
             title={row.remarks}
           >
-            {row.remarks || <span className="text-fg-muted italic">—</span>}
+            {row.remarks || <span className="text-slate-400 italic">—</span>}
           </span>
         )}
       </td>
 
-      {/* Actions: Move to JD (Tab 1) & Delete */}
+      {/* Actions: Move to JD (Tab 1) & Line Delete Icon */}
       <td className="py-3 px-3 text-center whitespace-nowrap">
         <div className="flex items-center justify-center gap-1.5">
           {activeTab === 'positive' && (
             <button
               onClick={() => onMoveToJd(row._id)}
-              className="bg-primary/20 hover:bg-primary/40 text-primary border border-primary/30 px-2 py-1 rounded text-micro font-semibold transition-colors flex items-center gap-1"
+              className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2 py-1 rounded-lg text-micro font-semibold transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
               title="1-Click Move to JD Received Tab"
             >
-              <Rocket size={14} strokeWidth={2} aria-hidden /> Move to JD
+              <Rocket size={13} strokeWidth={2} />
+              <span>Move to JD</span>
             </button>
           )}
           <button
@@ -308,10 +421,10 @@ function TableRow({
                 onDeleteRow(row._id);
               }
             }}
-            className="text-fg-subtle hover:text-destructive p-1 rounded transition-colors text-xs"
-            title="Delete"
+            className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 p-1.5 rounded-lg transition-all cursor-pointer"
+            title="Delete row"
           >
-            🗑️
+            <Trash2 size={14} strokeWidth={2} />
           </button>
         </div>
       </td>

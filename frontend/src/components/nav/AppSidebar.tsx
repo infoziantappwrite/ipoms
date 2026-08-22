@@ -155,7 +155,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
         aria-label="Primary"
         data-collapsed={collapsed || undefined}
         style={{ '--nav-w': collapsed ? '4.75rem' : '16.5rem' } as React.CSSProperties}
-        className={`group/nav fixed inset-y-0 left-0 z-overlay flex min-w-0 shrink-0 flex-col overflow-hidden
+        className={`group/nav fixed inset-y-0 left-0 z-overlay flex min-w-0 shrink-0 flex-col overflow-hidden print:hidden
           w-[16.5rem] lg:w-[var(--nav-w)]
           border-r border-border bg-surface shadow-2
           lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 lg:shadow-none

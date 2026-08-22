@@ -1,3 +1,5 @@
+'use client';
+
 import { useState } from 'react';
 import {
   Clock,
@@ -100,27 +102,26 @@ export function WeeklySection({
         <div className="flex items-center gap-2.5">
           <IconComponent size={15} strokeWidth={2} className={config.iconClass} />
           <span className="text-xs font-bold tracking-wide uppercase">
-            {order}. {title}
+            {title}
           </span>
-        </div>
           <span className={`text-micro px-2 py-0.5 rounded-full border font-semibold ${config.badgeClass}`}>
             {rows.length}
           </span>
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="text-xs text-fg-subtle font-medium hidden sm:inline">
+          <span className="text-xs font-medium opacity-80 hidden sm:inline">
             {summaryMetric}
           </span>
-          <button className="text-fg-subtle hover:text-white text-xs px-1 transition-transform">
-            {isCollapsed ? '▼' : '▲'}
+          <button className="p-1 rounded hover:bg-black/5 transition-transform" title={isCollapsed ? 'Expand' : 'Collapse'}>
+            {isCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
           </button>
         </div>
       </div>
 
       {/* Table Content */}
       {!isCollapsed && (
-        <div className="bg-background/70">
+        <div className="bg-white">
           <WeeklyTable
             rows={rows}
             sectionKey={sectionKey}

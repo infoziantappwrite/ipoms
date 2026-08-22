@@ -32,15 +32,15 @@ export function ReportsNavigation({ activeTab, onTabChange }: Props) {
   ];
 
   return (
-    <header className="glass-panel border-b border-border px-6 pt-4 pb-0 space-y-3">
+    <header className="bg-white border-b border-slate-200 px-6 pt-4 pb-0 space-y-3 shadow-2xs print:hidden">
       {/* ── Top Row: Title & Top-Right Sign Out ────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-fg tracking-tight flex items-center gap-2">
-            <TrendingUp size={18} strokeWidth={2} className="text-primary" />
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+            <TrendingUp size={20} strokeWidth={2.25} className="text-primary" />
             <span>Reports & Analytics</span>
           </h1>
-          <p className="text-xs text-fg-subtle mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             Operational BI, 4 Enterprise Report Templates & Document-Style Editor
           </p>
         </div>
@@ -51,8 +51,8 @@ export function ReportsNavigation({ activeTab, onTabChange }: Props) {
         </div>
       </div>
 
-      {/* ── Bottom Row: Excel-Style Navigation Tabs ───────────────────── */}
-      <div className="flex items-center gap-1 overflow-x-auto border-t border-border/40 pt-1 no-scrollbar">
+      {/* ── Bottom Row: High-Contrast Equal 3-Column Tabs ─────────── */}
+      <div className="grid grid-cols-3 w-full border-t border-slate-200 pt-2 gap-2">
         {tabs.map((t) => {
           const IconComponent = t.Icon;
           const isActive = activeTab === t.id;
@@ -60,21 +60,25 @@ export function ReportsNavigation({ activeTab, onTabChange }: Props) {
             <button
               key={t.id}
               onClick={() => onTabChange(t.id)}
-              className={`flex items-center gap-2 px-5 py-3 text-xs font-bold transition-all relative select-none border-b-2 cursor-pointer
+              className={`flex items-center justify-center gap-2.5 py-3 px-3 text-xs font-bold transition-all select-none rounded-t-xl cursor-pointer w-full text-center
                 ${
                   isActive
-                    ? 'text-primary border-primary bg-primary-subtle'
-                    : 'text-fg-subtle hover:text-fg border-transparent hover:bg-background/20'
+                    ? 'bg-primary text-white shadow-sm ring-1 ring-blue-700 font-extrabold'
+                    : 'bg-slate-100/80 text-slate-600 hover:text-slate-900 hover:bg-slate-200/80'
                 }`}
             >
-              <IconComponent size={15} strokeWidth={isActive ? 2.25 : 1.75} className={isActive ? 'text-primary' : 'text-fg-subtle'} />
-              <span>{t.label}</span>
+              <IconComponent
+                size={16}
+                strokeWidth={isActive ? 2.5 : 2}
+                className={isActive ? 'text-white shrink-0' : 'text-slate-500 shrink-0'}
+              />
+              <span className="truncate">{t.label}</span>
               {t.badge && (
                 <span
-                  className={`text-micro px-1.5 py-0.5 rounded font-mono hidden sm:inline ${
+                  className={`text-micro px-2 py-0.5 rounded font-mono hidden md:inline shrink-0 ${
                     isActive
-                      ? 'bg-primary/20 text-primary font-bold'
-                      : 'bg-surface text-fg-subtle border border-border-strong'
+                      ? 'bg-white/20 text-white font-bold border border-white/30'
+                      : 'bg-white text-slate-600 border border-slate-300'
                   }`}
                 >
                   {t.badge}

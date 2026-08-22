@@ -49,17 +49,80 @@ interface Props {
   onSkip: () => void;
 }
 
-// Format a Date (or ISO string) as HH:MM:SS AM/PM per spec 10.1
+// Format a Date (or ISO string) as HH:MM AM/PM per user preference
 function formatTime(d: string | Date | undefined): string {
   if (!d) return '';
   const date = typeof d === 'string' ? new Date(d) : d;
   if (isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
 // Get current time as ISO string for submission to API
 function nowISO(): string {
   return new Date().toISOString();
+}
+
+// Smart time parser: predicts AM/PM from system time if omitted, accepts 852, 08:52, 8.52, etc.
+function smartParseTime(input: string): { iso: string; formatted: string } | null {
+  if (!input || !input.trim()) return null;
+  const raw = input.trim();
+
+  // 1. Detect explicit AM / PM or A / P
+  let explicitPeriod: 'AM' | 'PM' | null = null;
+  if (/\b(am|a)\b/i.test(raw) || raw.toUpperCase().endsWith('AM') || raw.toUpperCase().endsWith('A')) {
+    explicitPeriod = 'AM';
+  } else if (/\b(pm|p)\b/i.test(raw) || raw.toUpperCase().endsWith('PM') || raw.toUpperCase().endsWith('P')) {
+    explicitPeriod = 'PM';
+  }
+
+  // 2. Extract digits only for hour & minute
+  const clean = raw.replace(/[a-zA-Z]/g, '').trim();
+  let parts = clean.split(/[:.]/).map(Number);
+
+  if (parts.length === 1 && !isNaN(parts[0])) {
+    const numStr = parts[0].toString();
+    if (numStr.length === 3) {
+      parts = [parseInt(numStr[0], 10), parseInt(numStr.slice(1), 10)];
+    } else if (numStr.length === 4) {
+      parts = [parseInt(numStr.slice(0, 2), 10), parseInt(numStr.slice(2), 10)];
+    }
+  }
+
+  if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) {
+    return null;
+  }
+
+  let h = parts[0];
+  const m = Math.min(59, Math.max(0, parts[1]));
+  const s = parts[2] ? Math.min(59, Math.max(0, parts[2])) : 0;
+
+  // 3. Handle 24-hour inputs (e.g. 14:30 -> 2:30 PM)
+  if (h >= 13 && h <= 23) {
+    explicitPeriod = 'PM';
+    h = h - 12;
+  } else if (h === 0) {
+    explicitPeriod = 'AM';
+    h = 12;
+  }
+
+  // 4. If period was not explicitly typed, predict from system time
+  const now = new Date();
+  const systemPeriod: 'AM' | 'PM' = now.getHours() >= 12 ? 'PM' : 'AM';
+  const period = explicitPeriod || systemPeriod;
+
+  // 5. Convert to 24-hour hour for Date object
+  let hour24 = h;
+  if (period === 'PM' && h < 12) hour24 = h + 12;
+  if (period === 'AM' && h === 12) hour24 = 0;
+
+  const targetDate = new Date();
+  targetDate.setHours(hour24, m, s, 0);
+
+  const formatted = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')} ${period}`;
+  return {
+    iso: targetDate.toISOString(),
+    formatted,
+  };
 }
 
 export function TrackerRow({ row, isReadOnly, onUpdate, onSkip }: Props) {
@@ -92,6 +155,8 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onSkip }: Props) {
   const handleKeyDownEnter = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
+      // Trigger blur update explicitly
+      handleStartTimeBlur();
       // Focus next row's Start Time cell — traverse the DOM
       const currentRow = (e.currentTarget as HTMLElement).closest('[data-row-id]');
       if (currentRow) {
@@ -104,22 +169,18 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onSkip }: Props) {
     }
   }, []);
 
-  // ── Start Time blur: persist to server
+  // ── Start Time blur: smart-parse time, auto-predict AM/PM, format input, persist
   const handleStartTimeBlur = useCallback(() => {
     const val = startTimeRef.current?.value?.trim();
     if (!val) return;
-    // Parse the typed time (HH:MM:SS AM/PM) — build a Date for today
-    const today = new Date();
-    const [timePart, period] = val.split(' ');
-    if (!timePart) return;
-    const parts = timePart.split(':').map(Number);
-    let h = parts[0] || 0;
-    const m = parts[1] || 0;
-    const s = parts[2] || 0;
-    if (period?.toUpperCase() === 'PM' && h < 12) h += 12;
-    if (period?.toUpperCase() === 'AM' && h === 12) h = 0;
-    today.setHours(h, m, s, 0);
-    onUpdate({ call_start_time: today.toISOString() });
+
+    const parsed = smartParseTime(val);
+    if (parsed) {
+      if (startTimeRef.current) {
+        startTimeRef.current.value = parsed.formatted;
+      }
+      onUpdate({ call_start_time: parsed.iso });
+    }
   }, [onUpdate]);
 
   // ── Call Outcome selection: captures End Time automatically (Spec 10.3)
@@ -175,10 +236,10 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onSkip }: Props) {
             data-field="start_time"
             type="text"
             defaultValue={formatTime(row.call_start_time)}
-            placeholder="HH:MM:SS AM"
+            placeholder="HH:MM AM"
             onKeyDown={(e) => { handleStartTimeKeyDown(e); handleKeyDownEnter(e); }}
             onBlur={handleStartTimeBlur}
-            title="Press Spacebar to insert current time"
+            title="Type 8:52, 08:52, or 8:52 AM • Spacebar fills current time"
             className="w-full bg-transparent border border-transparent hover:border-border-strong focus:bg-surface px-1.5 py-1 rounded text-fg placeholder-fg-subtle
                        transition-colors cursor-text"
           />

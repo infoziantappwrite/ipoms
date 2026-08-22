@@ -129,33 +129,40 @@ export default function LoadContactsPage() {
     }
 
     const ids = Array.from(selected);
+    let sent = false;
 
-    // 1. PostMessage to parent opener window if opened via window.open
-    if (window.opener && !window.opener.closed) {
+    // 1. BroadcastChannel for robust cross-tab sync (Primary)
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const channel = new BroadcastChannel('ipoms_tracker_sync');
+        channel.postMessage({ type: 'LOAD_CONTACTS', companyIds: ids, timestamp: Date.now() });
+        channel.close();
+        sent = true;
+      } catch {
+        sent = false;
+      }
+    }
+
+    // 2. PostMessage to parent opener window if BroadcastChannel not active
+    if (!sent && window.opener && !window.opener.closed) {
       try {
         window.opener.postMessage({ type: 'IPOMS_LOAD_CONTACTS', companyIds: ids }, '*');
+        sent = true;
       } catch (err) {
         console.error('Opener postMessage error:', err);
       }
     }
 
-    // 2. BroadcastChannel for robust cross-tab sync
-    try {
-      const channel = new BroadcastChannel('ipoms_tracker_sync');
-      channel.postMessage({ type: 'LOAD_CONTACTS', companyIds: ids, timestamp: Date.now() });
-      channel.close();
-    } catch {
-      // Fallback to localStorage
-    }
-
     // 3. LocalStorage event fallback
-    try {
-      localStorage.setItem('ipoms_imported_contacts', JSON.stringify({
-        ids,
-        timestamp: Date.now(),
-      }));
-    } catch {
-      // ignore
+    if (!sent) {
+      try {
+        localStorage.setItem('ipoms_imported_contacts', JSON.stringify({
+          ids,
+          timestamp: Date.now(),
+        }));
+      } catch {
+        // ignore
+      }
     }
 
     setImportedSuccess(true);
@@ -317,7 +324,10 @@ export default function LoadContactsPage() {
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => {}}
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRowClick(index, c._id, e);
+                            }}
                             className="rounded border-border text-primary focus:ring-primary cursor-pointer w-4 h-4"
                           />
                         </td>

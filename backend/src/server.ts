@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -40,6 +41,7 @@ app.use(
   })
 );
 app.use(express.json());
+app.use(cookieParser());
 app.use(morgan('dev'));
 
 // ── Shared Helpers ───────────────────────────────────────────────────────────
@@ -291,8 +293,27 @@ app.get('/api/v1/daily-tracker/today', async (req: Request, res: Response) => {
       is_finalized: false,
     }).sort({ created_at: 1 });
 
-    const enriched = rows.map((row, idx) => ({
-      ...row.toObject(),
+    // Auto-clean any unfinalized duplicate rows created in the same session
+    const seenKeys = new Set<string>();
+    const uniqueRows: any[] = [];
+    const duplicateIdsToDelete: any[] = [];
+
+    for (const row of rows) {
+      const key = `${row.company_id || row.company_name}_${row.mobile_number}`;
+      if (seenKeys.has(key) && !row.call_start_time && !row.outcome_status) {
+        duplicateIdsToDelete.push(row._id);
+      } else {
+        seenKeys.add(key);
+        uniqueRows.push(row);
+      }
+    }
+
+    if (duplicateIdsToDelete.length > 0) {
+      await DailyTracker.deleteMany({ _id: { $in: duplicateIdsToDelete } });
+    }
+
+    const enriched = uniqueRows.map((row, idx) => ({
+      ...row.toObject ? row.toObject() : row,
       serial_no: idx + 1,
       duration_formatted: row.duration_seconds != null ? formatDuration(row.duration_seconds) : null,
     }));
@@ -346,6 +367,7 @@ app.post('/api/v1/daily-tracker/load-contacts', async (req: Request, res: Respon
 
     const existingRows = await DailyTracker.find({
       coordinator_id: new Types.ObjectId(coordinator_id),
+      college_id: new Types.ObjectId(college_id),
       session_date: today,
       is_finalized: false,
     }).select('company_id mobile_number');
@@ -852,44 +874,44 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
         total_records: rows.length,
         sections: {
           follow_ups_due_today: {
-            title: 'Follow-up Due Today',
-            order: 1,
+            title: 'Follow-ups Due Today',
+            order: 0,
             summary_metric: `${followUpsDueToday.length} Urgent Follow-ups • Action Required Today`,
             rows: followUpsDueToday,
           },
           completed: {
             title: 'Companies Completed',
-            order: 2,
+            order: 1,
             summary_metric: `${completed.length} Drives Completed • ${completed.reduce((acc, curr) => acc + (curr.selected_count || 0), 0)} Offers Placed`,
             rows: completed,
           },
           in_progress: {
             title: 'Companies In Progress',
-            order: 3,
+            order: 2,
             summary_metric: `${inProgress.length} Active Operations • Drives Scheduled`,
             rows: inProgress,
           },
           pipeline: {
             title: 'Companies in Pipeline',
-            order: 4,
+            order: 3,
             summary_metric: `${pipeline.length} Total Leads • Awaiting JD`,
             rows: pipeline,
           },
           top_companies: {
             title: 'Top Companies',
-            order: 5,
+            order: 4,
             summary_metric: `${topCompanies.length} Priority Hiring Partners`,
             rows: topCompanies,
           },
           rejected_by_hr: {
             title: 'Rejected by HR',
-            order: 6,
+            order: 5,
             summary_metric: `${rejectedByHr.length} Employer Declines`,
             rows: rejectedByHr,
           },
           rejected_by_college: {
             title: 'Rejected by College',
-            order: 7,
+            order: 6,
             summary_metric: `${rejectedByCollege.length} Institutional Declines`,
             rows: rejectedByCollege,
           },
@@ -941,6 +963,8 @@ app.post('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
       resolvedCompanyId = existingMeta?._id || new Types.ObjectId();
     }
 
+    const effectiveSection = pipeline_section === 'follow_ups_due_today' ? 'in_progress' : (pipeline_section || 'pipeline');
+    const effectiveFollowUp = pipeline_section === 'follow_ups_due_today' && !follow_up_date ? new Date() : (follow_up_date ? new Date(follow_up_date) : null);
     const { startFriday, endThursday, weekNumber } = getFridayWeekBounds();
 
     const newDrive = await WeeklyTracker.create({
@@ -954,9 +978,9 @@ app.post('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
       company_type: company_type?.trim() || 'Software / IT',
       ctc_lpa: ctc_lpa?.trim() || '',
       eligible_batch: eligible_batch?.trim() || '2026 Batch',
-      pipeline_section: pipeline_section || 'pipeline',
+      pipeline_section: effectiveSection,
       current_status_text: current_status_text?.trim() || 'Invite email sent, awaiting JD',
-      follow_up_date: follow_up_date ? new Date(follow_up_date) : null,
+      follow_up_date: effectiveFollowUp,
       drive_date: drive_date ? new Date(drive_date) : null,
       selected_count: Number(selected_count) || 0,
       week_number: weekNumber,
@@ -1948,11 +1972,11 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       template_type,
       report_title:
         template_type === 'weekly_placement'
-          ? `Weekly Placement Operations Report — ${targetCollege?.college_name || 'All Partner Institutions'}`
+          ? 'Weekly Report'
           : template_type === 'monthly_placement'
           ? `Monthly Placement Review — ${academic_year} Season`
           : template_type === 'college_performance'
-          ? `Institutional Placement Performance — ${targetCollege?.college_name || 'College Overview'}`
+          ? `College Performance Report — ${targetCollege?.college_name || 'Overview'}`
           : `Coordinator Performance Assessment — ${coordinator?.full_name || 'Operations Team'}`,
       report_period: week_label,
       generated_by: coordinator?.full_name || 'A. Mohanaradha (Lead Placement Coordinator)',

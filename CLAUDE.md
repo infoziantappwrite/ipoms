@@ -98,7 +98,11 @@ roles 4           system_settings 1 users 8          weekly_tracker 8
 Run `npm run verify:policy` after adding any endpoint — it fails the build if a route has
 no policy.
 
-**JWT:** single access token, **8h**, `JWT_ACCESS_SECRET`. There is **no refresh token**.
+**JWT:** access token, **8h**, `JWT_ACCESS_SECRET`. **Refresh token added 22 Aug 2026**:
+opt-in via "Remember this device for 30 days" at login, `JWT_REFRESH_SECRET`, stateless
+30-day token in an httpOnly cookie scoped to `/api/v1/auth`, sliding window (renewed on
+each use via `POST /auth/refresh`), cleared by `POST /auth/logout`. No DB-backed
+revocation list — matches the rest of this app's stateless-JWT model.
 **Jobs:** 1 of 4 (`finalizeDailyTracker`, 23:59:59).
 **Tests:** none. No test directory, no test script, no framework.
 
@@ -111,7 +115,7 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
 | # | Spec requires | Reality | Verdict |
 |---|---|---|---|
 | 1 | Strict 3-tier `Controller → Service → Repository` in `controllers/ services/ repositories/ routes/ validators/ middleware/` (Ch.6 §1.3, Ch.7 §7.1.1 #2/#4/#10, V1_DECISIONS §1.3) | One ~4,080-line `server.ts`. None of those directories exist. | **Largest architectural debt.** Refactoring is a big, risky change — propose it, never start it unasked. |
-| 2 | Dual-token JWT: 15-min access + 7-day HTTP-only refresh cookie | Single 8h access token, no refresh | Open gap. 8h was a deliberate simplification; confirm before "fixing". |
+| 2 | Dual-token JWT: 15-min access + 7-day HTTP-only refresh cookie | 8h access token + **opt-in 30-day httpOnly refresh cookie (added 22 Aug 2026)**, stateless, sliding window | **Closed**, on different numbers than the spec (8h/30d vs 15min/7d) — a deliberate choice, not an oversight. |
 | 3 | 14 collections | 12 (see §3) | `recycle_bin` and `import_processing_history` unbuilt → soft-delete restore and import audit cannot work |
 | 4 | 4 cron jobs (00:00, 02:00, 02:30, 03:00 IST) | 1 job at 23:59:59 | 3 unbuilt. Two of them purge collections that don't exist yet. |
 | 5 | Weekly Tracker **7** sections incl. *Hold by TPO* and *Hold by HR* (Ch.6 §1.3 Recon #2) | Enum has **6**: `pipeline, in_progress, completed, top_companies, rejected_by_hr, rejected_by_college` | The Weekly Placement **Report** needs Holds-by-TPO/HR sections that have **no data source**. |
@@ -198,7 +202,7 @@ Data flow: `company_metadata → assigned_work → daily_tracker → weekly_trac
 | 04 | Weekly Tracker | `/weekly-tracker` | Placement lifecycle. One master dataset, sections derived from status — nobody moves rows by hand. Status is **free text**, not a dropdown (deliberate). Follow-up colour: green >7d, yellow ≤3d, red today/overdue. Friday–Friday weeks. |
 | 05 | Daily Leads | `/daily-leads` | Two tabs, Positives / JD Received, identical columns. **Deliberately manual** — never auto-sync. Coordinator-only write; everyone else read-only. Remembers last active tab. |
 | 06 | Reports & Analytics | `/reports` | 4 templates (Weekly, Monthly, College, Coordinator). Report edits are **presentation-only and never mutate operational records**. Reports are never stored — exported to the user's machine. Every generation writes an audit log. |
-| 07 | Dashboards | `/dashboard` | Landing page. **Inform and route — never a data-entry screen.** Order: Greeting → Notifications → Assigned Work → Priority College → Today's Tasks (max 3) → KPIs → Quick Nav → Insights. Live, non-editable, minimal. |
+| 07 | Dashboards | `/dashboard` | Landing page. **Inform and route — never a data-entry screen.** Order: Greeting → Notifications → Assigned Work → Priority College → Today's Tasks (max 3) → KPIs. Live, non-editable, minimal. **Quick Nav shortcut cards removed 22 Aug 2026** (user decision) — the left sidebar already covers module navigation; the coordinator dashboard no longer duplicates it. **Observations/Insights section also removed 22 Aug 2026** (user decision). |
 | 09 | Settings | `/settings` | **Customises appearance, never business logic.** |
 | 10 | System Admin | — | Director/CEO only. Health, data-quality, announcements. Largely unbuilt. |
 

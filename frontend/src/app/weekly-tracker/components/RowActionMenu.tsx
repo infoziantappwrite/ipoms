@@ -12,9 +12,9 @@ interface Props {
 }
 
 const SECTIONS = [
-  { key: 'pipeline', label: 'Companies in Pipeline' },
-  { key: 'in_progress', label: 'Companies In Progress' },
   { key: 'completed', label: 'Companies Completed' },
+  { key: 'in_progress', label: 'Companies In Progress' },
+  { key: 'pipeline', label: 'Companies in Pipeline' },
   { key: 'top_companies', label: 'Top Companies' },
   { key: 'rejected_by_hr', label: 'Rejected by HR' },
   { key: 'rejected_by_college', label: 'Rejected by College' },

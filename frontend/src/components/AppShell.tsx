@@ -27,7 +27,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Drawer trigger — only where the drawer is off-canvas. */}
-        <div className="sticky top-0 z-sticky flex h-14 items-center gap-3 border-b border-border bg-surface px-4 lg:hidden">
+        <div className="sticky top-0 z-sticky flex h-14 items-center gap-3 border-b border-border bg-surface px-4 lg:hidden print:hidden">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}

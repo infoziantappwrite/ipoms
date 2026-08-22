@@ -263,9 +263,9 @@ export default function WeeklyTrackerPage() {
         />
       )}
 
-      {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
+      {/* ── KPI Cards (Slim Single-Row Profile) ──────────────────────────── */}
       {selectedCollegeId && kpi && (
-        <div className="px-6 py-4">
+        <div className="px-6 py-2">
           <WeeklyKpiCards
             kpi={kpi}
             activeSectionFilter={activeSectionFilter}

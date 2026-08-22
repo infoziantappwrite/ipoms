@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 const MONTHS = [
@@ -66,41 +66,58 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
 
   const handleDayClick = (day: number) => {
     const isToday = day === todayDate && viewMonth === todayMonth && viewYear === todayYear;
-    if (isToday) { onClose(); return; } // Today — don't open history for today
+    if (isToday) { onClose(); return; }
     const dateStr = `${viewYear}-${String(viewMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     onSelectDate(dateStr);
   };
 
   return (
-    <div className="fixed inset-0 scrim flex items-center justify-center z-50">
-      <div className="glass-panel rounded-2xl w-80 border border-border-strong shadow-4">
+    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
+      {/* Modern Flat 2.0 Clean Modal Card */}
+      <div className="w-full max-w-sm rounded-2xl bg-white border border-slate-200 shadow-2xl overflow-hidden flex flex-col">
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border-strong">
-          <button onClick={prevMonth} aria-label="Previous month" className="text-fg-subtle hover:text-fg px-2 py-1 rounded transition-colors">
-            <ChevronLeft size={16} strokeWidth={2} aria-hidden />
+        {/* ── Modern Flat Header ─────────────────────────────────────────── */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50/75">
+          <button
+            onClick={prevMonth}
+            aria-label="Previous month"
+            className="w-8 h-8 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 flex items-center justify-center transition-colors shadow-xs cursor-pointer"
+          >
+            <ChevronLeft size={16} strokeWidth={2} />
           </button>
+          
           <div className="text-center">
-            <p className="text-sm font-semibold text-fg">{MONTHS[viewMonth - 1]} {viewYear}</p>
-            {loadingDots && <p className="text-xs text-fg-subtle animate-pulse">Loading activity…</p>}
+            <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+              {MONTHS[viewMonth - 1]} {viewYear}
+            </h3>
+            {loadingDots && (
+              <p className="text-micro text-primary font-medium animate-pulse mt-0.5">
+                Checking call activity…
+              </p>
+            )}
           </div>
-          <button onClick={nextMonth} aria-label="Next month" className="text-fg-subtle hover:text-fg px-2 py-1 rounded transition-colors">
-            <ChevronRight size={16} strokeWidth={2} aria-hidden />
+
+          <button
+            onClick={nextMonth}
+            aria-label="Next month"
+            className="w-8 h-8 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 flex items-center justify-center transition-colors shadow-xs cursor-pointer"
+          >
+            <ChevronRight size={16} strokeWidth={2} />
           </button>
         </div>
 
-        {/* Day headers */}
-        <div className="grid grid-cols-7 text-center text-xs text-fg-subtle px-3 pt-3 pb-1">
+        {/* ── Weekday Headers ────────────────────────────────────────────── */}
+        <div className="grid grid-cols-7 text-center text-micro font-bold text-slate-400 px-4 pt-3.5 pb-1 uppercase tracking-wider bg-white">
           {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
             <div key={d} className="py-1">{d}</div>
           ))}
         </div>
 
-        {/* Calendar grid */}
-        <div className="grid grid-cols-7 text-center text-xs px-3 pb-4 gap-y-1">
+        {/* ── Calendar Grid ──────────────────────────────────────────────── */}
+        <div className="grid grid-cols-7 text-center text-xs px-4 pb-4 gap-1 bg-white">
           {/* Empty cells before month start */}
           {Array.from({ length: firstDay }).map((_, i) => (
-            <div key={`empty-${i}`} />
+            <div key={`empty-${i}`} className="h-9" />
           ))}
 
           {/* Days */}
@@ -116,36 +133,54 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
                 onClick={() => !isFuture && handleDayClick(day)}
                 disabled={isFuture}
                 className={`
-                  relative py-1.5 rounded-lg text-xs transition-colors
-                  ${isFuture ? 'text-fg-muted cursor-default' : 'cursor-pointer hover:bg-surface-raised'}
-                  ${isToday ? 'bg-primary text-white font-bold' : ''}
-                  ${hasActivity && !isToday ? 'text-fg font-semibold' : ''}
-                  ${!hasActivity && !isToday && !isFuture ? 'text-fg-subtle' : ''}
+                  relative h-9 flex flex-col items-center justify-center rounded-xl text-xs transition-colors
+                  ${
+                    isFuture
+                      ? 'text-slate-300 cursor-not-allowed font-normal'
+                      : 'cursor-pointer hover:bg-blue-50 hover:text-primary font-medium'
+                  }
+                  ${isToday ? 'bg-primary text-white font-bold shadow-xs hover:bg-blue-700 hover:text-white' : ''}
+                  ${hasActivity && !isToday ? 'text-slate-900 font-bold' : ''}
+                  ${!hasActivity && !isToday && !isFuture ? 'text-slate-600' : ''}
                 `}
               >
-                {day}
-                {/* Activity dot — Spec Section 15 */}
+                <span>{day}</span>
+                {/* Activity Dot */}
                 {hasActivity && (
-                  <span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full
-                                    ${isToday ? 'bg-white' : 'bg-primary'}`} />
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full mt-0.5 ${
+                      isToday ? 'bg-white' : 'bg-primary'
+                    }`}
+                  />
                 )}
               </button>
             );
           })}
         </div>
 
-        {/* Legend */}
-        <div className="flex items-center justify-center gap-4 px-5 py-3 border-t border-border-strong text-xs text-fg-subtle">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-primary" />
-            <span>Has calls</span>
+        {/* ── Modern Flat Legend & Footer ────────────────────────────────── */}
+        <div className="flex items-center justify-between px-5 py-3 border-t border-slate-200 bg-slate-50/80 text-xs">
+          <div className="flex items-center gap-3 text-slate-600 font-medium">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-primary" />
+              <span className="text-micro">Has calls</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3.5 h-3.5 rounded-md bg-primary text-white text-micro font-bold inline-flex items-center justify-center">
+                T
+              </span>
+              <span className="text-micro">Today</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-4 h-4 rounded-lg bg-primary inline-flex items-center justify-center text-white text-xs">T</span>
-            <span>Today</span>
-          </div>
-          <button onClick={onClose} className="ml-auto text-fg-subtle hover:text-fg transition-colors">Close</button>
+          
+          <button
+            onClick={onClose}
+            className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 font-semibold rounded-lg text-xs border border-slate-300 transition-colors shadow-xs cursor-pointer"
+          >
+            Close
+          </button>
         </div>
+
       </div>
     </div>
   );

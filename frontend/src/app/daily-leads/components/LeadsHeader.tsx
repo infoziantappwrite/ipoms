@@ -1,16 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CalendarDays, FileSpreadsheet, Globe, Plus, Target } from 'lucide-react';
+import { CalendarDays, FileSpreadsheet, Plus, Target, RefreshCw } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
+import { CollegeSelector, College } from '@/components/CollegeSelector';
 import { apiFetch } from '@/lib/api';
-
-interface College {
-  _id: string;
-  college_name: string;
-  college_code: string;
-  logo_url?: string;
-}
 
 interface Props {
   selectedDate: string;
@@ -35,53 +29,60 @@ export function LeadsHeader({
   onExportCsv,
   onRefresh,
 }: Props) {
-  const [colleges, setColleges] = useState<College[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [selectedCollegeObj, setSelectedCollegeObj] = useState<College | null>(null);
 
+  // If a college is selected, fetch its info or update
   useEffect(() => {
-    apiFetch('/colleges')
-      .then((data) => {
-        if (data.success && Array.isArray((data.data as any)?.colleges)) {
-          setColleges((data.data as any).colleges);
-        }
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
-
-  const selectedCollege = colleges.find((c) => c._id === selectedCollegeId);
+    if (selectedCollegeId === 'all') {
+      setSelectedCollegeObj(null);
+      return;
+    }
+    apiFetch('/colleges').then((data) => {
+      if (data.success && Array.isArray((data.data as any)?.colleges)) {
+        const found = (data.data as any).colleges.find((c: College) => c._id === selectedCollegeId);
+        if (found) setSelectedCollegeObj(found);
+      }
+    }).catch(console.error);
+  }, [selectedCollegeId]);
 
   return (
-    <header className="glass-panel border-b border-border px-6 py-4 space-y-3">
+    <header className="bg-white border-b border-slate-200 px-6 py-4 space-y-3 shadow-xs">
       {/* ── Top Row: Title & Top-Right Sign Out ────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-fg tracking-tight flex items-center gap-2">
-            <Target size={18} strokeWidth={2} className="text-primary" />
-            <span>Daily Leads</span>
-          </h1>
-          <p className="text-xs text-fg-subtle mt-0.5">
-            Manual Timestamped Register • Positives & JD Received Tracking
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-primary">
+              <Target size={18} strokeWidth={2.5} />
+            </div>
+            <h1 className="text-base font-bold text-slate-900 tracking-tight">
+              Daily Leads
+            </h1>
+            <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-semibold">
+              Positives & JD Tracking
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 mt-1 font-medium">
+            Manual Timestamped Register
           </p>
         </div>
 
         {/* Pin Selected College Logo & Sign Out to Absolute Top Right */}
         <div className="flex items-center gap-3 shrink-0">
-          {selectedCollege && (
+          {selectedCollegeObj && (
             <div
-              title={`${selectedCollege.college_name} (${selectedCollege.college_code})`}
-              className="flex items-center justify-center bg-surface/90 border border-border/80 p-1 rounded-xl shadow-sm animate-fadeIn"
+              title={`${selectedCollegeObj.college_name} (${selectedCollegeObj.college_code})`}
+              className="flex items-center justify-center bg-white border border-slate-200 px-2.5 py-1 rounded-xl shadow-xs animate-fadeIn h-9 max-w-[160px] shrink-0"
             >
-              {selectedCollege.logo_url ? (
+              {selectedCollegeObj.logo_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={selectedCollege.logo_url}
-                  alt={selectedCollege.college_name}
-                  className="w-8 h-8 object-contain rounded-lg bg-white/95 p-0.5 shadow-sm border border-border/50"
+                  src={selectedCollegeObj.logo_url}
+                  alt={selectedCollegeObj.college_name}
+                  className="max-h-7 max-w-full w-auto h-auto object-contain rounded"
                 />
               ) : (
-                <span className="w-8 h-8 rounded-lg bg-primary/20 text-primary font-bold text-xs flex items-center justify-center font-mono">
-                  {selectedCollege.college_code?.slice(0, 2) || 'CL'}
+                <span className="w-7 h-7 rounded-lg bg-blue-100 text-primary font-bold text-xs flex items-center justify-center font-mono">
+                  {selectedCollegeObj.college_code?.slice(0, 2) || 'CL'}
                 </span>
               )}
             </div>
@@ -93,47 +94,42 @@ export function LeadsHeader({
         </div>
       </div>
 
-      {/* ── Bottom Controls Row: Date, College Filter, Search, Actions ── */}
-      <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t border-border/40">
-        <div className="flex items-center gap-3 flex-wrap">
+      {/* ── Bottom Controls Row: Date, Smart College Selector, Search, Actions ── */}
+      <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t border-slate-100">
+        <div className="flex items-center gap-2.5 flex-wrap">
           {/* Date Picker */}
-          <div className="flex items-center gap-1.5 bg-background border border-border rounded-xl px-2.5 py-1.5 shadow-inner">
-            <CalendarDays size={14} strokeWidth={2} className="text-fg-subtle" />
+          <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-xl px-3 py-1.5 shadow-xs">
+            <CalendarDays size={14} strokeWidth={2} className="text-slate-400" />
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => onDateChange(e.target.value)}
-              className="bg-transparent text-xs text-fg cursor-pointer focus:outline-none"
+              className="bg-transparent text-xs text-slate-800 font-medium cursor-pointer focus:outline-none"
             />
           </div>
 
-          {/* College Filter */}
-          <select
-            value={selectedCollegeId}
-            onChange={(e) => {
-              const val = e.target.value;
-              const col = colleges.find((c) => c._id === val);
-              onCollegeChange(val, col ? col.college_name : 'All Colleges');
+          {/* Smart Auto-Shrinking College Selector */}
+          <CollegeSelector
+            selectedCollegeId={selectedCollegeId}
+            allowAll={true}
+            allLabel="All Colleges"
+            label=""
+            onSelect={(id, name) => {
+              onCollegeChange(id, name);
             }}
-            disabled={loading}
-            className="bg-surface border border-border-strong text-fg text-xs px-3 py-2 rounded-xl min-w-[200px] cursor-pointer"
-          >
-            <option value="all">All Colleges</option>
-            {colleges.map((c) => (
-              <option key={c._id} value={c._id}>
-                [{c.college_code}] {c.college_name}
-              </option>
-            ))}
-          </select>
+            onSelectCollege={(col) => {
+              setSelectedCollegeObj(col);
+            }}
+          />
 
           {/* Search Box */}
-          <div className="w-56">
+          <div className="w-52 sm:w-60">
             <input
               type="text"
               placeholder="Search company, role, remarks…"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full bg-surface border border-border-strong text-fg text-xs px-3.5 py-2 rounded-xl placeholder-fg-subtle"
+              className="w-full bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 text-slate-800 text-xs px-3.5 py-1.5 rounded-xl placeholder:text-slate-400 outline-none shadow-xs"
             />
           </div>
         </div>
@@ -142,22 +138,28 @@ export function LeadsHeader({
         <div className="flex items-center gap-2">
           <button
             onClick={onRefresh}
-            className="p-2 bg-surface hover:bg-surface-raised text-fg rounded-xl text-xs transition-colors border border-border"
-            title="Refresh"
+            className="p-2 bg-[#FEF3C7] hover:bg-[#FDE68A] text-amber-900 border border-amber-300 rounded-xl text-xs transition-colors shadow-xs cursor-pointer flex items-center justify-center"
+            title="Refresh leads"
           >
-            🔄
+            <RefreshCw size={14} strokeWidth={2} />
           </button>
 
           <button
             onClick={onExportCsv}
-            className="flex items-center gap-1.5 bg-success hover:bg-success/90 text-white px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors shadow-1"
+            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
           >
             <FileSpreadsheet size={14} strokeWidth={2} /> Export CSV
           </button>
 
           <button
-            onClick={onOpenAddModal}
-            className="flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-2 transition-colors"
+            onClick={() => {
+              if (selectedCollegeId === 'all' || !selectedCollegeId) {
+                alert('Please select a specific college from the dropdown before adding a new entry.');
+                return;
+              }
+              onOpenAddModal();
+            }}
+            className="flex items-center gap-1.5 bg-primary hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
           >
             <Plus size={14} strokeWidth={2} /> Add Entry
           </button>

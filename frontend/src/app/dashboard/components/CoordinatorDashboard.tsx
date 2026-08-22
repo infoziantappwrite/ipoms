@@ -2,8 +2,7 @@
 
 import Link from 'next/link';
 import {
-  ArrowRight, CalendarDays, Check, Landmark, Lightbulb, Megaphone,
-  PhoneCall, Target, TrendingUp, type LucideIcon,
+  ArrowRight, Check, Landmark, Megaphone,
 } from 'lucide-react';
 
 import { AssignedWorkWidget } from './AssignedWorkWidget';
@@ -15,20 +14,12 @@ interface Props {
   onMarkComplete: (id: string) => void;
 }
 
-/** Quick navigation — hue matches each module's identity in the sidebar. */
-const QUICK_NAV: { title: string; desc: string; href: string; Icon: LucideIcon; tone: string; tint: string }[] = [
-  { title: 'Daily Tracker', desc: 'Call logging & HR contacts', href: '/tracker', Icon: PhoneCall, tone: 'text-module-2', tint: 'bg-module-2/10' },
-  { title: 'Weekly Tracker', desc: 'Placement pipeline board', href: '/weekly-tracker', Icon: CalendarDays, tone: 'text-module-3', tint: 'bg-module-3/10' },
-  { title: 'Daily Leads', desc: 'Positive responses & JDs', href: '/daily-leads', Icon: Target, tone: 'text-module-4', tint: 'bg-module-4/10' },
-  { title: 'Reports & BI', desc: 'Live analytics & templates', href: '/reports', Icon: TrendingUp, tone: 'text-module-6', tint: 'bg-module-6/10' },
-];
-
 export function CoordinatorDashboard({ data, onLoadToMetadata, onMarkComplete }: Props) {
   if (!data) return null;
 
   const {
     priority_notification, assigned_work, priority_college,
-    today_tasks, kpi_summary, insights,
+    today_tasks, kpi_summary,
   } = data;
 
   // AppShell already owns the <main id="main"> landmark for every route, so
@@ -198,55 +189,6 @@ export function CoordinatorDashboard({ data, onLoadToMetadata, onMarkComplete }:
           </ol>
         </section>
       </div>
-
-      {/* ── Quick navigation ──────────────────────────────────────────────── */}
-      <nav aria-label="Module shortcuts" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {QUICK_NAV.map(({ title, desc, href, Icon, tone, tint }) => (
-          <Link
-            key={href}
-            href={href}
-            className="group flex items-center gap-3 rounded-panel border border-border bg-surface p-4 shadow-1 transition-shadow duration-200 hover:shadow-3"
-          >
-            <span aria-hidden className={`grid h-10 w-10 shrink-0 place-items-center rounded-panel ${tint} ${tone}`}>
-              <Icon size={19} strokeWidth={2} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <h3 className="truncate text-body font-bold text-fg">{title}</h3>
-              <p className="truncate text-micro text-fg-subtle">{desc}</p>
-            </div>
-            <ArrowRight
-              size={15}
-              strokeWidth={2}
-              aria-hidden
-              className="shrink-0 text-fg-subtle transition-colors duration-200 group-hover:text-primary"
-            />
-          </Link>
-        ))}
-      </nav>
-
-      {/* ── Insights ──────────────────────────────────────────────────────── */}
-      {insights?.length > 0 && (
-        <section
-          aria-labelledby="insights-heading"
-          className="rounded-panel border border-border bg-surface-sunken p-4"
-        >
-          <h2
-            id="insights-heading"
-            className="flex items-center gap-2 text-micro font-bold uppercase tracking-wide text-fg-muted"
-          >
-            <Lightbulb size={14} strokeWidth={2} className="shrink-0 text-fg-subtle" aria-hidden />
-            Observations
-          </h2>
-          <ul className="mt-2.5 space-y-1.5">
-            {insights.map((ins: string, i: number) => (
-              <li key={i} className="flex gap-2.5 text-micro leading-relaxed text-fg-muted">
-                <span aria-hidden className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-fg-disabled" />
-                {ins}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
     </div>
   );
 }

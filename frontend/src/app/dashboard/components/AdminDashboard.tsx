@@ -89,16 +89,16 @@ export function AdminDashboard({ data }: Props) {
           </div>
           <Link
             href="/reports"
-            className="text-xs text-primary hover:text-primary font-semibold flex items-center gap-1"
+            className="text-xs text-primary hover:underline font-semibold flex items-center gap-1"
           >
-            View Full Reports & BI →
+            View Full Reports & BI
           </Link>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
             <thead>
-              <tr className="bg-background/80 text-fg-subtle font-semibold border-b border-border text-micro uppercase">
+              <tr className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200 text-micro uppercase">
                 <th className="py-3 px-4">Institution Name</th>
                 <th className="py-3 px-4 text-center">Calls Logged</th>
                 <th className="py-3 px-4 text-center">Drives Conducted</th>
@@ -106,26 +106,26 @@ export function AdminDashboard({ data }: Props) {
                 <th className="py-3 px-4 text-center">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/50">
+            <tbody className="divide-y divide-slate-100 bg-white">
               {leaderboard?.map((c: any) => (
-                <tr key={c.college_id} className="hover:bg-surface/30 transition-colors">
-                  <td className="py-3 px-4 font-semibold text-fg">
+                <tr key={c.college_id} className="hover:bg-slate-50 transition-colors">
+                  <td className="py-3 px-4 font-bold text-slate-800">
                     <span className="text-primary font-mono mr-2">[{c.college_code}]</span>
                     {c.college_name}
                   </td>
-                  <td className="py-3 px-4 text-center text-fg-muted font-mono">{c.calls}</td>
-                  <td className="py-3 px-4 text-center text-warning font-mono font-bold">
+                  <td className="py-3 px-4 text-center text-slate-600 font-mono">{c.calls}</td>
+                  <td className="py-3 px-4 text-center text-amber-600 font-mono font-bold">
                     {c.drives_completed}
                   </td>
-                  <td className="py-3 px-4 text-center text-success font-bold font-mono">
+                  <td className="py-3 px-4 text-center text-emerald-600 font-bold font-mono">
                     {c.total_offers}
                   </td>
                   <td className="py-3 px-4 text-center">
                     <Link
                       href="/reports"
-                      className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 px-2.5 py-1 rounded text-micro font-semibold transition-colors"
+                      className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg text-micro font-semibold transition-colors"
                     >
-                      Audit Report →
+                      Audit Report
                     </Link>
                   </td>
                 </tr>

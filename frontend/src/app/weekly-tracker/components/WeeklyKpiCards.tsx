@@ -22,92 +22,91 @@ export function WeeklyKpiCards({ kpi, activeSectionFilter, onFilterSection }: Pr
   const cards = [
     {
       key: 'follow_ups_due_today',
-      label: 'Follow-ups Due Today',
+      label: 'Follow-ups',
       value: kpi.follow_ups_due_today,
-      subValue: 'Urgent Action',
-      color: 'text-amber-700',
-      border: 'border-amber-200 bg-amber-50/50 hover:border-amber-300',
-      activeBorder: 'border-amber-500 bg-amber-50 ring-1 ring-amber-400',
+      textColor: 'text-amber-700',
+      bgLight: 'bg-amber-50',
+      borderCol: 'border-amber-200/80 hover:border-amber-300',
+      activeBorder: 'border-amber-500 bg-amber-50/80 ring-2 ring-amber-400/30',
       Icon: Clock,
-      iconClass: 'text-amber-600',
     },
     {
       key: 'completed',
-      label: 'Companies Completed',
+      label: 'Completed',
       value: kpi.completed,
-      subValue: `${kpi.total_offers} Offers Placed`,
-      color: 'text-emerald-700',
-      border: 'border-emerald-200 bg-emerald-50/50 hover:border-emerald-300',
-      activeBorder: 'border-emerald-500 bg-emerald-50 ring-1 ring-emerald-400',
+      textColor: 'text-emerald-700',
+      bgLight: 'bg-emerald-50',
+      borderCol: 'border-emerald-200/80 hover:border-emerald-300',
+      activeBorder: 'border-emerald-500 bg-emerald-50/80 ring-2 ring-emerald-400/30',
       Icon: Trophy,
-      iconClass: 'text-emerald-600',
     },
     {
       key: 'in_progress',
-      label: 'Companies In Progress',
+      label: 'In Progress',
       value: kpi.in_progress,
-      subValue: 'Active Drives',
-      color: 'text-blue-700',
-      border: 'border-blue-200 bg-blue-50/50 hover:border-blue-300',
-      activeBorder: 'border-blue-500 bg-blue-50 ring-1 ring-blue-400',
+      textColor: 'text-blue-700',
+      bgLight: 'bg-blue-50',
+      borderCol: 'border-blue-200/80 hover:border-blue-300',
+      activeBorder: 'border-blue-500 bg-blue-50/80 ring-2 ring-blue-400/30',
       Icon: Rocket,
-      iconClass: 'text-blue-600',
     },
     {
       key: 'pipeline',
-      label: 'Companies in Pipeline',
+      label: 'Pipeline',
       value: kpi.pipeline,
-      subValue: 'Awaiting JD',
-      color: 'text-cyan-700',
-      border: 'border-cyan-200 bg-cyan-50/50 hover:border-cyan-300',
-      activeBorder: 'border-cyan-500 bg-cyan-50 ring-1 ring-cyan-400',
+      textColor: 'text-cyan-700',
+      bgLight: 'bg-cyan-50',
+      borderCol: 'border-cyan-200/80 hover:border-cyan-300',
+      activeBorder: 'border-cyan-500 bg-cyan-50/80 ring-2 ring-cyan-400/30',
       Icon: Inbox,
-      iconClass: 'text-cyan-600',
     },
     {
       key: 'top_companies',
       label: 'Top Companies',
       value: kpi.top_companies,
-      subValue: '≥ 3.5 LPA / Pinned',
-      color: 'text-purple-700',
-      border: 'border-purple-200 bg-purple-50/50 hover:border-purple-300',
-      activeBorder: 'border-purple-500 bg-purple-50 ring-1 ring-purple-400',
+      textColor: 'text-purple-700',
+      bgLight: 'bg-purple-50',
+      borderCol: 'border-purple-200/80 hover:border-purple-300',
+      activeBorder: 'border-purple-500 bg-purple-50/80 ring-2 ring-purple-400/30',
       Icon: Star,
-      iconClass: 'text-purple-600',
     },
     {
       key: 'rejected',
-      label: 'Rejected Companies',
+      label: 'Rejected',
       value: kpi.rejected,
-      subValue: 'HR / TPO Declines',
-      color: 'text-slate-600',
-      border: 'border-slate-200 bg-slate-50/50 hover:border-slate-300',
-      activeBorder: 'border-slate-400 bg-slate-100 ring-1 ring-slate-400',
+      textColor: 'text-slate-600',
+      bgLight: 'bg-slate-100',
+      borderCol: 'border-slate-200 hover:border-slate-300',
+      activeBorder: 'border-slate-500 bg-slate-100 ring-2 ring-slate-400/30',
       Icon: XCircle,
-      iconClass: 'text-slate-500',
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 w-full">
       {cards.map((c) => {
         const isActive = activeSectionFilter === c.key;
         const IconComponent = c.Icon;
         return (
           <button
             key={c.key}
+            type="button"
             onClick={() => onFilterSection(isActive ? 'all' : c.key)}
-            className={`rounded-xl p-3.5 flex flex-col text-left transition-all duration-200 border cursor-pointer shadow-xs
-                        ${isActive ? c.activeBorder : c.border}`}
+            className={`bg-white rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2 border transition-all duration-200 cursor-pointer shadow-2xs ${
+              isActive ? c.activeBorder : `${c.borderCol} hover:bg-slate-50/60`
+            }`}
           >
-            <div className="flex items-center justify-between">
-              <div className="w-8 h-8 rounded-lg bg-white border border-slate-200/80 shadow-2xs flex items-center justify-center">
-                <IconComponent size={16} strokeWidth={2} className={c.iconClass} />
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div className={`w-5 h-5 rounded-md ${c.bgLight} flex items-center justify-center shrink-0`}>
+                <IconComponent size={12} strokeWidth={2.5} className={c.textColor} aria-hidden />
               </div>
-              <span className={`text-2xl font-bold ${c.color} tabular-nums`}>{c.value}</span>
+              <span className="text-micro font-semibold text-slate-700 truncate">
+                {c.label}
+              </span>
             </div>
-            <p className="text-xs font-bold text-slate-800 mt-2 truncate">{c.label}</p>
-            <p className="text-micro text-slate-500 font-medium mt-0.5">{c.subValue}</p>
+            <span className={`text-xs font-bold font-mono tabular-nums ${c.textColor} shrink-0`}>
+              {c.value}
+            </span>
           </button>
         );
       })}

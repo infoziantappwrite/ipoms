@@ -1,0 +1,32 @@
+- generic [active] [ref=f2e1]:
+  - link "Skip to main content" [ref=f2e2] [cursor=pointer]:
+    - /url: "#main"
+  - main [ref=f2e3]:
+    - generic [ref=f2e7]:
+      - generic [ref=f2e8]:
+        - img "Infoziant" [ref=f2e10]
+        - heading "Sign in to iPOMS" [level=1] [ref=f2e11]
+        - paragraph [ref=f2e12]: Infoziant Placement Operations Management System
+      - generic [ref=f2e13]:
+        - button "Sign In" [ref=f2e14] [cursor=pointer]
+        - button "Create Account" [ref=f2e18] [cursor=pointer]
+      - alert [ref=f2e39]:
+        - generic [ref=f2e42]: No iPOMS account exists for this email address.
+      - generic [ref=f2e21]:
+        - generic [ref=f2e22]:
+          - generic [ref=f2e23]: Official Email Address
+          - textbox "name@infoziant.com" [ref=f2e24]: definitely.not.a.real.user@infoziant.com
+          - paragraph [ref=f2e25]: Type your name and press Tab — @infoziant.com is added for you.
+        - generic [ref=f2e26]:
+          - generic [ref=f2e27]:
+            - generic [ref=f2e28]: Password
+            - button "Forgot password?" [ref=f2e29] [cursor=pointer]
+          - generic [ref=f2e30]:
+            - textbox "••••••••" [ref=f2e31]: AnyPassword1@
+            - button "Show" [ref=f2e32] [cursor=pointer]
+        - generic [ref=f2e33] [cursor=pointer]:
+          - checkbox "Remember this device for 30 days" [checked] [ref=f2e34]
+          - generic [ref=f2e35]: Remember this device for 30 days
+        - button "Sign-In" [ref=f2e36] [cursor=pointer]
+  - status
+  - alert [ref=f2e38]

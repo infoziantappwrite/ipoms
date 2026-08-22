@@ -132,9 +132,19 @@ export default function DailyTrackerPage() {
     return () => clearInterval(interval);
   }, [selectedCollegeId, loadKpi]);
 
-  // ── Handle contact picker load
+  // ── Handle contact picker load (Debounced to prevent multiple parallel triggers)
+  const lastSyncRef = useRef<{ time: number; ids: string }>({ time: 0, ids: '' });
   const handleContactsLoaded = useCallback(async (companyIds: string[]) => {
     if (!selectedCollegeId || !coordinatorId || companyIds.length === 0) return;
+
+    const idsKey = companyIds.slice().sort().join(',');
+    const now = Date.now();
+    if (now - lastSyncRef.current.time < 2000 && lastSyncRef.current.ids === idsKey) {
+      // Ignore duplicate parallel trigger
+      return;
+    }
+    lastSyncRef.current = { time: now, ids: idsKey };
+
     try {
       const res = await apiFetch('/daily-tracker/load-contacts', {
         method: 'POST',
@@ -148,8 +158,8 @@ export default function DailyTrackerPage() {
         await loadTodayRows();
         await loadKpi();
         const data = res.data as any;
-        if (data.duplicates_skipped > 0) {
-          alert(`${data.duplicates_skipped} duplicate(s) already exist in today's tracker and were skipped:\n${data.duplicate_companies.join(', ')}`);
+        if (data.duplicates_skipped > 0 && data.loaded === 0) {
+          alert(`Selected contact(s) are already loaded in today's tracker for this college:\n${data.duplicate_companies.join(', ')}`);
         }
       }
     } catch (e) { console.error('[DT] Load contacts failed', e); }
@@ -317,76 +327,95 @@ export default function DailyTrackerPage() {
     return true;
   });
 
+  // ── History View Statistics
+  const historyTotalLoaded = historyRows.length;
+  const historyCompletedCount = historyRows.filter(
+    (r) => r.outcome_status && r.outcome_status !== 'none' && !r.is_skipped
+  ).length;
+  const historyDisplayDate = historyDate
+    ? new Date(historyDate).toLocaleDateString('en-IN', {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+      })
+    : '';
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-background text-fg flex flex-col">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
 
-      {/* ── Top Section: Title & Top-Right Sign Out ───────────────────────── */}
-      <header className="glass-panel border-b border-border px-6 py-4 space-y-3">
+      {/* ── Top Section: Title & Top-Right Header ───────────────────────── */}
+      <header className="bg-white border-b border-slate-200 px-6 py-4 space-y-3 shrink-0 shadow-xs">
         <div className="flex items-center justify-between gap-4">
           {/* Left: Tracker title + date */}
           <div>
-            <div className="flex items-center gap-2">
-              {isHistoryMode && (
-                <button
-                  onClick={() => setIsHistoryMode(false)}
-                  className="text-xs bg-surface-raised hover:bg-surface-raised text-fg-muted px-2 py-1 rounded-md transition-colors"
-                >
-                  ← Back to Today
-                </button>
-              )}
-              <h1 className="text-xl font-bold text-fg tracking-tight flex items-center gap-2">
-                <ClipboardList size={18} strokeWidth={2} className="text-primary" aria-hidden />
-                <span>Daily Tracker</span>
-                <span className="text-xs bg-primary/20 text-primary border border-primary/30 px-2.5 py-0.5 rounded-full font-semibold">
-                  {monthName} {yearStr}
-                </span>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-primary">
+                <ClipboardList size={18} strokeWidth={2.25} />
+              </div>
+              <h1 className="text-base font-bold text-slate-900 tracking-tight">
+                Daily Tracker
               </h1>
+              <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full font-semibold">
+                {isHistoryMode ? 'History Archive' : `${monthName} ${yearStr}`}
+              </span>
               {isHistoryMode && (
-                <span className="text-xs bg-warning/20 text-warning border border-warning/30 px-2 py-0.5 rounded-full">
+                <span className="text-micro bg-amber-50 text-amber-800 border border-amber-300 px-2.5 py-0.5 rounded-full font-bold">
                   Read-Only
                 </span>
               )}
             </div>
-            <p className="text-xs text-fg-subtle mt-0.5">{todayDisplay}</p>
+            <p className="text-xs text-slate-500 mt-1 font-medium">
+              {isHistoryMode ? historyDisplayDate : todayDisplay}
+            </p>
           </div>
 
-          {/* Right: Selected College Logo Badge + Auto-save status + Top-Right Sign Out */}
+          {/* Right: Back to Today (in history) + Selected College Logo Badge + Sign Out */}
           <div className="flex items-center gap-3">
-            {/* Selected College Logo Badge */}
+            {isHistoryMode && (
+              <button
+                onClick={() => setIsHistoryMode(false)}
+                className="px-3.5 py-1.5 bg-primary hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
+              >
+                Back to Today
+              </button>
+            )}
+
+            {/* Selected College Logo Badge (Dynamic Aspect Ratio) */}
             {selectedCollegeObj && (
               <div
                 title={`${selectedCollegeObj.college_name} (${selectedCollegeObj.college_code})`}
-                className="flex items-center justify-center bg-surface/90 border border-border/80 p-1 rounded-xl shadow-sm animate-fadeIn"
+                className="flex items-center justify-center bg-white border border-slate-200 px-2.5 py-1 rounded-xl shadow-xs animate-fadeIn h-9 max-w-[160px] shrink-0"
               >
                 {selectedCollegeObj.logo_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={selectedCollegeObj.logo_url}
                     alt={selectedCollegeObj.college_name}
-                    className="w-8 h-8 object-contain rounded-lg bg-white/95 p-0.5 shadow-sm border border-border/50"
+                    className="max-h-7 max-w-full w-auto h-auto object-contain rounded"
                   />
                 ) : (
-                  <span className="w-8 h-8 rounded-lg bg-primary/20 text-primary font-bold text-xs flex items-center justify-center font-mono">
+                  <span className="w-7 h-7 rounded-lg bg-blue-100 text-primary font-bold text-xs flex items-center justify-center font-mono">
                     {selectedCollegeObj.college_code?.slice(0, 2) || 'CL'}
                   </span>
                 )}
               </div>
             )}
 
-            <AutoSaveBadge status={saveStatus} lastSavedAt={lastSavedAt} />
+            {!isHistoryMode && (
+              <AutoSaveBadge status={saveStatus} lastSavedAt={lastSavedAt} />
+            )}
             <div className="shrink-0">
               <UserSignOutButton />
             </div>
           </div>
         </div>
 
-        {/* ── Sub-bar: College Selector & Outreach Loaded Summary ── */}
-        <div className="flex items-center justify-between gap-4 flex-wrap pt-2 border-t border-border/40">
-          <div className="flex items-center gap-3">
+        {/* ── Sub-bar: College Selector (Acronyms in History), Outcomes, Search & Counts ── */}
+        <div className="flex items-center justify-between gap-4 flex-wrap pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <CollegeSelector
               selectedCollegeId={selectedCollegeId}
+              showAcronymOnly={isHistoryMode}
               onSelect={(id, name) => {
                 setSelectedCollegeId(id);
                 setSelectedCollegeName(name);
@@ -396,19 +425,70 @@ export default function DailyTrackerPage() {
                 setSelectedCollegeObj(col);
               }}
             />
+
+            {/* In History Mode, place Outcomes dropdown and Search field in the same row */}
+            {isHistoryMode && (
+              <>
+                <select
+                  value={outcomeFilter}
+                  onChange={(e) => setOutcomeFilter(e.target.value as CallOutcome | 'all')}
+                  className="bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 text-slate-800 text-xs px-3 py-2 rounded-xl outline-none font-medium shadow-xs cursor-pointer"
+                >
+                  <option value="all">All Outcomes</option>
+                  <option value="jd_received">JD Received</option>
+                  <option value="positive">Positive</option>
+                  <option value="hiring">Hiring</option>
+                  <option value="call_back">Call Back</option>
+                  <option value="follow_up">Follow Up</option>
+                  <option value="no_response">No Response</option>
+                  <option value="not_hiring">Not Hiring</option>
+                </select>
+
+                <input
+                  type="text"
+                  placeholder="Search history records…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 text-slate-800 text-xs px-3.5 py-2 rounded-xl outline-none shadow-xs w-44 sm:w-56"
+                />
+              </>
+            )}
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-fg-muted">
-            <span>Calls Loaded Today:</span>
-            <span className="text-sm font-bold text-primary tabular-nums font-mono">{kpi?.total_loaded ?? 0}</span>
-          </div>
+          {/* Calls Counts Summary above table */}
+          {isHistoryMode ? (
+            <div className="flex items-center gap-2.5 text-xs flex-wrap">
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs">
+                <span className="text-slate-500 font-medium">Calls Loaded:</span>
+                <span className="font-bold text-slate-900 tabular-nums font-mono text-sm">{historyTotalLoaded}</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl shadow-xs">
+                <span className="text-emerald-700 font-medium">Completed:</span>
+                <span className="font-bold text-emerald-800 tabular-nums font-mono text-sm">{historyCompletedCount}</span>
+              </div>
+              <span className="text-xs text-slate-500 font-medium ml-1">
+                Showing {displayRows.length} / {historyRows.length} rows
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2.5 text-xs flex-wrap">
+              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs">
+                <span className="text-slate-500 font-medium">Calls Loaded Today:</span>
+                <span className="text-sm font-bold text-primary tabular-nums font-mono">{kpi?.total_loaded ?? 0}</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl shadow-xs">
+                <span className="text-emerald-700 font-medium">Completed:</span>
+                <span className="text-sm font-bold text-emerald-800 tabular-nums font-mono">{kpi?.completed ?? 0}</span>
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
-      {/* ── Toolbar ───────────────────────────────────────────────────────── */}
+      {/* ── Live Today Toolbar (Only rendered in live mode) ──────────────────── */}
       {!isHistoryMode && (
-        <div className="flex items-center gap-2 px-6 py-3 bg-background/50 border-b border-border flex-wrap">
-          {/* Load Today's Contacts (Opens in New Window / Tab) */}
+        <div className="flex items-center gap-2 px-6 py-3 bg-slate-50/75 border-b border-slate-200 flex-wrap">
+          {/* Load Button */}
           <button
             onClick={() => {
               if (!selectedCollegeId) {
@@ -417,26 +497,27 @@ export default function DailyTrackerPage() {
               }
               window.open('/tracker/load-contacts', '_blank');
             }}
-            className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-[2px_2px_8px_rgba(30,58,138,0.25)] active:scale-[0.98] cursor-pointer"
-            title="Open Load Today's Contacts in a New Tab"
+            className="flex items-center gap-1.5 bg-primary hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
+            title="Click me to load contacts from metadata base"
           >
-            <Download size={14} strokeWidth={2} aria-hidden /> Load Today&apos;s Contacts
+            <Download size={14} strokeWidth={2.5} aria-hidden /> Load
           </button>
 
-          {/* Save Progress (Ctrl+S) */}
+          {/* Save Button */}
           <button
             onClick={handleSaveProgress}
             disabled={!selectedCollegeId}
-            className="flex items-center gap-2 bg-success hover:bg-success disabled:opacity-40 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
+            title="You can use Ctrl + S to save the progress"
           >
-            <Save size={14} strokeWidth={2} aria-hidden /> Save Progress
-            <kbd className="text-xs bg-success px-1 py-0.5 rounded">Ctrl+S</kbd>
+            <Save size={14} strokeWidth={2.5} aria-hidden /> Save
           </button>
 
-          {/* Refresh */}
+          {/* Refresh (Butter Yellow) */}
           <button
             onClick={() => { loadTodayRows(); loadKpi(); }}
-            className="flex items-center gap-2 bg-surface-raised hover:bg-surface-raised text-fg px-3 py-2 rounded-lg text-sm transition-colors"
+            className="flex items-center gap-1.5 bg-[#FEF3C7] hover:bg-[#FDE68A] text-amber-900 border border-amber-300 px-3.5 py-2 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
+            title="Refresh calls table"
           >
             <RefreshCw size={14} strokeWidth={2} aria-hidden /> Refresh
           </button>
@@ -444,19 +525,19 @@ export default function DailyTrackerPage() {
           {/* History / Calendar */}
           <button
             onClick={() => setIsCalendarOpen(true)}
-            className="flex items-center gap-2 bg-surface-raised hover:bg-surface-raised text-fg px-3 py-2 rounded-lg text-sm transition-colors"
+            className="flex items-center gap-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer"
           >
             <CalendarDays size={14} strokeWidth={2} aria-hidden /> History
           </button>
 
           {/* Divider */}
-          <div className="h-6 w-px bg-surface-raised mx-1" />
+          <div className="h-6 w-px bg-slate-200 mx-1" />
 
           {/* Filter by outcome */}
           <select
             value={outcomeFilter}
             onChange={(e) => setOutcomeFilter(e.target.value as CallOutcome | 'all')}
-            className="bg-surface border border-border-strong text-fg text-sm px-3 py-2 rounded-lg"
+            className="bg-white border border-slate-300 text-slate-800 text-xs px-3 py-2 rounded-xl outline-none font-medium shadow-xs"
           >
             <option value="all">All Outcomes</option>
             <option value="jd_received">JD Received</option>
@@ -480,20 +561,20 @@ export default function DailyTrackerPage() {
               placeholder="Search company, HR, mobile…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-surface border border-border-strong text-fg text-sm px-3 py-2 rounded-lg placeholder-fg-subtle"
+              className="w-full bg-white border border-slate-300 text-slate-800 text-xs px-3.5 py-2 rounded-xl outline-none placeholder:text-slate-400 shadow-xs"
             />
           </div>
 
           {/* Row count */}
-          <span className="ml-auto text-xs text-fg-subtle">
+          <span className="ml-auto text-xs text-slate-500 font-medium">
             Showing {displayRows.length} / {rows.length} rows
           </span>
         </div>
       )}
 
-      {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
+      {/* ── KPI Cards (Slim Single-Row Profile) ──────────────────────────── */}
       {kpi && !isHistoryMode && (
-        <div className="px-6 py-4">
+        <div className="px-6 py-2">
           <KpiCards kpi={kpi} />
         </div>
       )}
@@ -520,28 +601,19 @@ export default function DailyTrackerPage() {
       )}
 
       {/* ── Bottom Status Bar ─────────────────────────────────────────────── */}
-      <footer className="glass-panel border-t border-border px-6 py-2 flex items-center gap-6 text-xs text-fg-subtle">
-        <span>Total: <strong className="text-fg">{rows.length}</strong> rows</span>
-        <span>Completed: <strong className="text-success">{kpi?.completed ?? 0}</strong></span>
-        <span>Pending: <strong className="text-warning">{kpi?.pending ?? 0}</strong></span>
-        <span>Positive: <strong className="text-primary">{kpi?.positive ?? 0}</strong></span>
-        {kpi && kpi.total_loaded > 0 && (
-          <span>
-            Progress:{' '}
-            <strong className="text-fg">
-              {Math.round(((kpi.completed + kpi.skipped) / kpi.total_loaded) * 100)}%
-            </strong>
-          </span>
-        )}
+      <footer className="bg-white border-t border-slate-200 px-6 py-2.5 flex items-center gap-6 text-xs text-slate-500 font-medium shrink-0">
+        <span>Total: <strong className="text-slate-900">{isHistoryMode ? historyRows.length : rows.length}</strong> rows</span>
+        <span>Completed: <strong className="text-emerald-700 font-bold">{isHistoryMode ? historyCompletedCount : (kpi?.completed ?? 0)}</strong></span>
+        <span>Pending: <strong className="text-amber-700 font-bold">{isHistoryMode ? Math.max(0, historyTotalLoaded - historyCompletedCount) : (kpi?.pending ?? 0)}</strong></span>
+        {!isHistoryMode && <span>Positive: <strong className="text-primary font-bold">{kpi?.positive ?? 0}</strong></span>}
         {isHistoryMode && (
-          <span className="ml-auto text-warning flex items-center gap-1.5">
-            <BookOpen size={13} strokeWidth={2} aria-hidden />
-            Viewing history — {historyDate} — Read-Only
+          <span className="ml-auto text-slate-400 font-medium text-xs">
+            {historyDate}
           </span>
         )}
         {lastSavedAt && !isHistoryMode && (
-          <span className="ml-auto">
-            Last saved: <strong className="text-fg-muted">{lastSavedAt.toLocaleTimeString('en-IN')}</strong>
+          <span className="ml-auto text-slate-500">
+            Last saved: <strong className="text-slate-700 font-mono">{lastSavedAt.toLocaleTimeString('en-IN')}</strong>
           </span>
         )}
       </footer>

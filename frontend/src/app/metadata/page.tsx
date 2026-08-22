@@ -227,14 +227,14 @@ export default function MetadataPage() {
                 onClick={() => setPage(page - 1)}
                 className="px-3 py-1.5 bg-background border border-border hover:bg-surface disabled:opacity-40 rounded-lg"
               >
-                ← Previous
+                Previous
               </button>
               <button
                 disabled={page >= totalPages}
                 onClick={() => setPage(page + 1)}
-                className="px-3 py-1.5 bg-background border border-border hover:bg-surface disabled:opacity-40 rounded-lg"
+                className="px-3 py-1.5 bg-background border border-border hover:bg-surface disabled:opacity-40 rounded-lg cursor-pointer"
               >
-                Next →
+                Next
               </button>
             </div>
           </div>

@@ -1,8 +1,9 @@
-'use client';
-
 import { useState, useEffect } from 'react';
-import { Globe, Save, Sparkles, Wrench, BarChart3, TrendingUp, GraduationCap, UserCheck } from 'lucide-react';
+import { Globe, Save, Sparkles, Wrench, BarChart3, TrendingUp, GraduationCap, UserCheck, Calendar, AlertCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+
+import { CollegeSelector } from '@/components/CollegeSelector';
+import { DateRangeCalendar, formatPeriodFromDates } from './DateRangeCalendar';
 
 interface College {
   _id: string;
@@ -26,7 +27,14 @@ export function ReportBuilderWizard({
   const [templateType, setTemplateType] = useState(initialTemplateType || 'weekly_placement');
   const [collegeId, setCollegeId] = useState(initialCollegeId || 'all');
   const [academicYear, setAcademicYear] = useState('2026');
-  const [weekLabel, setWeekLabel] = useState('Week 30: 18 Jul - 24 Jul 2026');
+  
+  // Dynamic Interactive Date Range Calendar Selection
+  const [startDate, setStartDate] = useState('2026-08-21');
+  const [endDate, setEndDate] = useState('2026-08-27');
+  const [weekLabel, setWeekLabel] = useState(
+    () => formatPeriodFromDates('2026-08-21', '2026-08-27') || 'August 2026 • Week 3: 21 Aug – 27 Aug 2026'
+  );
+
   const [theme, setTheme] = useState('blue');
   const [customRemarks, setCustomRemarks] = useState(
     'All campus drives are progressing actively as per schedule. Follow-ups with upcoming tech partners remain on track.'
@@ -49,20 +57,59 @@ export function ReportBuilderWizard({
   const [showSavePresetModal, setShowSavePresetModal] = useState(false);
 
   useEffect(() => {
-    fetch(`${API}/colleges`)
-      .then((r) => r.json())
+    apiFetch('/colleges')
       .then((data) => {
-        if (data.success) setColleges(data.data.colleges);
+        if (data.success && Array.isArray((data.data as any)?.colleges)) {
+          setColleges((data.data as any).colleges);
+        }
       })
       .catch(console.error);
   }, []);
 
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+
   const handleGenerate = async () => {
+    setValidationErrors([]);
+
+    const errors: string[] = [];
+
+    // 1. Mandatory Target College (Option 2)
+    if (!collegeId || collegeId.trim() === '') {
+      errors.push('Option 2: Target College must be selected.');
+    }
+
+    // 2. Mandatory Graduating Academic Year (Option 3)
+    if (!academicYear || academicYear.trim() === '') {
+      errors.push('Option 3: Graduating Academic Year must be selected.');
+    }
+
+    // 3. Mandatory Date Range (Option 4) with minimum 5 days verification
+    if (!startDate || !endDate) {
+      errors.push('Option 4: Both "From" and "To" dates are required for the Report Period.');
+    } else {
+      const s = new Date(startDate + 'T00:00:00');
+      const e = new Date(endDate + 'T00:00:00');
+      if (s > e) {
+        errors.push('Option 4: The "From" start date cannot be after the "To" end date.');
+      } else {
+        const diffDays = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        if (diffDays < 5) {
+          errors.push(
+            `Option 4: Weekly Report date range must span a minimum of 5 days (currently ${diffDays} day${diffDays === 1 ? '' : 's'}).`
+          );
+        }
+      }
+    }
+
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await fetch(`${API}/reports/generate`, {
+      const res = await apiFetch('/reports/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           template_type: templateType,
           college_id: collegeId,
@@ -74,15 +121,14 @@ export function ReportBuilderWizard({
           custom_remarks: customRemarks,
         }),
       });
-      const data = await res.json();
-      if (data.success) {
-        onReportGenerated(data.data.report);
+      if (res.success && res.data) {
+        onReportGenerated((res.data as any).report);
       } else {
-        alert(data.error?.message || 'Failed to generate report');
+        setValidationErrors([res.error?.message || 'Failed to generate report']);
       }
     } catch (err) {
       console.error('Generate report error:', err);
-      alert('Network error while generating report');
+      setValidationErrors(['Network error while generating report. Please try again.']);
     } finally {
       setLoading(false);
     }
@@ -94,154 +140,177 @@ export function ReportBuilderWizard({
       return;
     }
     try {
-      const res = await fetch(`${API}/reports/presets`, {
+      const res = await apiFetch('/reports/presets', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           template_type: templateType,
           preset_name: presetName.trim(),
-          college_id: collegeId,
-          coordinator_id: coordinatorId,
-          academic_year: academicYear,
+          college_id: collegeId === 'all' ? null : collegeId,
           theme,
+          academic_year: academicYear,
+          week_label: weekLabel,
           included_sections: sections,
           custom_remarks: customRemarks,
         }),
       });
-      const data = await res.json();
-      if (data.success) {
-        alert('Preset saved to Report Library successfully!');
+      if (res.success) {
+        alert('Preset saved to Report Library successfully');
         setShowSavePresetModal(false);
         setPresetName('');
+      } else {
+        alert(res.error?.message || 'Failed to save preset');
       }
     } catch (err) {
       console.error('Save preset error:', err);
+      alert('Network error while saving preset');
     }
   };
 
-  return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+  const TEMPLATES = [
+    { id: 'weekly_placement', label: 'Weekly Placement', icon: BarChart3 },
+    { id: 'monthly_placement', label: 'Monthly Placement', icon: TrendingUp },
+    { id: 'college_deep_dive', label: 'College Deep-Dive', icon: GraduationCap },
+    { id: 'coordinator_activity', label: 'Coordinator Activity', icon: UserCheck },
+  ];
 
-      <div className="glass-panel rounded-2xl border border-border p-6 shadow-4 space-y-6">
+  return (
+    <div className="space-y-6">
+      {/* Wizard Form Card */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-6">
 
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border pb-4">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
           <div>
-            <h2 className="text-base font-bold text-fg flex items-center gap-2">
-              <Wrench size={16} strokeWidth={2} className="text-primary" />
-              <span>Guided Report Builder Wizard</span>
+            <h2 className="text-base font-bold text-slate-800 tracking-tight flex items-center gap-2">
+              <Wrench size={18} strokeWidth={2} className="text-primary" /> Guided Report Builder Wizard
             </h2>
-            <p className="text-xs text-fg-subtle mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               Configure parameters, select sections, and generate an interactive live report
             </p>
           </div>
           <button
             type="button"
             onClick={() => setShowSavePresetModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-surface hover:bg-surface-raised text-primary border border-primary/30 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer shadow-xs"
           >
-            <Save size={14} strokeWidth={2} aria-hidden /> Save as Preset
+            <Save size={14} strokeWidth={2} /> Save as Preset
           </button>
         </div>
 
-        {/* Step 1: Select Template Type */}
+        {/* Step 1: Select Report Template (Slim Profile) */}
         <div>
-          <label className="block text-xs font-semibold text-fg-muted mb-2">
+          <label className="block text-xs font-semibold text-slate-700 mb-2">
             1. Select Report Template
           </label>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-            {[
-              { id: 'weekly_placement', label: 'Weekly Placement', Icon: BarChart3 },
-              { id: 'monthly_placement', label: 'Monthly Placement', Icon: TrendingUp },
-              { id: 'college_performance', label: 'College Deep-Dive', Icon: GraduationCap },
-              { id: 'coordinator_performance', label: 'Coordinator Activity', Icon: UserCheck },
-            ].map((t) => {
-              const IconComponent = t.Icon;
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {TEMPLATES.map((t) => {
+              const IconComponent = t.icon;
               const isSelected = templateType === t.id;
               return (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => setTemplateType(t.id)}
-                  className={`p-3 rounded-xl border text-xs font-semibold flex flex-col items-center gap-2 transition-all text-center cursor-pointer
-                              ${
-                                isSelected
-                                  ? 'bg-primary text-white border-primary shadow-xs'
-                                  : 'bg-surface border-border text-fg-subtle hover:border-border-strong hover:text-fg'
-                              }`}
+                  className={`px-3 py-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer select-none shadow-2xs ${
+                    isSelected
+                      ? 'bg-primary text-white border-primary shadow-xs font-bold'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                  }`}
                 >
-                  <IconComponent size={20} strokeWidth={isSelected ? 2.25 : 1.75} className={isSelected ? 'text-white' : 'text-slate-500'} />
-                  <span>{t.label}</span>
+                  <IconComponent
+                    size={14}
+                    strokeWidth={isSelected ? 2.5 : 2}
+                    className={isSelected ? 'text-white shrink-0' : 'text-slate-500 shrink-0'}
+                  />
+                  <span className="truncate">{t.label}</span>
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Step 2: Choose Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-          {/* Target College */}
+        {/* Step 2 & Step 3: Target College & Graduating Academic Year */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          {/* Step 2: Target College */}
           <div>
-            <label className="block text-xs font-semibold text-fg-muted mb-1">
-              2. Target College
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              2. Target College <span className="text-red-500 font-bold ml-0.5">*</span>
+            </label>
+            <CollegeSelector
+              selectedCollegeId={collegeId}
+              allowAll={true}
+              allLabel="All Colleges (Consolidated)"
+              label=""
+              onSelect={(id) => {
+                setCollegeId(id);
+                setValidationErrors([]);
+              }}
+            />
+          </div>
+
+          {/* Step 3: Graduating Academic Year */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              3. Graduating Academic Year <span className="text-red-500 font-bold ml-0.5">*</span>
             </label>
             <select
-              value={collegeId}
-              onChange={(e) => setCollegeId(e.target.value)}
-              className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg text-xs cursor-pointer"
-            >
-              <option value="all"><Globe size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}All Colleges (Consolidated)</option>
-              {colleges.map((c) => (
-                <option key={c._id} value={c._id}>
-                  [{c.college_code}] {c.college_name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Academic Year */}
-          <div>
-            <label className="block text-xs font-semibold text-fg-muted mb-1">Academic Year</label>
-            <select
               value={academicYear}
-              onChange={(e) => setAcademicYear(e.target.value)}
-              className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg text-xs cursor-pointer"
+              onChange={(e) => {
+                setAcademicYear(e.target.value);
+                setValidationErrors([]);
+              }}
+              className="w-full bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3 py-2 text-slate-800 text-xs cursor-pointer outline-none font-medium shadow-xs"
             >
-              <option value="2026">2026 Batch Season</option>
-              <option value="2025">2025 Batch Season</option>
+              <option value="">-- Select Graduating Year --</option>
+              <option value="2026">2026 Graduating</option>
+              <option value="2027">2027 Graduating</option>
+              <option value="2028">2028 Graduating</option>
+              <option value="2029">2029 Graduating</option>
+              <option value="2030">2030 Graduating</option>
+              <option value="2031">2031 Graduating</option>
+              <option value="2032">2032 Graduating</option>
+              <option value="2033">2033 Graduating</option>
+              <option value="2034">2034 Graduating</option>
+              <option value="2035">2035 Graduating</option>
             </select>
-          </div>
-
-          {/* Report Period Label */}
-          <div>
-            <label className="block text-xs font-semibold text-fg-muted mb-1">Period Header</label>
-            <input
-              type="text"
-              value={weekLabel}
-              onChange={(e) => setWeekLabel(e.target.value)}
-              className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg text-xs "
-            />
           </div>
         </div>
 
-        {/* Step 3: Choose Sections to Include (Spec Section 9.6) */}
+        {/* Step 4: Report Period & Weekly Date Range */}
+        <div className="space-y-2 pt-2">
+          <label className="block text-xs font-semibold text-slate-700">
+            4. Report Period & Weekly Date Range <span className="text-red-500 font-bold ml-0.5">*</span>
+          </label>
+          <DateRangeCalendar
+            startDate={startDate}
+            endDate={endDate}
+            onChangeRange={(s, e, calculatedLabel) => {
+              setStartDate(s);
+              setEndDate(e);
+              setWeekLabel(calculatedLabel);
+              setValidationErrors([]);
+            }}
+          />
+        </div>
+
+        {/* Step 5: Choose Sections to Include (Spec Section 9.6) */}
         <div className="pt-2">
-          <label className="block text-xs font-semibold text-fg-muted mb-2">
-            3. Included Sections in Generated Report
+          <label className="block text-xs font-semibold text-slate-700 mb-2">
+            5. Included Sections in Generated Report
           </label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
             {Object.entries(sections).map(([key, val]) => (
               <label
                 key={key}
-                className="flex items-center gap-2 bg-background/60 border border-border p-2.5 rounded-lg cursor-pointer hover:bg-surface/60 transition-colors select-none"
+                className="flex items-center gap-2 bg-slate-50 border border-slate-200 p-2.5 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors select-none"
               >
                 <input
                   type="checkbox"
                   checked={val}
                   onChange={(e) => setSections({ ...sections, [key]: e.target.checked })}
-                  className="rounded bg-surface border-border-strong text-primary "
+                  className="rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
                 />
-                <span className="capitalize text-fg-muted font-medium">
+                <span className="capitalize font-medium text-slate-700">
                   {key.replace('_', ' ')}
                 </span>
               </label>
@@ -249,58 +318,49 @@ export function ReportBuilderWizard({
           </div>
         </div>
 
-        {/* Step 4: Color Theme (Spec Section 10.3) */}
+        {/* Step 6: Coordinator Custom Remarks */}
         <div className="pt-2">
-          <label className="block text-xs font-semibold text-fg-muted mb-2">
-            4. Visual Branding Theme
-          </label>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {[
-              { id: 'blue', label: 'Infoziant Deep Blue', bg: 'bg-primary' },
-              { id: 'green', label: 'Emerald Green', bg: 'bg-success' },
-              { id: 'purple', label: 'Corporate Purple', bg: 'bg-purple-600' },
-              { id: 'college_branded', label: 'College Branded Theme', bg: 'bg-gradient-to-r from-primary to-indigo-600' },
-            ].map((th) => (
-              <button
-                key={th.id}
-                type="button"
-                onClick={() => setTheme(th.id)}
-                className={`p-3 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-all
-                            ${
-                              theme === th.id
-                                ? 'border-white bg-surface text-white shadow-2'
-                                : 'border-border bg-background/40 text-fg-subtle'
-                            }`}
-              >
-                <span className={`w-3.5 h-3.5 rounded-full ${th.bg} shrink-0`} />
-                <span className="text-micro truncate">{th.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Custom Remarks */}
-        <div>
-          <label className="block text-xs font-semibold text-fg-muted mb-1">
-            Coordinator Remarks & Notes
+          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+            6. Coordinator Remarks & Notes
           </label>
           <textarea
             rows={2}
             value={customRemarks}
             onChange={(e) => setCustomRemarks(e.target.value)}
-            className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg text-xs "
+            className="w-full bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl p-3 text-xs text-slate-800 outline-none shadow-xs"
           />
         </div>
 
-        {/* Action Button */}
-        <div className="pt-4 border-t border-border flex items-center justify-end gap-3">
+        {/* Minimal SaaS Theme Matching Mandatory Alert */}
+        {validationErrors.length > 0 && (
+          <div className="p-3.5 bg-slate-50 border border-rose-200 rounded-xl text-xs space-y-2 animate-fadeIn shadow-2xs">
+            <div className="flex items-center gap-2 text-rose-700 font-bold">
+              <AlertCircle size={15} strokeWidth={2.25} className="text-rose-600 shrink-0" />
+              <span>Mandatory Options Required</span>
+            </div>
+            <p className="text-slate-600 text-micro">
+              These mandatory fields are missed by you. Please select them before generating the report:
+            </p>
+            <ul className="space-y-1 text-slate-700 text-micro pl-1 font-medium">
+              {validationErrors.map((err, i) => (
+                <li key={i} className="flex items-center gap-1.5 text-rose-700 font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                  <span>{err}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Generate Report Submit Button */}
+        <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-3">
           <button
             type="button"
             onClick={handleGenerate}
             disabled={loading}
-            className="px-6 py-2.5 bg-primary hover:bg-primary disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-3 transition-colors flex items-center gap-2"
+            className="px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
           >
-            <Sparkles size={14} strokeWidth={2} aria-hidden /> {loading ? 'Aggregating Live Data…' : 'Generate Live Report & Open Editor →'}
+            <Sparkles size={14} strokeWidth={2} aria-hidden /> {loading ? 'Generating…' : 'Generate Report'}
           </button>
         </div>
 
@@ -308,37 +368,36 @@ export function ReportBuilderWizard({
 
       {/* Modal: Save Preset */}
       {showSavePresetModal && (
-        <div className="fixed inset-0 scrim flex items-center justify-center z-50 p-4">
-          <div className="glass-panel rounded-2xl w-full max-w-md border border-border-strong shadow-4 p-6 space-y-4">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Save size={14} strokeWidth={2} aria-hidden /> Save Preset to Report Library
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="rounded-2xl w-full max-w-md bg-white border border-slate-200 shadow-2xl p-6 space-y-4">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Save size={16} strokeWidth={2} className="text-primary" /> Save Preset to Report Library
             </h3>
-            <p className="text-xs text-fg-subtle">
-              Save current filter and section selections as a reusable template preset.
+            <p className="text-xs text-slate-500">
+              Save your current filters, section toggles, and remarks to quickly reload later.
             </p>
             <div>
-              <label className="block text-xs font-semibold text-fg-muted mb-1">Preset Name</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Preset Name</label>
               <input
                 type="text"
                 value={presetName}
                 onChange={(e) => setPresetName(e.target.value)}
-                placeholder="e.g. AAA CET Friday Review Preset"
-                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg text-xs "
-                autoFocus
+                placeholder="e.g. Weekly Dean Summary Preset"
+                className="w-full bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2 text-xs text-slate-900 outline-none"
               />
             </div>
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setShowSavePresetModal(false)}
-                className="px-4 py-2 bg-surface text-fg-muted rounded-lg text-xs"
+                className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleSavePreset}
-                className="px-4 py-2 bg-primary hover:bg-primary text-white rounded-lg text-xs font-semibold"
+                className="px-5 py-2 bg-primary hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
               >
                 Save Preset
               </button>
@@ -346,7 +405,6 @@ export function ReportBuilderWizard({
           </div>
         </div>
       )}
-
     </div>
   );
 }

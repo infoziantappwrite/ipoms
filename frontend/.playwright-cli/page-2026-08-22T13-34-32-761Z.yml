@@ -1,0 +1,32 @@
+- generic [active] [ref=e1]:
+  - link "Skip to main content" [ref=e2] [cursor=pointer]:
+    - /url: "#main"
+  - main [ref=e3]:
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - img "Infoziant" [ref=e10]
+        - heading "Sign in to iPOMS" [level=1] [ref=e11]
+        - paragraph [ref=e12]: Infoziant Placement Operations Management System
+      - generic [ref=e13]:
+        - button "Sign In" [ref=e14] [cursor=pointer]
+        - button "Create Account" [ref=e18] [cursor=pointer]
+      - alert [ref=e38]:
+        - generic [ref=e41]: Incorrect password. 1 attempt remaining before your account is locked.
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - generic [ref=e23]: Official Email Address
+          - textbox "name@infoziant.com" [ref=e24]: e2e.lockout.001@infoziant.com
+          - paragraph [ref=e25]: Type your name and press Tab — @infoziant.com is added for you.
+        - generic [ref=e26]:
+          - generic [ref=e27]:
+            - generic [ref=e28]: Password
+            - button "Forgot password?" [ref=e29] [cursor=pointer]
+          - generic [ref=e30]:
+            - textbox "••••••••" [ref=e31]: WrongPassword1@
+            - button "Show" [ref=e32] [cursor=pointer]
+        - generic [ref=e33] [cursor=pointer]:
+          - checkbox "Remember this device for 30 days" [checked] [ref=e34]
+          - generic [ref=e35]: Remember this device for 30 days
+        - button "Sign-In" [ref=e36] [cursor=pointer]
+  - status
+  - alert [ref=e42]
