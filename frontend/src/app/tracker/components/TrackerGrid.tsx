@@ -2,7 +2,7 @@
 
 import { TrackerRow } from './TrackerRow';
 import type { TrackerRow as TrackerRowType, CallOutcome } from '../page';
-import { Download } from 'lucide-react';
+import { ClipboardList, Download } from 'lucide-react';
 
 interface Props {
   rows: TrackerRowType[];
@@ -12,15 +12,16 @@ interface Props {
 }
 
 const COLUMN_HEADERS = [
-  { label: 'S.No', width: 'w-12' },
+  { label: '#', width: 'w-12 text-center' },
   { label: 'Start Time', width: 'w-28' },
   { label: 'End Time', width: 'w-28' },
   { label: 'Duration', width: 'w-20' },
   { label: 'Company Name', width: 'min-w-[160px] flex-1' },
-  { label: 'HR Name', width: 'w-36' },
-  { label: 'Mobile', width: 'w-32' },
-  { label: 'Email', width: 'w-44' },
-  { label: 'Call Outcome', width: 'w-44' },
+  { label: 'HR Name', width: 'w-32' },
+  { label: 'Contact', width: 'w-32' },
+  { label: 'Email ID', width: 'w-40' },
+  { label: 'Call Outcome / Status', width: 'w-44' },
+  { label: 'Follow Up', width: 'w-36' },
   { label: 'Comments', width: 'flex-1 min-w-[140px]' },
   { label: 'Actions', width: 'w-16' },
 ];
@@ -29,7 +30,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onSkip }: Props) {
   if (rows.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 text-fg-muted py-16">
-        <div className="text-5xl">📋</div>
+        <ClipboardList size={44} strokeWidth={1.5} aria-hidden />
         <p className="text-lg font-semibold text-fg-subtle">
           {isReadOnly ? 'No calls recorded on this date.' : "No contacts loaded yet."}
         </p>

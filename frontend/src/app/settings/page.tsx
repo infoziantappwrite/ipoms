@@ -91,6 +91,9 @@ export default function SettingsPage() {
             const parsed = JSON.parse(stored);
             parsed.full_name = (res.data as any).full_name;
             parsed.profile_photo_url = (res.data as any).profile_photo_url;
+            parsed.is_profile_locked = (res.data as any).is_profile_locked;
+            parsed.linkedin_profile = (res.data as any).linkedin_profile;
+            parsed.date_of_joining = (res.data as any).date_of_joining;
             localStorage.setItem('ipoms_user', JSON.stringify(parsed));
           }
         } catch { /* ignore */ }
@@ -156,16 +159,11 @@ export default function SettingsPage() {
       {/* ── Top Header Bar (Clean Title + Subtitle on Left, Sign Out on Far Right) ── */}
       <div className="glass-panel border-b border-border px-6 py-5 flex items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-              <Settings size={18} strokeWidth={2} aria-hidden />
-              <span>{isAdmin ? 'Settings & System Administration' : 'Profile'}</span>
-            </h1>
-            <span className="text-xs bg-primary/20 text-primary border border-primary/30 px-2.5 py-0.5 rounded-full font-semibold">
-              {isAdmin ? 'Administration & Governance' : 'Personal Profile'}
-            </span>
-          </div>
-          <p className="text-xs text-fg-subtle mt-1">
+          <h1 className="text-xl font-bold text-fg tracking-tight flex items-center gap-2">
+            <Settings size={18} strokeWidth={2} className="text-primary" aria-hidden />
+            <span>{isAdmin ? 'Settings & System Administration' : 'Profile'}</span>
+          </h1>
+          <p className="text-xs text-fg-subtle mt-0.5">
             {isAdmin
               ? 'Personal Profile, User Accounts, Role Permissions (RBAC) & Global Season Configuration'
               : 'Manage your profile picture, personal contact details, residential address, and security'}

@@ -1,8 +1,6 @@
 {
-  "/reports/page": "app/reports/page.js",
-  "/tracker/page": "app/tracker/page.js",
-  "/settings/page": "app/settings/page.js",
+  "/page": "app/page.js",
+  "/tracker/load-contacts/page": "app/tracker/load-contacts/page.js",
   "/login/page": "app/login/page.js",
-  "/daily-leads/page": "app/daily-leads/page.js",
-  "/weekly-tracker/page": "app/weekly-tracker/page.js"
+  "/home/page": "app/home/page.js"
 }

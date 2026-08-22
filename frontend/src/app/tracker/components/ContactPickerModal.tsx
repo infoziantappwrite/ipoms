@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Download } from 'lucide-react';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { CheckSquare, ChevronLeft, ChevronRight, Download, Loader2, Sparkles, X } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 
 interface Company {
   _id: string;
@@ -28,22 +27,26 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
+
   const searchRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<NodeJS.Timeout>();
 
   const fetchCompanies = useCallback(async (q: string, p: number) => {
     setLoading(true);
     try {
-      const url = `${API}/companies/search?q=${encodeURIComponent(q)}&page=${p}&limit=50`;
-      const r = await fetch(url);
-      const data = await r.json();
-      if (data.success) {
-        setCompanies(data.data.companies);
-        setTotal(data.data.pagination.total);
-        setTotalPages(data.data.pagination.totalPages);
+      const res = await apiFetch(`/companies/search?q=${encodeURIComponent(q)}&page=${p}&limit=100`);
+      if (res.success) {
+        const data = res.data as any;
+        setCompanies(data.companies || []);
+        setTotal(data.pagination?.total || 0);
+        setTotalPages(data.pagination?.totalPages || 1);
       }
-    } catch (e) { console.error('[Picker] Fetch failed', e); }
-    finally { setLoading(false); }
+    } catch (e) {
+      console.error('[Picker] Fetch failed', e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   // Initial load + debounced search
@@ -52,24 +55,51 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
     debounceRef.current = setTimeout(() => {
       fetchCompanies(query, 1);
       setPage(1);
-    }, 200);
+      setLastClickedIndex(null);
+    }, 250);
   }, [query, fetchCompanies]);
 
   useEffect(() => {
     fetchCompanies(query, page);
+    setLastClickedIndex(null);
   }, [page]);
 
   useEffect(() => {
     setTimeout(() => searchRef.current?.focus(), 50);
   }, []);
 
-  const toggleSelect = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  // ─── Shift + Click & Ctrl / Cmd Multi-Selection (Google Sheets / Excel Style) ───
+  const handleRowClick = (index: number, id: string, e: React.MouseEvent) => {
+    const isShift = e.shiftKey;
+    const isCtrl = e.ctrlKey || e.metaKey;
+
+    if (isShift && lastClickedIndex !== null) {
+      const start = Math.min(lastClickedIndex, index);
+      const end = Math.max(lastClickedIndex, index);
+      const rangeIds = companies.slice(start, end + 1).map((c) => c._id);
+
+      setSelected((prev) => {
+        const next = new Set(prev);
+        rangeIds.forEach((item) => next.add(item));
+        return next;
+      });
+    } else if (isCtrl) {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+      setLastClickedIndex(index);
+    } else {
+      setSelected((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+      setLastClickedIndex(index);
+    }
   };
 
   const handleSelectAll = () => {
@@ -99,143 +129,211 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
 
   // Keyboard: Escape closes
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 scrim flex items-center justify-center z-50">
-      <div className="glass-panel rounded-2xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col
-                      border border-border-strong shadow-4">
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fade-in">
+      {/* Expansive Window Container with Crisp Light Neumorphic Styling */}
+      <div className="bg-white border border-border rounded-3xl w-full max-w-6xl h-[92vh] flex flex-col shadow-[0_20px_60px_rgba(0,0,0,0.12),0_4px_16px_rgba(0,0,0,0.06)] overflow-hidden">
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border-strong">
-          <div>
-            <h2 className="text-lg font-semibold text-white"><Download size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}Load Today's Contacts</h2>
-            <p className="text-xs text-fg-subtle mt-0.5">
-              Read-only view — Add/Edit/Delete available in Master Company Database only
-            </p>
-          </div>
-          <button onClick={onClose} className="text-fg-subtle hover:text-white text-xl transition-colors">✕</button>
-        </div>
-
-        {/* Search bar */}
-        <div className="px-6 py-3 border-b border-border">
-          <input
-            ref={searchRef}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by company name, HR name, mobile, or email…"
-            className="w-full bg-surface border border-border-strong text-fg px-4 py-2.5 rounded-lg
-                       placeholder-fg-subtle text-sm"
-          />
-          <div className="flex items-center justify-between mt-2 text-xs text-fg-subtle">
-            <span>
-              {loading ? 'Searching…' : `${total.toLocaleString()} companies found`}
-            </span>
-            <div className="flex gap-3">
-              <button onClick={handleSelectAll} className="text-primary hover:text-primary transition-colors">
-                Select All on Page ({companies.length})
-              </button>
-              <button onClick={handleDeselectAll} className="text-fg-subtle hover:text-fg-muted transition-colors">
-                Deselect Page
-              </button>
+        {/* Top Header Bar */}
+        <div className="flex items-center justify-between px-6 py-4 bg-surface-sunken border-b border-border shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-[inset_1px_1px_2px_rgba(0,0,0,0.04)]">
+              <Download size={18} strokeWidth={2} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-fg tracking-tight">Load Today's Contacts</h2>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                  Read-Only Master Picker
+                </span>
+              </div>
+              <p className="text-xs text-fg-subtle mt-0.5">
+                Select company contacts to populate your active Daily Tracker workspace. Master records remain protected.
+              </p>
             </div>
           </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="w-8 h-8 rounded-lg bg-surface hover:bg-surface-sunken border border-border text-fg-subtle hover:text-fg flex items-center justify-center transition-all cursor-pointer shadow-sm"
+          >
+            <X size={16} strokeWidth={2} />
+          </button>
         </div>
 
-        {/* Company list */}
-        <div className="flex-1 overflow-y-auto">
+        {/* Search & Selection Controls with Light Inset Neumorphic Input */}
+        <div className="px-6 py-3 bg-surface border-b border-border shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="w-full sm:max-w-md">
+            <input
+              ref={searchRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by company, HR name, mobile, or email…"
+              className="w-full bg-slate-50 border border-border-strong text-fg px-3.5 py-2 rounded-xl placeholder:text-fg-disabled text-xs shadow-[inset_1px_1px_3px_rgba(0,0,0,0.05)] focus:outline-none focus:border-primary transition-all font-medium"
+            />
+          </div>
+
+          {/* Quick Selection Actions */}
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-fg-muted font-medium mr-1 text-[11px]">
+              {loading ? 'Searching…' : `${total.toLocaleString()} companies`}
+            </span>
+            <button
+              onClick={handleSelectAll}
+              className="px-2.5 py-1.5 rounded-lg bg-surface hover:bg-surface-sunken border border-border text-fg-muted hover:text-fg font-semibold transition-all shadow-sm cursor-pointer text-[11px]"
+            >
+              Select All on Page ({companies.length})
+            </button>
+            <button
+              onClick={handleDeselectAll}
+              className="px-2.5 py-1.5 rounded-lg bg-surface hover:bg-surface-sunken border border-border text-fg-subtle hover:text-fg font-medium transition-all cursor-pointer text-[11px]"
+            >
+              Deselect All
+            </button>
+          </div>
+        </div>
+
+        {/* Keyboard Helper Hint */}
+        <div className="px-6 py-1.5 bg-slate-50 border-b border-border/80 flex items-center justify-between text-[11px] text-fg-subtle shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="text-fg font-semibold">⚡ Excel Shortcuts:</span>
+            <span>Hold <kbd className="px-1 py-0.5 rounded bg-surface border border-border text-fg font-mono text-[10px] shadow-xs">Shift</kbd> + Click to select a range</span>
+            <span>•</span>
+            <span>Hold <kbd className="px-1 py-0.5 rounded bg-surface border border-border text-fg font-mono text-[10px] shadow-xs">Ctrl</kbd> / <kbd className="px-1 py-0.5 rounded bg-surface border border-border text-fg font-mono text-[10px] shadow-xs">Cmd</kbd> + Click for multi-select</span>
+          </div>
+          <span className="font-bold text-primary">
+            {selected.size} selected
+          </span>
+        </div>
+
+        {/* Company Data Table — Clean, Crisp & Light-Neumorphic */}
+        <div className="flex-1 overflow-y-auto overflow-x-auto bg-surface select-none">
           {loading ? (
-            <div className="flex items-center justify-center py-12 text-fg-subtle">
-              <div className="animate-spin text-2xl mr-3">⟳</div> Loading…
+            <div className="flex flex-col items-center justify-center h-full py-16 text-fg-subtle gap-3">
+              <Loader2 size={24} className="animate-spin text-primary" />
+              <p className="text-xs font-medium">Loading companies from Master Database…</p>
             </div>
           ) : companies.length === 0 ? (
-            <div className="flex items-center justify-center py-12 text-fg-muted">
-              No companies found matching your search.
+            <div className="flex flex-col items-center justify-center h-full py-16 text-fg-subtle gap-2">
+              <CheckSquare size={32} className="text-fg-disabled" />
+              <p className="text-sm font-semibold text-fg">No companies found matching your search</p>
+              <p className="text-xs text-fg-muted">Try searching by company name, HR name, or phone number.</p>
             </div>
           ) : (
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-fg-subtle uppercase tracking-wide bg-background/50 border-b border-border">
-                  <th className="w-10 px-3 py-2 text-left">☑</th>
-                  <th className="px-3 py-2 text-left">Company Name</th>
-                  <th className="px-3 py-2 text-left">HR Name</th>
-                  <th className="px-3 py-2 text-left">Mobile</th>
-                  <th className="px-3 py-2 text-left">Email</th>
-                  <th className="px-3 py-2 text-left">Type</th>
+            <table className="w-full text-xs text-left border-collapse">
+              <thead className="sticky top-0 z-10 bg-surface-sunken border-b border-border text-[11px] font-bold text-fg-muted uppercase tracking-wider">
+                <tr>
+                  <th className="w-12 px-4 py-3 text-center">
+                    <input
+                      type="checkbox"
+                      checked={companies.length > 0 && companies.every((c) => selected.has(c._id))}
+                      onChange={(e) => (e.target.checked ? handleSelectAll() : handleDeselectAll())}
+                      className="rounded border-border text-primary focus:ring-primary cursor-pointer w-4 h-4"
+                    />
+                  </th>
+                  <th className="px-4 py-3">Company Name</th>
+                  <th className="px-4 py-3">HR Contact</th>
+                  <th className="px-4 py-3">Designation</th>
+                  <th className="px-4 py-3">Mobile Number</th>
+                  <th className="px-4 py-3">Email ID</th>
+                  <th className="px-4 py-3">Sector / Type</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border/50">
-                {companies.map((c) => (
-                  <tr
-                    key={c._id}
-                    onClick={() => toggleSelect(c._id)}
-                    className={`cursor-pointer transition-colors hover:bg-surface/40
-                                ${selected.has(c._id) ? 'bg-primary/30 border-primary/20' : ''}`}
-                  >
-                    <td className="px-3 py-2">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(c._id)}
-                        onChange={() => toggleSelect(c._id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="accent-primary w-4 h-4 cursor-pointer"
-                      />
-                    </td>
-                    <td className="px-3 py-2 text-fg font-medium">{c.company_name}</td>
-                    <td className="px-3 py-2 text-fg-muted">{c.hr_name}</td>
-                    <td className="px-3 py-2 text-fg-muted font-mono">{c.primary_mobile}</td>
-                    <td className="px-3 py-2 text-fg-subtle">{c.primary_email || '—'}</td>
-                    <td className="px-3 py-2 text-fg-subtle">{c.company_type || '—'}</td>
-                  </tr>
-                ))}
+              <tbody className="divide-y divide-border font-sans">
+                {companies.map((c, index) => {
+                  const isSelected = selected.has(c._id);
+                  return (
+                    <tr
+                      key={c._id}
+                      onClick={(e) => handleRowClick(index, c._id, e)}
+                      className={`cursor-pointer transition-colors duration-150 ${
+                        isSelected
+                          ? 'bg-primary/10 text-primary font-medium'
+                          : 'hover:bg-slate-50 text-fg'
+                      }`}
+                    >
+                      <td className="w-12 px-4 py-2.5 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => {}}
+                          onClick={(e) => e.stopPropagation()}
+                          className="rounded border-border text-primary focus:ring-primary cursor-pointer w-4 h-4"
+                        />
+                      </td>
+                      <td className="px-4 py-2.5 font-bold text-fg">
+                        {c.company_name}
+                      </td>
+                      <td className="px-4 py-2.5 text-fg-muted font-medium">{c.hr_name || '—'}</td>
+                      <td className="px-4 py-2.5 text-fg-subtle text-[11px]">{c.hr_designation || 'HR'}</td>
+                      <td className="px-4 py-2.5 font-mono text-fg tabular-nums font-semibold">{c.primary_mobile || '—'}</td>
+                      <td className="px-4 py-2.5 text-fg-muted truncate max-w-[180px]" title={c.primary_email}>
+                        {c.primary_email || '—'}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                          {c.company_type || 'General'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
         </div>
 
-        {/* Pagination */}
+        {/* Pagination Bar */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-3 px-6 py-2 border-t border-border text-xs text-fg-subtle">
-            <button
-              disabled={page === 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="disabled:opacity-30 hover:text-white transition-colors px-3 py-1 rounded hover:bg-surface"
-            >
-              ← Prev
-            </button>
-            <span>Page {page} of {totalPages}</span>
-            <button
-              disabled={page === totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              className="disabled:opacity-30 hover:text-white transition-colors px-3 py-1 rounded hover:bg-surface"
-            >
-              Next →
-            </button>
+          <div className="flex items-center justify-between px-6 py-2.5 bg-surface-sunken border-t border-border text-xs text-fg-muted shrink-0">
+            <span className="text-[11px]">
+              Showing page <strong className="text-fg">{page}</strong> of <strong className="text-fg">{totalPages}</strong>
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={page === 1}
+                onClick={() => setPage((p) => p - 1)}
+                className="flex items-center gap-1 disabled:opacity-30 hover:text-fg transition-colors px-3 py-1.5 rounded-lg bg-surface border border-border hover:bg-slate-50 cursor-pointer text-xs font-semibold shadow-xs"
+              >
+                <ChevronLeft size={14} /> Previous
+              </button>
+              <button
+                disabled={page === totalPages}
+                onClick={() => setPage((p) => p + 1)}
+                className="flex items-center gap-1 disabled:opacity-30 hover:text-fg transition-colors px-3 py-1.5 rounded-lg bg-surface border border-border hover:bg-slate-50 cursor-pointer text-xs font-semibold shadow-xs"
+              >
+                Next <ChevronRight size={14} />
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Footer: Load Selected */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-border-strong">
-          <p className="text-sm text-fg-subtle">
-            <strong className="text-white">{selected.size}</strong> contact(s) selected
-          </p>
-          <div className="flex gap-3">
+        {/* Bottom Footer Bar with Light Neumorphic Action Buttons */}
+        <div className="flex items-center justify-between px-6 py-4 bg-surface border-t border-border shrink-0">
+          <div className="text-xs text-fg-muted">
+            Total Selected: <strong className="text-primary text-sm font-black ml-1">{selected.size}</strong> contacts
+          </div>
+          <div className="flex items-center gap-3">
             <button
               onClick={onClose}
-              className="bg-surface-raised hover:bg-surface-raised text-fg px-4 py-2 rounded-lg text-sm transition-colors"
+              className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-200 text-xs font-semibold transition-all cursor-pointer shadow-xs"
             >
               Cancel
             </button>
             <button
               onClick={handleLoad}
               disabled={selected.size === 0}
-              className="bg-primary hover:bg-primary disabled:opacity-40 text-white px-5 py-2 rounded-lg text-sm font-semibold transition-colors"
+              className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold transition-all shadow-[2px_2px_8px_rgba(30,58,138,0.25)] active:scale-[0.99] cursor-pointer"
             >
-              Load {selected.size > 0 ? selected.size : ''} Selected →
+              Load Selected ({selected.size})
             </button>
           </div>
         </div>

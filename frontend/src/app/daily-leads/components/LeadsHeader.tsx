@@ -56,14 +56,10 @@ export function LeadsHeader({
       {/* ── Top Row: Title & Top-Right Sign Out ────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-              <Target size={18} strokeWidth={2} className="text-primary" /> Daily Leads
-            </h1>
-            <span className="text-xs bg-success/20 text-success border border-success/30 px-2.5 py-0.5 rounded-full font-semibold">
-              Live Tracker
-            </span>
-          </div>
+          <h1 className="text-xl font-bold text-fg tracking-tight flex items-center gap-2">
+            <Target size={18} strokeWidth={2} className="text-primary" />
+            <span>Daily Leads</span>
+          </h1>
           <p className="text-xs text-fg-subtle mt-0.5">
             Manual Timestamped Register • Positives & JD Received Tracking
           </p>

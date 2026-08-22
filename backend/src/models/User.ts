@@ -11,6 +11,11 @@ export interface IUser extends Document {
   secondary_mobile?: string;
   alternate_mobile?: string;
   residential_address?: string;
+  address_line?: string;
+  pincode?: string;
+  city?: string;
+  state?: string;
+  linkedin_profile?: string;
   date_of_birth?: Date | null;
   date_of_joining?: Date | null;
   profile_photo_url?: string;
@@ -96,6 +101,31 @@ const UserSchema: Schema<IUser> = new Schema(
       default: '',
     },
     residential_address: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    address_line: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    pincode: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    city: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    state: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    linkedin_profile: {
       type: String,
       trim: true,
       default: '',

@@ -16,40 +16,15 @@
       "static/chunks/main-app.js",
       "static/chunks/app/login/page.js"
     ],
-    "/dashboard/page": [
+    "/home/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/page.js"
+      "static/chunks/app/home/page.js"
     ],
-    "/tracker/page": [
+    "/tracker/load-contacts/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/tracker/page.js"
-    ],
-    "/settings/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/settings/page.js"
-    ],
-    "/notifications/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/notifications/page.js"
-    ],
-    "/reports/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/reports/page.js"
-    ],
-    "/daily-leads/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/daily-leads/page.js"
-    ],
-    "/weekly-tracker/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/weekly-tracker/page.js"
+      "static/chunks/app/tracker/load-contacts/page.js"
     ]
   }
 }

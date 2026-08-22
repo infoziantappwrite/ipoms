@@ -4,28 +4,42 @@ import { useRef, useCallback } from 'react';
 import type { TrackerRow as TrackerRowType, CallOutcome } from '../page';
 
 const OUTCOMES: { value: CallOutcome; label: string; color: string }[] = [
-  { value: 'no_response', label: 'No Response', color: 'text-destructive' },
-  { value: 'invalid', label: 'Invalid', color: 'text-fg-subtle' },
-  { value: 'not_hiring', label: 'Not Hiring', color: 'text-fg-subtle' },
-  { value: 'already_connected', label: 'Already Connected', color: 'text-fg-subtle' },
-  { value: 'follow_up', label: 'Follow Up', color: 'text-warning' },
+  { value: 'jd_received', label: 'JD Received', color: 'text-primary' },
+  { value: 'hiring_freezed', label: 'Hiring Freezed', color: 'text-warning' },
+  { value: 'hiring_completed', label: 'Hiring Completed', color: 'text-info' },
+  { value: 'call_back', label: 'Call Back', color: 'text-warning' },
+  { value: 'hiring', label: 'Hiring', color: 'text-success' },
   { value: 'invite_mail', label: 'Invite Mail', color: 'text-primary' },
-  { value: 'drive_scheduled', label: 'Drive Scheduled', color: 'text-primary' },
-  { value: 'drive_in_progress', label: 'Drive In Progress', color: 'text-primary' },
+  { value: 'not_hiring', label: 'Not Hiring', color: 'text-fg-subtle' },
+  { value: 'no_response', label: 'No Response', color: 'text-destructive' },
+  { value: 'follow_up', label: 'Follow Up', color: 'text-warning font-semibold' },
+  { value: 'in_connect', label: 'In Connect', color: 'text-primary' },
+  { value: 'invalid', label: 'Invalid', color: 'text-fg-subtle' },
   { value: 'drive_completed', label: 'Drive Completed', color: 'text-success' },
 ];
 
+export const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+/**
+ * Row tint per outcome using subtle tokens.
+ */
 const OUTCOME_ROW_COLORS: Record<CallOutcome | 'none', string> = {
   none: '',
-  no_response: 'bg-destructive/20',
-  invalid: 'bg-surface/40',
-  not_hiring: 'bg-surface/40',
-  already_connected: 'bg-surface/40',
-  follow_up: 'bg-warning/20',
-  invite_mail: 'bg-primary/20',
-  drive_scheduled: 'bg-primary/30',
-  drive_in_progress: 'bg-primary/30',
-  drive_completed: 'bg-success/20',
+  jd_received: 'bg-primary-subtle',
+  hiring_freezed: 'bg-warning-subtle',
+  hiring_completed: 'bg-info-subtle',
+  call_back: 'bg-warning-subtle',
+  hiring: 'bg-success-subtle',
+  invite_mail: 'bg-primary-subtle',
+  not_hiring: 'bg-surface-sunken',
+  no_response: 'bg-destructive-subtle',
+  follow_up: 'bg-warning-subtle',
+  in_connect: 'bg-primary-subtle',
+  invalid: 'bg-surface-sunken',
+  drive_completed: 'bg-success-subtle',
 };
 
 interface Props {
@@ -111,7 +125,17 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onSkip }: Props) {
   // ── Call Outcome selection: captures End Time automatically (Spec 10.3)
   const handleOutcomeChange = useCallback((value: string) => {
     if (!value) return;
-    onUpdate({ outcome_status: value as CallOutcome });
+    const outcome = value as CallOutcome;
+    if (outcome !== 'follow_up') {
+      onUpdate({ outcome_status: outcome, follow_up_month: null });
+    } else {
+      onUpdate({ outcome_status: outcome });
+    }
+  }, [onUpdate]);
+
+  // ── Follow Up Month selection (Only enabled when outcome === follow_up)
+  const handleMonthChange = useCallback((month: string) => {
+    onUpdate({ follow_up_month: month || null });
   }, [onUpdate]);
 
   // ── Comments blur: persist to server
@@ -126,7 +150,7 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onSkip }: Props) {
         data-row-id={row._id}
         className={`flex items-center gap-1 px-2 py-1.5 text-xs ${rowBg} border-b border-border/30`}
       >
-        <div className="w-12 px-1 text-fg-muted shrink-0">{row.serial_no}</div>
+        <div className="w-12 px-1 text-center text-fg-muted shrink-0">{row.serial_no}</div>
         <div className="flex-1 text-fg-muted line-through px-1">{row.company_name} — {row.hr_name}</div>
         <span className="text-fg-muted bg-surface px-2 py-0.5 rounded-full text-xs">Skipped</span>
       </div>
@@ -138,8 +162,8 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onSkip }: Props) {
       data-row-id={row._id}
       className={`flex items-center gap-1 px-2 py-1 text-xs ${rowBg} hover:bg-surface/30 transition-colors group`}
     >
-      {/* S.No */}
-      <div className="w-12 px-1 text-fg-subtle shrink-0 tabular-nums">{row.serial_no}</div>
+      {/* S.No / # */}
+      <div className="w-12 px-1 text-center text-fg-subtle shrink-0 tabular-nums">{row.serial_no}</div>
 
       {/* Start Time — manual, spacebar inserts now (Spec 10.2) */}
       <div className="w-28 shrink-0">
@@ -181,17 +205,17 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onSkip }: Props) {
       </div>
 
       {/* HR Name — pre-filled */}
-      <div className="w-36 shrink-0 px-1 text-fg-muted truncate" title={row.hr_name}>
+      <div className="w-32 shrink-0 px-1 text-fg-muted truncate" title={row.hr_name}>
         {row.hr_name}
       </div>
 
-      {/* Mobile */}
+      {/* Contact (Mobile Number) */}
       <div className="w-32 shrink-0 px-1 text-fg-muted font-mono tabular-nums">
         {row.mobile_number}
       </div>
 
-      {/* Email — optional */}
-      <div className="w-44 shrink-0 px-1 truncate" title={row.email_id || ''}>
+      {/* Email ID — optional */}
+      <div className="w-40 shrink-0 px-1 truncate" title={row.email_id || ''}>
         {row.email_id ? (
           <span className="text-fg-subtle">{row.email_id}</span>
         ) : (
@@ -199,7 +223,7 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onSkip }: Props) {
         )}
       </div>
 
-      {/* Call Outcome — mandatory before row complete (Spec 12) */}
+      {/* Call Outcome / Status — mandatory before row complete (Spec 12) */}
       <div className="w-44 shrink-0">
         {isReadOnly ? (
           <OutcomeBadge outcome={row.outcome_status} />
@@ -219,6 +243,33 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onSkip }: Props) {
               </option>
             ))}
           </select>
+        )}
+      </div>
+
+      {/* Follow Up — 12 Months Dropdown (Enabled ONLY when Outcome is Follow Up) */}
+      <div className="w-36 shrink-0">
+        {isReadOnly ? (
+          <span className="text-xs text-fg-subtle px-1">
+            {row.outcome_status === 'follow_up' && row.follow_up_month ? row.follow_up_month : '—'}
+          </span>
+        ) : row.outcome_status === 'follow_up' ? (
+          <select
+            value={row.follow_up_month ?? ''}
+            onChange={(e) => handleMonthChange(e.target.value)}
+            onKeyDown={handleKeyDownEnter}
+            className="w-full bg-warning-subtle/50 border border-warning/70 text-warning-strong font-medium rounded px-1.5 py-1 text-xs cursor-pointer focus:ring-1 focus:ring-warning"
+          >
+            <option value="">— Pick Month —</option>
+            {MONTHS.map((m) => (
+              <option key={m} value={m} className="text-fg bg-surface">
+                {m}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="w-full text-center text-fg-muted/40 text-xs py-1 select-none font-mono">
+            —
+          </div>
         )}
       </div>
 
@@ -270,15 +321,18 @@ function OutcomeBadge({ outcome }: { outcome?: CallOutcome }) {
 
 function getOutcomeColor(outcome: CallOutcome): string {
   const map: Record<CallOutcome, string> = {
-    no_response: 'text-destructive',
-    invalid: 'text-fg-subtle',
+    jd_received: 'text-primary font-bold',
+    hiring_freezed: 'text-warning font-semibold',
+    hiring_completed: 'text-info font-semibold',
+    call_back: 'text-warning font-semibold',
+    hiring: 'text-success font-bold',
+    invite_mail: 'text-primary font-bold',
     not_hiring: 'text-fg-subtle',
-    already_connected: 'text-fg-subtle',
-    follow_up: 'text-warning',
-    invite_mail: 'text-primary',
-    drive_scheduled: 'text-primary',
-    drive_in_progress: 'text-primary',
-    drive_completed: 'text-success',
+    no_response: 'text-destructive',
+    follow_up: 'text-warning font-bold',
+    in_connect: 'text-primary font-semibold',
+    invalid: 'text-fg-subtle',
+    drive_completed: 'text-success font-bold',
   };
   return map[outcome] ?? 'text-fg-muted';
 }

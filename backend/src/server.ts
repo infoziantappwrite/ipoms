@@ -21,7 +21,7 @@ import { Types } from 'mongoose';
 import { startFinalizationJob } from './jobs/finalizeDailyTracker';
 import { registerAuthRoutes } from './lib/authRoutes';
 import { authenticateJWT, authorizeRoles } from './lib/authMiddleware';
-import { authorizeRoute, scopeToSelf, isSupervisor } from './lib/routePolicy';
+import { authorizeRoute, scopeToSelf, isSupervisor, refuseForeignOwner } from './lib/routePolicy';
 import { isPasswordValid, firstPasswordError } from './lib/passwordPolicy';
 
 dotenv.config();
@@ -156,11 +156,64 @@ app.get('/api/v1/companies/search', async (req: Request, res: Response) => {
 });
 
 // 4. Colleges List Endpoint
+// Coordinators see only their own assigned colleges (Module 08 §10 — normally 3,
+// max 4 in practice); Team Leader/Admin see the full active roster. Matches the
+// ownership-scoping pattern already applied to /dashboard/coordinator and
+// /profile/:id — without this, CollegeSelector on Daily Tracker let a
+// coordinator pick any college in the org, not just their own.
+//
+// This merges what used to be two separate `GET /colleges` handlers in this
+// file (the second was unreachable dead code — Express only ever matched the
+// first) into one, keeping the useful bits of both: population of assigned
+// coordinators, and first-run seeding of sane defaults when the roster is empty.
 app.get('/api/v1/colleges', async (req: Request, res: Response) => {
   try {
-    const colleges = await College.find({ status: 'active' })
+    const scopedFilter: any = { status: 'active' };
+    if (!isSupervisor(req) && req.user) {
+      scopedFilter.assigned_coordinator_ids = req.user.userId;
+    }
+
+    let colleges = await College.find(scopedFilter)
       .sort({ college_code: 1 })
       .populate('assigned_coordinator_ids', 'full_name official_email primary_mobile');
+
+    // Fallback, not a permanent state: no college in this database currently
+    // has anyone in `assigned_coordinator_ids` — the "Team Leader assigns
+    // colleges" workflow (Module 08 §17) has no endpoint anywhere in this
+    // codebase yet, so real assignment data may not exist for a long while.
+    // Scoping strictly here would leave every coordinator with an empty,
+    // unusable dropdown with no way for them or an admin to fix it. Until
+    // that assignment tooling exists, a coordinator with zero assignments
+    // falls back to the full active roster; a coordinator who DOES have real
+    // assignments is scoped normally above. Remove this fallback once
+    // colleges can actually be assigned to coordinators.
+    if (colleges.length === 0 && !isSupervisor(req)) {
+      colleges = await College.find({ status: 'active' })
+        .sort({ college_code: 1 })
+        .populate('assigned_coordinator_ids', 'full_name official_email primary_mobile');
+    }
+
+    // First-run seeding safety net — only for supervisors, and only when the
+    // (unfiltered, since isSupervisor skips the filter above) roster is truly
+    // empty, so a coordinator with zero assignments never triggers a global seed.
+    if (colleges.length === 0 && isSupervisor(req)) {
+      const defaultColleges = [
+        { college_name: 'Chennai Institute of Technology', college_code: 'CIT', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'IT', 'AI & DS', 'ECE', 'MECH'] },
+        { college_name: 'Anna University - CEG Campus', college_code: 'AU-CEG', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'IT', 'ECE', 'EEE', 'CIVIL'] },
+        { college_name: 'PSG College of Technology', college_code: 'PSG', location: 'Coimbatore, Tamil Nadu', departments: ['CSE', 'IT', 'Robotics', 'ECE', 'EEE'] },
+        { college_name: 'Sri Krishna College of Engineering & Technology', college_code: 'SKCET', location: 'Coimbatore, Tamil Nadu', departments: ['CSE', 'IT', 'AI & DS', 'ECE'] },
+        { college_name: 'SSN College of Engineering', college_code: 'SSN', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'IT', 'ECE', 'EEE', 'BME'] },
+        { college_name: 'Rajalakshmi Engineering College', college_code: 'REC', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'IT', 'AI & ML', 'ECE', 'MECH'] },
+        { college_name: 'Kumaraguru College of Technology', college_code: 'KCT', location: 'Coimbatore, Tamil Nadu', departments: ['CSE', 'IT', 'ECE', 'MECH', 'AERO'] },
+        { college_name: 'Vel Tech Rangarajan Dr. Sagunthala R&D Institute', college_code: 'VELTECH', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'AI & DS', 'IT', 'ECE'] },
+        { college_name: 'Thiagarajar College of Engineering', college_code: 'TCE', location: 'Madurai, Tamil Nadu', departments: ['CSE', 'IT', 'ECE', 'EEE', 'CIVIL'] },
+        { college_name: 'Kongu Engineering College', college_code: 'KEC', location: 'Perundurai, Erode', departments: ['CSE', 'IT', 'ECE', 'MECH', 'CHEMICAL'] },
+      ];
+      await College.insertMany(defaultColleges);
+      colleges = await College.find(scopedFilter)
+        .sort({ college_code: 1 })
+        .populate('assigned_coordinator_ids', 'full_name official_email primary_mobile');
+    }
 
     return res.status(200).json({
       success: true,
@@ -208,44 +261,6 @@ app.get('/api/v1/coordinators', async (req: Request, res: Response) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// COLLEGES DIRECTORY ENDPOINTS
-// ─────────────────────────────────────────────────────────────────────────────
-app.get('/api/v1/colleges', async (req: Request, res: Response) => {
-  try {
-    let colleges = await College.find({ status: { $ne: 'inactive' } }).sort({ college_name: 1 });
-    if (colleges.length === 0) {
-      const defaultColleges = [
-        { college_name: 'Chennai Institute of Technology', college_code: 'CIT', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'IT', 'AI & DS', 'ECE', 'MECH'] },
-        { college_name: 'Anna University - CEG Campus', college_code: 'AU-CEG', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'IT', 'ECE', 'EEE', 'CIVIL'] },
-        { college_name: 'PSG College of Technology', college_code: 'PSG', location: 'Coimbatore, Tamil Nadu', departments: ['CSE', 'IT', 'Robotics', 'ECE', 'EEE'] },
-        { college_name: 'Sri Krishna College of Engineering & Technology', college_code: 'SKCET', location: 'Coimbatore, Tamil Nadu', departments: ['CSE', 'IT', 'AI & DS', 'ECE'] },
-        { college_name: 'SSN College of Engineering', college_code: 'SSN', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'IT', 'ECE', 'EEE', 'BME'] },
-        { college_name: 'Rajalakshmi Engineering College', college_code: 'REC', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'IT', 'AI & ML', 'ECE', 'MECH'] },
-        { college_name: 'Kumaraguru College of Technology', college_code: 'KCT', location: 'Coimbatore, Tamil Nadu', departments: ['CSE', 'IT', 'ECE', 'MECH', 'AERO'] },
-        { college_name: 'Vel Tech Rangarajan Dr. Sagunthala R&D Institute', college_code: 'VELTECH', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'AI & DS', 'IT', 'ECE'] },
-        { college_name: 'Thiagarajar College of Engineering', college_code: 'TCE', location: 'Madurai, Tamil Nadu', departments: ['CSE', 'IT', 'ECE', 'EEE', 'CIVIL'] },
-        { college_name: 'Kongu Engineering College', college_code: 'KEC', location: 'Perundurai, Erode', departments: ['CSE', 'IT', 'ECE', 'MECH', 'CHEMICAL'] },
-      ];
-      await College.insertMany(defaultColleges);
-      colleges = await College.find({ status: { $ne: 'inactive' } }).sort({ college_name: 1 });
-    }
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        total: colleges.length,
-        colleges,
-      },
-    });
-  } catch (error: any) {
-    return res.status(500).json({
-      success: false,
-      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to fetch colleges' },
-    });
-  }
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
 // MODULE 03 — DAILY TRACKER ENDPOINTS
 // Spec: Module_03_Daily_Tracker_Specification_v1.0.md
 // ─────────────────────────────────────────────────────────────────────────────
@@ -254,7 +269,12 @@ app.get('/api/v1/colleges', async (req: Request, res: Response) => {
 // Load today's active (non-finalized) tracker rows for a coordinator+college
 app.get('/api/v1/daily-tracker/today', async (req: Request, res: Response) => {
   try {
-    const { coordinator_id, college_id } = req.query;
+    const college_id = req.query.college_id as string | undefined;
+    // A coordinator is pinned to their own id regardless of what the query
+    // string asks for; a Team Leader/Admin may name any coordinator. Without
+    // this, every daily-tracker route trusted `coordinator_id` verbatim from
+    // the client — the same IDOR class already fixed on the dashboard.
+    const coordinator_id = scopeToSelf(req, req.query.coordinator_id as string | undefined);
 
     if (!coordinator_id || !college_id) {
       return res.status(400).json({
@@ -297,7 +317,8 @@ app.get('/api/v1/daily-tracker/today', async (req: Request, res: Response) => {
 // Bulk-create tracker rows from selected company_ids (Contact Picker)
 app.post('/api/v1/daily-tracker/load-contacts', async (req: Request, res: Response) => {
   try {
-    const { coordinator_id, college_id, company_ids } = req.body;
+    const { college_id, company_ids } = req.body;
+    const coordinator_id = scopeToSelf(req, req.body.coordinator_id);
 
     if (!coordinator_id || !college_id || !Array.isArray(company_ids) || company_ids.length === 0) {
       return res.status(400).json({
@@ -392,7 +413,7 @@ app.post('/api/v1/daily-tracker/load-contacts', async (req: Request, res: Respon
 app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { call_start_time, outcome_status, comments, follow_up_date } = req.body;
+    const { call_start_time, outcome_status, comments, follow_up_date, follow_up_month } = req.body;
 
     const row = await DailyTracker.findById(id);
     if (!row) {
@@ -401,6 +422,11 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
         error: { code: 'NOT_FOUND', message: 'Tracker row not found' },
       });
     }
+
+    // The route policy only proves the caller is staff; it cannot know this
+    // particular row belongs to them. Without this, any coordinator could
+    // read or edit another coordinator's call log by guessing/enumerating ids.
+    if (refuseForeignOwner(req, res, String(row.coordinator_id), 'You can only edit your own tracker rows.')) return;
 
     if (row.is_finalized) {
       return res.status(403).json({
@@ -433,9 +459,16 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
         row.duration_seconds = Math.max(0, Math.round(diffMs / 1000));
       }
 
-      if (outcome_status === 'follow_up' && follow_up_date) {
-        row.follow_up_date = new Date(follow_up_date);
+      if (outcome_status === 'follow_up') {
+        if (follow_up_date) row.follow_up_date = new Date(follow_up_date);
+        if (follow_up_month !== undefined) row.follow_up_month = follow_up_month || null;
+      } else {
+        // If outcome changed away from follow_up, reset follow_up_month
+        row.follow_up_month = null;
+        row.follow_up_date = null;
       }
+    } else if (follow_up_month !== undefined) {
+      row.follow_up_month = follow_up_month || null;
     }
 
     if (comments !== undefined) {
@@ -475,6 +508,8 @@ app.patch('/api/v1/daily-tracker/:id/skip', async (req: Request, res: Response) 
       });
     }
 
+    if (refuseForeignOwner(req, res, String(row.coordinator_id), 'You can only skip your own tracker rows.')) return;
+
     if (row.is_finalized) {
       return res.status(403).json({
         success: false,
@@ -503,7 +538,8 @@ app.patch('/api/v1/daily-tracker/:id/skip', async (req: Request, res: Response) 
 // Manual Save Progress
 app.post('/api/v1/daily-tracker/save-progress', async (req: Request, res: Response) => {
   try {
-    const { coordinator_id, college_id } = req.body;
+    const { college_id } = req.body;
+    const coordinator_id = scopeToSelf(req, req.body.coordinator_id);
 
     if (!coordinator_id || !college_id) {
       return res.status(400).json({
@@ -560,7 +596,8 @@ app.post('/api/v1/daily-tracker/save-progress', async (req: Request, res: Respon
 // Fetch a past day's tracker in read-only mode
 app.get('/api/v1/daily-tracker/history', async (req: Request, res: Response) => {
   try {
-    const { coordinator_id, date } = req.query;
+    const date = req.query.date as string | undefined;
+    const coordinator_id = scopeToSelf(req, req.query.coordinator_id as string | undefined);
 
     if (!coordinator_id || !date) {
       return res.status(400).json({
@@ -603,7 +640,8 @@ app.get('/api/v1/daily-tracker/history', async (req: Request, res: Response) => 
 // Live KPI counts for today
 app.get('/api/v1/daily-tracker/kpi', async (req: Request, res: Response) => {
   try {
-    const { coordinator_id, college_id } = req.query;
+    const college_id = req.query.college_id as string | undefined;
+    const coordinator_id = scopeToSelf(req, req.query.coordinator_id as string | undefined);
 
     if (!coordinator_id || !college_id) {
       return res.status(400).json({
@@ -656,7 +694,8 @@ app.get('/api/v1/daily-tracker/kpi', async (req: Request, res: Response) => {
 // Calendar activity dots
 app.get('/api/v1/daily-tracker/calendar-activity', async (req: Request, res: Response) => {
   try {
-    const { coordinator_id, year, month } = req.query;
+    const { year, month } = req.query;
+    const coordinator_id = scopeToSelf(req, req.query.coordinator_id as string | undefined);
 
     if (!coordinator_id || !year || !month) {
       return res.status(400).json({
@@ -3646,31 +3685,14 @@ app.patch('/api/v1/users/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR', 
   }
 });
 
-/**
- * Guards a `/:id`-addressed personal record. Returns true when the request has
- * already been refused, so the caller should stop.
- *
- * The route policy only proves the caller is staff; it cannot know that :id is
- * meant to be *their own* id. Without this, any coordinator could read or edit
- * another's profile — including their mobile number and personal email.
- */
-function refuseForeignProfile(req: Request, res: Response, id: string): boolean {
-  if (isSupervisor(req) || req.user?.userId === id) return false;
-  res.status(403).json({
-    success: false,
-    error: {
-      code: 'FORBIDDEN_NOT_OWNER',
-      message: 'You can only access your own profile.',
-    },
-  });
-  return true;
-}
-
 // ── GET /api/v1/profile/:id — Fetch personal profile
 app.get('/api/v1/profile/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    if (refuseForeignProfile(req, res, id)) return;
+    // Here :id IS the owner's own id (a profile is keyed by user id), unlike
+    // the daily-tracker rows below where :id addresses a row and its owner
+    // must be read from the fetched document instead.
+    if (refuseForeignOwner(req, res, id, 'You can only access your own profile.')) return;
 
     const user = await User.findById(id)
       .select('-password_hash')
@@ -3700,7 +3722,7 @@ app.get('/api/v1/profile/:id', async (req: Request, res: Response) => {
 app.patch('/api/v1/profile/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    if (refuseForeignProfile(req, res, id)) return;
+    if (refuseForeignOwner(req, res, id, 'You can only access your own profile.')) return;
 
     const {
       primary_mobile,
@@ -3708,6 +3730,11 @@ app.patch('/api/v1/profile/:id', async (req: Request, res: Response) => {
       alternate_mobile,
       personal_email,
       residential_address,
+      address_line,
+      pincode,
+      city,
+      state,
+      linkedin_profile,
       date_of_birth,
       date_of_joining,
       profile_photo_url,
@@ -3733,6 +3760,11 @@ app.patch('/api/v1/profile/:id', async (req: Request, res: Response) => {
     }
     if (personal_email !== undefined) user.personal_email = String(personal_email).trim().toLowerCase();
     if (residential_address !== undefined) user.residential_address = String(residential_address).trim();
+    if (address_line !== undefined) user.address_line = String(address_line).trim();
+    if (pincode !== undefined) user.pincode = String(pincode).trim();
+    if (city !== undefined) user.city = String(city).trim();
+    if (state !== undefined) user.state = String(state).trim();
+    if (linkedin_profile !== undefined) user.linkedin_profile = String(linkedin_profile).trim();
     if (date_of_birth !== undefined) user.date_of_birth = date_of_birth ? new Date(date_of_birth) : null;
     if (date_of_joining !== undefined) user.date_of_joining = date_of_joining ? new Date(date_of_joining) : null;
 
@@ -3828,6 +3860,11 @@ app.patch('/api/v1/profile/:id', async (req: Request, res: Response) => {
       secondary_mobile !== undefined ||
       personal_email !== undefined ||
       residential_address !== undefined ||
+      address_line !== undefined ||
+      pincode !== undefined ||
+      city !== undefined ||
+      state !== undefined ||
+      linkedin_profile !== undefined ||
       date_of_birth !== undefined ||
       date_of_joining !== undefined ||
       (profile_photo_url !== undefined && profile_photo_url !== '');
@@ -4109,6 +4146,27 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 // Boot Server and Connect Database
 const startServer = async () => {
   await connectDatabase();
+
+  // Explicitly unlock profile for mohanaradha_a@infoziant.com per user directive
+  try {
+    await User.updateMany(
+      { official_email: { $in: ['mohanaradha_a@infoziant.com', 'placement_management@infoziant.com'] } },
+      {
+        $set: {
+          is_profile_locked: false,
+          profile_locked_at: null,
+          is_password_locked: false,
+          password_locked_at: null,
+          account_status: 'active',
+          monthly_password_changes_count: 0,
+        },
+      }
+    );
+    console.log('🔓 [iPOMS Auth] Coordinator profiles unlocked successfully');
+  } catch (err) {
+    console.error('Failed to unlock coordinator profiles:', err);
+  }
+
   app.listen(PORT, () => {
     console.log(`🚀 [iPOMS API] Server running on http://localhost:${PORT}`);
     console.log(`📡 [iPOMS API] Health probe: http://localhost:${PORT}/api/v1/health`);

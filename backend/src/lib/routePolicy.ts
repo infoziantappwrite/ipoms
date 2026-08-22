@@ -225,6 +225,26 @@ export function scopeToSelf(req: Request, requestedId?: string): string | undefi
   return self;
 }
 
+/**
+ * Ownership check for a specific document already fetched from the database —
+ * the `:id` in the URL addresses the ROW, not the owner, so unlike
+ * `scopeToSelf` there is no query param to substitute; the caller must look the
+ * record up first and pass whichever field identifies its owner
+ * (`row.coordinator_id`, a profile's own `_id`, etc.).
+ *
+ * Returns true when access is refused (and has already written the 403), so
+ * call sites read as `if (refuseForeignOwner(req, res, row.coordinator_id)) return;`.
+ * A supervisor may always proceed; everyone else must own the record.
+ */
+export function refuseForeignOwner(req: Request, res: Response, ownerId: string | undefined, message = 'You do not have access to this record.'): boolean {
+  if (isSupervisor(req) || req.user?.userId === String(ownerId)) return false;
+  res.status(403).json({
+    success: false,
+    error: { code: 'FORBIDDEN_NOT_OWNER', message },
+  });
+  return true;
+}
+
 /** Exposed for tests and for the coverage check in verifyRoutePolicy.ts. */
 export const __policyTable = POLICIES;
 export { findPolicy };

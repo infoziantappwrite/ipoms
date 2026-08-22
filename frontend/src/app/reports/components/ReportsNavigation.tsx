@@ -36,16 +36,12 @@ export function ReportsNavigation({ activeTab, onTabChange }: Props) {
       {/* ── Top Row: Title & Top-Right Sign Out ────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-              <TrendingUp size={18} strokeWidth={2} className="text-primary" /> Report Generation
-            </h1>
-            <span className="text-xs bg-primary/20 text-primary border border-primary/30 px-2.5 py-0.5 rounded-full font-semibold">
-              Operational BI & Analytics
-            </span>
-          </div>
+          <h1 className="text-xl font-bold text-fg tracking-tight flex items-center gap-2">
+            <TrendingUp size={18} strokeWidth={2} className="text-primary" />
+            <span>Reports & Analytics</span>
+          </h1>
           <p className="text-xs text-fg-subtle mt-0.5">
-            Business Intelligence, 4 Enterprise Report Templates & Document-Style Editor
+            Operational BI, 4 Enterprise Report Templates & Document-Style Editor
           </p>
         </div>
 

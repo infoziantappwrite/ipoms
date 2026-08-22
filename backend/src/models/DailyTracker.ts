@@ -6,21 +6,24 @@ import mongoose, { Document, Schema, Model, Types } from 'mongoose';
 // Response 2 / secondary lifecycle belongs EXCLUSIVELY to Weekly Tracker (Module 04).
 
 export type CallOutcome =
-  | 'no_response'
-  | 'invalid'
-  | 'not_hiring'
-  | 'already_connected'
-  | 'follow_up'
+  | 'jd_received'
+  | 'hiring_freezed'
+  | 'hiring_completed'
+  | 'call_back'
+  | 'hiring'
   | 'invite_mail'
-  | 'drive_scheduled'
-  | 'drive_in_progress'
+  | 'not_hiring'
+  | 'no_response'
+  | 'follow_up'
+  | 'in_connect'
+  | 'invalid'
   | 'drive_completed';
 
 // Outcomes that auto-promote to Weekly Tracker after finalization
 export const POSITIVE_OUTCOMES: CallOutcome[] = [
+  'jd_received',
+  'hiring',
   'invite_mail',
-  'drive_scheduled',
-  'drive_in_progress',
   'drive_completed',
 ];
 
@@ -50,9 +53,10 @@ export interface IDailyTracker extends Document {
   call_end_time?: Date;                     // Auto-locked when outcome selected
   duration_seconds?: number;                // Computed: end - start (in seconds)
 
-  // Outcome (Spec Section 12) — only Response 1, no Response 2
+  // Outcome (Spec Section 12)
   outcome_status?: CallOutcome;
-  follow_up_date?: Date;                    // Only relevant when outcome = follow_up
+  follow_up_month?: string | null;          // 12 calendar months: January–December (only when outcome = follow_up)
+  follow_up_date?: Date | null;             // Cleared to null when outcome moves away from follow_up
 
   // Notes
   comments?: string;                        // Always optional
@@ -161,22 +165,45 @@ const DailyTrackerSchema: Schema<IDailyTracker> = new Schema(
       min: 0,
     },
 
-    // ── Outcome (Spec Section 12 — ONLY Response 1)
+    // ── Outcome (Spec Section 12 — 12 Standard Outcomes)
     outcome_status: {
       type: String,
       enum: [
-        'no_response',
-        'invalid',
-        'not_hiring',
-        'already_connected',
-        'follow_up',
+        'jd_received',
+        'hiring_freezed',
+        'hiring_completed',
+        'call_back',
+        'hiring',
         'invite_mail',
-        'drive_scheduled',
-        'drive_in_progress',
+        'not_hiring',
+        'no_response',
+        'follow_up',
+        'in_connect',
+        'invalid',
         'drive_completed',
       ],
       default: null,
       index: true,
+    },
+    follow_up_month: {
+      type: String,
+      enum: [
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
+        null,
+      ],
+      default: null,
+      trim: true,
     },
     follow_up_date: {
       type: Date,

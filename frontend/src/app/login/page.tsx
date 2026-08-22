@@ -402,7 +402,7 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full py-3 bg-primary hover:bg-primary-hover disabled:opacity-60 text-primary-foreground rounded-xl font-bold shadow-2 transition-all active:scale-[0.99] text-xs cursor-pointer"
             >
-              {loading ? 'Authenticating…' : 'Sign In to Operations Portal →'}
+              {loading ? 'Authenticating…' : 'Sign-In'}
             </button>
           </form>
         )}

@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -25,20 +25,20 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
   const fetchActiveDays = useCallback(async (year: number, month: number) => {
     setLoadingDots(true);
     try {
-      const r = await fetch(
-        `${API}/daily-tracker/calendar-activity?coordinator_id=${coordinatorId}&year=${year}&month=${month}`
+      const res = await apiFetch(
+        `/daily-tracker/calendar-activity?coordinator_id=${coordinatorId}&year=${year}&month=${month}`
       );
-      const data = await r.json();
-      if (data.success) {
-        setActiveDays(new Set(data.data.active_days));
+      if (res.success) {
+        setActiveDays(new Set((res.data as any).active_days));
       }
     } catch (e) { console.error('[Calendar] Fetch failed', e); }
     finally { setLoadingDots(false); }
   }, [coordinatorId]);
 
   useEffect(() => {
+    if (!coordinatorId) return;
     fetchActiveDays(viewYear, viewMonth);
-  }, [viewYear, viewMonth, fetchActiveDays]);
+  }, [viewYear, viewMonth, coordinatorId, fetchActiveDays]);
 
   // Escape key
   useEffect(() => {
@@ -77,12 +77,16 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-strong">
-          <button onClick={prevMonth} className="text-fg-subtle hover:text-white px-2 py-1 rounded transition-colors">←</button>
+          <button onClick={prevMonth} aria-label="Previous month" className="text-fg-subtle hover:text-fg px-2 py-1 rounded transition-colors">
+            <ChevronLeft size={16} strokeWidth={2} aria-hidden />
+          </button>
           <div className="text-center">
-            <p className="text-sm font-semibold text-white">{MONTHS[viewMonth - 1]} {viewYear}</p>
+            <p className="text-sm font-semibold text-fg">{MONTHS[viewMonth - 1]} {viewYear}</p>
             {loadingDots && <p className="text-xs text-fg-subtle animate-pulse">Loading activity…</p>}
           </div>
-          <button onClick={nextMonth} className="text-fg-subtle hover:text-white px-2 py-1 rounded transition-colors">→</button>
+          <button onClick={nextMonth} aria-label="Next month" className="text-fg-subtle hover:text-fg px-2 py-1 rounded transition-colors">
+            <ChevronRight size={16} strokeWidth={2} aria-hidden />
+          </button>
         </div>
 
         {/* Day headers */}
@@ -115,7 +119,7 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
                   relative py-1.5 rounded-lg text-xs transition-colors
                   ${isFuture ? 'text-fg-muted cursor-default' : 'cursor-pointer hover:bg-surface-raised'}
                   ${isToday ? 'bg-primary text-white font-bold' : ''}
-                  ${hasActivity && !isToday ? 'text-white font-semibold' : ''}
+                  ${hasActivity && !isToday ? 'text-fg font-semibold' : ''}
                   ${!hasActivity && !isToday && !isFuture ? 'text-fg-subtle' : ''}
                 `}
               >
@@ -140,7 +144,7 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
             <span className="w-4 h-4 rounded-lg bg-primary inline-flex items-center justify-center text-white text-xs">T</span>
             <span>Today</span>
           </div>
-          <button onClick={onClose} className="ml-auto text-fg-subtle hover:text-white transition-colors">Close</button>
+          <button onClick={onClose} className="ml-auto text-fg-subtle hover:text-fg transition-colors">Close</button>
         </div>
       </div>
     </div>

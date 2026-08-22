@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { apiFetch } from '@/lib/api';
 
 export interface College {
   _id: string;
@@ -23,11 +22,13 @@ export function CollegeSelector({ selectedCollegeId, onSelect, onSelectCollege }
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API}/colleges`)
-      .then((r) => r.json())
+    // Scoping happens server-side: a coordinator gets only their own assigned
+    // colleges back, a Team Leader/Admin gets the full roster — see
+    // GET /api/v1/colleges in routePolicy.ts / server.ts.
+    apiFetch('/colleges')
       .then((data) => {
-        if (data.success && Array.isArray(data.data?.colleges)) {
-          setColleges(data.data.colleges);
+        if (data.success && Array.isArray((data.data as any)?.colleges)) {
+          setColleges((data.data as any).colleges);
         }
       })
       .catch(console.error)

@@ -76,9 +76,10 @@ export function WeeklyHeader({
       {/* ── Top Row: Title & Top-Right Sign Out ────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-              <BarChart3 size={18} strokeWidth={2} className="text-primary" /> Weekly Tracker
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold text-fg tracking-tight flex items-center gap-2">
+              <BarChart3 size={18} strokeWidth={2} className="text-primary" />
+              <span>Weekly Tracker</span>
             </h1>
             <span className="text-xs bg-primary/20 text-primary border border-primary/30 px-2.5 py-0.5 rounded-full font-semibold">
               2026 Season

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { CheckCircle2, Clock, PhoneOff, Repeat, SkipForward, Target, type LucideIcon } from 'lucide-react';
 
 // ── Types
 interface KpiData {
@@ -19,9 +20,9 @@ interface Props {
 
 // ── Individual KPI Card
 function KpiCard({
-  label, value, color, icon, ring,
+  label, value, color, Icon, ring,
 }: {
-  label: string; value: number; color: string; icon: string; ring: string;
+  label: string; value: number; color: string; Icon: LucideIcon; ring: string;
 }) {
   const prevRef = useRef(value);
   const [bump, setBump] = useState(false);
@@ -41,7 +42,7 @@ function KpiCard({
                   transition-all duration-300 ${bump ? 'scale-105' : 'scale-100'}`}
     >
       <div className="flex items-center justify-between">
-        <span className="text-lg">{icon}</span>
+        <Icon size={17} strokeWidth={2} className={color} aria-hidden />
         <span className={`text-2xl font-bold ${color} tabular-nums`}>{value}</span>
       </div>
       <p className="text-xs text-fg-subtle font-medium mt-1">{label}</p>
@@ -57,42 +58,42 @@ export function KpiCards({ kpi }: Props) {
       value: kpi.completed,
       color: 'text-success',
       ring: 'border-success/20 hover:border-success/40',
-      icon: '✅',
+      Icon: CheckCircle2,
     },
     {
       label: 'Pending',
       value: kpi.pending,
       color: 'text-warning',
       ring: 'border-warning/20 hover:border-warning/40',
-      icon: '⏳',
+      Icon: Clock,
     },
     {
       label: 'Positive',
       value: kpi.positive,
       color: 'text-primary',
       ring: 'border-primary/20 hover:border-primary/40',
-      icon: '🎯',
+      Icon: Target,
     },
     {
       label: 'No Response',
       value: kpi.no_response,
       color: 'text-destructive',
       ring: 'border-destructive/20 hover:border-destructive/40',
-      icon: '📵',
+      Icon: PhoneOff,
     },
     {
       label: 'Follow Up',
       value: kpi.follow_up,
       color: 'text-warning',
       ring: 'border-warning/20 hover:border-warning/40',
-      icon: '🔁',
+      Icon: Repeat,
     },
     {
       label: 'Skipped',
       value: kpi.skipped,
       color: 'text-fg-subtle',
       ring: 'border-border-strong/30 hover:border-border-strong/40',
-      icon: '⏭️',
+      Icon: SkipForward,
     },
   ];
 

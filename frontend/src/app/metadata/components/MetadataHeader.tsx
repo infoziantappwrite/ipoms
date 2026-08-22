@@ -46,16 +46,14 @@ export function MetadataHeader({
       {/* ── Top Row: Title & Top-Right Sign Out ────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-              <Building2 size={18} strokeWidth={2} className="text-primary" /> Master Metadata Directory
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold text-fg tracking-tight flex items-center gap-2">
+              <Building2 size={18} strokeWidth={2} className="text-primary" />
+              <span>Master Metadata Directory</span>
             </h1>
-            <span className="text-xs bg-primary/20 text-primary border border-primary/30 px-2.5 py-0.5 rounded-full font-semibold">
-              {totalCount} Contacts
-            </span>
             {isRecycleBin && (
-              <span className="text-xs bg-destructive/20 text-destructive border border-destructive/30 px-2.5 py-0.5 rounded-full font-bold animate-pulse">
-                <Trash2 size={14} className="inline shrink-0" /> Recycle Bin Active
+              <span className="text-xs bg-danger/20 text-danger border border-danger/30 px-2.5 py-0.5 rounded-full font-bold">
+                <Trash2 size={12} className="inline mr-1 shrink-0" /> Recycle Bin Active
               </span>
             )}
           </div>

@@ -8,15 +8,25 @@ import { TrackerGrid } from './components/TrackerGrid';
 import { CalendarPicker } from './components/CalendarPicker';
 import { AutoSaveBadge } from './components/AutoSaveBadge';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
-import { AlertTriangle, CalendarDays, Download, RefreshCw, Save } from 'lucide-react';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { AlertTriangle, BookOpen, CalendarDays, ClipboardList, Download, RefreshCw, Save } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
+import { readSessionUser } from '@/lib/session';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type CallOutcome =
-  | 'no_response' | 'invalid' | 'not_hiring' | 'already_connected'
-  | 'follow_up' | 'invite_mail' | 'drive_scheduled' | 'drive_in_progress' | 'drive_completed';
+  | 'jd_received'
+  | 'hiring_freezed'
+  | 'hiring_completed'
+  | 'call_back'
+  | 'hiring'
+  | 'invite_mail'
+  | 'not_hiring'
+  | 'no_response'
+  | 'follow_up'
+  | 'in_connect'
+  | 'invalid'
+  | 'drive_completed';
 
 export interface TrackerRow {
   _id: string;
@@ -30,6 +40,7 @@ export interface TrackerRow {
   duration_seconds?: number;
   duration_formatted?: string;
   outcome_status?: CallOutcome;
+  follow_up_month?: string | null;
   comments?: string;
   is_skipped: boolean;
   is_finalized: boolean;
@@ -68,8 +79,13 @@ export default function DailyTrackerPage() {
   const [showEmailWarning, setShowEmailWarning] = useState(false);
   const [sessionDate, setSessionDate] = useState<string>('');
 
-  // Hardcoded coordinator until auth is wired — will come from JWT in production
-  const COORDINATOR_ID = '000000000000000000000001';
+  // Real signed-in identity. The backend still enforces ownership itself
+  // (scopeToSelf pins a coordinator to their own id regardless of what's
+  // sent) — this is just what the UI asks for by default.
+  const [coordinatorId, setCoordinatorId] = useState<string>('');
+  useEffect(() => {
+    setCoordinatorId(readSessionUser()?._id ?? '');
+  }, []);
 
   // ── Derive today's title (e.g. "August Tracker 2026")
   const today = new Date();
@@ -82,26 +98,24 @@ export default function DailyTrackerPage() {
 
   // ── Load today's tracker rows
   const loadTodayRows = useCallback(async () => {
-    if (!selectedCollegeId) return;
+    if (!selectedCollegeId || !coordinatorId) return;
     try {
-      const r = await fetch(`${API}/daily-tracker/today?coordinator_id=${COORDINATOR_ID}&college_id=${selectedCollegeId}`);
-      const data = await r.json();
-      if (data.success) {
-        setRows(data.data.rows);
-        setSessionDate(data.data.session_date);
+      const res = await apiFetch(`/daily-tracker/today?coordinator_id=${coordinatorId}&college_id=${selectedCollegeId}`);
+      if (res.success) {
+        setRows((res.data as any).rows);
+        setSessionDate((res.data as any).session_date);
       }
     } catch (e) { console.error('[DT] Load today failed', e); }
-  }, [selectedCollegeId]);
+  }, [selectedCollegeId, coordinatorId]);
 
   // ── Load KPI counts
   const loadKpi = useCallback(async () => {
-    if (!selectedCollegeId) return;
+    if (!selectedCollegeId || !coordinatorId) return;
     try {
-      const r = await fetch(`${API}/daily-tracker/kpi?coordinator_id=${COORDINATOR_ID}&college_id=${selectedCollegeId}`);
-      const data = await r.json();
-      if (data.success) setKpi(data.data.kpi);
+      const res = await apiFetch(`/daily-tracker/kpi?coordinator_id=${coordinatorId}&college_id=${selectedCollegeId}`);
+      if (res.success) setKpi((res.data as any).kpi);
     } catch (e) { console.error('[KPI] Load failed', e); }
-  }, [selectedCollegeId]);
+  }, [selectedCollegeId, coordinatorId]);
 
   // ── Load both on college change or refresh
   useEffect(() => {
@@ -120,46 +134,87 @@ export default function DailyTrackerPage() {
 
   // ── Handle contact picker load
   const handleContactsLoaded = useCallback(async (companyIds: string[]) => {
-    if (!selectedCollegeId || companyIds.length === 0) return;
+    if (!selectedCollegeId || !coordinatorId || companyIds.length === 0) return;
     try {
-      const r = await fetch(`${API}/daily-tracker/load-contacts`, {
+      const res = await apiFetch('/daily-tracker/load-contacts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          coordinator_id: COORDINATOR_ID,
+          coordinator_id: coordinatorId,
           college_id: selectedCollegeId,
           company_ids: companyIds,
         }),
       });
-      const data = await r.json();
-      if (data.success) {
+      if (res.success) {
         await loadTodayRows();
         await loadKpi();
-        if (data.data.duplicates_skipped > 0) {
-          alert(`⚠️ ${data.data.duplicates_skipped} duplicate(s) already exist in today's tracker and were skipped:\n${data.data.duplicate_companies.join(', ')}`);
+        const data = res.data as any;
+        if (data.duplicates_skipped > 0) {
+          alert(`${data.duplicates_skipped} duplicate(s) already exist in today's tracker and were skipped:\n${data.duplicate_companies.join(', ')}`);
         }
       }
     } catch (e) { console.error('[DT] Load contacts failed', e); }
-  }, [selectedCollegeId, loadTodayRows, loadKpi]);
+  }, [selectedCollegeId, coordinatorId, loadTodayRows, loadKpi]);
+
+  // ── Listen for imported contacts from the Load Contacts new tab
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'IPOMS_LOAD_CONTACTS' && Array.isArray(event.data.companyIds)) {
+        handleContactsLoaded(event.data.companyIds);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('ipoms_tracker_sync');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'LOAD_CONTACTS' && Array.isArray(event.data.companyIds)) {
+          handleContactsLoaded(event.data.companyIds);
+        }
+      };
+    } catch {
+      // BroadcastChannel unsupported
+    }
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === 'ipoms_imported_contacts' && event.newValue) {
+        try {
+          const parsed = JSON.parse(event.newValue);
+          if (Array.isArray(parsed.ids) && parsed.ids.length > 0) {
+            handleContactsLoaded(parsed.ids);
+          }
+        } catch {
+          // ignore
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('storage', handleStorage);
+      channel?.close();
+    };
+  }, [handleContactsLoaded]);
 
   // ── Handle row update (auto-save on each change)
   const handleRowUpdate = useCallback(async (rowId: string, patch: Partial<TrackerRow>) => {
     setSaveStatus('saving');
     try {
-      const r = await fetch(`${API}/daily-tracker/${rowId}`, {
+      const res = await apiFetch(`/daily-tracker/${rowId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),
       });
-      const data = await r.json();
-      if (data.success) {
-        setRows((prev) => prev.map((row) => row._id === rowId ? { ...row, ...data.data } : row));
+      if (res.success) {
+        setRows((prev) => prev.map((row) => row._id === rowId ? { ...row, ...(res.data as any) } : row));
         await loadKpi();
         setSaveStatus('saved');
         setLastSavedAt(new Date());
-      } else if (data.error?.code === 'START_TIME_REQUIRED') {
-        setSaveStatus('saved');
-        alert(data.error.message);
+      } else if (res.error?.code === 'START_TIME_REQUIRED') {
+        // The save was refused, not completed — surfacing it as 'saved' here
+        // used to mislead the coordinator into thinking the row was recorded.
+        setSaveStatus('idle');
+        alert(res.error.message);
       } else {
         setSaveStatus('idle');
       }
@@ -172,9 +227,8 @@ export default function DailyTrackerPage() {
   // ── Handle skip
   const handleSkip = useCallback(async (rowId: string) => {
     try {
-      const r = await fetch(`${API}/daily-tracker/${rowId}/skip`, { method: 'PATCH' });
-      const data = await r.json();
-      if (data.success) {
+      const res = await apiFetch(`/daily-tracker/${rowId}/skip`, { method: 'PATCH' });
+      if (res.success) {
         setRows((prev) => prev.map((row) => row._id === rowId ? { ...row, is_skipped: true } : row));
         await loadKpi();
       }
@@ -199,20 +253,20 @@ export default function DailyTrackerPage() {
   }, [selectedCollegeId, rows]);
 
   const doSaveProgress = async () => {
+    if (!coordinatorId) return;
     setSaveStatus('saving');
     try {
-      const r = await fetch(`${API}/daily-tracker/save-progress`, {
+      const res = await apiFetch('/daily-tracker/save-progress', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ coordinator_id: COORDINATOR_ID, college_id: selectedCollegeId }),
+        body: JSON.stringify({ coordinator_id: coordinatorId, college_id: selectedCollegeId }),
       });
-      const data = await r.json();
-      if (data.success) {
+      if (res.success) {
         setSaveStatus('saved');
         setLastSavedAt(new Date());
         setShowEmailWarning(false);
-        if (data.data.positive_promoted > 0) {
-          console.log(`✅ ${data.data.positive_promoted} positive outcome(s) queued for Weekly Tracker`);
+        const data = res.data as any;
+        if (data.positive_promoted > 0) {
+          console.log(`${data.positive_promoted} positive outcome(s) queued for Weekly Tracker`);
         }
       }
     } catch (e) {
@@ -235,13 +289,13 @@ export default function DailyTrackerPage() {
 
   // ── Load history view
   const handleViewHistory = async (date: string) => {
+    if (!coordinatorId) return;
     setIsCalendarOpen(false);
     setHistoryDate(date);
     try {
-      const r = await fetch(`${API}/daily-tracker/history?coordinator_id=${COORDINATOR_ID}&date=${date}`);
-      const data = await r.json();
-      if (data.success) {
-        setHistoryRows(data.data.rows);
+      const res = await apiFetch(`/daily-tracker/history?coordinator_id=${coordinatorId}&date=${date}`);
+      if (res.success) {
+        setHistoryRows((res.data as any).rows);
         setIsHistoryMode(true);
       }
     } catch (e) { console.error('[DT] History load failed', e); }
@@ -282,8 +336,9 @@ export default function DailyTrackerPage() {
                   ← Back to Today
                 </button>
               )}
-              <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                <span>📋 Daily Tracker</span>
+              <h1 className="text-xl font-bold text-fg tracking-tight flex items-center gap-2">
+                <ClipboardList size={18} strokeWidth={2} className="text-primary" aria-hidden />
+                <span>Daily Tracker</span>
                 <span className="text-xs bg-primary/20 text-primary border border-primary/30 px-2.5 py-0.5 rounded-full font-semibold">
                   {monthName} {yearStr}
                 </span>
@@ -357,12 +412,19 @@ export default function DailyTrackerPage() {
       {/* ── Toolbar ───────────────────────────────────────────────────────── */}
       {!isHistoryMode && (
         <div className="flex items-center gap-2 px-6 py-3 bg-background/50 border-b border-border flex-wrap">
-          {/* Load Contacts */}
+          {/* Load Today's Contacts (Opens in New Window / Tab) */}
           <button
-            onClick={() => selectedCollegeId ? setIsPickerOpen(true) : alert('Please select a college first')}
-            className="flex items-center gap-2 bg-primary hover:bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            onClick={() => {
+              if (!selectedCollegeId) {
+                alert('Please select a college first');
+                return;
+              }
+              window.open('/tracker/load-contacts', '_blank');
+            }}
+            className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-[2px_2px_8px_rgba(30,58,138,0.25)] active:scale-[0.98] cursor-pointer"
+            title="Open Load Today's Contacts in a New Tab"
           >
-            <Download size={14} strokeWidth={2} aria-hidden /> Load Contacts
+            <Download size={14} strokeWidth={2} aria-hidden /> Load Today&apos;s Contacts
           </button>
 
           {/* Save Progress (Ctrl+S) */}
@@ -398,17 +460,20 @@ export default function DailyTrackerPage() {
           <select
             value={outcomeFilter}
             onChange={(e) => setOutcomeFilter(e.target.value as CallOutcome | 'all')}
-            className="bg-surface border border-border-strong text-fg text-sm px-3 py-2 rounded-lg "
+            className="bg-surface border border-border-strong text-fg text-sm px-3 py-2 rounded-lg"
           >
             <option value="all">All Outcomes</option>
-            <option value="no_response">No Response</option>
-            <option value="invalid">Invalid</option>
-            <option value="not_hiring">Not Hiring</option>
-            <option value="already_connected">Already Connected</option>
-            <option value="follow_up">Follow Up</option>
+            <option value="jd_received">JD Received</option>
+            <option value="hiring_freezed">Hiring Freezed</option>
+            <option value="hiring_completed">Hiring Completed</option>
+            <option value="call_back">Call Back</option>
+            <option value="hiring">Hiring</option>
             <option value="invite_mail">Invite Mail</option>
-            <option value="drive_scheduled">Drive Scheduled</option>
-            <option value="drive_in_progress">Drive In Progress</option>
+            <option value="not_hiring">Not Hiring</option>
+            <option value="no_response">No Response</option>
+            <option value="follow_up">Follow Up</option>
+            <option value="in_connect">In Connect</option>
+            <option value="invalid">Invalid</option>
             <option value="drive_completed">Drive Completed</option>
           </select>
 
@@ -440,7 +505,7 @@ export default function DailyTrackerPage() {
       {/* ── No College Selected state ──────────────────────────────────────── */}
       {!selectedCollegeId && (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 text-fg-subtle">
-          <div className="text-6xl">📋</div>
+          <ClipboardList size={56} strokeWidth={1.5} aria-hidden />
           <p className="text-xl font-semibold text-fg-subtle">Select a College to Begin</p>
           <p className="text-sm">Choose a college from the dropdown above, then load contacts to start logging calls.</p>
         </div>
@@ -467,13 +532,16 @@ export default function DailyTrackerPage() {
         {kpi && kpi.total_loaded > 0 && (
           <span>
             Progress:{' '}
-            <strong className="text-white">
+            <strong className="text-fg">
               {Math.round(((kpi.completed + kpi.skipped) / kpi.total_loaded) * 100)}%
             </strong>
           </span>
         )}
         {isHistoryMode && (
-          <span className="ml-auto text-warning">📖 Viewing history — {historyDate} — Read-Only</span>
+          <span className="ml-auto text-warning flex items-center gap-1.5">
+            <BookOpen size={13} strokeWidth={2} aria-hidden />
+            Viewing history — {historyDate} — Read-Only
+          </span>
         )}
         {lastSavedAt && !isHistoryMode && (
           <span className="ml-auto">
@@ -492,7 +560,7 @@ export default function DailyTrackerPage() {
 
       {isCalendarOpen && (
         <CalendarPicker
-          coordinatorId={COORDINATOR_ID}
+          coordinatorId={coordinatorId}
           onClose={() => setIsCalendarOpen(false)}
           onSelectDate={handleViewHistory}
         />
