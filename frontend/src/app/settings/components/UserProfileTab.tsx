@@ -193,19 +193,23 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
     }
   };
 
-  // Calculate 30-day monthly limit eligibility for photo
+  // Calculate monthly 2-time photo change limit
   const getPhotoEligibility = () => {
-    if (!currentUser?.photo_last_updated_at) {
-      return { eligible: true, daysLeft: 0, lastDate: null };
-    }
-    const lastDate = new Date(currentUser.photo_last_updated_at);
-    const diffMs = Date.now() - lastDate.getTime();
-    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-    if (diffMs < thirtyDaysMs) {
-      const daysLeft = Math.ceil((thirtyDaysMs - diffMs) / (24 * 60 * 60 * 1000));
-      return { eligible: false, daysLeft, lastDate };
-    }
-    return { eligible: true, daysLeft: 0, lastDate };
+    const now = new Date();
+    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const changesCount = currentUser?.last_photo_change_month === currentMonthStr
+      ? (currentUser?.monthly_photo_changes_count || 0)
+      : 0;
+
+    const remaining = Math.max(0, 2 - changesCount);
+    const eligible = remaining > 0;
+
+    return {
+      eligible,
+      changesCount,
+      remaining,
+      lastDate: currentUser?.photo_last_updated_at ? new Date(currentUser.photo_last_updated_at) : null,
+    };
   };
 
   const photoStatus = getPhotoEligibility();
@@ -217,7 +221,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
     if (!file) return;
 
     if (!photoStatus.eligible) {
-      setPhotoError(`Photo can only be changed once per month. Available in ${photoStatus.daysLeft} days.`);
+      setPhotoError('Monthly limit reached: You have already changed your profile photo 2 times this month. You can update again next month.');
       return;
     }
 
@@ -240,19 +244,42 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
     reader.readAsDataURL(file);
   };
 
-  // Handle Cropped Image from PhotoCropModal
-  const handleCropFinished = (croppedDataUrl: string) => {
+  // Handle Cropped Image from PhotoCropModal -> Immediately save to database & sync everywhere!
+  const handleCropFinished = async (croppedDataUrl: string) => {
     setPhotoPreview(croppedDataUrl);
     setProfilePhotoUrl(croppedDataUrl);
     setCropModalSrc(null);
+    setPhotoError('');
+
+    try {
+      const res = await onUpdateProfile({ profile_photo_url: croppedDataUrl });
+      if (res.success) {
+        setSuccessMsg('Profile photo updated successfully!');
+      } else {
+        setPhotoError(res.error || 'Failed to save profile photo.');
+      }
+    } catch {
+      setPhotoError('Network error while saving profile photo.');
+    }
   };
 
-  // Handle Photo Deletion / Removal
-  const handleDeletePhoto = () => {
+  // Handle Photo Deletion / Removal -> Immediately clear from database & sync everywhere!
+  const handleDeletePhoto = async () => {
     setPhotoPreview('');
     setProfilePhotoUrl('');
     setPhotoError('');
     if (fileInputRef.current) fileInputRef.current.value = '';
+
+    try {
+      const res = await onUpdateProfile({ profile_photo_url: '' });
+      if (res.success) {
+        setSuccessMsg('Profile photo removed.');
+      } else {
+        setPhotoError(res.error || 'Failed to remove photo.');
+      }
+    } catch {
+      setPhotoError('Network error while removing photo.');
+    }
   };
 
   // Trigger modal on Personal Form Submit
@@ -373,37 +400,43 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
         {/* ── MAIN 2-COLUMN PROFILE LAYOUT (GitHub / Linear Style) ──────── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-          {/* ── LEFT COLUMN (Profile Visual Identity Card) ─────────────── */}
-          <div className="lg:col-span-4 glass-panel rounded-2xl border border-border p-6 shadow-3 flex flex-col items-center text-center space-y-5 sticky top-6">
+          {/* ── LEFT COLUMN (Profile Visual Identity Card - Fully Fits In Viewport) ── */}
+          <div className="lg:col-span-4 glass-panel rounded-2xl border border-border p-5 sm:p-6 shadow-3 flex flex-col items-center text-center sticky top-20 space-y-4 max-h-[calc(100vh-6.5rem)]">
 
             {/* Profile Avatar with Photo Update Overlay & Delete Option */}
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-2 w-full">
               <div className="relative group">
-                <div className="w-32 h-32 rounded-2xl overflow-hidden border-2 border-border-strong bg-surface flex items-center justify-center shadow-4 relative">
+                <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl overflow-hidden border-2 border-border-strong bg-surface flex items-center justify-center shadow-md relative">
                   {photoPreview ? (
                     <img
                       src={photoPreview}
                       alt={effectiveName}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-300"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/10 to-transparent flex items-center justify-center text-3xl font-black text-primary">
+                    <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/10 to-transparent flex items-center justify-center text-4xl font-black text-primary group-hover:scale-105 transition-transform duration-300">
                       {effectiveName.charAt(0)}
                     </div>
                   )}
 
-                  {/* Hover Camera Overlay if eligible */}
-                  {photoStatus.eligible && (
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="absolute inset-0 bg-black/50 text-white flex flex-col items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer backdrop-blur-[2px]"
-                      title="Change profile picture"
-                    >
-                      <Camera size={24} />
-                      <span className="text-[10px] font-bold">Update Photo</span>
-                    </button>
-                  )}
+                  {/* Always allow hover camera click; limit error triggers on upload attempt */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!photoStatus.eligible) {
+                        setPhotoError('Monthly limit reached: You can change your profile photo a maximum of 2 times per month. You can update again next month.');
+                        return;
+                      }
+                      fileInputRef.current?.click();
+                    }}
+                    className="absolute inset-0 bg-black/55 text-white flex flex-col items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer backdrop-blur-xs"
+                    title="Change profile picture"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
+                      <Camera size={18} />
+                    </div>
+                    <span className="text-[11px] font-bold">Update Photo</span>
+                  </button>
                 </div>
 
                 {/* Hidden File Input */}
@@ -421,7 +454,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
                 <button
                   type="button"
                   onClick={handleDeletePhoto}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-danger/10 hover:bg-danger/20 text-danger border border-danger/25 hover:border-danger/40 text-[11px] font-semibold transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm animate-fadeIn"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-danger/10 hover:bg-danger/20 text-danger border border-danger/25 hover:border-danger/40 text-[11px] font-semibold transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-xs animate-fadeIn"
                   title="Remove Profile Photo"
                 >
                   <Trash2 size={12} className="shrink-0" />
@@ -430,54 +463,96 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
               )}
             </div>
 
-            {/* Photo Change Rule Badge */}
-            <div className="w-full text-center">
-              {photoStatus.eligible ? (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-success/10 border border-success/20 text-success text-[11px] font-semibold">
-                  <Sparkles size={12} />
-                  <span>Photo update available</span>
+            {/* Photo Limitation Alert (Only shown when user attempts to upload beyond rule) */}
+            {photoError && (
+              <div className="w-full text-center px-1 animate-fadeIn">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-danger/10 border border-danger/25 text-danger text-xs font-semibold text-left">
+                  <AlertCircle size={13} className="shrink-0 text-danger" />
+                  <span>{photoError}</span>
                 </div>
-              ) : (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-warning/10 border border-warning/20 text-warning text-[11px] font-semibold">
-                  <Lock size={12} />
-                  <span>Photo locked • Available in {photoStatus.daysLeft} days</span>
-                </div>
-              )}
-              {photoError && (
-                <p className="text-[11px] text-danger mt-1.5 font-medium">{photoError}</p>
-              )}
-              <p className="text-[10px] text-fg-subtle mt-1">
-                Profile photo can be updated once per month. Max 2MB (PNG/JPG).
-              </p>
-            </div>
+              </div>
+            )}
 
             {/* User Identity Header */}
             <div className="w-full space-y-1">
-              <h2 className="text-lg font-bold text-fg leading-tight">
+              <h2 className="text-lg sm:text-xl font-bold text-fg leading-tight">
                 {effectiveName}
               </h2>
               <p className="text-xs text-fg-muted font-mono">
                 @{effectiveUsername}
               </p>
-              <div className="pt-2 flex justify-center">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold uppercase tracking-wider">
+              <div className="pt-1.5 flex justify-center">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[11px] font-bold uppercase tracking-wider">
                   <Shield size={12} />
-                  {effectiveRole}
+                  <span>{effectiveRole}</span>
                 </span>
               </div>
             </div>
 
-            {/* Quick Metadata Info List */}
-            <div className="w-full border-t border-border pt-4 text-left space-y-2.5 text-xs">
+            {/* Quick Metadata Info List (Icon-only buttons for Outlook, WhatsApp & LinkedIn) */}
+            <div className="w-full border-t border-border pt-3.5 text-left space-y-2.5 text-xs">
+              
+              {/* 1. Organization */}
               <div className="flex items-center gap-2 text-fg-muted">
                 <Building size={14} className="text-fg-subtle shrink-0" />
                 <span className="truncate">Infoziant Placement Operations</span>
               </div>
-              <div className="flex items-center gap-2 text-fg-muted">
-                <Mail size={14} className="text-fg-subtle shrink-0" />
-                <span className="truncate font-mono">{effectiveEmail}</span>
+
+              {/* 2. Official Email + Outlook Icon Button */}
+              <div className="flex items-center justify-between gap-2 text-fg-muted">
+                <div className="flex items-center gap-2 text-fg-muted min-w-0">
+                  <Mail size={14} className="text-fg-subtle shrink-0" />
+                  <span className="truncate font-mono text-xs">{effectiveEmail}</span>
+                </div>
+                <a
+                  href="https://outlook.office.com/mail/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Open Outlook Web Mailbox"
+                  className="w-7 h-7 rounded-lg bg-[#0078d4] hover:bg-[#006cbd] text-white flex items-center justify-center shadow-xs transition-all hover:scale-110 active:scale-95 cursor-pointer shrink-0 ml-1"
+                >
+                  <svg className="w-3.5 h-3.5 fill-white" viewBox="0 0 24 24">
+                    <path d="M22 6.5l-10 6.5-10-6.5v11a1 1 0 001 1h18a1 1 0 001-1v-11z" />
+                    <path d="M12 11.5l10-6.5H2l10 6.5z" opacity="0.85" />
+                  </svg>
+                </a>
               </div>
-              <div className="flex items-center justify-between text-fg-muted pt-1">
+
+              {/* 3. Primary Mobile / Contact + WhatsApp Icon Button */}
+              <div className="flex items-center justify-between gap-2 text-fg-muted">
+                <div className="flex items-center gap-2 text-fg-muted min-w-0">
+                  <Phone size={14} className="text-fg-subtle shrink-0" />
+                  <span className="truncate font-mono text-xs">
+                    {(primaryMobile || currentUser?.primary_mobile)
+                      ? (String(primaryMobile || currentUser?.primary_mobile).startsWith('+')
+                          ? String(primaryMobile || currentUser?.primary_mobile)
+                          : `+91 ${String(primaryMobile || currentUser?.primary_mobile)}`)
+                      : 'WhatsApp Contact'}
+                  </span>
+                </div>
+                {(() => {
+                  const rawDigits = String(primaryMobile || currentUser?.primary_mobile || '').replace(/\D/g, '');
+                  const waLink = rawDigits
+                    ? (rawDigits.length === 10 ? `https://wa.me/91${rawDigits}` : `https://wa.me/${rawDigits}`)
+                    : 'https://web.whatsapp.com/';
+                  return (
+                    <a
+                      href={waLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={rawDigits ? `Open WhatsApp Chat (${primaryMobile || currentUser?.primary_mobile})` : 'Open WhatsApp Web on Laptop'}
+                      className="w-7 h-7 rounded-lg bg-[#25D366] hover:bg-[#20ba5a] text-white flex items-center justify-center shadow-xs transition-all hover:scale-110 active:scale-95 cursor-pointer shrink-0 ml-1"
+                    >
+                      <svg className="w-3.5 h-3.5 fill-white" viewBox="0 0 24 24">
+                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
+                      </svg>
+                    </a>
+                  );
+                })()}
+              </div>
+
+              {/* 4. Joining Date + LinkedIn Icon Button */}
+              <div className="flex items-center justify-between text-fg-muted">
                 <div className="flex items-center gap-2">
                   <Calendar size={14} className="text-fg-subtle shrink-0" />
                   <span>Joined {dateOfJoining ? new Date(dateOfJoining).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '2026 Season'}</span>
@@ -488,25 +563,27 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
                     target="_blank"
                     rel="noopener noreferrer"
                     title={`Open LinkedIn Profile: ${getFullLinkedinUrl(linkedinProfile)}`}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0077b5] text-white border border-[#0077b5] text-[11px] font-bold shadow-sm transition-all hover:bg-[#006097] hover:scale-105 active:scale-95 animate-fadeIn cursor-pointer"
+                    className="w-7 h-7 rounded-lg bg-[#0077b5] hover:bg-[#006097] text-white flex items-center justify-center shadow-xs transition-all hover:scale-110 active:scale-95 cursor-pointer shrink-0 ml-1"
                   >
                     <svg className="w-3.5 h-3.5 fill-white" viewBox="0 0 24 24">
                       <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 10.9v8.37H9.2V10.9H6.46M7.83 6.44a1.64 1.64 0 1 0 0 3.28 1.64 1.64 0 0 0 0-3.28z" />
                     </svg>
-                    <span>LinkedIn</span>
                   </a>
                 ) : (
-                  <span
-                    title="LinkedIn profile not added yet"
-                    className="flex items-center gap-1 px-2 py-0.5 rounded text-fg-muted/40 text-[10px] cursor-not-allowed"
+                  <a
+                    href={cleanLinkedinSlug(effectiveUsername) ? getFullLinkedinUrl(effectiveUsername) : "https://www.linkedin.com/"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Open LinkedIn"
+                    className="w-7 h-7 rounded-lg bg-[#0077b5]/80 hover:bg-[#0077b5] text-white flex items-center justify-center shadow-xs transition-all hover:scale-110 active:scale-95 cursor-pointer shrink-0 ml-1"
                   >
-                    <svg className="w-3.5 h-3.5 fill-current opacity-30" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5 fill-white" viewBox="0 0 24 24">
                       <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 10.9v8.37H9.2V10.9H6.46M7.83 6.44a1.64 1.64 0 1 0 0 3.28 1.64 1.64 0 0 0 0-3.28z" />
                     </svg>
-                    <span className="text-[10px] opacity-40">Not linked</span>
-                  </span>
+                  </a>
                 )}
               </div>
+
             </div>
 
           </div>

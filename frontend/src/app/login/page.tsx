@@ -284,7 +284,7 @@ export default function LoginPage() {
       <aside className="relative hidden lg:flex flex-col items-center justify-between overflow-hidden border-r border-border bg-white py-12">
         {/* Top: Sliding Partner College Logos */}
         <div className="w-full space-y-2">
-          <p className="text-center text-[11px] font-bold text-slate-400 uppercase tracking-widest font-mono">
+          <p className="text-center text-micro font-bold text-slate-400 uppercase tracking-widest font-mono">
             Partner Institutions
           </p>
           <LoginCollegeLogoStrip />
@@ -302,7 +302,7 @@ export default function LoginPage() {
 
         {/* Bottom: Sliding Operations Modules */}
         <div className="w-full space-y-2">
-          <p className="text-center text-[11px] font-bold text-slate-400 uppercase tracking-widest font-mono">
+          <p className="text-center text-micro font-bold text-slate-400 uppercase tracking-widest font-mono">
             Core Modules
           </p>
           <LoginModuleMarquee />

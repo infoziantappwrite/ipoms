@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { Phone } from 'lucide-react';
 import type { TrackerRow as TrackerRowType, CallOutcome } from '../page';
 

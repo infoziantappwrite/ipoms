@@ -7,6 +7,9 @@ export interface SessionUser {
   full_name: string;
   official_email: string;
   role_codes: string[];
+  profile_photo_url?: string;
+  designation?: string;
+  employee_id?: string;
 }
 
 const USER_KEY = 'ipoms_user';

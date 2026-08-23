@@ -20,20 +20,33 @@ export function PhotoCropModal({ imageSrc, onCropComplete, onCancel }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [naturalSize, setNaturalSize] = useState({ width: 280, height: 280 });
 
-  // Load image
+  // Viewport size in pixels
+  const VIEWPORT_SIZE = 280;
+
+  // Load image & determine natural dimensions
   useEffect(() => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.src = imageSrc;
     img.onload = () => {
       imageRef.current = img;
+      setNaturalSize({ width: img.naturalWidth, height: img.naturalHeight });
       setImageLoaded(true);
       setZoom(1);
       setOffset({ x: 0, y: 0 });
       setRotation(0);
     };
   }, [imageSrc]);
+
+  // Base dimensions computed using 'cover' scaling
+  const baseScale = Math.max(
+    VIEWPORT_SIZE / naturalSize.width,
+    VIEWPORT_SIZE / naturalSize.height
+  );
+  const baseWidth = naturalSize.width * baseScale;
+  const baseHeight = naturalSize.height * baseScale;
 
   // Handle Drag / Pan
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -95,72 +108,66 @@ export function PhotoCropModal({ imageSrc, onCropComplete, onCancel }: Props) {
     setRotation(0);
   };
 
-  // Execute Canvas Crop
+  // Exact 1:1 Pixel-Perfect WYSIWYG Canvas Crop
   const handleApplyCrop = useCallback(() => {
     if (!imageRef.current) return;
     const img = imageRef.current;
 
-    // Output crop size (512 x 512 for high resolution avatar)
-    const outputSize = 512;
+    // High-resolution output (600 x 600)
+    const outputSize = 600;
     const canvas = document.createElement('canvas');
     canvas.width = outputSize;
     canvas.height = outputSize;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // High quality smoothing
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    // Viewport diameter in the UI is 280px
-    const viewportSize = 280;
-    const scaleFactor = outputSize / viewportSize;
+    const scaleFactor = outputSize / VIEWPORT_SIZE;
 
-    // Center canvas origin
+    // Center canvas coordinate system
     ctx.translate(outputSize / 2, outputSize / 2);
     ctx.rotate((rotation * Math.PI) / 180);
 
-    // Calculate scaled image size based on natural dimensions
-    const baseScale = Math.max(viewportSize / img.naturalWidth, viewportSize / img.naturalHeight);
-    const drawWidth = img.naturalWidth * baseScale * zoom * scaleFactor;
-    const drawHeight = img.naturalHeight * baseScale * zoom * scaleFactor;
-
-    // Account for user pan offset
-    const drawX = offset.x * scaleFactor - drawWidth / 2;
-    const drawY = offset.y * scaleFactor - drawHeight / 2;
+    // Render exact image frame with pan offset and zoom
+    const drawWidth = baseWidth * scaleFactor * zoom;
+    const drawHeight = baseHeight * scaleFactor * zoom;
+    const drawX = (offset.x * scaleFactor) - (drawWidth / 2);
+    const drawY = (offset.y * scaleFactor) - (drawHeight / 2);
 
     ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
 
-    // Export as high-quality WebP / JPEG
-    const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    // Export clean JPEG / WebP data URL
+    const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
     onCropComplete(croppedDataUrl);
-  }, [offset, rotation, zoom, onCropComplete]);
+  }, [baseWidth, baseHeight, offset, rotation, zoom, onCropComplete]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fadeIn select-none">
-      <div className="max-w-md w-full rounded-3xl bg-white border border-slate-200/90 p-6 shadow-[0_20px_45px_rgba(15,23,42,0.12)] space-y-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn select-none">
+      <div className="max-w-md w-full rounded-3xl bg-white border border-slate-200/90 p-6 shadow-2xl space-y-5">
         
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-[inset_1px_1px_2px_rgba(0,0,0,0.04)]">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-xs">
               <User size={18} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-fg">Crop Face & Shoulder Portrait</h3>
-              <p className="text-[11px] text-fg-subtle">Drag to position, scroll or slide to zoom</p>
+              <h3 className="text-sm font-bold text-slate-900">Crop Profile Photo</h3>
+              <p className="text-[11px] text-slate-500">Drag to position, scroll or slide to zoom</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onCancel}
-            className="w-8 h-8 rounded-lg bg-surface hover:bg-surface-sunken text-fg-subtle hover:text-fg border border-border flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center transition-colors cursor-pointer"
           >
             <X size={16} />
           </button>
         </div>
 
-        {/* Interactive Crop Viewport Canvas Area */}
+        {/* Interactive Crop Viewport Canvas Area (Exact 280x280 Square) */}
         <div className="flex flex-col items-center">
           <div
             ref={containerRef}
@@ -172,64 +179,70 @@ export function PhotoCropModal({ imageSrc, onCropComplete, onCancel }: Props) {
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
             onWheel={handleWheel}
-            className="w-[280px] h-[280px] rounded-2xl bg-slate-100 overflow-hidden relative border-2 border-dashed border-slate-300 flex items-center justify-center cursor-grab active:cursor-grabbing shadow-[inset_2px_2px_6px_rgba(0,0,0,0.06)]"
+            className="w-[280px] h-[280px] rounded-3xl bg-slate-950 overflow-hidden relative border-2 border-primary flex items-center justify-center cursor-grab active:cursor-grabbing shadow-inner"
           >
             {imageLoaded && (
               <div
                 style={{
+                  width: `${baseWidth}px`,
+                  height: `${baseHeight}px`,
                   transform: `translate(${offset.x}px, ${offset.y}px) rotate(${rotation}deg) scale(${zoom})`,
                   transformOrigin: 'center center',
                   transition: isDragging ? 'none' : 'transform 0.05s ease-out',
                 }}
-                className="pointer-events-none flex items-center justify-center"
+                className="pointer-events-none shrink-0 flex items-center justify-center"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={imageSrc}
                   alt="Crop Preview"
-                  className="max-w-none select-none"
-                  style={{
-                    maxHeight: '280px',
-                    maxWidth: '280px',
-                    objectFit: 'contain',
-                  }}
+                  className="w-full h-full object-cover select-none pointer-events-none"
                   draggable={false}
                 />
               </div>
             )}
 
-            {/* Circular & Passport Outline Mask with Soft Scrim */}
-            <div className="absolute inset-0 pointer-events-none border-[3px] border-primary rounded-full shadow-[0_0_0_9999px_rgba(241,245,249,0.85)]" />
+            {/* Square Rounded Mask Guide (Matches Profile Card Shape Exactly) */}
+            <div className="absolute inset-0 pointer-events-none rounded-3xl border-2 border-white/60 shadow-[0_0_0_9999px_rgba(15,23,42,0.65)]" />
 
-            {/* Face & Shoulder Silhouette Guide */}
+            {/* Silhouette & Alignment Grid Guide */}
             {showGuide && (
               <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center opacity-70">
+                {/* Subtle Grid Crosshairs */}
+                <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none border border-white/20">
+                  <div className="border-r border-b border-white/20" />
+                  <div className="border-r border-b border-white/20" />
+                  <div className="border-b border-white/20" />
+                  <div className="border-r border-b border-white/20" />
+                  <div className="border-r border-b border-white/20" />
+                  <div className="border-b border-white/20" />
+                  <div className="border-r border-white/20" />
+                  <div className="border-r border-white/20" />
+                  <div />
+                </div>
                 {/* Head circle */}
-                <div className="w-24 h-28 rounded-full border border-dashed border-primary mt-4" />
+                <div className="w-28 h-32 rounded-full border border-dashed border-white/80 mt-2 shadow-sm" />
                 {/* Shoulder curve */}
-                <div className="w-48 h-20 rounded-t-full border-t border-dashed border-primary -mt-2" />
-                <span className="absolute bottom-3 text-[10px] text-primary font-bold bg-white/90 shadow-sm border border-primary/20 px-2 py-0.5 rounded-full font-mono">
-                  Face & Shoulder Zone
-                </span>
+                <div className="w-48 h-16 rounded-t-full border-t border-dashed border-white/80 -mt-2 shadow-sm" />
               </div>
             )}
 
             {/* Pan Drag Indicator */}
-            <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-white/90 shadow-sm border border-border text-fg-subtle text-[10px] flex items-center gap-1 pointer-events-none font-medium">
-              <Move size={10} /> Drag
+            <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/60 text-white text-[10px] flex items-center gap-1 pointer-events-none font-medium backdrop-blur-xs">
+              <Move size={10} /> Drag to Pan
             </div>
           </div>
         </div>
 
         {/* Controls Toolbar */}
-        <div className="space-y-3 bg-surface-sunken p-3.5 rounded-2xl border border-border">
+        <div className="space-y-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
           
           {/* Zoom Slider */}
           <div className="flex items-center gap-3 text-xs">
             <button
               type="button"
               onClick={() => setZoom((prev) => Math.max(0.5, prev - 0.15))}
-              className="w-7 h-7 rounded-lg bg-surface hover:bg-surface-raised text-fg border border-border flex items-center justify-center cursor-pointer transition-colors shadow-sm"
+              className="w-7 h-7 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center justify-center cursor-pointer transition-colors shadow-xs"
               title="Zoom out"
             >
               <ZoomOut size={13} />
@@ -248,13 +261,13 @@ export function PhotoCropModal({ imageSrc, onCropComplete, onCancel }: Props) {
             <button
               type="button"
               onClick={() => setZoom((prev) => Math.min(3.5, prev + 0.15))}
-              className="w-7 h-7 rounded-lg bg-surface hover:bg-surface-raised text-fg border border-border flex items-center justify-center cursor-pointer transition-colors shadow-sm"
+              className="w-7 h-7 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 flex items-center justify-center cursor-pointer transition-colors shadow-xs"
               title="Zoom in"
             >
               <ZoomIn size={13} />
             </button>
 
-            <span className="font-mono text-[11px] text-fg-muted font-bold w-10 text-right">
+            <span className="font-mono text-[11px] text-slate-600 font-bold w-10 text-right">
               {Math.round(zoom * 100)}%
             </span>
           </div>
@@ -265,7 +278,7 @@ export function PhotoCropModal({ imageSrc, onCropComplete, onCancel }: Props) {
               <button
                 type="button"
                 onClick={handleRotate}
-                className="px-3 py-1.5 rounded-lg bg-surface hover:bg-surface-sunken text-fg text-[11px] font-semibold flex items-center gap-1.5 border border-border transition-colors cursor-pointer shadow-sm"
+                className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center gap-1.5 border border-slate-200 transition-colors cursor-pointer shadow-xs"
                 title="Rotate 90 degrees"
               >
                 <RotateCw size={12} />
@@ -275,7 +288,7 @@ export function PhotoCropModal({ imageSrc, onCropComplete, onCancel }: Props) {
               <button
                 type="button"
                 onClick={handleReset}
-                className="px-3 py-1.5 rounded-lg bg-surface hover:bg-surface-sunken text-fg text-[11px] font-semibold flex items-center gap-1.5 border border-border transition-colors cursor-pointer shadow-sm"
+                className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-semibold flex items-center gap-1.5 border border-slate-200 transition-colors cursor-pointer shadow-xs"
                 title="Reset Position"
               >
                 <RefreshCw size={12} />
@@ -286,10 +299,10 @@ export function PhotoCropModal({ imageSrc, onCropComplete, onCancel }: Props) {
             <button
               type="button"
               onClick={() => setShowGuide(!showGuide)}
-              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 border transition-colors cursor-pointer shadow-sm ${
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 border transition-colors cursor-pointer shadow-xs ${
                 showGuide
-                  ? 'bg-primary/10 border-primary/30 text-primary'
-                  : 'bg-surface border-border text-fg-subtle hover:text-fg'
+                  ? 'bg-blue-50 border-blue-200 text-primary'
+                  : 'bg-white border-slate-200 text-slate-500 hover:text-slate-800'
               }`}
               title="Toggle Face & Shoulder alignment guide"
             >
@@ -301,21 +314,22 @@ export function PhotoCropModal({ imageSrc, onCropComplete, onCancel }: Props) {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-3 pt-1 border-t border-border">
+        <div className="flex items-center justify-end gap-3 pt-2">
           <button
             type="button"
             onClick={onCancel}
-            className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 text-xs font-semibold border border-slate-200 transition-all active:scale-[0.98] cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
           >
             Cancel
           </button>
+          
           <button
             type="button"
             onClick={handleApplyCrop}
-            className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold shadow-sm flex items-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+            className="px-5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold shadow-md shadow-primary/25 flex items-center gap-2 transition-all hover:scale-105 active:scale-95 cursor-pointer"
           >
             <Check size={14} />
-            <span>Crop & Save Photo</span>
+            <span>Apply & Save Crop</span>
           </button>
         </div>
 

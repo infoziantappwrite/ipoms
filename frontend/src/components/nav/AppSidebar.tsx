@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, PhoneCall, CalendarDays, Target, Database,
-  TrendingUp, Bell, UserCheck, User, PanelLeftClose, X, LogOut,
+  TrendingUp, MessageSquareText, Bell, PanelLeftClose, X,
 } from 'lucide-react';
 
 import { InfoziantMark } from '@/components/InfoziantMark';
@@ -17,6 +17,7 @@ import {
   type SessionUser, type RoleKey,
 } from '@/lib/session';
 import { apiFetch } from '@/lib/api';
+import { subscribeChatEvent } from '@/lib/chatStream';
 
 /** How long the drawer stays open after sign-in before settling to the rail. */
 const INTRO_HOLD_MS = 5000;
@@ -35,8 +36,8 @@ const NAV: NavItem[] = [
   { href: '/daily-leads',    label: 'Daily Leads',    Icon: Target },
   { href: '/metadata',       label: 'Metadata DB',    Icon: Database },
   { href: '/reports',        label: 'Reports & BI',   Icon: TrendingUp },
+  { href: '/chat',           label: 'Chat',           Icon: MessageSquareText },
   { href: '/notifications',  label: 'Alerts',         Icon: Bell },
-  { href: '/settings',       label: 'Profile',        Icon: User },
 ];
 
 interface Props {
@@ -54,6 +55,59 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
   const [roster, setRoster] = useState<string[]>([]);
   const [hovered, setHovered] = useState<HTMLElement | null>(null);
   const [hoverLabel, setHoverLabel] = useState('');
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+
+  const fetchChatUnread = useCallback(async () => {
+    try {
+      const u = readSessionUser();
+      const uid = u?._id || (u as any)?.userId;
+      const res = await apiFetch(`/chat/conversations${uid ? `?user_id=${uid}` : ''}`);
+      if (res.success && Array.isArray(res.data)) {
+        const total = res.data.reduce((acc: number, c: any) => acc + (c.unread_count || 0), 0);
+        setChatUnreadCount(total);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    fetchChatUnread();
+
+    // Real-time badge updates via the shared chat SSE connection.
+    const unsubscribe = subscribeChatEvent('new_message', (parsed) => {
+      if (!parsed) {
+        fetchChatUnread();
+        return;
+      }
+      const msg = parsed.message;
+      const myId = readSessionUser()?._id || (readSessionUser() as any)?.userId;
+      if (!myId || String(msg.sender_id) !== String(myId)) {
+        setChatUnreadCount((prev) => prev + 1);
+        fetchChatUnread();
+      }
+    });
+
+    const handleChatRead = () => {
+      setChatUnreadCount(0);
+      fetchChatUnread();
+    };
+
+    window.addEventListener('ipoms_chat_read', handleChatRead);
+    // Fallback poll — catches anything missed if the SSE connection drops.
+    const interval = setInterval(fetchChatUnread, 15000);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('ipoms_chat_read', handleChatRead);
+      clearInterval(interval);
+    };
+  }, [fetchChatUnread]);
+
+  // If user is actively viewing /chat, clear badge
+  useEffect(() => {
+    if (pathname === '/chat') {
+      setChatUnreadCount(0);
+    }
+  }, [pathname]);
 
   const introScheduled = useRef(false);
   const introCancelled = useRef(false);
@@ -64,15 +118,14 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
     try { window.sessionStorage.setItem(NAV_INTRO_KEY, 'done'); } catch { /* ignore */ }
   }, []);
 
-  // Restoring state and scheduling the intro have different idempotency needs,
-  // so they are guarded differently. StrictMode double-invokes this effect and
-  // resets state between the two passes, so the restore must run on every pass
-  // or a rail-preferring user gets an expanded drawer. The intro timer must NOT
-  // run twice, so a ref guards it — and it is not cleared on teardown, since
-  // clearing on StrictMode's simulated unmount would cancel the only timer the
-  // guarded second pass declines to reschedule.
+  // Sync user state from localStorage and live update events
   useEffect(() => {
-    setUser(readSessionUser());
+    const refreshUser = () => {
+      const session = readSessionUser();
+      setUser(session);
+    };
+
+    refreshUser();
 
     if (window.sessionStorage.getItem(NAV_INTRO_KEY) === 'pending') {
       setCollapsed(false);
@@ -88,11 +141,24 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
       setCollapsed(window.localStorage.getItem(NAV_COLLAPSED_KEY) === '1');
     }
 
-    // Transitions stay off until after the width correction above has painted,
-    // so a returning user does not watch the drawer animate shut on every hard
-    // reload. Not cancelled on teardown: StrictMode's simulated unmount would
-    // otherwise leave transitions permanently disabled.
     setTimeout(() => setMounted(true), 60);
+
+    // Live event listeners for immediate multi-screen synchronization
+    const handleUserUpdated = (e: any) => {
+      if (e.detail) {
+        setUser(e.detail);
+      } else {
+        refreshUser();
+      }
+    };
+
+    window.addEventListener('ipoms_user_updated', handleUserUpdated);
+    window.addEventListener('storage', refreshUser);
+
+    return () => {
+      window.removeEventListener('ipoms_user_updated', handleUserUpdated);
+      window.removeEventListener('storage', refreshUser);
+    };
   }, []);
 
   // Roster is only needed to disambiguate avatar initials (MO vs MU).
@@ -130,6 +196,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
   const name = user?.full_name ?? 'Signed in';
   const initials = initialsFor(name, roster);
   const items = NAV.filter((i) => !i.roles || i.roles.includes(role));
+  const isSettingsActive = pathname === '/settings' || pathname.startsWith('/settings/');
 
   const showLabel = (el: HTMLElement | null, label: string) => {
     if (!collapsed) return;
@@ -148,9 +215,6 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
         } ${mounted ? 'transition-opacity duration-200' : ''}`}
       />
 
-      {/* min-w-0 is load-bearing: at lg the drawer is a flex child, and a flex
-          item's default min-width:auto floors it at the widest nav label's
-          min-content width, silently overriding the collapsed width. */}
       <aside
         aria-label="Primary"
         data-collapsed={collapsed || undefined}
@@ -188,12 +252,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
           </button>
         </div>
 
-        {/* ── Collapse toggle ───────────────────────────────────────────────
-            Its own row rather than sharing the brand row: at the 76px rail
-            there is no horizontal space beside the 40px mark, so a right-edge
-            button would sit on top of the logo. Reserving the row in both
-            states also means the nav items below never shift vertically when
-            the drawer collapses. */}
+        {/* ── Collapse toggle ─────────────────────────────────────────────── */}
         <div className={`hidden shrink-0 px-[18px] pb-2 lg:flex ${collapsed ? 'justify-center' : 'justify-end'}`}>
           <button
             type="button"
@@ -202,7 +261,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
             aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
             className="grid h-7 w-7 place-items-center rounded-full border border-border bg-surface
               text-fg-subtle shadow-1 transition-[box-shadow,color] duration-200
-              hover:text-primary active:shadow-inset-1"
+              hover:text-primary active:shadow-inset-1 cursor-pointer"
           >
             <PanelLeftClose
               size={15}
@@ -213,11 +272,14 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
           </button>
         </div>
 
-        {/* ── Nav ───────────────────────────────────────────────────────── */}
+        {/* ── Main Nav Items ─────────────────────────────────────────────── */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden px-[18px] py-2">
           <ul className="space-y-1">
             {items.map(({ href, label, Icon }) => {
               const active = pathname === href || pathname.startsWith(`${href}/`);
+              const isChat = href === '/chat';
+              const showBadge = isChat && chatUnreadCount > 0 && pathname !== '/chat';
+
               return (
                 <li key={href}>
                   <Link
@@ -233,15 +295,27 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                         ? 'bg-primary text-primary-foreground shadow-1'
                         : 'text-fg-muted hover:bg-surface-sunken hover:text-fg'}`}
                   >
-                    <span className="grid h-10 w-10 shrink-0 place-items-center">
+                    <span className="relative grid h-10 w-10 shrink-0 place-items-center">
                       <Icon size={19} strokeWidth={2} aria-hidden />
+                      {showBadge && collapsed && (
+                        <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-xs">
+                          {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                        </span>
+                      )}
                     </span>
-                    <span
-                      className={`whitespace-nowrap text-body font-semibold
-                        ${mounted ? 'transition-opacity duration-200' : ''}
-                        ${collapsed ? 'opacity-100 lg:opacity-0' : 'opacity-100'}`}
-                    >
-                      {label}
+                    <span className="flex-1 flex items-center justify-between min-w-0 pr-2">
+                      <span
+                        className={`whitespace-nowrap text-body font-semibold
+                          ${mounted ? 'transition-opacity duration-200' : ''}
+                          ${collapsed ? 'opacity-100 lg:opacity-0' : 'opacity-100'}`}
+                      >
+                        {label}
+                      </span>
+                      {showBadge && !collapsed && (
+                        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white shadow-2xs">
+                          {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                        </span>
+                      )}
                     </span>
                   </Link>
                 </li>
@@ -250,27 +324,50 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
           </ul>
         </nav>
 
-        {/* ── Signed-in identity ────────────────────────────────────────── */}
-        <div className="shrink-0 border-t border-border px-[18px] py-3">
+        {/* ── Signed-in Profile Identity Avatar (Instant Photo Sync) ───── */}
+        <div className="shrink-0 border-t border-border px-[14px] py-2.5">
           <Link
             href="/settings"
-            className="flex items-center gap-3 group/id hover:opacity-90 transition-opacity"
+            className={`flex items-center gap-3 p-1 rounded-xl transition-all group/id cursor-pointer ${
+              isSettingsActive
+                ? 'bg-primary/10 border border-primary/25 shadow-xs'
+                : 'hover:bg-surface-sunken border border-transparent'
+            }`}
             onMouseEnter={(e) => showLabel(e.currentTarget, `${name} · View Profile`)}
             onMouseLeave={() => setHovered(null)}
           >
-            <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-control border border-primary-subtle bg-primary-subtle text-body font-bold tracking-tight text-primary group-hover/id:border-primary">
-              {initials}
+            {/* Avatar Badge: Renders real photo image if present, fallback to initials */}
+            <div className="relative shrink-0">
+              <span
+                className={`grid h-10 w-10 place-items-center rounded-xl overflow-hidden text-body font-black tracking-tight transition-all ${
+                  isSettingsActive
+                    ? 'border border-primary ring-2 ring-primary/30 shadow-xs'
+                    : 'border border-primary-subtle bg-primary-subtle text-primary group-hover/id:border-primary'
+                }`}
+              >
+                {user?.profile_photo_url ? (
+                  <img
+                    src={user.profile_photo_url}
+                    alt={name}
+                    className="w-full h-full object-cover object-center"
+                  />
+                ) : (
+                  <span className="text-sm font-bold">{initials}</span>
+                )}
+              </span>
+
+              {/* High-visibility vibrant green active presence light (unclipped & glowing) */}
               <span
                 aria-hidden
-                className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-surface bg-success"
-              />
-            </span>
+                className="absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white border-2 border-white shadow-xs z-20 pointer-events-none"
+              >
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 ring-1 ring-emerald-600/40 animate-pulse" />
+              </span>
+            </div>
 
             <div className={`min-w-0 ${mounted ? 'transition-opacity duration-200' : ''} ${collapsed ? 'opacity-100 lg:opacity-0' : 'opacity-100'}`}>
-              <div className="truncate whitespace-nowrap text-body font-semibold leading-tight text-fg group-hover/id:text-primary transition-colors">{name}</div>
-              <div className="mt-0.5 flex items-center gap-1.5 whitespace-nowrap text-micro font-medium text-success">
-                Online
-                <span className="text-fg-subtle">· {ROLE_LABEL[role]}</span>
+              <div className={`truncate whitespace-nowrap text-body font-bold leading-none transition-colors ${isSettingsActive ? 'text-primary' : 'text-fg group-hover/id:text-primary'}`}>
+                {name}
               </div>
             </div>
           </Link>

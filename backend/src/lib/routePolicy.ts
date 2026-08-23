@@ -138,6 +138,9 @@ const POLICIES: Policy[] = [
   { method: 'PATCH',  pattern: /^\/settings\/?$/,                        roles: ADMIN },
   // Read is open to staff: the UI reads branding and dropdown enums from here.
   { method: 'GET',    pattern: /^\/settings\/?$/,                        roles: STAFF },
+
+  // ── Team Chat & Coordinator Doubt Hub ─────────────────────────────────────
+  { method: '*',      pattern: /^\/chat(\/.*)?$/,                         roles: STAFF },
 ];
 
 /** Paths served before authentication; never reach this middleware. */

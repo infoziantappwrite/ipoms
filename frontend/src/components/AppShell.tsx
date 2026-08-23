@@ -6,6 +6,7 @@ import { Menu } from 'lucide-react';
 
 import { AppSidebar } from './nav/AppSidebar';
 import { InfoziantMark } from './InfoziantMark';
+import { ChatNotificationToast } from './chat/ChatNotificationToast';
 
 /** Routes that render their own full-screen chrome and must not show the drawer. */
 const CHROMELESS = ['/', '/login', '/signup'];
@@ -42,6 +43,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <main id="main" className="flex flex-1 flex-col">{children}</main>
       </div>
+
+      <ChatNotificationToast />
     </div>
   );
 }

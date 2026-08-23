@@ -36,34 +36,24 @@ export function CoordinatorDashboard({ data, onLoadToMetadata, onMarkComplete }:
           aria-labelledby="directive-heading"
           className="rounded-panel border border-info/30 bg-info-subtle p-4"
         >
-          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-            <div className="flex min-w-0 gap-3">
-              <span
-                aria-hidden
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-control bg-info/10 text-info"
-              >
-                <Megaphone size={16} strokeWidth={2} />
-              </span>
-              <div className="min-w-0">
-                <p className="text-micro font-semibold uppercase tracking-wide text-info">
-                  {priority_notification.sender_name}
-                </p>
-                <h2 id="directive-heading" className="mt-0.5 text-body font-bold text-fg">
-                  {priority_notification.title}
-                </h2>
-                <p className="mt-1 text-micro leading-relaxed text-fg-muted">
-                  {priority_notification.message}
-                </p>
-              </div>
-            </div>
-
-            <Link
-              href="/tracker"
-              className="flex shrink-0 items-center gap-1.5 rounded-control border border-border bg-surface px-3 py-1.5 text-micro font-semibold text-primary shadow-1 transition-[box-shadow,color] duration-200 hover:text-primary-hover active:shadow-inset-1"
+          <div className="flex items-start gap-3">
+            <span
+              aria-hidden
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-control bg-info/10 text-info"
             >
-              Open Daily Tracker
-              <ArrowRight size={13} strokeWidth={2} aria-hidden />
-            </Link>
+              <Megaphone size={16} strokeWidth={2} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-micro font-semibold uppercase tracking-wide text-info">
+                {priority_notification.sender_name}
+              </p>
+              <h2 id="directive-heading" className="mt-0.5 text-body font-bold text-fg">
+                {priority_notification.title}
+              </h2>
+              <p className="mt-1 text-micro leading-relaxed text-fg-muted">
+                {priority_notification.message}
+              </p>
+            </div>
           </div>
         </section>
       )}

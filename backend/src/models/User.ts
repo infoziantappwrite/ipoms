@@ -20,6 +20,8 @@ export interface IUser extends Document {
   date_of_joining?: Date | null;
   profile_photo_url?: string;
   photo_last_updated_at?: Date | null;
+  monthly_photo_changes_count: number;
+  last_photo_change_month?: string;
   is_profile_locked: boolean;
   profile_locked_at?: Date | null;
   monthly_password_changes_count: number;
@@ -145,6 +147,14 @@ const UserSchema: Schema<IUser> = new Schema(
     photo_last_updated_at: {
       type: Date,
       default: null,
+    },
+    monthly_photo_changes_count: {
+      type: Number,
+      default: 0,
+    },
+    last_photo_change_month: {
+      type: String,
+      default: '',
     },
     is_profile_locked: {
       type: Boolean,

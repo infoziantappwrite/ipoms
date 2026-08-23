@@ -116,6 +116,9 @@ function publicUser(user: any) {
     username: user.username,
     official_email: user.official_email,
     role_codes: user.role_codes,
+    profile_photo_url: user.profile_photo_url || '',
+    designation: user.designation || (user.role_codes?.includes('ADMIN') || user.role_codes?.includes('ADMINISTRATOR') ? 'Administrator' : user.role_codes?.includes('TEAM_LEADER') ? 'Team Leader' : 'Placement Operations Coordinator'),
+    employee_id: user.employee_id || '',
     must_change_password: user.must_change_password,
   };
 }

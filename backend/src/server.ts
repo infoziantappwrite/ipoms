@@ -21,7 +21,8 @@ import { SystemSettings } from './models/SystemSettings';
 import { Types } from 'mongoose';
 import { startFinalizationJob } from './jobs/finalizeDailyTracker';
 import { registerAuthRoutes } from './lib/authRoutes';
-import { authenticateJWT, authorizeRoles } from './lib/authMiddleware';
+import { registerChatRoutes, seedDefaultChatChannels } from './lib/chatRoutes';
+import { authenticateJWT, authorizeRoles, AuthUserPayload } from './lib/authMiddleware';
 import { authorizeRoute, scopeToSelf, isSupervisor, refuseForeignOwner } from './lib/routePolicy';
 import { isPasswordValid, firstPasswordError } from './lib/passwordPolicy';
 
@@ -101,10 +102,37 @@ app.use('/api/v1', (req: Request, res: Response, next: NextFunction) => {
   if (req.path === '/health' || req.path.startsWith('/auth')) {
     return next();
   }
+  // /chat/stream is Server-Sent Events via the browser's native EventSource,
+  // which cannot set an Authorization header. It authenticates via a
+  // `?token=` query param instead, verified here with the same secret and
+  // populating req.user the same way, so authorizeRoute's role check right
+  // after this still applies exactly as it does to every other route.
+  // Every other /chat/* route still goes through the normal header check.
+  if (req.path === '/chat/stream') {
+    const token = req.query.token as string | undefined;
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED_TOKEN_MISSING', message: 'Authentication token is missing.' },
+      });
+    }
+    try {
+      req.user = jwt.verify(token, JWT_ACCESS_SECRET) as AuthUserPayload;
+      return next();
+    } catch {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'UNAUTHORIZED_TOKEN_INVALID', message: 'Invalid or expired authentication token.' },
+      });
+    }
+  }
   return authenticateJWT(req, res, next);
 });
 
 app.use('/api/v1', authorizeRoute);
+
+// Register Coordinator Team Chat & Doubt Hub routes
+registerChatRoutes(app);
 
 // 3. High-Speed Company Search Endpoint (Searches across 3,550+ companies in < 10ms)
 app.get('/api/v1/companies/search', async (req: Request, res: Response) => {
@@ -2188,35 +2216,104 @@ app.delete('/api/v1/reports/presets/:id', async (req: Request, res: Response) =>
  * response was rendering as mojibake ("ð") wherever the
  * transport charset disagreed with the source file's encoding.
  */
-type GreetingPeriod = 'morning' | 'afternoon' | 'evening' | 'night';
+type GreetingPeriod =
+  | 'midnight'
+  | 'wee_hours'
+  | 'dawn'
+  | 'morning'
+  | 'midday'
+  | 'afternoon'
+  | 'early_evening'
+  | 'dusk'
+  | 'evening'
+  | 'night';
 
 function getTimeGreeting(fullName: string): { greeting: string; period: GreetingPeriod; subtext: string } {
-  const hour = new Date().getHours();
-  const firstName = fullName.split(' ')[0] || fullName;
+  const now = new Date();
+  const hour = now.getHours();
+  const minute = now.getMinutes();
+  const totalMinutes = hour * 60 + minute;
+  const rawFirst = fullName.split(' ')[0] || fullName;
+  const firstName = rawFirst.charAt(0).toUpperCase() + rawFirst.slice(1);
 
-  if (hour >= 5 && hour < 12) {
+  // 1. Midnight: 12:00 AM to 12:59 AM (0 to < 60 mins)
+  if (totalMinutes < 60) {
     return {
-      greeting: `Good morning, ${firstName}`,
+      greeting: `Midnight Check-In, ${firstName}`,
+      period: 'midnight',
+      subtext: 'Start of a new calendar date — reviewing overnight placement queues.',
+    };
+  }
+  // 2. Wee hours / Early morning: 1:00 AM to 4:59 AM (60 to < 300 mins)
+  else if (totalMinutes < 300) {
+    return {
+      greeting: `Working In The Wee Hours, ${firstName}`,
+      period: 'wee_hours',
+      subtext: 'The very early dark hours — quiet time for strategic operations.',
+    };
+  }
+  // 3. Dawn / Daybreak: 5:00 AM to 5:59 AM (300 to < 360 mins)
+  else if (totalMinutes < 360) {
+    return {
+      greeting: `Dawn & Daybreak Greetings, ${firstName}`,
+      period: 'dawn',
+      subtext: 'First early light in the sky — gearing up for fresh campus drives.',
+    };
+  }
+  // 4. Morning / Sunrise: 6:00 AM to 11:59 AM (360 to < 720 mins)
+  else if (totalMinutes < 720) {
+    return {
+      greeting: `Good Morning, ${firstName}`,
       period: 'morning',
-      subtext: 'Here is where today stands across your colleges.',
+      subtext: 'The start of the day — active outreach across partner colleges.',
     };
-  } else if (hour >= 12 && hour < 17) {
+  }
+  // 5. Noon / Midday: 12:00 PM to 12:59 PM (720 to < 780 mins)
+  else if (totalMinutes < 780) {
     return {
-      greeting: `Good afternoon, ${firstName}`,
+      greeting: `Good Midday, ${firstName}`,
+      period: 'midday',
+      subtext: 'Midday check — reviewing morning call logs and afternoon targets.',
+    };
+  }
+  // 6. Afternoon: 1:00 PM to 4:59 PM (780 to < 1020 mins)
+  else if (totalMinutes < 1020) {
+    return {
+      greeting: `Good Afternoon, ${firstName}`,
       period: 'afternoon',
-      subtext: 'Mid-day corporate follow-ups and drive schedules.',
+      subtext: 'Mid-day corporate follow-ups and candidate interview rounds.',
     };
-  } else if (hour >= 17 && hour < 20) {
+  }
+  // 7. Twilight: 5:00 PM to 5:59 PM (1020 to < 1080 mins)
+  else if (totalMinutes < 1080) {
     return {
-      greeting: `Good evening, ${firstName}`,
+      greeting: `Good Twilight, ${firstName}`,
+      period: 'early_evening',
+      subtext: 'Twilight transitions — wrapping up afternoon outreach and preparing evening reports.',
+    };
+  }
+  // 8. Dusk / Twilight: 6:00 PM to 6:59 PM (1080 to < 1140 mins)
+  else if (totalMinutes < 1140) {
+    return {
+      greeting: `Good Evening (Dusk), ${firstName}`,
+      period: 'dusk',
+      subtext: 'Dusk operational review — the sunset twilight before nightfall.',
+    };
+  }
+  // 9. Evening: 7:00 PM to 8:59 PM (1140 to < 1260 mins)
+  else if (totalMinutes < 1260) {
+    return {
+      greeting: `Good Evening, ${firstName}`,
       period: 'evening',
-      subtext: 'Wrapping up today\'s call logs and daily leads.',
+      subtext: 'Wrapping up today\'s call logs and positive corporate leads.',
     };
-  } else {
+  }
+  // 10. Night: 9:00 PM to 11:59 PM (1260 to 1439 mins)
+  else {
     return {
-      greeting: `Working late, ${firstName}`,
+      greeting: `Good Night, ${firstName}`,
       period: 'night',
-      subtext: 'Night operational review — remember to submit finalized sheets.',
+      subtext: 'Night review — ensure all daily logs and tracker rows are finalized.',
     };
   }
 }
@@ -3792,31 +3889,37 @@ app.patch('/api/v1/profile/:id', async (req: Request, res: Response) => {
     if (date_of_birth !== undefined) user.date_of_birth = date_of_birth ? new Date(date_of_birth) : null;
     if (date_of_joining !== undefined) user.date_of_joining = date_of_joining ? new Date(date_of_joining) : null;
 
-    // Monthly Profile Photo Update Rule: 1 change allowed per 30 days
-    if (profile_photo_url !== undefined && profile_photo_url !== user.profile_photo_url && profile_photo_url !== '') {
-      if (user.photo_last_updated_at) {
-        const lastUpdated = new Date(user.photo_last_updated_at).getTime();
-        const diffMs = Date.now() - lastUpdated;
-        const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-        if (diffMs < thirtyDaysMs) {
-          const daysRemaining = Math.ceil((thirtyDaysMs - diffMs) / (24 * 60 * 60 * 1000));
+    // Monthly Profile Photo Update Rule: 2 changes allowed per calendar month
+    const now = new Date();
+    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    
+    if (user.last_photo_change_month !== currentMonthStr) {
+      user.monthly_photo_changes_count = 0;
+      user.last_photo_change_month = currentMonthStr;
+    }
+
+    if (profile_photo_url !== undefined && profile_photo_url !== user.profile_photo_url) {
+      if (profile_photo_url === '') {
+        user.profile_photo_url = '';
+      } else {
+        if ((user.monthly_photo_changes_count || 0) >= 2) {
           return res.status(400).json({
             success: false,
             error: {
-              code: 'PHOTO_MONTHLY_LIMIT',
-              message: `Profile picture can only be changed once per month. You can update your photo again in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}.`,
-              daysRemaining,
+              code: 'PHOTO_MONTHLY_LIMIT_EXCEEDED',
+              message: 'Monthly Limit Reached: You are allowed to change your profile photo a maximum of 2 times per month. You can update your photo again next month.',
+              monthly_photo_changes_count: user.monthly_photo_changes_count,
             },
           });
         }
+        user.profile_photo_url = profile_photo_url;
+        user.monthly_photo_changes_count = (user.monthly_photo_changes_count || 0) + 1;
+        user.last_photo_change_month = currentMonthStr;
+        user.photo_last_updated_at = new Date();
       }
-      user.profile_photo_url = profile_photo_url;
-      user.photo_last_updated_at = new Date();
     }
 
     // 2-Per-Month Password Update Rule (3rd attempt locks profile)
-    const now = new Date();
-    const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     if (user.last_password_change_month !== currentMonthStr) {
       user.monthly_password_changes_count = 0;
       user.last_password_change_month = currentMonthStr;
@@ -4170,6 +4273,7 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 // Boot Server and Connect Database
 const startServer = async () => {
   await connectDatabase();
+  await seedDefaultChatChannels();
 
   // Explicitly unlock profile for mohanaradha_a@infoziant.com per user directive
   try {
