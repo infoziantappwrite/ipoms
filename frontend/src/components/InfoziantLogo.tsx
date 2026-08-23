@@ -52,8 +52,8 @@ export function InfoziantLogo({
 
   return (
     <Link
-      href="/home"
-      aria-label="Infoziant iPOMS home"
+      href="/dashboard"
+      aria-label="Infoziant iPOMS Dashboard"
       className="inline-flex cursor-pointer transition-opacity hover:opacity-90"
     >
       {mark}

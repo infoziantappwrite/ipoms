@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { InfoziantMark } from '@/components/InfoziantMark';
-import GradientWaves from '@/components/effects/GradientWaves/GradientWaves';
+import { LoginModuleMarquee } from '@/components/auth/LoginModuleMarquee';
+import { LoginCollegeLogoStrip } from '@/components/auth/LoginCollegeLogoStrip';
 import { PasswordChecklist } from '@/components/auth/PasswordChecklist';
 import {
   AlertTriangle, CheckCircle2, LockKeyhole, LogIn, PenLine,
@@ -39,7 +40,6 @@ export default function LoginPage() {
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [mobile, setMobile] = useState('');
-  const [roleCode, setRoleCode] = useState('COORDINATOR');
 
   // OTP reset flow (2 steps)
   const [otp, setOtp] = useState('');
@@ -147,7 +147,11 @@ export default function LoginPage() {
           username: username.trim().toLowerCase(),
           official_email: completeEmail(email).toLowerCase(),
           primary_mobile: mobile.trim(),
-          role_codes: [roleCode],
+          // No role_codes here on purpose — the backend always forces
+          // PLACEMENT_COORDINATOR on public signup regardless of what's
+          // sent (see backend/src/lib/authRoutes.ts, the privilege-
+          // escalation fix). Sending a value this endpoint ignores would
+          // just be misleading.
           password,
         }),
       });
@@ -267,71 +271,100 @@ export default function LoginPage() {
     'w-full bg-white border border-border-strong rounded-xl px-3.5 py-2.5 text-fg';
 
   const heading =
-    mode === 'login' ? 'Sign in to iPOMS'
-    : mode === 'signup' ? 'Create iPOMS Staff Account'
-    : mode === 'forgot' ? 'Reset your password'
+    mode === 'login' ? 'Sign In'
+    : mode === 'signup' ? 'Create Account'
+    : mode === 'forgot' ? 'Reset Password'
     : mode === 'verify_otp' ? 'Verify & Unlock Account'
     : 'Set New Password';
 
   return (
-    <div className="min-h-screen bg-background relative flex items-center justify-center p-4 sm:p-6 lg:p-8 overflow-hidden">
-      <div className="absolute inset-0 z-0">
-        <GradientWaves
-          horizonColor="#7edbee"
-          waveColor="#a1bcc1"
-          crestColor="#90e0ed"
-          speed={0.4}
-          amplitude={2.45}
-          waveScale={0.6}
-          waveRatio={1.15}
-          swell={37}
-          turbulence={20.5}
-          tilt={1.05}
-          zoom={0.75}
-          height={5.6}
-          fogDepth={17}
-          detail="medium"
-          brightness={1.05}
-          opacity={1}
-          grain
-          grainIntensity={0.05}
-          mouseInteraction
-          parallaxStrength={0.37}
-        />
-      </div>
+    <div className="min-h-screen bg-background lg:grid lg:grid-cols-[1.05fr_1fr]">
 
-      <div className="relative z-10 w-full max-w-xl bg-white border border-border rounded-3xl shadow-4 p-8 sm:p-10 space-y-6">
-
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center">
-            <InfoziantMark size={104} />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-fg">{heading}</h1>
-          <p className="text-xs text-fg-subtle">
-            Infoziant Placement Operations Management System
+      {/* ── Left: brand panel with top logos, center title, and bottom marquee ── */}
+      <aside className="relative hidden lg:flex flex-col items-center justify-between overflow-hidden border-r border-border bg-white py-12">
+        {/* Top: Sliding Partner College Logos */}
+        <div className="w-full space-y-2">
+          <p className="text-center text-[11px] font-bold text-slate-400 uppercase tracking-widest font-mono">
+            Partner Institutions
           </p>
+          <LoginCollegeLogoStrip />
         </div>
 
+        {/* Center: Highlighted Application Title */}
+        <div className="flex flex-col items-center text-center px-8 shrink-0 my-auto py-8">
+          <p className="font-display text-4xl font-bold tracking-tight text-primary drop-shadow-xs">
+            iPOMS
+          </p>
+          <h2 className="mt-2 font-display text-sm font-semibold tracking-normal text-slate-700 whitespace-nowrap">
+            Infoziant Placement Operations Management System
+          </h2>
+        </div>
+
+        {/* Bottom: Sliding Operations Modules */}
+        <div className="w-full space-y-2">
+          <p className="text-center text-[11px] font-bold text-slate-400 uppercase tracking-widest font-mono">
+            Core Modules
+          </p>
+          <LoginModuleMarquee />
+        </div>
+      </aside>
+
+      {/* ── Right: the working surface. Deliberately still. Sized to never
+           need internal scroll — checked against the sign-up form, the
+           tallest state, at 375px width. ─────────────────────────────────── */}
+      <main className="relative flex min-h-screen items-center justify-center bg-surface p-4 sm:p-6 lg:min-h-0 lg:p-10">
+        {/* Desktop-only mark — absolutely positioned so it can never add
+            height or trigger scroll, per user request to keep it out of
+            the form's flow. The left panel now carries the app name alone. */}
+        <div className="hidden lg:block absolute top-8 right-8">
+          <InfoziantMark size={88} />
+        </div>
+
+        <div className="w-full max-w-md space-y-4">
+
+          {/* Compact brand lockup — only where the left panel is absent. */}
+          <div className="flex flex-col items-center gap-1 lg:hidden">
+            <InfoziantMark size={52} />
+            <p className="text-title font-bold tracking-tight text-primary">iPOMS</p>
+          </div>
+
+          <div className="space-y-1">
+            <h1 className="text-display font-bold tracking-tight text-fg lg:text-display-lg">{heading}</h1>
+            <p className="text-micro text-fg-muted lg:hidden whitespace-nowrap">
+              Infoziant Placement Operations Management System
+            </p>
+          </div>
+
         {(mode === 'login' || mode === 'signup') && (
-          <div className="grid grid-cols-2 gap-2 bg-surface-sunken p-1 rounded-2xl border border-border">
+          <div
+            role="tablist"
+            aria-label="Authentication mode"
+            className="relative grid grid-cols-2 bg-surface-sunken p-1 rounded-2xl border border-border"
+          >
+            {/* The glider: one authored moment, expo-out so it settles rather than stops. */}
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-xl bg-white border border-border/50 shadow-1 transition-transform duration-[420ms] ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none"
+              style={{ transform: mode === 'signup' ? 'translateX(100%)' : 'translateX(0)' }}
+            />
             <button
               type="button"
+              role="tab"
+              aria-selected={mode === 'login'}
               onClick={() => goTo('login')}
-              className={`py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                mode === 'login'
-                  ? 'bg-white text-fg shadow-1 border border-border/50'
-                  : 'text-fg-subtle hover:text-fg'
+              className={`relative z-10 py-2 rounded-xl text-xs font-bold transition-colors duration-200 flex items-center justify-center gap-1.5 ${
+                mode === 'login' ? 'text-fg' : 'text-fg-subtle hover:text-fg'
               }`}
             >
               <LogIn size={14} strokeWidth={2} aria-hidden /> Sign In
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={mode === 'signup'}
               onClick={() => goTo('signup')}
-              className={`py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                mode === 'signup'
-                  ? 'bg-white text-fg shadow-1 border border-border/50'
-                  : 'text-fg-subtle hover:text-fg'
+              className={`relative z-10 py-2 rounded-xl text-xs font-bold transition-colors duration-200 flex items-center justify-center gap-1.5 ${
+                mode === 'signup' ? 'text-fg' : 'text-fg-subtle hover:text-fg'
               }`}
             >
               <PenLine size={14} strokeWidth={2} aria-hidden /> Create Account
@@ -435,8 +468,8 @@ export default function LoginPage() {
         )}
 
         {mode === 'signup' && (
-          <form onSubmit={handleSignUp} className="space-y-4 text-xs animate-form-in">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <form onSubmit={handleSignUp} className="space-y-3 text-xs animate-form-in">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
                 <label className="block text-fg-muted font-bold mb-1">Full Name *</label>
                 <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)}
@@ -449,7 +482,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
                 <label className="block text-fg-muted font-bold mb-1">Official Email *</label>
                 <input type="text"
@@ -462,15 +495,6 @@ export default function LoginPage() {
                 <input type="text" value={mobile} onChange={(e) => setMobile(e.target.value)}
                   placeholder="9876543210" className={`${inputClass} font-mono`} />
               </div>
-            </div>
-
-            <div>
-              <label className="block text-fg-muted font-bold mb-1">Assigned Role</label>
-              <select value={roleCode} onChange={(e) => setRoleCode(e.target.value)}
-                className={`${inputClass} cursor-pointer`}>
-                <option value="COORDINATOR">Placement Coordinator</option>
-                <option value="TEAM_LEADER">Team Leader</option>
-              </select>
             </div>
 
             <div>
@@ -663,7 +687,8 @@ export default function LoginPage() {
           </form>
         )}
 
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

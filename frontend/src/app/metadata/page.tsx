@@ -6,6 +6,7 @@ import { MetadataTable } from './components/MetadataTable';
 import { ContactEditModal } from './components/ContactEditModal';
 import { DuplicateWarningModal } from './components/DuplicateWarningModal';
 import { BulkPasteModal } from './components/BulkPasteModal';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -200,6 +201,38 @@ export default function MetadataPage() {
 
       {/* ── Main Working Table View ───────────────────────────────────────── */}
       <div className="p-6 max-w-7xl mx-auto w-full space-y-4 flex-1">
+        {/* Top Pagination Pair */}
+        {totalPages > 1 && !loading && (
+          <div className="flex items-center justify-between px-2 text-xs text-fg-muted">
+            <span className="text-[11px]">
+              Page <strong className="text-fg">{page}</strong> of <strong className="text-fg">{totalPages}</strong> ({totalCount.toLocaleString()} companies)
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+                title="Previous Page"
+                className="w-8 h-8 rounded-xl bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
+              >
+                <ChevronLeft size={16} strokeWidth={2.25} />
+              </button>
+              <span className="text-xs font-mono font-bold text-fg px-2.5 py-1 bg-surface border border-border rounded-lg shadow-2xs">
+                {page} / {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => setPage(page + 1)}
+                title="Next Page"
+                className="w-8 h-8 rounded-xl bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
+              >
+                <ChevronRight size={16} strokeWidth={2.25} />
+              </button>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="p-12 text-center text-fg-subtle italic text-xs">
             Loading corporate metadata database…
@@ -215,26 +248,33 @@ export default function MetadataPage() {
           />
         )}
 
-        {/* Pagination Bar */}
+        {/* Bottom Pagination Bar with Minimal Icon-Only Buttons */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-2 pt-2 text-xs text-fg-subtle">
             <span>
-              Showing Page <strong>{page}</strong> of <strong>{totalPages}</strong> ({totalCount} total contacts)
+              Showing Page <strong>{page}</strong> of <strong>{totalPages}</strong> ({totalCount.toLocaleString()} total contacts)
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
+                type="button"
                 disabled={page <= 1}
                 onClick={() => setPage(page - 1)}
-                className="px-3 py-1.5 bg-background border border-border hover:bg-surface disabled:opacity-40 rounded-lg"
+                title="Previous Page"
+                className="w-8 h-8 rounded-xl bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
               >
-                Previous
+                <ChevronLeft size={16} strokeWidth={2.25} />
               </button>
+              <span className="text-xs font-mono font-bold text-fg px-2.5 py-1 bg-surface border border-border rounded-lg shadow-2xs">
+                {page} / {totalPages}
+              </span>
               <button
+                type="button"
                 disabled={page >= totalPages}
                 onClick={() => setPage(page + 1)}
-                className="px-3 py-1.5 bg-background border border-border hover:bg-surface disabled:opacity-40 rounded-lg cursor-pointer"
+                title="Next Page"
+                className="w-8 h-8 rounded-xl bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
               >
-                Next
+                <ChevronRight size={16} strokeWidth={2.25} />
               </button>
             </div>
           </div>

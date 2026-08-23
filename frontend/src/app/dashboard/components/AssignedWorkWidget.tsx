@@ -123,7 +123,7 @@ export function AssignedWorkWidget({ assignments, onLoadToMetadata, onMarkComple
                               className="shrink-0 text-fg-subtle"
                               aria-hidden
                             />
-                            <span className="truncate">{item.company_name}</span>
+                            <span className="font-bold text-fg">{item.company_name}</span>
                           </h4>
                           <span
                             className={`shrink-0 rounded-control border px-1.5 py-0.5 font-mono text-micro font-semibold ${meta.chip}`}

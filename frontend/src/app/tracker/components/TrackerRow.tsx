@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useCallback } from 'react';
+import { Phone } from 'lucide-react';
 import type { TrackerRow as TrackerRowType, CallOutcome } from '../page';
 
 const OUTCOMES: { value: CallOutcome; label: string; color: string }[] = [
@@ -47,6 +48,7 @@ interface Props {
   isReadOnly: boolean;
   onUpdate: (patch: Partial<TrackerRowType>) => void;
   onSkip: () => void;
+  onCall?: (row: TrackerRowType) => void;
 }
 
 // Format a Date (or ISO string) as HH:MM AM/PM per user preference
@@ -125,13 +127,19 @@ function smartParseTime(input: string): { iso: string; formatted: string } | nul
   };
 }
 
-export function TrackerRow({ row, isReadOnly, onUpdate, onSkip }: Props) {
+export function TrackerRow({ row, isReadOnly, onUpdate, onSkip, onCall }: Props) {
   const startTimeRef = useRef<HTMLInputElement>(null);
-  const commentsRef = useRef<HTMLInputElement>(null);
+  const commentsRef = useRef<HTMLTextAreaElement | HTMLInputElement>(null);
 
   const rowBg = row.is_skipped
     ? 'bg-background/20 opacity-50'
     : OUTCOME_ROW_COLORS[row.outcome_status ?? 'none'];
+
+  useEffect(() => {
+    if (commentsRef.current && commentsRef.current.value !== (row.comments ?? '')) {
+      commentsRef.current.value = row.comments ?? '';
+    }
+  }, [row.comments]);
 
   // ── Spacebar handler for Start Time (Spec 11 — Spacebar fills Start Time)
   const handleStartTimeKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -221,7 +229,7 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onSkip }: Props) {
   return (
     <div
       data-row-id={row._id}
-      className={`flex items-center gap-1 px-2 py-1 text-xs ${rowBg} hover:bg-surface/30 transition-colors group`}
+      className={`flex items-start gap-1 px-2 py-2 min-h-[42px] text-xs ${rowBg} hover:bg-surface/30 transition-colors group`}
     >
       {/* S.No / # */}
       <div className="w-12 px-1 text-center text-fg-subtle shrink-0 tabular-nums">{row.serial_no}</div>
@@ -260,19 +268,30 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onSkip }: Props) {
         )}
       </div>
 
-      {/* Company Name — pre-filled, read-only */}
-      <div className="min-w-[160px] flex-1 px-1 text-fg font-medium truncate" title={row.company_name}>
+      {/* Company Name — wraps gracefully beyond 35 chars without overlapping */}
+      <div className="w-[250px] shrink-0 px-1 text-fg font-semibold break-words leading-tight" title={row.company_name}>
         {row.company_name}
       </div>
 
       {/* HR Name — pre-filled */}
-      <div className="w-32 shrink-0 px-1 text-fg-muted truncate" title={row.hr_name}>
+      <div className="w-36 shrink-0 px-1 text-fg-muted truncate" title={row.hr_name}>
         {row.hr_name}
       </div>
 
-      {/* Contact (Mobile Number) */}
-      <div className="w-32 shrink-0 px-1 text-fg-muted font-mono tabular-nums">
-        {row.mobile_number}
+      {/* Contact (Mobile Number) with 1-Click Call Icon */}
+      <div className="w-32 shrink-0 px-1 text-fg-muted font-mono tabular-nums flex items-center gap-1.5 group/contact">
+        {!isReadOnly && row.mobile_number && (
+          <button
+            type="button"
+            onClick={() => onCall?.(row)}
+            title={`Click to call ${row.hr_name || row.company_name} (${row.mobile_number})`}
+            className="w-5 h-5 rounded-md bg-emerald-50 hover:bg-emerald-100 border border-emerald-200
+                       text-emerald-700 flex items-center justify-center transition-all opacity-70 hover:opacity-100 hover:scale-110 cursor-pointer shrink-0 shadow-2xs"
+          >
+            <Phone size={10} strokeWidth={2.5} />
+          </button>
+        )}
+        <span className="truncate">{row.mobile_number}</span>
       </div>
 
       {/* Email ID — optional */}
@@ -334,20 +353,33 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onSkip }: Props) {
         )}
       </div>
 
-      {/* Comments — always optional (Spec) */}
-      <div className="flex-1 min-w-[140px] shrink-0">
+      {/* Comments — wraps at ~35 chars, expands height, shows full text */}
+      <div className="flex-1 min-w-[180px] shrink-0">
         {isReadOnly ? (
-          <span className="px-1 text-fg-subtle italic text-xs">{row.comments || '—'}</span>
+          <p className="px-1 text-fg-subtle italic text-xs break-words leading-relaxed whitespace-pre-wrap">
+            {row.comments || '—'}
+          </p>
         ) : (
-          <input
-            ref={commentsRef}
-            type="text"
+          <textarea
+            ref={commentsRef as any}
             defaultValue={row.comments ?? ''}
             placeholder="Optional notes…"
-            onKeyDown={handleKeyDownEnter}
+            rows={row.comments && row.comments.length > 35 ? Math.min(4, Math.ceil(row.comments.length / 35)) : 1}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleCommentsBlur();
+                handleKeyDownEnter(e);
+              }
+            }}
             onBlur={handleCommentsBlur}
-            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:bg-surface px-1.5 py-1 rounded text-fg-muted placeholder-fg-subtle
-                       transition-colors"
+            onInput={(e) => {
+              const target = e.currentTarget;
+              target.style.height = 'auto';
+              target.style.height = `${Math.max(28, target.scrollHeight)}px`;
+            }}
+            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:bg-surface px-1.5 py-1 rounded text-fg placeholder-fg-subtle
+                       transition-colors resize-none break-words leading-relaxed text-xs outline-none focus:ring-1 focus:ring-primary/30"
           />
         )}
       </div>

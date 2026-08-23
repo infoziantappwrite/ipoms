@@ -1,6 +1,7 @@
 'use client';
 
 import { InfoziantMark } from './InfoziantMark';
+import { WaveLoader } from './WaveLoader';
 
 interface Props {
   /** Fired when the user advances early (click anywhere, or any keypress — see EntryPage). */
@@ -24,30 +25,26 @@ export function SplashScreen({ onSkip }: Props) {
       role="status"
       aria-live="polite"
       onClick={onSkip}
-      className="fixed inset-0 z-modal flex flex-col items-center justify-center gap-8 bg-surface px-6"
+      className="fixed inset-0 z-modal flex flex-col items-center justify-center gap-6 bg-surface px-6 cursor-pointer select-none"
     >
       <span className="sr-only">Loading iPOMS, opening sign in shortly</span>
 
       <div className="flex flex-col items-center gap-5 text-center">
         <InfoziantMark size={160} />
 
-        <div className="space-y-1.5">
-          <h1 className="text-display-lg font-bold tracking-tight text-fg">
+        <div className="space-y-1">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-primary drop-shadow-sm">
             iPOMS
           </h1>
-          <p className="text-body text-fg-subtle max-w-sm">
+          <p className="font-display text-xs font-semibold text-slate-500 tracking-normal whitespace-nowrap">
             Infoziant Placement Operations Management System
           </p>
         </div>
       </div>
 
-      {/* Indeterminate loading bar — debossed track, navy fill sliding across.
-          No percentage: nothing real is being measured, so a number would lie. */}
-      <div
-        aria-hidden
-        className="h-1.5 w-56 overflow-hidden rounded-full bg-surface-sunken shadow-inset-1"
-      >
-        <div className="h-full w-1/4 rounded-full bg-primary animate-indeterminate" />
+      {/* 5-bar animated equalizer wave loader */}
+      <div className="mt-2 flex flex-col items-center">
+        <WaveLoader />
       </div>
     </div>
   );

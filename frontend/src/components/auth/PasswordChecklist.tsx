@@ -1,32 +1,34 @@
 'use client';
 
-import { Check, Circle } from 'lucide-react';
 import { checkPassword } from '@/lib/passwordPolicy';
 
 /**
- * Live policy checklist. Shown while the user types rather than as an error
- * after they submit — a rule you can watch yourself satisfy is far less
- * frustrating than one that rejects you afterwards.
+ * Compact 2-line password policy hint. Shows a condensed summary instead of
+ * 6 separate bullet points. Turns green when all rules are satisfied.
  */
 export function PasswordChecklist({ password }: { password: string }) {
   const rules = checkPassword(password);
+  const allPassed = password.length > 0 && rules.every((r) => r.passed);
+  const failedRules = rules.filter((r) => !r.passed);
+
+  if (allPassed) {
+    return (
+      <p className="mt-1.5 text-micro text-success font-medium" aria-live="polite">
+        Password meets all requirements.
+      </p>
+    );
+  }
 
   return (
-    <ul className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2" aria-live="polite">
-      {rules.map((r) => (
-        <li
-          key={r.id}
-          className={`flex items-center gap-1.5 text-micro transition-colors ${
-            r.passed ? 'text-success' : 'text-fg-subtle'
-          }`}
-        >
-          {r.passed
-            ? <Check size={12} strokeWidth={3} className="shrink-0" aria-hidden />
-            : <Circle size={12} strokeWidth={2} className="shrink-0" aria-hidden />}
-          <span>{r.label}</span>
-          <span className="sr-only">{r.passed ? '— met' : '— not yet met'}</span>
-        </li>
-      ))}
-    </ul>
+    <div className="mt-1.5 text-micro text-fg-subtle leading-relaxed" aria-live="polite">
+      <p>
+        Min 9 characters with uppercase, lowercase, a number, and one special character (@ or .).
+      </p>
+      {password.length > 0 && failedRules.length > 0 && (
+        <p className="text-destructive mt-0.5 font-medium">
+          Missing: {failedRules.map((r) => r.label).join(' · ')}
+        </p>
+      )}
+    </div>
   );
 }

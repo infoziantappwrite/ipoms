@@ -7,6 +7,7 @@ import { ContactPickerModal } from './components/ContactPickerModal';
 import { TrackerGrid } from './components/TrackerGrid';
 import { CalendarPicker } from './components/CalendarPicker';
 import { AutoSaveBadge } from './components/AutoSaveBadge';
+import { SoftphonePanel, SoftphoneCallResult } from './components/SoftphonePanel';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { AlertTriangle, BookOpen, CalendarDays, ClipboardList, Download, RefreshCw, Save } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
@@ -78,6 +79,7 @@ export default function DailyTrackerPage() {
   const [missingEmailRows, setMissingEmailRows] = useState<string[]>([]);
   const [showEmailWarning, setShowEmailWarning] = useState(false);
   const [sessionDate, setSessionDate] = useState<string>('');
+  const [activeCallRow, setActiveCallRow] = useState<TrackerRow | null>(null);
 
   // Real signed-in identity. The backend still enforces ownership itself
   // (scopeToSelf pins a coordinator to their own id regardless of what's
@@ -234,6 +236,20 @@ export default function DailyTrackerPage() {
     }
   }, [loadKpi]);
 
+  // ── Handle Softphone wrap-up save (auto-populates tracker row)
+  const handleSoftphoneSave = useCallback(async (result: SoftphoneCallResult) => {
+    await handleRowUpdate(result.rowId, {
+      call_start_time: result.call_start_time,
+      call_end_time: result.call_end_time,
+      duration_seconds: result.duration_seconds,
+      duration_formatted: result.duration_formatted,
+      outcome_status: result.outcome_status,
+      follow_up_month: result.follow_up_month,
+      comments: result.comments,
+    });
+    setActiveCallRow(null);
+  }, [handleRowUpdate]);
+
   // ── Handle skip
   const handleSkip = useCallback(async (rowId: string) => {
     try {
@@ -330,7 +346,7 @@ export default function DailyTrackerPage() {
   // ── History View Statistics
   const historyTotalLoaded = historyRows.length;
   const historyCompletedCount = historyRows.filter(
-    (r) => r.outcome_status && r.outcome_status !== 'none' && !r.is_skipped
+    (r) => r.outcome_status && !r.is_skipped
   ).length;
   const historyDisplayDate = historyDate
     ? new Date(historyDate).toLocaleDateString('en-IN', {
@@ -415,7 +431,6 @@ export default function DailyTrackerPage() {
           <div className="flex items-center gap-2.5 flex-wrap">
             <CollegeSelector
               selectedCollegeId={selectedCollegeId}
-              showAcronymOnly={isHistoryMode}
               onSelect={(id, name) => {
                 setSelectedCollegeId(id);
                 setSelectedCollegeName(name);
@@ -596,6 +611,7 @@ export default function DailyTrackerPage() {
             isReadOnly={isHistoryMode}
             onRowUpdate={handleRowUpdate}
             onSkip={handleSkip}
+            onCall={(row) => setActiveCallRow(row)}
           />
         </div>
       )}
@@ -663,6 +679,12 @@ export default function DailyTrackerPage() {
           </div>
         </div>
       )}
+      {/* ── Softphone Panel (Click-to-Call) ───────────────────────────────── */}
+      <SoftphonePanel
+        row={activeCallRow}
+        onSave={handleSoftphoneSave}
+        onClose={() => setActiveCallRow(null)}
+      />
     </div>
   );
 }

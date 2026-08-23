@@ -230,7 +230,7 @@ export default function LoadContactsPage() {
             />
           </div>
 
-          {/* Quick Action Tools */}
+          {/* Quick Action Tools & Top Pagination Icon Pair */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="text-fg-muted font-semibold text-[11px] mr-1">
               {loading ? 'Searching…' : `${total.toLocaleString()} total companies`}
@@ -249,6 +249,33 @@ export default function LoadContactsPage() {
             >
               Deselect All
             </button>
+
+            {/* Top Pagination Icon Pair */}
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1 ml-2 pl-2 border-l border-border">
+                <button
+                  type="button"
+                  disabled={page === 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  title="Previous Page"
+                  className="w-7 h-7 rounded-lg bg-white border border-border hover:bg-slate-50 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 hover:text-slate-900 shadow-2xs transition-all cursor-pointer"
+                >
+                  <ChevronLeft size={15} strokeWidth={2.25} />
+                </button>
+                <span className="text-[11px] font-mono font-bold text-slate-700 px-1.5">
+                  {page}/{totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={page === totalPages}
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  title="Next Page"
+                  className="w-7 h-7 rounded-lg bg-white border border-border hover:bg-slate-50 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 hover:text-slate-900 shadow-2xs transition-all cursor-pointer"
+                >
+                  <ChevronRight size={15} strokeWidth={2.25} />
+                </button>
+              </div>
+            )}
           </div>
 
         </div>
@@ -298,7 +325,7 @@ export default function LoadContactsPage() {
                         className="rounded border-border text-primary focus:ring-primary cursor-pointer w-4 h-4"
                       />
                     </th>
-                    <th className="px-4 py-3.5">Company Name</th>
+                    <th className="px-4 py-3.5 min-w-[220px] max-w-[280px]">Company Name</th>
                     <th className="px-4 py-3.5">HR Contact</th>
                     <th className="px-4 py-3.5">Designation</th>
                     <th className="px-4 py-3.5">Mobile Number</th>
@@ -331,7 +358,7 @@ export default function LoadContactsPage() {
                             className="rounded border-border text-primary focus:ring-primary cursor-pointer w-4 h-4"
                           />
                         </td>
-                        <td className="px-4 py-3 font-bold text-fg">
+                        <td className="px-4 py-3 font-bold text-fg min-w-[220px] max-w-[280px] break-words leading-snug">
                           {c.company_name}
                         </td>
                         <td className="px-4 py-3 text-fg-muted font-medium">{c.hr_name || '—'}</td>
@@ -353,27 +380,34 @@ export default function LoadContactsPage() {
             )}
           </div>
 
-          {/* Pagination Controls */}
+          {/* Bottom Pagination Controls with Minimal Icon-Only Buttons */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-6 py-3 bg-surface-sunken border-t border-border text-xs text-fg-muted shrink-0">
               <span className="text-[11px]">
-                Showing page <strong className="text-fg">{page}</strong> of <strong className="text-fg">{totalPages}</strong>
+                Showing page <strong className="text-fg">{page}</strong> of <strong className="text-fg">{totalPages}</strong> ({total.toLocaleString()} total)
               </span>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button
+                  type="button"
                   disabled={page === 1}
-                  onClick={() => setPage((p) => p - 1)}
-                  className="flex items-center gap-1 disabled:opacity-30 hover:text-fg transition-colors px-3 py-1.5 rounded-lg bg-white border border-border hover:bg-slate-50 cursor-pointer text-xs font-semibold shadow-xs"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  title="Previous Page"
+                  className="w-8 h-8 rounded-xl bg-white border border-border hover:bg-slate-50 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 hover:text-slate-900 shadow-2xs transition-all cursor-pointer"
                 >
-                  <ChevronLeft size={14} /> Previous
+                  <ChevronLeft size={16} strokeWidth={2.25} />
                 </button>
+                <span className="text-xs font-mono font-bold text-slate-700 px-2.5 py-1 bg-white border border-border rounded-lg shadow-2xs">
+                  {page} / {totalPages}
+                </span>
                 <button
+                  type="button"
                   disabled={page === totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                  className="flex items-center gap-1 disabled:opacity-30 hover:text-fg transition-colors px-3 py-1.5 rounded-lg bg-white border border-border hover:bg-slate-50 cursor-pointer text-xs font-semibold shadow-xs"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  title="Next Page"
+                  className="w-8 h-8 rounded-xl bg-white border border-border hover:bg-slate-50 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 hover:text-slate-900 shadow-2xs transition-all cursor-pointer"
                 >
-                  Next <ChevronRight size={14} />
+                  <ChevronRight size={16} strokeWidth={2.25} />
                 </button>
               </div>
             </div>

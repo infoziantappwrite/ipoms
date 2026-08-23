@@ -29,7 +29,7 @@ export function MetadataTable({
         <table className="w-full text-xs text-left">
           <thead>
             <tr className="bg-background/90 text-fg-subtle font-semibold border-b border-border text-micro uppercase tracking-wider">
-              <th className="py-3.5 px-5">Company Name</th>
+              <th className="py-3.5 px-5 min-w-[220px] max-w-[280px] text-left">Company Name</th>
               <th className="py-3.5 px-4">HR Contact Person</th>
               <th className="py-3.5 px-4">Mobile Numbers</th>
               <th className="py-3.5 px-4">Email ID(s)</th>
@@ -38,10 +38,10 @@ export function MetadataTable({
               <th className="py-3.5 px-5 text-center">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border/60">
+          <tbody className="divide-y divide-border/50">
             {companies.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-fg-subtle italic">
+                <td colSpan={7} className="py-12 text-center text-fg-subtle">
                   {isRecycleBin ? 'Recycle bin is empty' : 'No matching companies found in metadata catalog'}
                 </td>
               </tr>
@@ -49,7 +49,7 @@ export function MetadataTable({
               companies.map((c) => (
                 <tr key={c._id} className="hover:bg-surface/30 transition-colors">
                   {/* Company Name */}
-                  <td className="py-3 px-5 font-bold text-white">
+                  <td className="py-3 px-5 font-bold text-white min-w-[220px] max-w-[280px] break-words leading-tight">
                     <Building2 size={14} strokeWidth={2} aria-hidden />
                     {c.company_name}
                   </td>

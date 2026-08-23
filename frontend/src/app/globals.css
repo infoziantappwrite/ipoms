@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -433,6 +433,61 @@ textarea:focus-visible,
   .avoid-break {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WAVE / EQUALIZER LOADER ANIMATION (Uiverse.io by satyamchaudharydev)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.wave-loading {
+  --speed-of-animation: 0.9s;
+  --gap: 6px;
+  --first-color: #4c86f9;
+  --second-color: #49a84c;
+  --third-color: #f6bb02;
+  --fourth-color: #f6bb02;
+  --fifth-color: #2196f3;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--gap);
+  height: 56px;
+}
+
+.wave-loading span {
+  width: 4px;
+  height: 42px;
+  border-radius: 9999px;
+  background: var(--first-color);
+  animation: wave-scale var(--speed-of-animation) ease-in-out infinite;
+}
+
+.wave-loading span:nth-child(2) {
+  background: var(--second-color);
+  animation-delay: -0.8s;
+}
+
+.wave-loading span:nth-child(3) {
+  background: var(--third-color);
+  animation-delay: -0.7s;
+}
+
+.wave-loading span:nth-child(4) {
+  background: var(--fourth-color);
+  animation-delay: -0.6s;
+}
+
+.wave-loading span:nth-child(5) {
+  background: var(--fifth-color);
+  animation-delay: -0.5s;
+}
+
+@keyframes wave-scale {
+  0%, 40%, 100% {
+    transform: scaleY(0.08);
+  }
+  20% {
+    transform: scaleY(1);
   }
 }
 

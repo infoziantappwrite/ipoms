@@ -1,0 +1,85 @@
+- generic [active] [ref=f1e1]:
+  - link "Skip to main content" [ref=f1e2] [cursor=pointer]:
+    - /url: "#main"
+  - main [ref=f1e3]:
+    - generic [ref=f1e4]:
+      - complementary [ref=f1e5]:
+        - generic [ref=f1e6]:
+          - img "Infoziant" [ref=f1e7]
+          - paragraph [ref=f1e8]: iPOMS
+          - heading "Placement Operations Management System" [level=2] [ref=f1e9]
+          - paragraph [ref=f1e10]: Intelligent operations, verified corporate metadata, and real-time business intelligence for placement teams.
+        - generic [ref=f1e14]:
+          - generic [ref=f1e16]:
+            - generic [ref=f1e24]:
+              - paragraph [ref=f1e25]: Role-Based Dashboard
+              - paragraph [ref=f1e26]: Operational Hub
+            - generic [ref=f1e31]:
+              - paragraph [ref=f1e32]: Daily Call Tracker
+              - paragraph [ref=f1e33]: Core Engine
+            - generic [ref=f1e38]:
+              - paragraph [ref=f1e39]: Weekly Tracker Lifecycle
+              - paragraph [ref=f1e40]: Pipeline CRM
+            - generic [ref=f1e47]:
+              - paragraph [ref=f1e48]: Daily Leads Register
+              - paragraph [ref=f1e49]: High Intent
+            - generic [ref=f1e57]:
+              - paragraph [ref=f1e58]: Role-Based Dashboard
+              - paragraph [ref=f1e59]: Operational Hub
+            - generic [ref=f1e64]:
+              - paragraph [ref=f1e65]: Daily Call Tracker
+              - paragraph [ref=f1e66]: Core Engine
+            - generic [ref=f1e71]:
+              - paragraph [ref=f1e72]: Weekly Tracker Lifecycle
+              - paragraph [ref=f1e73]: Pipeline CRM
+            - generic [ref=f1e80]:
+              - paragraph [ref=f1e81]: Daily Leads Register
+              - paragraph [ref=f1e82]: High Intent
+          - generic [ref=f1e84]:
+            - generic [ref=f1e91]:
+              - paragraph [ref=f1e92]: Master Company Metadata
+              - paragraph [ref=f1e93]: 3,550+ Records
+            - generic [ref=f1e99]:
+              - paragraph [ref=f1e100]: Reports & Analytics Center
+              - paragraph [ref=f1e101]: BI & Presets
+            - generic [ref=f1e107]:
+              - paragraph [ref=f1e108]: Enterprise Alerts
+              - paragraph [ref=f1e109]: Real-Time
+            - generic [ref=f1e115]:
+              - paragraph [ref=f1e116]: User Management
+              - paragraph [ref=f1e117]: Governance
+            - generic [ref=f1e124]:
+              - paragraph [ref=f1e125]: Master Company Metadata
+              - paragraph [ref=f1e126]: 3,550+ Records
+            - generic [ref=f1e132]:
+              - paragraph [ref=f1e133]: Reports & Analytics Center
+              - paragraph [ref=f1e134]: BI & Presets
+            - generic [ref=f1e140]:
+              - paragraph [ref=f1e141]: Enterprise Alerts
+              - paragraph [ref=f1e142]: Real-Time
+            - generic [ref=f1e148]:
+              - paragraph [ref=f1e149]: User Management
+              - paragraph [ref=f1e150]: Governance
+      - main [ref=f1e151]:
+        - generic [ref=f1e152]:
+          - heading "Sign in to iPOMS" [level=1] [ref=f1e154]
+          - tablist "Authentication mode" [ref=f1e155]:
+            - tab "Sign In" [selected] [ref=f1e156] [cursor=pointer]
+            - tab "Create Account" [ref=f1e160] [cursor=pointer]
+          - generic [ref=f1e163]:
+            - generic [ref=f1e164]:
+              - generic [ref=f1e165]: Official Email Address
+              - textbox "name@infoziant.com" [ref=f1e166]
+              - paragraph [ref=f1e167]: Type your name and press Tab — @infoziant.com is added for you.
+            - generic [ref=f1e168]:
+              - generic [ref=f1e169]:
+                - generic [ref=f1e170]: Password
+                - button "Forgot password?" [ref=f1e171] [cursor=pointer]
+              - generic [ref=f1e172]:
+                - textbox "••••••••" [ref=f1e173]
+                - button "Show" [ref=f1e174] [cursor=pointer]
+            - generic [ref=f1e175] [cursor=pointer]:
+              - checkbox "Remember this device for 30 days" [checked] [ref=f1e176]
+              - generic [ref=f1e177]: Remember this device for 30 days
+            - button "Sign-In" [ref=f1e178] [cursor=pointer]
+  - status

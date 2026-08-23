@@ -114,6 +114,8 @@ const config: Config = {
       fontFamily: {
         sans: ['IBM Plex Sans', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
         mono: ['IBM Plex Mono', 'ui-monospace', 'SF Mono', 'Menlo', 'monospace'],
+        display: ['Plus Jakarta Sans', 'Outfit', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        outfit: ['Outfit', 'Plus Jakarta Sans', 'system-ui', 'sans-serif'],
       },
 
       /**
@@ -126,6 +128,10 @@ const config: Config = {
         title: ['1rem', { lineHeight: '1.5rem' }],                              // 16 — card titles
         display: ['1.25rem', { lineHeight: '1.75rem', letterSpacing: '-0.01em' }], // 20 — page titles
         'display-lg': ['1.5rem', { lineHeight: '2rem', letterSpacing: '-0.02em' }], // 24 — KPI numbers
+        // Brand lockup only — the marketing-scale step for the product name on
+        // unauthenticated screens (login/splash). Deliberately outside the
+        // data-density ramp above; never use it inside the authenticated app.
+        brand: ['3.5rem', { lineHeight: '1', letterSpacing: '-0.04em' }],          // 56 — product wordmark
       },
 
       /**

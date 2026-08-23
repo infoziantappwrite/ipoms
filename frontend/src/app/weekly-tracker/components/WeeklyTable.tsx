@@ -100,7 +100,7 @@ export function WeeklyTable({
         <thead>
           <tr className="bg-background/80 text-fg-subtle font-semibold border-b border-border uppercase tracking-wider text-micro">
             <th className="py-2.5 px-3 w-10 text-center">#</th>
-            <th className="py-2.5 px-3 min-w-[170px]">Company Name</th>
+            <th className="py-2.5 px-3 min-w-[220px] max-w-[280px] text-left">Company Name</th>
             <th className="py-2.5 px-3 min-w-[200px]">Role(s)</th>
             <th className="py-2.5 px-3 min-w-[120px]">CDC Ref</th>
             <th className="py-2.5 px-3 min-w-[130px]">Type</th>
@@ -180,10 +180,10 @@ function TableRow({
       <td className="py-2.5 px-3 text-center text-fg-subtle font-mono">{index}</td>
 
       {/* Company Name */}
-      <td className="py-2.5 px-3 font-semibold text-fg">
+      <td className="py-2.5 px-3 font-semibold text-fg min-w-[220px] max-w-[280px] break-words leading-tight">
         <div className="flex items-center gap-1.5">
           {row.is_pinned_top && (
-            <span className="text-warning text-xs" title="Pinned to Top Companies">★</span>
+            <span className="text-warning text-xs shrink-0" title="Pinned to Top Companies">★</span>
           )}
           {editingField === 'company_name' ? (
             <input
@@ -345,7 +345,7 @@ function TableRow({
         ) : (
           <span
             onClick={() => startEdit('current_status_text', row.current_status_text)}
-            className="cursor-pointer hover:text-primary transition-colors line-clamp-2"
+            className="cursor-pointer hover:text-primary transition-colors break-words leading-relaxed whitespace-pre-wrap max-w-[280px] inline-block"
             title={row.current_status_text}
           >
             {row.current_status_text || <span className="text-fg-muted italic">—</span>}

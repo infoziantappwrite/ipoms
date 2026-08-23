@@ -9,24 +9,25 @@ interface Props {
   isReadOnly: boolean;
   onRowUpdate: (rowId: string, patch: Partial<TrackerRowType>) => Promise<void>;
   onSkip: (rowId: string) => Promise<void>;
+  onCall?: (row: TrackerRowType) => void;
 }
 
 const COLUMN_HEADERS = [
-  { label: '#', width: 'w-12 text-center' },
-  { label: 'Start Time', width: 'w-28' },
-  { label: 'End Time', width: 'w-28' },
-  { label: 'Duration', width: 'w-20' },
-  { label: 'Company Name', width: 'min-w-[160px] flex-1' },
-  { label: 'HR Name', width: 'w-32' },
-  { label: 'Contact', width: 'w-32' },
-  { label: 'Email ID', width: 'w-40' },
-  { label: 'Call Outcome / Status', width: 'w-44' },
-  { label: 'Follow Up', width: 'w-36' },
+  { label: '#', width: 'w-12 text-center shrink-0' },
+  { label: 'Start Time', width: 'w-28 shrink-0' },
+  { label: 'End Time', width: 'w-28 shrink-0' },
+  { label: 'Duration', width: 'w-20 shrink-0' },
+  { label: 'Company Name', width: 'w-[250px] shrink-0' },
+  { label: 'HR Name', width: 'w-36 shrink-0' },
+  { label: 'Contact', width: 'w-32 shrink-0' },
+  { label: 'Email ID', width: 'w-40 shrink-0' },
+  { label: 'Call Outcome / Status', width: 'w-44 shrink-0' },
+  { label: 'Follow Up', width: 'w-36 shrink-0' },
   { label: 'Comments', width: 'flex-1 min-w-[140px]' },
-  { label: 'Actions', width: 'w-16' },
+  { label: 'Actions', width: 'w-16 shrink-0' },
 ];
 
-export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onSkip }: Props) {
+export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onSkip, onCall }: Props) {
   if (rows.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16 text-center">
@@ -68,6 +69,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onSkip }: Props) {
             isReadOnly={isReadOnly}
             onUpdate={(patch) => onRowUpdate(row._id, patch)}
             onSkip={() => onSkip(row._id)}
+            onCall={onCall}
           />
         ))}
       </div>

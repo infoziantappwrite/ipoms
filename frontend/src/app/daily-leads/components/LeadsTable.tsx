@@ -130,7 +130,7 @@ export function LeadsTable({
               <th className="py-3 px-2 w-10 text-center">#</th>
               <th className="py-3 px-3 min-w-[90px]">Time</th>
               <th className="py-3 px-3 min-w-[100px]">Date</th>
-              <th className="py-3 px-3 min-w-[170px]">Company Name</th>
+              <th className="py-3 px-3 min-w-[220px] max-w-[280px] text-left">Company Name</th>
               <th className="py-3 px-3 min-w-[170px]">Role Offered</th>
               <th className="py-3 px-3 min-w-[110px]">CTC</th>
               <th className="py-3 px-3 min-w-[160px]">College</th>
@@ -275,7 +275,7 @@ function TableRow({
       </td>
 
       {/* Company Name */}
-      <td className="py-3 px-3 font-bold text-slate-900 whitespace-nowrap">
+      <td className="py-3 px-3 font-bold text-slate-900 min-w-[220px] max-w-[280px] break-words leading-tight">
         {editingField === 'company_name' ? (
           <input
             type="text"
@@ -394,7 +394,7 @@ function TableRow({
         ) : (
           <span
             onClick={() => startEdit('remarks', row.remarks)}
-            className="cursor-pointer hover:text-primary transition-colors line-clamp-1"
+            className="cursor-pointer hover:text-primary transition-colors break-words leading-relaxed whitespace-pre-wrap max-w-[260px] inline-block"
             title={row.remarks}
           >
             {row.remarks || <span className="text-slate-400 italic">—</span>}
