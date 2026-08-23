@@ -18,6 +18,65 @@ The `version 1/` folder holds the original design specs (chapters, module docs, 
 
 A placement-operations tool for Infoziant's internal team: coordinators log outreach calls, track weekly placement pipelines, manage a shared company/HR-contact database, capture daily leads, generate reports, and now coordinate with each other over an internal team chat. Four roles use it — an Administrator, Team Leaders, Placement Coordinators (the primary daily users), and external, read-only TPOs (college placement officers) who only see their own college's finalized weekly report.
 
+> **A note on the diagrams below:** GitHub's README renderer executes no CSS or JavaScript, so nothing here can *animate* in the literal sense — but it does render [Mermaid](https://mermaid.js.org/) diagrams natively as live, styled SVG (dark-mode aware), which is the closest thing to an "animated network graph" a README can actually show. Every diagram below is generated from the real route policy and Mongoose schemas, not drawn freehand.
+
+---
+
+## How it works — request flow
+
+Every API call passes through three independent gates before it touches the database — this is the same auth model described in [Auth model](#auth-model-as-built) below, drawn as a flow:
+
+```mermaid
+flowchart TD
+    Browser["🌐 Browser<br/>Next.js 14 App Router — :3000"]
+    G1["1️⃣ authenticateJWT<br/>who are you?"]
+    G2["2️⃣ authorizeRoute<br/>routePolicy.ts — default-deny by role"]
+    G3["3️⃣ Ownership scoping<br/>may you see THIS record?"]
+    Handler["server.ts route handler<br/>66+ endpoints"]
+    DB[("🗄️ MongoDB<br/>ipoms_db · 12 collections")]
+    SSE["📡 SSE /chat/stream<br/>auth via ?token= — EventSource can't send headers"]
+    Cron["⏱️ node-cron<br/>23:59:59 IST — finalize daily tracker"]
+
+    Browser -->|"HTTPS REST /api/v1/*"| G1
+    G1 -->|401 if not signed in| G2
+    G2 -->|403 if role not allowed| G3
+    G3 -->|scoped to own records| Handler
+    Handler <--> DB
+    Handler -.->|live push, no polling| SSE -.->|new_message, presence, reactions| Browser
+    Cron --> DB
+
+    style G1 fill:#1E3A8A,color:#fff
+    style G2 fill:#1E3A8A,color:#fff
+    style G3 fill:#1E3A8A,color:#fff
+```
+
+## How it works — day-to-day workflow
+
+What each role actually does in the app, module to module:
+
+```mermaid
+flowchart LR
+    Login(["🔐 Login<br/>email + password"]) --> Dash["📊 Dashboard<br/>greeting · notifications · today's tasks"]
+
+    subgraph COORD["👤 Placement Coordinator — daily loop"]
+        Dash --> DT["📞 Daily Tracker<br/>log calls, Start/End time, auto-save"]
+        DT -->|finalizes 23:59:59 IST| WT["📈 Weekly Tracker<br/>pipeline, in_progress, completed…"]
+        DT --> DL["✅ Daily Leads<br/>Positives → JD Received"]
+        WT --> Rep["📄 Reports<br/>generate · edit · export"]
+        Dash --> Chat["💬 Team Chat<br/>doubts · coordination"]
+    end
+
+    subgraph LEAD["🧑‍💼 Team Leader / Administrator"]
+        Assign["📋 Assign Work<br/>college → coordinator"] --> Dash
+        Rep --> Audit["🗂️ Immutable Audit Log"]
+    end
+
+    subgraph EXT["🏫 TPO — external, read-only"]
+        WT --> Finalized["📑 Finalized Weekly Report"]
+        Finalized --> TPOView["Own college only"]
+    end
+```
+
 ---
 
 ## Actual tech stack (as run today)
@@ -50,6 +109,55 @@ frontend/src/app/
   login/  signup/  dashboard/  tracker/  weekly-tracker/
   daily-leads/  metadata/  reports/  chat/  notifications/  settings/
 ```
+
+---
+
+## Data model — entity relationships
+
+Generated from the actual `ref:` declarations in `backend/src/models/`, not from the spec. `CompanyMetadata` is deliberately a leaf node — it's an Excel-like repository identified by company name only, never owned by a single record.
+
+```mermaid
+erDiagram
+    ROLE ||--o{ USER : role_ids
+    COLLEGE ||--o{ USER : assigned_college_ids
+    USER ||--o{ COLLEGE : assigned_coordinator_ids
+
+    USER ||--o{ ASSIGNED_WORK : sender_tl_id
+    USER ||--o{ ASSIGNED_WORK : assigned_to_coordinator_id
+    COLLEGE ||--o{ ASSIGNED_WORK : college_id
+
+    USER ||--o{ DAILY_TRACKER : coordinator_id
+    COLLEGE ||--o{ DAILY_TRACKER : college_id
+    COMPANY_METADATA ||--o{ DAILY_TRACKER : company_id
+
+    DAILY_TRACKER ||--o{ WEEKLY_TRACKER : daily_tracker_id
+    USER ||--o{ WEEKLY_TRACKER : coordinator_id
+    COLLEGE ||--o{ WEEKLY_TRACKER : college_id
+    COMPANY_METADATA ||--o{ WEEKLY_TRACKER : company_id
+
+    DAILY_TRACKER ||--o{ DAILY_LEAD : daily_tracker_id
+    USER ||--o{ DAILY_LEAD : coordinator_id
+    USER ||--o{ DAILY_LEAD : updated_by
+    COLLEGE ||--o{ DAILY_LEAD : college_id
+    COMPANY_METADATA ||--o{ DAILY_LEAD : company_id
+
+    USER ||--o{ NOTIFICATION : user_id
+    USER ||--o{ NOTIFICATION : sender_id
+    USER ||--o{ NOTIFICATION : target_user_ids
+    COLLEGE ||--o{ NOTIFICATION : target_college_id
+
+    USER ||--o{ REPORT_LIBRARY : coordinator_id
+    COLLEGE ||--o{ REPORT_LIBRARY : college_id
+
+    USER ||--o{ AUDIT_LOG : performed_by
+
+    USER ||--o{ CHAT_CONVERSATION : participant_ids
+    USER ||--o{ CHAT_CONVERSATION : created_by
+    CHAT_CONVERSATION ||--o{ CHAT_MESSAGE : conversation_id
+    USER ||--o{ CHAT_MESSAGE : sender_id
+```
+
+**12 live collections** (not the 14 the spec calls for — `recycle_bin` and `import_processing_history` are unbuilt, see [Known gaps](#known-gaps-and-what-blocks-a-release)): `users`, `roles`, `colleges`, `company_metadata`, `assigned_work`, `daily_tracker`, `weekly_tracker`, `daily_leads`, `notifications`, `report_library`, `system_settings`, `audit_logs` — plus `chat_conversations`/`chat_messages` added this cycle.
 
 ---
 
