@@ -146,5 +146,5 @@ The original design documents (`version 1/`, chapter and module `.md` files, the
 ## Organization
 
 * **Project:** iPOMS — Infoziant Placement Operations Management System
-* **Organization:** Infoziant IT Solutions Inc.
+* **Organization:** Infoziant.
 * **Repository:** [github.com/mohanaradha-13/ipoms](https://github.com/mohanaradha-13/ipoms)
