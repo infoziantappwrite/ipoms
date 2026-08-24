@@ -2,6 +2,11 @@
 # iPOMS .gitignore
 # ===========================
 
+# --- Secrets ---
+.env
+*.env
+!.env.example
+
 # --- IDE & Editor ---
 .vscode/
 .idea/
