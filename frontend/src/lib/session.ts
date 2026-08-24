@@ -66,14 +66,15 @@ export function armNavIntro() {
   } catch { /* storage disabled */ }
 }
 
-/** Updates the stored session user and dispatches sync events across all pages/drawers. */
-export function updateSessionUser(patch: Partial<SessionUser> & Record<string, any>) {
+/** Updates the stored session user and dispatches sync events across all pages/drawers safely without infinite loops. */
+export function updateSessionUser(patch: Partial<SessionUser> & Record<string, any>, emitEvents = true) {
   if (typeof window === 'undefined') return;
   try {
     const current = readSessionUser() || ({} as SessionUser);
     const updated = { ...current, ...patch };
     window.localStorage.setItem(USER_KEY, JSON.stringify(updated));
-    window.dispatchEvent(new CustomEvent('ipoms_user_updated', { detail: updated }));
-    window.dispatchEvent(new Event('storage'));
+    if (emitEvents) {
+      window.dispatchEvent(new CustomEvent('ipoms_user_updated', { detail: updated }));
+    }
   } catch { /* ignore */ }
 }

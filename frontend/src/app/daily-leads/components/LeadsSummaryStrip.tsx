@@ -11,14 +11,15 @@ export interface LeadsSummaryData {
 interface Props {
   summary: LeadsSummaryData;
   activeTab: 'positive' | 'jd_received';
+  isAllDates?: boolean;
   onTabChange: (tab: 'positive' | 'jd_received') => void;
 }
 
-export function LeadsSummaryStrip({ summary, activeTab, onTabChange }: Props) {
+export function LeadsSummaryStrip({ summary, activeTab, isAllDates = false, onTabChange }: Props) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 px-6 py-2">
 
-      {/* Card 1: Today's Positives */}
+      {/* Card 1: Positives */}
       <button
         type="button"
         onClick={() => onTabChange('positive')}
@@ -33,7 +34,9 @@ export function LeadsSummaryStrip({ summary, activeTab, onTabChange }: Props) {
             <Sparkles size={13} strokeWidth={2.25} className="text-emerald-700" />
           </div>
           <div className="text-left truncate">
-            <p className="text-xs font-bold text-slate-800 truncate">Today's Positives</p>
+            <p className="text-xs font-bold text-slate-800 truncate">
+              {isAllDates ? 'Total Positives' : "Today's Positives"}
+            </p>
             <p className="text-micro text-slate-400 font-medium hidden sm:block">Opportunities</p>
           </div>
         </div>
@@ -42,7 +45,7 @@ export function LeadsSummaryStrip({ summary, activeTab, onTabChange }: Props) {
         </span>
       </button>
 
-      {/* Card 2: Today's JD Received */}
+      {/* Card 2: JD Received */}
       <button
         type="button"
         onClick={() => onTabChange('jd_received')}
@@ -57,7 +60,9 @@ export function LeadsSummaryStrip({ summary, activeTab, onTabChange }: Props) {
             <FileText size={13} strokeWidth={2.25} className="text-blue-700" />
           </div>
           <div className="text-left truncate">
-            <p className="text-xs font-bold text-slate-800 truncate">Today's JD Received</p>
+            <p className="text-xs font-bold text-slate-800 truncate">
+              {isAllDates ? 'Total JD Received' : "Today's JD Received"}
+            </p>
             <p className="text-micro text-slate-400 font-medium hidden sm:block">In Hand</p>
           </div>
         </div>
@@ -73,7 +78,9 @@ export function LeadsSummaryStrip({ summary, activeTab, onTabChange }: Props) {
             <Building2 size={13} strokeWidth={2.25} className="text-purple-700" />
           </div>
           <div className="text-left truncate">
-            <p className="text-xs font-bold text-slate-800 truncate">Active Colleges Today</p>
+            <p className="text-xs font-bold text-slate-800 truncate">
+              {isAllDates ? 'Active Colleges' : 'Active Colleges Today'}
+            </p>
             <p className="text-micro text-slate-400 font-medium hidden sm:block">Active Roster</p>
           </div>
         </div>

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, PhoneCall, CalendarDays, Target, ListTodo, Database,
-  TrendingUp, MessageSquareText, PanelLeftClose, X,
+  FileSpreadsheet, MessageSquareText, PanelLeftClose, X,
 } from 'lucide-react';
 
 import { InfoziantMark } from '@/components/InfoziantMark';
@@ -18,6 +18,7 @@ import {
 } from '@/lib/session';
 import { apiFetch } from '@/lib/api';
 import { subscribeChatEvent } from '@/lib/chatStream';
+import { updateSessionUser } from '@/lib/session';
 
 /** How long the drawer stays open after sign-in before settling to the rail. */
 const INTRO_HOLD_MS = 5000;
@@ -36,7 +37,7 @@ const NAV: NavItem[] = [
   { href: '/daily-leads',    label: 'Daily Leads',    Icon: Target },
   { href: '/pending-tasks',  label: 'Pending Task',   Icon: ListTodo },
   { href: '/metadata',       label: 'Metadata DB',    Icon: Database },
-  { href: '/reports',        label: 'Reports & BI',   Icon: TrendingUp },
+  { href: '/reports',        label: 'Report Builder', Icon: FileSpreadsheet },
   { href: '/chat',           label: 'Chat',           Icon: MessageSquareText },
 ];
 
@@ -159,17 +160,20 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
     const handleUserUpdated = (e: any) => {
       if (e.detail) {
         setUser(e.detail);
-      } else {
-        refreshUser();
       }
     };
 
+    const handleStorageChange = () => {
+      const s = readSessionUser();
+      if (s) setUser(s);
+    };
+
     window.addEventListener('ipoms_user_updated', handleUserUpdated);
-    window.addEventListener('storage', refreshUser);
+    window.addEventListener('storage', handleStorageChange);
 
     return () => {
       window.removeEventListener('ipoms_user_updated', handleUserUpdated);
-      window.removeEventListener('storage', refreshUser);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 

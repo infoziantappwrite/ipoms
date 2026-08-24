@@ -33,6 +33,7 @@ export default function PendingTasksPage() {
 
   // ── Selection State for Bulk Operations
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
 
   // ── Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -71,6 +72,7 @@ export default function PendingTasksPage() {
   // Clear selections when filters or college change
   useEffect(() => {
     setSelectedIds([]);
+    setIsSelectionMode(false);
   }, [selectedCollegeId, searchQuery]);
 
   // ── College Change Handler from Header Dropdown
@@ -107,7 +109,7 @@ export default function PendingTasksPage() {
     try {
       const res = await apiFetch(`/pending-tasks/kpi?college_id=${selectedCollegeId}`);
       if (res.success && res.data) {
-        setKpi((res.data as any).kpi);
+        setKpi((res.data as any).kpi || null);
       }
     } catch (err) {
       console.error('[PendingTask] KPI load error:', err);
@@ -119,20 +121,28 @@ export default function PendingTasksPage() {
     loadKpi();
   }, [loadTasks, loadKpi]);
 
-  // ── Toggle Single Row Selection
+  // ── Selection Handlers
   const handleToggleSelect = (id: string) => {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
 
-  // ── Toggle Select All Rows
   const handleToggleSelectAll = () => {
     if (selectedIds.length === tasks.length) {
       setSelectedIds([]);
     } else {
       setSelectedIds(tasks.map((t) => t._id));
     }
+  };
+
+  const handleToggleSelectionMode = () => {
+    setIsSelectionMode((prev) => {
+      if (prev) {
+        setSelectedIds([]);
+      }
+      return !prev;
+    });
   };
 
   // ── Add / Edit Modal Openers
@@ -185,6 +195,7 @@ export default function PendingTasksPage() {
       }
     } catch (err) {
       console.error('[PendingTask] Save error:', err);
+      alert('Network error while saving task');
       return false;
     }
   };
@@ -205,6 +216,8 @@ export default function PendingTasksPage() {
         }),
       });
       if (res.success) {
+        setSelectedIds([]);
+        setIsSelectionMode(false);
         setIsBulkEditModalOpen(false);
         await loadTasks();
         await loadKpi();
@@ -245,6 +258,7 @@ export default function PendingTasksPage() {
         });
         if (res.success) {
           setSelectedIds([]);
+          setIsSelectionMode(false);
           setIsDeleteModalOpen(false);
           await loadTasks();
           await loadKpi();
@@ -285,7 +299,7 @@ export default function PendingTasksPage() {
       'JD Received Date',
       'DB Shared Date',
       'Current Status',
-      'Action to be Taken',
+      'Remarks / Next Action',
       'Drive Date',
       'Remarks',
     ];
@@ -328,6 +342,8 @@ export default function PendingTasksPage() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         selectedCount={selectedIds.length}
+        isSelectionMode={isSelectionMode}
+        onToggleSelectionMode={handleToggleSelectionMode}
         onOpenAddModal={handleOpenAddModal}
         onEditSelected={handleOpenBulkEdit}
         onDeleteSelected={handleOpenBulkDelete}
@@ -347,6 +363,7 @@ export default function PendingTasksPage() {
         <PendingTaskTable
           tasks={tasks}
           selectedIds={selectedIds}
+          isSelectionMode={isSelectionMode}
           onToggleSelect={handleToggleSelect}
           onToggleSelectAll={handleToggleSelectAll}
           onEdit={handleOpenEditModal}

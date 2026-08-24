@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Globe, Save, Sparkles, Wrench, BarChart3, TrendingUp, ListTodo, Calendar, AlertCircle } from 'lucide-react';
+import { Globe, Sparkles, BarChart3, TrendingUp, ListTodo, Calendar, AlertCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 import { CollegeSelector } from '@/components/CollegeSelector';
@@ -54,8 +54,6 @@ export function ReportBuilderWizard({
 
   const [colleges, setColleges] = useState<College[]>([]);
   const [loading, setLoading] = useState(false);
-  const [presetName, setPresetName] = useState('');
-  const [showSavePresetModal, setShowSavePresetModal] = useState(false);
 
   useEffect(() => {
     apiFetch('/colleges')
@@ -135,38 +133,6 @@ export function ReportBuilderWizard({
     }
   };
 
-  const handleSavePreset = async () => {
-    if (!presetName.trim()) {
-      alert('Please enter a preset name');
-      return;
-    }
-    try {
-      const res = await apiFetch('/reports/presets', {
-        method: 'POST',
-        body: JSON.stringify({
-          template_type: templateType,
-          preset_name: presetName.trim(),
-          college_id: collegeId === 'all' ? null : collegeId,
-          theme,
-          academic_year: academicYear,
-          week_label: weekLabel,
-          included_sections: sections,
-          custom_remarks: customRemarks,
-        }),
-      });
-      if (res.success) {
-        alert('Preset saved to Report Library successfully');
-        setShowSavePresetModal(false);
-        setPresetName('');
-      } else {
-        alert(res.error?.message || 'Failed to save preset');
-      }
-    } catch (err) {
-      console.error('Save preset error:', err);
-      alert('Network error while saving preset');
-    }
-  };
-
   const TEMPLATES = [
     { id: 'weekly_placement', label: 'Weekly Placement', icon: BarChart3 },
     { id: 'monthly_placement', label: 'Monthly Placement', icon: TrendingUp },
@@ -177,25 +143,6 @@ export function ReportBuilderWizard({
     <div className="space-y-6">
       {/* Wizard Form Card */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-6">
-
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-          <div>
-            <h2 className="text-base font-bold text-slate-800 tracking-tight flex items-center gap-2">
-              <Wrench size={18} strokeWidth={2} className="text-primary" /> Guided Report Builder Wizard
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Configure parameters, select sections, and generate an interactive live report
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowSavePresetModal(true)}
-            className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer shadow-xs"
-          >
-            <Save size={14} strokeWidth={2} /> Save as Preset
-          </button>
-        </div>
 
         {/* Step 1: Select Report Template (3 Options) */}
         <div>
@@ -364,46 +311,6 @@ export function ReportBuilderWizard({
         </div>
 
       </div>
-
-      {/* Modal: Save Preset */}
-      {showSavePresetModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
-          <div className="rounded-2xl w-full max-w-md bg-white border border-slate-200 shadow-2xl p-6 space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Save size={16} strokeWidth={2} className="text-primary" /> Save Preset to Report Library
-            </h3>
-            <p className="text-xs text-slate-500">
-              Save your current filters, section toggles, and remarks to quickly reload later.
-            </p>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Preset Name</label>
-              <input
-                type="text"
-                value={presetName}
-                onChange={(e) => setPresetName(e.target.value)}
-                placeholder="e.g. Weekly Dean Summary Preset"
-                className="w-full bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2 text-xs text-slate-900 outline-none"
-              />
-            </div>
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowSavePresetModal(false)}
-                className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSavePreset}
-                className="px-5 py-2 bg-primary hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
-              >
-                Save Preset
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

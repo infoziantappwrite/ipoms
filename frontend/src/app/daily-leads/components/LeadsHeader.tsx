@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CalendarDays, FileSpreadsheet, Plus, Target, RefreshCw } from 'lucide-react';
+import { FileSpreadsheet, Plus, Target, Trash2 } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { CollegeSelector, College } from '@/components/CollegeSelector';
+import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { apiFetch } from '@/lib/api';
 
 interface Props {
@@ -16,6 +17,8 @@ interface Props {
   onOpenAddModal: () => void;
   onExportCsv: () => void;
   onRefresh: () => void;
+  isDeleteMode?: boolean;
+  onToggleDeleteMode?: () => void;
 }
 
 export function LeadsHeader({
@@ -28,6 +31,8 @@ export function LeadsHeader({
   onOpenAddModal,
   onExportCsv,
   onRefresh,
+  isDeleteMode = false,
+  onToggleDeleteMode,
 }: Props) {
   const [selectedCollegeObj, setSelectedCollegeObj] = useState<College | null>(null);
 
@@ -57,12 +62,9 @@ export function LeadsHeader({
             <h1 className="text-base font-bold text-slate-900 tracking-tight">
               Daily Leads
             </h1>
-            <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full font-semibold">
-              Positives & JD Tracking
-            </span>
           </div>
           <p className="text-xs text-slate-500 mt-1 font-medium">
-            Manual Timestamped Register
+            Positives and JD Tracker
           </p>
         </div>
 
@@ -107,16 +109,12 @@ export function LeadsHeader({
       {/* ── Bottom Controls Row: Date, Smart College Selector, Search, Actions ── */}
       <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t border-slate-100">
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Date Picker */}
-          <div className="flex items-center gap-1.5 bg-white border border-slate-300 rounded-xl px-3 py-1.5 shadow-xs">
-            <CalendarDays size={14} strokeWidth={2} className="text-slate-400" />
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => onDateChange(e.target.value)}
-              className="bg-transparent text-xs text-slate-800 font-medium cursor-pointer focus:outline-none"
-            />
-          </div>
+          {/* Smooth Calendar Date Picker */}
+          <SmoothDatePicker
+            value={selectedDate}
+            onChange={onDateChange}
+            theme="navy"
+          />
 
           {/* Smart Auto-Shrinking College Selector */}
           <CollegeSelector
@@ -136,7 +134,7 @@ export function LeadsHeader({
           <div className="w-52 sm:w-60">
             <input
               type="text"
-              placeholder="Search company, role, remarks…"
+              placeholder="Search company, role…"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               className="w-full bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 text-slate-800 text-xs px-3.5 py-1.5 rounded-xl placeholder:text-slate-400 outline-none shadow-xs"
@@ -146,22 +144,32 @@ export function LeadsHeader({
 
         {/* Right Action Buttons */}
         <div className="flex items-center gap-2">
-          <button
-            onClick={onRefresh}
-            className="p-2 bg-[#FEF3C7] hover:bg-[#FDE68A] text-amber-900 border border-amber-300 rounded-xl text-xs transition-colors shadow-xs cursor-pointer flex items-center justify-center"
-            title="Refresh leads"
-          >
-            <RefreshCw size={14} strokeWidth={2} />
-          </button>
+          {onToggleDeleteMode && (
+            <button
+              type="button"
+              onClick={onToggleDeleteMode}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 ${
+                isDeleteMode
+                  ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-200'
+                  : 'bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300'
+              }`}
+              title={isDeleteMode ? 'Exit Delete Mode' : 'Select and delete leads'}
+            >
+              <Trash2 size={14} strokeWidth={2} />
+              <span>{isDeleteMode ? 'Exit Delete' : 'Delete'}</span>
+            </button>
+          )}
 
           <button
+            type="button"
             onClick={onExportCsv}
-            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
+            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer active:scale-95"
           >
             <FileSpreadsheet size={14} strokeWidth={2} /> Export CSV
           </button>
 
           <button
+            type="button"
             onClick={() => {
               if (selectedCollegeId === 'all' || !selectedCollegeId) {
                 alert('Please select a specific college from the dropdown before adding a new entry.');
@@ -169,7 +177,7 @@ export function LeadsHeader({
               }
               onOpenAddModal();
             }}
-            className="flex items-center gap-1.5 bg-primary hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 bg-primary hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer active:scale-95"
           >
             <Plus size={14} strokeWidth={2} /> Add Entry
           </button>

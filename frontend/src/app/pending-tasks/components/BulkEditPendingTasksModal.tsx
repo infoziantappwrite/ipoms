@@ -11,6 +11,7 @@ import {
   Sparkles,
   Building2,
 } from 'lucide-react';
+import { CharCountBadge } from '@/components/ui/CharCountBadge';
 import type { PendingTaskRow } from '../types';
 
 interface Props {
@@ -94,7 +95,19 @@ export function BulkEditPendingTasksModal({
       if (updateDbSharedDate) {
         updates.db_shared_date = dbSharedDate ? new Date(dbSharedDate).toISOString() : null;
       }
-      if (updateAction && actionToBeTaken.trim()) {
+      if (updateAction) {
+        if (!actionToBeTaken.trim()) {
+          setErrorMessage('Remarks / Next Action is required when checked for update.');
+          setSubmitting(false);
+          return;
+        }
+        if (actionToBeTaken.trim().length < 10) {
+          setErrorMessage(
+            `Remarks / Next Action must be at least 10 characters long (currently ${actionToBeTaken.trim().length}/10).`
+          );
+          setSubmitting(false);
+          return;
+        }
         updates.action_to_be_taken = actionToBeTaken.trim();
       }
       if (updateCurrentStatus && currentStatus.trim()) {
@@ -222,25 +235,37 @@ export function BulkEditPendingTasksModal({
             )}
           </div>
 
-          {/* Field 3: Action to be Taken */}
+          {/* Field 3: Remarks / Next Action */}
           <div className={`p-3.5 rounded-xl border transition-all ${updateAction ? 'bg-indigo-50/40 border-indigo-200' : 'bg-slate-50/50 border-slate-200'}`}>
-            <label className="flex items-center gap-2.5 text-xs font-bold text-slate-800 cursor-pointer mb-2">
-              <input
-                type="checkbox"
-                checked={updateAction}
-                onChange={(e) => setUpdateAction(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-              />
-              <span>Update Action to be Taken</span>
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="flex items-center gap-2.5 text-xs font-bold text-slate-800 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={updateAction}
+                  onChange={(e) => setUpdateAction(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                />
+                <span>Update Remarks / Next Action</span>
+              </label>
+              {updateAction && (
+                <div className="text-[10px] font-medium">
+                  <CharCountBadge length={actionToBeTaken.trim().length} min={10} belowLabel="Min 10 characters required" />
+                </div>
+              )}
+            </div>
             {updateAction && (
               <div className="pl-6.5 mt-1.5 space-y-2">
                 <textarea
                   value={actionToBeTaken}
                   onChange={(e) => setActionToBeTaken(e.target.value)}
                   rows={2}
-                  placeholder="Type action manually or click a suggested preset below..."
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none font-medium"
+                  minLength={10}
+                  placeholder="Type remarks or next action manually (min 10 chars, e.g., Database to be shared at the earliest, Drive date to be confirmed, etc.)..."
+                  className={`w-full px-3 py-2 text-xs bg-white border rounded-lg text-slate-900 focus:outline-none focus:ring-2 resize-none font-medium transition-colors ${
+                    actionToBeTaken.trim().length > 0 && actionToBeTaken.trim().length < 10
+                      ? 'border-amber-400 focus:border-amber-500 focus:ring-amber-500/20'
+                      : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20'
+                  }`}
                 />
                 <div className="flex flex-wrap gap-1.5">
                   {ACTION_SUGGESTIONS.map((opt) => (

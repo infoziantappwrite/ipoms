@@ -1,3 +1,4 @@
+// iPOMS Backend Server - August 2026 Segregation Active
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -25,6 +26,8 @@ import { startFinalizationJob } from './jobs/finalizeDailyTracker';
 import { registerAuthRoutes } from './lib/authRoutes';
 import { registerChatRoutes, seedDefaultChatChannels } from './lib/chatRoutes';
 import { registerPendingTaskRoutes } from './lib/pendingTaskRoutes';
+import { seedAugustAllCollegesPositives } from './lib/seedAugustAllCollegesPositives';
+import { seedAugustAllCollegesJdReceived } from './lib/seedAugustAllCollegesJdReceived';
 import { authenticateJWT, authorizeRoles, AuthUserPayload } from './lib/authMiddleware';
 import { authorizeRoute, scopeToSelf, isSupervisor, refuseForeignOwner } from './lib/routePolicy';
 import { isPasswordValid, firstPasswordError } from './lib/passwordPolicy';
@@ -77,8 +80,27 @@ function getTodayDate(): Date {
 }
 
 function parseDateParam(dateStr: string): Date {
-  const d = new Date(dateStr);
-  return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  if (!dateStr) return getTodayDate();
+  const trimmed = dateStr.trim();
+  // Check if DD-MM-YYYY or DD/MM/YYYY
+  if (/^\d{1,2}[-/]\d{1,2}[-/]\d{4}$/.test(trimmed)) {
+    const parts = trimmed.split(/[-/]/);
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const year = parseInt(parts[2], 10);
+    return new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+  }
+  // Check if YYYY-MM-DD or YYYY/MM/DD
+  if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(trimmed)) {
+    const parts = trimmed.split(/[-/]/);
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2].slice(0, 2), 10);
+    return new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
+  }
+  const d = new Date(trimmed);
+  if (isNaN(d.getTime())) return getTodayDate();
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
 }
 
 // Format duration from seconds to "01m 53s" as per spec Section 10.4
@@ -101,6 +123,82 @@ app.get('/api/v1/health', (req: Request, res: Response) => {
     version: '1.0.0',
     timestamp: new Date().toISOString(),
   });
+});
+
+app.get('/api/v1/health/daily-leads-diagnostics', async (req: Request, res: Response) => {
+  try {
+    if (req.query.resync === 'true') {
+      await seedAugustAllCollegesPositives();
+      await seedAugustAllCollegesJdReceived();
+    }
+    let ngceCollege = await College.findOne({ college_code: 'NGCE' });
+    if (!ngceCollege) {
+      ngceCollege = await College.create({
+        college_name: 'Narayana Guru College of Engineering',
+        college_code: 'NGCE',
+        location: 'Kanyakumari / Coimbatore, Tamil Nadu',
+        departments: ['CSE', 'IT', 'AI & DS', 'ECE', 'MECH'],
+        is_deleted: false,
+      });
+    }
+    await College.deleteMany({ college_code: { $in: ['MAR', 'NGC'] } });
+    if (ngceCollege) {
+      await DailyLead.updateMany(
+        { company_name: { $in: ['Merlin Automation', 'sasken', 'Avinya Infinity Solutions Pvt Ltd', 'BIBUS India', 'SSHRD GROUP', 'DEEPFACTS'] } },
+        { $set: { college_id: ngceCollege._id } }
+      );
+    }
+
+    const augStart = new Date(Date.UTC(2026, 7, 1, 0, 0, 0, 0));
+    const preAugustCount = await DailyLead.countDocuments({ lead_date: { $lt: augStart } });
+    const augustPositivesCount = await DailyLead.countDocuments({ lead_type: 'positive', lead_date: { $gte: augStart } });
+    const augustJdCount = await DailyLead.countDocuments({ lead_type: 'jd_received', lead_date: { $gte: augStart } });
+
+    const positives = await DailyLead.find({ lead_type: 'positive', lead_date: { $gte: augStart } })
+      .populate('college_id', 'college_name college_code');
+    const jds = await DailyLead.find({ lead_type: 'jd_received', lead_date: { $gte: augStart } })
+      .populate('college_id', 'college_name college_code');
+
+    const collegeBreakdown: Record<string, number> = {};
+    const dateBreakdown: Record<string, number> = {};
+
+    positives.forEach((p: any) => {
+      const cCode = p.college_id?.college_code || 'UNKNOWN';
+      collegeBreakdown[cCode] = (collegeBreakdown[cCode] || 0) + 1;
+      const dStr = p.lead_date && p.lead_date instanceof Date ? p.lead_date.toISOString().split('T')[0] : (p.lead_date ? String(p.lead_date).split('T')[0] : 'UNKNOWN');
+      dateBreakdown[dStr] = (dateBreakdown[dStr] || 0) + 1;
+    });
+
+    const jdCollegeBreakdown: Record<string, number> = {};
+    const jdDateBreakdown: Record<string, number> = {};
+
+    jds.forEach((j: any) => {
+      const cCode = j.college_id?.college_code || 'UNKNOWN';
+      jdCollegeBreakdown[cCode] = (jdCollegeBreakdown[cCode] || 0) + 1;
+      const dStr = j.lead_date && j.lead_date instanceof Date ? j.lead_date.toISOString().split('T')[0] : (j.lead_date ? String(j.lead_date).split('T')[0] : 'UNKNOWN');
+      jdDateBreakdown[dStr] = (jdDateBreakdown[dStr] || 0) + 1;
+    });
+
+    const allColleges = await College.find({ is_deleted: { $ne: true } }, 'college_code college_name');
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        pre_august_records_count: preAugustCount,
+        august_positives_total: augustPositivesCount,
+        august_jd_received_total: augustJdCount,
+        positives_by_college: collegeBreakdown,
+        positives_by_date: dateBreakdown,
+        jd_received_by_college: jdCollegeBreakdown,
+        jd_received_by_date: jdDateBreakdown,
+        all_colleges: allColleges,
+        status: preAugustCount === 0 ? 'CLEAN_AUGUST_ONLY' : 'DIRTY_PRE_AUGUST_EXISTS',
+      },
+    });
+  } catch (err: any) {
+    console.error('❌ [Diagnostics Error]:', err);
+    return res.status(200).json({ success: false, error: err.stack || err.message });
+  }
 });
 
 // 2. Authentication Login Endpoint
@@ -219,6 +317,19 @@ app.get('/api/v1/companies/search', async (req: Request, res: Response) => {
 // coordinators, and first-run seeding of sane defaults when the roster is empty.
 app.get('/api/v1/colleges', async (req: Request, res: Response) => {
   try {
+    // Ensure NGCE college is active and available in roster
+    const ngceExists = await College.findOne({ college_code: 'NGCE' });
+    if (!ngceExists) {
+      await College.create({
+        college_name: 'Narayana Guru College of Engineering',
+        college_code: 'NGCE',
+        location: 'Kanyakumari / Coimbatore, Tamil Nadu',
+        departments: ['CSE', 'IT', 'AI & DS', 'ECE', 'MECH'],
+        status: 'active',
+        is_deleted: false,
+      });
+    }
+
     const scopedFilter: any = { status: 'active' };
     if (!isSupervisor(req) && req.user) {
       scopedFilter.assigned_coordinator_ids = req.user.userId;
@@ -1633,28 +1744,66 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MODULE 05 — DAILY LEADS ENDPOINTS
-// Spec: Module_05_Daily_Leads_Specification_v1.0.md
-// ─────────────────────────────────────────────────────────────────────────────
+// ── DL-0: GET /api/v1/daily-leads/diagnostics
+// Verification endpoint to confirm zero pre-August data and accurate August breakdown
+app.get('/api/v1/daily-leads/diagnostics', async (req: Request, res: Response) => {
+  try {
+    const augStart = new Date(Date.UTC(2026, 7, 1, 0, 0, 0, 0));
+    const preAugustCount = await DailyLead.countDocuments({ lead_date: { $lt: augStart } });
+    const augustPositivesCount = await DailyLead.countDocuments({ lead_type: 'positive', lead_date: { $gte: augStart } });
+    const augustJdCount = await DailyLead.countDocuments({ lead_type: 'jd_received', lead_date: { $gte: augStart } });
+
+    const positives = await DailyLead.find({ lead_type: 'positive', lead_date: { $gte: augStart } })
+      .populate('college_id', 'college_name college_code');
+
+    const collegeBreakdown: Record<string, number> = {};
+    const dateBreakdown: Record<string, number> = {};
+
+    positives.forEach((p: any) => {
+      const cCode = p.college_id?.college_code || 'UNKNOWN';
+      collegeBreakdown[cCode] = (collegeBreakdown[cCode] || 0) + 1;
+      const dStr = p.lead_date.toISOString().split('T')[0];
+      dateBreakdown[dStr] = (dateBreakdown[dStr] || 0) + 1;
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        pre_august_records_count: preAugustCount,
+        august_positives_total: augustPositivesCount,
+        august_jd_received_total: augustJdCount,
+        by_college: collegeBreakdown,
+        by_date: dateBreakdown,
+        status: preAugustCount === 0 ? 'CLEAN_AUGUST_ONLY' : 'DIRTY_PRE_AUGUST_EXISTS',
+      },
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: { message: err.message } });
+  }
+});
 
 // ── DL-1: GET /api/v1/daily-leads
 // Fetch leads by date, optional college_id, and lead_type with search
 app.get('/api/v1/daily-leads', async (req: Request, res: Response) => {
   try {
-    const { date, college_id, lead_type, search } = req.query;
-
-    const targetDate = date ? parseDateParam(String(date)) : getTodayDate();
-    const nextDate = new Date(targetDate);
-    nextDate.setDate(targetDate.getDate() + 1);
+    const { date, college_id, coordinator_id, lead_type, search } = req.query;
 
     const filter: any = {
-      lead_date: { $gte: targetDate, $lt: nextDate },
       is_deleted: false,
     };
 
+    if (date && date !== 'all') {
+      const targetDate = parseDateParam(String(date));
+      const nextDate = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
+      filter.lead_date = { $gte: targetDate, $lt: nextDate };
+    }
+
     if (college_id && college_id !== 'all') {
       filter.college_id = new Types.ObjectId(String(college_id));
+    }
+
+    if (coordinator_id && coordinator_id !== 'all') {
+      filter.coordinator_id = new Types.ObjectId(String(coordinator_id));
     }
 
     if (lead_type && LEAD_TYPES.includes(lead_type as LeadType)) {
@@ -1671,15 +1820,42 @@ app.get('/api/v1/daily-leads', async (req: Request, res: Response) => {
       ];
     }
 
+    // Ensure NGCE college exists and has its leads mapped
+    let ngceCollege = await College.findOne({ college_code: 'NGCE' });
+    if (!ngceCollege) {
+      ngceCollege = await College.create({
+        college_name: 'Narayana Guru College of Engineering',
+        college_code: 'NGCE',
+        location: 'Kanyakumari / Coimbatore, Tamil Nadu',
+        departments: ['CSE', 'IT', 'AI & DS', 'ECE', 'MECH'],
+        is_deleted: false,
+      });
+    }
+    await DailyLead.updateMany(
+      { company_name: { $in: ['Merlin Automation', 'sasken', 'Avinya Infinity Solutions Pvt Ltd', 'BIBUS India', 'SSHRD GROUP', 'DEEPFACTS'] } },
+      { $set: { college_id: ngceCollege._id } }
+    );
+
+    // Ensure August positives across all colleges are seeded on first load
+    const totalAugustCount = await DailyLead.countDocuments({ lead_type: 'positive', is_deleted: false });
+    if (totalAugustCount === 0) {
+      await seedAugustAllCollegesPositives();
+    }
+
+    const totalAugustJdCount = await DailyLead.countDocuments({ lead_type: 'jd_received', is_deleted: false });
+    if (totalAugustJdCount === 0) {
+      await seedAugustAllCollegesJdReceived();
+    }
+
     const leads = await DailyLead.find(filter)
-      .sort({ created_at: -1 })
+      .sort({ lead_date: -1, created_at: -1 })
       .populate('college_id', 'college_name college_code')
       .populate('coordinator_id', 'full_name official_email');
 
     return res.status(200).json({
       success: true,
       data: {
-        date: targetDate.toISOString(),
+        date: date || 'all',
         lead_type: lead_type || 'all',
         total: leads.length,
         leads,
@@ -1887,19 +2063,29 @@ app.delete('/api/v1/daily-leads/:id', async (req: Request, res: Response) => {
 // Summary Strip counts: Positives count, JDs count, Active colleges count (Spec Section 7.3)
 app.get('/api/v1/daily-leads/summary', async (req: Request, res: Response) => {
   try {
-    const { date, college_id } = req.query;
-
-    const targetDate = date ? parseDateParam(String(date)) : getTodayDate();
-    const nextDate = new Date(targetDate);
-    nextDate.setDate(targetDate.getDate() + 1);
+    const { date, college_id, coordinator_id } = req.query;
 
     const baseFilter: any = {
-      lead_date: { $gte: targetDate, $lt: nextDate },
       is_deleted: false,
     };
 
+    if (date && date !== 'all') {
+      const targetDate = parseDateParam(String(date));
+      const nextDate = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
+      baseFilter.lead_date = { $gte: targetDate, $lt: nextDate };
+    }
+
     if (college_id && college_id !== 'all') {
       baseFilter.college_id = new Types.ObjectId(String(college_id));
+    }
+
+    if (coordinator_id && coordinator_id !== 'all') {
+      baseFilter.coordinator_id = new Types.ObjectId(String(coordinator_id));
+    }
+
+    const totalAugustCount = await DailyLead.countDocuments({ lead_type: 'positive', is_deleted: false });
+    if (totalAugustCount === 0) {
+      await seedAugustAllCollegesPositives();
     }
 
     const [positivesCount, jdCount, activeColleges] = await Promise.all([
@@ -1911,7 +2097,7 @@ app.get('/api/v1/daily-leads/summary', async (req: Request, res: Response) => {
     return res.status(200).json({
       success: true,
       data: {
-        date: targetDate.toISOString(),
+        date: date || 'all',
         summary: {
           positives_count: positivesCount,
           jd_received_count: jdCount,
@@ -4596,6 +4782,10 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 const startServer = async () => {
   await connectDatabase();
   await seedDefaultChatChannels();
+  // Ensure strict zero records exist before August 2026 for daily leads
+  await DailyLead.deleteMany({ lead_date: { $lt: new Date('2026-08-01T00:00:00.000Z') } });
+  await seedAugustAllCollegesPositives();
+  await seedAugustAllCollegesJdReceived();
 
   app.listen(PORT, () => {
     console.log(`🚀 [iPOMS API] Server running on http://localhost:${PORT}`);

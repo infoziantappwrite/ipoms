@@ -31,6 +31,9 @@ export default function DailyLeadsPage() {
   // Search Query
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Delete Mode State
+  const [isDeleteMode, setIsDeleteMode] = useState(false);
+
   // Data
   const [leads, setLeads] = useState<DailyLeadRow[]>([]);
   const [summary, setSummary] = useState<LeadsSummaryData>({
@@ -77,7 +80,26 @@ export default function DailyLeadsPage() {
 
   const handleTabChange = (tab: 'positive' | 'jd_received') => {
     setActiveTab(tab);
+
+    // Auto-refresh calendar date to today's date
+    const today = new Date().toISOString().split('T')[0];
+    setSelectedDate(today);
+
+    // Auto-refresh college dropdown to All Colleges
+    setSelectedCollegeId('all');
+    setSelectedCollegeName('All Colleges');
+    try {
+      setActiveCollege('all', 'All Colleges');
+    } catch {
+      // ignore
+    }
+
+    // Reset search, delete mode, and selections
+    setSearchQuery('');
+    setIsDeleteMode(false);
     setSelectedIds([]);
+    setIsAllSelected(false);
+
     try {
       localStorage.setItem('ipoms_daily_leads_active_tab', tab);
     } catch {
@@ -85,15 +107,20 @@ export default function DailyLeadsPage() {
     }
   };
 
-  // ── Fetch Leads
+  // ── Fetch Leads (requires specific college selection)
   const loadLeads = useCallback(async () => {
+    if (!selectedCollegeId || selectedCollegeId === 'all') {
+      setLeads([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const params = new URLSearchParams({
         date: selectedDate,
         lead_type: activeTab,
+        college_id: selectedCollegeId,
       });
-      if (selectedCollegeId !== 'all') params.set('college_id', selectedCollegeId);
       if (searchQuery.trim()) params.set('search', searchQuery.trim());
 
       const res = await apiFetch(`/daily-leads?${params.toString()}`);
@@ -109,9 +136,16 @@ export default function DailyLeadsPage() {
 
   // ── Fetch Summary Strip Counts
   const loadSummary = useCallback(async () => {
+    if (!selectedCollegeId || selectedCollegeId === 'all') {
+      setSummary({
+        positives_count: 0,
+        jd_received_count: 0,
+        active_colleges_count: 0,
+      });
+      return;
+    }
     try {
-      const params = new URLSearchParams({ date: selectedDate });
-      if (selectedCollegeId !== 'all') params.set('college_id', selectedCollegeId);
+      const params = new URLSearchParams({ date: selectedDate, college_id: selectedCollegeId });
 
       const res = await apiFetch(`/daily-leads/summary?${params.toString()}`);
       if (res.success && res.data) {
@@ -140,21 +174,6 @@ export default function DailyLeadsPage() {
       }
     } catch (err) {
       console.error('Failed to update lead:', err);
-    }
-  };
-
-  // ── 1-Click Move to JD Received (Spec Section 6.3 & 11)
-  const handleMoveToJd = async (rowId: string) => {
-    try {
-      const res = await apiFetch(`/daily-leads/${rowId}/move-to-jd`, {
-        method: 'POST',
-      });
-      if (res.success) {
-        await loadLeads();
-        await loadSummary();
-      }
-    } catch (err) {
-      console.error('Failed to move to JD:', err);
     }
   };
 
@@ -197,14 +216,39 @@ export default function DailyLeadsPage() {
     setIsAllSelected(false);
   };
 
+  // ── Delete Mode Handlers
+  const handleToggleDeleteMode = () => {
+    if (isDeleteMode) {
+      setIsDeleteMode(false);
+      setSelectedIds([]);
+      setIsAllSelected(false);
+    } else {
+      if (leads.length === 0) {
+        alert(`No ${activeTab === 'positive' ? 'positive leads' : 'JD received records'} to delete.`);
+        return;
+      }
+      setIsDeleteMode(true);
+    }
+  };
+
+  const handleCancelDeleteMode = () => {
+    setIsDeleteMode(false);
+    setSelectedIds([]);
+    setIsAllSelected(false);
+  };
+
   // ── Bulk Delete Selected Rows
   const handleBulkDelete = async () => {
-    if (selectedIds.length === 0) return;
+    if (selectedIds.length === 0) {
+      alert('Please select at least one row to delete.');
+      return;
+    }
+    const tabName = activeTab === 'positive' ? 'Positive Leads' : 'JD Received';
     if (
       !confirm(
-        `Are you sure you want to move ${selectedIds.length} selected ${
-          selectedIds.length === 1 ? 'entry' : 'entries'
-        } to Recycle Bin?`
+        `Are you sure you want to delete ${selectedIds.length} selected ${
+          selectedIds.length === 1 ? 'record' : 'records'
+        } from ${tabName}?`
       )
     ) {
       return;
@@ -218,6 +262,7 @@ export default function DailyLeadsPage() {
       );
       setSelectedIds([]);
       setIsAllSelected(false);
+      setIsDeleteMode(false);
       await loadLeads();
       await loadSummary();
     } catch (err) {
@@ -232,19 +277,19 @@ export default function DailyLeadsPage() {
       return;
     }
 
-    const rows = leads.map((r, idx) => ({
-      'S.No': idx + 1,
-      Time: r.event_time,
-      Date: new Date(r.lead_date).toISOString().split('T')[0],
-      Company: r.company_name,
-      Role: r.job_role,
-      CTC: r.ctc,
-      College: r.college_id?.college_name || '',
-      'College Code': r.college_id?.college_code || '',
-      Batch: r.eligible_batch,
-      Remarks: r.remarks,
-      Tab: r.lead_type === 'positive' ? 'Positives' : 'JD Received',
-    }));
+    const rows = leads.map((r, idx) => {
+      const base: any = {
+        'SI.NO': idx + 1,
+        'Time Stamp': r.event_time,
+        Date: r.lead_date ? new Date(r.lead_date).toISOString().split('T')[0] : '',
+        'Company Name': r.company_name,
+        Role: r.job_role,
+        CTC: r.ctc,
+        'Eligible Batch': r.eligible_batch,
+        Tab: r.lead_type === 'positive' ? 'Positives' : 'JD Received',
+      };
+      return base;
+    });
 
     const headers = Object.keys(rows[0]);
     const csvContent = [
@@ -269,7 +314,6 @@ export default function DailyLeadsPage() {
 
   return (
     <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
-
       {/* ── Top Header ────────────────────────────────────────────────────── */}
       <LeadsHeader
         selectedDate={selectedDate}
@@ -287,25 +331,34 @@ export default function DailyLeadsPage() {
           loadLeads();
           loadSummary();
         }}
+        isDeleteMode={isDeleteMode}
+        onToggleDeleteMode={handleToggleDeleteMode}
       />
 
-      {/* ── Tab Bar (Positives vs JD Received) ────────────────────────────── */}
+      {/* ── Tab Bar (Positives vs JD Received) with Right Corner Delete Action ── */}
       <LeadsTabBar
         activeTab={activeTab}
         onTabChange={handleTabChange}
         positivesCount={summary.positives_count}
         jdCount={summary.jd_received_count}
+        totalRows={leads.length}
+        isDeleteMode={isDeleteMode}
         selectedCount={selectedIds.length}
+        isAllSelected={isAllSelected}
+        onToggleDeleteMode={handleToggleDeleteMode}
+        onToggleSelectAll={handleToggleSelectAll}
         onClearSelection={handleClearSelection}
         onBulkDelete={handleBulkDelete}
       />
 
       {/* ── Table Workspace ───────────────────────────────────────────────── */}
       <div className="flex-1 px-6 py-4">
-        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
+        <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-xs">
           <LeadsTable
             rows={leads}
             activeTab={activeTab}
+            selectedCollegeId={selectedCollegeId}
+            isDeleteMode={isDeleteMode}
             selectedIds={selectedIds}
             isAllSelected={isAllSelected}
             onToggleSelect={handleToggleSelect}
@@ -313,8 +366,6 @@ export default function DailyLeadsPage() {
             onClearSelection={handleClearSelection}
             onBulkDelete={handleBulkDelete}
             onUpdateRow={handleUpdateRow}
-            onMoveToJd={handleMoveToJd}
-            onDeleteRow={handleDeleteRow}
           />
         </div>
       </div>
@@ -324,7 +375,7 @@ export default function DailyLeadsPage() {
         <AddLeadModal
           initialLeadType={activeTab}
           initialCollegeId={selectedCollegeId}
-          initialDate={selectedDate}
+          initialDate={selectedDate === 'all' ? new Date().toISOString().split('T')[0] : selectedDate}
           coordinatorId={coordinatorId}
           onClose={() => setIsAddModalOpen(false)}
           onAdded={() => {
@@ -333,7 +384,6 @@ export default function DailyLeadsPage() {
           }}
         />
       )}
-
     </div>
   );
 }

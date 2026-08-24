@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { CollegeSelector, College } from '@/components/CollegeSelector';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
+import { SelectionModeBar } from '@/components/ui/SelectionModeBar';
 import { apiFetch } from '@/lib/api';
 
 interface Props {
@@ -26,6 +27,8 @@ interface Props {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   selectedCount: number;
+  isSelectionMode: boolean;
+  onToggleSelectionMode: () => void;
   onOpenAddModal: () => void;
   onEditSelected?: () => void;
   onDeleteSelected: () => void;
@@ -40,6 +43,8 @@ export function PendingTaskHeader({
   searchQuery,
   onSearchChange,
   selectedCount,
+  isSelectionMode,
+  onToggleSelectionMode,
   onOpenAddModal,
   onEditSelected,
   onDeleteSelected,
@@ -133,7 +138,7 @@ export function PendingTaskHeader({
           />
         </div>
 
-        {/* Right Actions: College Dropdown, Edit/Delete Selected, Refresh, Export, Add */}
+        {/* Right Actions: College Dropdown, Top Delete Toggle/Banner, Refresh, Export, Add */}
         <div className="flex items-center flex-wrap gap-2 shrink-0">
           {/* Dropdown list for picking college near the refresh button */}
           <div className="min-w-[200px]">
@@ -147,41 +152,25 @@ export function PendingTaskHeader({
             />
           </div>
 
-          {/* Edit Selected (Bulk Edit) */}
-          {selectedCount > 0 && onEditSelected && (
+          {/* Delete Mode Toggle or Active Controls */}
+          {!isSelectionMode ? (
             <button
               type="button"
-              onClick={onEditSelected}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg shadow-2xs transition-colors cursor-pointer animate-fadeIn"
+              onClick={onToggleSelectionMode}
+              title="Select rows to delete"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 border border-slate-200 rounded-lg shadow-2xs transition-colors cursor-pointer"
             >
-              <Edit3 size={14} />
-              <span>Edit ({selectedCount})</span>
+              <Trash2 size={14} className="text-slate-500 hover:text-rose-600" />
+              <span className="hidden sm:inline">Delete</span>
             </button>
+          ) : (
+            <SelectionModeBar
+              selectedCount={selectedCount}
+              onCancel={onToggleSelectionMode}
+              onDelete={onDeleteSelected}
+              onEdit={onEditSelected}
+            />
           )}
-
-          {/* Delete Selected (Bulk Delete) */}
-          {selectedCount > 0 && (
-            <button
-              type="button"
-              onClick={onDeleteSelected}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg shadow-2xs transition-colors cursor-pointer animate-fadeIn"
-            >
-              <Trash2 size={14} />
-              <span>Delete ({selectedCount})</span>
-            </button>
-          )}
-
-          {/* Refresh Button */}
-          <button
-            type="button"
-            onClick={onRefresh}
-            disabled={loading}
-            title="Refresh Table Data"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
-          >
-            <RefreshCw size={14} className={loading ? 'animate-spin text-indigo-600' : 'text-slate-500'} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
 
           {/* Export CSV */}
           <button

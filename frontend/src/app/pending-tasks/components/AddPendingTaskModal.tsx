@@ -15,6 +15,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { CharCountBadge } from '@/components/ui/CharCountBadge';
 import type { PendingTaskRow } from '../types';
 
 interface Props {
@@ -153,7 +154,13 @@ export function AddPendingTaskModal({
       return;
     }
     if (!actionToBeTaken.trim()) {
-      setErrorMessage('Action to be Taken is required.');
+      setErrorMessage('Remarks / Next Action is required.');
+      return;
+    }
+    if (actionToBeTaken.trim().length < 10) {
+      setErrorMessage(
+        `Remarks / Next Action must be at least 10 characters long (currently ${actionToBeTaken.trim().length}/10).`
+      );
       return;
     }
 
@@ -240,39 +247,29 @@ export function AddPendingTaskModal({
                 onFocus={() => {
                   if (companySuggestions.length > 0) setShowCompanyDropdown(true);
                 }}
-                placeholder="e.g. Zoho Corporation, Amazon..."
+                placeholder="Type or select company name..."
                 required
                 className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
               />
               {isSearchingCompany && (
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">
-                  searching...
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">
+                  Searching...
                 </span>
               )}
             </div>
 
-            {/* Suggestions Dropdown */}
+            {/* Autocomplete Dropdown */}
             {showCompanyDropdown && companySuggestions.length > 0 && (
-              <div
-                className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 max-h-48 overflow-y-auto py-1 no-scrollbar"
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-              >
-                {companySuggestions.map((c) => (
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 max-h-48 overflow-y-auto divide-y divide-slate-100">
+                {companySuggestions.map((comp) => (
                   <button
-                    key={c._id}
+                    key={comp._id}
                     type="button"
-                    onClick={() => handleSelectCompany(c)}
-                    className="w-full px-3 py-2 text-left text-xs hover:bg-indigo-50 flex items-center justify-between gap-2 transition-colors cursor-pointer"
+                    onClick={() => handleSelectCompany(comp)}
+                    className="w-full text-left px-3.5 py-2 text-xs hover:bg-indigo-50 flex items-center justify-between cursor-pointer"
                   >
-                    <div className="truncate">
-                      <span className="font-semibold text-slate-800">{c.company_name}</span>
-                      {c.domain && (
-                        <span className="ml-1.5 text-[10px] text-slate-400">({c.domain})</span>
-                      )}
-                    </div>
-                    {c.location && (
-                      <span className="text-[10px] text-slate-400 shrink-0">{c.location}</span>
-                    )}
+                    <span className="font-bold text-slate-900">{comp.company_name}</span>
+                    {comp.domain && <span className="text-slate-400 text-[11px]">{comp.domain}</span>}
                   </button>
                 ))}
               </div>
@@ -281,7 +278,6 @@ export function AddPendingTaskModal({
 
           {/* Row 2: JD Received Date & DB Shared Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* JD Received Date */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
                 JD Received Date
@@ -294,11 +290,9 @@ export function AddPendingTaskModal({
               />
             </div>
 
-            {/* DB Shared Date */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center justify-between">
-                <span>DB Shared Date</span>
-                {dbSharedDate && <span className="text-[10px] text-emerald-600 font-semibold">✓ Shared</span>}
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                DB Shared Date
               </label>
               <input
                 type="date"
@@ -337,25 +331,30 @@ export function AddPendingTaskModal({
             </div>
           </div>
 
-          {/* Row 4: Action to be Taken (Free text with quick suggestion chips) */}
+          {/* Row 4: Remarks / Next Action (Free text with minimum 10 characters and quick suggestions) */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs font-semibold text-slate-700">
-                Action to be Taken <span className="text-rose-500">*</span>
+                Remarks / Next Action <span className="text-rose-500">*</span>
               </label>
-              <span className="text-[10px] text-slate-400 font-medium">
-                Free text • Type manually or click a suggestion below
-              </span>
+              <div className="text-[10px] font-medium flex items-center gap-1.5">
+                <CharCountBadge length={actionToBeTaken.trim().length} min={10} />
+              </div>
             </div>
             <textarea
               value={actionToBeTaken}
               onChange={(e) => setActionToBeTaken(e.target.value)}
               rows={2}
-              placeholder="Type action manually (e.g., Database to be shared at the earliest, Drive date to be confirmed, etc.)..."
+              minLength={10}
+              placeholder="Type remarks or next action manually (min 10 chars, e.g., Database to be shared at the earliest, Drive date to be confirmed, etc.)..."
               required
-              className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none font-medium"
+              className={`w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:ring-2 resize-none font-medium transition-colors ${
+                actionToBeTaken.trim().length > 0 && actionToBeTaken.trim().length < 10
+                  ? 'border-amber-400 focus:border-amber-500 focus:ring-amber-500/20'
+                  : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20'
+              }`}
             />
-            {/* Quick-Click Suggestions for Action to be Taken */}
+            {/* Quick-Click Suggestions for Remarks / Next Action */}
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               {ACTION_SUGGESTIONS.map((opt) => (
                 <button
@@ -374,7 +373,7 @@ export function AddPendingTaskModal({
             </div>
           </div>
 
-          {/* Row 5: Drive Date & Remarks */}
+          {/* Row 5: Drive Date & Additional Notes */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -390,7 +389,7 @@ export function AddPendingTaskModal({
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Remarks / Notes
+                Additional Notes
               </label>
               <input
                 type="text"

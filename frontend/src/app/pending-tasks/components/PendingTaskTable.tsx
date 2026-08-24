@@ -19,6 +19,7 @@ import type { PendingTaskRow } from '../types';
 interface Props {
   tasks: PendingTaskRow[];
   selectedIds: string[];
+  isSelectionMode?: boolean;
   onToggleSelect: (id: string) => void;
   onToggleSelectAll: () => void;
   onEdit: (task: PendingTaskRow) => void;
@@ -31,6 +32,7 @@ interface Props {
 export function PendingTaskTable({
   tasks,
   selectedIds,
+  isSelectionMode = false,
   onToggleSelect,
   onToggleSelectAll,
   onEdit,
@@ -100,19 +102,21 @@ export function PendingTaskTable({
             {/* ── Table Header ────────────────────────────────────────── */}
             <thead>
               <tr className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider select-none">
-                {/* Select All Checkbox */}
-                <th className="w-10 px-3 py-3 text-center">
-                  <input
-                    type="checkbox"
-                    checked={isAllSelected}
-                    title={selectedIds.length === tasks.length ? 'Deselect all rows' : 'Select all rows'}
-                    ref={(el) => {
-                      if (el) el.indeterminate = isSomeSelected;
-                    }}
-                    onChange={onToggleSelectAll}
-                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                  />
-                </th>
+                {/* Select All Checkbox (Visible only in selection mode) */}
+                {isSelectionMode && (
+                  <th className="w-10 px-3 py-3 text-center">
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      title={selectedIds.length === tasks.length ? 'Deselect all rows' : 'Select all rows'}
+                      ref={(el) => {
+                        if (el) el.indeterminate = isSomeSelected;
+                      }}
+                      onChange={onToggleSelectAll}
+                      className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                  </th>
+                )}
 
                 {/* S.No */}
                 <th className="w-14 px-3 py-3 text-center">
@@ -139,9 +143,9 @@ export function PendingTaskTable({
                   Current Status
                 </th>
 
-                {/* Action to be Taken */}
+                {/* Remarks / Next Action */}
                 <th className="px-4 py-3 min-w-[240px]">
-                  Action to be Taken
+                  Remarks / Next Action
                 </th>
 
                 {/* Drive Date */}
@@ -150,7 +154,7 @@ export function PendingTaskTable({
                 </th>
 
                 {/* Actions */}
-                <th className="w-20 px-4 py-3 text-right">
+                <th className="w-16 px-4 py-3 text-right">
                   Actions
                 </th>
               </tr>
@@ -168,15 +172,17 @@ export function PendingTaskTable({
                       isSelected ? 'bg-indigo-50/60' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'
                     }`}
                   >
-                    {/* Checkbox */}
-                    <td className="px-3 py-3 text-center">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => onToggleSelect(task._id)}
-                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                      />
-                    </td>
+                    {/* Checkbox (Visible only in selection mode) */}
+                    {isSelectionMode && (
+                      <td className="px-3 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => onToggleSelect(task._id)}
+                          className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                        />
+                      </td>
+                    )}
 
                     {/* S.No */}
                     <td className="px-3 py-3 text-center font-mono font-semibold text-slate-500 text-xs">
@@ -221,7 +227,7 @@ export function PendingTaskTable({
                       </span>
                     </td>
 
-                    {/* Action to be Taken */}
+                    {/* Remarks / Next Action */}
                     <td className="px-4 py-3">
                       <div className="bg-indigo-50/60 border border-indigo-100 text-indigo-900 px-2.5 py-1 rounded-lg text-xs font-semibold max-w-[280px]">
                         {task.action_to_be_taken}
@@ -245,9 +251,9 @@ export function PendingTaskTable({
                       )}
                     </td>
 
-                    {/* Actions Column */}
+                    {/* Actions Column (Only Pen / Edit icon) */}
                     <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end">
                         <button
                           type="button"
                           onClick={() => onEdit(task)}
@@ -255,14 +261,6 @@ export function PendingTaskTable({
                           className="w-7 h-7 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition-colors cursor-pointer"
                         >
                           <Edit2 size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDelete(task)}
-                          title="Delete Task"
-                          className="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors cursor-pointer"
-                        >
-                          <Trash2 size={14} />
                         </button>
                       </div>
                     </td>

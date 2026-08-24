@@ -184,7 +184,17 @@ export function registerPendingTaskRoutes(app: Express) {
           success: false,
           error: {
             code: 'VALIDATION_ERROR',
-            message: 'college_id, company_name, and action_to_be_taken are required',
+            message: 'college_id, company_name, and Remarks / Next Action are required',
+          },
+        });
+      }
+
+      if (action_to_be_taken.trim().length < 10) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Remarks / Next Action must contain at least 10 characters',
           },
         });
       }
@@ -297,7 +307,18 @@ export function registerPendingTaskRoutes(app: Express) {
       if (db_shared_status !== undefined) existingTask.db_shared_status = db_shared_status;
       if (current_status !== undefined) existingTask.current_status = current_status;
       if (next_status !== undefined) existingTask.next_status = next_status;
-      if (action_to_be_taken !== undefined) existingTask.action_to_be_taken = action_to_be_taken;
+      if (action_to_be_taken !== undefined) {
+        if (action_to_be_taken.trim().length < 10) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'Remarks / Next Action must contain at least 10 characters',
+            },
+          });
+        }
+        existingTask.action_to_be_taken = action_to_be_taken.trim();
+      }
       if (drive_date !== undefined) existingTask.drive_date = drive_date ? new Date(drive_date) : null;
       if (remarks !== undefined) existingTask.remarks = remarks;
       if (is_completed !== undefined) existingTask.is_completed = Boolean(is_completed);
@@ -451,6 +472,15 @@ export function registerPendingTaskRoutes(app: Express) {
         setObj.db_shared_status = updates.db_shared_date ? 'Shared' : 'Pending';
       }
       if (updates.action_to_be_taken !== undefined && updates.action_to_be_taken.trim() !== '') {
+        if (updates.action_to_be_taken.trim().length < 10) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'Remarks / Next Action must contain at least 10 characters',
+            },
+          });
+        }
         setObj.action_to_be_taken = updates.action_to_be_taken.trim();
       }
       if (updates.current_status !== undefined && updates.current_status.trim() !== '') {

@@ -182,7 +182,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           <th>JD Received Date</th>
           <th>DB Shared Date</th>
           <th>Current Status</th>
-          <th>Action to be Taken</th>
+          <th>Remarks / Next Action</th>
           <th>Drive Date</th>
         </tr>
       `;
@@ -741,7 +741,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                       <th className="py-2 px-3">JD Received Date</th>
                       <th className="py-2 px-3">DB Shared Date</th>
                       <th className="py-2 px-3">Current Status</th>
-                      <th className="py-2 px-3">Action to be Taken</th>
+                      <th className="py-2 px-3">Remarks / Next Action</th>
                       <th className="py-2 px-3">Drive Date</th>
                       <th className="py-2 px-3">Remarks</th>
                     </tr>

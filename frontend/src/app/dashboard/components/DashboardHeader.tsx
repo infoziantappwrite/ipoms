@@ -133,17 +133,20 @@ export function DashboardHeader() {
     const handleUserUpdated = (e: CustomEvent<SessionUser>) => {
       if (e.detail) {
         setUser(e.detail);
-      } else {
-        refreshProfile();
       }
     };
 
+    const handleStorageChange = () => {
+      const u = readSessionUser();
+      if (u) setUser(u);
+    };
+
     window.addEventListener('ipoms_user_updated', handleUserUpdated as EventListener);
-    window.addEventListener('storage', refreshProfile);
+    window.addEventListener('storage', handleStorageChange);
 
     return () => {
       window.removeEventListener('ipoms_user_updated', handleUserUpdated as EventListener);
-      window.removeEventListener('storage', refreshProfile);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
