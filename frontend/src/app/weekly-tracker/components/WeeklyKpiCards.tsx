@@ -21,16 +21,6 @@ interface Props {
 export function WeeklyKpiCards({ kpi, activeSectionFilter, onFilterSection }: Props) {
   const cards = [
     {
-      key: 'follow_ups_due_today',
-      label: 'Follow-ups',
-      value: kpi.follow_ups_due_today,
-      textColor: 'text-amber-700',
-      bgLight: 'bg-amber-50',
-      borderCol: 'border-amber-200/80 hover:border-amber-300',
-      activeBorder: 'border-amber-500 bg-amber-50/80 ring-2 ring-amber-400/30',
-      Icon: Clock,
-    },
-    {
       key: 'completed',
       label: 'Completed',
       value: kpi.completed,
@@ -83,7 +73,7 @@ export function WeeklyKpiCards({ kpi, activeSectionFilter, onFilterSection }: Pr
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 w-full">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 w-full">
       {cards.map((c) => {
         const isActive = activeSectionFilter === c.key;
         const IconComponent = c.Icon;

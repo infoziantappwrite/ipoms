@@ -32,6 +32,7 @@ interface Props {
   rows: DailyLeadRow[];
   activeTab: 'positive' | 'jd_received';
   selectedIds: string[];
+  isAllSelected?: boolean;
   onToggleSelect: (id: string) => void;
   onToggleSelectAll: () => void;
   onClearSelection: () => void;
@@ -45,6 +46,7 @@ export function LeadsTable({
   rows,
   activeTab,
   selectedIds,
+  isAllSelected = false,
   onToggleSelect,
   onToggleSelectAll,
   onClearSelection,
@@ -53,9 +55,6 @@ export function LeadsTable({
   onMoveToJd,
   onDeleteRow,
 }: Props) {
-  const isAllSelected = rows.length > 0 && selectedIds.length === rows.length;
-  const isSomeSelected = selectedIds.length > 0 && selectedIds.length < rows.length;
-
   if (rows.length === 0) {
     return (
       <div className="py-16 text-center flex flex-col items-center justify-center gap-3">
@@ -80,35 +79,6 @@ export function LeadsTable({
 
   return (
     <div className="overflow-hidden">
-      {/* ── Top Bulk Actions Floating Banner ────────────────────────────── */}
-      {selectedIds.length > 0 && (
-        <div className="bg-gradient-to-r from-rose-50 via-red-50 to-orange-50 border-b border-rose-200 px-4 py-2.5 flex items-center justify-between animate-fadeIn">
-          <div className="flex items-center gap-2.5">
-            <span className="w-5 h-5 rounded-full bg-rose-600 text-white text-micro font-bold flex items-center justify-center shadow-xs">
-              {selectedIds.length}
-            </span>
-            <span className="text-xs font-bold text-slate-800">
-              {selectedIds.length} {selectedIds.length === 1 ? 'entry' : 'entries'} selected
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onClearSelection}
-              className="px-3 py-1 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer"
-            >
-              Clear Selection
-            </button>
-            <button
-              onClick={onBulkDelete}
-              className="px-3.5 py-1 bg-gradient-to-b from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 text-white text-xs font-bold rounded-lg shadow-xs border border-rose-700 flex items-center gap-1.5 active:translate-y-[1px] transition-all cursor-pointer"
-            >
-              <Trash2 size={13} strokeWidth={2.2} />
-              <span>Delete Selected ({selectedIds.length})</span>
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* ── Table Container ─────────────────────────────────────────────── */}
       <div className="overflow-x-auto">
         <table className="w-full text-xs text-left">
@@ -119,9 +89,6 @@ export function LeadsTable({
                 <input
                   type="checkbox"
                   checked={isAllSelected}
-                  ref={(input) => {
-                    if (input) input.indeterminate = isSomeSelected;
-                  }}
                   onChange={onToggleSelectAll}
                   className="rounded border-slate-300 text-primary focus:ring-primary w-4 h-4 cursor-pointer align-middle"
                   title="Select All"

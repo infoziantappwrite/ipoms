@@ -102,7 +102,6 @@ export function WeeklyTable({
             <th className="py-2.5 px-3 w-10 text-center">#</th>
             <th className="py-2.5 px-3 min-w-[220px] max-w-[280px] text-left">Company Name</th>
             <th className="py-2.5 px-3 min-w-[200px]">Role(s)</th>
-            <th className="py-2.5 px-3 min-w-[120px]">CDC Ref</th>
             <th className="py-2.5 px-3 min-w-[130px]">Type</th>
             <th className="py-2.5 px-3 min-w-[110px]">CTC</th>
             <th className="py-2.5 px-3 min-w-[140px]">Follow-Up</th>
@@ -235,27 +234,6 @@ function TableRow({
         )}
       </td>
 
-      {/* CDC Reference */}
-      <td className="py-2.5 px-3 text-fg-subtle">
-        {editingField === 'cdc_reference' ? (
-          <input
-            type="text"
-            value={tempValue}
-            onChange={(e) => setTempValue(e.target.value)}
-            onBlur={() => commitEdit('cdc_reference')}
-            onKeyDown={(e) => handleKeyDown(e, 'cdc_reference')}
-            autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white w-full"
-          />
-        ) : (
-          <span
-            onClick={() => startEdit('cdc_reference', row.cdc_reference)}
-            className="cursor-pointer hover:text-primary transition-colors"
-          >
-            {row.cdc_reference || <span className="text-fg-muted italic">—</span>}
-          </span>
-        )}
-      </td>
 
       {/* Company Type */}
       <td className="py-2.5 px-3 text-fg-subtle">

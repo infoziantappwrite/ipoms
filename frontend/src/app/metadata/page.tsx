@@ -7,8 +7,7 @@ import { ContactEditModal } from './components/ContactEditModal';
 import { DuplicateWarningModal } from './components/DuplicateWarningModal';
 import { BulkPasteModal } from './components/BulkPasteModal';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { apiFetch } from '@/lib/api';
 
 export default function MetadataPage() {
   const [companies, setCompanies] = useState<any[]>([]);
@@ -34,16 +33,17 @@ export default function MetadataPage() {
   const loadMetadata = useCallback(async () => {
     setLoading(true);
     try {
-      let url = `${API}/metadata?page=${page}&limit=50&is_deleted=${isRecycleBin}`;
-      if (searchQuery.trim()) url += `&q=${encodeURIComponent(searchQuery.trim())}`;
-      if (selectedType !== 'all') url += `&type=${selectedType}`;
+      let endpoint = `/metadata?page=${page}&limit=50&is_deleted=${isRecycleBin}`;
+      if (searchQuery.trim()) endpoint += `&q=${encodeURIComponent(searchQuery.trim())}`;
+      if (selectedType !== 'all') endpoint += `&type=${selectedType}`;
 
-      const res = await fetch(url);
-      const data = await res.json();
-      if (data.success) {
-        setCompanies(data.data.companies);
-        setTotalCount(data.data.total);
-        setTotalPages(data.data.totalPages || 1);
+      const res = await apiFetch<any>(endpoint);
+      if (res.success && res.data) {
+        setCompanies(res.data.companies || []);
+        setTotalCount(res.data.total || 0);
+        setTotalPages(res.data.totalPages || 1);
+      } else {
+        setCompanies([]);
       }
     } catch (err) {
       console.error('Failed to load metadata:', err);
@@ -86,10 +86,11 @@ export default function MetadataPage() {
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to move "${name}" to the Recycle Bin?`)) return;
     try {
-      const res = await fetch(`${API}/metadata/${id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (data.success) {
+      const res = await apiFetch(`/metadata/${id}`, { method: 'DELETE' });
+      if (res.success) {
         loadMetadata();
+      } else {
+        alert(res.error?.message || 'Delete failed');
       }
     } catch (err) {
       console.error('Delete metadata error:', err);
@@ -98,11 +99,12 @@ export default function MetadataPage() {
 
   const handleRestore = async (id: string, name: string) => {
     try {
-      const res = await fetch(`${API}/metadata/${id}/restore`, { method: 'POST' });
-      const data = await res.json();
-      if (data.success) {
+      const res = await apiFetch(`/metadata/${id}/restore`, { method: 'POST' });
+      if (res.success) {
         alert(`"${name}" restored successfully from Recycle Bin!`);
         loadMetadata();
+      } else {
+        alert(res.error?.message || 'Restore failed');
       }
     } catch (err) {
       console.error('Restore metadata error:', err);
@@ -112,10 +114,11 @@ export default function MetadataPage() {
   const handlePurge = async (id: string, name: string) => {
     if (!confirm(`⚠️ PERMANENT PURGE: Are you sure you want to completely delete "${name}" from the database? This cannot be undone.`)) return;
     try {
-      const res = await fetch(`${API}/metadata/${id}/purge`, { method: 'DELETE' });
-      const data = await res.json();
-      if (data.success) {
+      const res = await apiFetch(`/metadata/${id}/purge`, { method: 'DELETE' });
+      if (res.success) {
         loadMetadata();
+      } else {
+        alert(res.error?.message || 'Purge failed');
       }
     } catch (err) {
       console.error('Purge metadata error:', err);
@@ -133,19 +136,17 @@ export default function MetadataPage() {
   const handleContinueSaveDuplicate = async () => {
     if (!pendingSaveData) return;
     try {
-      const res = await fetch(`${API}/metadata`, {
+      const res = await apiFetch(`/metadata`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...pendingSaveData, force_save: true }),
       });
-      const data = await res.json();
-      if (data.success) {
+      if (res.success) {
         alert('Company contact saved successfully!');
         setShowDuplicateModal(false);
         setShowEditModal(false);
         loadMetadata();
       } else {
-        alert(data.error?.message || 'Save failed');
+        alert(res.error?.message || 'Save failed');
       }
     } catch (err) {
       console.error('Force save error:', err);
@@ -241,6 +242,8 @@ export default function MetadataPage() {
           <MetadataTable
             companies={companies}
             isRecycleBin={isRecycleBin}
+            page={page}
+            limit={50}
             onEdit={handleOpenEdit}
             onDelete={handleDelete}
             onRestore={handleRestore}

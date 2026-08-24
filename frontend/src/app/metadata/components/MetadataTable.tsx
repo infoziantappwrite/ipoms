@@ -1,10 +1,26 @@
 'use client';
 
-import { Building2, Pencil, Phone, RotateCcw, X } from 'lucide-react';
+import React from 'react';
+import { Pencil, Phone, RotateCcw, Trash2, X } from 'lucide-react';
+
+interface CompanyRecord {
+  _id: string;
+  company_name: string;
+  hr_name?: string;
+  hr_designation?: string;
+  primary_mobile?: string;
+  mobile_numbers?: string[];
+  primary_email?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 interface Props {
-  companies: any[];
+  companies: CompanyRecord[];
   isRecycleBin: boolean;
-  onEdit: (company: any) => void;
+  page?: number;
+  limit?: number;
+  onEdit: (company: CompanyRecord) => void;
   onDelete: (id: string, name: string) => void;
   onRestore: (id: string, name: string) => void;
   onPurge: (id: string, name: string) => void;
@@ -13,6 +29,8 @@ interface Props {
 export function MetadataTable({
   companies,
   isRecycleBin,
+  page = 1,
+  limit = 50,
   onEdit,
   onDelete,
   onRestore,
@@ -24,21 +42,21 @@ export function MetadataTable({
   };
 
   return (
-    <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-4">
+    <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-1 bg-surface">
       <div className="overflow-x-auto">
         <table className="w-full text-xs text-left">
           <thead>
-            <tr className="bg-background/90 text-fg-subtle font-semibold border-b border-border text-micro uppercase tracking-wider">
-              <th className="py-3.5 px-5 min-w-[220px] max-w-[280px] text-left">Company Name</th>
+            <tr className="bg-surface-sunken text-fg-subtle font-semibold border-b border-border text-micro uppercase tracking-wider">
+              <th className="py-3.5 px-4 w-12 text-center">#</th>
+              <th className="py-3.5 px-5 min-w-[200px] max-w-[280px] text-left">Company Name</th>
               <th className="py-3.5 px-4">HR Contact Person</th>
               <th className="py-3.5 px-4">Mobile Numbers</th>
               <th className="py-3.5 px-4">Email ID(s)</th>
-              <th className="py-3.5 px-4 text-center">Company Type</th>
-              <th className="py-3.5 px-4 text-center">Last Updated</th>
-              <th className="py-3.5 px-5 text-center">Actions</th>
+              <th className="py-3.5 px-4 text-center whitespace-nowrap min-w-[110px]">Last Updated</th>
+              <th className="py-3.5 px-5 text-center whitespace-nowrap">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border/50">
+          <tbody className="divide-y divide-border/60">
             {companies.length === 0 ? (
               <tr>
                 <td colSpan={7} className="py-12 text-center text-fg-subtle">
@@ -46,125 +64,128 @@ export function MetadataTable({
                 </td>
               </tr>
             ) : (
-              companies.map((c) => (
-                <tr key={c._id} className="hover:bg-surface/30 transition-colors">
-                  {/* Company Name */}
-                  <td className="py-3 px-5 font-bold text-white min-w-[220px] max-w-[280px] break-words leading-tight">
-                    <Building2 size={14} strokeWidth={2} aria-hidden />
-                    {c.company_name}
-                  </td>
+              companies.map((c, idx) => {
+                const serialNo = (page - 1) * limit + idx + 1;
+                return (
+                  <tr key={c._id} className="hover:bg-surface-sunken/60 transition-colors">
+                    {/* Serial Number (#) */}
+                    <td className="py-3.5 px-4 text-center font-mono text-fg-subtle text-[11px] font-semibold">
+                      {serialNo}
+                    </td>
 
-                  {/* HR Contact */}
-                  <td className="py-3 px-4 text-fg">
-                    <div className="font-semibold">{c.hr_name || '—'}</div>
-                    {c.hr_designation && (
-                      <span className="text-micro text-fg-subtle block">{c.hr_designation}</span>
-                    )}
-                  </td>
+                    {/* Company Name */}
+                    <td className="py-3.5 px-5 font-bold text-fg min-w-[200px] max-w-[280px] break-words leading-tight text-xs">
+                      {c.company_name}
+                    </td>
 
-                  {/* Mobile Numbers with click-to-copy */}
-                  <td className="py-3 px-4">
-                    <div className="flex flex-wrap gap-1">
-                      {c.primary_mobile ? (
-                        <button
-                          type="button"
-                          onClick={() => copyToClipboard(c.primary_mobile)}
-                          className="bg-surface/80 hover:bg-surface-raised text-fg px-2 py-0.5 rounded font-mono text-micro border border-border-strong transition-colors"
-                          title="Click to copy number"
+                    {/* HR Contact */}
+                    <td className="py-3.5 px-4 text-fg">
+                      <div className="font-semibold text-fg">{c.hr_name || '—'}</div>
+                      {c.hr_designation && (
+                        <span className="text-micro text-fg-subtle block mt-0.5">{c.hr_designation}</span>
+                      )}
+                    </td>
+
+                    {/* Mobile Numbers with click-to-copy */}
+                    <td className="py-3.5 px-4">
+                      <div className="flex flex-wrap gap-1.5">
+                        {c.primary_mobile ? (
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(c.primary_mobile!)}
+                            className="bg-surface-sunken hover:bg-surface text-fg px-2 py-0.5 rounded-md font-mono text-micro border border-border transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                            title="Click to copy number"
+                          >
+                            <Phone size={12} strokeWidth={2} className="text-primary shrink-0" aria-hidden />
+                            <span>{c.primary_mobile}</span>
+                          </button>
+                        ) : (
+                          <span className="text-fg-subtle">—</span>
+                        )}
+                        {c.mobile_numbers
+                          ?.filter((m: string) => m !== c.primary_mobile)
+                          .map((m: string, i: number) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => copyToClipboard(m)}
+                              className="bg-surface-sunken/50 hover:bg-surface text-fg-subtle hover:text-fg px-1.5 py-0.5 rounded-md font-mono text-micro border border-border/80 transition-colors cursor-pointer"
+                              title="Click to copy alternate number"
+                            >
+                              {m}
+                            </button>
+                          ))}
+                      </div>
+                    </td>
+
+                    {/* Email ID(s) */}
+                    <td className="py-3.5 px-4 text-fg-muted font-mono text-micro">
+                      {c.primary_email ? (
+                        <a
+                          href={`mailto:${c.primary_email}`}
+                          className="text-primary hover:underline underline-offset-2 font-medium"
                         >
-                          <Phone size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}{c.primary_mobile}
-                        </button>
+                          {c.primary_email}
+                        </a>
                       ) : (
                         <span className="text-fg-subtle">—</span>
                       )}
-                      {c.mobile_numbers
-                        ?.filter((m: string) => m !== c.primary_mobile)
-                        .map((m: string, i: number) => (
+                    </td>
+
+                    {/* Audit Trail (Spec Section 15) */}
+                    <td className="py-3.5 px-4 text-center text-micro text-fg-subtle font-mono whitespace-nowrap">
+                      {new Date(c.updated_at || c.created_at || '').toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="py-3.5 px-5 text-center">
+                      {!isRecycleBin ? (
+                        <div className="flex items-center justify-center gap-1.5">
                           <button
-                            key={i}
                             type="button"
-                            onClick={() => copyToClipboard(m)}
-                            className="bg-background hover:bg-surface text-fg-subtle px-1.5 py-0.5 rounded font-mono text-micro border border-border"
-                            title="Click to copy alternate number"
+                            onClick={() => onEdit(c)}
+                            className="w-7 h-7 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                            title="Edit Company Details"
                           >
-                            {m}
+                            <Pencil size={13} strokeWidth={2} aria-hidden />
                           </button>
-                        ))}
-                    </div>
-                  </td>
-
-                  {/* Email ID(s) */}
-                  <td className="py-3 px-4 text-fg-muted font-mono text-micro">
-                    {c.primary_email ? (
-                      <a
-                        href={`mailto:${c.primary_email}`}
-                        className="text-primary hover:text-primary underline underline-offset-2"
-                      >
-                        {c.primary_email}
-                      </a>
-                    ) : (
-                      <span className="text-fg-subtle">—</span>
-                    )}
-                  </td>
-
-                  {/* Company Type Badge (Spec Section 13) */}
-                  <td className="py-3 px-4 text-center">
-                    <span className="text-micro bg-surface text-fg-muted px-2.5 py-1 rounded-full border border-border-strong capitalize font-medium">
-                      {(c.company_type || 'other').replace('_', ' ')}
-                    </span>
-                  </td>
-
-                  {/* Audit Trail (Spec Section 15) */}
-                  <td className="py-3 px-4 text-center text-micro text-fg-subtle font-mono">
-                    {new Date(c.updated_at || c.created_at).toLocaleDateString('en-IN', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                  </td>
-
-                  {/* Actions */}
-                  <td className="py-3 px-5 text-center">
-                    {!isRecycleBin ? (
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => onEdit(c)}
-                          className="bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 px-2.5 py-1 rounded text-micro font-semibold transition-colors"
-                        >
-                          <Pencil size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDelete(c._id, c.company_name)}
-                          className="bg-destructive/10 hover:bg-destructive/20 text-destructive border border-destructive/20 px-2 py-1 rounded text-micro font-semibold transition-colors"
-                          title="Move to Recycle Bin"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => onRestore(c._id, c.company_name)}
-                          className="bg-success/20 hover:bg-success/30 text-success border border-success/30 px-2.5 py-1 rounded text-micro font-semibold transition-colors"
-                        >
-                          <RotateCcw size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}Restore
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onPurge(c._id, c.company_name)}
-                          className="bg-destructive/20 hover:bg-destructive/40 text-destructive border border-destructive/30 px-2 py-1 rounded text-micro font-bold transition-colors"
-                          title="Permanently Purge"
-                        >
-                          <X size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}Purge
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))
+                          <button
+                            type="button"
+                            onClick={() => onDelete(c._id, c.company_name)}
+                            className="w-7 h-7 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 border border-rose-500/20 flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                            title="Move to Recycle Bin"
+                          >
+                            <Trash2 size={13} strokeWidth={2} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => onRestore(c._id, c.company_name)}
+                            className="w-7 h-7 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 border border-emerald-500/20 flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                            title="Restore Contact"
+                          >
+                            <RotateCcw size={13} strokeWidth={2} aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onPurge(c._id, c.company_name)}
+                            className="w-7 h-7 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-600 border border-rose-500/30 flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                            title="Permanently Purge"
+                          >
+                            <X size={13} strokeWidth={2} aria-hidden />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

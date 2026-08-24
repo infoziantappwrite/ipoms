@@ -12,7 +12,10 @@ import { ChatNotificationToast } from './chat/ChatNotificationToast';
 const CHROMELESS = ['/', '/login', '/signup'];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const rawPathname = usePathname();
+  // next.config.mjs sets trailingSlash: true (for the Capacitor static export),
+  // so usePathname() returns "/login/" not "/login" — normalize before matching.
+  const pathname = rawPathname.length > 1 ? rawPathname.replace(/\/$/, '') : rawPathname;
   const [mobileOpen, setMobileOpen] = useState(false);
   // Stable identity: the sidebar closes on route change via an effect keyed to
   // this callback, so a fresh function each render would re-fire it endlessly.

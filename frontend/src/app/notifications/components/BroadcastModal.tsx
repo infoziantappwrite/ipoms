@@ -177,7 +177,7 @@ export function BroadcastModal({ onClose, onSuccess }: Props) {
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Urgent: Update CDC references before 5:00 PM"
+              placeholder="e.g. Urgent: Update tracker records before 5:00 PM"
               className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 placeholder:text-slate-400 text-xs transition-colors shadow-xs"
             />
           </div>

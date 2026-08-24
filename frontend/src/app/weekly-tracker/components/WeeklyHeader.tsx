@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { BarChart3, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BarChart3, ChevronLeft, ChevronRight, Plus, RefreshCw, RotateCw, FileSpreadsheet } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { CollegeSelector, College } from '@/components/CollegeSelector';
 import { apiFetch } from '@/lib/api';
@@ -11,6 +11,12 @@ interface Props {
   onSelectCollege: (id: string, name: string) => void;
   weekOffset: number;
   onWeekChange: (offset: number) => void;
+  onOpenAddModal?: () => void;
+  onSyncDailyPositives?: () => void;
+  onRefresh?: () => void;
+  onExportCsv?: () => void;
+  searchQuery?: string;
+  onSearchChange?: (q: string) => void;
 }
 
 // Calculate Month-wise Friday-to-Friday week display (e.g., "August 2026 • Week 3: 21 Aug 2026 – 27 Aug 2026")
@@ -58,6 +64,12 @@ export function WeeklyHeader({
   onSelectCollege,
   weekOffset,
   onWeekChange,
+  onOpenAddModal,
+  onSyncDailyPositives,
+  onRefresh,
+  onExportCsv,
+  searchQuery,
+  onSearchChange,
 }: Props) {
   const [selectedCollegeObj, setSelectedCollegeObj] = useState<College | null>(null);
 
@@ -122,7 +134,7 @@ export function WeeklyHeader({
         </div>
       </div>
 
-      {/* ── Bottom Controls Row: Monthly-wise Week Selector & College Filter ── */}
+      {/* ── Bottom Controls Row: Monthly-wise Week Selector, Action Buttons & College Filter ── */}
       <div className="flex items-center justify-between gap-4 flex-wrap pt-2 border-t border-slate-100">
         
         {/* Month-wise Friday-to-Friday Week Selector */}
@@ -171,6 +183,74 @@ export function WeeklyHeader({
             </button>
           )}
         </div>
+
+        {/* ── Icon-Only Action Buttons & Search next to icons ── */}
+        {selectedCollegeId && (
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              {onOpenAddModal && (
+                <button
+                  type="button"
+                  onClick={onOpenAddModal}
+                  className="w-8 h-8 bg-[#1e3a8a] hover:bg-[#172554] text-white rounded-lg flex items-center justify-center shadow-xs transition-colors cursor-pointer"
+                  title="Add Company"
+                  aria-label="Add Company"
+                >
+                  <Plus size={16} strokeWidth={2.5} />
+                </button>
+              )}
+
+              {onSyncDailyPositives && (
+                <button
+                  type="button"
+                  onClick={onSyncDailyPositives}
+                  className="w-8 h-8 bg-[#4f46e5] hover:bg-[#4338ca] text-white rounded-lg flex items-center justify-center shadow-xs transition-colors cursor-pointer"
+                  title="Sync Daily Positives"
+                  aria-label="Sync Daily Positives"
+                >
+                  <RefreshCw size={15} strokeWidth={2.5} />
+                </button>
+              )}
+
+              {onRefresh && (
+                <button
+                  type="button"
+                  onClick={onRefresh}
+                  className="w-8 h-8 bg-[#fef3c7] hover:bg-[#fde68a] text-[#78350f] border border-[#fde68a] rounded-lg flex items-center justify-center shadow-xs transition-colors cursor-pointer"
+                  title="Refresh"
+                  aria-label="Refresh"
+                >
+                  <RotateCw size={15} strokeWidth={2.5} />
+                </button>
+              )}
+
+              {onExportCsv && (
+                <button
+                  type="button"
+                  onClick={onExportCsv}
+                  className="w-8 h-8 bg-[#047857] hover:bg-[#065f46] text-white rounded-lg flex items-center justify-center shadow-xs transition-colors cursor-pointer"
+                  title="Export CSV"
+                  aria-label="Export CSV"
+                >
+                  <FileSpreadsheet size={15} strokeWidth={2.5} />
+                </button>
+              )}
+            </div>
+
+            {/* Search Input next to icons */}
+            {onSearchChange && (
+              <div className="w-52 sm:w-60">
+                <input
+                  type="text"
+                  placeholder="Search company, role, status…"
+                  value={searchQuery || ''}
+                  onChange={(e) => onSearchChange(e.target.value)}
+                  className="w-full bg-white border border-slate-300 text-slate-800 text-xs px-3 py-1.5 rounded-xl shadow-2xs placeholder:text-slate-400 outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Smart Auto-Shrinking College Selector */}
         <CollegeSelector

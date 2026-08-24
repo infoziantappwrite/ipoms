@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from 'react';
 import { ChevronDown, Search, Check, Building2, Globe } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
+import { setActiveCollege } from '@/lib/collegeSession';
+
 export interface College {
   _id: string;
   college_name: string;
@@ -88,6 +90,7 @@ export function CollegeSelector({
   });
 
   const handleSelectCollege = (college: College) => {
+    setActiveCollege(college._id, college.college_name, college);
     onSelect(college._id, college.college_name);
     if (onSelectCollege) onSelectCollege(college);
     setIsOpen(false);

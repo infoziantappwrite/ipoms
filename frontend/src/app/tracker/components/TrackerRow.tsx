@@ -195,12 +195,17 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onSkip, onCall }: Props)
   const handleOutcomeChange = useCallback((value: string) => {
     if (!value) return;
     const outcome = value as CallOutcome;
-    if (outcome !== 'follow_up') {
-      onUpdate({ outcome_status: outcome, follow_up_month: null });
-    } else {
-      onUpdate({ outcome_status: outcome });
+    const now = nowISO();
+    const startTimePatch = !row.call_start_time ? { call_start_time: now } : {};
+    if (startTimeRef.current && !startTimeRef.current.value) {
+      startTimeRef.current.value = formatTime(now);
     }
-  }, [onUpdate]);
+    if (outcome !== 'follow_up') {
+      onUpdate({ ...startTimePatch, outcome_status: outcome, follow_up_month: null });
+    } else {
+      onUpdate({ ...startTimePatch, outcome_status: outcome });
+    }
+  }, [onUpdate, row.call_start_time]);
 
   // ── Follow Up Month selection (Only enabled when outcome === follow_up)
   const handleMonthChange = useCallback((month: string) => {
@@ -229,7 +234,7 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onSkip, onCall }: Props)
   return (
     <div
       data-row-id={row._id}
-      className={`flex items-start gap-1 px-2 py-2 min-h-[42px] text-xs ${rowBg} hover:bg-surface/30 transition-colors group`}
+      className={`flex items-start gap-1 px-2 py-2 min-h-[42px] text-xs ${rowBg} hover:bg-surface-sunken/40 transition-colors group w-full min-w-fit`}
     >
       {/* S.No / # */}
       <div className="w-12 px-1 text-center text-fg-subtle shrink-0 tabular-nums">{row.serial_no}</div>
@@ -303,7 +308,7 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onSkip, onCall }: Props)
         )}
       </div>
 
-      {/* Call Outcome / Status — mandatory before row complete (Spec 12) */}
+      {/* Call Status — mandatory before row complete (Spec 12) */}
       <div className="w-44 shrink-0">
         {isReadOnly ? (
           <OutcomeBadge outcome={row.outcome_status} />
@@ -316,7 +321,7 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onSkip, onCall }: Props)
                         cursor-pointer
                         ${row.outcome_status ? getOutcomeColor(row.outcome_status) : 'text-fg-subtle'}`}
           >
-            <option value="">— Select Outcome —</option>
+            <option value="">— Select Call Status —</option>
             {OUTCOMES.map((o) => (
               <option key={o.value} value={o.value} className={o.color}>
                 {o.label}

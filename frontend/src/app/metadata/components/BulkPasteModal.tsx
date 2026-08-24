@@ -1,9 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { ClipboardList, Search } from 'lucide-react';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { ClipboardList, Search, X } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 
 interface Props {
   onClose: () => void;
@@ -40,17 +39,15 @@ export function BulkPasteModal({ onClose, onSuccess }: Props) {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API}/metadata/bulk-import`, {
+      const res = await apiFetch<any>(`/metadata/bulk-import`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rows: parsedRows }),
       });
-      const data = await res.json();
-      if (data.success) {
-        setImportResult(data.data);
+      if (res.success && res.data) {
+        setImportResult(res.data);
         onSuccess();
       } else {
-        alert(data.error?.message || 'Import failed');
+        alert(res.error?.message || 'Import failed');
       }
     } catch (err) {
       console.error('Bulk import error:', err);
@@ -60,26 +57,31 @@ export function BulkPasteModal({ onClose, onSuccess }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 scrim flex items-center justify-center z-50 p-4">
-      <div className="glass-panel rounded-2xl w-full max-w-2xl border border-border-strong shadow-4 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+      <div className="bg-surface text-fg rounded-2xl w-full max-w-2xl border border-border shadow-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto animate-scaleIn">
 
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-border pb-3">
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <ClipboardList size={14} strokeWidth={2} aria-hidden /> Bulk Paste Excel Contacts (Fast Importer)
+        <div className="flex items-center justify-between border-b border-border pb-3.5">
+          <h3 className="text-sm font-bold text-fg flex items-center gap-2">
+            <ClipboardList size={16} strokeWidth={2} className="text-primary" aria-hidden />
+            Bulk Paste Excel Contacts (Fast Importer)
           </h3>
-          <button onClick={onClose} className="text-fg-subtle hover:text-white text-base">
-            ✕
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="w-7 h-7 rounded-lg hover:bg-surface-sunken text-fg-subtle hover:text-fg flex items-center justify-center transition-colors cursor-pointer"
+          >
+            <X size={16} strokeWidth={2} />
           </button>
         </div>
 
         {/* Instructions */}
-        <div className="p-3 bg-background/60 rounded-xl border border-border text-micro text-fg-muted space-y-1">
+        <div className="p-3 bg-surface-sunken rounded-xl border border-border text-xs text-fg-muted space-y-1">
           <p className="font-semibold text-primary">💡 Excel Copy-Paste Instructions:</p>
-          <p>
+          <p className="text-[11px]">
             Copy rows directly from your Excel sheet and paste below. Expected columns:
-            <code className="text-fg bg-surface px-1 py-0.5 rounded font-mono ml-1">
-              Company Name | HR Name | Mobile Number | Email ID | Industry
+            <code className="text-fg bg-surface px-1.5 py-0.5 rounded font-mono ml-1 border border-border text-micro">
+              Company Name | HR Name | Mobile Number | Email ID
             </code>
           </p>
         </div>
@@ -88,7 +90,7 @@ export function BulkPasteModal({ onClose, onSuccess }: Props) {
           <>
             {/* Raw Text Input */}
             <div>
-              <label className="block text-fg-muted font-semibold mb-1 text-xs">
+              <label className="block text-xs font-semibold text-fg-muted mb-1">
                 Paste Excel Rows Here:
               </label>
               <textarea
@@ -98,9 +100,9 @@ export function BulkPasteModal({ onClose, onSuccess }: Props) {
                   setRawText(e.target.value);
                   setParsedRows([]);
                 }}
-                placeholder="Google	Sundar Pichai	9876543210	hr@google.com	software
-Amazon	Andy Jassy	9876543211	hr@amazon.com	software"
-                className="w-full bg-background border border-border-strong rounded-xl p-3 text-xs text-fg font-mono "
+                placeholder="Google	Sundar Pichai	9876543210	hr@google.com
+Amazon	Andy Jassy	9876543211	hr@amazon.com"
+                className="w-full bg-surface-sunken border border-border rounded-lg p-3 text-xs text-fg font-mono placeholder:text-fg-subtle/60 focus:bg-surface focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
               />
             </div>
 
@@ -108,9 +110,10 @@ Amazon	Andy Jassy	9876543211	hr@amazon.com	software"
               <button
                 type="button"
                 onClick={handleParse}
-                className="px-4 py-2 bg-surface hover:bg-surface-raised text-primary border border-primary/30 rounded-xl text-xs font-semibold"
+                className="px-4 py-2 bg-surface hover:bg-surface-sunken text-primary border border-primary/20 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
               >
-                <Search size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}Parse & Preview Rows ({rawText.trim().split('\n').length})
+                <Search size={14} strokeWidth={2} className="inline mr-1.5 shrink-0" aria-hidden />
+                Parse & Preview Rows ({rawText.trim().split('\n').length})
               </button>
             )}
 
@@ -126,7 +129,7 @@ Amazon	Andy Jassy	9876543211	hr@amazon.com	software"
                       setParsedRows([]);
                       setRawText('');
                     }}
-                    className="text-micro text-fg-subtle hover:text-white"
+                    className="text-micro text-fg-subtle hover:text-fg cursor-pointer transition-colors"
                   >
                     Clear
                   </button>
@@ -134,7 +137,7 @@ Amazon	Andy Jassy	9876543211	hr@amazon.com	software"
 
                 <div className="max-h-48 overflow-y-auto border border-border rounded-xl overflow-hidden">
                   <table className="w-full text-micro text-left">
-                    <thead className="bg-background text-fg-subtle border-b border-border">
+                    <thead className="bg-surface-sunken text-fg-subtle border-b border-border">
                       <tr>
                         <th className="py-2 px-3">#</th>
                         <th className="py-2 px-3">Company</th>
@@ -145,9 +148,9 @@ Amazon	Andy Jassy	9876543211	hr@amazon.com	software"
                     </thead>
                     <tbody className="divide-y divide-border/60 text-fg-muted font-mono">
                       {parsedRows.map((r, idx) => (
-                        <tr key={idx} className="hover:bg-surface/30">
+                        <tr key={idx} className="hover:bg-surface-sunken/40">
                           <td className="py-1.5 px-3 text-fg-subtle">{idx + 1}</td>
-                          <td className="py-1.5 px-3 font-sans font-semibold text-white">{r.company_name}</td>
+                          <td className="py-1.5 px-3 font-sans font-semibold text-fg">{r.company_name}</td>
                           <td className="py-1.5 px-3 font-sans">{r.hr_name || '—'}</td>
                           <td className="py-1.5 px-3">{r.primary_mobile || '—'}</td>
                           <td className="py-1.5 px-3">{r.primary_email || '—'}</td>
@@ -164,45 +167,37 @@ Amazon	Andy Jassy	9876543211	hr@amazon.com	software"
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 bg-surface hover:bg-surface-raised text-fg-muted rounded-xl text-xs font-medium"
+                className="px-4 py-2 bg-surface hover:bg-surface-sunken text-fg-muted hover:text-fg rounded-lg text-xs font-medium border border-border transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                disabled={parsedRows.length === 0 || loading}
+                disabled={loading || parsedRows.length === 0}
                 onClick={handleImport}
-                className="px-5 py-2 bg-primary hover:bg-primary disabled:opacity-40 text-white rounded-xl text-xs font-bold shadow-2 transition-colors"
+                className="px-5 py-2 bg-primary hover:bg-primary/90 disabled:opacity-40 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
               >
-                {loading ? 'Importing…' : `Import ${parsedRows.length} Contacts 🚀`}
+                {loading ? 'Importing…' : `Import ${parsedRows.length} Contacts`}
               </button>
             </div>
           </>
         ) : (
-          /* Import Results Screen */
+          /* Success Report */
           <div className="space-y-4 text-xs">
-            <div className="p-4 bg-success/20 border border-success/40 rounded-xl space-y-1">
-              <h4 className="font-bold text-success text-sm flex items-center gap-1.5">
-                <span>🎉</span> Bulk Import Finished!
-              </h4>
-              <p className="text-fg-muted">
-                Successfully imported <strong className="text-success">{importResult.imported_count}</strong> new corporate contacts.
-              </p>
-              {importResult.skipped_count > 0 && (
-                <p className="text-warning">
-                  Skipped {importResult.skipped_count} row(s) due to missing company names or exact duplicates.
-                </p>
-              )}
+            <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-700 dark:text-emerald-300 space-y-1">
+              <p className="font-bold text-sm">✅ Bulk Import Finished</p>
+              <p>Total rows processed: {importResult.total_processed}</p>
+              <p>Successfully inserted: {importResult.inserted_count}</p>
+              <p>Updated existing: {importResult.updated_count}</p>
+              <p>Duplicates / Skipped: {importResult.skipped_count}</p>
             </div>
 
-            {importResult.errors?.length > 0 && (
-              <div className="space-y-1.5">
-                <span className="font-bold text-fg-muted">Skipped Rows Details:</span>
-                <div className="max-h-36 overflow-y-auto bg-background p-3 rounded-xl border border-border font-mono text-micro text-fg-subtle space-y-1">
-                  {importResult.errors.map((e: any, i: number) => (
-                    <div key={i}>
-                      Row #{e.row_number} [{e.company_name}]: <span className="text-destructive">{e.reason}</span>
-                    </div>
+            {importResult.skipped_companies?.length > 0 && (
+              <div className="space-y-1">
+                <p className="font-semibold text-fg-muted">Skipped Companies (Already Existed):</p>
+                <div className="max-h-32 overflow-y-auto p-2 bg-surface-sunken border border-border rounded-lg text-micro font-mono text-fg-subtle">
+                  {importResult.skipped_companies.map((name: string, i: number) => (
+                    <div key={i}>• {name}</div>
                   ))}
                 </div>
               </div>
@@ -211,10 +206,13 @@ Amazon	Andy Jassy	9876543211	hr@amazon.com	software"
             <div className="flex justify-end pt-2">
               <button
                 type="button"
-                onClick={onClose}
-                className="px-5 py-2 bg-primary hover:bg-primary text-white rounded-xl font-bold text-xs"
+                onClick={() => {
+                  onClose();
+                  setImportResult(null);
+                }}
+                className="px-5 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg font-semibold text-xs transition-colors cursor-pointer"
               >
-                Done & Close
+                Done
               </button>
             </div>
           </div>

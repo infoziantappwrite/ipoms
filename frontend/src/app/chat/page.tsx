@@ -658,15 +658,8 @@ export default function TeamChatPage() {
                 {/* Chats List */}
                 <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                   {filteredDirectChats.length === 0 ? (
-                    <div className="p-6 text-center text-fg-subtle text-xs space-y-2.5">
-                      <p>No chats yet. Click <span className="font-bold text-primary">+ New Chat</span> to start messaging!</p>
-                      <button
-                        type="button"
-                        onClick={() => setShowNewChatModal(true)}
-                        className="px-3.5 py-1.5 rounded-xl bg-primary text-white font-bold text-xs shadow-xs hover:bg-primary/90 transition-all hover:scale-105 active:scale-95 cursor-pointer"
-                      >
-                        + New Chat
-                      </button>
+                    <div className="p-6 text-center text-fg-subtle text-xs">
+                      <p>No chats yet . Click <span className="font-bold text-primary">+</span> to start messaging</p>
                     </div>
                   ) : (
                     filteredDirectChats.map((c) => {

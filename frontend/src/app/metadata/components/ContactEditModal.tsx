@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Plus, Pencil, X, Building2 } from 'lucide-react';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { apiFetch } from '@/lib/api';
 
 interface Props {
   initialData?: any | null;
@@ -72,31 +71,27 @@ export function ContactEditModal({
         force_save: forceSave,
       };
 
-      const url = isEditing ? `${API}/metadata/${initialData._id}` : `${API}/metadata`;
+      const endpoint = isEditing ? `/metadata/${initialData._id}` : `/metadata`;
       const method = isEditing ? 'PATCH' : 'POST';
 
-      const res = await fetch(url, {
+      const res = await apiFetch<any>(endpoint, {
         method,
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
-
-      if (res.status === 409) {
-        // Duplicate detected (Spec Section 7 & 11)
-        const isExact = data.error?.code === 'EXACT_DUPLICATE';
-        onDuplicateFound(data.error?.existing_record, payload, isExact);
+      if (res.error?.code === 'DUPLICATE_COMPANY' || res.error?.code === 'EXACT_DUPLICATE' || (res as any).status === 409) {
+        const isExact = res.error?.code === 'EXACT_DUPLICATE';
+        onDuplicateFound((res.error as any)?.existing_record, payload, isExact);
         setLoading(false);
         return;
       }
 
-      if (data.success) {
+      if (res.success) {
         alert(isEditing ? 'Company details updated!' : 'Company contact created successfully!');
         onSuccess();
         onClose();
       } else {
-        alert(data.error?.message || 'Operation failed');
+        alert(res.error?.message || 'Operation failed');
       }
     } catch (err) {
       console.error('Save metadata error:', err);
@@ -106,11 +101,11 @@ export function ContactEditModal({
   };
 
   return (
-    <div className="fixed inset-0 scrim flex items-center justify-center z-50 p-4">
-      <div className="glass-panel rounded-2xl w-full max-w-xl border border-border-strong shadow-4 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+      <div className="bg-surface text-fg rounded-2xl w-full max-w-xl border border-border shadow-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto animate-scaleIn">
 
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border pb-3">
+        <div className="flex items-center justify-between border-b border-border pb-3.5">
           <h3 className="text-sm font-bold text-fg flex items-center gap-2">
             {isEditing ? (
               <Pencil size={16} strokeWidth={2} className="text-primary" aria-hidden />
@@ -119,7 +114,11 @@ export function ContactEditModal({
             )}
             {isEditing ? 'Edit Company & HR Contact' : 'Add New Company & HR Contact'}
           </h3>
-          <button onClick={onClose} aria-label="Close" className="text-fg-subtle hover:text-fg transition-colors">
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="w-7 h-7 rounded-lg hover:bg-surface-sunken text-fg-subtle hover:text-fg flex items-center justify-center transition-colors cursor-pointer"
+          >
             <X size={16} strokeWidth={2} />
           </button>
         </div>
@@ -129,23 +128,23 @@ export function ContactEditModal({
           {/* Company Name & Type Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-fg-muted font-semibold mb-1">Company Name *</label>
+              <label className="block text-xs font-semibold text-fg-muted mb-1">Company Name *</label>
               <input
                 type="text"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 placeholder="e.g. Infosys, TCS, Microsoft"
-                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
+                className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-xs text-fg placeholder:text-fg-subtle/60 focus:bg-surface focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-fg-muted font-semibold mb-1">Company Industry Type</label>
+              <label className="block text-xs font-semibold text-fg-muted mb-1">Company Industry Type</label>
               <select
                 value={companyType}
                 onChange={(e) => setCompanyType(e.target.value)}
-                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg cursor-pointer"
+                className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-xs text-fg focus:bg-surface focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all cursor-pointer"
               >
                 {companyTypes.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -159,24 +158,24 @@ export function ContactEditModal({
           {/* HR Name & Designation Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-fg-muted font-semibold mb-1">HR Contact Person Name</label>
+              <label className="block text-xs font-semibold text-fg-muted mb-1">HR Contact Person Name</label>
               <input
                 type="text"
                 value={hrName}
                 onChange={(e) => setHrName(e.target.value)}
                 placeholder="e.g. Rajesh Sharma"
-                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
+                className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-xs text-fg placeholder:text-fg-subtle/60 focus:bg-surface focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
               />
             </div>
 
             <div>
-              <label className="block text-fg-muted font-semibold mb-1">HR Designation</label>
+              <label className="block text-xs font-semibold text-fg-muted mb-1">HR Designation</label>
               <input
                 type="text"
                 value={hrDesignation}
                 onChange={(e) => setHrDesignation(e.target.value)}
                 placeholder="e.g. Lead Campus Recruiter"
-                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
+                className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-xs text-fg placeholder:text-fg-subtle/60 focus:bg-surface focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
               />
             </div>
           </div>
@@ -184,31 +183,31 @@ export function ContactEditModal({
           {/* Mobile & Email Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-fg-muted font-semibold mb-1">Primary Mobile Number</label>
+              <label className="block text-xs font-semibold text-fg-muted mb-1">Primary Mobile Number</label>
               <input
                 type="text"
                 value={primaryMobile}
                 onChange={(e) => setPrimaryMobile(e.target.value)}
                 placeholder="e.g. 9876543210"
-                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg font-mono"
+                className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-xs text-fg font-mono placeholder:text-fg-subtle/60 focus:bg-surface focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
               />
             </div>
 
             <div>
-              <label className="block text-fg-muted font-semibold mb-1">Primary Official Email</label>
+              <label className="block text-xs font-semibold text-fg-muted mb-1">Primary Official Email</label>
               <input
                 type="email"
                 value={primaryEmail}
                 onChange={(e) => setPrimaryEmail(e.target.value)}
                 placeholder="e.g. hr@company.com"
-                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg font-mono"
+                className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-xs text-fg font-mono placeholder:text-fg-subtle/60 focus:bg-surface focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
               />
             </div>
           </div>
 
           {/* Additional Mobile Numbers */}
           <div>
-            <label className="block text-fg-muted font-semibold mb-1">
+            <label className="block text-xs font-semibold text-fg-muted mb-1">
               Alternate Phone Numbers (Comma-separated)
             </label>
             <input
@@ -216,19 +215,19 @@ export function ContactEditModal({
               value={altMobiles}
               onChange={(e) => setAltMobiles(e.target.value)}
               placeholder="e.g. 9876543211, 044-28282828"
-              className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg font-mono text-micro"
+              className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-xs text-fg font-mono placeholder:text-fg-subtle/60 focus:bg-surface focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             />
           </div>
 
           {/* Notes */}
           <div>
-            <label className="block text-fg-muted font-semibold mb-1">Calling Notes & Intelligence</label>
+            <label className="block text-xs font-semibold text-fg-muted mb-1">Calling Notes & Intelligence</label>
             <textarea
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Notes on hiring seasons, previous hiring batches, preferred colleges..."
-              className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
+              className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-xs text-fg placeholder:text-fg-subtle/60 focus:bg-surface focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             />
           </div>
 
@@ -237,20 +236,16 @@ export function ContactEditModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-surface hover:bg-surface-raised text-fg-muted rounded-xl font-medium"
+              className="px-4 py-2 bg-surface hover:bg-surface-sunken text-fg-muted hover:text-fg rounded-lg text-xs font-medium border border-border transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl font-bold shadow-2 transition-colors flex items-center gap-1.5"
+              className="px-5 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
-              {loading ? 'Saving…' : isEditing ? 'Save Changes' : (
-                <>
-                  Create Contact <Building2 size={14} strokeWidth={2} aria-hidden />
-                </>
-              )}
+              {loading ? 'Saving…' : isEditing ? 'Save Changes' : 'Create Contact'}
             </button>
           </div>
 

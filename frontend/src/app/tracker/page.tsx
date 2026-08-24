@@ -60,11 +60,19 @@ export interface KpiData {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
+import { getActiveCollege, resolveDefaultCollege } from '@/lib/collegeSession';
+
 export default function DailyTrackerPage() {
   // ── State
-  const [selectedCollegeId, setSelectedCollegeId] = useState<string>('');
-  const [selectedCollegeName, setSelectedCollegeName] = useState<string>('');
-  const [selectedCollegeObj, setSelectedCollegeObj] = useState<College | null>(null);
+  const [selectedCollegeId, setSelectedCollegeId] = useState<string>(() => {
+    return getActiveCollege().id || '';
+  });
+  const [selectedCollegeName, setSelectedCollegeName] = useState<string>(() => {
+    return getActiveCollege().name || '';
+  });
+  const [selectedCollegeObj, setSelectedCollegeObj] = useState<College | null>(() => {
+    return getActiveCollege().obj || null;
+  });
   const [rows, setRows] = useState<TrackerRow[]>([]);
   const [kpi, setKpi] = useState<KpiData | null>(null);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -86,7 +94,17 @@ export default function DailyTrackerPage() {
   // sent) — this is just what the UI asks for by default.
   const [coordinatorId, setCoordinatorId] = useState<string>('');
   useEffect(() => {
-    setCoordinatorId(readSessionUser()?._id ?? '');
+    const user = readSessionUser();
+    const cId = user?._id ?? '';
+    setCoordinatorId(cId);
+
+    resolveDefaultCollege().then((col) => {
+      if (col.id) {
+        setSelectedCollegeId(col.id);
+        setSelectedCollegeName(col.name);
+        if (col.obj) setSelectedCollegeObj(col.obj);
+      }
+    });
   }, []);
 
   // ── Derive today's title (e.g. "August Tracker 2026")
@@ -435,9 +453,20 @@ export default function DailyTrackerPage() {
                 setSelectedCollegeId(id);
                 setSelectedCollegeName(name);
                 setIsHistoryMode(false);
+                try {
+                  localStorage.setItem('ipoms_daily_tracker_college_id', id);
+                  localStorage.setItem('ipoms_daily_tracker_college_name', name);
+                } catch (e) {}
               }}
               onSelectCollege={(col) => {
                 setSelectedCollegeObj(col);
+                try {
+                  if (col) {
+                    localStorage.setItem('ipoms_daily_tracker_college_obj', JSON.stringify(col));
+                  } else {
+                    localStorage.removeItem('ipoms_daily_tracker_college_obj');
+                  }
+                } catch (e) {}
               }}
             />
 
@@ -449,7 +478,7 @@ export default function DailyTrackerPage() {
                   onChange={(e) => setOutcomeFilter(e.target.value as CallOutcome | 'all')}
                   className="bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 text-slate-800 text-xs px-3 py-2 rounded-xl outline-none font-medium shadow-xs cursor-pointer"
                 >
-                  <option value="all">All Outcomes</option>
+                  <option value="all">All Call Statuses</option>
                   <option value="jd_received">JD Received</option>
                   <option value="positive">Positive</option>
                   <option value="hiring">Hiring</option>
@@ -554,7 +583,7 @@ export default function DailyTrackerPage() {
             onChange={(e) => setOutcomeFilter(e.target.value as CallOutcome | 'all')}
             className="bg-white border border-slate-300 text-slate-800 text-xs px-3 py-2 rounded-xl outline-none font-medium shadow-xs"
           >
-            <option value="all">All Outcomes</option>
+            <option value="all">All Call Statuses</option>
             <option value="jd_received">JD Received</option>
             <option value="hiring_freezed">Hiring Freezed</option>
             <option value="hiring_completed">Hiring Completed</option>

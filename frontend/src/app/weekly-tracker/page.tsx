@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { CalendarDays } from 'lucide-react';
 import { WeeklyHeader } from './components/WeeklyHeader';
 import { WeeklyKpiCards, WeeklyKpiData } from './components/WeeklyKpiCards';
-import { WeeklyToolbar } from './components/WeeklyToolbar';
 import { WeeklySection } from './components/WeeklySection';
 import { AddCompanyModal } from './components/AddCompanyModal';
 import type { WeeklyRow } from './components/WeeklyTable';
@@ -28,9 +27,15 @@ interface SectionsResponse {
   rejected_by_college: SectionData;
 }
 
+import { getActiveCollege, resolveDefaultCollege } from '@/lib/collegeSession';
+
 export default function WeeklyTrackerPage() {
-  const [selectedCollegeId, setSelectedCollegeId] = useState<string>('');
-  const [selectedCollegeName, setSelectedCollegeName] = useState<string>('');
+  const [selectedCollegeId, setSelectedCollegeId] = useState<string>(() => {
+    return getActiveCollege().id || '';
+  });
+  const [selectedCollegeName, setSelectedCollegeName] = useState<string>(() => {
+    return getActiveCollege().name || '';
+  });
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [sections, setSections] = useState<SectionsResponse | null>(null);
   const [kpi, setKpi] = useState<WeeklyKpiData | null>(null);
@@ -45,6 +50,13 @@ export default function WeeklyTrackerPage() {
   useEffect(() => {
     const user = readSessionUser();
     if (user?._id) setCoordinatorId(user._id);
+
+    resolveDefaultCollege().then((col) => {
+      if (col.id) {
+        setSelectedCollegeId(col.id);
+        setSelectedCollegeName(col.name);
+      }
+    });
   }, []);
 
   // ── Load Weekly Tracker Sections
@@ -187,7 +199,6 @@ export default function WeeklyTrackerPage() {
           'S.No': i + 1,
           'Company Name': r.company_name,
           Roles: r.job_role,
-          'CDC Reference': r.cdc_reference || '',
           Type: r.company_type || '',
           CTC: r.ctc_lpa || '',
           'Follow-Up Date': r.follow_up_date ? new Date(r.follow_up_date).toISOString().split('T')[0] : '',
@@ -243,25 +254,16 @@ export default function WeeklyTrackerPage() {
         }}
         weekOffset={weekOffset}
         onWeekChange={setWeekOffset}
+        onOpenAddModal={() => setIsAddModalOpen(true)}
+        onSyncDailyPositives={handleSyncDailyPositives}
+        onRefresh={() => {
+          loadWeeklyTracker();
+          loadKpi();
+        }}
+        onExportCsv={handleExportCsv}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
       />
-
-      {/* ── Toolbar ───────────────────────────────────────────────────────── */}
-      {selectedCollegeId && (
-        <WeeklyToolbar
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          companyTypeFilter={companyTypeFilter}
-          onCompanyTypeChange={setCompanyTypeFilter}
-          onOpenAddModal={() => setIsAddModalOpen(true)}
-          onSyncDailyPositives={handleSyncDailyPositives}
-          onRefresh={() => {
-            loadWeeklyTracker();
-            loadKpi();
-          }}
-          onExportCsv={handleExportCsv}
-          totalRecords={totalRecords}
-        />
-      )}
 
       {/* ── KPI Cards (Slim Single-Row Profile) ──────────────────────────── */}
       {selectedCollegeId && kpi && (
@@ -289,25 +291,10 @@ export default function WeeklyTrackerPage() {
         </div>
       )}
 
-      {/* ── 7 Operational Sections ────────────────────────────────────────── */}
+      {/* ── Operational Sections ────────────────────────────────────────── */}
       {selectedCollegeId && sections && (
         <div className="flex-1 px-6 pb-8 space-y-4">
-          {/* Section 1: Follow-ups Due Today */}
-          {shouldRenderSection('follow_ups_due_today') && (
-            <WeeklySection
-              sectionKey="follow_ups_due_today"
-              title={sections.follow_ups_due_today.title}
-              order={sections.follow_ups_due_today.order}
-              summaryMetric={sections.follow_ups_due_today.summary_metric}
-              rows={sections.follow_ups_due_today.rows}
-              onUpdateRow={handleUpdateRow}
-              onMoveSection={handleMoveSection}
-              onTogglePin={handleTogglePin}
-              onDeleteRow={handleDeleteRow}
-            />
-          )}
-
-          {/* Section 2: Companies Completed */}
+          {/* Section: Companies Completed */}
           {shouldRenderSection('completed') && (
             <WeeklySection
               sectionKey="completed"

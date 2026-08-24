@@ -2,12 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { LeadsHeader } from './components/LeadsHeader';
-import { LeadsSummaryStrip, LeadsSummaryData } from './components/LeadsSummaryStrip';
+import type { LeadsSummaryData } from './components/LeadsSummaryStrip';
 import { LeadsTabBar } from './components/LeadsTabBar';
 import { LeadsTable, DailyLeadRow } from './components/LeadsTable';
 import { AddLeadModal } from './components/AddLeadModal';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
+
+import { getActiveCollege, setActiveCollege } from '@/lib/collegeSession';
 
 export default function DailyLeadsPage() {
   // Date State (Defaults to today in YYYY-MM-DD)
@@ -16,8 +18,12 @@ export default function DailyLeadsPage() {
   });
 
   // College State ('all' or specific college ObjectId)
-  const [selectedCollegeId, setSelectedCollegeId] = useState<string>('all');
-  const [selectedCollegeName, setSelectedCollegeName] = useState<string>('All Colleges');
+  const [selectedCollegeId, setSelectedCollegeId] = useState<string>(() => {
+    return getActiveCollege().id || 'all';
+  });
+  const [selectedCollegeName, setSelectedCollegeName] = useState<string>(() => {
+    return getActiveCollege().name || 'All Colleges';
+  });
 
   // Tab State: 'positive' or 'jd_received' (with persistent localStorage memory per Spec Section 6.4)
   const [activeTab, setActiveTab] = useState<'positive' | 'jd_received'>('positive');
@@ -38,15 +44,23 @@ export default function DailyLeadsPage() {
 
   // Multi-Selection State for Bulk Deletion
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isAllSelected, setIsAllSelected] = useState(false);
 
   useEffect(() => {
     const user = readSessionUser();
     if (user?._id) setCoordinatorId(user._id);
+
+    const active = getActiveCollege();
+    if (active.id && active.id !== 'all') {
+      setSelectedCollegeId(active.id);
+      setSelectedCollegeName(active.name);
+    }
   }, []);
 
   // Clear selection whenever filters or tab change
   useEffect(() => {
     setSelectedIds([]);
+    setIsAllSelected(false);
   }, [selectedDate, selectedCollegeId, activeTab, searchQuery]);
 
   // ── Load Last Active Tab from localStorage on mount (Spec Section 6.4)
@@ -162,21 +176,25 @@ export default function DailyLeadsPage() {
 
   // ── Multi-Select Handlers
   const handleToggleSelect = (id: string) => {
+    setIsAllSelected(false);
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
 
   const handleToggleSelectAll = () => {
-    if (selectedIds.length === leads.length) {
+    if (isAllSelected) {
       setSelectedIds([]);
+      setIsAllSelected(false);
     } else {
       setSelectedIds(leads.map((l) => l._id));
+      setIsAllSelected(true);
     }
   };
 
   const handleClearSelection = () => {
     setSelectedIds([]);
+    setIsAllSelected(false);
   };
 
   // ── Bulk Delete Selected Rows
@@ -199,6 +217,7 @@ export default function DailyLeadsPage() {
         )
       );
       setSelectedIds([]);
+      setIsAllSelected(false);
       await loadLeads();
       await loadSummary();
     } catch (err) {
@@ -270,19 +289,15 @@ export default function DailyLeadsPage() {
         }}
       />
 
-      {/* ── Summary Strip (Fixed above tabs per Spec Section 12) ───────────── */}
-      <LeadsSummaryStrip
-        summary={summary}
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-      />
-
       {/* ── Tab Bar (Positives vs JD Received) ────────────────────────────── */}
       <LeadsTabBar
         activeTab={activeTab}
         onTabChange={handleTabChange}
         positivesCount={summary.positives_count}
         jdCount={summary.jd_received_count}
+        selectedCount={selectedIds.length}
+        onClearSelection={handleClearSelection}
+        onBulkDelete={handleBulkDelete}
       />
 
       {/* ── Table Workspace ───────────────────────────────────────────────── */}
@@ -292,6 +307,7 @@ export default function DailyLeadsPage() {
             rows={leads}
             activeTab={activeTab}
             selectedIds={selectedIds}
+            isAllSelected={isAllSelected}
             onToggleSelect={handleToggleSelect}
             onToggleSelectAll={handleToggleSelectAll}
             onClearSelection={handleClearSelection}
