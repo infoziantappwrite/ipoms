@@ -52,7 +52,12 @@ const COLLEGE_LOGO_MAP: Record<string, string> = {
   VCE: '/college-logos/vaigai.png',
 };
 
-export function NativeReportEditor({ reportData, onBackToBuilder }: Props) {
+interface NativeReportEditorProps {
+  reportData: any;
+  onBackToBuilder?: () => void;
+}
+
+export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReportEditorProps) {
   const [report, setReport] = useState(reportData);
   const [logoFailed, setLogoFailed] = useState(false);
 

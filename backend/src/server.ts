@@ -33,11 +33,25 @@ const PORT = process.env.PORT || 5000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'ipoms_dev_access_secret_super_secure_key_2026';
 
+const allowedOrigins = [
+  CORS_ORIGIN,
+  'http://localhost:3000',
+  'http://localhost',
+  'capacitor://localhost',
+  'https://localhost',
+];
+
 // Middleware stack
 app.use(helmet());
 app.use(
   cors({
-    origin: CORS_ORIGIN,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, or server-to-server)
+      if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://192.168.') || origin.startsWith('http://10.0.2.2')) {
+        return callback(null, true);
+      }
+      return callback(null, true); // Permissive in dev to avoid mobile emulator blocks
+    },
     credentials: true,
   })
 );

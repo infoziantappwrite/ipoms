@@ -125,11 +125,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-fg">
-      <DashboardHeader
-        greetingData={dashboardData?.greeting}
-        callsCompleted={dashboardData?.kpi_summary?.calls_completed}
-        callsTarget={dashboardData?.kpi_summary?.calls_assigned}
-      />
+      <DashboardHeader />
 
       {loading && !dashboardData ? (
         <DashboardSkeleton />
