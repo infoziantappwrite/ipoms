@@ -1,16 +1,18 @@
 import mongoose, { Document, Schema, Model, Types } from 'mongoose';
 
-// ─── 4 Standardized Report Template Types ─────────────────────────────────────
+// ─── 3 Standardized Report Template Types ─────────────────────────────────────
 // Spec: Module_06_Reports_Analytics_Specification_v1.0.md — Section 8.3
 export type ReportTemplateType =
   | 'weekly_placement'
   | 'monthly_placement'
+  | 'pending_tasks'
   | 'college_performance'
   | 'coordinator_performance';
 
 export const REPORT_TEMPLATE_TYPES: ReportTemplateType[] = [
   'weekly_placement',
   'monthly_placement',
+  'pending_tasks',
   'college_performance',
   'coordinator_performance',
 ];
@@ -25,6 +27,7 @@ export interface IIncludedSections {
   completed_companies: boolean;
   in_progress: boolean;
   pipeline: boolean;
+  pending_tasks?: boolean;
   charts: boolean;
   insights: boolean;
   remarks: boolean;

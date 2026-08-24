@@ -28,10 +28,9 @@ const SECTIONS = [
   { value: 'completed', label: 'Companies Completed' },
   { value: 'in_progress', label: 'Companies In Progress' },
   { value: 'pipeline', label: 'Companies in Pipeline' },
-  { value: 'follow_ups_due_today', label: 'Follow-ups Due Today' },
   { value: 'top_companies', label: 'Top Companies' },
-  { value: 'rejected_by_hr', label: 'Rejected by HR' },
-  { value: 'rejected_by_college', label: 'Rejected by College' },
+  { value: 'rejected_by_hr', label: 'Companies Rejected by HR' },
+  { value: 'rejected_by_college', label: 'Companies Rejected by TPO' },
 ];
 
 export function AddCompanyModal({

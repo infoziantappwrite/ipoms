@@ -5,7 +5,8 @@ import {
   Lock, Camera, Calendar, Mail, Phone, MapPin,
   Building, Shield, CheckCircle2, AlertCircle, Sparkles, User as UserIcon, AlertTriangle, Save, KeyRound, Trash2
 } from 'lucide-react';
-import { readSessionUser } from '@/lib/session';
+import { readSessionUser, updateSessionUser } from '@/lib/session';
+import { apiFetch } from '@/lib/api';
 import { PhotoCropModal } from './PhotoCropModal';
 
 interface Props {
@@ -78,7 +79,22 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
   const [sessionFallback, setSessionFallback] = useState<any>(null);
 
   useEffect(() => {
-    setSessionFallback(readSessionUser());
+    const session = readSessionUser();
+    if (session) {
+      setSessionFallback(session);
+      const uid = session._id || (session as any).id || (session as any).userId;
+      if (uid) {
+        apiFetch(`/profile/${uid}`).then((res) => {
+          if (res.success && res.data) {
+            updateSessionUser(res.data);
+            setSessionFallback(res.data);
+            if (res.data.is_profile_locked) {
+              setIsLockedAfterUpdate(true);
+            }
+          }
+        }).catch(() => {});
+      }
+    }
   }, []);
 
   const effectiveUser = currentUser || sessionFallback;
@@ -147,9 +163,9 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
       if (userToUse.date_of_joining) {
         setDateOfJoining(new Date(userToUse.date_of_joining).toISOString().split('T')[0]);
       }
-      if (userToUse.profile_photo_url) {
-        setProfilePhotoUrl(userToUse.profile_photo_url);
-        setPhotoPreview(userToUse.profile_photo_url);
+      if (userToUse.profile_photo_url !== undefined) {
+        setProfilePhotoUrl(userToUse.profile_photo_url || '');
+        setPhotoPreview(userToUse.profile_photo_url || '');
       }
       if (userToUse.is_profile_locked) {
         setIsLockedAfterUpdate(true);
@@ -193,7 +209,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
     }
   };
 
-  // Calculate monthly 2-time photo change limit
+  // Calculate monthly 5-time photo change limit
   const getPhotoEligibility = () => {
     const now = new Date();
     const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -201,7 +217,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
       ? (currentUser?.monthly_photo_changes_count || 0)
       : 0;
 
-    const remaining = Math.max(0, 2 - changesCount);
+    const remaining = Math.max(0, 5 - changesCount);
     const eligible = remaining > 0;
 
     return {
@@ -221,7 +237,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
     if (!file) return;
 
     if (!photoStatus.eligible) {
-      setPhotoError('Monthly limit reached: You have already changed your profile photo 2 times this month. You can update again next month.');
+      setPhotoError('Monthly limit reached: You have already changed your profile photo 5 times this month. You can update again next month.');
       return;
     }
 
@@ -244,26 +260,15 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
     reader.readAsDataURL(file);
   };
 
-  // Handle Cropped Image from PhotoCropModal -> Immediately save to database & sync everywhere!
-  const handleCropFinished = async (croppedDataUrl: string) => {
+  // Handle Cropped Image from PhotoCropModal -> Stage in local preview until 'Update Profile' is clicked!
+  const handleCropFinished = (croppedDataUrl: string) => {
     setPhotoPreview(croppedDataUrl);
     setProfilePhotoUrl(croppedDataUrl);
     setCropModalSrc(null);
     setPhotoError('');
-
-    try {
-      const res = await onUpdateProfile({ profile_photo_url: croppedDataUrl });
-      if (res.success) {
-        setSuccessMsg('Profile photo updated successfully!');
-      } else {
-        setPhotoError(res.error || 'Failed to save profile photo.');
-      }
-    } catch {
-      setPhotoError('Network error while saving profile photo.');
-    }
   };
 
-  // Handle Photo Deletion / Removal -> Immediately clear from database & sync everywhere!
+  // Handle Photo Deletion / Removal -> Instantly removes photo from DB, localStorage session, and all app components
   const handleDeletePhoto = async () => {
     setPhotoPreview('');
     setProfilePhotoUrl('');
@@ -273,12 +278,14 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
     try {
       const res = await onUpdateProfile({ profile_photo_url: '' });
       if (res.success) {
-        setSuccessMsg('Profile photo removed.');
+        updateSessionUser({ profile_photo_url: '' });
+        setSuccessMsg('Profile photo removed successfully across all views.');
+        setTimeout(() => setSuccessMsg(''), 3000);
       } else {
         setPhotoError(res.error || 'Failed to remove photo.');
       }
     } catch {
-      setPhotoError('Network error while removing photo.');
+      setPhotoError('Network error removing profile photo.');
     }
   };
 
@@ -292,7 +299,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
     setShowConfirmModal(true);
   };
 
-  // Perform confirmed backend update for personal details
+  // Perform confirmed backend update for personal details + profile photo
   const handleConfirmedUpdate = async () => {
     setShowConfirmModal(false);
     setLoading(true);
@@ -320,9 +327,8 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
         date_of_joining: dateOfJoining || null,
       };
 
-      if (profilePhotoUrl && profilePhotoUrl !== currentUser?.profile_photo_url) {
-        payload.profile_photo_url = profilePhotoUrl;
-      }
+      // Always send profile_photo_url so backend saves it to database
+      payload.profile_photo_url = profilePhotoUrl;
 
       const res = await onUpdateProfile(payload);
       if (res.success) {
@@ -400,13 +406,13 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
         {/* ── MAIN 2-COLUMN PROFILE LAYOUT (GitHub / Linear Style) ──────── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-          {/* ── LEFT COLUMN (Profile Visual Identity Card - Fully Fits In Viewport) ── */}
-          <div className="lg:col-span-4 glass-panel rounded-2xl border border-border p-5 sm:p-6 shadow-3 flex flex-col items-center text-center sticky top-20 space-y-4 max-h-[calc(100vh-6.5rem)]">
+          {/* ── LEFT COLUMN (Profile Visual Identity Card) ── */}
+          <div className="lg:col-span-4 bg-white dark:bg-zinc-900 rounded-3xl border border-slate-200/90 dark:border-zinc-800 p-6 shadow-sm flex flex-col items-center text-center sticky top-20 space-y-4 h-fit">
 
             {/* Profile Avatar with Photo Update Overlay & Delete Option */}
             <div className="flex flex-col items-center gap-2 w-full">
               <div className="relative group">
-                <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl overflow-hidden border-2 border-border-strong bg-surface flex items-center justify-center shadow-md relative">
+                <div className="w-32 h-32 sm:w-36 sm:h-36 rounded-2xl overflow-hidden border-2 border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 flex items-center justify-center shadow-sm relative">
                   {photoPreview ? (
                     <img
                       src={photoPreview}
@@ -424,7 +430,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
                     type="button"
                     onClick={() => {
                       if (!photoStatus.eligible) {
-                        setPhotoError('Monthly limit reached: You can change your profile photo a maximum of 2 times per month. You can update again next month.');
+                        setPhotoError('Monthly limit reached: You can change your profile photo a maximum of 5 times per month. You can update again next month.');
                         return;
                       }
                       fileInputRef.current?.click();
@@ -478,10 +484,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
               <h2 className="text-lg sm:text-xl font-bold text-fg leading-tight">
                 {effectiveName}
               </h2>
-              <p className="text-xs text-fg-muted font-mono">
-                @{effectiveUsername}
-              </p>
-              <div className="pt-1.5 flex justify-center">
+              <div className="pt-1 flex justify-center">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[11px] font-bold uppercase tracking-wider">
                   <Shield size={12} />
                   <span>{effectiveRole}</span>
@@ -490,16 +493,16 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
             </div>
 
             {/* Quick Metadata Info List (Icon-only buttons for Outlook, WhatsApp & LinkedIn) */}
-            <div className="w-full border-t border-border pt-3.5 text-left space-y-2.5 text-xs">
+            <div className="w-full border-t border-border pt-4 text-left space-y-3 text-xs">
               
               {/* 1. Organization */}
-              <div className="flex items-center gap-2 text-fg-muted">
+              <div className="flex items-center gap-2 text-fg-muted py-0.5">
                 <Building size={14} className="text-fg-subtle shrink-0" />
                 <span className="truncate">Infoziant Placement Operations</span>
               </div>
 
               {/* 2. Official Email + Outlook Icon Button */}
-              <div className="flex items-center justify-between gap-2 text-fg-muted">
+              <div className="flex items-center justify-between gap-2 text-fg-muted py-0.5">
                 <div className="flex items-center gap-2 text-fg-muted min-w-0">
                   <Mail size={14} className="text-fg-subtle shrink-0" />
                   <span className="truncate font-mono text-xs">{effectiveEmail}</span>
@@ -519,7 +522,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
               </div>
 
               {/* 3. Primary Mobile / Contact + WhatsApp Icon Button */}
-              <div className="flex items-center justify-between gap-2 text-fg-muted">
+              <div className="flex items-center justify-between gap-2 text-fg-muted py-0.5">
                 <div className="flex items-center gap-2 text-fg-muted min-w-0">
                   <Phone size={14} className="text-fg-subtle shrink-0" />
                   <span className="truncate font-mono text-xs">
@@ -552,7 +555,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
               </div>
 
               {/* 4. Joining Date + LinkedIn Icon Button */}
-              <div className="flex items-center justify-between text-fg-muted">
+              <div className="flex items-center justify-between text-fg-muted py-0.5">
                 <div className="flex items-center gap-2">
                   <Calendar size={14} className="text-fg-subtle shrink-0" />
                   <span>Joined {dateOfJoining ? new Date(dateOfJoining).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '2026 Season'}</span>
@@ -665,7 +668,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
               </div>
             </div>
 
-            {/* 2. Personal & Contact Information (DOB, Date of Joining, LinkedIn are locked; Contacts remain editable) */}
+            {/* 2. Personal & Contact Information (Primary Mobile, Personal Email, LinkedIn, DOB, Date of Joining are locked once submitted) */}
             <form onSubmit={handleFormSubmit}>
               <div className="glass-panel rounded-2xl border border-border p-6 shadow-3 space-y-4">
                 <div className="border-b border-border pb-3 flex items-center justify-between flex-wrap gap-2">
@@ -676,30 +679,33 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
                     </h3>
                     <p className="text-[11px] text-fg-subtle mt-0.5">
                       {isPersonalLocked
-                        ? 'Date of Birth, Joining Date, and LinkedIn are locked. Mobile numbers and Address can still be updated.'
+                        ? 'Primary Mobile, Personal Email, LinkedIn, DOB, and Joining Date are locked. Alternate mobile and address remain editable.'
                         : 'Update your contact phone numbers, personal email, address, and dates.'}
                     </p>
                   </div>
                   {isPersonalLocked && (
-                    <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                      <Lock size={11} /> DOB & Joining Locked
+                    <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                      <Lock size={11} /> Primary Details & Dates Locked
                     </span>
                   )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                  {/* Primary Mobile (Always Editable) */}
+                  {/* Primary Mobile (Locked once profile is saved/locked) */}
                   <div>
-                    <label className="block text-fg-muted font-semibold mb-1 flex items-center gap-1">
-                      <Phone size={12} className="text-primary" />
+                    <label className={`block font-semibold mb-1 flex items-center gap-1 ${isPersonalLocked ? 'text-fg-muted cursor-not-allowed' : 'text-fg-muted'}`}>
+                      <Phone size={12} className={isPersonalLocked ? 'text-fg-subtle' : 'text-primary'} />
                       <span>Primary Mobile Number</span>
+                      {isPersonalLocked && <Lock size={10} className="text-fg-subtle" />}
                     </label>
                     <input
                       type="tel"
                       value={primaryMobile}
                       onChange={(e) => setPrimaryMobile(e.target.value)}
+                      disabled={isPersonalLocked}
+                      title={isPersonalLocked ? 'Primary Mobile Number is permanently locked. Contact Administrator to change.' : 'Enter Primary Mobile Number'}
                       placeholder="+91 98765 43210"
-                      className={normalInputClass}
+                      className={isPersonalLocked ? whiteDisabledInputClass : normalInputClass}
                     />
                   </div>
 
@@ -718,18 +724,21 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
                     />
                   </div>
 
-                  {/* Personal Email (Always Editable) */}
+                  {/* Personal Email (Locked once profile is saved/locked) */}
                   <div>
-                    <label className="block text-fg-muted font-semibold mb-1 flex items-center gap-1">
-                      <Mail size={12} className="text-primary" />
+                    <label className={`block font-semibold mb-1 flex items-center gap-1 ${isPersonalLocked ? 'text-fg-muted cursor-not-allowed' : 'text-fg-muted'}`}>
+                      <Mail size={12} className={isPersonalLocked ? 'text-fg-subtle' : 'text-primary'} />
                       <span>Personal Email Address</span>
+                      {isPersonalLocked && <Lock size={10} className="text-fg-subtle" />}
                     </label>
                     <input
                       type="email"
                       value={personalEmail}
                       onChange={(e) => setPersonalEmail(e.target.value)}
+                      disabled={isPersonalLocked}
+                      title={isPersonalLocked ? 'Personal Email Address is permanently locked. Contact Administrator to change.' : 'Enter Personal Email Address'}
                       placeholder="personal.email@gmail.com"
-                      className={normalInputClass}
+                      className={isPersonalLocked ? whiteDisabledInputClass : normalInputClass}
                     />
                   </div>
 
@@ -873,8 +882,8 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
                 <div className="flex items-center justify-between flex-wrap gap-3 pt-2 border-t border-border">
                   <p className="text-[11px] text-fg-subtle">
                     {isPersonalLocked
-                      ? '🔒 DOB, Joining Date, and LinkedIn are locked. Phone numbers and address can be updated anytime.'
-                      : '💡 Submitting will permanently lock your Date of Birth, Date of Joining, and LinkedIn profile.'}
+                      ? '🔒 Primary Mobile, Personal Email, LinkedIn, DOB, and Joining Date are locked. Alternate mobile and address remain editable.'
+                      : '💡 Submitting will permanently lock your Primary Mobile, Personal Email, LinkedIn, DOB, and Joining Date.'}
                   </p>
 
                   <button
@@ -1027,7 +1036,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
 
             {/* Inset Light Message Container */}
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 text-xs text-slate-700 leading-relaxed font-normal shadow-[inset_0_1px_3px_rgba(0,0,0,0.04)]">
-              Are you sure you want to update your profile? Once updated and confirmed, your Date of Birth, Date of Joining Office, and LinkedIn profile handle will be recorded and permanently locked (only an Administrator can unlock them). Your mobile numbers, personal email, and address will remain editable anytime.
+              Are you sure you want to update your profile? Once updated and confirmed, your <strong>Primary Mobile Number, Personal Email Address, LinkedIn Profile Handle, Date of Birth, and Date of Joining Office</strong> will be recorded and permanently locked (only an Administrator can unlock them). Your residential address and alternate mobile number will remain editable anytime.
             </div>
 
             {/* Normal Light Action Buttons */}

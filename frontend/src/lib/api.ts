@@ -119,3 +119,32 @@ export async function apiFetch<T = any>(
     };
   }
 }
+
+/**
+ * Fetch wrapper for downloading binary blobs (e.g. XLSX, PDF, CSV files).
+ */
+export async function apiFetchBlob(endpoint: string, options: RequestInit = {}): Promise<Blob> {
+  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+  const token = typeof window !== 'undefined' ? localStorage.getItem('ipoms_token') : null;
+  const headers: Record<string, string> = {};
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      ...headers,
+      ...(options.headers as Record<string, string>),
+    },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Download failed with status: ${response.status}`);
+  }
+
+  return response.blob();
+}
+

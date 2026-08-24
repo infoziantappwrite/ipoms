@@ -174,6 +174,7 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
               <option value="/tracker">Daily Call Tracker (/tracker)</option>
               <option value="/weekly-tracker">Weekly Tracker Board (/weekly-tracker)</option>
               <option value="/daily-leads">Daily Leads Register (/daily-leads)</option>
+              <option value="/pending-tasks">Pending Task Register (/pending-tasks)</option>
               <option value="/reports">Reports & Analytics (/reports)</option>
             </select>
           </div>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Clock, PhoneOff, Repeat, SkipForward, Target, type LucideIcon } from 'lucide-react';
+import { CheckCircle2, Clock, PhoneOff, Repeat, Target, type LucideIcon } from 'lucide-react';
 
 // ── Types
 interface KpiData {
@@ -11,7 +11,7 @@ interface KpiData {
   positive: number;
   no_response: number;
   follow_up: number;
-  skipped: number;
+  skipped?: number;
 }
 
 interface Props {
@@ -105,18 +105,10 @@ export function KpiCards({ kpi }: Props) {
       borderCol: 'border-indigo-200/80 hover:border-indigo-300',
       Icon: Repeat,
     },
-    {
-      label: 'Skipped',
-      value: kpi.skipped,
-      textColor: 'text-slate-600',
-      bgLight: 'bg-slate-100',
-      borderCol: 'border-slate-200 hover:border-slate-300',
-      Icon: SkipForward,
-    },
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 w-full">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 w-full">
       {cards.map((card) => (
         <KpiCard key={card.label} {...card} />
       ))}

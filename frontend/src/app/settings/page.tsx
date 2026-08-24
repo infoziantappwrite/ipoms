@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { Settings } from 'lucide-react';
 import { SettingsNav, SettingsSection } from './components/SettingsNav';
 import { UserProfileTab } from './components/UserProfileTab';
 import { UserManagementTab } from './components/UserManagementTab';
@@ -9,9 +10,8 @@ import { RoleMatrixTab } from './components/RoleMatrixTab';
 import { SystemConfigTab } from './components/SystemConfigTab';
 import { SystemInfoTab } from './components/SystemInfoTab';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
-import { Settings } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { readSessionUser, roleOf } from '@/lib/session';
+import { readSessionUser, roleOf, updateSessionUser } from '@/lib/session';
 
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState<SettingsSection>('profile');
@@ -84,20 +84,8 @@ export default function SettingsPage() {
       });
       if (res.success) {
         setCurrentUser(res.data);
-        // Sync with localStorage
-        try {
-          const stored = localStorage.getItem('ipoms_user');
-          if (stored) {
-            const parsed = JSON.parse(stored);
-            parsed.full_name = (res.data as any).full_name;
-            parsed.profile_photo_url = (res.data as any).profile_photo_url;
-            parsed.is_profile_locked = (res.data as any).is_profile_locked;
-            parsed.linkedin_profile = (res.data as any).linkedin_profile;
-            parsed.date_of_joining = (res.data as any).date_of_joining;
-            localStorage.setItem('ipoms_user', JSON.stringify(parsed));
-            window.dispatchEvent(new CustomEvent('ipoms_user_updated', { detail: parsed }));
-          }
-        } catch { /* ignore */ }
+        // Sync with localStorage & live app events
+        updateSessionUser(res.data);
         return { success: true, message: res.message || 'Profile updated successfully!' };
       } else {
         return { success: false, error: res.error?.message || 'Failed to update profile.' };

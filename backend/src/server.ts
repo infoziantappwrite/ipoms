@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import ExcelJS from 'exceljs';
 import { connectDatabase } from './config/database';
 import { CompanyMetadata } from './models/CompanyMetadata';
 import { User } from './models/User';
@@ -17,11 +18,13 @@ import { DailyLead, LEAD_TYPES, LeadType } from './models/DailyLead';
 import { ReportLibrary, REPORT_TEMPLATE_TYPES, ReportTemplateType, REPORT_THEMES, ReportTheme } from './models/ReportLibrary';
 import { AssignedWork, ASSIGNMENT_PRIORITIES, AssignmentPriority, ASSIGNMENT_STATUSES, AssignmentStatus } from './models/AssignedWork';
 import { Notification, NOTIFICATION_TYPES, NotificationType, AUDIENCE_TYPES, AudienceType, SENDER_ROLES, SenderRole } from './models/Notification';
+import { PendingTask } from './models/PendingTask';
 import { SystemSettings } from './models/SystemSettings';
 import { Types } from 'mongoose';
 import { startFinalizationJob } from './jobs/finalizeDailyTracker';
 import { registerAuthRoutes } from './lib/authRoutes';
 import { registerChatRoutes, seedDefaultChatChannels } from './lib/chatRoutes';
+import { registerPendingTaskRoutes } from './lib/pendingTaskRoutes';
 import { authenticateJWT, authorizeRoles, AuthUserPayload } from './lib/authMiddleware';
 import { authorizeRoute, scopeToSelf, isSupervisor, refuseForeignOwner } from './lib/routePolicy';
 import { isPasswordValid, firstPasswordError } from './lib/passwordPolicy';
@@ -55,7 +58,8 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ limit: '25mb', extended: true }));
 app.use(cookieParser());
 app.use(morgan('dev'));
 
@@ -147,6 +151,9 @@ app.use('/api/v1', authorizeRoute);
 
 // Register Coordinator Team Chat & Doubt Hub routes
 registerChatRoutes(app);
+
+// Register Pending Task routes
+registerPendingTaskRoutes(app);
 
 // 3. High-Speed Company Search Endpoint (Searches across 3,550+ companies in < 10ms)
 app.get('/api/v1/companies/search', async (req: Request, res: Response) => {
@@ -598,6 +605,43 @@ app.patch('/api/v1/daily-tracker/:id/skip', async (req: Request, res: Response) 
   }
 });
 
+// ── DT-4B: DELETE /api/v1/daily-tracker/:id
+// Delete a contact row from today's daily tracker
+app.delete('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const row = await DailyTracker.findById(id);
+    if (!row) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Tracker row not found' },
+      });
+    }
+
+    if (refuseForeignOwner(req, res, String(row.coordinator_id), 'You can only delete your own tracker rows.')) return;
+
+    if (row.is_finalized) {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'FINALIZED', message: 'Cannot delete — this day is finalized' },
+      });
+    }
+
+    await DailyTracker.findByIdAndDelete(id);
+
+    return res.status(200).json({
+      success: true,
+      message: `${row.company_name} removed from today's calling sheet`,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to delete row' },
+    });
+  }
+});
+
 // ── DT-5: POST /api/v1/daily-tracker/save-progress
 // Manual Save Progress
 app.post('/api/v1/daily-tracker/save-progress', async (req: Request, res: Response) => {
@@ -722,13 +766,12 @@ app.get('/api/v1/daily-tracker/kpi', async (req: Request, res: Response) => {
       is_finalized: false,
     };
 
-    const [total, completed, skipped, noResponse, followUp, positive] = await Promise.all([
-      DailyTracker.countDocuments(baseFilter),
+    const [total, completed, noResponse, followUp, positive] = await Promise.all([
+      DailyTracker.countDocuments({ ...baseFilter, is_skipped: false }),
       DailyTracker.countDocuments({ ...baseFilter, outcome_status: { $ne: null }, is_skipped: false }),
-      DailyTracker.countDocuments({ ...baseFilter, is_skipped: true }),
-      DailyTracker.countDocuments({ ...baseFilter, outcome_status: 'no_response' }),
-      DailyTracker.countDocuments({ ...baseFilter, outcome_status: 'follow_up' }),
-      DailyTracker.countDocuments({ ...baseFilter, outcome_status: { $in: POSITIVE_OUTCOMES } }),
+      DailyTracker.countDocuments({ ...baseFilter, outcome_status: 'no_response', is_skipped: false }),
+      DailyTracker.countDocuments({ ...baseFilter, outcome_status: 'follow_up', is_skipped: false }),
+      DailyTracker.countDocuments({ ...baseFilter, outcome_status: { $in: POSITIVE_OUTCOMES }, is_skipped: false }),
     ]);
 
     return res.status(200).json({
@@ -738,11 +781,10 @@ app.get('/api/v1/daily-tracker/kpi', async (req: Request, res: Response) => {
         kpi: {
           total_loaded: total,
           completed,
-          pending: Math.max(0, total - completed - skipped),
+          pending: Math.max(0, total - completed),
           positive,
           no_response: noResponse,
           follow_up: followUp,
-          skipped,
         },
       },
     });
@@ -964,6 +1006,218 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to fetch weekly tracker' },
+    });
+  }
+});
+
+// ── WT-1X: GET /api/v1/weekly-tracker/export-xlsx
+// Export all 6 sections to a single-sheet styled XLSX workbook with college acronym tab name
+app.get('/api/v1/weekly-tracker/export-xlsx', async (req: Request, res: Response) => {
+  try {
+    const { college_id, academic_year, search, company_type } = req.query;
+
+    if (!college_id) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'college_id is required' },
+      });
+    }
+
+    const college = await College.findById(college_id);
+    const collegeCode = college?.college_code || 'COLLEGE';
+    const collegeName = college?.college_name || 'Weekly Placement Tracker';
+
+    const year = Number(academic_year) || 2026;
+    const filter: any = {
+      college_id: new Types.ObjectId(String(college_id)),
+      academic_year: year,
+      is_deleted: false,
+    };
+
+    if (company_type && company_type !== 'all') {
+      filter.company_type = company_type;
+    }
+
+    if (search) {
+      const q = String(search).trim();
+      filter.$or = [
+        { company_name: { $regex: q, $options: 'i' } },
+        { job_role: { $regex: q, $options: 'i' } },
+        { cdc_reference: { $regex: q, $options: 'i' } },
+        { current_status_text: { $regex: q, $options: 'i' } },
+      ];
+    }
+
+    const rows = await WeeklyTracker.find(filter)
+      .sort({ follow_up_date: 1, company_name: 1 })
+      .populate('coordinator_id', 'full_name official_email');
+
+    // Partition into sections
+    const completed = rows.filter((r) => r.pipeline_section === 'completed');
+    const inProgress = rows.filter((r) => r.pipeline_section === 'in_progress');
+    const pipeline = rows.filter((r) => r.pipeline_section === 'pipeline');
+    const topCompanies = rows.filter((r) => r.is_pinned_top || r.pipeline_section === 'top_companies');
+    const rejectedByHr = rows.filter((r) => r.pipeline_section === 'rejected_by_hr');
+    const rejectedByCollege = rows.filter((r) => r.pipeline_section === 'rejected_by_college');
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'iPOMS Placement Operations Management System';
+    workbook.created = new Date();
+
+    // Sheet Name is the College Acronym (max 31 characters as required by Excel)
+    const sheetName = (collegeCode || 'Tracker').substring(0, 31);
+    const sheet = workbook.addWorksheet(sheetName, {
+      views: [{ showGridLines: true }],
+    });
+
+    // Setup columns with base widths
+    sheet.columns = [
+      { key: 'sno', width: 8 },
+      { key: 'company_name', width: 32 },
+      { key: 'job_role', width: 26 },
+      { key: 'ctc_lpa', width: 14 },
+      { key: 'status', width: 36 },
+      { key: 'extra', width: 18 },
+      { key: 'remarks', width: 28 },
+    ];
+
+    // ── Main Header Title Banner ──
+    const titleRow = sheet.addRow([`${collegeName} (${collegeCode}) - Weekly Placement Tracker`]);
+    sheet.mergeCells(`A${titleRow.number}:G${titleRow.number}`);
+    titleRow.font = { name: 'Arial', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF1E3A8A' }, // Navy Blue
+    };
+    titleRow.alignment = { horizontal: 'center', vertical: 'middle' };
+    titleRow.height = 32;
+
+    const subTitleRow = sheet.addRow([`Academic Season ${year} | Generated on: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`]);
+    sheet.mergeCells(`A${subTitleRow.number}:G${subTitleRow.number}`);
+    subTitleRow.font = { name: 'Arial', size: 10, italic: true, color: { argb: 'FF334155' } };
+    subTitleRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFF1F5F9' },
+    };
+    subTitleRow.alignment = { horizontal: 'center', vertical: 'middle' };
+    subTitleRow.height = 20;
+
+    sheet.addRow([]); // Blank spacer
+
+    // Helper to render each section
+    const renderSection = (
+      sectionTitle: string,
+      sectionRows: any[],
+      bannerColor: string,
+      extraHeaderTitle: string = 'Offers Released'
+    ) => {
+      // Section Header Banner
+      const secHeader = sheet.addRow([`${sectionTitle} (${sectionRows.length})`]);
+      sheet.mergeCells(`A${secHeader.number}:G${secHeader.number}`);
+      secHeader.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+      secHeader.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: bannerColor },
+      };
+      secHeader.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+      secHeader.height = 24;
+
+      // Table Column Headers
+      const colHeaders = sheet.addRow([
+        'S.No',
+        'Company Name',
+        'Job Role',
+        'CTC (LPA)',
+        'Current Status',
+        extraHeaderTitle,
+        'Remarks / Notes',
+      ]);
+      colHeaders.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF1E293B' } };
+      colHeaders.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE2E8F0' },
+      };
+      colHeaders.alignment = { vertical: 'middle' };
+      colHeaders.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+      colHeaders.getCell(4).alignment = { horizontal: 'center', vertical: 'middle' };
+      colHeaders.getCell(6).alignment = { horizontal: 'center', vertical: 'middle' };
+      colHeaders.height = 22;
+
+      // Rows
+      if (sectionRows.length === 0) {
+        const emptyRow = sheet.addRow(['', 'No companies listed in this section', '', '', '', '', '']);
+        sheet.mergeCells(`B${emptyRow.number}:G${emptyRow.number}`);
+        emptyRow.font = { name: 'Arial', size: 9, italic: true, color: { argb: 'FF94A3B8' } };
+        emptyRow.height = 20;
+      } else {
+        sectionRows.forEach((r, idx) => {
+          const rowData = sheet.addRow([
+            idx + 1,
+            r.company_name || '-',
+            r.job_role || '-',
+            r.ctc_lpa || '-',
+            r.current_status_text || '-',
+            r.pipeline_section === 'completed'
+              ? (r.selected_count !== undefined ? String(r.selected_count) : '-')
+              : (r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN') : '-'),
+            r.remarks || r.cdc_reference || '-',
+          ]);
+          rowData.font = { name: 'Arial', size: 10, color: { argb: 'FF0F172A' } };
+          rowData.alignment = { vertical: 'middle' };
+          rowData.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+          rowData.getCell(4).alignment = { horizontal: 'center', vertical: 'middle' };
+          rowData.getCell(6).alignment = { horizontal: 'center', vertical: 'middle' };
+          rowData.height = 20;
+
+          // Apply light borders
+          for (let c = 1; c <= 7; c++) {
+            rowData.getCell(c).border = {
+              top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+              right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            };
+          }
+        });
+      }
+
+      sheet.addRow([]); // Blank spacer between sections
+    };
+
+    // 1. Companies Completed (Green Banner)
+    renderSection('1. COMPANIES COMPLETED', completed, 'FF047857', 'Offers Released');
+
+    // 2. Companies in Progress (Blue Banner)
+    renderSection('2. COMPANIES IN PROGRESS', inProgress, 'FF2563EB', 'Follow-up / Drive Date');
+
+    // 3. Companies in Pipeline (Indigo Banner)
+    renderSection('3. COMPANIES IN PIPELINE', pipeline, 'FF4F46E5', 'Timeline');
+
+    // 4. Top Companies (Amber Banner)
+    renderSection('4. TOP COMPANIES', topCompanies, 'FFD97706', 'Package / Tier');
+
+    // 5. Companies Rejected by HR (Rose / Coral Banner)
+    renderSection('5. COMPANIES REJECTED BY HR', rejectedByHr, 'FFE11D48', 'Reason');
+
+    // 6. Companies Rejected by TPO (Slate / Purple Banner)
+    renderSection('6. COMPANIES REJECTED BY TPO', rejectedByCollege, 'FF64748B', 'Reason');
+
+    // Send the XLSX buffer
+    const buffer = await workbook.xlsx.writeBuffer();
+    const filename = `Weekly_Tracker_${collegeCode}_${year}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(Buffer.from(buffer));
+  } catch (error: any) {
+    console.error('❌ [WeeklyTracker] Export XLSX error:', error);
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to export XLSX' },
     });
   }
 });
@@ -1202,6 +1456,35 @@ app.delete('/api/v1/weekly-tracker/:id', async (req: Request, res: Response) => 
     return res.status(500).json({
       success: false,
       error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to delete record' },
+    });
+  }
+});
+
+// ── WT-6B: POST /api/v1/weekly-tracker/batch-delete
+app.post('/api/v1/weekly-tracker/batch-delete', async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'ids array is required' },
+      });
+    }
+
+    const objectIds = ids.map((id: string) => new Types.ObjectId(id));
+    await WeeklyTracker.updateMany(
+      { _id: { $in: objectIds } },
+      { $set: { is_deleted: true, deleted_at: new Date() } }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `${ids.length} records moved to Recycle Bin`,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to batch delete records' },
     });
   }
 });
@@ -1902,7 +2185,7 @@ app.get('/api/v1/analytics/company-responsiveness', async (req: Request, res: Re
 });
 
 // ── RA-4: GET /api/v1/reports/templates
-// Returns the 4 Standardized Report Templates (Spec Section 8.3)
+// Returns the 3 Standardized Report Templates (Spec Section 8.3)
 app.get('/api/v1/reports/templates', (req: Request, res: Response) => {
   const templates = [
     {
@@ -1922,20 +2205,12 @@ app.get('/api/v1/reports/templates', (req: Request, res: Response) => {
       default_sections: ['kpi_summary', 'completed_companies', 'charts', 'insights', 'remarks'],
     },
     {
-      id: 'college_performance',
-      title: 'College Performance Report',
-      audience: 'Institution Management & TPOs',
-      icon: '🏛️',
-      description: 'Institution-specific deep-dive covering total corporate outreach, positive responses, conducted drives, student offers, and package breakdown.',
-      default_sections: ['kpi_summary', 'completed_companies', 'in_progress', 'pipeline', 'remarks'],
-    },
-    {
-      id: 'coordinator_performance',
-      title: 'Coordinator Performance Report',
-      audience: 'Placement Team Leaders & Operations',
-      icon: '👤',
-      description: 'Operational activity review covering daily call completions, positive leads generated, JDs received, and drives coordinated.',
-      default_sections: ['kpi_summary', 'completed_companies', 'insights', 'remarks'],
+      id: 'pending_tasks',
+      title: 'Pending Tasks Report',
+      audience: 'Institution Management & Operations',
+      icon: '📋',
+      description: 'Institutional pending tasks status report covering JD received dates, DB shared status, current recruitment stages, and actionable next steps.',
+      default_sections: ['kpi_summary', 'pending_tasks', 'insights', 'remarks'],
     },
   ];
 
@@ -1973,12 +2248,14 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
     const wtFilter: any = { academic_year, is_deleted: false };
     const dtFilter: any = {};
     const dlFilter: any = { is_deleted: false };
+    const ptFilter: any = { is_deleted: false };
 
     if (college_id && college_id !== 'all') {
       const cId = new Types.ObjectId(String(college_id));
       wtFilter.college_id = cId;
       dtFilter.college_id = cId;
       dlFilter.college_id = cId;
+      ptFilter.college_id = cId;
     }
 
     if (coordinator_id) {
@@ -1997,6 +2274,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       totalCalls,
       positiveCalls,
       totalJds,
+      pendingTasksList,
     ] = await Promise.all([
       WeeklyTracker.find({ ...wtFilter, pipeline_section: 'completed' }).sort({ created_at: -1 }),
       WeeklyTracker.find({ ...wtFilter, pipeline_section: 'in_progress' }).sort({ created_at: -1 }),
@@ -2005,9 +2283,22 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       DailyTracker.countDocuments(dtFilter),
       DailyTracker.countDocuments({ ...dtFilter, outcome_status: { $in: POSITIVE_OUTCOMES } }),
       DailyLead.countDocuments({ ...dlFilter, lead_type: 'jd_received' }),
+      PendingTask.find(ptFilter).sort({ serial_no: 1, created_at: -1 }),
     ]);
 
     const totalOffers = completedRows.reduce((sum, r) => sum + (r.selected_count || 0), 0);
+
+    let ptSharedCount = 0;
+    let ptPendingCount = 0;
+    let ptDrivesScheduled = 0;
+    const now = new Date();
+    for (const pt of pendingTasksList) {
+      if (pt.db_shared_date) ptSharedCount++;
+      else ptPendingCount++;
+      if (pt.drive_date && new Date(pt.drive_date) >= new Date(now.getFullYear(), now.getMonth(), now.getDate())) {
+        ptDrivesScheduled++;
+      }
+    }
 
     // Build the Generated Report Document Schema
     const reportDocument = {
@@ -2017,9 +2308,9 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
           ? 'Weekly Report'
           : template_type === 'monthly_placement'
           ? `Monthly Placement Review — ${academic_year} Season`
-          : template_type === 'college_performance'
-          ? `College Performance Report — ${targetCollege?.college_name || 'Overview'}`
-          : `Coordinator Performance Assessment — ${coordinator?.full_name || 'Operations Team'}`,
+          : template_type === 'pending_tasks'
+          ? `Placement Pending Tasks Report — ${targetCollege?.college_name || 'All Colleges'}`
+          : 'Placement Operations Report',
       report_period: week_label,
       generated_by: coordinator?.full_name || 'A. Mohanaradha (Lead Placement Coordinator)',
       generated_date: new Date().toLocaleDateString('en-IN', {
@@ -2044,6 +2335,10 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         drives_in_progress: inProgressRows.length,
         pipeline_leads: pipelineRows.length,
         total_offers: totalOffers,
+        total_pending_tasks: pendingTasksList.length,
+        db_shared_count: ptSharedCount,
+        db_pending_count: ptPendingCount,
+        drives_scheduled: ptDrivesScheduled,
       },
       sections: {
         completed_companies: completedRows.map((r, i) => ({
@@ -2072,11 +2367,28 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
           ctc_lpa: r.ctc_lpa || 'Awaiting JD',
           current_status_text: r.current_status_text,
         })),
+        pending_tasks: pendingTasksList.map((pt, i) => ({
+          s_no: pt.serial_no || i + 1,
+          company_name: pt.company_name,
+          jd_received_date: pt.jd_received_date ? new Date(pt.jd_received_date).toLocaleDateString('en-IN') : '—',
+          db_shared_date: pt.db_shared_date ? new Date(pt.db_shared_date).toLocaleDateString('en-IN') : '—',
+          db_shared_status: pt.db_shared_date ? 'Shared' : 'Pending',
+          current_status: pt.current_status || '—',
+          action_to_be_taken: pt.action_to_be_taken || '—',
+          drive_date: pt.drive_date ? new Date(pt.drive_date).toLocaleDateString('en-IN') : '—',
+          remarks: pt.remarks || '',
+        })),
       },
       insights: [
-        `Operational Velocity: Contacted corporate leads resulted in ${completedRows.length} completed drives with ${totalOffers} offers placed.`,
-        `Active Pipeline: ${inProgressRows.length} drives currently underway with technical rounds in progress.`,
-        `Lead Conversion: ${totalJds} Job Descriptions secured and circulated to students for registration.`,
+        template_type === 'pending_tasks'
+          ? `Pending Tasks Velocity: ${pendingTasksList.length} companies tracked, with ${ptSharedCount} databases shared and ${ptPendingCount} pending.`
+          : `Operational Velocity: Contacted corporate leads resulted in ${completedRows.length} completed drives with ${totalOffers} offers placed.`,
+        template_type === 'pending_tasks'
+          ? `Drive Scheduling: ${ptDrivesScheduled} upcoming campus recruitment drives scheduled.`
+          : `Active Pipeline: ${inProgressRows.length} drives currently underway with technical rounds in progress.`,
+        template_type === 'pending_tasks'
+          ? `Action items recorded for swift coordinator follow-ups.`
+          : `Lead Conversion: ${totalJds} Job Descriptions secured and circulated to students for registration.`,
       ],
       remarks: custom_remarks || 'All recruitment drives are proceeding as per placement schedule. Follow-ups with upcoming product companies remain active.',
       included_sections: included_sections || {
@@ -2084,6 +2396,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         completed_companies: true,
         in_progress: true,
         pipeline: true,
+        pending_tasks: true,
         charts: true,
         insights: true,
         remarks: true,
@@ -3884,8 +4197,18 @@ app.patch('/api/v1/profile/:id', async (req: Request, res: Response) => {
       });
     }
 
-    // Editable fields
-    if (primary_mobile !== undefined) user.primary_mobile = String(primary_mobile).trim();
+    const isCurrentlyLocked = Boolean(user.is_profile_locked);
+
+    // If profile is already locked, protect the 5 immutable fields from modification
+    if (!isCurrentlyLocked) {
+      if (primary_mobile !== undefined && String(primary_mobile).trim()) user.primary_mobile = String(primary_mobile).trim();
+      if (personal_email !== undefined && String(personal_email).trim()) user.personal_email = String(personal_email).trim().toLowerCase();
+      if (linkedin_profile !== undefined && String(linkedin_profile).trim()) user.linkedin_profile = String(linkedin_profile).trim();
+      if (date_of_birth !== undefined && date_of_birth) user.date_of_birth = new Date(date_of_birth);
+      if (date_of_joining !== undefined && date_of_joining) user.date_of_joining = new Date(date_of_joining);
+    }
+
+    // Editable contact & location fields
     if (alternate_mobile !== undefined) {
       user.alternate_mobile = String(alternate_mobile).trim();
       user.secondary_mobile = String(alternate_mobile).trim();
@@ -3893,17 +4216,13 @@ app.patch('/api/v1/profile/:id', async (req: Request, res: Response) => {
       user.secondary_mobile = String(secondary_mobile).trim();
       user.alternate_mobile = String(secondary_mobile).trim();
     }
-    if (personal_email !== undefined) user.personal_email = String(personal_email).trim().toLowerCase();
     if (residential_address !== undefined) user.residential_address = String(residential_address).trim();
     if (address_line !== undefined) user.address_line = String(address_line).trim();
     if (pincode !== undefined) user.pincode = String(pincode).trim();
     if (city !== undefined) user.city = String(city).trim();
     if (state !== undefined) user.state = String(state).trim();
-    if (linkedin_profile !== undefined) user.linkedin_profile = String(linkedin_profile).trim();
-    if (date_of_birth !== undefined) user.date_of_birth = date_of_birth ? new Date(date_of_birth) : null;
-    if (date_of_joining !== undefined) user.date_of_joining = date_of_joining ? new Date(date_of_joining) : null;
 
-    // Monthly Profile Photo Update Rule: 2 changes allowed per calendar month
+    // Monthly Profile Photo Update Rule: 5 changes allowed per calendar month
     const now = new Date();
     const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     
@@ -3916,12 +4235,12 @@ app.patch('/api/v1/profile/:id', async (req: Request, res: Response) => {
       if (profile_photo_url === '') {
         user.profile_photo_url = '';
       } else {
-        if ((user.monthly_photo_changes_count || 0) >= 2) {
+        if ((user.monthly_photo_changes_count || 0) >= 5) {
           return res.status(400).json({
             success: false,
             error: {
               code: 'PHOTO_MONTHLY_LIMIT_EXCEEDED',
-              message: 'Monthly Limit Reached: You are allowed to change your profile photo a maximum of 2 times per month. You can update your photo again next month.',
+              message: 'Monthly Limit Reached: You are allowed to change your profile photo a maximum of 5 times per month. You can update your photo again next month.',
               monthly_photo_changes_count: user.monthly_photo_changes_count,
             },
           });
@@ -3940,10 +4259,6 @@ app.patch('/api/v1/profile/:id', async (req: Request, res: Response) => {
     }
 
     if (password && String(password).trim()) {
-      // Enforce the same policy as signup / forgot-password reset — this
-      // endpoint used to hash and store whatever was sent, so long as it was
-      // 9+ characters, silently accepting passwords with no uppercase, no
-      // digit, or forbidden special characters.
       const trimmedPassword = String(password).trim();
       if (!isPasswordValid(trimmedPassword)) {
         return res.status(400).json({
@@ -3966,7 +4281,6 @@ app.patch('/api/v1/profile/:id', async (req: Request, res: Response) => {
         });
       }
 
-      // Check if user has already used their 2 allowed password changes this month
       if ((user.monthly_password_changes_count || 0) >= 2) {
         user.is_password_locked = true;
         user.account_status = 'blocked';
@@ -3989,12 +4303,7 @@ app.patch('/api/v1/profile/:id', async (req: Request, res: Response) => {
       user.last_password_change_month = currentMonthStr;
     }
 
-    // Lock profile once a PERSONAL field is updated, so the change stays as
-    // read-only proof of what was submitted. This used to fire unconditionally
-    // on every PATCH, including a password-only request — the security tab
-    // has no confirmation modal (unlike the personal-details form) and never
-    // warned that changing a password would also permanently lock contact
-    // fields as a side effect.
+    // Lock profile permanently once personal fields are updated
     const touchedPersonalFields =
       primary_mobile !== undefined ||
       alternate_mobile !== undefined ||
@@ -4007,12 +4316,11 @@ app.patch('/api/v1/profile/:id', async (req: Request, res: Response) => {
       state !== undefined ||
       linkedin_profile !== undefined ||
       date_of_birth !== undefined ||
-      date_of_joining !== undefined ||
-      (profile_photo_url !== undefined && profile_photo_url !== '');
+      date_of_joining !== undefined;
 
     if (touchedPersonalFields) {
       user.is_profile_locked = true;
-      user.profile_locked_at = new Date();
+      user.profile_locked_at = user.profile_locked_at || new Date();
     }
 
     await user.save();
@@ -4288,26 +4596,6 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 const startServer = async () => {
   await connectDatabase();
   await seedDefaultChatChannels();
-
-  // Explicitly unlock profile for mohanaradha_a@infoziant.com per user directive
-  try {
-    await User.updateMany(
-      { official_email: { $in: ['mohanaradha_a@infoziant.com', 'placement_management@infoziant.com'] } },
-      {
-        $set: {
-          is_profile_locked: false,
-          profile_locked_at: null,
-          is_password_locked: false,
-          password_locked_at: null,
-          account_status: 'active',
-          monthly_password_changes_count: 0,
-        },
-      }
-    );
-    console.log('🔓 [iPOMS Auth] Coordinator profiles unlocked successfully');
-  } catch (err) {
-    console.error('Failed to unlock coordinator profiles:', err);
-  }
 
   app.listen(PORT, () => {
     console.log(`🚀 [iPOMS API] Server running on http://localhost:${PORT}`);

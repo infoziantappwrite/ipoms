@@ -155,16 +155,6 @@ export function CollegeSelector({
         />
       </button>
 
-      {/* Location display next to shrunken acronym */}
-      {selected && selected.location && (
-        <span
-          className="text-xs text-slate-500 font-medium hidden sm:inline truncate max-w-[180px]"
-          title={selected.location}
-        >
-          {selected.location}
-        </span>
-      )}
-
       {/* ── Dropdown Popover ──────────────────────────────────────────── */}
       {isOpen && (
         <div

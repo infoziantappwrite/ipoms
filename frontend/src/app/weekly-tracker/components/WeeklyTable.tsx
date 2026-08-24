@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { FolderOpen } from 'lucide-react';
-import { RowActionMenu } from './RowActionMenu';
+import { useState } from 'react';
+import { FolderOpen, Star } from 'lucide-react';
 
 export interface WeeklyRow {
   _id: string;
@@ -26,56 +25,23 @@ export interface WeeklyRow {
 interface Props {
   rows: WeeklyRow[];
   sectionKey: string;
+  isDeleteMode?: boolean;
+  selectedRowIds?: string[];
+  onToggleSelectRow?: (rowId: string) => void;
+  onToggleSelectAll?: () => void;
   onUpdateRow: (rowId: string, patch: Partial<WeeklyRow>) => Promise<void>;
   onMoveSection: (rowId: string, newSection: string) => Promise<void>;
   onTogglePin: (rowId: string) => Promise<void>;
   onDeleteRow: (rowId: string) => Promise<void>;
 }
 
-// Follow-up proximity badge calculation (Spec Section 13)
-// Green: > 7 days away, Yellow: within next 3 days, Orange/Red: due today or overdue
-function getFollowUpBadge(dateStr?: string) {
-  if (!dateStr) return null;
-  const target = new Date(dateStr);
-  if (isNaN(target.getTime())) return null;
-
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  target.setHours(0, 0, 0, 0);
-
-  const diffDays = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  const formattedDate = target.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-
-  if (diffDays < 0) {
-    return {
-      text: `${formattedDate} (Overdue)`,
-      badgeClass: 'bg-destructive/20 text-destructive border border-destructive/30',
-      dotClass: 'bg-destructive',
-    };
-  } else if (diffDays === 0) {
-    return {
-      text: `${formattedDate} (Today)`,
-      badgeClass: 'bg-warning/20 text-warning border border-warning/30',
-      dotClass: 'bg-warning animate-pulse',
-    };
-  } else if (diffDays <= 3) {
-    return {
-      text: `${formattedDate} (${diffDays}d)`,
-      badgeClass: 'bg-warning/20 text-warning border border-warning/30',
-      dotClass: 'bg-warning',
-    };
-  } else {
-    return {
-      text: formattedDate,
-      badgeClass: 'bg-success/20 text-success border border-success/30',
-      dotClass: 'bg-success',
-    };
-  }
-}
-
 export function WeeklyTable({
   rows,
   sectionKey,
+  isDeleteMode = false,
+  selectedRowIds = [],
+  onToggleSelectRow,
+  onToggleSelectAll,
   onUpdateRow,
   onMoveSection,
   onTogglePin,
@@ -99,17 +65,25 @@ export function WeeklyTable({
       <table className="w-full text-xs text-left">
         <thead>
           <tr className="bg-background/80 text-fg-subtle font-semibold border-b border-border uppercase tracking-wider text-micro">
-            <th className="py-2.5 px-3 w-10 text-center">#</th>
-            <th className="py-2.5 px-3 min-w-[220px] max-w-[280px] text-left">Company Name</th>
-            <th className="py-2.5 px-3 min-w-[200px]">Role(s)</th>
-            <th className="py-2.5 px-3 min-w-[130px]">Type</th>
-            <th className="py-2.5 px-3 min-w-[110px]">CTC</th>
-            <th className="py-2.5 px-3 min-w-[140px]">Follow-Up</th>
-            <th className="py-2.5 px-3 min-w-[240px]">Current Status & Notes</th>
-            {isCompletedSection && (
-              <th className="py-2.5 px-3 min-w-[90px] text-center">Offers</th>
+            {isDeleteMode && (
+              <th className="py-2.5 px-2 w-10 text-center">
+                <input
+                  type="checkbox"
+                  checked={selectedRowIds.length === rows.length && rows.length > 0}
+                  onChange={onToggleSelectAll}
+                  className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer accent-rose-600"
+                  title="Select All"
+                />
+              </th>
             )}
-            <th className="py-2.5 px-3 w-12 text-center"></th>
+            <th className="py-2.5 px-3 w-12 text-center">S.No</th>
+            <th className="py-2.5 px-3 min-w-[200px] text-left">Company Name</th>
+            <th className="py-2.5 px-3 min-w-[180px]">Role</th>
+            <th className="py-2.5 px-3 min-w-[100px]">CTC</th>
+            <th className="py-2.5 px-3 min-w-[260px]">Status</th>
+            {isCompletedSection && (
+              <th className="py-2.5 px-3 min-w-[120px] text-center">Offers Received</th>
+            )}
           </tr>
         </thead>
         <tbody className="divide-y divide-border/60 font-normal">
@@ -119,6 +93,9 @@ export function WeeklyTable({
               row={row}
               index={idx + 1}
               isCompletedSection={isCompletedSection}
+              isDeleteMode={isDeleteMode}
+              isSelected={selectedRowIds.includes(row._id)}
+              onToggleSelect={() => onToggleSelectRow && onToggleSelectRow(row._id)}
               onUpdateRow={onUpdateRow}
               onMoveSection={onMoveSection}
               onTogglePin={onTogglePin}
@@ -135,6 +112,9 @@ function TableRow({
   row,
   index,
   isCompletedSection,
+  isDeleteMode,
+  isSelected,
+  onToggleSelect,
   onUpdateRow,
   onMoveSection,
   onTogglePin,
@@ -143,17 +123,20 @@ function TableRow({
   row: WeeklyRow;
   index: number;
   isCompletedSection: boolean;
-  onUpdateRow: (rowId: string, patch: Partial<WeeklyRow>) => Promise<void>;
-  onMoveSection: (rowId: string, newSection: string) => Promise<void>;
-  onTogglePin: (rowId: string) => Promise<void>;
-  onDeleteRow: (rowId: string) => Promise<void>;
+  isDeleteMode: boolean;
+  isSelected: boolean;
+  onToggleSelect: () => void;
+  onUpdateRow: (id: string, updates: Partial<WeeklyRow>) => Promise<void>;
+  onMoveSection: (id: string, targetSection: string) => Promise<void>;
+  onTogglePin: (id: string) => Promise<void>;
+  onDeleteRow: (id: string) => Promise<void>;
 }) {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [tempValue, setTempValue] = useState<any>('');
 
   const startEdit = (field: string, val: any) => {
     setEditingField(field);
-    setTempValue(val ?? '');
+    setTempValue(val);
   };
 
   const commitEdit = (field: string) => {
@@ -164,25 +147,38 @@ function TableRow({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, field: string) => {
-    if (e.key === 'Enter') {
-      commitEdit(field);
-    } else if (e.key === 'Escape') {
-      setEditingField(null);
-    }
+    if (e.key === 'Enter') commitEdit(field);
+    if (e.key === 'Escape') setEditingField(null);
   };
 
-  const followUpBadge = getFollowUpBadge(row.follow_up_date);
-
   return (
-    <tr className="hover:bg-surface/30 transition-colors group">
-      {/* S.No */}
-      <td className="py-2.5 px-3 text-center text-fg-subtle font-mono">{index}</td>
+    <tr
+      className={`hover:bg-surface-subtle/50 transition-colors ${
+        isSelected ? 'bg-rose-50/70 dark:bg-rose-950/30' : row.is_pinned_top ? 'bg-primary-subtle/30 font-medium' : ''
+      }`}
+    >
+      {/* Checkbox in delete mode */}
+      {isDeleteMode && (
+        <td className="py-2.5 px-2 text-center" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={onToggleSelect}
+            className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer accent-rose-600"
+          />
+        </td>
+      )}
 
-      {/* Company Name */}
-      <td className="py-2.5 px-3 font-semibold text-fg min-w-[220px] max-w-[280px] break-words leading-tight">
+      {/* 1. S.No */}
+      <td className="py-2.5 px-3 text-center text-fg-subtle">
+        {index}
+      </td>
+
+      {/* 2. Company Name */}
+      <td className="py-2.5 px-3 font-semibold text-fg">
         <div className="flex items-center gap-1.5">
           {row.is_pinned_top && (
-            <span className="text-warning text-xs shrink-0" title="Pinned to Top Companies">★</span>
+            <Star size={11} className="text-warning fill-warning shrink-0" />
           )}
           {editingField === 'company_name' ? (
             <input
@@ -205,7 +201,7 @@ function TableRow({
         </div>
       </td>
 
-      {/* Role (Comma-separated multi-roles per Spec Section 6) */}
+      {/* 3. Role */}
       <td className="py-2.5 px-3 text-fg-muted">
         {editingField === 'job_role' ? (
           <input
@@ -234,30 +230,7 @@ function TableRow({
         )}
       </td>
 
-
-      {/* Company Type */}
-      <td className="py-2.5 px-3 text-fg-subtle">
-        {editingField === 'company_type' ? (
-          <input
-            type="text"
-            value={tempValue}
-            onChange={(e) => setTempValue(e.target.value)}
-            onBlur={() => commitEdit('company_type')}
-            onKeyDown={(e) => handleKeyDown(e, 'company_type')}
-            autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white w-full"
-          />
-        ) : (
-          <span
-            onClick={() => startEdit('company_type', row.company_type)}
-            className="cursor-pointer hover:text-primary transition-colors text-fg-subtle"
-          >
-            {row.company_type || <span className="text-fg-muted italic">—</span>}
-          </span>
-        )}
-      </td>
-
-      {/* CTC */}
+      {/* 4. CTC */}
       <td className="py-2.5 px-3 text-success font-medium">
         {editingField === 'ctc_lpa' ? (
           <input
@@ -279,36 +252,7 @@ function TableRow({
         )}
       </td>
 
-      {/* Follow-Up Date & Badge */}
-      <td className="py-2.5 px-3">
-        {editingField === 'follow_up_date' ? (
-          <input
-            type="date"
-            value={tempValue ? new Date(tempValue).toISOString().split('T')[0] : ''}
-            onChange={(e) => setTempValue(e.target.value)}
-            onBlur={() => commitEdit('follow_up_date')}
-            onKeyDown={(e) => handleKeyDown(e, 'follow_up_date')}
-            autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white "
-          />
-        ) : (
-          <div
-            onClick={() => startEdit('follow_up_date', row.follow_up_date)}
-            className="cursor-pointer flex items-center gap-1.5"
-          >
-            {followUpBadge ? (
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-micro font-medium ${followUpBadge.badgeClass}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${followUpBadge.dotClass}`} />
-                {followUpBadge.text}
-              </span>
-            ) : (
-              <span className="text-fg-muted italic text-micro hover:text-primary">+ Add Date</span>
-            )}
-          </div>
-        )}
-      </td>
-
-      {/* Current Status Notes (Rich Natural Free-Text per Spec Section 5) */}
+      {/* 5. Status */}
       <td className="py-2.5 px-3 text-fg-muted">
         {editingField === 'current_status_text' ? (
           <input
@@ -323,7 +267,7 @@ function TableRow({
         ) : (
           <span
             onClick={() => startEdit('current_status_text', row.current_status_text)}
-            className="cursor-pointer hover:text-primary transition-colors break-words leading-relaxed whitespace-pre-wrap max-w-[280px] inline-block"
+            className="cursor-pointer hover:text-primary transition-colors break-words leading-relaxed whitespace-pre-wrap max-w-[320px] inline-block"
             title={row.current_status_text}
           >
             {row.current_status_text || <span className="text-fg-muted italic">—</span>}
@@ -331,7 +275,7 @@ function TableRow({
         )}
       </td>
 
-      {/* Offers (Completed Section Only per Spec Section 5) */}
+      {/* 6. Offers Received (Completed Section Only) */}
       {isCompletedSection && (
         <td className="py-2.5 px-3 text-center font-bold text-success">
           {editingField === 'selected_count' ? (
@@ -348,24 +292,13 @@ function TableRow({
           ) : (
             <span
               onClick={() => startEdit('selected_count', row.selected_count || 0)}
-              className="cursor-pointer hover:underline"
+              className="cursor-pointer hover:underline inline-flex items-center justify-center px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold"
             >
               {row.selected_count ?? 0}
             </span>
           )}
         </td>
       )}
-
-      {/* Actions */}
-      <td className="py-2.5 px-3 text-center">
-        <RowActionMenu
-          isPinned={row.is_pinned_top}
-          currentSection={row.pipeline_section}
-          onMoveSection={(newSec) => onMoveSection(row._id, newSec)}
-          onTogglePin={() => onTogglePin(row._id)}
-          onDelete={() => onDeleteRow(row._id)}
-        />
-      </td>
     </tr>
   );
 }

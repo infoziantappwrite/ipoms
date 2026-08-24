@@ -13,9 +13,8 @@ import {
   Sparkles,
   type LucideIcon
 } from 'lucide-react';
-import { NotificationBellDropdown } from '@/components/NotificationBellDropdown';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
-import { readSessionUser, roleOf, type SessionUser } from '@/lib/session';
+import { readSessionUser, roleOf, updateSessionUser, type SessionUser } from '@/lib/session';
 import { apiFetch } from '@/lib/api';
 
 export type DashboardRole = 'coordinator' | 'team_leader' | 'admin';
@@ -58,15 +57,12 @@ const PERIOD_EMOJI: Record<GreetingPeriod, string> = {
   night: '🌙',
 };
 
-// Curated 30-second motivational quotes for placement coordinators
-const MOTIVATIONAL_QUOTES: { quote: string }[] = [
-  { quote: 'Connecting ambitious graduates with world-class career opportunities every day.' },
-  { quote: 'Your dedication turns placement aspirations into real-world corporate success.' },
-  { quote: 'Every recruiter connected brings us closer to 100% student placement.' },
-  { quote: 'Empowering students to achieve their dreams with purposeful corporate outreach.' },
-  { quote: 'Consistency in corporate relationships builds lifelong placement partnerships.' },
-  { quote: 'Turning ambition into achievement through strategic placement coordination.' },
-  { quote: 'Bridging the gap between premier talent and industry leaders.' },
+const MOTIVATIONAL_QUOTES = [
+  'Every positive response brings our campus closer to 100% placement success.',
+  'Your persistence today builds the career pathways of tomorrow.',
+  'Focus on quality engagements — meaningful calls yield high-value drives.',
+  'Consistent daily outreach transforms regional opportunities into corporate offers.',
+  'Precision in tracking leads to speed in placement conversions.',
 ];
 
 function toTitleCase(str: string): string {
@@ -111,9 +107,21 @@ export function DashboardHeader() {
   const currentQuote = MOTIVATIONAL_QUOTES[quoteIndex] || MOTIVATIONAL_QUOTES[0];
 
   useEffect(() => {
-    const refreshProfile = () => {
+    const refreshProfile = async () => {
       const u = readSessionUser();
-      setUser(u);
+      if (u) {
+        setUser(u);
+        const uid = u._id || (u as any).userId;
+        if (uid) {
+          try {
+            const res = await apiFetch(`/profile/${uid}`);
+            if (res.success && res.data) {
+              updateSessionUser(res.data);
+              setUser(res.data);
+            }
+          } catch { /* ignore */ }
+        }
+      }
     };
 
     refreshProfile();
@@ -176,9 +184,8 @@ export function DashboardHeader() {
             <span>{toTitleCase(greetingData?.greeting ?? `Good ${period}`)} {periodEmoji}</span>
           </div>
 
-          {/* Top-Right Notification Bell & Sign Out */}
+          {/* Top-Right Sign Out */}
           <div className="flex items-center gap-3">
-            <NotificationBellDropdown />
             <UserSignOutButton />
           </div>
 
@@ -223,7 +230,7 @@ export function DashboardHeader() {
                   isFading ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'
                 }`}
               >
-                {currentQuote.quote}
+                {currentQuote}
               </p>
             </div>
 

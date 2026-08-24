@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, PhoneCall, CalendarDays, Target, Database,
-  TrendingUp, MessageSquareText, Bell, PanelLeftClose, X,
+  LayoutDashboard, PhoneCall, CalendarDays, Target, ListTodo, Database,
+  TrendingUp, MessageSquareText, PanelLeftClose, X,
 } from 'lucide-react';
 
 import { InfoziantMark } from '@/components/InfoziantMark';
@@ -34,10 +34,10 @@ const NAV: NavItem[] = [
   { href: '/tracker',        label: 'Daily Tracker',  Icon: PhoneCall },
   { href: '/weekly-tracker', label: 'Weekly Tracker', Icon: CalendarDays },
   { href: '/daily-leads',    label: 'Daily Leads',    Icon: Target },
+  { href: '/pending-tasks',  label: 'Pending Task',   Icon: ListTodo },
   { href: '/metadata',       label: 'Metadata DB',    Icon: Database },
   { href: '/reports',        label: 'Reports & BI',   Icon: TrendingUp },
   { href: '/chat',           label: 'Chat',           Icon: MessageSquareText },
-  { href: '/notifications',  label: 'Alerts',         Icon: Bell },
 ];
 
 interface Props {
@@ -118,11 +118,23 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
     try { window.sessionStorage.setItem(NAV_INTRO_KEY, 'done'); } catch { /* ignore */ }
   }, []);
 
-  // Sync user state from localStorage and live update events
+  // Sync user state from localStorage, live update events, and background database fetch
   useEffect(() => {
-    const refreshUser = () => {
+    const refreshUser = async () => {
       const session = readSessionUser();
-      setUser(session);
+      if (session) {
+        setUser(session);
+        const uid = session._id || (session as any).userId;
+        if (uid) {
+          try {
+            const res = await apiFetch(`/profile/${uid}`);
+            if (res.success && res.data) {
+              updateSessionUser(res.data);
+              setUser(res.data);
+            }
+          } catch { /* ignore */ }
+        }
+      }
     };
 
     refreshUser();

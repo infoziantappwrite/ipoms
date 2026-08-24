@@ -7,7 +7,7 @@ import { WeeklyKpiCards, WeeklyKpiData } from './components/WeeklyKpiCards';
 import { WeeklySection } from './components/WeeklySection';
 import { AddCompanyModal } from './components/AddCompanyModal';
 import type { WeeklyRow } from './components/WeeklyTable';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, apiFetchBlob } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
 
 interface SectionData {
@@ -187,51 +187,31 @@ export default function WeeklyTrackerPage() {
     }
   };
 
-  // ── CSV Export Utility
-  const handleExportCsv = () => {
-    if (!sections) return;
-
-    const allRows: any[] = [];
-    Object.entries(sections).forEach(([key, sec]) => {
-      sec.rows.forEach((r: WeeklyRow, i: number) => {
-        allRows.push({
-          Section: sec.title,
-          'S.No': i + 1,
-          'Company Name': r.company_name,
-          Roles: r.job_role,
-          Type: r.company_type || '',
-          CTC: r.ctc_lpa || '',
-          'Follow-Up Date': r.follow_up_date ? new Date(r.follow_up_date).toISOString().split('T')[0] : '',
-          'Status Notes': r.current_status_text,
-          Offers: r.selected_count || 0,
-        });
-      });
-    });
-
-    if (allRows.length === 0) {
-      alert('No data available to export.');
+  // ── XLSX Excel Export Utility
+  const handleExportXlsx = async () => {
+    if (!selectedCollegeId) {
+      alert('Please select a college first');
       return;
     }
 
-    const headers = Object.keys(allRows[0]);
-    const csvContent = [
-      headers.join(','),
-      ...allRows.map((row) =>
-        headers.map((h) => `"${String(row[h] || '').replace(/"/g, '""')}"`).join(',')
-      ),
-    ].join('\n');
+    try {
+      const q = searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : '';
+      const blob = await apiFetchBlob(
+        `/weekly-tracker/export-xlsx?college_id=${selectedCollegeId}&academic_year=2026${q}`
+      );
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute(
-      'download',
-      `Weekly_Tracker_${selectedCollegeName.replace(/\s+/g, '_')}_2026.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Weekly_Tracker_${selectedCollegeName.replace(/\s+/g, '_')}_2026.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.error('Export XLSX error:', err);
+      alert('Failed to export XLSX document: ' + (err.message || 'Unknown error'));
+    }
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -256,11 +236,7 @@ export default function WeeklyTrackerPage() {
         onWeekChange={setWeekOffset}
         onOpenAddModal={() => setIsAddModalOpen(true)}
         onSyncDailyPositives={handleSyncDailyPositives}
-        onRefresh={() => {
-          loadWeeklyTracker();
-          loadKpi();
-        }}
-        onExportCsv={handleExportCsv}
+        onExportXlsx={handleExportXlsx}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
       />

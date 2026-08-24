@@ -120,6 +120,20 @@ function publicUser(user: any) {
     designation: user.designation || (user.role_codes?.includes('ADMIN') || user.role_codes?.includes('ADMINISTRATOR') ? 'Administrator' : user.role_codes?.includes('TEAM_LEADER') ? 'Team Leader' : 'Placement Operations Coordinator'),
     employee_id: user.employee_id || '',
     must_change_password: user.must_change_password,
+    is_profile_locked: Boolean(user.is_profile_locked),
+    profile_locked_at: user.profile_locked_at || null,
+    personal_email: user.personal_email || '',
+    primary_mobile: user.primary_mobile || '',
+    secondary_mobile: user.secondary_mobile || user.alternate_mobile || '',
+    alternate_mobile: user.alternate_mobile || user.secondary_mobile || '',
+    linkedin_profile: user.linkedin_profile || '',
+    date_of_birth: user.date_of_birth || null,
+    date_of_joining: user.date_of_joining || null,
+    address_line: user.address_line || user.residential_address || '',
+    residential_address: user.residential_address || user.address_line || '',
+    pincode: user.pincode || '',
+    city: user.city || '',
+    state: user.state || '',
   };
 }
 

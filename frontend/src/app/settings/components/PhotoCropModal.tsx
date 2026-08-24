@@ -113,8 +113,8 @@ export function PhotoCropModal({ imageSrc, onCropComplete, onCancel }: Props) {
     if (!imageRef.current) return;
     const img = imageRef.current;
 
-    // High-resolution output (600 x 600)
-    const outputSize = 600;
+    // High-resolution avatar output (400 x 400, crisp and lightweight ~40KB)
+    const outputSize = 400;
     const canvas = document.createElement('canvas');
     canvas.width = outputSize;
     canvas.height = outputSize;
@@ -138,8 +138,8 @@ export function PhotoCropModal({ imageSrc, onCropComplete, onCancel }: Props) {
 
     ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
 
-    // Export clean JPEG / WebP data URL
-    const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    // Export clean compressed JPEG data URL
+    const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
     onCropComplete(croppedDataUrl);
   }, [baseWidth, baseHeight, offset, rotation, zoom, onCropComplete]);
 

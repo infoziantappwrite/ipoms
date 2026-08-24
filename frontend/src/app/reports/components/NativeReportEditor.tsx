@@ -9,6 +9,8 @@ import {
   Calendar,
   User,
   Building2,
+  ListTodo,
+  Clock,
 } from 'lucide-react';
 
 const COLLEGE_LOGO_MAP: Record<string, string> = {
@@ -79,6 +81,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
   const handleUpdateCell = (sectionKey: string, rowIndex: number, field: string, value: any) => {
     setReport((prev: any) => {
       const updated = { ...prev };
+      if (!updated.sections[sectionKey]) return updated;
       const sec = [...updated.sections[sectionKey]];
       sec[rowIndex] = { ...sec[rowIndex], [field]: value };
       updated.sections[sectionKey] = sec;
@@ -105,50 +108,98 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           </x:ExcelWorkbook>
         </xml>
         <![endif]-->
-        <meta http-equiv="content-type" content="application/vnd.ms-excel; charset=UTF-8"/>
+        <meta http-equiv="content-type" content="text/plain; charset=UTF-8"/>
         <style>
-          table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11pt; }
-          th { background-color: #1E3A8A; color: #FFFFFF; font-weight: bold; border: 1px solid #CBD5E1; padding: 6px 10px; text-align: left; }
-          td { border: 1px solid #E2E8F0; padding: 5px 8px; }
-          .title { font-size: 16pt; font-weight: bold; color: #1E3A8A; }
-          .meta { font-size: 10pt; color: #475569; }
-          .sec-header { background-color: #F1F5F9; font-weight: bold; font-size: 12pt; color: #1E3A8A; border: 1px solid #CBD5E1; padding: 6px; }
-          .kpi-th { background-color: #0F766E; color: #FFFFFF; font-weight: bold; text-align: center; }
-          .kpi-val { font-size: 13pt; font-weight: bold; text-align: center; }
+          body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
+          table { border-collapse: collapse; width: 100%; }
+          th { background-color: #1e3a8a; color: #ffffff; font-weight: bold; border: 1px solid #94a3b8; padding: 6px; }
+          td { border: 1px solid #cbd5e1; padding: 6px; }
+          .header-title { font-size: 16pt; font-weight: bold; color: #1e3a8a; }
+          .header-sub { font-size: 11pt; color: #475569; }
+          .sec-header { background-color: #f1f5f9; font-weight: bold; font-size: 12pt; color: #0f172a; padding: 8px; border: 1px solid #94a3b8; }
         </style>
       </head>
       <body>
         <table>
-          <tr><td colspan="7" class="title">INFOZIANT — ${report.report_title || 'Weekly Report'}</td></tr>
-          <tr><td colspan="7" class="meta">Institution: <b>${report.branding?.college_name || 'Consolidated Partner Institutions'} [${report.branding?.college_code || 'iPOMS'}]</b></td></tr>
-          <tr><td colspan="7" class="meta">Period: <b>${report.report_period || '—'}</b> | Generated: <b>${report.generated_date || '—'}</b> | Prepared By: <b>${report.generated_by || '—'}</b></td></tr>
+          <tr><td colspan="7" class="header-title">${report.branding?.company_name || 'Infoziant IT Solutions'}</td></tr>
+          <tr><td colspan="7" class="header-sub">${report.branding?.college_name || 'Partner Institutions'} — ${report.report_title}</td></tr>
+          <tr><td colspan="7" style="color:#64748b;">Period: ${report.report_period || ''} | Generated: ${report.generated_date || ''}</td></tr>
           <tr><td colspan="7"></td></tr>
     `;
 
     // KPI Summary
     if (report.kpi_summary) {
+      if (report.kpi_summary.total_pending_tasks !== undefined) {
+        html += `
+          <tr><td colspan="7" class="sec-header">PENDING TASKS KPI SUMMARY</td></tr>
+          <tr>
+            <th colspan="2">Total Tasks</th>
+            <th colspan="2">DB Shared</th>
+            <th colspan="2">DB Pending</th>
+            <th>Drives Scheduled</th>
+          </tr>
+          <tr>
+            <td colspan="2" style="text-align:center; font-weight:bold;">${report.kpi_summary.total_pending_tasks}</td>
+            <td colspan="2" style="text-align:center; font-weight:bold; color:#059669;">${report.kpi_summary.db_shared_count || 0}</td>
+            <td colspan="2" style="text-align:center; font-weight:bold; color:#d97706;">${report.kpi_summary.db_pending_count || 0}</td>
+            <td style="text-align:center; font-weight:bold; color:#2563eb;">${report.kpi_summary.drives_scheduled || 0}</td>
+          </tr>
+          <tr><td colspan="7"></td></tr>
+        `;
+      } else {
+        html += `
+          <tr><td colspan="7" class="sec-header">EXECUTIVE KPI SUMMARY</td></tr>
+          <tr>
+            <th>Total Calls</th>
+            <th>Positives</th>
+            <th>JDs</th>
+            <th>Completed</th>
+            <th>In Progress</th>
+            <th>Pipeline</th>
+            <th>Offers Placed</th>
+          </tr>
+          <tr>
+            <td style="text-align:center;">${report.kpi_summary.total_calls || 0}</td>
+            <td style="text-align:center;">${report.kpi_summary.positive_responses || 0}</td>
+            <td style="text-align:center;">${report.kpi_summary.jds_received || 0}</td>
+            <td style="text-align:center;">${report.kpi_summary.drives_completed || 0}</td>
+            <td style="text-align:center;">${report.kpi_summary.drives_in_progress || 0}</td>
+            <td style="text-align:center;">${report.kpi_summary.pipeline_leads || 0}</td>
+            <td style="text-align:center; font-weight:bold; color:#059669;">${report.kpi_summary.total_offers || 0}</td>
+          </tr>
+          <tr><td colspan="7"></td></tr>
+        `;
+      }
+    }
+
+    // Section: Pending Tasks
+    if (report.sections?.pending_tasks && report.sections.pending_tasks.length > 0) {
       html += `
-        <tr><td colspan="7" class="sec-header">OPERATIONAL KPI SUMMARY</td></tr>
+        <tr><td colspan="7" class="sec-header">PLACEMENT PENDING TASKS (${report.sections.pending_tasks.length} Tasks)</td></tr>
         <tr>
-          <th class="kpi-th">Total Calls</th>
-          <th class="kpi-th">Positives</th>
-          <th class="kpi-th">JDs Received</th>
-          <th class="kpi-th">Completed</th>
-          <th class="kpi-th">In Progress</th>
-          <th class="kpi-th">Pipeline</th>
-          <th class="kpi-th">Offers Placed</th>
+          <th style="width:50px; text-align:center;">#</th>
+          <th>Company Name</th>
+          <th>JD Received Date</th>
+          <th>DB Shared Date</th>
+          <th>Current Status</th>
+          <th>Action to be Taken</th>
+          <th>Drive Date</th>
         </tr>
-        <tr>
-          <td class="kpi-val" style="color:#2563EB;">${report.kpi_summary.total_calls}</td>
-          <td class="kpi-val" style="color:#059669;">${report.kpi_summary.positive_responses}</td>
-          <td class="kpi-val" style="color:#0891B2;">${report.kpi_summary.jds_received}</td>
-          <td class="kpi-val" style="color:#D97706;">${report.kpi_summary.drives_completed}</td>
-          <td class="kpi-val" style="color:#7C3AED;">${report.kpi_summary.drives_in_progress}</td>
-          <td class="kpi-val" style="color:#475569;">${report.kpi_summary.pipeline_leads}</td>
-          <td class="kpi-val" style="color:#059669;">${report.kpi_summary.total_offers}</td>
-        </tr>
-        <tr><td colspan="7"></td></tr>
       `;
+      report.sections.pending_tasks.forEach((r: any) => {
+        html += `
+          <tr>
+            <td style="text-align:center;">${r.s_no}</td>
+            <td><b>${r.company_name}</b></td>
+            <td>${r.jd_received_date || '—'}</td>
+            <td>${r.db_shared_date || '—'}</td>
+            <td>${r.current_status || '—'}</td>
+            <td>${r.action_to_be_taken || '—'}</td>
+            <td>${r.drive_date || '—'}</td>
+          </tr>
+        `;
+      });
+      html += `<tr><td colspan="7"></td></tr>`;
     }
 
     // Section 1: Companies Completed
@@ -431,36 +482,59 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
 
         {/* 3. Live KPI Summary Strip (Slim Single-Row Profile) */}
         {report.included_sections?.kpi_summary && report.kpi_summary && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 pt-1">
-            <div className="bg-white border border-blue-200/80 p-2 rounded-xl text-center shadow-2xs">
-              <span className="text-micro text-slate-500 font-semibold uppercase block">Calls</span>
-              <span className="text-sm font-bold font-mono text-primary tabular-nums">{report.kpi_summary.total_calls}</span>
-            </div>
-            <div className="bg-white border border-emerald-200/80 p-2 rounded-xl text-center shadow-2xs">
-              <span className="text-micro text-slate-500 font-semibold uppercase block">Positives</span>
-              <span className="text-sm font-bold font-mono text-emerald-700 tabular-nums">{report.kpi_summary.positive_responses}</span>
-            </div>
-            <div className="bg-white border border-cyan-200/80 p-2 rounded-xl text-center shadow-2xs">
-              <span className="text-micro text-slate-500 font-semibold uppercase block">JDs Received</span>
-              <span className="text-sm font-bold font-mono text-cyan-700 tabular-nums">{report.kpi_summary.jds_received}</span>
-            </div>
-            <div className="bg-white border border-amber-200/80 p-2 rounded-xl text-center shadow-2xs">
-              <span className="text-micro text-slate-500 font-semibold uppercase block">Completed</span>
-              <span className="text-sm font-bold font-mono text-amber-700 tabular-nums">{report.kpi_summary.drives_completed}</span>
-            </div>
-            <div className="bg-white border border-purple-200/80 p-2 rounded-xl text-center shadow-2xs">
-              <span className="text-micro text-slate-500 font-semibold uppercase block">In Progress</span>
-              <span className="text-sm font-bold font-mono text-purple-700 tabular-nums">{report.kpi_summary.drives_in_progress}</span>
-            </div>
-            <div className="bg-white border border-slate-200 p-2 rounded-xl text-center shadow-2xs">
-              <span className="text-micro text-slate-500 font-semibold uppercase block">Pipeline</span>
-              <span className="text-sm font-bold font-mono text-slate-700 tabular-nums">{report.kpi_summary.pipeline_leads}</span>
-            </div>
-            <div className="bg-white border border-emerald-300 p-2 rounded-xl text-center shadow-2xs bg-emerald-50/40">
-              <span className="text-micro text-emerald-800 font-bold uppercase block">Offers</span>
-              <span className="text-sm font-bold font-mono text-emerald-700 tabular-nums">{report.kpi_summary.total_offers}</span>
-            </div>
-          </div>
+          <>
+            {report.kpi_summary.total_pending_tasks !== undefined ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                <div className="bg-white border border-blue-200/80 p-2.5 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-slate-500 font-semibold uppercase block">Total Tasks</span>
+                  <span className="text-base font-bold font-mono text-primary tabular-nums">{report.kpi_summary.total_pending_tasks}</span>
+                </div>
+                <div className="bg-white border border-emerald-200/80 p-2.5 rounded-xl text-center shadow-2xs bg-emerald-50/20">
+                  <span className="text-micro text-emerald-700 font-semibold uppercase block">DB Shared</span>
+                  <span className="text-base font-bold font-mono text-emerald-700 tabular-nums">{report.kpi_summary.db_shared_count || 0}</span>
+                </div>
+                <div className="bg-white border border-amber-200/80 p-2.5 rounded-xl text-center shadow-2xs bg-amber-50/20">
+                  <span className="text-micro text-amber-700 font-semibold uppercase block">DB Pending</span>
+                  <span className="text-base font-bold font-mono text-amber-700 tabular-nums">{report.kpi_summary.db_pending_count || 0}</span>
+                </div>
+                <div className="bg-white border border-purple-200/80 p-2.5 rounded-xl text-center shadow-2xs bg-purple-50/20">
+                  <span className="text-micro text-purple-700 font-semibold uppercase block">Drives Scheduled</span>
+                  <span className="text-base font-bold font-mono text-purple-700 tabular-nums">{report.kpi_summary.drives_scheduled || 0}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 pt-1">
+                <div className="bg-white border border-blue-200/80 p-2 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-slate-500 font-semibold uppercase block">Calls</span>
+                  <span className="text-sm font-bold font-mono text-primary tabular-nums">{report.kpi_summary.total_calls}</span>
+                </div>
+                <div className="bg-white border border-emerald-200/80 p-2 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-slate-500 font-semibold uppercase block">Positives</span>
+                  <span className="text-sm font-bold font-mono text-emerald-700 tabular-nums">{report.kpi_summary.positive_responses}</span>
+                </div>
+                <div className="bg-white border border-cyan-200/80 p-2 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-slate-500 font-semibold uppercase block">JDs Received</span>
+                  <span className="text-sm font-bold font-mono text-cyan-700 tabular-nums">{report.kpi_summary.jds_received}</span>
+                </div>
+                <div className="bg-white border border-amber-200/80 p-2 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-slate-500 font-semibold uppercase block">Completed</span>
+                  <span className="text-sm font-bold font-mono text-amber-700 tabular-nums">{report.kpi_summary.drives_completed}</span>
+                </div>
+                <div className="bg-white border border-purple-200/80 p-2 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-slate-500 font-semibold uppercase block">In Progress</span>
+                  <span className="text-sm font-bold font-mono text-purple-700 tabular-nums">{report.kpi_summary.drives_in_progress}</span>
+                </div>
+                <div className="bg-white border border-slate-200 p-2 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-slate-500 font-semibold uppercase block">Pipeline</span>
+                  <span className="text-sm font-bold font-mono text-slate-700 tabular-nums">{report.kpi_summary.pipeline_leads}</span>
+                </div>
+                <div className="bg-white border border-emerald-300 p-2 rounded-xl text-center shadow-2xs bg-emerald-50/40">
+                  <span className="text-micro text-emerald-800 font-bold uppercase block">Offers</span>
+                  <span className="text-sm font-bold font-mono text-emerald-700 tabular-nums">{report.kpi_summary.total_offers}</span>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* 4. Section 1: Companies Completed */}
@@ -634,6 +708,118 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                         <td className="py-2 px-3 text-slate-600">{r.job_role}</td>
                         <td className="py-2 px-3 text-slate-500">{r.company_type}</td>
                         <td className="py-2 px-3 text-slate-500">{r.current_status_text}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 6. Section: Placement Pending Tasks */}
+        {report.included_sections?.pending_tasks && report.sections?.pending_tasks && (
+          <div className="space-y-2 pt-2">
+            <div className="px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/70 font-bold text-xs flex items-center justify-between text-indigo-900">
+              <span className="flex items-center gap-1.5">
+                <ListTodo size={14} strokeWidth={2.25} className="text-indigo-700" /> PLACEMENT PENDING TASKS
+              </span>
+              <span className="font-mono text-micro bg-white px-2 py-0.5 rounded-md border border-indigo-200 text-indigo-700 font-bold">
+                {report.sections.pending_tasks.length} Tasks
+              </span>
+            </div>
+
+            {report.sections.pending_tasks.length === 0 ? (
+              <p className="text-xs text-slate-400 italic py-2">No pending tasks recorded for this institution.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 text-micro">
+                      <th className="py-2 px-2 w-8 text-center">#</th>
+                      <th className="py-2 px-3">Company Name</th>
+                      <th className="py-2 px-3">JD Received Date</th>
+                      <th className="py-2 px-3">DB Shared Date</th>
+                      <th className="py-2 px-3">Current Status</th>
+                      <th className="py-2 px-3">Action to be Taken</th>
+                      <th className="py-2 px-3">Drive Date</th>
+                      <th className="py-2 px-3">Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-normal">
+                    {report.sections.pending_tasks.map((r: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-slate-50/60">
+                        <td className="py-2 px-2 text-center text-slate-400">{r.s_no}</td>
+                        <td className="py-2 px-3 font-semibold text-slate-800">
+                          <input
+                            type="text"
+                            value={r.company_name}
+                            onChange={(e) =>
+                              handleUpdateCell('pending_tasks', idx, 'company_name', e.target.value)
+                            }
+                            className="bg-transparent w-full focus:bg-white focus:border focus:border-primary rounded px-1 outline-none"
+                          />
+                        </td>
+                        <td className="py-2 px-3 text-slate-600">
+                          <input
+                            type="text"
+                            value={r.jd_received_date}
+                            onChange={(e) =>
+                              handleUpdateCell('pending_tasks', idx, 'jd_received_date', e.target.value)
+                            }
+                            className="bg-transparent w-full focus:bg-white focus:border focus:border-primary rounded px-1 outline-none"
+                          />
+                        </td>
+                        <td className="py-2 px-3 text-slate-600">
+                          <input
+                            type="text"
+                            value={r.db_shared_date}
+                            onChange={(e) =>
+                              handleUpdateCell('pending_tasks', idx, 'db_shared_date', e.target.value)
+                            }
+                            className="bg-transparent w-full focus:bg-white focus:border focus:border-primary rounded px-1 outline-none"
+                          />
+                        </td>
+                        <td className="py-2 px-3 text-slate-700">
+                          <input
+                            type="text"
+                            value={r.current_status}
+                            onChange={(e) =>
+                              handleUpdateCell('pending_tasks', idx, 'current_status', e.target.value)
+                            }
+                            className="bg-transparent w-full focus:bg-white focus:border focus:border-primary rounded px-1 outline-none"
+                          />
+                        </td>
+                        <td className="py-2 px-3 text-slate-700 font-medium">
+                          <input
+                            type="text"
+                            value={r.action_to_be_taken}
+                            onChange={(e) =>
+                              handleUpdateCell('pending_tasks', idx, 'action_to_be_taken', e.target.value)
+                            }
+                            className="bg-transparent w-full focus:bg-white focus:border focus:border-primary rounded px-1 outline-none"
+                          />
+                        </td>
+                        <td className="py-2 px-3 text-indigo-700 font-semibold">
+                          <input
+                            type="text"
+                            value={r.drive_date}
+                            onChange={(e) =>
+                              handleUpdateCell('pending_tasks', idx, 'drive_date', e.target.value)
+                            }
+                            className="bg-transparent w-full focus:bg-white focus:border focus:border-primary rounded px-1 outline-none"
+                          />
+                        </td>
+                        <td className="py-2 px-3 text-slate-500">
+                          <input
+                            type="text"
+                            value={r.remarks}
+                            onChange={(e) =>
+                              handleUpdateCell('pending_tasks', idx, 'remarks', e.target.value)
+                            }
+                            className="bg-transparent w-full focus:bg-white focus:border focus:border-primary rounded px-1 outline-none"
+                          />
+                        </td>
                       </tr>
                     ))}
                   </tbody>

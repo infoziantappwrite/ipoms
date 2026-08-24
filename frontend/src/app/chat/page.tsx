@@ -11,7 +11,6 @@ import {
 import { readSessionUser, type SessionUser } from '@/lib/session';
 import { apiFetch } from '@/lib/api';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
-import { NotificationBellDropdown } from '@/components/NotificationBellDropdown';
 import { getSenderColor } from '@/lib/chatColors';
 import { subscribeChatEvent } from '@/lib/chatStream';
 
@@ -544,7 +543,6 @@ export default function TeamChatPage() {
             <span>{genuineCoordinators.filter((c) => c.is_online).length || 1} Online</span>
           </span>
 
-          <NotificationBellDropdown />
           <UserSignOutButton />
         </div>
       </header>

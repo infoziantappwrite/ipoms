@@ -4,12 +4,28 @@ export type RoleKey = 'admin' | 'team_leader' | 'coordinator';
 
 export interface SessionUser {
   _id: string;
+  id?: string;
   full_name: string;
+  username?: string;
   official_email: string;
   role_codes: string[];
   profile_photo_url?: string;
   designation?: string;
   employee_id?: string;
+  is_profile_locked?: boolean;
+  profile_locked_at?: string | null;
+  primary_mobile?: string;
+  secondary_mobile?: string;
+  alternate_mobile?: string;
+  personal_email?: string;
+  linkedin_profile?: string;
+  date_of_birth?: string | null;
+  date_of_joining?: string | null;
+  address_line?: string;
+  residential_address?: string;
+  pincode?: string;
+  city?: string;
+  state?: string;
 }
 
 const USER_KEY = 'ipoms_user';
@@ -48,4 +64,16 @@ export function armNavIntro() {
   try {
     window.sessionStorage.setItem(NAV_INTRO_KEY, 'pending');
   } catch { /* storage disabled */ }
+}
+
+/** Updates the stored session user and dispatches sync events across all pages/drawers. */
+export function updateSessionUser(patch: Partial<SessionUser> & Record<string, any>) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = readSessionUser() || ({} as SessionUser);
+    const updated = { ...current, ...patch };
+    window.localStorage.setItem(USER_KEY, JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent('ipoms_user_updated', { detail: updated }));
+    window.dispatchEvent(new Event('storage'));
+  } catch { /* ignore */ }
 }

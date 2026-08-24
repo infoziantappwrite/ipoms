@@ -69,20 +69,30 @@ export function LeadsHeader({
         {/* Pin Selected College Logo & Sign Out to Absolute Top Right */}
         <div className="flex items-center gap-3 shrink-0">
           {selectedCollegeObj && (
-            <div
-              title={`${selectedCollegeObj.college_name} (${selectedCollegeObj.college_code})`}
-              className="flex items-center justify-center bg-white border border-slate-200 px-2.5 py-1 rounded-xl shadow-xs animate-fadeIn h-9 max-w-[160px] shrink-0"
-            >
-              {selectedCollegeObj.logo_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={selectedCollegeObj.logo_url}
-                  alt={selectedCollegeObj.college_name}
-                  className="max-h-7 max-w-full w-auto h-auto object-contain rounded"
-                />
-              ) : (
-                <span className="w-7 h-7 rounded-lg bg-blue-100 text-primary font-bold text-xs flex items-center justify-center font-mono">
-                  {selectedCollegeObj.college_code?.slice(0, 2) || 'CL'}
+            <div className="flex items-center gap-2">
+              <div
+                title={`${selectedCollegeObj.college_name} (${selectedCollegeObj.college_code})`}
+                className="flex items-center justify-center bg-white border border-slate-200 px-2.5 py-1 rounded-xl shadow-xs animate-fadeIn h-9 max-w-[160px] shrink-0"
+              >
+                {selectedCollegeObj.logo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={selectedCollegeObj.logo_url}
+                    alt={selectedCollegeObj.college_name}
+                    className="max-h-7 max-w-full w-auto h-auto object-contain rounded"
+                  />
+                ) : (
+                  <span className="w-7 h-7 rounded-lg bg-blue-100 text-primary font-bold text-xs flex items-center justify-center font-mono">
+                    {selectedCollegeObj.college_code?.slice(0, 2) || 'CL'}
+                  </span>
+                )}
+              </div>
+              {selectedCollegeObj.location && (
+                <span
+                  className="text-xs text-slate-500 font-medium hidden sm:inline truncate max-w-[160px]"
+                  title={selectedCollegeObj.location}
+                >
+                  {selectedCollegeObj.location}
                 </span>
               )}
             </div>

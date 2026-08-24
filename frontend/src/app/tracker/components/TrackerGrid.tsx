@@ -8,7 +8,7 @@ interface Props {
   rows: TrackerRowType[];
   isReadOnly: boolean;
   onRowUpdate: (rowId: string, patch: Partial<TrackerRowType>) => Promise<void>;
-  onSkip: (rowId: string) => Promise<void>;
+  onDelete: (rowId: string) => Promise<void>;
   onCall?: (row: TrackerRowType) => void;
 }
 
@@ -24,10 +24,10 @@ const COLUMN_HEADERS = [
   { label: 'Call Status', width: 'w-44 shrink-0' },
   { label: 'Follow Up', width: 'w-36 shrink-0' },
   { label: 'Comments', width: 'flex-1 min-w-[200px]' },
-  { label: 'Actions', width: 'w-16 shrink-0' },
+  { label: 'Actions', width: 'w-16 text-center shrink-0' },
 ];
 
-export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onSkip, onCall }: Props) {
+export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onDelete, onCall }: Props) {
   if (rows.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16 text-center">
@@ -69,23 +69,12 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onSkip, onCall }: P
               row={row}
               isReadOnly={isReadOnly}
               onUpdate={(patch) => onRowUpdate(row._id, patch)}
-              onSkip={() => onSkip(row._id)}
+              onDelete={() => onDelete(row._id)}
               onCall={onCall}
             />
           ))}
         </div>
       </div>
-
-      {/* Keyboard shortcut hint footer */}
-      {!isReadOnly && (
-        <div className="sticky bottom-0 bg-background/90 border-t border-border px-4 py-1.5
-                        flex items-center gap-4 text-xs text-fg-muted">
-          <span><kbd className="bg-surface px-1 py-0.5 rounded text-fg-subtle">Tab</kbd> Next cell</span>
-          <span><kbd className="bg-surface px-1 py-0.5 rounded text-fg-subtle">Enter</kbd> Save row</span>
-          <span><kbd className="bg-surface px-1 py-0.5 rounded text-fg-subtle">Ctrl+S</kbd> Save all</span>
-          <span><kbd className="bg-surface px-1 py-0.5 rounded text-fg-subtle">Del</kbd> Clear cell</span>
-        </div>
-      )}
     </div>
   );
 }

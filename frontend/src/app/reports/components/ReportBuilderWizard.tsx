@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Globe, Save, Sparkles, Wrench, BarChart3, TrendingUp, GraduationCap, UserCheck, Calendar, AlertCircle } from 'lucide-react';
+import { Globe, Save, Sparkles, Wrench, BarChart3, TrendingUp, ListTodo, Calendar, AlertCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 import { CollegeSelector } from '@/components/CollegeSelector';
@@ -26,7 +26,7 @@ export function ReportBuilderWizard({
 }: Props) {
   const [templateType, setTemplateType] = useState(initialTemplateType || 'weekly_placement');
   const [collegeId, setCollegeId] = useState(initialCollegeId || 'all');
-  const [academicYear, setAcademicYear] = useState('2026');
+  const [academicYear, setAcademicYear] = useState('2027');
   
   // Dynamic Interactive Date Range Calendar Selection
   const [startDate, setStartDate] = useState('2026-08-21');
@@ -46,6 +46,7 @@ export function ReportBuilderWizard({
     completed_companies: true,
     in_progress: true,
     pipeline: true,
+    pending_tasks: true,
     charts: true,
     insights: true,
     remarks: true,
@@ -169,8 +170,7 @@ export function ReportBuilderWizard({
   const TEMPLATES = [
     { id: 'weekly_placement', label: 'Weekly Placement', icon: BarChart3 },
     { id: 'monthly_placement', label: 'Monthly Placement', icon: TrendingUp },
-    { id: 'college_deep_dive', label: 'College Deep-Dive', icon: GraduationCap },
-    { id: 'coordinator_activity', label: 'Coordinator Activity', icon: UserCheck },
+    { id: 'pending_tasks', label: 'Pending Tasks', icon: ListTodo },
   ];
 
   return (
@@ -197,12 +197,12 @@ export function ReportBuilderWizard({
           </button>
         </div>
 
-        {/* Step 1: Select Report Template (Slim Profile) */}
+        {/* Step 1: Select Report Template (3 Options) */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-2">
             1. Select Report Template
           </label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             {TEMPLATES.map((t) => {
               const IconComponent = t.icon;
               const isSelected = templateType === t.id;
@@ -211,14 +211,14 @@ export function ReportBuilderWizard({
                   key={t.id}
                   type="button"
                   onClick={() => setTemplateType(t.id)}
-                  className={`px-3 py-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer select-none shadow-2xs ${
+                  className={`px-4 py-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer select-none shadow-2xs ${
                     isSelected
                       ? 'bg-primary text-white border-primary shadow-xs font-bold'
                       : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                   }`}
                 >
                   <IconComponent
-                    size={14}
+                    size={15}
                     strokeWidth={isSelected ? 2.5 : 2}
                     className={isSelected ? 'text-white shrink-0' : 'text-slate-500 shrink-0'}
                   />
@@ -262,7 +262,6 @@ export function ReportBuilderWizard({
               className="w-full bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3 py-2 text-slate-800 text-xs cursor-pointer outline-none font-medium shadow-xs"
             >
               <option value="">-- Select Graduating Year --</option>
-              <option value="2026">2026 Graduating</option>
               <option value="2027">2027 Graduating</option>
               <option value="2028">2028 Graduating</option>
               <option value="2029">2029 Graduating</option>

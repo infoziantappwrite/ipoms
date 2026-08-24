@@ -1,8 +1,8 @@
 'use client';
 
-import { TrendingUp, BarChart3, FileSpreadsheet, Wrench } from 'lucide-react';
+import { TrendingUp, BarChart3, Wrench } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
-export type ReportsTab = 'analytics' | 'library' | 'builder';
+export type ReportsTab = 'analytics' | 'builder';
 
 interface Props {
   activeTab: ReportsTab;
@@ -18,16 +18,10 @@ export function ReportsNavigation({ activeTab, onTabChange }: Props) {
       badge: 'Real-Time Insights',
     },
     {
-      id: 'library' as ReportsTab,
-      label: 'Reports Library',
-      Icon: FileSpreadsheet,
-      badge: '4 Templates',
-    },
-    {
       id: 'builder' as ReportsTab,
       label: 'Report Builder & Editor',
       Icon: Wrench,
-      badge: 'Interactive Canvas',
+      badge: 'Weekly • Monthly • Pending',
     },
   ];
 
@@ -41,7 +35,7 @@ export function ReportsNavigation({ activeTab, onTabChange }: Props) {
             <span>Reports & Analytics</span>
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Operational BI, 4 Enterprise Report Templates & Document-Style Editor
+            Operational BI, Institutional Report Generation & Document-Style Editor
           </p>
         </div>
 
@@ -51,8 +45,8 @@ export function ReportsNavigation({ activeTab, onTabChange }: Props) {
         </div>
       </div>
 
-      {/* ── Bottom Row: High-Contrast Equal 3-Column Tabs ─────────── */}
-      <div className="grid grid-cols-3 w-full border-t border-slate-200 pt-2 gap-2">
+      {/* ── Bottom Row: High-Contrast Equal 2-Column Tabs ─────────── */}
+      <div className="grid grid-cols-2 w-full border-t border-slate-200 pt-2 gap-2">
         {tabs.map((t) => {
           const IconComponent = t.Icon;
           const isActive = activeTab === t.id;

@@ -99,6 +99,9 @@ const POLICIES: Policy[] = [
   // ── Daily Leads ───────────────────────────────────────────────────────────
   { method: '*',      pattern: /^\/daily-leads(\/.*)?$/,                 roles: STAFF },
 
+  // ── Pending Tasks ─────────────────────────────────────────────────────────
+  { method: '*',      pattern: /^\/pending-tasks(\/.*)?$/,               roles: STAFF },
+
   // ── Analytics & Reports ───────────────────────────────────────────────────
   { method: '*',      pattern: /^\/analytics(\/.*)?$/,                   roles: STAFF },
   { method: '*',      pattern: /^\/reports(\/.*)?$/,                     roles: STAFF },

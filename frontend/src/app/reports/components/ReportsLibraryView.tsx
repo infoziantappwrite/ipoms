@@ -8,8 +8,7 @@ import {
   Trash2,
   TrendingUp,
   BarChart3,
-  GraduationCap,
-  UserCheck,
+  ListTodo,
   CheckCircle2,
 } from 'lucide-react';
 
@@ -22,9 +21,8 @@ interface Props {
 
 const TEMPLATE_ICONS: Record<string, any> = {
   weekly_placement: TrendingUp,
-  monthly_summary: BarChart3,
-  college_deep_dive: GraduationCap,
-  coordinator_activity: UserCheck,
+  monthly_placement: BarChart3,
+  pending_tasks: ListTodo,
 };
 
 export function ReportsLibraryView({ onSelectTemplate, onLoadPreset }: Props) {
@@ -68,24 +66,24 @@ export function ReportsLibraryView({ onSelectTemplate, onLoadPreset }: Props) {
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
 
-      {/* 4 Standardized Report Template Cards */}
+      {/* 3 Standardized Report Template Cards */}
       <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <FileSpreadsheet size={16} strokeWidth={2.25} className="text-primary" />
-              <span>Enterprise Report Templates</span>
+              <span>Institutional Report Templates</span>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              4 standardized institutional report templates. Select any template to configure and generate a live report.
+              3 standardized institutional report templates. Select any template to configure and generate a live report.
             </p>
           </div>
           <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full font-semibold flex items-center gap-1.5 shadow-2xs">
-            <CheckCircle2 size={13} strokeWidth={2.5} /> 4 Approved Formats
+            <CheckCircle2 size={13} strokeWidth={2.5} /> 3 Approved Formats
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {templates.map((t) => {
             const IconComp = TEMPLATE_ICONS[t.id] || FileSpreadsheet;
             return (

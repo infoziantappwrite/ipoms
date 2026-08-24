@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useCallback, useEffect } from 'react';
-import { Phone } from 'lucide-react';
+import { Phone, Trash2 } from 'lucide-react';
 import type { TrackerRow as TrackerRowType, CallOutcome } from '../page';
 
 const OUTCOMES: { value: CallOutcome; label: string; color: string }[] = [
@@ -47,7 +47,7 @@ interface Props {
   row: TrackerRowType;
   isReadOnly: boolean;
   onUpdate: (patch: Partial<TrackerRowType>) => void;
-  onSkip: () => void;
+  onDelete: () => void;
   onCall?: (row: TrackerRowType) => void;
 }
 
@@ -127,7 +127,7 @@ function smartParseTime(input: string): { iso: string; formatted: string } | nul
   };
 }
 
-export function TrackerRow({ row, isReadOnly, onUpdate, onSkip, onCall }: Props) {
+export function TrackerRow({ row, isReadOnly, onUpdate, onDelete, onCall }: Props) {
   const startTimeRef = useRef<HTMLInputElement>(null);
   const commentsRef = useRef<HTMLTextAreaElement | HTMLInputElement>(null);
 
@@ -216,20 +216,6 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onSkip, onCall }: Props)
   const handleCommentsBlur = useCallback(() => {
     onUpdate({ comments: commentsRef.current?.value ?? '' });
   }, [onUpdate]);
-
-  if (row.is_skipped && !isReadOnly) {
-    // Skipped rows: show dimmed with skip badge
-    return (
-      <div
-        data-row-id={row._id}
-        className={`flex items-center gap-1 px-2 py-1.5 text-xs ${rowBg} border-b border-border/30`}
-      >
-        <div className="w-12 px-1 text-center text-fg-muted shrink-0">{row.serial_no}</div>
-        <div className="flex-1 text-fg-muted line-through px-1">{row.company_name} — {row.hr_name}</div>
-        <span className="text-fg-muted bg-surface px-2 py-0.5 rounded-full text-xs">Skipped</span>
-      </div>
-    );
-  }
 
   return (
     <div
@@ -389,16 +375,16 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onSkip, onCall }: Props)
         )}
       </div>
 
-      {/* Actions — Skip button (Spec Section 8) */}
-      <div className="w-16 shrink-0 flex justify-center">
-        {!isReadOnly && !row.is_skipped && (
+      {/* Actions — Delete button */}
+      <div className="w-16 shrink-0 flex items-center justify-center">
+        {!isReadOnly && (
           <button
-            onClick={onSkip}
-            title="Skip this contact for today (will NOT delete from Master Database)"
-            className="opacity-0 group-hover:opacity-100 text-fg-subtle hover:text-destructive
-                       transition-all text-xs px-1.5 py-1 rounded hover:bg-destructive/20"
+            onClick={onDelete}
+            title="Delete this contact row from today's tracker"
+            className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600
+                       transition-all p-1.5 rounded-lg hover:bg-rose-50 cursor-pointer"
           >
-            Skip
+            <Trash2 size={14} />
           </button>
         )}
       </div>

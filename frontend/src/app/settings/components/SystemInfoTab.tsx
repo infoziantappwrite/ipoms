@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import {
-  BarChart3, LayoutDashboard, PhoneCall, CalendarDays, Target,
-  Database, TrendingUp, Bell, Settings, ExternalLink
+  BarChart3, LayoutDashboard, PhoneCall, CalendarDays, Target, ListTodo,
+  Database, TrendingUp, Settings, ExternalLink
 } from 'lucide-react';
 
 interface Props {
@@ -25,18 +25,18 @@ export function SystemInfoTab({ summaryData }: Props) {
       title: 'Daily Call Tracker',
       code: 'Module 03',
       Icon: PhoneCall,
-      desc: 'Lightning-fast 30-call daily logging grid with auto-save debounce, instant contact picker, and keyboard-driven efficiency.',
+      desc: 'Session-based outbound calling console with auto-duration timestamps, 12 single-choice call outcomes, and monthly follow-up scheduler.',
       href: '/tracker',
-      badge: 'Core Engine',
+      badge: 'Telephony Engine',
       color: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
     },
     {
-      title: 'Weekly Tracker Lifecycle',
+      title: 'Weekly Lifecycle Tracker',
       code: 'Module 04',
       Icon: CalendarDays,
-      desc: '7-stage placement pipeline board with follow-up proximity tracking, multi-role salary ranges, and institutional filtering.',
+      desc: '7-stage company pipeline board, stage promotions, automated Monday carry-overs, and dual-party rejection audit trails.',
       href: '/weekly-tracker',
-      badge: 'Pipeline CRM',
+      badge: 'Pipeline Matrix',
       color: 'border-purple-500/30 text-purple-400 bg-purple-500/10',
     },
     {
@@ -47,6 +47,15 @@ export function SystemInfoTab({ summaryData }: Props) {
       href: '/daily-leads',
       badge: 'Lead Registry',
       color: 'border-amber-500/30 text-amber-400 bg-amber-500/10',
+    },
+    {
+      title: 'Pending Task Register',
+      code: 'Module 09',
+      Icon: ListTodo,
+      desc: 'College-wise task tracking board with JD dates, DB shared status, pipeline actions, and scheduled campus drive dates.',
+      href: '/pending-tasks',
+      badge: 'Task Operations',
+      color: 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10',
     },
     {
       title: 'Master Metadata Database',
@@ -67,17 +76,8 @@ export function SystemInfoTab({ summaryData }: Props) {
       color: 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10',
     },
     {
-      title: 'Notifications & Broadcasts',
-      code: 'Module 08',
-      Icon: Bell,
-      desc: 'Targeted broadcast engine, policy circulars, urgent drive alerts, and automated call-reminder notifications.',
-      href: '/notifications',
-      badge: 'Alerts Engine',
-      color: 'border-rose-500/30 text-rose-400 bg-rose-500/10',
-    },
-    {
       title: 'System Settings & RBAC',
-      code: 'Module 01 & 09',
+      code: 'Module 01 & 08',
       Icon: Settings,
       desc: 'Personal profile, user account provisioning, role permissions matrix, audit logs, and global season configuration.',
       href: '/settings',
