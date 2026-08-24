@@ -1,22 +1,17 @@
 'use client';
 
 import React from 'react';
-import { ClipboardList, Sparkles } from 'lucide-react';
-import { SelectionModeBar } from '@/components/ui/SelectionModeBar';
+import { ClipboardList, Sparkles, Trash2 } from 'lucide-react';
 
 interface Props {
   activeTab: 'positive' | 'jd_received';
   onTabChange: (tab: 'positive' | 'jd_received') => void;
   positivesCount: number;
   jdCount: number;
-  totalRows: number;
-  isDeleteMode: boolean;
-  selectedCount: number;
-  isAllSelected: boolean;
-  onToggleDeleteMode: () => void;
-  onToggleSelectAll: () => void;
-  onClearSelection: () => void;
-  onBulkDelete: () => void;
+  totalRows?: number;
+  isDeleteMode?: boolean;
+  selectedCount?: number;
+  onBulkDelete?: () => void;
 }
 
 export function LeadsTabBar({
@@ -24,13 +19,8 @@ export function LeadsTabBar({
   onTabChange,
   positivesCount,
   jdCount,
-  totalRows,
-  isDeleteMode,
+  isDeleteMode = false,
   selectedCount = 0,
-  isAllSelected,
-  onToggleDeleteMode,
-  onToggleSelectAll,
-  onClearSelection,
   onBulkDelete,
 }: Props) {
   return (
@@ -96,18 +86,18 @@ export function LeadsTabBar({
         </button>
       </div>
 
-      {/* ── Right: Selection Controls (Only visible when isDeleteMode is active) ── */}
+      {/* ── Right: Delete Action (Only visible in Delete Mode when rows are selected) ── */}
       {isDeleteMode && (
-        <div className="py-1.5 animate-in fade-in duration-150">
-          <SelectionModeBar
-            selectedCount={selectedCount}
-            totalCount={totalRows}
-            onSelectAll={onToggleSelectAll}
-            isAllSelected={isAllSelected}
-            onCancel={onToggleDeleteMode}
-            onDelete={onBulkDelete}
-            deleteLabel="Delete Selected"
-          />
+        <div className="flex items-center gap-2 py-1.5 animate-in fade-in duration-150">
+          <button
+            type="button"
+            disabled={selectedCount === 0}
+            onClick={onBulkDelete}
+            className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer active:scale-95"
+          >
+            <Trash2 size={13} strokeWidth={2.2} aria-hidden />
+            <span>Delete Selected ({selectedCount})</span>
+          </button>
         </div>
       )}
     </div>

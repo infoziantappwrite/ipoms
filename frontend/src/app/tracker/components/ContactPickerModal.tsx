@@ -228,19 +228,6 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
           </div>
         </div>
 
-        {/* Keyboard Helper Hint */}
-        <div className="px-6 py-1.5 bg-slate-50 border-b border-border/80 flex items-center justify-between text-[11px] text-fg-subtle shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-fg font-semibold">⚡ Excel Shortcuts:</span>
-            <span>Hold <kbd className="px-1 py-0.5 rounded bg-surface border border-border text-fg font-mono text-[10px] shadow-xs">Shift</kbd> + Click to select a range</span>
-            <span>•</span>
-            <span>Hold <kbd className="px-1 py-0.5 rounded bg-surface border border-border text-fg font-mono text-[10px] shadow-xs">Ctrl</kbd> / <kbd className="px-1 py-0.5 rounded bg-surface border border-border text-fg font-mono text-[10px] shadow-xs">Cmd</kbd> + Click for multi-select</span>
-          </div>
-          <span className="font-bold text-primary">
-            {selected.size} selected
-          </span>
-        </div>
-
         {/* Company Data Table — Clean, Crisp & Light-Neumorphic */}
         <div className="flex-1 overflow-y-auto overflow-x-auto bg-surface select-none">
           {loading ? (
@@ -317,38 +304,6 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
             </table>
           )}
         </div>
-
-        {/* Bottom Pagination Bar with Minimal Icon-Only Arrow Buttons */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-2.5 bg-surface-sunken border-t border-border text-xs text-fg-muted shrink-0">
-            <span className="text-[11px]">
-              Showing page <strong className="text-fg">{page}</strong> of <strong className="text-fg">{totalPages}</strong> ({total.toLocaleString()} total)
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={page === 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                title="Previous Page"
-                className="w-8 h-8 rounded-xl bg-white border border-border hover:bg-slate-50 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 hover:text-slate-900 shadow-2xs transition-all cursor-pointer"
-              >
-                <ChevronLeft size={16} strokeWidth={2.25} />
-              </button>
-              <span className="text-xs font-mono font-bold text-slate-700 px-2.5 py-1 bg-white border border-border rounded-lg shadow-2xs">
-                {page} / {totalPages}
-              </span>
-              <button
-                type="button"
-                disabled={page === totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                title="Next Page"
-                className="w-8 h-8 rounded-xl bg-white border border-border hover:bg-slate-50 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 hover:text-slate-900 shadow-2xs transition-all cursor-pointer"
-              >
-                <ChevronRight size={16} strokeWidth={2.25} />
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Bottom Footer Bar with Light Neumorphic Action Buttons */}
         <div className="flex items-center justify-between px-6 py-4 bg-surface border-t border-border shrink-0">

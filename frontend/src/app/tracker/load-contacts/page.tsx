@@ -180,120 +180,102 @@ export default function LoadContactsPage() {
   return (
     <div className="min-h-screen bg-background text-fg flex flex-col font-sans selection:bg-primary selection:text-white">
       
-      {/* ── Top Header Bar ─────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 bg-surface border-b border-border shadow-[0_2px_10px_rgba(0,0,0,0.04)] px-6 py-4">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-[inset_1px_1px_3px_rgba(0,0,0,0.05)] shrink-0">
-              <Download size={20} strokeWidth={2} />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-fg tracking-tight flex items-center gap-2">
-                  <span>Load Today's Contacts</span>
-                </h1>
-                <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full font-bold">
-                  Master Database Picker
-                </span>
+      {/* ── Sticky Top Pinned Section (Header + Search Controls) ──────────── */}
+      <div className="sticky top-0 z-30 bg-surface border-b border-border shadow-xs">
+        {/* Top Header Bar */}
+        <header className="px-6 py-3.5 border-b border-border/70">
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-[inset_1px_1px_3px_rgba(0,0,0,0.05)] shrink-0">
+                <Download size={18} strokeWidth={2} />
               </div>
-              <p className="text-xs text-fg-subtle mt-0.5">
-                Select company contacts to populate your active Daily Tracker workspace. Master database records remain protected.
-              </p>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg font-bold text-fg tracking-tight flex items-center gap-2">
+                    <span>Load Today's Contacts</span>
+                  </h1>
+                  <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full font-bold">
+                    Master Database Picker
+                  </span>
+                </div>
+                <p className="text-xs text-fg-subtle mt-0.5">
+                  Select company contacts to populate your active Daily Tracker workspace. Master database records remain protected.
+                </p>
+              </div>
+            </div>
+
+            <div className="text-xs font-bold text-fg w-full md:w-auto">
+              Selected: <span className="text-primary text-base font-black ml-1">{selected.size}</span> contacts
             </div>
           </div>
+        </header>
 
-          {/* Selection count — the Import action itself lives once, in the
-              sticky footer, so it's reachable without scrolling back up but
-              isn't duplicated on screen. */}
-          <div className="text-xs font-bold text-fg w-full md:w-auto">
-            Selected: <span className="text-primary text-base font-black ml-1">{selected.size}</span> contacts
+        {/* ── Frozen Filter & Search Control Ribbon (Screenshot 2) ─────────── */}
+        <div className="bg-surface-sunken px-6 py-2.5">
+          <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+            
+            {/* Search Box */}
+            <div className="relative flex-1 max-w-lg">
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-fg-subtle" />
+              <input
+                ref={searchRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search by company, HR contact name, mobile number, or email…"
+                className="w-full bg-white border border-border-strong text-fg pl-9 pr-4 py-2 rounded-xl placeholder:text-fg-disabled text-xs shadow-[inset_1px_1px_3px_rgba(0,0,0,0.05)] focus:outline-none focus:border-primary transition-all font-medium"
+              />
+            </div>
+
+            {/* Quick Action Tools & Top Pagination Icon Pair */}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-fg-muted font-semibold text-[11px] mr-1">
+                {loading ? 'Searching…' : `${total.toLocaleString()} total companies`}
+              </span>
+
+              <button
+                onClick={handleSelectAll}
+                className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-border text-fg-muted hover:text-fg font-semibold transition-all shadow-xs cursor-pointer text-[11px]"
+              >
+                Select All on Page ({companies.length})
+              </button>
+
+              <button
+                onClick={handleDeselectAll}
+                className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-border text-fg-subtle hover:text-fg font-medium transition-all cursor-pointer text-[11px]"
+              >
+                Deselect All
+              </button>
+
+              {/* Top Pagination Icon Pair */}
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1 ml-2 pl-2 border-l border-border">
+                  <button
+                    type="button"
+                    disabled={page === 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    title="Previous Page"
+                    className="w-7 h-7 rounded-lg bg-white border border-border hover:bg-slate-50 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 hover:text-slate-900 shadow-2xs transition-all cursor-pointer"
+                  >
+                    <ChevronLeft size={15} strokeWidth={2.25} />
+                  </button>
+                  <span className="text-[11px] font-mono font-bold text-slate-700 px-1.5">
+                    {page}/{totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={page === totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    title="Next Page"
+                    className="w-7 h-7 rounded-lg bg-white border border-border hover:bg-slate-50 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 hover:text-slate-900 shadow-2xs transition-all cursor-pointer"
+                  >
+                    <ChevronRight size={15} strokeWidth={2.25} />
+                  </button>
+                </div>
+              )}
+            </div>
+
           </div>
-
-        </div>
-      </header>
-
-      {/* ── Filter & Search Control Ribbon ─────────────────────────────── */}
-      <div className="bg-surface-sunken border-b border-border px-6 py-3 shrink-0">
-        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-          
-          {/* Search Box */}
-          <div className="relative flex-1 max-w-lg">
-            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-fg-subtle" />
-            <input
-              ref={searchRef}
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by company, HR contact name, mobile number, or email…"
-              className="w-full bg-white border border-border-strong text-fg pl-9 pr-4 py-2 rounded-xl placeholder:text-fg-disabled text-xs shadow-[inset_1px_1px_3px_rgba(0,0,0,0.05)] focus:outline-none focus:border-primary transition-all font-medium"
-            />
-          </div>
-
-          {/* Quick Action Tools & Top Pagination Icon Pair */}
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-fg-muted font-semibold text-[11px] mr-1">
-              {loading ? 'Searching…' : `${total.toLocaleString()} total companies`}
-            </span>
-
-            <button
-              onClick={handleSelectAll}
-              className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-border text-fg-muted hover:text-fg font-semibold transition-all shadow-xs cursor-pointer text-[11px]"
-            >
-              Select All on Page ({companies.length})
-            </button>
-
-            <button
-              onClick={handleDeselectAll}
-              className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-border text-fg-subtle hover:text-fg font-medium transition-all cursor-pointer text-[11px]"
-            >
-              Deselect All
-            </button>
-
-            {/* Top Pagination Icon Pair */}
-            {totalPages > 1 && (
-              <div className="flex items-center gap-1 ml-2 pl-2 border-l border-border">
-                <button
-                  type="button"
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  title="Previous Page"
-                  className="w-7 h-7 rounded-lg bg-white border border-border hover:bg-slate-50 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 hover:text-slate-900 shadow-2xs transition-all cursor-pointer"
-                >
-                  <ChevronLeft size={15} strokeWidth={2.25} />
-                </button>
-                <span className="text-[11px] font-mono font-bold text-slate-700 px-1.5">
-                  {page}/{totalPages}
-                </span>
-                <button
-                  type="button"
-                  disabled={page === totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  title="Next Page"
-                  className="w-7 h-7 rounded-lg bg-white border border-border hover:bg-slate-50 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 hover:text-slate-900 shadow-2xs transition-all cursor-pointer"
-                >
-                  <ChevronRight size={15} strokeWidth={2.25} />
-                </button>
-              </div>
-            )}
-          </div>
-
-        </div>
-      </div>
-
-      {/* ── Excel Keyboard Shortcut Indicator ──────────────────────────── */}
-      <div className="bg-slate-50 border-b border-border/80 px-6 py-2 text-[11px] text-fg-subtle">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-fg font-semibold">⚡ Excel & Google Sheets Shortcuts:</span>
-            <span>Hold <kbd className="px-1.5 py-0.5 rounded bg-white border border-border text-fg font-mono text-[10px] shadow-xs">Shift</kbd> + Click to select range</span>
-            <span>•</span>
-            <span>Hold <kbd className="px-1.5 py-0.5 rounded bg-white border border-border text-fg font-mono text-[10px] shadow-xs">Ctrl</kbd> / <kbd className="px-1.5 py-0.5 rounded bg-white border border-border text-fg font-mono text-[10px] shadow-xs">Cmd</kbd> + Click for multi-selection</span>
-          </div>
-
-          <span className="font-bold text-primary">
-            Page {page} of {totalPages}
-          </span>
         </div>
       </div>
 
@@ -315,7 +297,7 @@ export default function LoadContactsPage() {
               </div>
             ) : (
               <table className="w-full text-xs text-left border-collapse select-none">
-                <thead className="bg-surface-sunken border-b border-border text-[11px] font-bold text-fg-muted uppercase tracking-wider">
+                <thead className="sticky top-0 z-10 bg-surface-sunken border-b border-border text-[11px] font-bold text-fg-muted uppercase tracking-wider shadow-2xs">
                   <tr>
                     <th className="w-12 px-4 py-3.5 text-center">
                       <input
@@ -379,40 +361,6 @@ export default function LoadContactsPage() {
               </table>
             )}
           </div>
-
-          {/* Bottom Pagination Controls with Minimal Icon-Only Buttons */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-3 bg-surface-sunken border-t border-border text-xs text-fg-muted shrink-0">
-              <span className="text-[11px]">
-                Showing page <strong className="text-fg">{page}</strong> of <strong className="text-fg">{totalPages}</strong> ({total.toLocaleString()} total)
-              </span>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  title="Previous Page"
-                  className="w-8 h-8 rounded-xl bg-white border border-border hover:bg-slate-50 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 hover:text-slate-900 shadow-2xs transition-all cursor-pointer"
-                >
-                  <ChevronLeft size={16} strokeWidth={2.25} />
-                </button>
-                <span className="text-xs font-mono font-bold text-slate-700 px-2.5 py-1 bg-white border border-border rounded-lg shadow-2xs">
-                  {page} / {totalPages}
-                </span>
-                <button
-                  type="button"
-                  disabled={page === totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  title="Next Page"
-                  className="w-8 h-8 rounded-xl bg-white border border-border hover:bg-slate-50 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 hover:text-slate-900 shadow-2xs transition-all cursor-pointer"
-                >
-                  <ChevronRight size={16} strokeWidth={2.25} />
-                </button>
-              </div>
-            </div>
-          )}
-
         </div>
       </main>
 

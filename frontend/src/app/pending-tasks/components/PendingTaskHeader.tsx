@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { CollegeSelector, College } from '@/components/CollegeSelector';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
-import { SelectionModeBar } from '@/components/ui/SelectionModeBar';
+import { SelectionCountBadge } from '@/components/ui/SelectionCountBadge';
 import { apiFetch } from '@/lib/api';
 
 interface Props {
@@ -152,24 +152,50 @@ export function PendingTaskHeader({
             />
           </div>
 
-          {/* Delete Mode Toggle or Active Controls */}
-          {!isSelectionMode ? (
-            <button
-              type="button"
-              onClick={onToggleSelectionMode}
-              title="Select rows to delete"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 border border-slate-200 rounded-lg shadow-2xs transition-colors cursor-pointer"
-            >
-              <Trash2 size={14} className="text-slate-500 hover:text-rose-600" />
-              <span className="hidden sm:inline">Delete</span>
-            </button>
-          ) : (
-            <SelectionModeBar
-              selectedCount={selectedCount}
-              onCancel={onToggleSelectionMode}
-              onDelete={onDeleteSelected}
-              onEdit={onEditSelected}
-            />
+          {/* Selection Toggle: stays visible in both states, so it's the one consistent
+              way to enter AND exit selection mode (mirrors Escape). No separate Cancel. */}
+          <button
+            type="button"
+            onClick={onToggleSelectionMode}
+            title={isSelectionMode ? 'Exit selection mode' : 'Select rows to edit or delete'}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg shadow-2xs transition-all cursor-pointer active:scale-95 ${
+              isSelectionMode
+                ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                : 'text-slate-700 bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 border border-slate-200 font-medium'
+            }`}
+          >
+            <Trash2 size={14} className={isSelectionMode ? '' : 'text-slate-500'} aria-hidden />
+            <span className="hidden sm:inline">{isSelectionMode ? 'Exit Selection' : 'Select'}</span>
+          </button>
+
+          {/* Active-selection actions: count badge + separate, purpose-specific Edit and
+              Delete buttons — not one bar wearing both hats. */}
+          {isSelectionMode && (
+            <div className="flex items-center gap-1.5 animate-in fade-in duration-150">
+              <SelectionCountBadge selectedCount={selectedCount} />
+
+              {onEditSelected && (
+                <button
+                  type="button"
+                  disabled={selectedCount === 0}
+                  onClick={onEditSelected}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-40 disabled:cursor-not-allowed border border-indigo-200 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                >
+                  <Edit3 size={13} aria-hidden />
+                  <span>Edit Selected</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                disabled={selectedCount === 0}
+                onClick={onDeleteSelected}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed border border-rose-700 rounded-lg shadow-2xs transition-colors cursor-pointer"
+              >
+                <Trash2 size={13} aria-hidden />
+                <span>Delete ({selectedCount})</span>
+              </button>
+            </div>
           )}
 
           {/* Export CSV */}

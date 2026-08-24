@@ -66,6 +66,16 @@ export default function DailyLeadsPage() {
     setIsAllSelected(false);
   }, [selectedDate, selectedCollegeId, activeTab, searchQuery]);
 
+  // Escape exits delete mode (mirrors the "Exit Delete" toggle button)
+  useEffect(() => {
+    if (!isDeleteMode) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') handleToggleDeleteMode();
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isDeleteMode]);
+
   // ── Load Last Active Tab from localStorage on mount (Spec Section 6.4)
   useEffect(() => {
     try {
@@ -335,19 +345,14 @@ export default function DailyLeadsPage() {
         onToggleDeleteMode={handleToggleDeleteMode}
       />
 
-      {/* ── Tab Bar (Positives vs JD Received) with Right Corner Delete Action ── */}
+      {/* ── Tab Bar (Positives vs JD Received) ────────────────────────────── */}
       <LeadsTabBar
         activeTab={activeTab}
         onTabChange={handleTabChange}
         positivesCount={summary.positives_count}
         jdCount={summary.jd_received_count}
-        totalRows={leads.length}
         isDeleteMode={isDeleteMode}
         selectedCount={selectedIds.length}
-        isAllSelected={isAllSelected}
-        onToggleDeleteMode={handleToggleDeleteMode}
-        onToggleSelectAll={handleToggleSelectAll}
-        onClearSelection={handleClearSelection}
         onBulkDelete={handleBulkDelete}
       />
 

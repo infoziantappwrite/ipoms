@@ -75,6 +75,16 @@ export default function PendingTasksPage() {
     setIsSelectionMode(false);
   }, [selectedCollegeId, searchQuery]);
 
+  // Escape exits selection mode (mirrors the "Exit Selection" toggle button)
+  useEffect(() => {
+    if (!isSelectionMode) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') handleToggleSelectionMode();
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isSelectionMode]);
+
   // ── College Change Handler from Header Dropdown
   const handleCollegeSelect = (id: string, name: string) => {
     setSelectedCollegeId(id);
