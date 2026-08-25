@@ -43,8 +43,13 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
   const fetchKpis = async (ids?: string[]) => {
     try {
       setLoading(true);
-      const targetIds = ids && ids.length > 0 ? ids : getCoordinatorSelectedColleges();
-      const queryParam = targetIds.length > 0 ? `?college_ids=${targetIds.join(',')}` : '';
+      const targetIds = ids !== undefined ? ids : getCoordinatorSelectedColleges();
+      if (!targetIds || targetIds.length === 0) {
+        setKpiData([]);
+        setLoading(false);
+        return;
+      }
+      const queryParam = `?college_ids=${encodeURIComponent(targetIds.join(','))}`;
       const res = await apiFetch(`/dashboard/college-kpis${queryParam}`);
       if (res.success && Array.isArray((res.data as any)?.colleges)) {
         setKpiData((res.data as any).colleges);

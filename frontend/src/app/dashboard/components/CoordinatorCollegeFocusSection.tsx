@@ -18,13 +18,14 @@ import {
   setCoordinatorSelectedColleges,
 } from '@/lib/collegeSession';
 import { College } from '@/components/CollegeSelector';
-import { toast } from '@/components/ui/Toast';
+import { useToast } from '@/components/ui/Toast';
 
 interface Props {
   onSelectionChange?: (selectedIds: string[]) => void;
 }
 
 export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
+  const { toast } = useToast();
   const [colleges, setColleges] = useState<College[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isEditing, setIsEditing] = useState(false);
@@ -45,20 +46,14 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
           if (savedIds && savedIds.length > 0) {
             // Verify stored IDs exist in live colleges list
             const validSaved = savedIds.filter((id) => list.some((c) => c._id === id));
-            if (validSaved.length > 0) {
-              setSelectedIds(validSaved.slice(0, 3));
-              if (onSelectionChange) onSelectionChange(validSaved.slice(0, 3));
-            } else if (list.length > 0) {
-              const defaultFirst = [list[0]._id];
-              setSelectedIds(defaultFirst);
-              setCoordinatorSelectedColleges(defaultFirst);
-              if (onSelectionChange) onSelectionChange(defaultFirst);
-            }
-          } else if (list.length > 0) {
-            const defaultFirst = [list[0]._id];
-            setSelectedIds(defaultFirst);
-            setCoordinatorSelectedColleges(defaultFirst);
-            if (onSelectionChange) onSelectionChange(defaultFirst);
+            setSelectedIds(validSaved.slice(0, 3));
+            if (onSelectionChange) onSelectionChange(validSaved.slice(0, 3));
+            setIsEditing(validSaved.length === 0);
+          } else {
+            // No default selection — start with empty selection in editing mode
+            setSelectedIds([]);
+            setIsEditing(true);
+            if (onSelectionChange) onSelectionChange([]);
           }
         }
       } catch (err) {
@@ -78,11 +73,6 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
     const isAlreadySelected = selectedIds.includes(collegeId);
 
     if (isAlreadySelected) {
-      // Rule: Minimum 1 college must be selected
-      if (selectedIds.length <= 1) {
-        toast('Minimum 1 college must remain selected in your focus list.', 'error');
-        return;
-      }
       const updated = selectedIds.filter((id) => id !== collegeId);
       setSelectedIds(updated);
       setCoordinatorSelectedColleges(updated);
@@ -103,7 +93,7 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
   const handleLockToggle = () => {
     if (isEditing) {
       if (selectedIds.length === 0) {
-        toast('Please select at least 1 college before locking.', 'error');
+        toast('Please select at least 1 college before locking your focus.', 'warning');
         return;
       }
       setIsEditing(false);

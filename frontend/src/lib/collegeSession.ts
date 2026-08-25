@@ -15,15 +15,12 @@ export function getCoordinatorSelectedColleges(): string[] {
     const raw = localStorage.getItem(COORDINATOR_SELECTED_COLLEGES_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed.slice(0, 3);
       }
     }
   } catch {}
-  
-  // Fallback to currently active single college if available
-  const active = getActiveCollege();
-  return active.id ? [active.id] : [];
+  return [];
 }
 
 export function setCoordinatorSelectedColleges(ids: string[]): string[] {

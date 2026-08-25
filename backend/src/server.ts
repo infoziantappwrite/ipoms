@@ -3025,6 +3025,8 @@ app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => 
       error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to fetch coordinator dashboard' },
     });
   }
+});
+
 // ── GET /api/v1/dashboard/college-kpis
 // Coordinator Per-College Focus KPI Cards (Min 1, Max 3 Colleges)
 app.get('/api/v1/dashboard/college-kpis', async (req: Request, res: Response) => {
@@ -3048,16 +3050,19 @@ app.get('/api/v1/dashboard/college-kpis', async (req: Request, res: Response) =>
       targetCollegeIds = collegeIdsQuery
         .split(',')
         .map((s) => s.trim())
-        .filter((s) => Types.ObjectId.isValid(s))
+        .filter(Boolean)
         .slice(0, 3);
     }
 
-    // If no college IDs provided, resolve up to 3 active colleges
+    // If no college IDs provided, return empty list (no forced default selection)
     if (targetCollegeIds.length === 0) {
-      const activeCols = await College.find({ status: { $ne: 'inactive' }, is_deleted: { $ne: true } })
-        .sort({ college_code: 1 })
-        .limit(3);
-      targetCollegeIds = activeCols.map((c) => c._id.toString());
+      return res.status(200).json({
+        success: true,
+        data: {
+          colleges: [],
+          total_selected: 0,
+        },
+      });
     }
 
     const POSITIVE_STATUSES = ['hiring', 'invite_mail', 'follow_up', 'jd_received', 'drive_completed', 'in_connect'];
@@ -3066,10 +3071,21 @@ app.get('/api/v1/dashboard/college-kpis', async (req: Request, res: Response) =>
 
     const kpiResults = await Promise.all(
       targetCollegeIds.map(async (cIdStr) => {
-        const cObjectId = new Types.ObjectId(cIdStr);
-        const college = await College.findById(cObjectId);
+        let college: any = null;
+        if (Types.ObjectId.isValid(cIdStr)) {
+          college = await College.findById(cIdStr);
+        }
+        if (!college) {
+          college = await College.findOne({
+            $or: [
+              { college_code: new RegExp(`^${escapeRegex(cIdStr)}$`, 'i') },
+              { college_name: new RegExp(`^${escapeRegex(cIdStr)}$`, 'i') },
+            ],
+          });
+        }
         if (!college) return null;
 
+        const cObjectId = college._id;
         const coordinatorBaseFilter: any = {
           college_id: cObjectId,
           coordinator_id: coordinator._id,
