@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { BarChart3, ChevronLeft, ChevronRight, Plus, RefreshCw, RotateCw, FileSpreadsheet } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Plus, RefreshCw, RotateCw, FileSpreadsheet } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { CollegeSelector, College } from '@/components/CollegeSelector';
 import { apiFetch } from '@/lib/api';
@@ -103,18 +103,18 @@ export function WeeklyHeader({
   const weekInfo = formatWeekDisplay(weekOffset);
 
   return (
-    <header className="bg-white border-b border-slate-200 px-6 py-4 space-y-3 shadow-xs">
+    <header className="bg-surface border-b border-border px-6 py-4 space-y-3 shadow-xs text-fg">
       {/* ── Top Row: Title & Top-Right Sign Out ────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-primary">
-              <BarChart3 size={18} strokeWidth={2.5} />
+            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+              <CalendarDays size={18} strokeWidth={2.5} />
             </div>
-            <h1 className="text-base font-bold text-slate-900 tracking-tight">
+            <h1 className="text-base font-bold text-fg tracking-tight">
               Weekly Tracker
             </h1>
-            <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full font-semibold">
+            <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full font-semibold">
               2026 Season
             </span>
           </div>
@@ -126,7 +126,7 @@ export function WeeklyHeader({
             <div className="flex items-center gap-2">
               <div
                 title={`${selectedCollegeObj.college_name} (${selectedCollegeObj.college_code})`}
-                className="flex items-center justify-center bg-white border border-slate-200 px-2.5 py-1 rounded-xl shadow-xs h-9 max-w-[160px] shrink-0"
+                className="flex items-center justify-center bg-surface border border-border px-2.5 py-1 rounded-xl shadow-xs h-9 max-w-[160px] shrink-0"
               >
                 {selectedCollegeObj.logo_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -136,14 +136,14 @@ export function WeeklyHeader({
                     className="max-h-7 max-w-full w-auto h-auto object-contain rounded"
                   />
                 ) : (
-                  <span className="w-7 h-7 rounded-lg bg-blue-100 text-primary font-bold text-xs flex items-center justify-center font-mono">
+                  <span className="w-7 h-7 rounded-lg bg-primary/10 text-primary font-bold text-xs flex items-center justify-center font-mono">
                     {selectedCollegeObj.college_code?.slice(0, 2) || 'CL'}
                   </span>
                 )}
               </div>
               {selectedCollegeObj.location && (
                 <span
-                  className="text-xs text-slate-500 font-medium hidden sm:inline truncate max-w-[160px]"
+                  className="text-xs text-fg-subtle font-medium hidden sm:inline truncate max-w-[160px]"
                   title={selectedCollegeObj.location}
                 >
                   {selectedCollegeObj.location}
@@ -159,13 +159,13 @@ export function WeeklyHeader({
       </div>
 
       {/* ── Bottom Controls Row: Monthly-wise Week Selector, Action Buttons & College Filter ── */}
-      <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t border-slate-100 relative z-30">
+      <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t border-border/80 relative z-30">
         
         {/* Month-wise Friday-to-Friday Week Selector */}
-        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 shadow-xs h-10 shrink-0">
+        <div className="flex items-center gap-2 bg-surface-sunken border border-border rounded-xl px-2.5 py-1 shadow-xs h-10 shrink-0">
           <button
             onClick={() => onWeekChange(weekOffset - 1)}
-            className="w-7 h-7 text-slate-500 hover:text-slate-900 hover:bg-slate-200/70 rounded-lg flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            className="w-7 h-7 text-fg-subtle hover:text-fg hover:bg-surface-raised rounded-lg flex items-center justify-center transition-colors cursor-pointer shrink-0"
             title="Previous Week"
           >
             <ChevronLeft size={16} strokeWidth={2.5} />
@@ -173,26 +173,26 @@ export function WeeklyHeader({
 
           <div className="text-center px-1.5 flex flex-col justify-center">
             <div className="flex items-center justify-center gap-1.5 leading-none">
-              <span className="text-xs font-bold text-slate-800 whitespace-nowrap">
+              <span className="text-xs font-bold text-fg whitespace-nowrap">
                 {weekInfo.monthName} {weekInfo.year}
               </span>
-              <span className="text-[11px] font-bold text-blue-700 bg-blue-100/80 border border-blue-300 px-1.5 py-0.5 rounded-full whitespace-nowrap leading-none">
+              <span className="text-[11px] font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded-full whitespace-nowrap leading-none">
                 Week {weekInfo.monthlyWeekNumber}
               </span>
               {weekInfo.isCurrent && (
-                <span className="text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded-md font-semibold whitespace-nowrap leading-none">
+                <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 px-1.5 py-0.5 rounded-md font-semibold whitespace-nowrap leading-none">
                   Current
                 </span>
               )}
             </div>
-            <div className="text-[10px] text-slate-500 font-mono mt-0.5 whitespace-nowrap leading-none">
+            <div className="text-[10px] text-fg-subtle font-mono mt-0.5 whitespace-nowrap leading-none">
               {weekInfo.rangeStr}
             </div>
           </div>
 
           <button
             onClick={() => onWeekChange(weekOffset + 1)}
-            className="w-7 h-7 text-slate-500 hover:text-slate-900 hover:bg-slate-200/70 rounded-lg flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            className="w-7 h-7 text-fg-subtle hover:text-fg hover:bg-surface-raised rounded-lg flex items-center justify-center transition-colors cursor-pointer shrink-0"
             title="Next Week"
           >
             <ChevronRight size={16} strokeWidth={2.5} />
@@ -201,7 +201,7 @@ export function WeeklyHeader({
           {weekOffset !== 0 && (
             <button
               onClick={() => onWeekChange(0)}
-              className="text-micro bg-white hover:bg-slate-100 text-slate-700 font-semibold px-2 py-1 rounded-lg ml-0.5 transition-colors cursor-pointer border border-slate-300 shadow-xs shrink-0"
+              className="text-micro bg-surface hover:bg-surface-raised text-fg font-semibold px-2 py-1 rounded-lg ml-0.5 transition-colors cursor-pointer border border-border shadow-xs shrink-0"
             >
               Current
             </button>
@@ -219,7 +219,7 @@ export function WeeklyHeader({
                   placeholder="Search company, role…"
                   value={searchQuery || ''}
                   onChange={(e) => onSearchChange(e.target.value)}
-                  className="w-full h-8 bg-white border border-slate-300 text-slate-800 text-xs px-2.5 rounded-xl shadow-2xs placeholder:text-slate-400 outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                  className="w-full h-8 bg-surface-sunken border border-border text-fg text-xs px-3 rounded-xl shadow-2xs placeholder:text-fg-disabled outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                 />
               </div>
             )}

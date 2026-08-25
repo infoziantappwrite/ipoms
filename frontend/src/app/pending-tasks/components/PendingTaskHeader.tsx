@@ -5,7 +5,6 @@ import {
   ListTodo,
   Plus,
   Trash2,
-  Edit3,
   RefreshCw,
   Download,
   Search,
@@ -18,7 +17,7 @@ import {
 } from 'lucide-react';
 import { CollegeSelector, College } from '@/components/CollegeSelector';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
-import { SelectionCountBadge } from '@/components/ui/SelectionCountBadge';
+import { AnimatedTrashIcon } from '@/components/icons/AnimatedIcons';
 import { apiFetch } from '@/lib/api';
 
 interface Props {
@@ -70,16 +69,16 @@ export function PendingTaskHeader({
   }, [selectedCollegeId]);
 
   return (
-    <header className="bg-white border-b border-slate-200 px-6 py-4 space-y-3 shadow-xs">
+    <header className="bg-surface border-b border-border px-6 py-4 space-y-3 shadow-xs text-fg">
       {/* ── Top Row: Header Info, College Logo, Top-Right Sign Out ── */}
       <div className="flex items-center justify-between gap-4">
         {/* Left: Title & College-Wise Tracker Badge */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 shadow-xs">
+          <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shadow-xs">
             <ListTodo size={22} strokeWidth={2.2} />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight">
+            <h1 className="text-lg font-bold text-fg tracking-tight">
               Pending Task
             </h1>
           </div>
@@ -92,7 +91,7 @@ export function PendingTaskHeader({
             <div className="flex items-center gap-2">
               <div
                 title={`${selectedCollegeObj.college_name} (${selectedCollegeObj.college_code})`}
-                className="flex items-center justify-center bg-white border border-slate-200 px-2.5 py-1 rounded-xl shadow-xs animate-fadeIn h-9 max-w-[170px] shrink-0"
+                className="flex items-center justify-center bg-surface border border-border px-2.5 py-1 rounded-xl shadow-xs animate-fadeIn h-9 max-w-[170px] shrink-0"
               >
                 {selectedCollegeObj.logo_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -102,17 +101,17 @@ export function PendingTaskHeader({
                     className="max-h-7 max-w-full w-auto h-auto object-contain rounded"
                   />
                 ) : (
-                  <span className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center font-mono">
+                  <span className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center font-mono">
                     {selectedCollegeObj.college_code?.slice(0, 2) || 'CL'}
                   </span>
                 )}
               </div>
               {selectedCollegeObj.location && (
                 <div
-                  className="flex items-center gap-1 text-xs text-slate-500 font-medium hidden sm:flex truncate max-w-[180px]"
+                  className="flex items-center gap-1 text-xs text-fg-subtle font-medium hidden sm:flex truncate max-w-[180px]"
                   title={`${selectedCollegeObj.college_name} • ${selectedCollegeObj.location}`}
                 >
-                  <MapPin size={13} className="text-slate-400 shrink-0" />
+                  <MapPin size={13} className="text-fg-disabled shrink-0" />
                   <span className="truncate">{selectedCollegeObj.location}</span>
                 </div>
               )}
@@ -125,22 +124,22 @@ export function PendingTaskHeader({
       </div>
 
       {/* ── Bottom Row: Search, College Dropdown & Action Buttons ── */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-1">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-1 border-t border-border/80">
         {/* Search Bar */}
         <div className="relative flex-1 max-w-md">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search company, current status, action..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors"
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-surface-sunken hover:bg-surface-raised focus:bg-surface border border-border rounded-lg text-fg placeholder:text-fg-disabled focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
           />
         </div>
 
         {/* Right Actions: College Dropdown, Top Delete Toggle/Banner, Refresh, Export, Add */}
         <div className="flex items-center flex-wrap gap-2 shrink-0">
-          {/* Dropdown list for picking college near the refresh button */}
+          {/* Dropdown list for picking college */}
           <div className="min-w-[200px]">
             <CollegeSelector
               selectedCollegeId={selectedCollegeId}
@@ -152,50 +151,30 @@ export function PendingTaskHeader({
             />
           </div>
 
-          {/* Selection Toggle: stays visible in both states, so it's the one consistent
-              way to enter AND exit selection mode (mirrors Escape). No separate Cancel. */}
+          {/* Dustbin / Delete Selection Toggle */}
           <button
             type="button"
             onClick={onToggleSelectionMode}
-            title={isSelectionMode ? 'Exit selection mode' : 'Select rows to edit or delete'}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg shadow-2xs transition-all cursor-pointer active:scale-95 ${
+            title={isSelectionMode ? 'Cancel deletion / Exit selection' : 'Delete pending tasks'}
+            className={`group w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-2xs active:scale-95 border ${
               isSelectionMode
-                ? 'bg-rose-600 hover:bg-rose-700 text-white'
-                : 'text-slate-700 bg-white hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 border border-slate-200 font-medium'
+                ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-600 shadow-xs'
+                : 'text-fg-subtle bg-surface hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/30 border-border'
             }`}
           >
-            <Trash2 size={14} className={isSelectionMode ? '' : 'text-slate-500'} aria-hidden />
-            <span className="hidden sm:inline">{isSelectionMode ? 'Exit Selection' : 'Select'}</span>
+            <AnimatedTrashIcon size={15} />
           </button>
 
-          {/* Active-selection actions: count badge + separate, purpose-specific Edit and
-              Delete buttons — not one bar wearing both hats. */}
-          {isSelectionMode && (
-            <div className="flex items-center gap-1.5 animate-in fade-in duration-150">
-              <SelectionCountBadge selectedCount={selectedCount} />
-
-              {onEditSelected && (
-                <button
-                  type="button"
-                  disabled={selectedCount === 0}
-                  onClick={onEditSelected}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-40 disabled:cursor-not-allowed border border-indigo-200 rounded-lg shadow-2xs transition-colors cursor-pointer"
-                >
-                  <Edit3 size={13} aria-hidden />
-                  <span>Edit Selected</span>
-                </button>
-              )}
-
-              <button
-                type="button"
-                disabled={selectedCount === 0}
-                onClick={onDeleteSelected}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed border border-rose-700 rounded-lg shadow-2xs transition-colors cursor-pointer"
-              >
-                <Trash2 size={13} aria-hidden />
-                <span>Delete ({selectedCount})</span>
-              </button>
-            </div>
+          {/* Delete Action (Visible only when checkboxes are ticked) */}
+          {isSelectionMode && selectedCount > 0 && (
+            <button
+              type="button"
+              onClick={onDeleteSelected}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 border border-rose-700 rounded-xl shadow-xs transition-all cursor-pointer animate-in fade-in duration-150 active:scale-95"
+            >
+              <Trash2 size={13} />
+              <span>Delete ({selectedCount})</span>
+            </button>
           )}
 
           {/* Export CSV */}
@@ -203,9 +182,9 @@ export function PendingTaskHeader({
             type="button"
             onClick={onExportCsv}
             title="Export tasks to CSV"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg shadow-2xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-fg bg-surface hover:bg-surface-raised border border-border rounded-lg shadow-2xs transition-colors cursor-pointer"
           >
-            <Download size={14} className="text-slate-500" />
+            <Download size={14} className="text-fg-subtle" />
             <span className="hidden sm:inline">Export</span>
           </button>
 
@@ -213,7 +192,7 @@ export function PendingTaskHeader({
           <button
             type="button"
             onClick={onOpenAddModal}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 border border-indigo-700 rounded-lg shadow-2xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-primary hover:bg-primary-hover border border-primary/40 rounded-lg shadow-2xs transition-colors cursor-pointer"
           >
             <Plus size={15} strokeWidth={2.5} />
             <span>Add Task</span>

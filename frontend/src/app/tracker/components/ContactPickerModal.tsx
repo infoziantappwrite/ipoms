@@ -111,18 +111,10 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
   };
 
   const handleDeselectAll = () => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      companies.forEach((c) => next.delete(c._id));
-      return next;
-    });
+    setSelected(new Set());
   };
 
   const handleLoad = () => {
-    if (selected.size === 0) {
-      alert('Please select at least one contact.');
-      return;
-    }
     onLoad(Array.from(selected));
     onClose();
   };
@@ -137,9 +129,9 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fade-in">
-      {/* Expansive Window Container with Crisp Light Neumorphic Styling */}
-      <div className="bg-white border border-border rounded-3xl w-full max-w-6xl h-[92vh] flex flex-col shadow-[0_20px_60px_rgba(0,0,0,0.12),0_4px_16px_rgba(0,0,0,0.06)] overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-overlay/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fade-in">
+      {/* Expansive Window Container with Semantic Theming */}
+      <div className="bg-surface border border-border rounded-3xl w-full max-w-6xl h-[92vh] flex flex-col shadow-2xl overflow-hidden text-fg">
 
         {/* Top Header Bar */}
         <div className="flex items-center justify-between px-6 py-4 bg-surface-sunken border-b border-border shrink-0">
@@ -162,13 +154,13 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
           <button
             onClick={onClose}
             aria-label="Close"
-            className="w-8 h-8 rounded-lg bg-surface hover:bg-surface-sunken border border-border text-fg-subtle hover:text-fg flex items-center justify-center transition-all cursor-pointer shadow-sm"
+            className="w-8 h-8 rounded-lg bg-surface hover:bg-surface-raised border border-border text-fg-subtle hover:text-fg flex items-center justify-center transition-all cursor-pointer shadow-sm"
           >
             <X size={16} strokeWidth={2} />
           </button>
         </div>
 
-        {/* Search & Selection Controls with Light Inset Neumorphic Input */}
+        {/* Search & Selection Controls */}
         <div className="px-6 py-3 bg-surface border-b border-border shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="w-full sm:max-w-md">
             <input
@@ -177,7 +169,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by company, HR name, mobile, or email…"
-              className="w-full bg-slate-50 border border-border-strong text-fg px-3.5 py-2 rounded-xl placeholder:text-fg-disabled text-xs shadow-[inset_1px_1px_3px_rgba(0,0,0,0.05)] focus:outline-none focus:border-primary transition-all font-medium"
+              className="w-full bg-surface-sunken border border-border text-fg px-3.5 py-2 rounded-xl placeholder:text-fg-disabled text-xs shadow-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"
             />
           </div>
 
@@ -188,13 +180,13 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
             </span>
             <button
               onClick={handleSelectAll}
-              className="px-2.5 py-1.5 rounded-lg bg-surface hover:bg-surface-sunken border border-border text-fg-muted hover:text-fg font-semibold transition-all shadow-xs cursor-pointer text-[11px]"
+              className="px-2.5 py-1.5 rounded-lg bg-surface hover:bg-surface-raised border border-border text-fg-muted hover:text-fg font-semibold transition-all shadow-xs cursor-pointer text-[11px]"
             >
               Select All on Page ({companies.length})
             </button>
             <button
               onClick={handleDeselectAll}
-              className="px-2.5 py-1.5 rounded-lg bg-surface hover:bg-surface-sunken border border-border text-fg-subtle hover:text-fg font-medium transition-all cursor-pointer text-[11px]"
+              className="px-2.5 py-1.5 rounded-lg bg-surface hover:bg-surface-raised border border-border text-fg-subtle hover:text-fg font-medium transition-all cursor-pointer text-[11px]"
             >
               Deselect All
             </button>
@@ -207,11 +199,11 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
                   disabled={page === 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   title="Previous Page"
-                  className="w-7 h-7 rounded-lg bg-white border border-border hover:bg-slate-50 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 hover:text-slate-900 shadow-2xs transition-all cursor-pointer"
+                  className="w-7 h-7 rounded-lg bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
                 >
                   <ChevronLeft size={15} strokeWidth={2.25} />
                 </button>
-                <span className="text-[11px] font-mono font-bold text-slate-700 px-1.5">
+                <span className="text-[11px] font-mono font-bold text-fg px-1.5">
                   {page}/{totalPages}
                 </span>
                 <button
@@ -219,7 +211,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
                   disabled={page === totalPages}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   title="Next Page"
-                  className="w-7 h-7 rounded-lg bg-white border border-border hover:bg-slate-50 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 hover:text-slate-900 shadow-2xs transition-all cursor-pointer"
+                  className="w-7 h-7 rounded-lg bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
                 >
                   <ChevronRight size={15} strokeWidth={2.25} />
                 </button>
@@ -228,7 +220,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
           </div>
         </div>
 
-        {/* Company Data Table — Clean, Crisp & Light-Neumorphic */}
+        {/* Company Data Table */}
         <div className="flex-1 overflow-y-auto overflow-x-auto bg-surface select-none">
           {loading ? (
             <div className="flex flex-col items-center justify-center h-full py-16 text-fg-subtle gap-3">
@@ -261,7 +253,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
                   <th className="px-4 py-3">Sector / Type</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border font-sans">
+              <tbody className="divide-y divide-border font-sans bg-surface">
                 {companies.map((c, index) => {
                   const isSelected = selected.has(c._id);
                   return (
@@ -270,8 +262,8 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
                       onClick={(e) => handleRowClick(index, c._id, e)}
                       className={`cursor-pointer transition-colors duration-150 ${
                         isSelected
-                          ? 'bg-primary/10 text-primary font-medium'
-                          : 'hover:bg-slate-50 text-fg'
+                          ? 'bg-primary/15 text-primary font-medium'
+                          : 'hover:bg-surface-sunken/80 text-fg'
                       }`}
                     >
                       <td className="w-12 px-4 py-2.5 text-center">
@@ -293,7 +285,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
                         {c.primary_email || '—'}
                       </td>
                       <td className="px-4 py-2.5">
-                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                        <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-surface-sunken text-fg-muted border border-border">
                           {c.company_type || 'General'}
                         </span>
                       </td>
@@ -305,7 +297,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
           )}
         </div>
 
-        {/* Bottom Footer Bar with Light Neumorphic Action Buttons */}
+        {/* Bottom Footer Bar */}
         <div className="flex items-center justify-between px-6 py-4 bg-surface border-t border-border shrink-0">
           <div className="text-xs text-fg-muted">
             Total Selected: <strong className="text-primary text-sm font-black ml-1">{selected.size}</strong> contacts
@@ -313,7 +305,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-200 text-xs font-semibold transition-all cursor-pointer shadow-xs"
+              className="px-5 py-2.5 rounded-xl bg-surface-sunken hover:bg-surface-raised text-fg border border-border text-xs font-semibold transition-all cursor-pointer shadow-xs"
             >
               Cancel
             </button>

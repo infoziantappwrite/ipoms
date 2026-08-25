@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Pencil, Plus, Search } from 'lucide-react';
+import { Pencil, Plus, Search, Lock, AlertTriangle, Unlock, Ban } from 'lucide-react';
 
 interface Props {
   users: any[];
@@ -170,15 +170,15 @@ export function UserManagementTab({
                         </div>
                         {u.is_profile_locked && (
                           <div>
-                            <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
-                              🔒 Profile Locked
+                            <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono inline-flex items-center gap-1">
+                              <Lock size={10} aria-hidden /> Profile Locked
                             </span>
                           </div>
                         )}
                         {(u.is_password_locked || u.account_status === 'blocked') && (
                           <div>
-                            <span className="text-[10px] font-bold text-danger bg-danger/15 border border-danger/30 px-1.5 py-0.5 rounded font-mono">
-                              🚨 Pwd Limit Exceeded
+                            <span className="text-[10px] font-bold text-danger bg-danger/15 border border-danger/30 px-1.5 py-0.5 rounded font-mono inline-flex items-center gap-1">
+                              <AlertTriangle size={10} aria-hidden /> Pwd Limit Exceeded
                             </span>
                           </div>
                         )}
@@ -201,7 +201,7 @@ export function UserManagementTab({
                               className="bg-warning/20 hover:bg-warning/30 text-warning border border-warning/30 px-2.5 py-1 rounded text-micro font-bold transition-colors cursor-pointer"
                               title="Unlock profile & reset password limits for this user"
                             >
-                              🔓 Unlock
+                              <Unlock size={12} className="inline shrink-0" aria-hidden /> Unlock
                             </button>
                           )}
                           <button
@@ -210,7 +210,7 @@ export function UserManagementTab({
                             className="bg-destructive/10 hover:bg-destructive/20 text-destructive border border-destructive/20 px-2 py-1 rounded text-micro font-semibold transition-colors"
                             title="Deactivate User"
                           >
-                            🚫
+                            <Ban size={12} aria-hidden />
                           </button>
                         </div>
                       </td>

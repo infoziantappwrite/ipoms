@@ -165,7 +165,7 @@ export function AnalyticsView({ selectedCollegeId, onSelectCollege }: Props) {
       {insights && (
         <div className="glass-panel rounded-2xl border border-border p-5 space-y-4">
           <div className="flex items-center justify-between border-b border-border pb-3">
-            <h2 className="text-sm font-bold text-white flex items-center gap-2">
+            <h2 className="text-sm font-bold text-fg flex items-center gap-2">
               <span>💡</span> Automated Operational Insights Engine
             </h2>
             <span className="text-micro bg-primary/10 text-primary border border-primary/30 px-2 py-0.5 rounded-full font-semibold">
@@ -243,7 +243,7 @@ export function AnalyticsView({ selectedCollegeId, onSelectCollege }: Props) {
         {/* Table 1: College Comparative Performance */}
         <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-3">
           <div className="px-4 py-3 border-b border-border bg-background/50 flex items-center justify-between">
-            <h3 className="text-xs font-bold text-white flex items-center gap-2">
+            <h3 className="text-xs font-bold text-fg flex items-center gap-2">
               <Landmark size={14} strokeWidth={2} aria-hidden /> Institutional Performance Comparison
             </h3>
             <span className="text-micro text-fg-subtle">Calls • Positives • Offers</span>
@@ -281,7 +281,7 @@ export function AnalyticsView({ selectedCollegeId, onSelectCollege }: Props) {
         {/* Table 2: Industry & Responsiveness Breakdown */}
         <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-3">
           <div className="px-4 py-3 border-b border-border bg-background/50 flex items-center justify-between">
-            <h3 className="text-xs font-bold text-white flex items-center gap-2">
+            <h3 className="text-xs font-bold text-fg flex items-center gap-2">
               <Building2 size={14} strokeWidth={2} aria-hidden /> Industry & Corporate Domain Breakdown
             </h3>
             <span className="text-micro text-fg-subtle">Weekly Tracker Pipeline</span>

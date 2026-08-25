@@ -344,7 +344,7 @@ export default function PendingTasksPage() {
   const selectedTasks = tasks.filter((t) => selectedIds.includes(t._id));
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
       {/* ── Header with College Selector & Action Controls ── */}
       <PendingTaskHeader
         selectedCollegeId={selectedCollegeId}

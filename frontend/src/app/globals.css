@@ -194,29 +194,29 @@
   --module-7: 163 230  53;  /* #A3E635 */
   --module-8: 148 163 184;  /* #94A3B8 */
 
-  /* ── Light Neumorphism Elevation Tokens ─────────────────────────────── */
-  --neu-light: 255 255 255;   /* pure white lit highlight edge */
-  --neu-dark:  148 163 184;   /* soft subtle ambient slate shadow */
+  /* ── Dark Neumorphic / Elevation Tokens ────────────────────────────── */
+  --neu-light:  51  65  85;   /* subtle dark slate-blue highlight edge */
+  --neu-dark:    2   6  23;   /* deep ambient slate shadow */
 
   --elevation-1:
-    -2px -2px 6px  rgb(var(--neu-light) / 0.95),
-     2px  2px 6px  rgb(var(--neu-dark)  / 0.12);
+    -1px -1px 3px  rgb(var(--neu-light) / 0.40),
+     2px  2px 6px  rgb(var(--neu-dark)  / 0.60);
   --elevation-2:
-    -4px -4px 12px rgb(var(--neu-light) / 0.95),
-     4px  4px 12px rgb(var(--neu-dark)  / 0.16);
+    -2px -2px 6px  rgb(var(--neu-light) / 0.35),
+     4px  4px 12px rgb(var(--neu-dark)  / 0.70);
   --elevation-3:
-    -6px -6px 18px rgb(var(--neu-light) / 0.95),
-     6px  6px 18px rgb(var(--neu-dark)  / 0.20);
+    -3px -3px 10px rgb(var(--neu-light) / 0.30),
+     6px  6px 18px rgb(var(--neu-dark)  / 0.80);
   --elevation-4:
-    -8px -8px 24px rgb(var(--neu-light) / 0.95),
-     8px  8px 24px rgb(var(--neu-dark)  / 0.24);
+    -4px -4px 14px rgb(var(--neu-light) / 0.25),
+     8px  8px 24px rgb(var(--neu-dark)  / 0.85);
 
   --elevation-inset-1:
-    inset -2px -2px 5px rgb(var(--neu-light) / 0.9),
-    inset  2px  2px 5px rgb(var(--neu-dark)  / 0.12);
+    inset -1px -1px 3px rgb(var(--neu-light) / 0.35),
+    inset  2px  2px 5px rgb(var(--neu-dark)  / 0.70);
   --elevation-inset-2:
-    inset -3px -3px 8px rgb(var(--neu-light) / 0.9),
-    inset  3px  3px 8px rgb(var(--neu-dark)  / 0.16);
+    inset -2px -2px 5px rgb(var(--neu-light) / 0.30),
+    inset  3px  3px 8px rgb(var(--neu-dark)  / 0.80);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

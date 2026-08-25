@@ -24,7 +24,7 @@ import { SystemSettings } from './models/SystemSettings';
 import { Types } from 'mongoose';
 import { startFinalizationJob } from './jobs/finalizeDailyTracker';
 import { registerAuthRoutes } from './lib/authRoutes';
-import { registerChatRoutes, seedDefaultChatChannels } from './lib/chatRoutes';
+import { registerActiveLeadRoutes, syncLeadFromDailyTracker } from './lib/activeLeadRoutes';
 import { registerPendingTaskRoutes } from './lib/pendingTaskRoutes';
 import { seedAugustAllCollegesPositives } from './lib/seedAugustAllCollegesPositives';
 import { seedAugustAllCollegesJdReceived } from './lib/seedAugustAllCollegesJdReceived';
@@ -67,6 +67,10 @@ app.use(cookieParser());
 app.use(morgan('dev'));
 
 // ── Shared Helpers ───────────────────────────────────────────────────────────
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 // Build session_date as midnight UTC for a given local date string (YYYY-MM-DD) or today
 function buildSessionDate(dateStr?: string): Date {
@@ -218,37 +222,13 @@ app.use('/api/v1', (req: Request, res: Response, next: NextFunction) => {
   if (req.path === '/health' || req.path.startsWith('/auth')) {
     return next();
   }
-  // /chat/stream is Server-Sent Events via the browser's native EventSource,
-  // which cannot set an Authorization header. It authenticates via a
-  // `?token=` query param instead, verified here with the same secret and
-  // populating req.user the same way, so authorizeRoute's role check right
-  // after this still applies exactly as it does to every other route.
-  // Every other /chat/* route still goes through the normal header check.
-  if (req.path === '/chat/stream') {
-    const token = req.query.token as string | undefined;
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        error: { code: 'UNAUTHORIZED_TOKEN_MISSING', message: 'Authentication token is missing.' },
-      });
-    }
-    try {
-      req.user = jwt.verify(token, JWT_ACCESS_SECRET) as AuthUserPayload;
-      return next();
-    } catch {
-      return res.status(401).json({
-        success: false,
-        error: { code: 'UNAUTHORIZED_TOKEN_INVALID', message: 'Invalid or expired authentication token.' },
-      });
-    }
-  }
   return authenticateJWT(req, res, next);
 });
 
 app.use('/api/v1', authorizeRoute);
 
-// Register Coordinator Team Chat & Doubt Hub routes
-registerChatRoutes(app);
+// Register Active Leads routes
+registerActiveLeadRoutes(app);
 
 // Register Pending Task routes
 registerPendingTaskRoutes(app);
@@ -659,6 +639,18 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
 
     row.last_saved_at = new Date();
     await row.save();
+
+    // Auto-sync into Active Leads if outcome indicates positive / hiring / follow up / invite
+    if (row.outcome_status && row.company_name) {
+      syncLeadFromDailyTracker({
+        company_name: row.company_name,
+        call_outcome: row.outcome_status,
+        remarks: row.comments,
+        coordinator_id: row.coordinator_id,
+        college_id: row.college_id,
+        daily_tracker_id: row._id,
+      }).catch((e) => console.error('Auto-lead sync error:', e));
+    }
 
     return res.status(200).json({
       success: true,
@@ -1888,10 +1880,30 @@ app.post('/api/v1/daily-leads', async (req: Request, res: Response) => {
       remarks,
     } = req.body;
 
-    if (!college_id || !coordinator_id || !company_name) {
+    if (!college_id || college_id === 'all' || !Types.ObjectId.isValid(String(college_id))) {
       return res.status(400).json({
         success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'college_id, coordinator_id, and company_name are required' },
+        error: { code: 'VALIDATION_ERROR', message: 'A valid college selection is required' },
+      });
+    }
+
+    if (!company_name || !company_name.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'Company name is required' },
+      });
+    }
+
+    let resolvedCoordinatorId = coordinator_id || (req as any).user?._id || (req as any).user?.id;
+    if (!resolvedCoordinatorId || !Types.ObjectId.isValid(String(resolvedCoordinatorId))) {
+      const fallbackUser = await User.findOne({ is_active: { $ne: false } });
+      resolvedCoordinatorId = fallbackUser?._id;
+    }
+
+    if (!resolvedCoordinatorId) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'Coordinator ID is required to attribute lead ownership' },
       });
     }
 
@@ -1899,7 +1911,7 @@ app.post('/api/v1/daily-leads', async (req: Request, res: Response) => {
     const timeStr = event_time || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 
     let resolvedCompanyId = company_id;
-    if (!resolvedCompanyId) {
+    if (!resolvedCompanyId || !Types.ObjectId.isValid(String(resolvedCompanyId))) {
       const existingMeta = await CompanyMetadata.findOne({
         company_name: { $regex: `^${company_name.trim()}$`, $options: 'i' },
       });
@@ -1909,9 +1921,9 @@ app.post('/api/v1/daily-leads', async (req: Request, res: Response) => {
     const newLead = await DailyLead.create({
       lead_type: lead_type || 'positive',
       college_id: new Types.ObjectId(String(college_id)),
-      coordinator_id: new Types.ObjectId(String(coordinator_id)),
+      coordinator_id: new Types.ObjectId(String(resolvedCoordinatorId)),
       company_id: new Types.ObjectId(String(resolvedCompanyId)),
-      daily_tracker_id: daily_tracker_id ? new Types.ObjectId(String(daily_tracker_id)) : null,
+      daily_tracker_id: daily_tracker_id && Types.ObjectId.isValid(String(daily_tracker_id)) ? new Types.ObjectId(String(daily_tracker_id)) : null,
       company_name: company_name.trim(),
       job_role: job_role?.trim() || 'Graduate Trainee',
       ctc: ctc?.trim() || '',
@@ -2813,15 +2825,15 @@ function getTimeGreeting(fullName: string): { greeting: string; period: Greeting
       subtext: 'Dusk operational review — the sunset twilight before nightfall.',
     };
   }
-  // 9. Evening: 7:00 PM to 8:59 PM (1140 to < 1260 mins)
-  else if (totalMinutes < 1260) {
+  // 9. Evening: 7:00 PM to 7:59 PM (1140 to < 1200 mins)
+  else if (totalMinutes < 1200) {
     return {
       greeting: `Good Evening, ${firstName}`,
       period: 'evening',
       subtext: 'Wrapping up today\'s call logs and positive corporate leads.',
     };
   }
-  // 10. Night: 9:00 PM to 11:59 PM (1260 to 1439 mins)
+  // 10. Night: 8:00 PM to 11:59 PM (1200 to 1439 mins)
   else {
     return {
       greeting: `Good Night, ${firstName}`,
@@ -3011,6 +3023,130 @@ app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => 
     return res.status(500).json({
       success: false,
       error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to fetch coordinator dashboard' },
+    });
+  }
+// ── GET /api/v1/dashboard/college-kpis
+// Coordinator Per-College Focus KPI Cards (Min 1, Max 3 Colleges)
+app.get('/api/v1/dashboard/college-kpis', async (req: Request, res: Response) => {
+  try {
+    const coordinatorId = scopeToSelf(req, req.query.coordinator_id as string | undefined);
+    const collegeIdsQuery = req.query.college_ids as string | undefined;
+
+    let coordinator: any = null;
+    if (coordinatorId) {
+      coordinator = await User.findById(coordinatorId);
+    }
+    if (!coordinator) {
+      coordinator = await User.findOne({ role_code: 'placement_coordinator' }) || {
+        _id: new Types.ObjectId(),
+        full_name: 'A. Mohanaradha',
+      };
+    }
+
+    let targetCollegeIds: string[] = [];
+    if (collegeIdsQuery) {
+      targetCollegeIds = collegeIdsQuery
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => Types.ObjectId.isValid(s))
+        .slice(0, 3);
+    }
+
+    // If no college IDs provided, resolve up to 3 active colleges
+    if (targetCollegeIds.length === 0) {
+      const activeCols = await College.find({ status: { $ne: 'inactive' }, is_deleted: { $ne: true } })
+        .sort({ college_code: 1 })
+        .limit(3);
+      targetCollegeIds = activeCols.map((c) => c._id.toString());
+    }
+
+    const POSITIVE_STATUSES = ['hiring', 'invite_mail', 'follow_up', 'jd_received', 'drive_completed', 'in_connect'];
+    const NEGATIVE_STATUSES = ['invalid', 'no_response', 'hiring_freezed', 'call_back'];
+    const NOT_HIRING_STATUSES = ['not_hiring'];
+
+    const kpiResults = await Promise.all(
+      targetCollegeIds.map(async (cIdStr) => {
+        const cObjectId = new Types.ObjectId(cIdStr);
+        const college = await College.findById(cObjectId);
+        if (!college) return null;
+
+        const coordinatorBaseFilter: any = {
+          college_id: cObjectId,
+          coordinator_id: coordinator._id,
+        };
+
+        const [
+          totalCalls,
+          totalPositives,
+          totalNegatives,
+          totalNotHiring,
+          activeLeadsCount,
+          weeklyPipelineCount,
+        ] = await Promise.all([
+          // Total Calls Made
+          DailyTracker.countDocuments({
+            ...coordinatorBaseFilter,
+            is_skipped: { $ne: true },
+          }),
+          // Positives (Hiring, Invite Email, Follow Up, JD Received, Drive Completed)
+          DailyTracker.countDocuments({
+            ...coordinatorBaseFilter,
+            outcome_status: { $in: POSITIVE_STATUSES },
+          }),
+          // Negatives (Invalid, No Response, Freeze)
+          DailyTracker.countDocuments({
+            ...coordinatorBaseFilter,
+            outcome_status: { $in: NEGATIVE_STATUSES },
+          }),
+          // Not Hiring
+          DailyTracker.countDocuments({
+            ...coordinatorBaseFilter,
+            outcome_status: { $in: NOT_HIRING_STATUSES },
+          }),
+          // Daily Leads
+          DailyLead.countDocuments({
+            ...coordinatorBaseFilter,
+            is_deleted: false,
+          }),
+          // Weekly in progress/pipeline
+          WeeklyTracker.countDocuments({
+            ...coordinatorBaseFilter,
+            is_deleted: false,
+          }),
+        ]);
+
+        const positiveRate = totalCalls > 0 ? Math.round((totalPositives / totalCalls) * 100) : 0;
+
+        return {
+          college_id: college._id,
+          college_name: college.college_name,
+          college_code: college.college_code,
+          location: college.location || '',
+          logo_url: (college as any).logo_url || '',
+          total_calls: totalCalls,
+          total_positives: totalPositives,
+          total_negatives: totalNegatives,
+          total_not_hiring: totalNotHiring,
+          active_leads: activeLeadsCount,
+          weekly_pipeline: weeklyPipelineCount,
+          positive_rate: positiveRate,
+        };
+      })
+    );
+
+    const validKpis = kpiResults.filter(Boolean);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        colleges: validKpis,
+        total_selected: validKpis.length,
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to fetch college KPIs' },
     });
   }
 });
@@ -3270,7 +3406,7 @@ app.post('/api/v1/assigned-work/:id/load-to-metadata', async (req: Request, res:
 
     // 1. Search for existing company in CompanyMetadata (Case-Insensitive)
     let company = await CompanyMetadata.findOne({
-      company_name: { $regex: new RegExp(`^${company_name.trim()}$`, 'i') },
+      company_name: { $regex: new RegExp(`^${escapeRegex(company_name.trim())}$`, 'i') },
       is_deleted: false,
     });
 
@@ -3743,8 +3879,9 @@ app.get('/api/v1/metadata', async (req: Request, res: Response) => {
         ];
       } else {
         // Starts-with regex
-        const startsWithRegex = new RegExp(`^${queryStr}`, 'i');
-        const containsRegex = new RegExp(queryStr, 'i');
+        const safeQuery = escapeRegex(queryStr);
+        const startsWithRegex = new RegExp(`^${safeQuery}`, 'i');
+        const containsRegex = new RegExp(safeQuery, 'i');
         filter.$or = [
           { company_name: startsWithRegex },
           { hr_contact_name: containsRegex },
@@ -3818,8 +3955,8 @@ app.post('/api/v1/metadata', async (req: Request, res: Response) => {
     if (!force_save && trimmedMobile) {
       const existing = await CompanyMetadata.findOne({
         is_deleted: false,
-        company_name: { $regex: new RegExp(`^${trimmedCompany}$`, 'i') },
-        hr_name: { $regex: new RegExp(`^${trimmedHr}$`, 'i') },
+        company_name: { $regex: new RegExp(`^${escapeRegex(trimmedCompany)}$`, 'i') },
+        hr_name: { $regex: new RegExp(`^${escapeRegex(trimmedHr)}$`, 'i') },
         $or: [
           { primary_mobile: trimmedMobile },
           { mobile_numbers: trimmedMobile },
@@ -4061,8 +4198,8 @@ app.post('/api/v1/metadata/bulk-import', authenticateJWT, authorizeRoles('ADMINI
       if (pMobile) {
         const exact = await CompanyMetadata.findOne({
           is_deleted: false,
-          company_name: { $regex: new RegExp(`^${cName}$`, 'i') },
-          hr_name: { $regex: new RegExp(`^${hName}$`, 'i') },
+          company_name: { $regex: new RegExp(`^${escapeRegex(cName)}$`, 'i') },
+          hr_name: { $regex: new RegExp(`^${escapeRegex(hName)}$`, 'i') },
           $or: [{ primary_mobile: pMobile }, { mobile_numbers: pMobile }],
           primary_email: pEmail,
         });
@@ -4124,7 +4261,7 @@ app.get('/api/v1/users', authenticateJWT, async (req: Request, res: Response) =>
 
     if (q && String(q).trim() !== '') {
       const qStr = String(q).trim();
-      const regex = new RegExp(qStr, 'i');
+      const regex = new RegExp(escapeRegex(qStr), 'i');
       filter.$or = [
         { full_name: regex },
         { username: regex },
@@ -4781,7 +4918,6 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 // Boot Server and Connect Database
 const startServer = async () => {
   await connectDatabase();
-  await seedDefaultChatChannels();
   // Ensure strict zero records exist before August 2026 for daily leads
   await DailyLead.deleteMany({ lead_date: { $lt: new Date('2026-08-01T00:00:00.000Z') } });
   await seedAugustAllCollegesPositives();

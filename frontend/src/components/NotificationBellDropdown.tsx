@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, Bell, CalendarDays, Check, Megaphone } from 'lucide-react';
+import { AlertTriangle, Bell, CalendarDays, Check, Megaphone, X } from 'lucide-react';
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
@@ -182,7 +182,7 @@ export function NotificationBellDropdown({ userId = '6a84719afa3bf51271bc1548' }
                               : 'bg-surface-sunken text-fg-muted border-border hover:bg-destructive-subtle hover:text-destructive'
                           }`}
                         >
-                          ✗ Cannot
+                          <X size={13} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}Cannot
                         </button>
                       </div>
                     ) : n.requires_acknowledgment && !n.is_read ? (

@@ -7,6 +7,77 @@ import { readSessionUser } from './session';
 export const ACTIVE_COLLEGE_ID_KEY = 'ipoms_active_college_id';
 export const ACTIVE_COLLEGE_NAME_KEY = 'ipoms_active_college_name';
 export const ACTIVE_COLLEGE_OBJ_KEY = 'ipoms_active_college_obj';
+export const COORDINATOR_SELECTED_COLLEGES_KEY = 'ipoms_coordinator_selected_colleges';
+
+export function getCoordinatorSelectedColleges(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(COORDINATOR_SELECTED_COLLEGES_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.slice(0, 3);
+      }
+    }
+  } catch {}
+  
+  // Fallback to currently active single college if available
+  const active = getActiveCollege();
+  return active.id ? [active.id] : [];
+}
+
+export function setCoordinatorSelectedColleges(ids: string[]): string[] {
+  if (typeof window === 'undefined') return ids;
+  const sanitized = Array.from(new Set(ids.filter(Boolean))).slice(0, 3);
+  try {
+    if (sanitized.length > 0) {
+      localStorage.setItem(COORDINATOR_SELECTED_COLLEGES_KEY, JSON.stringify(sanitized));
+      // Ensure the first selected college is also the active college session if not already in selection
+      const currentActive = getActiveCollege();
+      if (!currentActive.id || !sanitized.includes(currentActive.id)) {
+        // Will be updated when college list loads
+      }
+    }
+    window.dispatchEvent(
+      new CustomEvent('ipoms_coordinator_colleges_changed', {
+        detail: { selectedIds: sanitized },
+      })
+    );
+  } catch {}
+  return sanitized;
+}
+
+export function sortCollegesWithPriority(
+  allColleges: College[],
+  explicitSelectedIds?: string[]
+): (College & { isPinned?: boolean })[] {
+  if (!allColleges || allColleges.length === 0) return [];
+  const selectedIds = explicitSelectedIds && explicitSelectedIds.length > 0
+    ? explicitSelectedIds
+    : getCoordinatorSelectedColleges();
+
+  const pinned: (College & { isPinned?: boolean })[] = [];
+  const unpinned: (College & { isPinned?: boolean })[] = [];
+
+  const selectedSet = new Set(selectedIds);
+
+  for (const col of allColleges) {
+    if (selectedSet.has(col._id)) {
+      pinned.push({ ...col, isPinned: true });
+    } else {
+      unpinned.push({ ...col, isPinned: false });
+    }
+  }
+
+  // 1. Sort selected/pinned colleges alphabetically by college_name
+  pinned.sort((a, b) => a.college_name.localeCompare(b.college_name));
+
+  // 2. Sort remaining colleges alphabetically by college_name
+  unpinned.sort((a, b) => a.college_name.localeCompare(b.college_name));
+
+  // Pinned colleges appear as the top 1, 2, or 3 items
+  return [...pinned, ...unpinned];
+}
 
 export function getActiveCollege(): { id: string; name: string; obj: College | null } {
   if (typeof window === 'undefined') return { id: '', name: '', obj: null };

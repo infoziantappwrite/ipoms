@@ -1,5 +1,7 @@
+'use client';
+
 import { useState, useEffect } from 'react';
-import { Globe, Sparkles, BarChart3, TrendingUp, ListTodo, Calendar, AlertCircle } from 'lucide-react';
+import { Globe, Sparkles, BarChart3, TrendingUp, ListTodo, Calendar, CalendarDays, AlertCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 import { CollegeSelector } from '@/components/CollegeSelector';
@@ -134,22 +136,21 @@ export function ReportBuilderWizard({
   };
 
   const TEMPLATES = [
-    { id: 'weekly_placement', label: 'Weekly Placement', icon: BarChart3 },
-    { id: 'monthly_placement', label: 'Monthly Placement', icon: TrendingUp },
-    { id: 'pending_tasks', label: 'Pending Tasks', icon: ListTodo },
+    { id: 'weekly_placement', label: 'Weekly Placement Report', icon: CalendarDays },
+    { id: 'pending_tasks', label: 'Pending Tasks Report', icon: ListTodo },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-fg">
       {/* Wizard Form Card */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs space-y-6">
+      <div className="rounded-2xl border border-border bg-surface p-6 shadow-xs space-y-6">
 
-        {/* Step 1: Select Report Template (3 Options) */}
+        {/* Step 1: Select Report Template */}
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-2">
+          <label className="block text-xs font-semibold text-fg mb-2">
             1. Select Report Template
           </label>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {TEMPLATES.map((t) => {
               const IconComponent = t.icon;
               const isSelected = templateType === t.id;
@@ -161,13 +162,13 @@ export function ReportBuilderWizard({
                   className={`px-4 py-2.5 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer select-none shadow-2xs ${
                     isSelected
                       ? 'bg-primary text-white border-primary shadow-xs font-bold'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                      : 'bg-surface text-fg-muted border-border hover:bg-surface-raised'
                   }`}
                 >
                   <IconComponent
                     size={15}
                     strokeWidth={isSelected ? 2.5 : 2}
-                    className={isSelected ? 'text-white shrink-0' : 'text-slate-500 shrink-0'}
+                    className={isSelected ? 'text-white shrink-0' : 'text-fg-subtle shrink-0'}
                   />
                   <span className="truncate">{t.label}</span>
                 </button>
@@ -180,8 +181,8 @@ export function ReportBuilderWizard({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
           {/* Step 2: Target College */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              2. Target College <span className="text-red-500 font-bold ml-0.5">*</span>
+            <label className="block text-xs font-semibold text-fg mb-1.5">
+              2. Target College <span className="text-rose-500 font-bold ml-0.5">*</span>
             </label>
             <CollegeSelector
               selectedCollegeId={collegeId}
@@ -197,8 +198,8 @@ export function ReportBuilderWizard({
 
           {/* Step 3: Graduating Academic Year */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-              3. Graduating Academic Year <span className="text-red-500 font-bold ml-0.5">*</span>
+            <label className="block text-xs font-semibold text-fg mb-1.5">
+              3. Graduating Academic Year <span className="text-rose-500 font-bold ml-0.5">*</span>
             </label>
             <select
               value={academicYear}
@@ -206,26 +207,26 @@ export function ReportBuilderWizard({
                 setAcademicYear(e.target.value);
                 setValidationErrors([]);
               }}
-              className="w-full bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3 py-2 text-slate-800 text-xs cursor-pointer outline-none font-medium shadow-xs"
+              className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3 py-2 text-fg text-xs cursor-pointer outline-none font-medium shadow-xs"
             >
-              <option value="">-- Select Graduating Year --</option>
-              <option value="2027">2027 Graduating</option>
-              <option value="2028">2028 Graduating</option>
-              <option value="2029">2029 Graduating</option>
-              <option value="2030">2030 Graduating</option>
-              <option value="2031">2031 Graduating</option>
-              <option value="2032">2032 Graduating</option>
-              <option value="2033">2033 Graduating</option>
-              <option value="2034">2034 Graduating</option>
-              <option value="2035">2035 Graduating</option>
+              <option value="" className="bg-surface text-fg">-- Select Graduating Year --</option>
+              <option value="2027" className="bg-surface text-fg">2027 Graduating</option>
+              <option value="2028" className="bg-surface text-fg">2028 Graduating</option>
+              <option value="2029" className="bg-surface text-fg">2029 Graduating</option>
+              <option value="2030" className="bg-surface text-fg">2030 Graduating</option>
+              <option value="2031" className="bg-surface text-fg">2031 Graduating</option>
+              <option value="2032" className="bg-surface text-fg">2032 Graduating</option>
+              <option value="2033" className="bg-surface text-fg">2033 Graduating</option>
+              <option value="2034" className="bg-surface text-fg">2034 Graduating</option>
+              <option value="2035" className="bg-surface text-fg">2035 Graduating</option>
             </select>
           </div>
         </div>
 
         {/* Step 4: Report Period & Weekly Date Range */}
         <div className="space-y-2 pt-2">
-          <label className="block text-xs font-semibold text-slate-700">
-            4. Report Period & Weekly Date Range <span className="text-red-500 font-bold ml-0.5">*</span>
+          <label className="block text-xs font-semibold text-fg">
+            4. Report Period & Weekly Date Range <span className="text-rose-500 font-bold ml-0.5">*</span>
           </label>
           <DateRangeCalendar
             startDate={startDate}
@@ -241,22 +242,22 @@ export function ReportBuilderWizard({
 
         {/* Step 5: Choose Sections to Include (Spec Section 9.6) */}
         <div className="pt-2">
-          <label className="block text-xs font-semibold text-slate-700 mb-2">
+          <label className="block text-xs font-semibold text-fg mb-2">
             5. Included Sections in Generated Report
           </label>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
             {Object.entries(sections).map(([key, val]) => (
               <label
                 key={key}
-                className="flex items-center gap-2 bg-slate-50 border border-slate-200 p-2.5 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                className="flex items-center gap-2 bg-surface-sunken border border-border p-2.5 rounded-xl cursor-pointer hover:bg-surface-raised transition-colors select-none"
               >
                 <input
                   type="checkbox"
                   checked={val}
                   onChange={(e) => setSections({ ...sections, [key]: e.target.checked })}
-                  className="rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
+                  className="rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
                 />
-                <span className="capitalize font-medium text-slate-700">
+                <span className="capitalize font-medium text-fg-muted">
                   {key.replace('_', ' ')}
                 </span>
               </label>
@@ -266,30 +267,30 @@ export function ReportBuilderWizard({
 
         {/* Step 6: Coordinator Custom Remarks */}
         <div className="pt-2">
-          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+          <label className="block text-xs font-semibold text-fg mb-1.5">
             6. Coordinator Remarks & Notes
           </label>
           <textarea
             rows={2}
             value={customRemarks}
             onChange={(e) => setCustomRemarks(e.target.value)}
-            className="w-full bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl p-3 text-xs text-slate-800 outline-none shadow-xs"
+            className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl p-3 text-xs text-fg outline-none shadow-xs"
           />
         </div>
 
-        {/* Minimal SaaS Theme Matching Mandatory Alert */}
+        {/* Theme Matching Mandatory Alert */}
         {validationErrors.length > 0 && (
-          <div className="p-3.5 bg-slate-50 border border-rose-200 rounded-xl text-xs space-y-2 animate-fadeIn shadow-2xs">
-            <div className="flex items-center gap-2 text-rose-700 font-bold">
-              <AlertCircle size={15} strokeWidth={2.25} className="text-rose-600 shrink-0" />
+          <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-xs space-y-2 animate-fadeIn shadow-2xs">
+            <div className="flex items-center gap-2 text-rose-700 dark:text-rose-300 font-bold">
+              <AlertCircle size={15} strokeWidth={2.25} className="text-rose-600 dark:text-rose-400 shrink-0" />
               <span>Mandatory Options Required</span>
             </div>
-            <p className="text-slate-600 text-micro">
+            <p className="text-fg-muted text-micro">
               These mandatory fields are missed by you. Please select them before generating the report:
             </p>
-            <ul className="space-y-1 text-slate-700 text-micro pl-1 font-medium">
+            <ul className="space-y-1 text-fg-muted text-micro pl-1 font-medium">
               {validationErrors.map((err, i) => (
-                <li key={i} className="flex items-center gap-1.5 text-rose-700 font-semibold">
+                <li key={i} className="flex items-center gap-1.5 text-rose-700 dark:text-rose-300 font-semibold">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
                   <span>{err}</span>
                 </li>
@@ -299,12 +300,12 @@ export function ReportBuilderWizard({
         )}
 
         {/* Generate Report Submit Button */}
-        <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-3">
+        <div className="pt-4 border-t border-border flex items-center justify-end gap-3">
           <button
             type="button"
             onClick={handleGenerate}
             disabled={loading}
-            className="px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
+            className="px-6 py-2.5 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
           >
             <Sparkles size={14} strokeWidth={2} aria-hidden /> {loading ? 'Generating…' : 'Generate Report'}
           </button>

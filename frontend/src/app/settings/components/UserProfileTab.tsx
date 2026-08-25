@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Lock, Camera, Calendar, Mail, Phone, MapPin,
-  Building, Shield, CheckCircle2, AlertCircle, Sparkles, User as UserIcon, AlertTriangle, Save, KeyRound, Trash2
+  Building, Shield, CheckCircle2, AlertCircle, Sparkles, User as UserIcon, AlertTriangle, Save, KeyRound, Trash2, Lightbulb, Info
 } from 'lucide-react';
 import { readSessionUser, updateSessionUser } from '@/lib/session';
 import { apiFetch } from '@/lib/api';
@@ -661,8 +661,9 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
                     title="System username is automatically derived without initials"
                     className={`${whiteDisabledInputClass} font-mono`}
                   />
-                  <p className="text-[10px] text-fg-subtle mt-1.5 leading-normal">
-                    💡 Note: Your system username is always your name without initials (<span className="font-mono font-semibold text-primary">{effectiveUsername}</span>).
+                  <p className="text-[10px] text-fg-subtle mt-1.5 leading-normal flex items-start gap-1">
+                    <Lightbulb size={11} className="shrink-0 mt-0.5" aria-hidden />
+                    <span>Note: Your system username is always your name without initials (<span className="font-mono font-semibold text-primary">{effectiveUsername}</span>).</span>
                   </p>
                 </div>
               </div>
@@ -880,10 +881,18 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
 
                 {/* Personal Section Action Bar */}
                 <div className="flex items-center justify-between flex-wrap gap-3 pt-2 border-t border-border">
-                  <p className="text-[11px] text-fg-subtle">
-                    {isPersonalLocked
-                      ? '🔒 Primary Mobile, Personal Email, LinkedIn, DOB, and Joining Date are locked. Alternate mobile and address remain editable.'
-                      : '💡 Submitting will permanently lock your Primary Mobile, Personal Email, LinkedIn, DOB, and Joining Date.'}
+                  <p className="text-[11px] text-fg-subtle flex items-start gap-1">
+                    {isPersonalLocked ? (
+                      <>
+                        <Lock size={11} className="shrink-0 mt-0.5" aria-hidden />
+                        <span>Primary Mobile, Personal Email, LinkedIn, DOB, and Joining Date are locked. Alternate mobile and address remain editable.</span>
+                      </>
+                    ) : (
+                      <>
+                        <Lightbulb size={11} className="shrink-0 mt-0.5" aria-hidden />
+                        <span>Submitting will permanently lock your Primary Mobile, Personal Email, LinkedIn, DOB, and Joining Date.</span>
+                      </>
+                    )}
                   </p>
 
                   <button
@@ -995,8 +1004,9 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
 
                 {/* Password Change Action Bar */}
                 <div className="flex items-center justify-between flex-wrap gap-3 pt-2">
-                  <p className="text-[11px] text-fg-subtle">
-                    ℹ️ Rule: Maximum 2 password updates allowed per month. A 3rd attempt will automatically lock your profile.
+                  <p className="text-[11px] text-fg-subtle flex items-start gap-1">
+                    <Info size={11} className="shrink-0 mt-0.5" aria-hidden />
+                    <span>Rule: Maximum 2 password updates allowed per month. A 3rd attempt will automatically lock your profile.</span>
                   </p>
 
                   <button

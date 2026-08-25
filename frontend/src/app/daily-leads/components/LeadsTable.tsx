@@ -1,32 +1,32 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Sparkles, FileSpreadsheet, Trash2, Building2, AlertCircle } from 'lucide-react';
-
-const BATCH_YEARS = ['2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030', '2031', '2032'];
+import { useState } from 'react';
+import { Sparkles, Trash2, Calendar, FileText, CheckCircle2 } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 
 export interface DailyLeadRow {
   _id: string;
   lead_type: 'positive' | 'jd_received';
-  college_id: {
-    _id: string;
-    college_name: string;
-    college_code: string;
-  };
-  coordinator_id?: {
-    _id: string;
-    full_name: string;
-    official_email: string;
-  };
+  event_time: string;
+  lead_date: string;
   company_name: string;
   job_role: string;
   ctc: string;
   eligible_batch: string;
-  event_time: string;
-  lead_date: string;
   remarks?: string;
-  is_moved_to_jd?: boolean;
+  coordinator_id?: {
+    _id: string;
+    full_name: string;
+  };
+  college_id?: {
+    _id: string;
+    college_name: string;
+    college_code: string;
+  };
+  is_jd_received?: boolean;
 }
+
+const BATCH_YEARS = ['2025', '2026', '2027', '2028', '2029'];
 
 interface Props {
   rows: DailyLeadRow[];
@@ -38,7 +38,6 @@ interface Props {
   onToggleSelect: (id: string) => void;
   onToggleSelectAll: () => void;
   onClearSelection: () => void;
-  onCancelDeleteMode?: () => void;
   onBulkDelete: () => Promise<void>;
   onUpdateRow: (rowId: string, patch: Partial<DailyLeadRow>) => Promise<void>;
 }
@@ -53,45 +52,37 @@ export function LeadsTable({
   onToggleSelect,
   onToggleSelectAll,
   onClearSelection,
-  onCancelDeleteMode,
   onBulkDelete,
   onUpdateRow,
 }: Props) {
   // Prompt when 'All Colleges' or no college is chosen
   if (!selectedCollegeId || selectedCollegeId === 'all') {
     return (
-      <div className="py-24 text-center flex flex-col items-center justify-center gap-3.5 bg-white rounded-2xl border border-slate-100">
-        <div className="w-16 h-16 rounded-2xl bg-blue-50/80 border border-blue-200/80 shadow-xs flex items-center justify-center text-primary">
-          <Building2 size={32} strokeWidth={1.8} />
+      <div className="flex flex-col items-center justify-center p-12 text-center bg-surface border border-border rounded-2xl shadow-xs">
+        <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center mb-4 shadow-sm">
+          <Calendar size={28} strokeWidth={2} />
         </div>
-        <div className="space-y-1">
-          <p className="text-sm font-bold text-slate-800 tracking-tight">
-            Select a College to View Leads
-          </p>
-          <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-            Please select a college from the dropdown above to view the positives and JD for the day.
-          </p>
-        </div>
+        <h3 className="text-base font-bold text-fg mb-1">
+          Select a College to View Daily Leads
+        </h3>
+        <p className="text-xs text-fg-subtle max-w-md">
+          Please select a specific college from the top dropdown to view its segregated {activeTab === 'positive' ? 'Positive Leads' : 'JD Received'} for the selected date.
+        </p>
       </div>
     );
   }
 
-  // When a college is selected but no records exist
   if (rows.length === 0) {
     return (
-      <div className="py-20 text-center flex flex-col items-center justify-center gap-3 bg-white rounded-2xl border border-slate-100">
-        <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200/80 shadow-xs flex items-center justify-center text-slate-400">
-          {activeTab === 'positive' ? (
-            <Sparkles size={26} strokeWidth={1.75} className="text-emerald-500" />
-          ) : (
-            <FileSpreadsheet size={26} strokeWidth={1.75} className="text-blue-500" />
-          )}
+      <div className="flex flex-col items-center justify-center p-12 text-center bg-surface border border-border rounded-2xl shadow-xs">
+        <div className="w-14 h-14 rounded-2xl bg-surface-sunken border border-border text-fg-subtle flex items-center justify-center mb-3">
+          <FileText size={28} strokeWidth={1.75} />
         </div>
-        <div>
-          <p className="text-sm font-bold text-slate-800">
-            No {activeTab === 'positive' ? 'Positive Leads' : 'JDs Received'} Logged
-          </p>
-          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+        <div className="space-y-1">
+          <h3 className="text-sm font-bold text-fg">
+            No {activeTab === 'positive' ? 'Positive Leads' : 'JD Received Records'} Found
+          </h3>
+          <p className="text-xs text-fg-subtle max-w-sm">
             No opportunities recorded for this college on the selected date. Click <span className="text-primary font-semibold font-mono">+ Add Entry</span> in the header to register new activity.
           </p>
         </div>
@@ -102,10 +93,10 @@ export function LeadsTable({
   return (
     <div className="overflow-hidden">
       {/* ── Clean Table Container ─────────────────────────────────────────── */}
-      <div className="overflow-x-auto bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
+      <div className="overflow-x-auto bg-surface rounded-2xl border border-border shadow-2xs">
         <table className="w-full text-xs text-left border-collapse">
           <thead>
-            <tr className="bg-slate-50/90 text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider text-micro select-none">
+            <tr className="bg-surface-sunken text-fg-muted font-bold border-b border-border uppercase tracking-wider text-micro select-none">
               {/* Checkbox Column (Only visible when isDeleteMode is active) */}
               {isDeleteMode && (
                 <th className="py-3 px-3 w-10 text-center">
@@ -113,7 +104,7 @@ export function LeadsTable({
                     type="checkbox"
                     checked={isAllSelected}
                     onChange={onToggleSelectAll}
-                    className="rounded border-slate-300 text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer align-middle"
+                    className="rounded border-border text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer align-middle"
                     title="Select All Rows"
                   />
                 </th>
@@ -127,7 +118,7 @@ export function LeadsTable({
               <th className="py-3 px-3 min-w-[120px]">Eligible Batch</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 font-normal bg-white">
+          <tbody className="divide-y divide-border/60 font-normal bg-surface">
             {rows.map((row, idx) => {
               const isSelected = selectedIds.includes(row._id);
               return (
@@ -192,8 +183,8 @@ function TableRow({
     <tr
       className={`transition-colors ${
         isSelected
-          ? 'bg-rose-50/50 hover:bg-rose-50/70 text-slate-900'
-          : 'hover:bg-slate-50/80 text-slate-800'
+          ? 'bg-rose-50/60 dark:bg-rose-950/40 hover:bg-rose-50/80 dark:hover:bg-rose-950/60 text-fg'
+          : 'hover:bg-surface-sunken/80 text-fg'
       }`}
     >
       {/* Row Selection Checkbox (Only when isDeleteMode is active) */}
@@ -203,18 +194,18 @@ function TableRow({
             type="checkbox"
             checked={isSelected}
             onChange={onToggleSelect}
-            className="rounded border-slate-300 text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer align-middle"
+            className="rounded border-border text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer align-middle"
           />
         </td>
       )}
 
       {/* Row Index */}
-      <td className="py-3 px-3 text-center text-slate-400 font-mono text-micro font-medium">
+      <td className="py-3 px-3 text-center text-fg-subtle font-mono text-micro font-medium">
         {index}
       </td>
 
       {/* Time Stamp */}
-      <td className="py-3 px-3 text-slate-500 whitespace-nowrap font-mono text-micro">
+      <td className="py-3 px-3 text-fg-subtle whitespace-nowrap font-mono text-micro">
         {editingField === 'event_time' ? (
           <input
             type="text"
@@ -223,7 +214,7 @@ function TableRow({
             onBlur={() => commitEdit('event_time')}
             onKeyDown={(e) => handleKeyDown(e, 'event_time')}
             autoFocus
-            className="bg-white border border-primary rounded px-1.5 py-0.5 text-xs text-slate-900 w-20 shadow-xs outline-none"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-20 shadow-xs outline-none"
           />
         ) : (
           <span
@@ -237,7 +228,7 @@ function TableRow({
       </td>
 
       {/* Date */}
-      <td className="py-3 px-3 text-slate-600 whitespace-nowrap font-mono text-micro">
+      <td className="py-3 px-3 text-fg-muted whitespace-nowrap font-mono text-micro">
         {editingField === 'lead_date' ? (
           <input
             type="date"
@@ -246,7 +237,7 @@ function TableRow({
             onBlur={() => commitEdit('lead_date')}
             onKeyDown={(e) => handleKeyDown(e, 'lead_date')}
             autoFocus
-            className="bg-white border border-primary rounded px-1.5 py-0.5 text-xs text-slate-900 shadow-xs outline-none"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg shadow-xs outline-none"
           />
         ) : (
           <span
@@ -268,7 +259,7 @@ function TableRow({
       </td>
 
       {/* Company Name */}
-      <td className="py-3 px-3 font-bold text-slate-900 min-w-[240px] break-words leading-snug">
+      <td className="py-3 px-3 font-bold text-fg min-w-[240px] break-words leading-snug">
         {editingField === 'company_name' ? (
           <input
             type="text"
@@ -277,7 +268,7 @@ function TableRow({
             onBlur={() => commitEdit('company_name')}
             onKeyDown={(e) => handleKeyDown(e, 'company_name')}
             autoFocus
-            className="bg-white border border-primary rounded px-1.5 py-0.5 text-xs text-slate-900 w-full shadow-xs outline-none"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-full shadow-xs outline-none"
           />
         ) : (
           <span
@@ -291,7 +282,7 @@ function TableRow({
       </td>
 
       {/* Job Role */}
-      <td className="py-3 px-3 text-slate-700 whitespace-pre-wrap leading-tight min-w-[180px]">
+      <td className="py-3 px-3 text-fg-muted whitespace-pre-wrap leading-tight min-w-[180px]">
         {editingField === 'job_role' ? (
           <input
             type="text"
@@ -300,7 +291,7 @@ function TableRow({
             onBlur={() => commitEdit('job_role')}
             onKeyDown={(e) => handleKeyDown(e, 'job_role')}
             autoFocus
-            className="bg-white border border-primary rounded px-1.5 py-0.5 text-xs text-slate-900 w-full shadow-xs outline-none"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-full shadow-xs outline-none"
           />
         ) : (
           <span
@@ -314,7 +305,7 @@ function TableRow({
       </td>
 
       {/* CTC */}
-      <td className="py-3 px-3 whitespace-nowrap font-mono text-micro font-bold text-emerald-600">
+      <td className="py-3 px-3 whitespace-nowrap font-mono text-micro font-bold text-emerald-600 dark:text-emerald-400">
         {editingField === 'ctc' ? (
           <input
             type="text"
@@ -323,7 +314,7 @@ function TableRow({
             onBlur={() => commitEdit('ctc')}
             onKeyDown={(e) => handleKeyDown(e, 'ctc')}
             autoFocus
-            className="bg-white border border-primary rounded px-1.5 py-0.5 text-xs text-slate-900 w-24 shadow-xs outline-none"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-24 shadow-xs outline-none"
           />
         ) : (
           <span
@@ -331,13 +322,13 @@ function TableRow({
             className="cursor-pointer hover:underline transition-colors"
             title="Click to edit CTC"
           >
-            {row.ctc || <span className="text-slate-400 italic font-normal">—</span>}
+            {row.ctc || <span className="text-fg-disabled italic font-normal">—</span>}
           </span>
         )}
       </td>
 
       {/* Eligible Batch */}
-      <td className="py-3 px-3 text-slate-700 whitespace-nowrap">
+      <td className="py-3 px-3 text-fg-muted whitespace-nowrap">
         {editingField === 'eligible_batch' ? (
           <select
             value={tempValue}
@@ -346,10 +337,10 @@ function TableRow({
             }}
             onBlur={() => commitEdit('eligible_batch')}
             autoFocus
-            className="bg-white border border-primary rounded-lg px-2 py-1 text-xs text-slate-900 shadow-xs cursor-pointer outline-none font-medium"
+            className="bg-surface border border-primary rounded-lg px-2 py-1 text-xs text-fg shadow-xs cursor-pointer outline-none font-medium"
           >
             {BATCH_YEARS.map((y) => (
-              <option key={y} value={y}>
+              <option key={y} value={y} className="bg-surface text-fg">
                 {y}
               </option>
             ))}
@@ -357,7 +348,7 @@ function TableRow({
         ) : (
           <span
             onClick={() => startEdit('eligible_batch', row.eligible_batch)}
-            className="cursor-pointer hover:text-primary transition-colors font-mono font-medium px-2 py-0.5 rounded bg-slate-50 border border-slate-200"
+            className="cursor-pointer hover:text-primary transition-colors font-mono font-medium px-2 py-0.5 rounded bg-surface-sunken border border-border"
             title="Click to change batch"
           >
             {row.eligible_batch}

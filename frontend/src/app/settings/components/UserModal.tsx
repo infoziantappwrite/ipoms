@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Pencil, Plus, X, UserPlus } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 interface Props {
@@ -102,11 +103,11 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-border pb-3">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <span>{isEditing ? '✏️' : '➕'}</span>
+            {isEditing ? <Pencil size={14} strokeWidth={2.2} aria-hidden /> : <Plus size={14} strokeWidth={2.2} aria-hidden />}
             {isEditing ? 'Edit User & Permissions' : 'Create New User Account'}
           </h3>
-          <button onClick={onClose} className="text-fg-subtle hover:text-white text-base">
-            ✕
+          <button onClick={onClose} aria-label="Close" className="text-fg-subtle hover:text-white">
+            <X size={16} strokeWidth={2} />
           </button>
         </div>
 
@@ -252,9 +253,10 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 bg-primary hover:bg-primary text-white rounded-xl font-bold shadow-2 transition-colors"
+              className="px-5 py-2 bg-primary hover:bg-primary text-white rounded-xl font-bold shadow-2 transition-colors flex items-center gap-1.5"
             >
-              {loading ? 'Saving…' : isEditing ? 'Save User' : 'Create User Account 👥'}
+              {!loading && !isEditing && <UserPlus size={14} strokeWidth={2.2} aria-hidden />}
+              {loading ? 'Saving…' : isEditing ? 'Save User' : 'Create User Account'}
             </button>
           </div>
 

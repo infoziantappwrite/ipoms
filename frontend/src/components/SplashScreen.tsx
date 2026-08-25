@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { InfoziantMark } from './InfoziantMark';
 import { WaveLoader } from './WaveLoader';
 
@@ -9,23 +10,34 @@ interface Props {
 }
 
 /**
- * Branded entry splash. Presentational only — the 2s timer and routing live in
- * the page that renders this, so this stays testable and reusable.
- *
- * Pure white (`bg-surface`) rather than `bg-background` (#F8FAFC): the brief
- * asked for a white background specifically.
- *
- * No visible Skip control by request. Click-anywhere and any-keypress still
- * advance immediately (wired via the wrapping div's onClick + EntryPage's
- * keydown listener) — a silent escape hatch, not a discoverable one.
+ * Branded entry splash. Presentational only.
+ * Guaranteed to ALWAYS render in Light Theme (clean pure white background and dark navy branding).
  */
 export function SplashScreen({ onSkip }: Props) {
+  useEffect(() => {
+    // Lock document root to light theme during splash screen
+    const root = document.documentElement;
+    const previousWasDark = root.classList.contains('dark');
+    root.classList.remove('dark');
+    root.classList.add('light');
+    root.style.colorScheme = 'light';
+
+    return () => {
+      // Revert when unmounting if dark was active
+      if (previousWasDark) {
+        root.classList.add('dark');
+        root.classList.remove('light');
+        root.style.colorScheme = 'dark';
+      }
+    };
+  }, []);
+
   return (
     <div
       role="status"
       aria-live="polite"
       onClick={onSkip}
-      className="fixed inset-0 z-modal flex flex-col items-center justify-center gap-6 bg-surface px-6 cursor-pointer select-none"
+      className="fixed inset-0 z-modal flex flex-col items-center justify-center gap-6 bg-white text-slate-900 px-6 cursor-pointer select-none"
     >
       <span className="sr-only">Loading iPOMS, opening sign in shortly</span>
 

@@ -1,3 +1,5 @@
+'use client';
+
 import { useState } from 'react';
 import {
   FileSpreadsheet,
@@ -11,7 +13,9 @@ import {
   Building2,
   ListTodo,
   Clock,
+  Eye,
 } from 'lucide-react';
+import { A4PdfPreviewModal } from './A4PdfPreviewModal';
 
 const COLLEGE_LOGO_MAP: Record<string, string> = {
   ACET: '/college-logos/acet.png',
@@ -62,14 +66,15 @@ interface NativeReportEditorProps {
 export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReportEditorProps) {
   const [report, setReport] = useState(reportData);
   const [logoFailed, setLogoFailed] = useState(false);
+  const [showA4Preview, setShowA4Preview] = useState(false);
 
   if (!report) {
     return (
-      <div className="p-12 text-center text-slate-500">
+      <div className="p-12 text-center text-fg-subtle">
         <p className="text-sm">No report loaded in editor.</p>
         <button
           onClick={onBackToBuilder}
-          className="mt-3 px-4 py-2 bg-primary text-white rounded-xl text-xs font-semibold"
+          className="mt-3 px-4 py-2 bg-primary text-white rounded-xl text-xs font-semibold cursor-pointer"
         >
           Open Builder Wizard
         </button>
@@ -411,43 +416,47 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
   const collegeLogoUrl = COLLEGE_LOGO_MAP[collegeCode] || `/college-logos/${collegeCode.toLowerCase()}.png`;
 
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-4 print:p-0 print:m-0 print:max-w-full">
+    <div className="max-w-5xl mx-auto p-6 space-y-4 print:p-0 print:m-0 print:max-w-full text-fg">
 
-      {/* ── Document Canvas (Printable Page) ────────────────────────────────── */}
+      {/* ── Document Canvas (Editable In-App View & Printable Page) ────────────────────────────────── */}
       <div
         id="printable-report-canvas"
-        className="printable-report-canvas bg-white border border-slate-200 rounded-2xl shadow-xs p-8 space-y-6 text-slate-800 print:w-full print:p-0 print:border-none print:shadow-none"
+        className="printable-report-canvas bg-surface border border-border rounded-2xl shadow-xs p-8 space-y-6 text-fg print:w-full print:p-0 print:border-none print:shadow-none print:bg-white print:text-black"
       >
 
         {/* 1. Header Branding Strip with Infoziant Logo (Left) & Target College Logo (Right) */}
-        <div className="flex items-center justify-between border-b-2 border-slate-200 pb-4 gap-4">
+        <div className="flex items-center justify-between border-b-2 border-border print:border-slate-300 pb-4 gap-4">
           {/* Left: Infoziant Logo & Report Title + College Name with Acronym */}
           <div className="flex items-center gap-3.5">
-            <img
-              src="/infoziant-head.png"
-              alt="Infoziant"
-              className="h-14 w-auto object-contain shrink-0"
-              onError={(e) => {
-                // Fallback if direct root path fails
-                (e.target as HTMLImageElement).src = '/college-logos/Infozianthead.png';
-              }}
-            />
+            {/* Smooth square white base for high contrast in dark mode */}
+            <div className="bg-white rounded-xl p-1.5 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/infoziant-head.png"
+                alt="Infoziant"
+                className="h-12 w-auto object-contain shrink-0"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/college-logos/Infozianthead.png';
+                }}
+              />
+            </div>
             <div>
               <input
                 type="text"
                 value={report.report_title || 'Weekly Report'}
                 onChange={(e) => setReport({ ...report, report_title: e.target.value })}
-                className="text-base sm:text-lg font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-primary focus:bg-slate-50 px-1 rounded transition-colors outline-none tracking-tight font-sans"
+                className="text-base sm:text-lg font-bold text-fg print:text-slate-900 bg-transparent border-b border-transparent hover:border-border focus:border-primary focus:bg-surface-sunken px-1 rounded transition-colors outline-none tracking-tight font-sans"
               />
-              <p className="text-xs font-semibold text-slate-700 mt-0.5 px-1">
+              <p className="text-xs font-semibold text-fg-muted print:text-slate-700 mt-0.5 px-1">
                 {collegeName}
               </p>
             </div>
           </div>
 
-          {/* Right: Target College Logo (Show only logo when present) */}
-          <div className="flex items-center">
+          {/* Right: Target College Logo */}
+          <div className="flex items-center shrink-0">
             {!isConsolidated && !logoFailed ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 key={collegeLogoUrl}
                 src={collegeLogoUrl}
@@ -456,7 +465,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                 onError={() => setLogoFailed(true)}
               />
             ) : (
-              <div className="h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700 shadow-2xs">
+              <div className="h-9 px-3 bg-surface-sunken border border-border rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-fg shadow-2xs">
                 <Building2 size={14} className="text-primary shrink-0" />
                 <span>{isConsolidated ? 'iPOMS' : collegeCode}</span>
               </div>
@@ -465,72 +474,72 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         </div>
 
         {/* 2. Report Metadata Sub-bar */}
-        <div className="flex items-center justify-between flex-wrap gap-2 text-xs text-slate-600 bg-slate-50/80 border border-slate-200 rounded-xl px-4 py-2 font-medium">
+        <div className="flex items-center justify-between flex-wrap gap-2 text-xs text-fg-muted bg-surface-sunken border border-border rounded-xl px-4 py-2 font-medium print:bg-slate-50 print:text-slate-600 print:border-slate-200">
           <div className="flex items-center gap-1.5">
             <Calendar size={13} className="text-primary shrink-0" />
-            <span>Period: <strong className="text-slate-900 font-semibold">{report.report_period}</strong></span>
+            <span>Period: <strong className="text-fg print:text-slate-900 font-semibold">{report.report_period}</strong></span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Calendar size={13} className="text-slate-400 shrink-0" />
-            <span>Generated Date: <strong className="text-slate-900 font-semibold">{report.generated_date}</strong></span>
+            <Calendar size={13} className="text-fg-subtle print:text-slate-400 shrink-0" />
+            <span>Generated Date: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_date}</strong></span>
           </div>
           <div className="flex items-center gap-1.5">
-            <User size={13} className="text-slate-400 shrink-0" />
-            <span>Prepared By: <strong className="text-slate-900 font-semibold">{report.generated_by}</strong></span>
+            <User size={13} className="text-fg-subtle print:text-slate-400 shrink-0" />
+            <span>Prepared By: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_by}</strong></span>
           </div>
         </div>
 
-        {/* 3. Live KPI Summary Strip (Slim Single-Row Profile) */}
+        {/* 3. Live KPI Summary Strip */}
         {report.included_sections?.kpi_summary && report.kpi_summary && (
           <>
             {report.kpi_summary.total_pending_tasks !== undefined ? (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                <div className="bg-white border border-blue-200/80 p-2.5 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-slate-500 font-semibold uppercase block">Total Tasks</span>
+                <div className="bg-surface border border-blue-200 dark:border-blue-900/60 p-2.5 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Total Tasks</span>
                   <span className="text-base font-bold font-mono text-primary tabular-nums">{report.kpi_summary.total_pending_tasks}</span>
                 </div>
-                <div className="bg-white border border-emerald-200/80 p-2.5 rounded-xl text-center shadow-2xs bg-emerald-50/20">
-                  <span className="text-micro text-emerald-700 font-semibold uppercase block">DB Shared</span>
-                  <span className="text-base font-bold font-mono text-emerald-700 tabular-nums">{report.kpi_summary.db_shared_count || 0}</span>
+                <div className="bg-surface border border-emerald-200/80 dark:border-emerald-900/60 p-2.5 rounded-xl text-center shadow-2xs bg-emerald-50/20 dark:bg-emerald-950/20">
+                  <span className="text-micro text-emerald-700 dark:text-emerald-400 font-semibold uppercase block">DB Shared</span>
+                  <span className="text-base font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums">{report.kpi_summary.db_shared_count || 0}</span>
                 </div>
-                <div className="bg-white border border-amber-200/80 p-2.5 rounded-xl text-center shadow-2xs bg-amber-50/20">
-                  <span className="text-micro text-amber-700 font-semibold uppercase block">DB Pending</span>
-                  <span className="text-base font-bold font-mono text-amber-700 tabular-nums">{report.kpi_summary.db_pending_count || 0}</span>
+                <div className="bg-surface border border-amber-200/80 dark:border-amber-900/60 p-2.5 rounded-xl text-center shadow-2xs bg-amber-50/20 dark:bg-amber-950/20">
+                  <span className="text-micro text-amber-700 dark:text-amber-400 font-semibold uppercase block">DB Pending</span>
+                  <span className="text-base font-bold font-mono text-amber-700 dark:text-amber-400 tabular-nums">{report.kpi_summary.db_pending_count || 0}</span>
                 </div>
-                <div className="bg-white border border-purple-200/80 p-2.5 rounded-xl text-center shadow-2xs bg-purple-50/20">
-                  <span className="text-micro text-purple-700 font-semibold uppercase block">Drives Scheduled</span>
-                  <span className="text-base font-bold font-mono text-purple-700 tabular-nums">{report.kpi_summary.drives_scheduled || 0}</span>
+                <div className="bg-surface border border-purple-200/80 dark:border-purple-900/60 p-2.5 rounded-xl text-center shadow-2xs bg-purple-50/20 dark:bg-purple-950/20">
+                  <span className="text-micro text-purple-700 dark:text-purple-400 font-semibold uppercase block">Drives Scheduled</span>
+                  <span className="text-base font-bold font-mono text-purple-700 dark:text-purple-400 tabular-nums">{report.kpi_summary.drives_scheduled || 0}</span>
                 </div>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 pt-1">
-                <div className="bg-white border border-blue-200/80 p-2 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-slate-500 font-semibold uppercase block">Calls</span>
+                <div className="bg-surface border border-blue-200 dark:border-blue-900/60 p-2 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Calls</span>
                   <span className="text-sm font-bold font-mono text-primary tabular-nums">{report.kpi_summary.total_calls}</span>
                 </div>
-                <div className="bg-white border border-emerald-200/80 p-2 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-slate-500 font-semibold uppercase block">Positives</span>
-                  <span className="text-sm font-bold font-mono text-emerald-700 tabular-nums">{report.kpi_summary.positive_responses}</span>
+                <div className="bg-surface border border-emerald-200/80 dark:border-emerald-900/60 p-2 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Positives</span>
+                  <span className="text-sm font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums">{report.kpi_summary.positive_responses}</span>
                 </div>
-                <div className="bg-white border border-cyan-200/80 p-2 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-slate-500 font-semibold uppercase block">JDs Received</span>
-                  <span className="text-sm font-bold font-mono text-cyan-700 tabular-nums">{report.kpi_summary.jds_received}</span>
+                <div className="bg-surface border border-cyan-200/80 dark:border-cyan-900/60 p-2 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-fg-subtle font-semibold uppercase block">JDs Received</span>
+                  <span className="text-sm font-bold font-mono text-cyan-700 dark:text-cyan-400 tabular-nums">{report.kpi_summary.jds_received}</span>
                 </div>
-                <div className="bg-white border border-amber-200/80 p-2 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-slate-500 font-semibold uppercase block">Completed</span>
-                  <span className="text-sm font-bold font-mono text-amber-700 tabular-nums">{report.kpi_summary.drives_completed}</span>
+                <div className="bg-surface border border-amber-200/80 dark:border-amber-900/60 p-2 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Completed</span>
+                  <span className="text-sm font-bold font-mono text-amber-700 dark:text-amber-400 tabular-nums">{report.kpi_summary.drives_completed}</span>
                 </div>
-                <div className="bg-white border border-purple-200/80 p-2 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-slate-500 font-semibold uppercase block">In Progress</span>
-                  <span className="text-sm font-bold font-mono text-purple-700 tabular-nums">{report.kpi_summary.drives_in_progress}</span>
+                <div className="bg-surface border border-purple-200/80 dark:border-purple-900/60 p-2 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-fg-subtle font-semibold uppercase block">In Progress</span>
+                  <span className="text-sm font-bold font-mono text-purple-700 dark:text-purple-400 tabular-nums">{report.kpi_summary.drives_in_progress}</span>
                 </div>
-                <div className="bg-white border border-slate-200 p-2 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-slate-500 font-semibold uppercase block">Pipeline</span>
-                  <span className="text-sm font-bold font-mono text-slate-700 tabular-nums">{report.kpi_summary.pipeline_leads}</span>
+                <div className="bg-surface border border-border p-2 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Pipeline</span>
+                  <span className="text-sm font-bold font-mono text-fg-muted tabular-nums">{report.kpi_summary.pipeline_leads}</span>
                 </div>
-                <div className="bg-white border border-emerald-300 p-2 rounded-xl text-center shadow-2xs bg-emerald-50/40">
-                  <span className="text-micro text-emerald-800 font-bold uppercase block">Offers</span>
-                  <span className="text-sm font-bold font-mono text-emerald-700 tabular-nums">{report.kpi_summary.total_offers}</span>
+                <div className="bg-surface border border-emerald-300 dark:border-emerald-700 p-2 rounded-xl text-center shadow-2xs bg-emerald-50/40 dark:bg-emerald-950/40">
+                  <span className="text-micro text-emerald-800 dark:text-emerald-300 font-bold uppercase block">Offers</span>
+                  <span className="text-sm font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums">{report.kpi_summary.total_offers}</span>
                 </div>
               </div>
             )}
@@ -540,22 +549,22 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         {/* 4. Section 1: Companies Completed */}
         {report.included_sections?.completed_companies && report.sections?.completed_companies && (
           <div className="space-y-2 pt-2">
-            <div className="px-3 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50/70 font-bold text-xs flex items-center justify-between text-emerald-800">
+            <div className="px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/70 dark:bg-emerald-950/40 font-bold text-xs flex items-center justify-between text-emerald-800 dark:text-emerald-300">
               <span className="flex items-center gap-1.5">
-                <Trophy size={14} strokeWidth={2.25} className="text-emerald-700" /> 1. COMPANIES COMPLETED
+                <Trophy size={14} strokeWidth={2.25} className="text-emerald-700 dark:text-emerald-400" /> 1. COMPANIES COMPLETED
               </span>
-              <span className="font-mono text-micro bg-white px-2 py-0.5 rounded-md border border-emerald-200">
+              <span className="font-mono text-micro bg-surface px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
                 {report.sections.completed_companies.length} Drives
               </span>
             </div>
 
             {report.sections.completed_companies.length === 0 ? (
-              <p className="text-xs text-slate-400 italic py-2">No completed drives in this period.</p>
+              <p className="text-xs text-fg-subtle italic py-2">No completed drives in this period.</p>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="w-full text-xs text-left">
                   <thead>
-                    <tr className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 text-micro">
+                    <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
                       <th className="py-2 px-2 w-8 text-center">#</th>
                       <th className="py-2 px-3">Company Name</th>
                       <th className="py-2 px-3">Role(s)</th>
@@ -565,50 +574,50 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                       <th className="py-2 px-3">Status Notes</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-normal">
+                  <tbody className="divide-y divide-border/60 font-normal bg-surface">
                     {report.sections.completed_companies.map((r: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-50/60">
-                        <td className="py-2 px-2 text-center text-slate-400">{r.s_no}</td>
-                        <td className="py-2 px-3 font-semibold text-slate-800">
+                      <tr key={idx} className="hover:bg-surface-sunken/60">
+                        <td className="py-2 px-2 text-center text-fg-subtle">{r.s_no}</td>
+                        <td className="py-2 px-3 font-semibold text-fg">
                           <input
                             type="text"
                             value={r.company_name}
                             onChange={(e) =>
                               handleUpdateCell('completed_companies', idx, 'company_name', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-white focus:border focus:border-primary rounded px-1 outline-none"
+                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
                           />
                         </td>
-                        <td className="py-2 px-3 text-slate-600">
+                        <td className="py-2 px-3 text-fg-muted">
                           <input
                             type="text"
                             value={r.job_role}
                             onChange={(e) =>
                               handleUpdateCell('completed_companies', idx, 'job_role', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-white focus:border focus:border-primary rounded px-1 outline-none"
+                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-muted"
                           />
                         </td>
-                        <td className="py-2 px-3 text-slate-500">{r.company_type}</td>
-                        <td className="py-2 px-3 text-emerald-700 font-medium">{r.ctc_lpa}</td>
-                        <td className="py-2 px-3 text-center font-bold text-emerald-700">
+                        <td className="py-2 px-3 text-fg-subtle">{r.company_type}</td>
+                        <td className="py-2 px-3 text-emerald-600 dark:text-emerald-400 font-medium">{r.ctc_lpa}</td>
+                        <td className="py-2 px-3 text-center font-bold text-emerald-600 dark:text-emerald-400">
                           <input
                             type="number"
                             value={r.selected_count}
                             onChange={(e) =>
                               handleUpdateCell('completed_companies', idx, 'selected_count', Number(e.target.value))
                             }
-                            className="bg-transparent w-14 text-center focus:bg-white focus:border focus:border-primary rounded px-1 font-bold text-emerald-700 outline-none"
+                            className="bg-transparent w-14 text-center focus:bg-surface focus:border focus:border-primary rounded px-1 font-bold text-emerald-600 dark:text-emerald-400 outline-none"
                           />
                         </td>
-                        <td className="py-2 px-3 text-slate-500">
+                        <td className="py-2 px-3 text-fg-subtle">
                           <input
                             type="text"
                             value={r.current_status_text}
                             onChange={(e) =>
                               handleUpdateCell('completed_companies', idx, 'current_status_text', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-white focus:border focus:border-primary rounded px-1 outline-none"
+                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-subtle"
                           />
                         </td>
                       </tr>
@@ -623,22 +632,22 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         {/* 5. Section 2: Companies In Progress */}
         {report.included_sections?.in_progress && report.sections?.in_progress && (
           <div className="space-y-2 pt-2">
-            <div className="px-3 py-1.5 rounded-xl border border-blue-200 bg-blue-50/70 font-bold text-xs flex items-center justify-between text-blue-800">
+            <div className="px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800/60 bg-blue-50/70 dark:bg-blue-950/40 font-bold text-xs flex items-center justify-between text-blue-800 dark:text-blue-300">
               <span className="flex items-center gap-1.5">
-                <Rocket size={14} strokeWidth={2.25} className="text-blue-700" /> 2. COMPANIES IN PROGRESS
+                <Rocket size={14} strokeWidth={2.25} className="text-blue-700 dark:text-blue-400" /> 2. COMPANIES IN PROGRESS
               </span>
-              <span className="font-mono text-micro bg-white px-2 py-0.5 rounded-md border border-blue-200">
+              <span className="font-mono text-micro bg-surface px-2 py-0.5 rounded-md border border-blue-200 dark:border-blue-800">
                 {report.sections.in_progress.length} Drives
               </span>
             </div>
 
             {report.sections.in_progress.length === 0 ? (
-              <p className="text-xs text-slate-400 italic py-2">No active drives currently in progress.</p>
+              <p className="text-xs text-fg-subtle italic py-2">No active drives currently in progress.</p>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="w-full text-xs text-left">
                   <thead>
-                    <tr className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 text-micro">
+                    <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
                       <th className="py-2 px-2 w-8 text-center">#</th>
                       <th className="py-2 px-3">Company Name</th>
                       <th className="py-2 px-3">Role(s)</th>
@@ -647,24 +656,24 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                       <th className="py-2 px-3">Status Remarks</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-normal">
+                  <tbody className="divide-y divide-border/60 font-normal bg-surface">
                     {report.sections.in_progress.map((r: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-50/60">
-                        <td className="py-2 px-2 text-center text-slate-400">{r.s_no}</td>
-                        <td className="py-2 px-3 font-semibold text-slate-800">
+                      <tr key={idx} className="hover:bg-surface-sunken/60">
+                        <td className="py-2 px-2 text-center text-fg-subtle">{r.s_no}</td>
+                        <td className="py-2 px-3 font-semibold text-fg">
                           <input
                             type="text"
                             value={r.company_name}
                             onChange={(e) =>
                               handleUpdateCell('in_progress', idx, 'company_name', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-white focus:border focus:border-primary rounded px-1 outline-none"
+                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
                           />
                         </td>
-                        <td className="py-2 px-3 text-slate-600">{r.job_role}</td>
-                        <td className="py-2 px-3 text-slate-500">{r.company_type}</td>
-                        <td className="py-2 px-3 text-blue-700 font-medium">{r.ctc_lpa}</td>
-                        <td className="py-2 px-3 text-slate-500">{r.current_status_text}</td>
+                        <td className="py-2 px-3 text-fg-muted">{r.job_role}</td>
+                        <td className="py-2 px-3 text-fg-subtle">{r.company_type}</td>
+                        <td className="py-2 px-3 text-blue-600 dark:text-blue-400 font-medium">{r.ctc_lpa}</td>
+                        <td className="py-2 px-3 text-fg-subtle">{r.current_status_text}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -677,22 +686,22 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         {/* 6. Section 3: Companies in Pipeline */}
         {report.included_sections?.pipeline && report.sections?.pipeline && (
           <div className="space-y-2 pt-2">
-            <div className="px-3 py-1.5 rounded-xl border border-cyan-200 bg-cyan-50/70 font-bold text-xs flex items-center justify-between text-cyan-800">
+            <div className="px-3 py-1.5 rounded-xl border border-cyan-200 dark:border-cyan-800/60 bg-cyan-50/70 dark:bg-cyan-950/40 font-bold text-xs flex items-center justify-between text-cyan-800 dark:text-cyan-300">
               <span className="flex items-center gap-1.5">
-                <Inbox size={14} strokeWidth={2.25} className="text-cyan-700" /> 3. COMPANIES IN PIPELINE
+                <Inbox size={14} strokeWidth={2.25} className="text-cyan-700 dark:text-cyan-400" /> 3. COMPANIES IN PIPELINE
               </span>
-              <span className="font-mono text-micro bg-white px-2 py-0.5 rounded-md border border-cyan-200">
+              <span className="font-mono text-micro bg-surface px-2 py-0.5 rounded-md border border-cyan-200 dark:border-cyan-800">
                 {report.sections.pipeline.length} Leads
               </span>
             </div>
 
             {report.sections.pipeline.length === 0 ? (
-              <p className="text-xs text-slate-400 italic py-2">No pipeline leads recorded.</p>
+              <p className="text-xs text-fg-subtle italic py-2">No pipeline leads recorded.</p>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="w-full text-xs text-left">
                   <thead>
-                    <tr className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 text-micro">
+                    <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
                       <th className="py-2 px-2 w-8 text-center">#</th>
                       <th className="py-2 px-3">Company Name</th>
                       <th className="py-2 px-3">Role(s)</th>
@@ -700,14 +709,14 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                       <th className="py-2 px-3">Current Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-normal">
+                  <tbody className="divide-y divide-border/60 font-normal bg-surface">
                     {report.sections.pipeline.map((r: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-50/60">
-                        <td className="py-2 px-2 text-center text-slate-400">{r.s_no}</td>
-                        <td className="py-2 px-3 font-semibold text-slate-800">{r.company_name}</td>
-                        <td className="py-2 px-3 text-slate-600">{r.job_role}</td>
-                        <td className="py-2 px-3 text-slate-500">{r.company_type}</td>
-                        <td className="py-2 px-3 text-slate-500">{r.current_status_text}</td>
+                      <tr key={idx} className="hover:bg-surface-sunken/60">
+                        <td className="py-2 px-2 text-center text-fg-subtle">{r.s_no}</td>
+                        <td className="py-2 px-3 font-semibold text-fg">{r.company_name}</td>
+                        <td className="py-2 px-3 text-fg-muted">{r.job_role}</td>
+                        <td className="py-2 px-3 text-fg-subtle">{r.company_type}</td>
+                        <td className="py-2 px-3 text-fg-subtle">{r.current_status_text}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -720,22 +729,22 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         {/* 6. Section: Placement Pending Tasks */}
         {report.included_sections?.pending_tasks && report.sections?.pending_tasks && (
           <div className="space-y-2 pt-2">
-            <div className="px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/70 font-bold text-xs flex items-center justify-between text-indigo-900">
+            <div className="px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/70 dark:bg-indigo-950/40 font-bold text-xs flex items-center justify-between text-indigo-900 dark:text-indigo-300">
               <span className="flex items-center gap-1.5">
-                <ListTodo size={14} strokeWidth={2.25} className="text-indigo-700" /> PLACEMENT PENDING TASKS
+                <ListTodo size={14} strokeWidth={2.25} className="text-indigo-700 dark:text-indigo-400" /> PLACEMENT PENDING TASKS
               </span>
-              <span className="font-mono text-micro bg-white px-2 py-0.5 rounded-md border border-indigo-200 text-indigo-700 font-bold">
+              <span className="font-mono text-micro bg-surface px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 font-bold">
                 {report.sections.pending_tasks.length} Tasks
               </span>
             </div>
 
             {report.sections.pending_tasks.length === 0 ? (
-              <p className="text-xs text-slate-400 italic py-2">No pending tasks recorded for this institution.</p>
+              <p className="text-xs text-fg-subtle italic py-2">No pending tasks recorded for this institution.</p>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="w-full text-xs text-left">
                   <thead>
-                    <tr className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 text-micro">
+                    <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
                       <th className="py-2 px-2 w-8 text-center">#</th>
                       <th className="py-2 px-3">Company Name</th>
                       <th className="py-2 px-3">JD Received Date</th>
@@ -746,78 +755,78 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                       <th className="py-2 px-3">Remarks</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 font-normal">
+                  <tbody className="divide-y divide-border/60 font-normal bg-surface">
                     {report.sections.pending_tasks.map((r: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-50/60">
-                        <td className="py-2 px-2 text-center text-slate-400">{r.s_no}</td>
-                        <td className="py-2 px-3 font-semibold text-slate-800">
+                      <tr key={idx} className="hover:bg-surface-sunken/60">
+                        <td className="py-2 px-2 text-center text-fg-subtle">{r.s_no}</td>
+                        <td className="py-2 px-3 font-semibold text-fg">
                           <input
                             type="text"
                             value={r.company_name}
                             onChange={(e) =>
                               handleUpdateCell('pending_tasks', idx, 'company_name', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-white focus:border focus:border-primary rounded px-1 outline-none"
+                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
                           />
                         </td>
-                        <td className="py-2 px-3 text-slate-600">
+                        <td className="py-2 px-3 text-fg-muted">
                           <input
                             type="text"
                             value={r.jd_received_date}
                             onChange={(e) =>
                               handleUpdateCell('pending_tasks', idx, 'jd_received_date', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-white focus:border focus:border-primary rounded px-1 outline-none"
+                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-muted"
                           />
                         </td>
-                        <td className="py-2 px-3 text-slate-600">
+                        <td className="py-2 px-3 text-fg-muted">
                           <input
                             type="text"
                             value={r.db_shared_date}
                             onChange={(e) =>
                               handleUpdateCell('pending_tasks', idx, 'db_shared_date', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-white focus:border focus:border-primary rounded px-1 outline-none"
+                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-muted"
                           />
                         </td>
-                        <td className="py-2 px-3 text-slate-700">
+                        <td className="py-2 px-3 text-fg">
                           <input
                             type="text"
                             value={r.current_status}
                             onChange={(e) =>
                               handleUpdateCell('pending_tasks', idx, 'current_status', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-white focus:border focus:border-primary rounded px-1 outline-none"
+                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
                           />
                         </td>
-                        <td className="py-2 px-3 text-slate-700 font-medium">
+                        <td className="py-2 px-3 text-fg font-medium">
                           <input
                             type="text"
                             value={r.action_to_be_taken}
                             onChange={(e) =>
                               handleUpdateCell('pending_tasks', idx, 'action_to_be_taken', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-white focus:border focus:border-primary rounded px-1 outline-none"
+                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
                           />
                         </td>
-                        <td className="py-2 px-3 text-indigo-700 font-semibold">
+                        <td className="py-2 px-3 text-indigo-600 dark:text-indigo-400 font-semibold">
                           <input
                             type="text"
                             value={r.drive_date}
                             onChange={(e) =>
                               handleUpdateCell('pending_tasks', idx, 'drive_date', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-white focus:border focus:border-primary rounded px-1 outline-none"
+                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-indigo-600 dark:text-indigo-400"
                           />
                         </td>
-                        <td className="py-2 px-3 text-slate-500">
+                        <td className="py-2 px-3 text-fg-subtle">
                           <input
                             type="text"
                             value={r.remarks}
                             onChange={(e) =>
                               handleUpdateCell('pending_tasks', idx, 'remarks', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-white focus:border focus:border-primary rounded px-1 outline-none"
+                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-subtle"
                           />
                         </td>
                       </tr>
@@ -832,20 +841,20 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         {/* 7. Key Operational Observations & Remarks */}
         {report.included_sections?.remarks && (
           <div className="space-y-2 pt-2">
-            <div className="font-bold text-xs text-slate-700 flex items-center gap-1.5">
+            <div className="font-bold text-xs text-fg flex items-center gap-1.5">
               <PenLine size={14} strokeWidth={2} aria-hidden /> Coordinator Remarks & Observations
             </div>
             <textarea
               rows={3}
               value={report.remarks}
               onChange={(e) => setReport({ ...report, remarks: e.target.value })}
-              className="w-full bg-slate-50 border border-slate-300 focus:border-primary focus:bg-white rounded-xl p-3 text-xs text-slate-800 outline-none"
+              className="w-full bg-surface-sunken border border-border focus:border-primary focus:bg-surface rounded-xl p-3 text-xs text-fg outline-none"
             />
           </div>
         )}
 
         {/* 8. Confidential Footer */}
-        <div className="border-t border-slate-200 pt-4 text-center text-micro text-slate-400">
+        <div className="border-t border-border pt-4 text-center text-micro text-fg-subtle">
           <p>{report.branding?.confidential_notice || 'CONFIDENTIAL: For placement office & institutional leadership review only.'}</p>
           <p className="mt-0.5">© 2026 Infoziant IT Solutions Inc. All rights reserved.</p>
         </div>
@@ -858,12 +867,22 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         <button
           type="button"
           onClick={onBackToBuilder}
-          className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-[0.98]"
+          className="px-4 py-2 bg-surface hover:bg-surface-raised text-fg border border-border rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-[0.98]"
         >
           Back
         </button>
 
-        {/* 2. Export Excel (Emerald Green) */}
+        {/* 2. Preview A4 PDF Button */}
+        <button
+          type="button"
+          onClick={() => setShowA4Preview(true)}
+          className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.98]"
+          title="Preview exactly how this report will look printed on an A4 sheet"
+        >
+          <Eye size={14} strokeWidth={2} aria-hidden /> Preview
+        </button>
+
+        {/* 3. Export Excel (Emerald Green) */}
         <button
           type="button"
           onClick={handleExportExcel}
@@ -872,25 +891,33 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           <FileSpreadsheet size={14} strokeWidth={2} aria-hidden /> Export Excel
         </button>
 
-        {/* 3. Image (Infoziant Sky / Cyan) */}
+        {/* 4. Save Image (Infoziant Sky / Cyan) */}
         <button
           type="button"
           onClick={handleExportImage}
           disabled={exportingImage}
           className="flex items-center gap-1.5 px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.98]"
         >
-          <Download size={14} strokeWidth={2} aria-hidden /> {exportingImage ? 'Saving…' : 'Image'}
+          <Download size={14} strokeWidth={2} aria-hidden /> {exportingImage ? 'Saving…' : 'Save Image'}
         </button>
 
-        {/* 4. Save PDF (Infoziant Corporate Navy) */}
+        {/* 5. Save PDF (Infoziant Corporate Navy) */}
         <button
           type="button"
           onClick={handlePrintPdf}
-          className="flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-blue-900 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.98]"
+          className="flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.98]"
         >
           <Download size={14} strokeWidth={2} aria-hidden /> Save PDF
         </button>
       </div>
+
+      {/* ── Interactive A4 Light-Themed Print Preview Modal ── */}
+      <A4PdfPreviewModal
+        report={report}
+        isOpen={showA4Preview}
+        onClose={() => setShowA4Preview(false)}
+        onPrint={handlePrintPdf}
+      />
 
     </div>
   );

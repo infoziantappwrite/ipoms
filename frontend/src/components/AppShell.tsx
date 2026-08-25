@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { Menu } from 'lucide-react';
 
 import { AppSidebar } from './nav/AppSidebar';
 import { InfoziantMark } from './InfoziantMark';
-import { ChatNotificationToast } from './chat/ChatNotificationToast';
+import { initTheme } from '@/lib/theme';
 
 /** Routes that render their own full-screen chrome and must not show the drawer. */
 const CHROMELESS = ['/', '/login', '/signup'];
@@ -20,6 +21,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Stable identity: the sidebar closes on route change via an effect keyed to
   // this callback, so a fresh function each render would re-fire it endlessly.
   const closeMobile = useCallback(() => setMobileOpen(false), []);
+
+  useEffect(() => {
+    initTheme();
+  }, []);
 
   if (CHROMELESS.includes(pathname)) {
     return <main id="main" className="flex min-h-screen flex-1 flex-col">{children}</main>;
@@ -40,14 +45,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             <Menu size={18} strokeWidth={2} aria-hidden />
           </button>
-          <InfoziantMark size={26} />
+          <Link
+            href="/dashboard"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white p-1 shadow-2xs border border-slate-200/80 dark:border-white/20"
+            aria-label="iPOMS home"
+          >
+            <InfoziantMark size={22} />
+          </Link>
           <span className="text-body font-bold tracking-tight text-fg">iPOMS</span>
         </div>
 
         <main id="main" className="flex flex-1 flex-col">{children}</main>
       </div>
-
-      <ChatNotificationToast />
     </div>
   );
 }

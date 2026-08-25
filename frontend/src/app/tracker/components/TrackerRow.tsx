@@ -271,16 +271,25 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onDelete, onCall }: Prop
 
       {/* Contact (Mobile Number) with 1-Click Call Icon */}
       <div className="w-32 shrink-0 px-1 text-fg-muted font-mono tabular-nums flex items-center gap-1.5 group/contact">
-        {!isReadOnly && row.mobile_number && (
-          <button
-            type="button"
-            onClick={() => onCall?.(row)}
-            title={`Click to call ${row.hr_name || row.company_name} (${row.mobile_number})`}
-            className="w-5 h-5 rounded-md bg-emerald-50 hover:bg-emerald-100 border border-emerald-200
-                       text-emerald-700 flex items-center justify-center transition-all opacity-70 hover:opacity-100 hover:scale-110 cursor-pointer shrink-0 shadow-2xs"
-          >
-            <Phone size={10} strokeWidth={2.5} />
-          </button>
+        {row.mobile_number && (
+          !isReadOnly ? (
+            <button
+              type="button"
+              onClick={() => onCall?.(row)}
+              title={`Click to call ${row.hr_name || row.company_name} (${row.mobile_number})`}
+              className="w-5 h-5 rounded-md bg-emerald-500/15 hover:bg-emerald-500/30 border border-emerald-500/40 dark:border-emerald-400/60
+                         text-emerald-600 dark:text-emerald-400 flex items-center justify-center transition-all hover:scale-110 cursor-pointer shrink-0 shadow-2xs"
+            >
+              <Phone size={11} strokeWidth={2.5} className="text-emerald-600 dark:text-emerald-400" />
+            </button>
+          ) : (
+            <div
+              className="w-5 h-5 rounded-md bg-emerald-500/15 border border-emerald-500/40 dark:border-emerald-400/60
+                         text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 shadow-2xs"
+            >
+              <Phone size={11} strokeWidth={2.5} className="text-emerald-600 dark:text-emerald-400" />
+            </div>
+          )
         )}
         <span className="truncate">{row.mobile_number}</span>
       </div>

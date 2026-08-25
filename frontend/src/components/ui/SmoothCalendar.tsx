@@ -193,15 +193,15 @@ export function SmoothCalendar({
     >
       {/* ── Compact Header: Month Year + Arrows ── */}
       <div className="flex items-center justify-between mb-2.5 px-0.5">
-        <h2 className="text-xs font-bold text-slate-800 dark:text-slate-100 tracking-tight">
+        <h2 className="text-xs font-bold text-fg tracking-tight">
           {MONTH_NAMES[monthIndex]} {year}
         </h2>
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={handleToday}
             title="Jump to Today"
-            className="text-[10px] font-bold text-slate-500 hover:text-primary dark:hover:text-slate-100 px-1.5 py-0.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-0.5 mr-1 cursor-pointer"
+            className="text-[10px] font-bold text-fg-subtle hover:text-fg dark:text-slate-300 dark:hover:text-white px-2 py-0.5 rounded-lg hover:bg-surface-raised dark:hover:bg-slate-700/80 transition-colors flex items-center gap-1 mr-0.5 cursor-pointer"
           >
             <RotateCcw size={10} />
             Today
@@ -209,18 +209,18 @@ export function SmoothCalendar({
           <button
             type="button"
             onClick={handlePrevMonth}
-            className="w-6 h-6 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 cursor-pointer"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-fg-subtle hover:text-fg hover:bg-surface-raised dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-700/80 transition-all active:scale-95 cursor-pointer"
             aria-label="Previous Month"
           >
-            <ChevronLeft size={14} strokeWidth={2.5} />
+            <ChevronLeft size={15} strokeWidth={2.5} />
           </button>
           <button
             type="button"
             onClick={handleNextMonth}
-            className="w-6 h-6 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 cursor-pointer"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-fg-subtle hover:text-fg hover:bg-surface-raised dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-700/80 transition-all active:scale-95 cursor-pointer"
             aria-label="Next Month"
           >
-            <ChevronRight size={14} strokeWidth={2.5} />
+            <ChevronRight size={15} strokeWidth={2.5} />
           </button>
         </div>
       </div>
@@ -230,7 +230,7 @@ export function SmoothCalendar({
         {WEEKDAYS.map((wd) => (
           <div
             key={wd}
-            className="text-[10px] font-bold text-slate-400 dark:text-slate-500 py-0.5"
+            className="text-[10px] font-bold text-fg-subtle py-0.5"
           >
             {wd}
           </div>

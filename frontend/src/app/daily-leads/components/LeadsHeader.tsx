@@ -51,19 +51,19 @@ export function LeadsHeader({
   }, [selectedCollegeId]);
 
   return (
-    <header className="bg-white border-b border-slate-200 px-6 py-4 space-y-3 shadow-xs">
+    <header className="bg-surface border-b border-border px-6 py-4 space-y-3 shadow-xs text-fg">
       {/* ── Top Row: Title & Top-Right Sign Out ────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-primary">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
               <Target size={18} strokeWidth={2.5} />
             </div>
-            <h1 className="text-base font-bold text-slate-900 tracking-tight">
+            <h1 className="text-base font-bold text-fg tracking-tight">
               Daily Leads
             </h1>
           </div>
-          <p className="text-xs text-slate-500 mt-1 font-medium">
+          <p className="text-xs text-fg-subtle mt-1 font-medium">
             Positives and JD Tracker
           </p>
         </div>
@@ -107,7 +107,7 @@ export function LeadsHeader({
       </div>
 
       {/* ── Bottom Controls Row: Date, Smart College Selector, Search, Actions ── */}
-      <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t border-slate-100">
+      <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t border-border/80">
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Smooth Calendar Date Picker */}
           <SmoothDatePicker
@@ -137,7 +137,7 @@ export function LeadsHeader({
               placeholder="Search company, role…"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 text-slate-800 text-xs px-3.5 py-1.5 rounded-xl placeholder:text-slate-400 outline-none shadow-xs"
+              className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 text-fg text-xs px-3.5 py-1.5 rounded-xl placeholder:text-fg-disabled outline-none shadow-xs transition-colors"
             />
           </div>
         </div>
@@ -150,8 +150,8 @@ export function LeadsHeader({
               onClick={onToggleDeleteMode}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 ${
                 isDeleteMode
-                  ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-200'
-                  : 'bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300'
+                  ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-200 dark:shadow-none'
+                  : 'bg-surface border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:border-rose-300'
               }`}
               title={isDeleteMode ? 'Exit Delete Mode' : 'Select and delete leads'}
             >

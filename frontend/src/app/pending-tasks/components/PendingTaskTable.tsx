@@ -62,9 +62,9 @@ export function PendingTaskTable({
   if (loading) {
     return (
       <div className="px-6 pb-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-2xs">
-          <div className="inline-block w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3" />
-          <p className="text-sm font-medium text-slate-500">Loading pending tasks...</p>
+        <div className="bg-surface border border-border rounded-xl p-12 text-center shadow-2xs">
+          <div className="inline-block w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin mb-3" />
+          <p className="text-sm font-medium text-fg-subtle">Loading pending tasks...</p>
         </div>
       </div>
     );
@@ -73,18 +73,18 @@ export function PendingTaskTable({
   if (tasks.length === 0) {
     return (
       <div className="px-6 pb-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-2xs">
-          <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 mx-auto mb-3">
+        <div className="bg-surface border border-border rounded-xl p-12 text-center shadow-2xs">
+          <div className="w-12 h-12 rounded-xl bg-surface-sunken border border-border flex items-center justify-center text-fg-subtle mx-auto mb-3">
             <Building2 size={24} />
           </div>
-          <h3 className="text-base font-bold text-slate-800 mb-1">No Pending Tasks</h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto mb-4">
+          <h3 className="text-base font-bold text-fg mb-1">No Pending Tasks</h3>
+          <p className="text-xs text-fg-subtle max-w-sm mx-auto mb-4">
             There are no active placement pending tasks logged for {collegeName}.
           </p>
           <button
             type="button"
             onClick={onOpenAddModal}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-sm transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-xs font-bold shadow-sm transition-colors cursor-pointer"
           >
             <Plus size={15} />
             <span>Add First Task</span>
@@ -96,12 +96,12 @@ export function PendingTaskTable({
 
   return (
     <div className="px-6 pb-6">
-      <div className="bg-white border border-slate-200 rounded-xl shadow-2xs overflow-hidden">
+      <div className="bg-surface border border-border rounded-xl shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             {/* ── Table Header ────────────────────────────────────────── */}
             <thead>
-              <tr className="bg-slate-50/90 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider select-none">
+              <tr className="bg-surface-sunken border-b border-border text-[11px] font-bold text-fg-muted uppercase tracking-wider select-none">
                 {/* Select All Checkbox (Visible only in selection mode) */}
                 {isSelectionMode && (
                   <th className="w-10 px-3 py-3 text-center">
@@ -113,7 +113,7 @@ export function PendingTaskTable({
                         if (el) el.indeterminate = isSomeSelected;
                       }}
                       onChange={onToggleSelectAll}
-                      className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
                     />
                   </th>
                 )}
@@ -161,15 +161,15 @@ export function PendingTaskTable({
             </thead>
 
             {/* ── Table Body ────────────────────────────────────────── */}
-            <tbody className="divide-y divide-slate-100 text-xs">
+            <tbody className="divide-y divide-border/60 text-xs bg-surface">
               {tasks.map((task, idx) => {
                 const isSelected = selectedIds.includes(task._id);
 
                 return (
                   <tr
                     key={task._id}
-                    className={`transition-colors hover:bg-indigo-50/30 ${
-                      isSelected ? 'bg-indigo-50/60' : idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30'
+                    className={`transition-colors hover:bg-surface-sunken/70 ${
+                      isSelected ? 'bg-primary/10' : idx % 2 === 0 ? 'bg-surface' : 'bg-surface-sunken/30'
                     }`}
                   >
                     {/* Checkbox (Visible only in selection mode) */}
@@ -179,28 +179,28 @@ export function PendingTaskTable({
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => onToggleSelect(task._id)}
-                          className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                          className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
                         />
                       </td>
                     )}
 
                     {/* S.No */}
-                    <td className="px-3 py-3 text-center font-mono font-semibold text-slate-500 text-xs">
+                    <td className="px-3 py-3 text-center font-mono font-semibold text-fg-subtle text-xs">
                       {task.serial_no || idx + 1}
                     </td>
 
                     {/* Company Name */}
                     <td className="px-4 py-3">
-                      <span className="font-bold text-slate-900">
+                      <span className="font-bold text-fg">
                         {task.company_name}
                       </span>
                     </td>
 
                     {/* JD Received Date */}
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5 text-slate-600 font-medium">
-                        <Calendar size={13} className="text-slate-400 shrink-0" />
-                        <span className="font-mono text-[11px] text-slate-700">
+                      <div className="flex items-center gap-1.5 text-fg-muted font-medium">
+                        <Calendar size={13} className="text-fg-subtle shrink-0" />
+                        <span className="font-mono text-[11px] text-fg-muted">
                           {formatDate(task.jd_received_date)}
                         </span>
                       </div>
@@ -209,31 +209,31 @@ export function PendingTaskTable({
                     {/* DB Shared Date */}
                     <td className="px-4 py-3">
                       {task.db_shared_date ? (
-                        <div className="flex items-center gap-1.5 text-slate-600 font-medium">
+                        <div className="flex items-center gap-1.5 text-fg-muted font-medium">
                           <Calendar size={13} className="text-emerald-500 shrink-0" />
-                          <span className="font-mono text-[11px] text-slate-700 font-semibold">
+                          <span className="font-mono text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
                             {formatDate(task.db_shared_date)}
                           </span>
                         </div>
                       ) : (
-                        <span className="text-slate-400 text-xs font-mono">—</span>
+                        <span className="text-fg-disabled text-xs font-mono">—</span>
                       )}
                     </td>
 
                     {/* Current Status */}
                     <td className="px-4 py-3">
-                      <span className="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-800 border border-slate-200">
+                      <span className="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-surface-sunken text-fg-muted border border-border">
                         {task.current_status || 'JD Received'}
                       </span>
                     </td>
 
                     {/* Remarks / Next Action */}
                     <td className="px-4 py-3">
-                      <div className="bg-indigo-50/60 border border-indigo-100 text-indigo-900 px-2.5 py-1 rounded-lg text-xs font-semibold max-w-[280px]">
+                      <div className="bg-blue-500/10 dark:bg-sky-950/60 border border-blue-500/20 dark:border-sky-500/40 text-blue-700 dark:text-sky-300 px-2.5 py-1 rounded-lg text-xs font-bold max-w-[280px]">
                         {task.action_to_be_taken}
                       </div>
                       {task.remarks && (
-                        <p className="text-[10px] text-slate-400 mt-1 italic truncate max-w-[280px]">
+                        <p className="text-[10px] text-fg-subtle mt-1 italic truncate max-w-[280px]">
                           Note: {task.remarks}
                         </p>
                       )}
@@ -242,12 +242,12 @@ export function PendingTaskTable({
                     {/* Drive Date */}
                     <td className="px-4 py-3">
                       {task.drive_date ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold bg-sky-50 text-sky-800 border border-sky-200">
-                          <Calendar size={12} className="text-sky-600" />
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold bg-sky-50 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                          <Calendar size={12} className="text-sky-600 dark:text-sky-400" />
                           {formatDate(task.drive_date)}
                         </span>
                       ) : (
-                        <span className="text-slate-400 text-xs">—</span>
+                        <span className="text-fg-disabled text-xs">—</span>
                       )}
                     </td>
 
@@ -258,7 +258,7 @@ export function PendingTaskTable({
                           type="button"
                           onClick={() => onEdit(task)}
                           title="Edit Task"
-                          className="w-7 h-7 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center transition-colors cursor-pointer"
+                          className="w-7 h-7 rounded-lg text-fg-subtle hover:text-sky-400 hover:bg-surface-raised flex items-center justify-center transition-colors cursor-pointer"
                         >
                           <Edit2 size={14} />
                         </button>
@@ -272,12 +272,12 @@ export function PendingTaskTable({
         </div>
 
         {/* ── Table Footer ────────────────────────────────────────── */}
-        <div className="bg-slate-50 border-t border-slate-200 px-6 py-3 flex items-center justify-between text-xs text-slate-500 font-medium">
+        <div className="bg-surface-sunken border-t border-border px-6 py-3 flex items-center justify-between text-xs text-fg-subtle font-medium">
           <div>
-            Showing <span className="font-bold text-slate-700">{tasks.length}</span> pending task(s)
+            Showing <span className="font-bold text-fg">{tasks.length}</span> pending task(s)
           </div>
           {selectedIds.length > 0 && (
-            <div className="text-indigo-700 font-semibold">
+            <div className="text-primary font-semibold">
               {selectedIds.length} row(s) selected
             </div>
           )}

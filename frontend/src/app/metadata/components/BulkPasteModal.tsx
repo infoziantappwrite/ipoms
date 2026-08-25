@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ClipboardList, Search, X } from 'lucide-react';
+import { ClipboardList, Search, X, Lightbulb, CheckCircle2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 interface Props {
@@ -77,7 +77,9 @@ export function BulkPasteModal({ onClose, onSuccess }: Props) {
 
         {/* Instructions */}
         <div className="p-3 bg-surface-sunken rounded-xl border border-border text-xs text-fg-muted space-y-1">
-          <p className="font-semibold text-primary">💡 Excel Copy-Paste Instructions:</p>
+          <p className="font-semibold text-primary flex items-center gap-1.5">
+            <Lightbulb size={13} aria-hidden /> Excel Copy-Paste Instructions:
+          </p>
           <p className="text-[11px]">
             Copy rows directly from your Excel sheet and paste below. Expected columns:
             <code className="text-fg bg-surface px-1.5 py-0.5 rounded font-mono ml-1 border border-border text-micro">
@@ -185,7 +187,9 @@ Amazon	Andy Jassy	9876543211	hr@amazon.com"
           /* Success Report */
           <div className="space-y-4 text-xs">
             <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-700 dark:text-emerald-300 space-y-1">
-              <p className="font-bold text-sm">✅ Bulk Import Finished</p>
+              <p className="font-bold text-sm flex items-center gap-1.5">
+                <CheckCircle2 size={16} aria-hidden /> Bulk Import Finished
+              </p>
               <p>Total rows processed: {importResult.total_processed}</p>
               <p>Successfully inserted: {importResult.inserted_count}</p>
               <p>Updated existing: {importResult.updated_count}</p>

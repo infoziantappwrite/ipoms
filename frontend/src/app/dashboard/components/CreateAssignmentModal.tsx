@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -90,11 +90,11 @@ export function CreateAssignmentModal({ onClose, onSuccess }: Props) {
 
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-border pb-3">
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+          <h3 className="text-sm font-bold text-fg flex items-center gap-2">
             <Plus size={14} strokeWidth={2} aria-hidden /> Assign Operational Task to Coordinator
           </h3>
-          <button onClick={onClose} className="text-fg-subtle hover:text-white text-base">
-            ✕
+          <button onClick={onClose} className="text-fg-subtle hover:text-fg cursor-pointer" aria-label="Close">
+            <X size={16} strokeWidth={2} />
           </button>
         </div>
 
@@ -158,9 +158,9 @@ export function CreateAssignmentModal({ onClose, onSuccess }: Props) {
                 onChange={(e) => setPriority(e.target.value as any)}
                 className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
               >
-                <option value="high">🔴 High Priority</option>
-                <option value="medium">🟠 Medium</option>
-                <option value="low">🔵 Low</option>
+                <option value="high">High Priority</option>
+                <option value="medium">Medium Priority</option>
+                <option value="low">Low Priority</option>
               </select>
             </div>
           </div>

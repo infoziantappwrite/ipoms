@@ -96,8 +96,9 @@ const POLICIES: Policy[] = [
   // REPORT, not the live operational board (V1_DECISIONS §8.2).
   { method: '*',      pattern: /^\/weekly-tracker(\/.*)?$/,              roles: STAFF },
 
-  // ── Daily Leads ───────────────────────────────────────────────────────────
+  // ── Daily Leads & Active Leads ────────────────────────────────────────────
   { method: '*',      pattern: /^\/daily-leads(\/.*)?$/,                 roles: STAFF },
+  { method: '*',      pattern: /^\/active-leads(\/.*)?$/,                roles: STAFF },
 
   // ── Pending Tasks ─────────────────────────────────────────────────────────
   { method: '*',      pattern: /^\/pending-tasks(\/.*)?$/,               roles: STAFF },
@@ -109,6 +110,7 @@ const POLICIES: Policy[] = [
   // ── Dashboards ────────────────────────────────────────────────────────────
   { method: 'GET',    pattern: /^\/dashboard\/admin\/?$/,                roles: ADMIN },
   { method: 'GET',    pattern: /^\/dashboard\/team-leader\/?$/,          roles: TL_ADMIN },
+  { method: 'GET',    pattern: /^\/dashboard\/college-kpis\/?$/,         roles: STAFF },
   // Any staff member may call this; WHICH coordinator's data comes back is
   // decided by ownership scoping in the handler, not here.
   { method: 'GET',    pattern: /^\/dashboard\/coordinator\/?$/,          roles: STAFF },
@@ -142,8 +144,8 @@ const POLICIES: Policy[] = [
   // Read is open to staff: the UI reads branding and dropdown enums from here.
   { method: 'GET',    pattern: /^\/settings\/?$/,                        roles: STAFF },
 
-  // ── Team Chat & Coordinator Doubt Hub ─────────────────────────────────────
-  { method: '*',      pattern: /^\/chat(\/.*)?$/,                         roles: STAFF },
+  // ── Active Leads Module ───────────────────────────────────────────────────
+  { method: '*',      pattern: /^\/active-leads(\/.*)?$/,                 roles: STAFF },
 ];
 
 /** Paths served before authentication; never reach this middleware. */

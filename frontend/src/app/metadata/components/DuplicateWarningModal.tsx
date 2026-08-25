@@ -1,6 +1,6 @@
 'use client';
 
-import { Mail, Phone, X } from 'lucide-react';
+import { Mail, Phone, X, Ban, AlertTriangle } from 'lucide-react';
 
 interface Props {
   conflictingRecord: any;
@@ -24,7 +24,9 @@ export function DuplicateWarningModal({
         {/* Header */}
         <div className="flex items-start justify-between border-b border-border pb-3.5">
           <div className="flex items-center gap-3">
-            <span className="text-2xl">{isExactDuplicate ? '🚫' : '⚠️'}</span>
+            <span className="text-amber-600 dark:text-amber-400">
+              {isExactDuplicate ? <Ban size={28} strokeWidth={1.8} aria-hidden /> : <AlertTriangle size={28} strokeWidth={1.8} aria-hidden />}
+            </span>
             <div>
               <h3 className="text-sm font-bold text-fg">
                 {isExactDuplicate ? 'Exact Duplicate Record Blocked' : 'Possible Duplicate Contact Found'}

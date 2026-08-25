@@ -6,6 +6,7 @@ import {
   Search, Sparkles, X, CheckCircle2, Building2, Phone, Mail, User, ArrowLeft
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { initTheme } from '@/lib/theme';
 
 interface Company {
   _id: string;
@@ -31,6 +32,10 @@ export default function LoadContactsPage() {
 
   const searchRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    initTheme();
+  }, []);
 
   const fetchCompanies = useCallback(async (q: string, p: number, sector: string) => {
     setLoading(true);
@@ -114,39 +119,40 @@ export default function LoadContactsPage() {
   };
 
   const handleDeselectAll = () => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      companies.forEach((c) => next.delete(c._id));
-      return next;
-    });
+    setSelected(new Set());
   };
 
-  // Perform Import & Dispatch live sync to opener window / Daily Tracker tab
+  // ─── Import into Daily Tracker (via BroadcastChannel + window.opener + localStorage fallback) ───
   const handleImportToTracker = () => {
-    if (selected.size === 0) {
-      alert('Please select at least one contact to import.');
-      return;
-    }
+    if (selected.size === 0) return;
 
     const ids = Array.from(selected);
     let sent = false;
 
-    // 1. BroadcastChannel for robust cross-tab sync (Primary)
-    if (typeof BroadcastChannel !== 'undefined') {
-      try {
-        const channel = new BroadcastChannel('ipoms_tracker_sync');
-        channel.postMessage({ type: 'LOAD_CONTACTS', companyIds: ids, timestamp: Date.now() });
-        channel.close();
-        sent = true;
-      } catch {
-        sent = false;
-      }
+    // 1. BroadcastChannel (fast, modern)
+    try {
+      const channel = new BroadcastChannel('ipoms_tracker_sync');
+      channel.postMessage({
+        type: 'LOAD_CONTACTS',
+        companyIds: ids,
+        timestamp: Date.now(),
+      });
+      channel.close();
+      sent = true;
+    } catch (e) {
+      // Fallback
     }
 
-    // 2. PostMessage to parent opener window if BroadcastChannel not active
-    if (!sent && window.opener && !window.opener.closed) {
+    // 2. Direct Window Opener message
+    if (typeof window !== 'undefined' && window.opener && !window.opener.closed) {
       try {
-        window.opener.postMessage({ type: 'IPOMS_LOAD_CONTACTS', companyIds: ids }, '*');
+        window.opener.postMessage(
+          {
+            type: 'IPOMS_LOAD_CONTACTS',
+            companyIds: ids,
+          },
+          '*'
+        );
         sent = true;
       } catch (err) {
         console.error('Opener postMessage error:', err);
@@ -210,7 +216,7 @@ export default function LoadContactsPage() {
           </div>
         </header>
 
-        {/* ── Frozen Filter & Search Control Ribbon (Screenshot 2) ─────────── */}
+        {/* ── Frozen Filter & Search Control Ribbon ─────────── */}
         <div className="bg-surface-sunken px-6 py-2.5">
           <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
             
@@ -223,7 +229,7 @@ export default function LoadContactsPage() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search by company, HR contact name, mobile number, or email…"
-                className="w-full bg-white border border-border-strong text-fg pl-9 pr-4 py-2 rounded-xl placeholder:text-fg-disabled text-xs shadow-[inset_1px_1px_3px_rgba(0,0,0,0.05)] focus:outline-none focus:border-primary transition-all font-medium"
+                className="w-full bg-surface border border-border text-fg pl-9 pr-4 py-2 rounded-xl placeholder:text-fg-disabled text-xs shadow-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"
               />
             </div>
 
@@ -235,14 +241,14 @@ export default function LoadContactsPage() {
 
               <button
                 onClick={handleSelectAll}
-                className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-border text-fg-muted hover:text-fg font-semibold transition-all shadow-xs cursor-pointer text-[11px]"
+                className="px-3 py-1.5 rounded-lg bg-surface hover:bg-surface-raised border border-border text-fg-muted hover:text-fg font-semibold transition-all shadow-xs cursor-pointer text-[11px]"
               >
                 Select All on Page ({companies.length})
               </button>
 
               <button
                 onClick={handleDeselectAll}
-                className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-border text-fg-subtle hover:text-fg font-medium transition-all cursor-pointer text-[11px]"
+                className="px-3 py-1.5 rounded-lg bg-surface hover:bg-surface-raised border border-border text-fg-subtle hover:text-fg font-medium transition-all cursor-pointer text-[11px]"
               >
                 Deselect All
               </button>
@@ -255,11 +261,11 @@ export default function LoadContactsPage() {
                     disabled={page === 1}
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     title="Previous Page"
-                    className="w-7 h-7 rounded-lg bg-white border border-border hover:bg-slate-50 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 hover:text-slate-900 shadow-2xs transition-all cursor-pointer"
+                    className="w-7 h-7 rounded-lg bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
                   >
                     <ChevronLeft size={15} strokeWidth={2.25} />
                   </button>
-                  <span className="text-[11px] font-mono font-bold text-slate-700 px-1.5">
+                  <span className="text-[11px] font-mono font-bold text-fg px-1.5">
                     {page}/{totalPages}
                   </span>
                   <button
@@ -267,7 +273,7 @@ export default function LoadContactsPage() {
                     disabled={page === totalPages}
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     title="Next Page"
-                    className="w-7 h-7 rounded-lg bg-white border border-border hover:bg-slate-50 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 hover:text-slate-900 shadow-2xs transition-all cursor-pointer"
+                    className="w-7 h-7 rounded-lg bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
                   >
                     <ChevronRight size={15} strokeWidth={2.25} />
                   </button>
@@ -281,7 +287,7 @@ export default function LoadContactsPage() {
 
       {/* ── Main Contact Selection Table ───────────────────────────────── */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-6 flex flex-col">
-        <div className="bg-white border border-border rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] overflow-hidden flex flex-col flex-1">
+        <div className="bg-surface border border-border rounded-2xl shadow-xs overflow-hidden flex flex-col flex-1">
           
           <div className="overflow-x-auto flex-1">
             {loading ? (
@@ -315,7 +321,7 @@ export default function LoadContactsPage() {
                     <th className="px-4 py-3.5">Sector / Industry</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border font-sans">
+                <tbody className="divide-y divide-border font-sans bg-surface">
                   {companies.map((c, index) => {
                     const isSelected = selected.has(c._id);
                     return (
@@ -324,8 +330,8 @@ export default function LoadContactsPage() {
                         onClick={(e) => handleRowClick(index, c._id, e)}
                         className={`cursor-pointer transition-colors duration-150 ${
                           isSelected
-                            ? 'bg-primary/10 text-primary font-semibold'
-                            : 'hover:bg-slate-50 text-fg'
+                            ? 'bg-primary/15 text-primary font-semibold'
+                            : 'hover:bg-surface-sunken/80 text-fg'
                         }`}
                       >
                         <td className="w-12 px-4 py-3 text-center">
@@ -350,7 +356,7 @@ export default function LoadContactsPage() {
                           {c.primary_email || '—'}
                         </td>
                         <td className="px-4 py-3">
-                          <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                          <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-surface-sunken text-fg-muted border border-border">
                             {c.company_type || 'General'}
                           </span>
                         </td>
@@ -365,7 +371,7 @@ export default function LoadContactsPage() {
       </main>
 
       {/* ── Fixed Bottom Bar for Instant Action ────────────────────────── */}
-      <footer className="sticky bottom-0 z-20 bg-white border-t border-border shadow-[0_-4px_16px_rgba(0,0,0,0.06)] px-6 py-3">
+      <footer className="sticky bottom-0 z-20 bg-surface border-t border-border shadow-xs px-6 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs text-fg-muted">
             <span className="font-semibold">Selected Contacts:</span>
@@ -377,7 +383,7 @@ export default function LoadContactsPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => window.close()}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold border border-slate-200 transition-all cursor-pointer"
+              className="px-4 py-2 bg-surface-sunken hover:bg-surface-raised text-fg rounded-xl text-xs font-semibold border border-border transition-all cursor-pointer"
             >
               Close Window
             </button>

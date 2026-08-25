@@ -1,33 +1,29 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Megaphone, X } from 'lucide-react';
+import { Megaphone, X, Send, AlertCircle, Info, Calendar, Bell, CheckCircle2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { readSessionUser } from '@/lib/session';
 
 interface Props {
   onClose: () => void;
-  onSuccess: () => void;
+  onSent: () => void;
 }
 
-export function BroadcastModal({ onClose, onSuccess }: Props) {
-  const [colleges, setColleges] = useState<any[]>([]);
-
-  const [notificationType, setNotificationType] = useState('announcement');
-  const [audienceType, setAudienceType] = useState('everyone');
-  const [targetCollegeId, setTargetCollegeId] = useState('all');
+export function BroadcastModal({ onClose, onSent }: Props) {
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
-  const [priority, setPriority] = useState<'high' | 'medium' | 'low'>('medium');
+  const [notificationType, setNotificationType] = useState('announcement');
+  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [audienceType, setAudienceType] = useState('everyone');
+  const [targetCollegeId, setTargetCollegeId] = useState('all');
   const [actionUrl, setActionUrl] = useState('');
   const [requiresAck, setRequiresAck] = useState(false);
+
+  const [colleges, setColleges] = useState<{ _id: string; college_name: string; college_code: string }[]>([]);
   const [loading, setLoading] = useState(false);
-  const [senderId, setSenderId] = useState<string>('6a84719afa3bf51271bc1545');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const user = readSessionUser();
-    if (user?._id) setSenderId(user._id);
-
     apiFetch('/colleges')
       .then((data) => {
         if (data.success && Array.isArray((data.data as any)?.colleges)) {
@@ -40,96 +36,110 @@ export function BroadcastModal({ onClose, onSuccess }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !message.trim()) {
-      alert('Title and message body are mandatory.');
+      setError('Please provide a title and message body for the broadcast.');
       return;
     }
 
     setLoading(true);
+    setError(null);
+
     try {
-      const res = await apiFetch('/notifications', {
+      const res = await apiFetch('/notifications/broadcast', {
         method: 'POST',
         body: JSON.stringify({
-          notification_type: notificationType,
-          sender_id: senderId,
-          sender_role: 'team_leader',
-          audience_type: audienceType,
-          target_college_id: targetCollegeId !== 'all' ? targetCollegeId : null,
           title: title.trim(),
           message: message.trim(),
+          notification_type: notificationType,
           priority,
-          action_url: actionUrl.trim() || null,
-          requires_acknowledgment: requiresAck,
+          audience_type: audienceType,
+          target_college_id: targetCollegeId === 'all' ? undefined : targetCollegeId,
+          action_url: actionUrl.trim() || undefined,
+          requires_ack: requiresAck,
         }),
       });
+
       if (res.success) {
-        alert('Notification broadcast dispatched successfully!');
-        onSuccess();
+        onSent();
         onClose();
       } else {
-        alert(res.error?.message || 'Failed to dispatch broadcast');
+        setError(res.message || 'Failed to dispatch broadcast.');
       }
-    } catch (err) {
-      console.error('Broadcast error:', err);
+    } catch (err: any) {
+      console.error('Broadcast dispatch error:', err);
+      setError('Network error while dispatching broadcast notice.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4">
-      <div className="bg-white rounded-2xl w-full max-w-xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-fadeIn">
+    <div className="fixed inset-0 bg-overlay/50 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 animate-fadeIn">
+      {/* Themed Modal Card */}
+      <div className="w-full max-w-lg rounded-2xl bg-surface border border-border shadow-2xl overflow-hidden flex flex-col max-h-[90vh] text-fg">
 
-        {/* ── Fixed Modal Header ────────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/90 shrink-0">
-          <div>
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Megaphone size={16} strokeWidth={2.5} className="text-primary" />
-              <span>Dispatch Broadcast Alert / Meeting</span>
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Send organizational announcements, meetings, or task alerts
-            </p>
+        {/* ── Header ─────────────────────────────────────────── */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-sunken shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shadow-xs">
+              <Megaphone size={18} strokeWidth={2.5} />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-fg tracking-tight">
+                Send Operational Broadcast
+              </h2>
+              <p className="text-xs text-fg-subtle font-medium mt-0.5">
+                Dispatch urgent announcements, task alerts, or reminders to staff
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 p-1.5 rounded-lg transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-lg text-fg-subtle hover:text-fg hover:bg-surface-raised flex items-center justify-center transition-colors cursor-pointer"
+            title="Close"
           >
-            <X size={16} />
+            <X size={16} strokeWidth={2} />
           </button>
         </div>
 
+        {error && (
+          <div className="mx-6 mt-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-500 text-xs font-semibold flex items-center gap-2">
+            <AlertCircle size={15} className="shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
         {/* ── Scrollable Form Body ──────────────────────────────────────── */}
-        <form id="broadcast-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 text-xs no-scrollbar">
+        <form id="broadcast-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 text-xs no-scrollbar bg-surface">
 
           {/* Type & Priority Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">
+              <label className="block text-fg font-semibold mb-1">
                 Notification Category <span className="text-rose-500">*</span>
               </label>
               <select
                 value={notificationType}
                 onChange={(e) => setNotificationType(e.target.value)}
-                className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 text-xs cursor-pointer shadow-xs"
+                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-xl px-3.5 py-2 text-fg text-xs cursor-pointer shadow-xs outline-none"
               >
-                <option value="announcement">Announcement / Policy</option>
-                <option value="meeting">Meeting Invitation</option>
-                <option value="reminder">Operational Reminder</option>
-                <option value="system_alert">System Alert</option>
-                <option value="assignment">Task Assignment</option>
+                <option value="announcement" className="bg-surface text-fg">Announcement / Policy</option>
+                <option value="meeting" className="bg-surface text-fg">Meeting Invitation</option>
+                <option value="reminder" className="bg-surface text-fg">Operational Reminder</option>
+                <option value="system_alert" className="bg-surface text-fg">System Alert</option>
+                <option value="assignment" className="bg-surface text-fg">Task Assignment</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">Priority Level</label>
+              <label className="block text-fg font-semibold mb-1">Priority Level</label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as any)}
-                className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 text-xs cursor-pointer shadow-xs"
+                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-xl px-3.5 py-2 text-fg text-xs cursor-pointer shadow-xs outline-none"
               >
-                <option value="high">High Priority (Immediate Notice)</option>
-                <option value="medium">Medium Priority</option>
-                <option value="low">Low Priority</option>
+                <option value="high" className="bg-surface text-fg">High Priority (Immediate Notice)</option>
+                <option value="medium" className="bg-surface text-fg">Medium Priority</option>
+                <option value="low" className="bg-surface text-fg">Low Priority</option>
               </select>
             </div>
           </div>
@@ -137,29 +147,29 @@ export function BroadcastModal({ onClose, onSuccess }: Props) {
           {/* Audience Targeting */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">Target Audience <span className="text-rose-500">*</span></label>
+              <label className="block text-fg font-semibold mb-1">Target Audience <span className="text-rose-500">*</span></label>
               <select
                 value={audienceType}
                 onChange={(e) => setAudienceType(e.target.value)}
-                className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 text-xs cursor-pointer shadow-xs"
+                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-xl px-3.5 py-2 text-fg text-xs cursor-pointer shadow-xs outline-none"
               >
-                <option value="everyone">Everyone (All Staff & Leads)</option>
-                <option value="coordinators_only">Placement Coordinators Only</option>
-                <option value="leads_only">Team Leaders Only</option>
-                <option value="directors_only">Directors & Leadership Only</option>
+                <option value="everyone" className="bg-surface text-fg">Everyone (All Staff & Leads)</option>
+                <option value="coordinators_only" className="bg-surface text-fg">Placement Coordinators Only</option>
+                <option value="leads_only" className="bg-surface text-fg">Team Leaders Only</option>
+                <option value="directors_only" className="bg-surface text-fg">Directors & Leadership Only</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">Target College Scope</label>
+              <label className="block text-fg font-semibold mb-1">Target College Scope</label>
               <select
                 value={targetCollegeId}
                 onChange={(e) => setTargetCollegeId(e.target.value)}
-                className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 text-xs cursor-pointer shadow-xs"
+                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-xl px-3.5 py-2 text-fg text-xs cursor-pointer shadow-xs outline-none"
               >
-                <option value="all">All Assigned Colleges</option>
+                <option value="all" className="bg-surface text-fg">All Assigned Colleges</option>
                 {colleges.map((c) => (
-                  <option key={c._id} value={c._id}>
+                  <option key={c._id} value={c._id} className="bg-surface text-fg">
                     [{c.college_code}] {c.college_name}
                   </option>
                 ))}
@@ -169,7 +179,7 @@ export function BroadcastModal({ onClose, onSuccess }: Props) {
 
           {/* Title */}
           <div>
-            <label className="block text-slate-700 font-semibold mb-1">
+            <label className="block text-fg font-semibold mb-1">
               Broadcast Title <span className="text-rose-500">*</span>
             </label>
             <input
@@ -178,13 +188,13 @@ export function BroadcastModal({ onClose, onSuccess }: Props) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Urgent: Update tracker records before 5:00 PM"
-              className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 placeholder:text-slate-400 text-xs transition-colors shadow-xs"
+              className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-xl px-3.5 py-2 text-fg placeholder:text-fg-disabled text-xs transition-colors shadow-xs outline-none"
             />
           </div>
 
           {/* Message Body */}
           <div>
-            <label className="block text-slate-700 font-semibold mb-1">
+            <label className="block text-fg font-semibold mb-1">
               Message Body <span className="text-rose-500">*</span>
             </label>
             <textarea
@@ -193,20 +203,20 @@ export function BroadcastModal({ onClose, onSuccess }: Props) {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Write the full broadcast notice, agenda items, or specific instructions here…"
-              className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 placeholder:text-slate-400 text-xs transition-colors shadow-xs"
+              className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-xl px-3.5 py-2 text-fg placeholder:text-fg-disabled text-xs transition-colors shadow-xs outline-none"
             />
           </div>
 
           {/* Action Link & Acknowledgment Settings */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-700 font-semibold mb-1">Deep Link / Action URL</label>
+              <label className="block text-fg font-semibold mb-1">Deep Link / Action URL</label>
               <input
                 type="text"
                 value={actionUrl}
                 onChange={(e) => setActionUrl(e.target.value)}
                 placeholder="e.g. /weekly-tracker or https://meet.google.com/…"
-                className="w-full bg-white border border-slate-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 rounded-xl px-3.5 py-2 text-slate-900 placeholder:text-slate-400 text-xs transition-colors shadow-xs"
+                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-xl px-3.5 py-2 text-fg placeholder:text-fg-disabled text-xs transition-colors shadow-xs outline-none"
               />
             </div>
 
@@ -216,9 +226,9 @@ export function BroadcastModal({ onClose, onSuccess }: Props) {
                 id="requires-ack"
                 checked={requiresAck}
                 onChange={(e) => setRequiresAck(e.target.checked)}
-                className="rounded border-slate-300 text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                className="rounded border-border text-primary focus:ring-primary w-4 h-4 cursor-pointer"
               />
-              <label htmlFor="requires-ack" className="text-xs text-slate-700 font-semibold cursor-pointer">
+              <label htmlFor="requires-ack" className="text-xs text-fg font-semibold cursor-pointer">
                 Require Mandatory User Acknowledgment
               </label>
             </div>
@@ -227,11 +237,11 @@ export function BroadcastModal({ onClose, onSuccess }: Props) {
         </form>
 
         {/* ── Fixed Footer Actions ──────────────────────────────────────── */}
-        <div className="flex items-center justify-end gap-3 px-6 py-3.5 border-t border-slate-100 bg-slate-50/90 shrink-0">
+        <div className="flex items-center justify-end gap-3 px-6 py-3.5 border-t border-border bg-surface-sunken shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+            className="px-4 py-2 bg-surface hover:bg-surface-raised border border-border text-fg rounded-xl text-xs font-semibold transition-colors cursor-pointer"
           >
             Cancel
           </button>
@@ -239,7 +249,7 @@ export function BroadcastModal({ onClose, onSuccess }: Props) {
             type="submit"
             form="broadcast-form"
             disabled={loading}
-            className="px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-[4px_4px_10px_rgba(37,99,235,0.35),-2px_-2px_6px_#ffffff] active:shadow-[inset_2px_2px_5px_rgba(0,0,0,0.3)] transition-all flex items-center justify-center cursor-pointer"
+            className="px-6 py-2.5 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center justify-center cursor-pointer"
           >
             {loading ? 'Broadcasting…' : 'Dispatch Broadcast'}
           </button>

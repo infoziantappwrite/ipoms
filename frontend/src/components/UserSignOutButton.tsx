@@ -47,9 +47,9 @@ export function UserSignOutButton() {
       title="Sign Out of iPOMS"
       aria-label="Sign out"
       disabled={isSigningOut}
-      className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-rose-200/80 bg-white/90 hover:bg-rose-50/90 text-rose-500 hover:text-rose-600 transition-all shadow-2xs select-none group active:scale-95 cursor-pointer flex items-center justify-center"
+      className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-border bg-surface hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:border-rose-300 dark:hover:border-rose-800 text-rose-500 dark:text-rose-400 hover:text-rose-600 dark:hover:text-rose-300 transition-all shadow-2xs select-none group active:scale-95 cursor-pointer flex items-center justify-center"
     >
-      <LogOut size={16} strokeWidth={2} className="transition-transform group-hover:translate-x-0.5 text-rose-500 group-hover:text-rose-600" />
+      <LogOut size={16} strokeWidth={2} className="transition-transform group-hover:translate-x-0.5 text-rose-500 dark:text-rose-400 group-hover:text-rose-600 dark:group-hover:text-rose-300" />
     </button>
   );
 }

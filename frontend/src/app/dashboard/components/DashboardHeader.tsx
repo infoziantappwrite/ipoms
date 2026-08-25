@@ -14,6 +14,7 @@ import {
   type LucideIcon
 } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
+import { DashboardAmbientScene } from '@/components/dashboard/DashboardAmbientScene';
 import { readSessionUser, roleOf, updateSessionUser, type SessionUser } from '@/lib/session';
 import { apiFetch } from '@/lib/api';
 
@@ -44,25 +45,15 @@ const PERIOD_ICON: Record<GreetingPeriod, LucideIcon> = {
   night: Moon,
 };
 
-const PERIOD_EMOJI: Record<GreetingPeriod, string> = {
-  midnight: '🌙',
-  wee_hours: '✨',
-  dawn: '🌅',
-  morning: '☀️',
-  midday: '☀️',
-  afternoon: '🌤️',
-  early_evening: '🌇',
-  dusk: '🌆',
-  evening: '🌙',
-  night: '🌙',
-};
 
 const MOTIVATIONAL_QUOTES = [
-  'Every positive response brings our campus closer to 100% placement success.',
-  'Your persistence today builds the career pathways of tomorrow.',
-  'Focus on quality engagements — meaningful calls yield high-value drives.',
-  'Consistent daily outreach transforms regional opportunities into corporate offers.',
-  'Precision in tracking leads to speed in placement conversions.',
+  'Every positive response brings our students closer to 100% placement success.',
+  'Your persistent corporate outreach today builds high-impact career pathways for tomorrow.',
+  'Focus on quality corporate engagements — meaningful conversations yield marquee campus drives.',
+  'Relentless daily tracking transforms regional talent into premier corporate offers.',
+  'Speed, precision, and proactive relationship building define placement excellence.',
+  'Every corporate partnership forged opens doors of opportunity for hundreds of graduates.',
+  'Excellence in outreach is powered by consistent execution and unshakeable momentum.',
 ];
 
 function toTitleCase(str: string): string {
@@ -75,10 +66,11 @@ function getLocalTimeGreeting(): { greeting: string; period: GreetingPeriod } {
     return { greeting: 'Good Morning', period: 'morning' };
   } else if (hour >= 12 && hour < 17) {
     return { greeting: 'Good Afternoon', period: 'afternoon' };
-  } else if (hour >= 17 && hour < 21) {
+  } else if (hour >= 17 && hour < 20) {
     return { greeting: 'Good Evening', period: 'evening' };
   } else {
-    return { greeting: 'Good Evening', period: 'night' };
+    // 8:00 PM (20:00) onwards and late night
+    return { greeting: 'Good Night', period: 'night' };
   }
 }
 
@@ -91,8 +83,12 @@ export function DashboardHeader() {
   const [quoteIndex, setQuoteIndex] = useState(0);
   const [isFading, setIsFading] = useState(false);
 
-  // 30-Second quote auto-rotator
+  // Time-of-day greeting updater & 30-Second quote auto-rotator
   useEffect(() => {
+    const updateTime = () => setGreetingData(getLocalTimeGreeting());
+    updateTime();
+    const timeInterval = setInterval(updateTime, 30000);
+
     const quoteInterval = setInterval(() => {
       setIsFading(true);
       setTimeout(() => {
@@ -101,7 +97,10 @@ export function DashboardHeader() {
       }, 500);
     }, 30000);
 
-    return () => clearInterval(quoteInterval);
+    return () => {
+      clearInterval(timeInterval);
+      clearInterval(quoteInterval);
+    };
   }, []);
 
   const currentQuote = MOTIVATIONAL_QUOTES[quoteIndex] || MOTIVATIONAL_QUOTES[0];
@@ -154,7 +153,6 @@ export function DashboardHeader() {
     ? greetingData.period
     : 'morning';
   const PeriodIcon = PERIOD_ICON[period] || Sun;
-  const periodEmoji = PERIOD_EMOJI[period] || '☀️';
 
   const fullName = user?.full_name || 'Placement Coordinator';
   const initials = fullName
@@ -174,9 +172,11 @@ export function DashboardHeader() {
 
   return (
     <header className="w-full bg-gradient-to-b from-surface via-surface to-background text-fg border-b border-border shadow-xs relative overflow-hidden select-none">
+      {/* ── Ambient Dynamic Sky Animation (Day: Sun + Clouds + Birds + Floating Leaves | Night: Moon + Stars) ── */}
+      <DashboardAmbientScene />
       
       {/* ── Foreground Content Container ── */}
-      <div className="w-full max-w-7xl mx-auto px-6 py-8 sm:py-10 space-y-8">
+      <div className="w-full max-w-7xl mx-auto px-6 py-8 sm:py-10 space-y-8 relative z-10">
         
         {/* ── TOP BAR: Greeting Badge + Notifications & Sign Out ── */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -184,11 +184,11 @@ export function DashboardHeader() {
           {/* Greeting Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-surface-sunken border border-border text-fg text-xs sm:text-sm font-bold shadow-2xs">
             <PeriodIcon size={16} className="text-amber-500 shrink-0" />
-            <span>{toTitleCase(greetingData?.greeting ?? `Good ${period}`)} {periodEmoji}</span>
+            <span>{toTitleCase(greetingData?.greeting ?? `Good ${period}`)}</span>
           </div>
 
           {/* Top-Right Sign Out */}
-          <div className="flex items-center gap-3">
+          <div>
             <UserSignOutButton />
           </div>
 

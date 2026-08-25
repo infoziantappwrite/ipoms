@@ -46,14 +46,14 @@ export function RowActionMenu({
     <div className="relative inline-block text-left" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+        className="p-1 rounded-lg text-fg-subtle hover:text-fg hover:bg-surface-raised transition-colors cursor-pointer"
         title="Actions"
       >
         <MoreVertical size={15} />
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-1 w-52 rounded-xl bg-white border border-slate-200 shadow-xl z-50 py-1 text-xs text-slate-700">
+        <div className="absolute right-0 mt-1 w-52 rounded-xl bg-surface border border-border shadow-xl z-50 py-1 text-xs text-fg">
 
           {/* Toggle Pin Top */}
           <button
@@ -61,9 +61,9 @@ export function RowActionMenu({
               onTogglePin();
               setIsOpen(false);
             }}
-            className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 transition-colors cursor-pointer"
+            className="w-full text-left px-3 py-2 hover:bg-surface-raised flex items-center gap-2 transition-colors cursor-pointer"
           >
-            <Star size={14} className={isPinned ? 'fill-amber-400 text-amber-500' : 'text-slate-400'} />
+            <Star size={14} className={isPinned ? 'fill-amber-400 text-amber-500' : 'text-fg-subtle'} />
             <span>{isPinned ? 'Unpin from Top' : 'Pin to Top Companies'}</span>
           </button>
 
@@ -71,17 +71,17 @@ export function RowActionMenu({
           <div className="relative">
             <button
               onClick={() => setShowMoveSubmenu(!showMoveSubmenu)}
-              className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center justify-between transition-colors cursor-pointer"
+              className="w-full text-left px-3 py-2 hover:bg-surface-raised flex items-center justify-between transition-colors cursor-pointer"
             >
               <div className="flex items-center gap-2">
-                <FolderInput size={14} className="text-slate-400" />
+                <FolderInput size={14} className="text-fg-subtle" />
                 <span>Move Section</span>
               </div>
-              <ChevronRight size={13} className="text-slate-400" />
+              <ChevronRight size={13} className="text-fg-subtle" />
             </button>
 
             {showMoveSubmenu && (
-              <div className="absolute left-full top-0 ml-1 w-52 rounded-xl bg-white border border-slate-200 shadow-xl py-1">
+              <div className="absolute left-full top-0 ml-1 w-52 rounded-xl bg-surface border border-border shadow-xl py-1">
                 {SECTIONS.map((s) => (
                   <button
                     key={s.key}
@@ -90,8 +90,8 @@ export function RowActionMenu({
                       setIsOpen(false);
                       setShowMoveSubmenu(false);
                     }}
-                    className={`w-full text-left px-3 py-1.5 hover:bg-slate-50 transition-colors text-xs cursor-pointer
-                                ${currentSection === s.key ? 'text-primary font-bold bg-primary-subtle' : 'text-slate-700'}`}
+                    className={`w-full text-left px-3 py-1.5 hover:bg-surface-raised transition-colors text-xs cursor-pointer
+                                ${currentSection === s.key ? 'text-primary font-bold bg-primary/10' : 'text-fg'}`}
                   >
                     {s.label}
                   </button>
@@ -100,7 +100,7 @@ export function RowActionMenu({
             )}
           </div>
 
-          <div className="h-px bg-slate-100 my-1" />
+          <div className="h-px bg-border my-1" />
 
           {/* Delete */}
           <button
@@ -110,7 +110,7 @@ export function RowActionMenu({
                 setIsOpen(false);
               }
             }}
-            className="w-full text-left px-3 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2 transition-colors cursor-pointer"
+            className="w-full text-left px-3 py-2 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center gap-2 transition-colors cursor-pointer"
           >
             <Trash2 size={14} strokeWidth={2} />
             <span>Move to Recycle Bin</span>

@@ -1,23 +1,19 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Phone,
   PhoneOff,
+  Clock,
+  CheckCircle2,
   X,
   Minus,
   ChevronUp,
-  Keyboard,
   Building2,
   User,
-  Clock,
-  CheckCircle2,
-  Calendar,
-  Sparkles
 } from 'lucide-react';
-import type { TrackerRow, CallOutcome } from '../page';
+import { CallOutcome } from '@/types/tracker';
 
-// ── Outcome options (same as TrackerRow) ─────────────────────────────────────
 const OUTCOMES: { value: CallOutcome; label: string }[] = [
   { value: 'jd_received', label: 'JD Received' },
   { value: 'hiring_freezed', label: 'Hiring Freezed' },
@@ -35,209 +31,198 @@ const OUTCOMES: { value: CallOutcome; label: string }[] = [
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
 const DIALPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
 
-type PanelState = 'idle' | 'ready' | 'calling' | 'wrapup';
-
 export interface SoftphoneCallResult {
   rowId: string;
-  call_start_time: string;
-  call_end_time: string;
-  duration_seconds: number;
-  duration_formatted: string;
-  outcome_status: CallOutcome;
-  follow_up_month?: string | null;
+  outcomeStatus: CallOutcome;
+  followUpMonth?: string;
   comments?: string;
+  callDurationSeconds?: number;
 }
 
 interface Props {
-  /** The tracker row to call. Null = panel hidden. */
-  row: TrackerRow | null;
-  /** Called when the wrap-up form is saved. */
+  row: {
+    _id: string;
+    serial_no: number;
+    company_name: string;
+    hr_name?: string;
+    mobile_number?: string;
+    email_id?: string;
+    outcome_status?: CallOutcome;
+  } | null;
   onSave: (result: SoftphoneCallResult) => void;
-  /** Called when the panel is dismissed without saving. */
   onClose: () => void;
 }
 
-function formatDuration(totalSeconds: number): string {
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-}
-
-function formatDurationLong(totalSeconds: number): string {
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  if (m === 0) return `${s}s`;
-  return `${m}m ${s}s`;
-}
+type PanelState = 'ready' | 'calling' | 'wrapup';
 
 export function SoftphonePanel({ row, onSave, onClose }: Props) {
-  // ── State ──────────────────────────────────────────────────────────────────
-  const [panelState, setPanelState] = useState<PanelState>('idle');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [callStartISO, setCallStartISO] = useState('');
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [showDialpad, setShowDialpad] = useState(true);
+  if (!row) return null;
 
-  // Wrap-up form
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [panelState, setPanelState] = useState<PanelState>('ready');
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [showDialpad, setShowDialpad] = useState(false);
+
+  // Active call duration state
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Wrap-up inputs
   const [outcome, setOutcome] = useState<CallOutcome | ''>('');
   const [followUpMonth, setFollowUpMonth] = useState('');
   const [comments, setComments] = useState('');
 
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const numberInputRef = useRef<HTMLInputElement>(null);
 
-  const stopTimer = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-  }, []);
-
-  const startTimer = useCallback(() => {
-    stopTimer();
-    setElapsedSeconds(0);
-    timerRef.current = setInterval(() => {
-      setElapsedSeconds((prev) => prev + 1);
-    }, 1000);
-  }, [stopTimer]);
-
-  // ── Sync row into panel state when row changes ─────────────────────────────
+  // Init dialer state when row changes
   useEffect(() => {
     if (row) {
       setPhoneNumber(row.mobile_number || '');
       setPanelState('ready');
-      setElapsedSeconds(0);
-      setCallStartISO('');
       setIsMinimized(false);
-      setShowDialpad(true);
+      setElapsedSeconds(0);
       setOutcome(row.outcome_status || '');
-      setFollowUpMonth(row.follow_up_month || '');
-      setComments(row.comments || '');
-    } else {
-      setPanelState('idle');
-      stopTimer();
+      setFollowUpMonth('');
+      setComments('');
+      setShowDialpad(false);
     }
-  }, [row, stopTimer]);
+  }, [row]);
 
-  // Cleanup on unmount
+  // Handle active call timer
   useEffect(() => {
-    return () => stopTimer();
-  }, [stopTimer]);
+    if (panelState === 'calling') {
+      timerRef.current = setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [panelState]);
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
   const handleCall = () => {
     if (!phoneNumber.trim()) return;
 
-    // Clean number: remove spaces, dashes
+    // Trigger device native call protocol (Phone Link / MicroSIP / Android)
     const cleaned = phoneNumber.replace(/[\s\-()]/g, '');
-    const telNumber = cleaned.startsWith('+') ? cleaned : `+91${cleaned}`;
+    window.location.href = `tel:${cleaned}`;
 
-    // Open tel: link
-    window.open(`tel:${telNumber}`, '_self');
-
-    // Start tracking
-    const now = new Date().toISOString();
-    setCallStartISO(now);
     setPanelState('calling');
-    startTimer();
+    setElapsedSeconds(0);
   };
 
   const handleHangUp = () => {
-    stopTimer();
     setPanelState('wrapup');
   };
 
   const handleDialpadPress = (key: string) => {
-    setPhoneNumber((prev) => prev + key);
-    numberInputRef.current?.focus();
+    if (panelState === 'ready') {
+      setPhoneNumber((prev) => prev + key);
+    }
   };
 
   const handleBackspace = () => {
-    setPhoneNumber((prev) => prev.slice(0, -1));
+    if (panelState === 'ready') {
+      setPhoneNumber((prev) => prev.slice(0, -1));
+    }
   };
 
   const handleSaveWrapUp = () => {
-    if (!row || !outcome) return;
+    if (!outcome) {
+      alert('Please select a Call Outcome status');
+      return;
+    }
 
-    const callEnd = new Date().toISOString();
     const result: SoftphoneCallResult = {
       rowId: row._id,
-      call_start_time: callStartISO || new Date().toISOString(),
-      call_end_time: callEnd,
-      duration_seconds: elapsedSeconds,
-      duration_formatted: formatDurationLong(elapsedSeconds),
-      outcome_status: outcome,
-      follow_up_month: outcome === 'follow_up' ? (followUpMonth || null) : null,
+      outcomeStatus: outcome,
+      followUpMonth: outcome === 'follow_up' ? followUpMonth : undefined,
       comments: comments.trim() || undefined,
+      callDurationSeconds: elapsedSeconds,
     };
-    onSave(result);
-  };
 
-  const handleDismiss = () => {
-    stopTimer();
+    onSave(result);
     onClose();
   };
 
-  // ── Don't render if idle ───────────────────────────────────────────────────
-  if (!row || panelState === 'idle') return null;
+  const handleDismiss = () => {
+    if (panelState === 'calling' && !confirm('Active call is running. Close dialer?')) {
+      return;
+    }
+    onClose();
+  };
+
+  const formatDuration = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  const formatDurationLong = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    if (m === 0) return `${s} seconds`;
+    return `${m} min ${s} sec`;
+  };
 
   // ── Minimized pill (anchored at bottom-right if user collapses) ─────────────
   if (isMinimized) {
     return (
       <div
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-white border border-slate-200/90
-                   rounded-full px-4 py-2.5 shadow-2xl cursor-pointer hover:shadow-xl transition-all hover:scale-105"
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-surface border border-border
+                   rounded-full px-4 py-2.5 shadow-2xl cursor-pointer hover:shadow-xl transition-all hover:scale-105 text-fg"
         onClick={() => setIsMinimized(false)}
       >
         <div className={`w-2.5 h-2.5 rounded-full ${panelState === 'calling' ? 'bg-emerald-500 animate-pulse' : 'bg-primary'}`} />
         <div className="flex items-center gap-1.5">
-          <Phone size={14} strokeWidth={2.25} className="text-slate-700" />
-          <span className="text-xs font-bold text-slate-900 font-mono tabular-nums">
+          <Phone size={14} strokeWidth={2.25} className="text-fg" />
+          <span className="text-xs font-bold text-fg font-mono tabular-nums">
             {panelState === 'calling' ? formatDuration(elapsedSeconds) : 'Dialer Active'}
           </span>
         </div>
-        <span className="text-xs font-semibold text-slate-500 truncate max-w-[130px]">
+        <span className="text-xs font-semibold text-fg-subtle truncate max-w-[130px]">
           {row.company_name}
         </span>
-        <ChevronUp size={14} className="text-slate-400" />
+        <ChevronUp size={14} className="text-fg-subtle" />
       </div>
     );
   }
 
   // ── Centered Main Minimal SaaS Popup ───────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/40 backdrop-blur-xs animate-form-in">
-      <div className="w-full max-w-[420px] bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col transition-all">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50 backdrop-blur-xs animate-fadeIn">
+      <div className="w-full max-w-[420px] bg-surface rounded-3xl border border-border shadow-2xl overflow-hidden flex flex-col transition-all text-fg">
 
         {/* ── Top Modal Header ─────────────────────────────────────────────── */}
         <div className={`flex items-center justify-between px-6 py-4 border-b ${
           panelState === 'calling'
-            ? 'bg-emerald-50/70 border-emerald-200/80'
+            ? 'bg-emerald-500/10 border-emerald-500/30'
             : panelState === 'wrapup'
-            ? 'bg-blue-50/70 border-blue-200/80'
-            : 'bg-slate-50/80 border-slate-200/80'
+            ? 'bg-primary/10 border-primary/20'
+            : 'bg-surface-sunken border-border'
         }`}>
           <div className="flex items-center gap-3">
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center shadow-xs ${
               panelState === 'calling'
                 ? 'bg-emerald-600 text-white animate-pulse'
                 : panelState === 'wrapup'
-                ? 'bg-blue-600 text-white'
+                ? 'bg-primary text-white'
                 : 'bg-primary text-white'
             }`}>
               <Phone size={17} strokeWidth={2.25} />
             </div>
             <div>
-              <span className="text-xs font-bold text-slate-900 font-display block">
+              <span className="text-xs font-bold text-fg font-display block">
                 {panelState === 'wrapup' ? 'Call Summary & Wrap-Up' : panelState === 'calling' ? 'Active Call in Progress' : 'iPOMS Softphone'}
               </span>
-              <span className="text-[11px] font-semibold text-slate-500">
+              <span className="text-[11px] font-semibold text-fg-subtle">
                 {panelState === 'wrapup' ? 'Auto-syncing to daily tracker' : panelState === 'calling' ? 'Connected via Phone Link' : 'Ready to dial'}
               </span>
             </div>
@@ -246,14 +231,14 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => setIsMinimized(true)}
-              className="w-8 h-8 rounded-xl hover:bg-slate-200/80 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+              className="w-8 h-8 rounded-xl hover:bg-surface-raised flex items-center justify-center text-fg-subtle hover:text-fg transition-colors cursor-pointer"
               title="Minimize to pill"
             >
               <Minus size={15} strokeWidth={2} />
             </button>
             <button
               onClick={handleDismiss}
-              className="w-8 h-8 rounded-xl hover:bg-rose-100 flex items-center justify-center text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+              className="w-8 h-8 rounded-xl hover:bg-rose-500/20 flex items-center justify-center text-fg-subtle hover:text-rose-500 transition-colors cursor-pointer"
               title="Close modal"
             >
               <X size={15} strokeWidth={2} />
@@ -263,18 +248,18 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
 
         {/* ── Contact Info Card ────────────────────────────────────────────── */}
         <div className="px-6 pt-4 pb-2">
-          <div className="bg-slate-50 border border-slate-200/70 rounded-2xl p-3.5 flex items-center justify-between gap-3">
+          <div className="bg-surface-sunken border border-border rounded-2xl p-3.5 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
-                <Building2 size={14} className="text-slate-400 shrink-0" />
+              <div className="flex items-center gap-1.5 text-xs font-bold text-fg">
+                <Building2 size={14} className="text-fg-subtle shrink-0" />
                 <span className="truncate">{row.company_name}</span>
               </div>
-              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium mt-0.5">
-                <User size={13} className="text-slate-400 shrink-0" />
+              <div className="flex items-center gap-1.5 text-[11px] text-fg-subtle font-medium mt-0.5">
+                <User size={13} className="text-fg-subtle shrink-0" />
                 <span className="truncate">{row.hr_name || 'HR Team'}</span>
               </div>
             </div>
-            <span className="text-[10px] font-mono font-bold bg-white text-slate-700 border border-slate-200 px-2 py-1 rounded-lg shrink-0 shadow-2xs">
+            <span className="text-[10px] font-mono font-bold bg-surface text-fg-muted border border-border px-2 py-1 rounded-lg shrink-0 shadow-2xs">
               Row #{row.serial_no}
             </span>
           </div>
@@ -284,29 +269,29 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
         {panelState === 'wrapup' ? (
           <div className="px-6 pb-6 pt-2 space-y-3.5">
             {/* Duration Summary Pill */}
-            <div className="flex items-center justify-between bg-blue-50/80 border border-blue-200/70 rounded-2xl px-4 py-3">
+            <div className="flex items-center justify-between bg-primary/10 border border-primary/20 rounded-2xl px-4 py-3">
               <div className="flex items-center gap-2">
-                <Clock size={15} className="text-blue-600" />
-                <span className="text-xs font-semibold text-blue-900">Call Duration:</span>
+                <Clock size={15} className="text-primary" />
+                <span className="text-xs font-semibold text-fg">Call Duration:</span>
               </div>
-              <span className="text-sm font-bold text-blue-950 font-mono tabular-nums">
+              <span className="text-sm font-bold text-primary font-mono tabular-nums">
                 {formatDurationLong(elapsedSeconds)}
               </span>
             </div>
 
             {/* Outcome Selector */}
             <div>
-              <label className="text-xs font-bold text-slate-700 mb-1.5 block">
+              <label className="text-xs font-bold text-fg mb-1.5 block">
                 Call Outcome <span className="text-rose-500">*</span>
               </label>
               <select
                 value={outcome}
                 onChange={(e) => setOutcome(e.target.value as CallOutcome)}
-                className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-xs cursor-pointer"
+                className="w-full bg-surface-sunken border border-border rounded-xl px-3.5 py-2.5 text-xs font-semibold text-fg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-xs cursor-pointer"
               >
-                <option value="">— Select Outcome —</option>
+                <option value="" className="bg-surface text-fg">— Select Outcome —</option>
                 {OUTCOMES.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.value} value={o.value} className="bg-surface text-fg">{o.label}</option>
                 ))}
               </select>
             </div>
@@ -314,17 +299,17 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
             {/* Follow Up Month (Conditional) */}
             {outcome === 'follow_up' && (
               <div>
-                <label className="text-xs font-bold text-slate-700 mb-1.5 block">
+                <label className="text-xs font-bold text-fg mb-1.5 block">
                   Follow Up Month
                 </label>
                 <select
                   value={followUpMonth}
                   onChange={(e) => setFollowUpMonth(e.target.value)}
-                  className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-xs cursor-pointer"
+                  className="w-full bg-surface-sunken border border-border rounded-xl px-3.5 py-2.5 text-xs font-semibold text-fg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-xs cursor-pointer"
                 >
-                  <option value="">— Pick Month —</option>
+                  <option value="" className="bg-surface text-fg">— Pick Month —</option>
                   {MONTHS.map((m) => (
-                    <option key={m} value={m}>{m}</option>
+                    <option key={m} value={m} className="bg-surface text-fg">{m}</option>
                   ))}
                 </select>
               </div>
@@ -332,7 +317,7 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
 
             {/* Comments Field */}
             <div>
-              <label className="text-xs font-bold text-slate-700 mb-1.5 block">
+              <label className="text-xs font-bold text-fg mb-1.5 block">
                 Notes & Comments
               </label>
               <input
@@ -340,7 +325,7 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
                 placeholder="Optional call summary…"
-                className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-xs placeholder:text-slate-400 font-medium"
+                className="w-full bg-surface-sunken border border-border rounded-xl px-3.5 py-2.5 text-xs text-fg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-xs placeholder:text-fg-disabled font-medium"
               />
             </div>
 
@@ -348,7 +333,7 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
             <button
               onClick={handleSaveWrapUp}
               disabled={!outcome}
-              className="w-full bg-primary hover:bg-blue-800 active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-2xl py-3 text-xs font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
+              className="w-full bg-primary hover:bg-primary-hover active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-2xl py-3 text-xs font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
             >
               <CheckCircle2 size={16} strokeWidth={2.25} />
               Save to Daily Tracker
@@ -358,8 +343,8 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
           <>
             {/* ── Phone Number Input Bar ───────────────────────────────────── */}
             <div className="px-6 py-2">
-              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2.5 focus-within:border-primary focus-within:bg-white focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-                <span className="text-xs font-bold text-slate-400 font-mono shrink-0">+91</span>
+              <div className="flex items-center gap-2 bg-surface-sunken border border-border rounded-2xl px-4 py-2.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+                <span className="text-xs font-bold text-fg-subtle font-mono shrink-0">+91</span>
                 <input
                   ref={numberInputRef}
                   type="text"
@@ -367,12 +352,12 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
                   onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9+\-\s()]/g, ''))}
                   placeholder="Enter mobile number"
                   disabled={panelState === 'calling'}
-                  className="flex-1 bg-transparent text-base font-mono font-bold text-slate-900 outline-none placeholder:text-slate-400 tabular-nums disabled:text-slate-600"
+                  className="flex-1 bg-transparent text-base font-mono font-bold text-fg outline-none placeholder:text-fg-disabled tabular-nums disabled:text-fg-muted"
                 />
                 {phoneNumber && panelState === 'ready' && (
                   <button
                     onClick={handleBackspace}
-                    className="text-slate-400 hover:text-slate-700 text-xs font-mono font-bold px-1.5 py-0.5 rounded hover:bg-slate-200 transition-colors"
+                    className="text-fg-subtle hover:text-fg text-xs font-mono font-bold px-1.5 py-0.5 rounded hover:bg-surface-raised transition-colors"
                     title="Delete digit"
                   >
                     ⌫
@@ -389,8 +374,8 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
                     <button
                       key={key}
                       onClick={() => handleDialpadPress(key)}
-                      className="h-11 rounded-2xl bg-slate-50 hover:bg-slate-100 active:bg-slate-200 active:scale-95
-                                 border border-slate-200/80 text-sm font-bold text-slate-800 font-mono
+                      className="h-11 rounded-2xl bg-surface-sunken hover:bg-surface-raised active:bg-surface-raised active:scale-95
+                                 border border-border text-sm font-bold text-fg font-mono
                                  transition-all cursor-pointer shadow-2xs flex items-center justify-center"
                     >
                       {key}
@@ -400,16 +385,16 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
               </div>
             )}
 
-            {/* ── Live Timer (During Active Call) ──────────────────────────── */}
+            {/* ── Live Timer (During Active Call) ──────────────────── */}
             {panelState === 'calling' && (
               <div className="flex flex-col items-center justify-center py-6">
                 <div className="flex items-center gap-2.5">
                   <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-3xl font-bold text-slate-900 tabular-nums font-mono tracking-wider">
+                  <span className="text-3xl font-bold text-fg tabular-nums font-mono tracking-wider">
                     {formatDuration(elapsedSeconds)}
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 font-medium mt-1">Live call timer connected</p>
+                <p className="text-xs text-fg-subtle font-medium mt-1">Live call timer connected</p>
               </div>
             )}
 

@@ -7,8 +7,9 @@ import { ContactPickerModal } from './components/ContactPickerModal';
 import { TrackerGrid } from './components/TrackerGrid';
 import { CalendarPicker } from './components/CalendarPicker';
 import { SoftphonePanel, SoftphoneCallResult } from './components/SoftphonePanel';
+import { SmoothOutcomeDropdown } from '@/components/ui/SmoothOutcomeDropdown';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
-import { AlertTriangle, BookOpen, CalendarDays, ClipboardList, Download, RefreshCw, Save } from 'lucide-react';
+import { AlertTriangle, BookOpen, CalendarDays, ClipboardList, Download, PhoneCall, RefreshCw, Save } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
 
@@ -243,7 +244,7 @@ export default function DailyTrackerPage() {
         // The save was refused, not completed — surfacing it as 'saved' here
         // used to mislead the coordinator into thinking the row was recorded.
         setSaveStatus('idle');
-        alert(res.error.message);
+        alert(res.error?.message || res.message || 'Call start time is required before saving.');
       } else {
         setSaveStatus('idle');
       }
@@ -374,25 +375,25 @@ export default function DailyTrackerPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
+    <div className="min-h-screen bg-background text-fg flex flex-col font-sans">
 
       {/* ── Top Section: Title & Top-Right Header ───────────────────────── */}
-      <header className="bg-white border-b border-slate-200 px-6 py-4 space-y-3 shrink-0 shadow-xs">
+      <header className="bg-surface border-b border-border px-6 py-4 space-y-3 shrink-0 shadow-xs text-fg">
         <div className="flex items-center justify-between gap-4">
           {/* Left: Tracker title + date */}
           <div>
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-primary">
-                <ClipboardList size={18} strokeWidth={2.25} />
+              <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+                <PhoneCall size={18} strokeWidth={2.25} />
               </div>
-              <h1 className="text-base font-bold text-slate-900 tracking-tight">
+              <h1 className="text-base font-bold text-fg tracking-tight">
                 Daily Tracker
               </h1>
-              <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-0.5 rounded-full font-semibold">
+              <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full font-semibold">
                 {isHistoryMode ? 'History Archive' : `${monthName} ${yearStr}`}
               </span>
               {isHistoryMode && (
-                <span className="text-micro bg-amber-50 text-amber-800 border border-amber-300 px-2.5 py-0.5 rounded-full font-bold">
+                <span className="text-micro bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 px-2.5 py-0.5 rounded-full font-bold">
                   Read-Only
                 </span>
               )}
@@ -415,7 +416,7 @@ export default function DailyTrackerPage() {
               <div className="flex items-center gap-2">
                 <div
                   title={`${selectedCollegeObj.college_name} (${selectedCollegeObj.college_code})`}
-                  className="flex items-center justify-center bg-white border border-slate-200 px-2.5 py-1 rounded-xl shadow-xs animate-fadeIn h-9 max-w-[160px] shrink-0"
+                  className="flex items-center justify-center bg-surface border border-border px-2.5 py-1 rounded-xl shadow-xs animate-fadeIn h-9 max-w-[160px] shrink-0"
                 >
                   {selectedCollegeObj.logo_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -425,14 +426,14 @@ export default function DailyTrackerPage() {
                       className="max-h-7 max-w-full w-auto h-auto object-contain rounded"
                     />
                   ) : (
-                    <span className="w-7 h-7 rounded-lg bg-blue-100 text-primary font-bold text-xs flex items-center justify-center font-mono">
+                    <span className="w-7 h-7 rounded-lg bg-primary/10 text-primary font-bold text-xs flex items-center justify-center font-mono">
                       {selectedCollegeObj.college_code?.slice(0, 2) || 'CL'}
                     </span>
                   )}
                 </div>
                 {selectedCollegeObj.location && (
                   <span
-                    className="text-xs text-slate-500 font-medium hidden sm:inline truncate max-w-[160px]"
+                    className="text-xs text-fg-subtle font-medium hidden sm:inline truncate max-w-[160px]"
                     title={selectedCollegeObj.location}
                   >
                     {selectedCollegeObj.location}
@@ -448,7 +449,7 @@ export default function DailyTrackerPage() {
         </div>
 
         {/* ── Sub-bar: Unified Controls Row (College Selector + Actions + Filter + Search) ── */}
-        <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t border-slate-100 relative z-30">
+        <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t border-border/80 relative z-30">
           <div className="flex items-center gap-2.5 flex-wrap">
             <CollegeSelector
               selectedCollegeId={selectedCollegeId}
@@ -506,7 +507,7 @@ export default function DailyTrackerPage() {
                 <button
                   type="button"
                   onClick={() => { loadTodayRows(); loadKpi(); }}
-                  className="flex items-center gap-1.5 bg-[#FEF3C7] hover:bg-[#FDE68A] text-amber-900 border border-amber-300 px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
+                  className="flex items-center gap-1.5 bg-amber-100 dark:bg-amber-950/80 hover:bg-amber-200 dark:hover:bg-amber-900/80 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700/80 px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
                   title="Refresh calls table"
                 >
                   <RefreshCw size={14} strokeWidth={2} aria-hidden /> Refresh
@@ -516,34 +517,19 @@ export default function DailyTrackerPage() {
                 <button
                   type="button"
                   onClick={() => setIsCalendarOpen(true)}
-                  className="flex items-center gap-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer shrink-0"
+                  className="flex items-center gap-1.5 bg-surface hover:bg-surface-sunken text-fg border border-border px-3 py-1.5 rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer shrink-0"
                 >
                   <CalendarDays size={14} strokeWidth={2} aria-hidden /> History
                 </button>
 
                 {/* Divider */}
-                <div className="h-5 w-px bg-slate-200 mx-0.5 shrink-0 hidden sm:block" />
+                <div className="h-5 w-px bg-border mx-0.5 shrink-0 hidden sm:block" />
 
-                {/* Filter by outcome */}
-                <select
+                {/* Filter by outcome (Smooth UI Dropdown) */}
+                <SmoothOutcomeDropdown
                   value={outcomeFilter}
-                  onChange={(e) => setOutcomeFilter(e.target.value as CallOutcome | 'all')}
-                  className="bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 text-slate-800 text-xs px-3 py-1.5 rounded-xl outline-none font-medium shadow-xs cursor-pointer shrink-0"
-                >
-                  <option value="all">All Call Statuses</option>
-                  <option value="jd_received">JD Received</option>
-                  <option value="hiring_freezed">Hiring Freezed</option>
-                  <option value="hiring_completed">Hiring Completed</option>
-                  <option value="call_back">Call Back</option>
-                  <option value="hiring">Hiring</option>
-                  <option value="invite_mail">Invite Mail</option>
-                  <option value="not_hiring">Not Hiring</option>
-                  <option value="no_response">No Response</option>
-                  <option value="follow_up">Follow Up</option>
-                  <option value="in_connect">In Connect</option>
-                  <option value="invalid">Invalid</option>
-                  <option value="drive_completed">Drive Completed</option>
-                </select>
+                  onChange={setOutcomeFilter}
+                />
 
                 {/* Search */}
                 <div className="w-48 sm:w-56 shrink-0">
@@ -552,7 +538,7 @@ export default function DailyTrackerPage() {
                     placeholder="Search company, HR, mobile…"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 text-slate-800 text-xs px-3.5 py-1.5 rounded-xl outline-none placeholder:text-slate-400 shadow-xs"
+                    className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 text-fg text-xs px-3.5 py-1.5 rounded-xl outline-none placeholder:text-fg-disabled shadow-xs transition-colors"
                   />
                 </div>
               </>
@@ -577,28 +563,13 @@ export default function DailyTrackerPage() {
                 </button>
 
                 {/* Divider */}
-                <div className="h-5 w-px bg-slate-200 mx-0.5 shrink-0 hidden sm:block" />
+                <div className="h-5 w-px bg-border mx-0.5 shrink-0 hidden sm:block" />
 
-                {/* Filter by outcome */}
-                <select
+                {/* Filter by outcome (Smooth UI Dropdown) */}
+                <SmoothOutcomeDropdown
                   value={outcomeFilter}
-                  onChange={(e) => setOutcomeFilter(e.target.value as CallOutcome | 'all')}
-                  className="bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 text-slate-800 text-xs px-3 py-1.5 rounded-xl outline-none font-medium shadow-xs cursor-pointer shrink-0"
-                >
-                  <option value="all">All Call Statuses</option>
-                  <option value="jd_received">JD Received</option>
-                  <option value="hiring_freezed">Hiring Freezed</option>
-                  <option value="hiring_completed">Hiring Completed</option>
-                  <option value="call_back">Call Back</option>
-                  <option value="hiring">Hiring</option>
-                  <option value="invite_mail">Invite Mail</option>
-                  <option value="not_hiring">Not Hiring</option>
-                  <option value="no_response">No Response</option>
-                  <option value="follow_up">Follow Up</option>
-                  <option value="in_connect">In Connect</option>
-                  <option value="invalid">Invalid</option>
-                  <option value="drive_completed">Drive Completed</option>
-                </select>
+                  onChange={setOutcomeFilter}
+                />
 
                 {/* Search */}
                 <div className="w-48 sm:w-56 shrink-0">
@@ -607,7 +578,7 @@ export default function DailyTrackerPage() {
                     placeholder="Search history records…"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-white border border-slate-300 focus:border-primary focus:ring-2 focus:ring-primary/20 text-slate-800 text-xs px-3.5 py-1.5 rounded-xl outline-none placeholder:text-slate-400 shadow-xs"
+                    className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 text-fg text-xs px-3.5 py-1.5 rounded-xl outline-none placeholder:text-fg-disabled shadow-xs"
                   />
                 </div>
               </>
@@ -615,7 +586,7 @@ export default function DailyTrackerPage() {
           </div>
 
           {/* Row count summary */}
-          <div className="ml-auto text-xs text-slate-500 font-medium shrink-0">
+          <div className="ml-auto text-xs text-fg-subtle font-medium shrink-0">
             Showing {displayRows.length} / {isHistoryMode ? historyRows.length : rows.length} rows
           </div>
         </div>
@@ -651,34 +622,34 @@ export default function DailyTrackerPage() {
       )}
 
       {/* ── Bottom Unified Status Bar ─────────────────────────────────────── */}
-      <footer className="bg-white border-t border-slate-200 px-6 py-2.5 flex items-center justify-between gap-4 text-xs text-slate-500 font-medium shrink-0 flex-wrap shadow-2xs">
+      <footer className="bg-surface border-t border-border px-6 py-2.5 flex items-center justify-between gap-4 text-xs text-fg-subtle font-medium shrink-0 flex-wrap shadow-2xs">
         {/* Left: Row & Outcome Counts */}
         <div className="flex items-center gap-5">
-          <span>Total: <strong className="text-slate-900">{isHistoryMode ? historyRows.length : rows.length}</strong> rows</span>
-          <span>Completed: <strong className="text-emerald-700 font-bold">{isHistoryMode ? historyCompletedCount : (kpi?.completed ?? 0)}</strong></span>
-          <span>Pending: <strong className="text-amber-700 font-bold">{isHistoryMode ? Math.max(0, historyTotalLoaded - historyCompletedCount) : (kpi?.pending ?? 0)}</strong></span>
-          {!isHistoryMode && <span>Positive: <strong className="text-primary font-bold">{kpi?.positive ?? 0}</strong></span>}
+          <span>Total: <strong className="text-fg font-bold">{isHistoryMode ? historyRows.length : rows.length}</strong> rows</span>
+          <span>Completed: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{isHistoryMode ? historyCompletedCount : (kpi?.completed ?? 0)}</strong></span>
+          <span>Pending: <strong className="text-amber-600 dark:text-amber-400 font-bold">{isHistoryMode ? Math.max(0, historyTotalLoaded - historyCompletedCount) : (kpi?.pending ?? 0)}</strong></span>
+          {!isHistoryMode && <span>Positive: <strong className="text-primary dark:text-sky-400 font-bold">{kpi?.positive ?? 0}</strong></span>}
         </div>
 
         {/* Center: Keyboard Shortcuts (in live mode) */}
         {!isHistoryMode && (
-          <div className="hidden lg:flex items-center gap-3 text-micro text-slate-500 font-normal">
-            <span><kbd className="bg-slate-100 border border-slate-300/80 px-1.5 py-0.5 rounded text-slate-700 font-mono font-medium shadow-2xs">Tab</kbd> Next cell</span>
-            <span><kbd className="bg-slate-100 border border-slate-300/80 px-1.5 py-0.5 rounded text-slate-700 font-mono font-medium shadow-2xs">Enter</kbd> Save row</span>
-            <span><kbd className="bg-slate-100 border border-slate-300/80 px-1.5 py-0.5 rounded text-slate-700 font-mono font-medium shadow-2xs">Ctrl+S</kbd> Save all</span>
-            <span><kbd className="bg-slate-100 border border-slate-300/80 px-1.5 py-0.5 rounded text-slate-700 font-mono font-medium shadow-2xs">Del</kbd> Clear cell</span>
+          <div className="hidden lg:flex items-center gap-3 text-micro text-fg-subtle font-normal">
+            <span><kbd className="bg-surface-sunken border border-border px-1.5 py-0.5 rounded text-fg font-mono font-medium shadow-2xs">Tab</kbd> Next cell</span>
+            <span><kbd className="bg-surface-sunken border border-border px-1.5 py-0.5 rounded text-fg font-mono font-medium shadow-2xs">Enter</kbd> Save row</span>
+            <span><kbd className="bg-surface-sunken border border-border px-1.5 py-0.5 rounded text-fg font-mono font-medium shadow-2xs">Ctrl+S</kbd> Save all</span>
+            <span><kbd className="bg-surface-sunken border border-border px-1.5 py-0.5 rounded text-fg font-mono font-medium shadow-2xs">Del</kbd> Clear cell</span>
           </div>
         )}
 
         {/* Right: Last Saved Timestamp or History Date */}
         <div className="flex items-center gap-2">
           {isHistoryMode ? (
-            <span className="text-slate-400 font-medium text-xs">
+            <span className="text-fg-subtle font-medium text-xs">
               {historyDate}
             </span>
           ) : lastSavedAt ? (
-            <span className="text-slate-500">
-              Last saved: <strong className="text-slate-700 font-mono">{lastSavedAt.toLocaleTimeString('en-IN')}</strong>
+            <span className="text-fg-subtle">
+              Last saved: <strong className="text-fg font-mono">{lastSavedAt.toLocaleTimeString('en-IN')}</strong>
             </span>
           ) : null}
         </div>

@@ -52,26 +52,26 @@ export function WeeklyTable({
   if (rows.length === 0) {
     return (
       <div className="py-8 text-center flex flex-col items-center justify-center gap-2">
-        <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center justify-center text-slate-400">
+        <div className="w-10 h-10 rounded-xl bg-surface-sunken border border-border flex items-center justify-center text-fg-subtle">
           <FolderOpen size={18} strokeWidth={1.75} />
         </div>
-        <p className="text-xs text-slate-500 font-medium">No companies in this section</p>
+        <p className="text-xs text-fg-subtle font-medium">No companies in this section</p>
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto bg-surface">
       <table className="w-full text-xs text-left">
         <thead>
-          <tr className="bg-background/80 text-fg-subtle font-semibold border-b border-border uppercase tracking-wider text-micro">
+          <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border uppercase tracking-wider text-micro select-none">
             {isDeleteMode && (
               <th className="py-2.5 px-2 w-10 text-center">
                 <input
                   type="checkbox"
                   checked={selectedRowIds.length === rows.length && rows.length > 0}
                   onChange={onToggleSelectAll}
-                  className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer accent-rose-600"
+                  className="w-4 h-4 rounded border-border text-rose-600 focus:ring-rose-500 cursor-pointer accent-rose-600"
                   title="Select All"
                 />
               </th>
@@ -86,7 +86,7 @@ export function WeeklyTable({
             )}
           </tr>
         </thead>
-        <tbody className="divide-y divide-border/60 font-normal">
+        <tbody className="divide-y divide-border/60 font-normal bg-surface">
           {rows.map((row, idx) => (
             <TableRow
               key={row._id}
@@ -153,8 +153,8 @@ function TableRow({
 
   return (
     <tr
-      className={`hover:bg-surface-subtle/50 transition-colors ${
-        isSelected ? 'bg-rose-50/70 dark:bg-rose-950/30' : row.is_pinned_top ? 'bg-primary-subtle/30 font-medium' : ''
+      className={`hover:bg-surface-sunken/60 transition-colors ${
+        isSelected ? 'bg-rose-50/70 dark:bg-rose-950/40' : row.is_pinned_top ? 'bg-primary/10 font-medium' : ''
       }`}
     >
       {/* Checkbox in delete mode */}
@@ -164,13 +164,13 @@ function TableRow({
             type="checkbox"
             checked={isSelected}
             onChange={onToggleSelect}
-            className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer accent-rose-600"
+            className="w-4 h-4 rounded border-border text-rose-600 focus:ring-rose-500 cursor-pointer accent-rose-600"
           />
         </td>
       )}
 
       {/* 1. S.No */}
-      <td className="py-2.5 px-3 text-center text-fg-subtle">
+      <td className="py-2.5 px-3 text-center text-fg-subtle font-mono text-micro font-medium">
         {index}
       </td>
 
@@ -178,7 +178,7 @@ function TableRow({
       <td className="py-2.5 px-3 font-semibold text-fg">
         <div className="flex items-center gap-1.5">
           {row.is_pinned_top && (
-            <Star size={11} className="text-warning fill-warning shrink-0" />
+            <Star size={11} className="text-amber-500 fill-amber-500 shrink-0" />
           )}
           {editingField === 'company_name' ? (
             <input
@@ -188,12 +188,12 @@ function TableRow({
               onBlur={() => commitEdit('company_name')}
               onKeyDown={(e) => handleKeyDown(e, 'company_name')}
               autoFocus
-              className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white w-full"
+              className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-full outline-none shadow-xs"
             />
           ) : (
             <span
               onClick={() => startEdit('company_name', row.company_name)}
-              className="cursor-pointer hover:text-primary transition-colors"
+              className="cursor-pointer hover:text-primary transition-colors font-bold"
             >
               {row.company_name}
             </span>
@@ -211,7 +211,7 @@ function TableRow({
             onBlur={() => commitEdit('job_role')}
             onKeyDown={(e) => handleKeyDown(e, 'job_role')}
             autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white w-full"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-full outline-none shadow-xs"
           />
         ) : (
           <div
@@ -221,7 +221,7 @@ function TableRow({
             {row.job_role.split(',').map((r, i) => (
               <span
                 key={i}
-                className="bg-surface border border-border-strong text-fg-muted px-1.5 py-0.5 rounded text-micro"
+                className="bg-surface-sunken border border-border text-fg-muted px-1.5 py-0.5 rounded text-micro"
               >
                 {r.trim()}
               </span>
@@ -231,7 +231,7 @@ function TableRow({
       </td>
 
       {/* 4. CTC */}
-      <td className="py-2.5 px-3 text-success font-medium">
+      <td className="py-2.5 px-3 text-emerald-600 dark:text-emerald-400 font-mono font-medium">
         {editingField === 'ctc_lpa' ? (
           <input
             type="text"
@@ -240,14 +240,14 @@ function TableRow({
             onBlur={() => commitEdit('ctc_lpa')}
             onKeyDown={(e) => handleKeyDown(e, 'ctc_lpa')}
             autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white w-full"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-full outline-none shadow-xs"
           />
         ) : (
           <span
             onClick={() => startEdit('ctc_lpa', row.ctc_lpa)}
             className="cursor-pointer hover:text-primary transition-colors"
           >
-            {row.ctc_lpa || <span className="text-fg-muted italic">—</span>}
+            {row.ctc_lpa || <span className="text-fg-disabled italic">—</span>}
           </span>
         )}
       </td>
@@ -262,7 +262,7 @@ function TableRow({
             onBlur={() => commitEdit('current_status_text')}
             onKeyDown={(e) => handleKeyDown(e, 'current_status_text')}
             autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white w-full"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-full outline-none shadow-xs"
           />
         ) : (
           <span
@@ -270,14 +270,14 @@ function TableRow({
             className="cursor-pointer hover:text-primary transition-colors break-words leading-relaxed whitespace-pre-wrap max-w-[320px] inline-block"
             title={row.current_status_text}
           >
-            {row.current_status_text || <span className="text-fg-muted italic">—</span>}
+            {row.current_status_text || <span className="text-fg-disabled italic">—</span>}
           </span>
         )}
       </td>
 
       {/* 6. Offers Received (Completed Section Only) */}
       {isCompletedSection && (
-        <td className="py-2.5 px-3 text-center font-bold text-success">
+        <td className="py-2.5 px-3 text-center font-bold text-emerald-600 dark:text-emerald-400">
           {editingField === 'selected_count' ? (
             <input
               type="number"
@@ -287,7 +287,7 @@ function TableRow({
               onBlur={() => commitEdit('selected_count')}
               onKeyDown={(e) => handleKeyDown(e, 'selected_count')}
               autoFocus
-              className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-white text-center w-16"
+              className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg text-center w-16 outline-none shadow-xs"
             />
           ) : (
             <span

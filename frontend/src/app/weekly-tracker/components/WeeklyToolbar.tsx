@@ -28,10 +28,10 @@ export function WeeklyToolbar({
   totalRecords,
 }: Props) {
   return (
-    <div className="flex items-center justify-between gap-3 px-6 py-2.5 bg-surface border-b border-border flex-wrap">
+    <div className="flex items-center justify-between gap-3 px-6 py-2.5 bg-surface border-b border-border flex-wrap text-fg">
       {/* Left: Total Records Count */}
-      <div className="text-xs font-semibold text-slate-600">
-        Total Records: <span className="font-bold text-slate-900 font-mono">{totalRecords}</span>
+      <div className="text-xs font-semibold text-fg-muted">
+        Total Records: <span className="font-bold text-fg font-mono">{totalRecords}</span>
       </div>
 
       {/* Right: Search & Filters */}
@@ -40,10 +40,10 @@ export function WeeklyToolbar({
         <select
           value={companyTypeFilter}
           onChange={(e) => onCompanyTypeChange(e.target.value)}
-          className="bg-white border border-slate-300 text-slate-800 text-xs px-3 py-1.5 rounded-xl font-medium shadow-2xs outline-none cursor-pointer"
+          className="bg-surface-sunken border border-border text-fg text-xs px-3 py-1.5 rounded-xl font-medium shadow-2xs outline-none cursor-pointer"
         >
           {COMPANY_TYPES.map((t) => (
-            <option key={t} value={t === 'All Types' ? 'all' : t}>
+            <option key={t} value={t === 'All Types' ? 'all' : t} className="bg-surface text-fg">
               {t}
             </option>
           ))}
@@ -56,7 +56,7 @@ export function WeeklyToolbar({
             placeholder="Search company, role, status…"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full bg-white border border-slate-300 text-slate-800 text-xs px-3 py-1.5 rounded-xl shadow-2xs placeholder:text-slate-400 outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+            className="w-full bg-surface-sunken border border-border text-fg text-xs px-3 py-1.5 rounded-xl shadow-2xs placeholder:text-fg-disabled outline-none focus:border-primary focus:ring-1 focus:ring-primary"
           />
         </div>
       </div>

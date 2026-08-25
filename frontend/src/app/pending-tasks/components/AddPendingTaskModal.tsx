@@ -99,7 +99,6 @@ export function AddPendingTaskModal({
         );
         setRemarks(initialData.remarks || '');
       } else {
-        // Defaults for new task
         setCompanyName('');
         setCompanyId(null);
         setJdReceivedDate(new Date().toISOString().split('T')[0]);
@@ -113,32 +112,33 @@ export function AddPendingTaskModal({
     }
   }, [isOpen, initialData]);
 
-  // Company Search Autocomplete handler
+  // Debounced search for companies
   const handleCompanyInput = (val: string) => {
     setCompanyName(val);
     setCompanyId(null);
 
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    if (!val.trim()) {
+
+    if (val.trim().length >= 2) {
+      setIsSearchingCompany(true);
+      searchTimeoutRef.current = setTimeout(async () => {
+        try {
+          const res = await apiFetch(`/companies?search=${encodeURIComponent(val.trim())}&limit=8`);
+          if (res.success && Array.isArray((res.data as any)?.companies)) {
+            setCompanySuggestions((res.data as any).companies);
+            setShowCompanyDropdown(true);
+          }
+        } catch {
+          setCompanySuggestions([]);
+        } finally {
+          setIsSearchingCompany(false);
+        }
+      }, 300);
+    } else {
       setCompanySuggestions([]);
       setShowCompanyDropdown(false);
-      return;
+      setIsSearchingCompany(false);
     }
-
-    searchTimeoutRef.current = setTimeout(async () => {
-      setIsSearchingCompany(true);
-      try {
-        const res = await apiFetch(`/companies/search?q=${encodeURIComponent(val.trim())}&limit=6`);
-        if (res.success && Array.isArray((res.data as any)?.companies)) {
-          setCompanySuggestions((res.data as any).companies);
-          setShowCompanyDropdown(true);
-        }
-      } catch (err) {
-        console.error('Company search error:', err);
-      } finally {
-        setIsSearchingCompany(false);
-      }
-    }, 250);
   };
 
   const handleSelectCompany = (comp: any) => {
@@ -196,39 +196,39 @@ export function AddPendingTaskModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/60 backdrop-blur-xs animate-fadeIn text-fg">
       <div
-        className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl max-h-[90vh] overflow-y-auto no-scrollbar scroll-smooth"
+        className="bg-surface rounded-2xl shadow-xl border border-border w-full max-w-2xl max-h-[90vh] overflow-y-auto no-scrollbar scroll-smooth"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between z-10">
+        <div className="sticky top-0 bg-surface-sunken border-b border-border px-6 py-4 flex items-center justify-between z-10">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
               <Building2 size={18} />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">
+              <h2 className="text-base font-bold text-fg">
                 {initialData ? 'Edit Pending Task' : 'Add New Pending Task'}
               </h2>
-              <p className="text-xs text-slate-500 font-medium">
-                For College: <span className="font-semibold text-indigo-600">{collegeName}</span>
+              <p className="text-xs text-fg-subtle font-medium">
+                For College: <span className="font-semibold text-primary">{collegeName}</span>
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-lg text-fg-subtle hover:text-fg hover:bg-surface-raised flex items-center justify-center transition-colors cursor-pointer"
           >
             <X size={18} />
           </button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 bg-surface">
           {errorMessage && (
-            <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs px-3 py-2 rounded-lg flex items-center gap-2">
+            <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs px-3 py-2 rounded-lg flex items-center gap-2">
               <AlertCircle size={15} className="shrink-0" />
               <span>{errorMessage}</span>
             </div>
@@ -236,7 +236,7 @@ export function AddPendingTaskModal({
 
           {/* Row 1: Company Name (with Autocomplete) */}
           <div className="relative">
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold text-fg mb-1">
               Company Name <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
@@ -249,10 +249,10 @@ export function AddPendingTaskModal({
                 }}
                 placeholder="Type or select company name..."
                 required
-                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="w-full px-3 py-2 text-xs bg-surface-sunken border border-border rounded-lg text-fg placeholder:text-fg-disabled focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
               {isSearchingCompany && (
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle text-xs">
                   Searching...
                 </span>
               )}
@@ -260,16 +260,16 @@ export function AddPendingTaskModal({
 
             {/* Autocomplete Dropdown */}
             {showCompanyDropdown && companySuggestions.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 max-h-48 overflow-y-auto divide-y divide-slate-100">
+              <div className="absolute left-0 right-0 top-full mt-1 bg-surface border border-border rounded-xl shadow-lg z-20 max-h-48 overflow-y-auto divide-y divide-border/60">
                 {companySuggestions.map((comp) => (
                   <button
                     key={comp._id}
                     type="button"
                     onClick={() => handleSelectCompany(comp)}
-                    className="w-full text-left px-3.5 py-2 text-xs hover:bg-indigo-50 flex items-center justify-between cursor-pointer"
+                    className="w-full text-left px-3.5 py-2 text-xs hover:bg-primary/10 flex items-center justify-between cursor-pointer"
                   >
-                    <span className="font-bold text-slate-900">{comp.company_name}</span>
-                    {comp.domain && <span className="text-slate-400 text-[11px]">{comp.domain}</span>}
+                    <span className="font-bold text-fg">{comp.company_name}</span>
+                    {comp.domain && <span className="text-fg-subtle text-[11px]">{comp.domain}</span>}
                   </button>
                 ))}
               </div>
@@ -279,33 +279,33 @@ export function AddPendingTaskModal({
           {/* Row 2: JD Received Date & DB Shared Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-fg mb-1">
                 JD Received Date
               </label>
               <input
                 type="date"
                 value={jdReceivedDate}
                 onChange={(e) => setJdReceivedDate(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+                className="w-full px-3 py-2 text-xs bg-surface-sunken border border-border rounded-lg text-fg focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-fg mb-1">
                 DB Shared Date
               </label>
               <input
                 type="date"
                 value={dbSharedDate}
                 onChange={(e) => setDbSharedDate(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+                className="w-full px-3 py-2 text-xs bg-surface-sunken border border-border rounded-lg text-fg focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
               />
             </div>
           </div>
 
           {/* Row 3: Current Status */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold text-fg mb-1">
               Current Status
             </label>
             <input
@@ -313,7 +313,7 @@ export function AddPendingTaskModal({
               value={currentStatus}
               onChange={(e) => setCurrentStatus(e.target.value)}
               placeholder="e.g. JD Received, Shortlisting Candidates..."
-              className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              className="w-full px-3 py-2 text-xs bg-surface-sunken border border-border rounded-lg text-fg placeholder:text-fg-disabled focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
             <div className="flex flex-wrap gap-1 mt-1.5">
               {CURRENT_STATUS_SUGGESTIONS.map((s) => (
@@ -322,7 +322,7 @@ export function AddPendingTaskModal({
                   type="button"
                   onClick={() => setCurrentStatus(s)}
                   className={`text-[10px] px-2 py-0.5 rounded cursor-pointer transition-colors ${
-                    currentStatus === s ? 'bg-indigo-100 text-indigo-800 font-semibold' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                    currentStatus === s ? 'bg-primary/20 text-primary font-semibold' : 'bg-surface-sunken hover:bg-surface-raised text-fg-muted'
                   }`}
                 >
                   {s}
@@ -331,10 +331,10 @@ export function AddPendingTaskModal({
             </div>
           </div>
 
-          {/* Row 4: Remarks / Next Action (Free text with minimum 10 characters and quick suggestions) */}
+          {/* Row 4: Remarks / Next Action */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-semibold text-slate-700">
+              <label className="block text-xs font-semibold text-fg">
                 Remarks / Next Action <span className="text-rose-500">*</span>
               </label>
               <div className="text-[10px] font-medium flex items-center gap-1.5">
@@ -348,13 +348,13 @@ export function AddPendingTaskModal({
               minLength={10}
               placeholder="Type remarks or next action manually (min 10 chars, e.g., Database to be shared at the earliest, Drive date to be confirmed, etc.)..."
               required
-              className={`w-full px-3 py-2 text-xs bg-slate-50 border rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:ring-2 resize-none font-medium transition-colors ${
+              className={`w-full px-3 py-2 text-xs bg-surface-sunken border rounded-lg text-fg placeholder:text-fg-disabled focus:bg-surface focus:outline-none focus:ring-2 resize-none font-medium transition-colors ${
                 actionToBeTaken.trim().length > 0 && actionToBeTaken.trim().length < 10
                   ? 'border-amber-400 focus:border-amber-500 focus:ring-amber-500/20'
-                  : 'border-slate-200 focus:border-indigo-500 focus:ring-indigo-500/20'
+                  : 'border-border focus:border-primary focus:ring-primary/20'
               }`}
             />
-            {/* Quick-Click Suggestions for Remarks / Next Action */}
+            {/* Quick-Click Suggestions */}
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               {ACTION_SUGGESTIONS.map((opt) => (
                 <button
@@ -363,8 +363,8 @@ export function AddPendingTaskModal({
                   onClick={() => setActionToBeTaken(opt)}
                   className={`text-[10px] px-2.5 py-1 rounded-md border transition-all cursor-pointer ${
                     actionToBeTaken === opt
-                      ? 'bg-indigo-50 border-indigo-300 text-indigo-800 font-bold shadow-2xs'
-                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      ? 'bg-primary/20 border-primary/40 text-primary font-bold shadow-2xs'
+                      : 'bg-surface-sunken border-border text-fg-muted hover:bg-surface-raised hover:text-fg'
                   }`}
                 >
                   + {opt}
@@ -376,19 +376,19 @@ export function AddPendingTaskModal({
           {/* Row 5: Drive Date & Additional Notes */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-fg mb-1">
                 Drive Date (Scheduled)
               </label>
               <input
                 type="date"
                 value={driveDate}
                 onChange={(e) => setDriveDate(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+                className="w-full px-3 py-2 text-xs bg-surface-sunken border border-border rounded-lg text-fg focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-fg mb-1">
                 Additional Notes
               </label>
               <input
@@ -396,24 +396,24 @@ export function AddPendingTaskModal({
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
                 placeholder="Optional notes or HR contacts..."
-                className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                className="w-full px-3 py-2 text-xs bg-surface-sunken border border-border rounded-lg text-fg placeholder:text-fg-disabled focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
             </div>
           </div>
 
           {/* Footer Actions */}
-          <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+          <div className="pt-4 border-t border-border flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              className="px-4 py-2 text-xs font-medium text-fg-muted hover:text-fg hover:bg-surface-raised rounded-lg transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+              className="px-5 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-hover rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50"
             >
               {submitting ? 'Saving...' : initialData ? 'Update Task' : 'Create Task'}
             </button>

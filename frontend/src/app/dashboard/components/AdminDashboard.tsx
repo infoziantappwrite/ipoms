@@ -80,7 +80,7 @@ export function AdminDashboard({ data }: Props) {
       <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-4">
         <div className="px-5 py-4 border-b border-border bg-background/60 flex items-center justify-between">
           <div>
-            <h3 className="text-xs font-bold text-white flex items-center gap-2">
+            <h3 className="text-xs font-bold text-fg flex items-center gap-2">
               <Landmark size={14} strokeWidth={2} aria-hidden /> Institutional Placement Performance Leaderboard
             </h3>
             <p className="text-micro text-fg-subtle mt-0.5">

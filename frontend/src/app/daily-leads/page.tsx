@@ -118,13 +118,13 @@ export default function DailyLeadsPage() {
   };
 
   // ── Fetch Leads (requires specific college selection)
-  const loadLeads = useCallback(async () => {
+  const loadLeads = useCallback(async (showSpinner = true) => {
     if (!selectedCollegeId || selectedCollegeId === 'all') {
       setLeads([]);
-      setLoading(false);
+      if (showSpinner) setLoading(false);
       return;
     }
-    setLoading(true);
+    if (showSpinner) setLoading(true);
     try {
       const params = new URLSearchParams({
         date: selectedDate,
@@ -140,7 +140,7 @@ export default function DailyLeadsPage() {
     } catch (err) {
       console.error('Failed to load daily leads:', err);
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   }, [selectedDate, selectedCollegeId, activeTab, searchQuery]);
 
@@ -167,9 +167,60 @@ export default function DailyLeadsPage() {
   }, [selectedDate, selectedCollegeId]);
 
   useEffect(() => {
-    loadLeads();
+    loadLeads(true);
     loadSummary();
   }, [loadLeads, loadSummary]);
+
+  // ── Real-Time Multi-User Auto Synchronization & Polling ──
+  useEffect(() => {
+    // 1. Silent background interval every 5s
+    const interval = setInterval(() => {
+      loadLeads(false);
+      loadSummary();
+    }, 5000);
+
+    // 2. Tab focus revalidation
+    const handleFocus = () => {
+      if (document.visibilityState === 'visible') {
+        loadLeads(false);
+        loadSummary();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    // 3. Cross-tab BroadcastChannel
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('ipoms_daily_leads_sync');
+      bc.onmessage = (e) => {
+        if (e.data?.type === 'DAILY_LEADS_MUTATION') {
+          loadLeads(false);
+          loadSummary();
+        }
+      };
+    } catch {
+      // ignore
+    }
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+      if (bc) bc.close();
+    };
+  }, [loadLeads, loadSummary]);
+
+  const broadcastDailyLeadMutation = () => {
+    try {
+      const bc = new BroadcastChannel('ipoms_daily_leads_sync');
+      bc.postMessage({ type: 'DAILY_LEADS_MUTATION', timestamp: Date.now() });
+      bc.close();
+    } catch {
+      // ignore
+    }
+  };
 
   // ── Row Patch (Inline Edit)
   const handleUpdateRow = async (rowId: string, patch: Partial<DailyLeadRow>) => {
@@ -181,6 +232,7 @@ export default function DailyLeadsPage() {
       if (res.success) {
         await loadLeads();
         await loadSummary();
+        broadcastDailyLeadMutation();
       }
     } catch (err) {
       console.error('Failed to update lead:', err);
@@ -197,6 +249,7 @@ export default function DailyLeadsPage() {
         setSelectedIds((prev) => prev.filter((id) => id !== rowId));
         await loadLeads();
         await loadSummary();
+        broadcastDailyLeadMutation();
       }
     } catch (err) {
       console.error('Failed to delete lead:', err);
@@ -386,6 +439,7 @@ export default function DailyLeadsPage() {
           onAdded={() => {
             loadLeads();
             loadSummary();
+            broadcastDailyLeadMutation();
           }}
         />
       )}

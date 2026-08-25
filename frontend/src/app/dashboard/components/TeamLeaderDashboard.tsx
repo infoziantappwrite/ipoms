@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { CreateAssignmentModal } from './CreateAssignmentModal';
-import { Plus, Users } from 'lucide-react';
+import { Plus, Users, Briefcase } from 'lucide-react';
 
 interface Props {
   data: any;
@@ -28,8 +28,8 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
       {/* Top Action Bar */}
       <div className="glass-panel rounded-2xl border border-border p-5 shadow-3 flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h2 className="text-base font-bold text-white flex items-center gap-2">
-            <span>👔</span> Placement Team Activity & Operations
+          <h2 className="text-base font-bold text-fg flex items-center gap-2">
+            <Briefcase size={16} strokeWidth={2.2} aria-hidden /> Placement Team Activity & Operations
           </h2>
           <p className="text-xs text-fg-subtle mt-0.5">
             Monitor real-time coordinator call velocity, positive leads, and dispatch assigned tasks.
@@ -77,7 +77,7 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
       <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-4">
         <div className="px-5 py-4 border-b border-border bg-background/60 flex items-center justify-between">
           <div>
-            <h3 className="text-xs font-bold text-white flex items-center gap-2">
+            <h3 className="text-xs font-bold text-fg flex items-center gap-2">
               <Users size={14} strokeWidth={2} aria-hidden /> Coordinator Live Performance Matrix
             </h3>
             <p className="text-micro text-fg-subtle mt-0.5">

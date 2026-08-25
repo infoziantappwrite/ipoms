@@ -1,5 +1,7 @@
 'use client';
 
+import { Shield } from 'lucide-react';
+
 export function RoleMatrixTab() {
   const matrix = [
     { feature: 'Login / Logout', coord: true, tl: true, admin: true, tpo: true },
@@ -25,7 +27,7 @@ export function RoleMatrixTab() {
       <div className="glass-panel rounded-2xl border border-border p-5 shadow-4">
         <div className="border-b border-border pb-3 mb-4">
           <h3 className="text-xs font-bold text-white flex items-center gap-2">
-            <span>🛡️</span> Role-Based Access Control (RBAC) Permissions Matrix
+            <Shield size={14} strokeWidth={2.2} aria-hidden /> Role-Based Access Control (RBAC) Permissions Matrix
           </h3>
           <p className="text-micro text-fg-subtle mt-0.5">
             Operational and governance permissions frozen per Section 8 of Module 01 User Management Specification

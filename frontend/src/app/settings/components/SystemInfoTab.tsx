@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import {
   BarChart3, LayoutDashboard, PhoneCall, CalendarDays, Target, ListTodo,
-  Database, TrendingUp, Settings, ExternalLink
+  Database, TrendingUp, Settings, ExternalLink, CheckCircle2, Landmark, Info
 } from 'lucide-react';
 
 interface Props {
@@ -92,7 +92,9 @@ export function SystemInfoTab({ summaryData }: Props) {
       {/* Reassurance Health Panel */}
       <div className="glass-panel rounded-2xl border border-success/30 bg-success/20 p-5 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <span className="text-2xl p-2 bg-success/50 rounded-xl border border-success/30">🟢</span>
+          <span className="text-success p-2 bg-success/50 rounded-xl border border-success/30">
+            <CheckCircle2 size={24} strokeWidth={2} aria-hidden />
+          </span>
           <div>
             <h3 className="text-xs font-bold text-white">iPOMS Operational Health: All Systems Normal</h3>
             <p className="text-micro text-success mt-0.5">
@@ -147,7 +149,7 @@ export function SystemInfoTab({ summaryData }: Props) {
       <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-4">
         <div className="border-b border-border pb-3">
           <h3 className="text-xs font-bold text-white flex items-center gap-2">
-            <span>🏛️</span> Enterprise Module Directory & Architecture Hub
+            <Landmark size={14} strokeWidth={2.2} aria-hidden /> Enterprise Module Directory & Architecture Hub
           </h3>
           <p className="text-micro text-fg-subtle mt-0.5">
             Operational navigation and governance directory across all 8 integrated modules
@@ -195,7 +197,7 @@ export function SystemInfoTab({ summaryData }: Props) {
       <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-4">
         <div className="border-b border-border pb-3">
           <h3 className="text-xs font-bold text-white flex items-center gap-2">
-            <span>ℹ️</span> Application Build & Environment
+            <Info size={14} strokeWidth={2.2} aria-hidden /> Application Build & Environment
           </h3>
         </div>
 
