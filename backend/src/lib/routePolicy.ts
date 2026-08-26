@@ -150,7 +150,7 @@ const POLICIES: Policy[] = [
 
 /** Paths served before authentication; never reach this middleware. */
 function isPublic(path: string): boolean {
-  return path === '/health' || path.startsWith('/auth');
+  return path === '/health' || path.startsWith('/auth') || path === '/colleges';
 }
 
 function findPolicy(method: string, path: string): Policy | undefined {

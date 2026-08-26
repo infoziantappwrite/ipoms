@@ -69,10 +69,11 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onDelete, onCall }:
 
         {/* Rows with clear bordered separation */}
         <div className="divide-y divide-border border-b border-border">
-          {rows.map((row) => (
+          {rows.map((row, index) => (
             <TrackerRow
               key={row._id}
               row={row}
+              index={index + 1}
               isReadOnly={isReadOnly}
               onUpdate={(patch) => onRowUpdate(row._id, patch)}
               onDelete={() => onDelete(row._id)}

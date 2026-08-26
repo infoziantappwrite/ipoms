@@ -402,18 +402,11 @@ export function AddPendingTaskModal({
           </div>
 
           {/* Footer Actions */}
-          <div className="pt-4 border-t border-border flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-fg-muted hover:text-fg hover:bg-surface-raised rounded-lg transition-colors cursor-pointer"
-            >
-              Cancel
-            </button>
+          <div className="pt-4 border-t border-border flex items-center justify-end">
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-hover rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+              className="w-full sm:w-auto px-6 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-hover rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50"
             >
               {submitting ? 'Saving...' : initialData ? 'Update Task' : 'Create Task'}
             </button>

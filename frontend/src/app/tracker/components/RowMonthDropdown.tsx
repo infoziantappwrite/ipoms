@@ -63,13 +63,13 @@ export function RowMonthDropdown({ value, onChange, disabled = false }: Props) {
             ? 'bg-surface-sunken/40 border-border/40 text-fg-disabled/50 cursor-not-allowed'
             : value
             ? 'bg-warning-subtle/50 border-warning/70 text-warning-strong cursor-pointer active:scale-[0.98]'
-            : 'bg-surface/80 border-border text-fg-subtle hover:border-border-strong hover:text-fg cursor-pointer active:scale-[0.98]'
+            : 'bg-amber-500/10 border-amber-500/70 text-amber-700 dark:text-amber-300 ring-2 ring-amber-500/20 font-semibold cursor-pointer active:scale-[0.98]'
         }`}
       >
         <div className="flex items-center gap-2 truncate">
           <Calendar size={12} className={disabled ? 'text-fg-disabled/40 shrink-0' : 'text-warning-strong shrink-0'} />
           <span className="truncate text-xs">
-            {disabled ? '—' : (value || '— Pick Month —')}
+            {disabled ? '—' : (value || 'Select Month *')}
           </span>
         </div>
         <ChevronDown

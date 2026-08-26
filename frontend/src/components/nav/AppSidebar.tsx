@@ -181,7 +181,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
 
   const roleLabel = ROLE_LABEL[userRole] ?? 'Staff';
   const fullName = user?.full_name ?? 'Coordinator';
-  const email = user?.email ?? '';
+  const email = user?.official_email ?? (user as any)?.email ?? '';
 
   const showLabel = (el: HTMLElement, label: string) => {
     if (collapsed) {
@@ -367,7 +367,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
       />
 
       {/* Rail Tooltip when collapsed */}
-      <RailTooltip anchor={hovered} label={hoverLabel} visible={Boolean(collapsed && hovered)} />
+      {collapsed && hovered && <RailTooltip anchor={hovered} label={hoverLabel} />}
     </>
   );
 }

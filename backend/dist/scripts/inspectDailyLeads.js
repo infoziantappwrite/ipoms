@@ -7,35 +7,39 @@ const DailyTracker_1 = require("../models/DailyTracker");
 const database_1 = require("../config/database");
 async function inspectDailyLeads() {
     console.log('\n===============================================================');
-    console.log('🔍 DIRECT MONGODB DATABASE INSPECTION: "daily_leads" Collection');
+    console.log('🔍 DIRECT MONGODB DATABASE AUDIT: "daily_leads" Collection');
     console.log('===============================================================\n');
     await (0, database_1.connectDatabase)();
-    // Ensure models are registered in Mongoose
     const _ = [College_1.College.modelName, User_1.User.modelName, DailyTracker_1.DailyTracker.modelName];
-    const count = await DailyLead_1.DailyLead.countDocuments({});
-    console.log(`📊 Total Documents in 'daily_leads' collection: ${count}\n`);
-    const rows = await DailyLead_1.DailyLead.find({})
-        .sort({ created_at: -1 })
-        .limit(5)
+    const augStart = new Date(Date.UTC(2026, 7, 1, 0, 0, 0, 0));
+    // 1. Pre-August audit
+    const preAugustCount = await DailyLead_1.DailyLead.countDocuments({ lead_date: { $lt: augStart } });
+    console.log(`🧹 Pre-August 2026 Records: ${preAugustCount} ${preAugustCount === 0 ? '✅ (PERFECT ZERO)' : '❌ (NEEDS PURGE)'}`);
+    // 2. August Positives count
+    const augustPositivesCount = await DailyLead_1.DailyLead.countDocuments({ lead_type: 'positive', lead_date: { $gte: augStart } });
+    console.log(`📊 August 2026 Positives Count: ${augustPositivesCount}`);
+    // 3. Breakdown by College
+    const positives = await DailyLead_1.DailyLead.find({ lead_type: 'positive', lead_date: { $gte: augStart } })
         .populate('college_id', 'college_name college_code')
-        .populate('coordinator_id', 'full_name official_email');
-    rows.forEach((r, idx) => {
-        console.log(`[Daily Lead #${idx + 1}]`);
-        console.log(`  ID             : ${r._id}`);
-        console.log(`  Type (Tab)     : ${r.lead_type.toUpperCase()} (Moved to JD: ${r.is_moved_to_jd})`);
-        console.log(`  Company        : ${r.company_name}`);
-        console.log(`  Role           : ${r.job_role}`);
-        console.log(`  CTC            : ${r.ctc || 'N/A'}`);
-        console.log(`  Batch          : ${r.eligible_batch}`);
-        console.log(`  College        : [${r.college_id?.college_code}] ${r.college_id?.college_name}`);
-        console.log(`  Coordinator    : ${r.coordinator_id?.full_name}`);
-        console.log(`  Time & Date    : ${r.event_time} | ${r.lead_date.toISOString().split('T')[0]}`);
-        console.log(`  Remarks        : "${r.remarks}"`);
-        console.log(`  Is Deleted     : ${r.is_deleted}`);
-        console.log(`  Created At     : ${r.created_at.toISOString()}`);
-        console.log('---------------------------------------------------------------');
+        .sort({ lead_date: 1 });
+    const byCollege = {};
+    const byDate = {};
+    positives.forEach((p) => {
+        const code = p.college_id?.college_code || 'UNKNOWN';
+        byCollege[code] = (byCollege[code] || 0) + 1;
+        const dateStr = p.lead_date.toISOString().split('T')[0];
+        byDate[dateStr] = (byDate[dateStr] || 0) + 1;
+    });
+    console.log('\n🏛️ Positives Breakdown by College:');
+    console.table(byCollege);
+    console.log('\n📅 Positives Breakdown by Date:');
+    console.table(byDate);
+    console.log('\n🔍 Sample Today Records (2026-08-24):');
+    const todayRecords = positives.filter((p) => p.lead_date.toISOString().startsWith('2026-08-24'));
+    todayRecords.forEach((r, idx) => {
+        console.log(`  #${idx + 1} | [${r.college_id?.college_code}] ${r.company_name} | Role: ${r.job_role} | CTC: ${r.ctc} | Time: ${r.event_time} | Batch: ${r.eligible_batch}`);
     });
     await (0, database_1.disconnectDatabase)();
-    console.log('\n✅ Daily Leads database inspection verified successfully!\n');
+    console.log('\n✅ Database verification audit complete!\n');
 }
 inspectDailyLeads().catch(console.error);

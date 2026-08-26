@@ -6,24 +6,22 @@ import type { LeadsSummaryData } from './components/LeadsSummaryStrip';
 import { LeadsTabBar } from './components/LeadsTabBar';
 import { LeadsTable, DailyLeadRow } from './components/LeadsTable';
 import { AddLeadModal } from './components/AddLeadModal';
+import { CopyToJdModal } from './components/CopyToJdModal';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
-
+import { useToast } from '@/components/ui/Toast';
 import { getActiveCollege, setActiveCollege } from '@/lib/collegeSession';
 
 export default function DailyLeadsPage() {
+  const { toast } = useToast();
+
   // Date State (Defaults to today in YYYY-MM-DD)
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     return new Date().toISOString().split('T')[0];
   });
 
-  // College State ('all' or specific college ObjectId)
-  const [selectedCollegeId, setSelectedCollegeId] = useState<string>(() => {
-    return getActiveCollege().id || 'all';
-  });
-  const [selectedCollegeName, setSelectedCollegeName] = useState<string>(() => {
-    return getActiveCollege().name || 'All Colleges';
-  });
+  // College List State for Table Dropdowns
+  const [colleges, setColleges] = useState<{ _id: string; college_name: string; college_code: string }[]>([]);
 
   // Tab State: 'positive' or 'jd_received' (with persistent localStorage memory per Spec Section 6.4)
   const [activeTab, setActiveTab] = useState<'positive' | 'jd_received'>('positive');
@@ -33,6 +31,12 @@ export default function DailyLeadsPage() {
 
   // Delete Mode State
   const [isDeleteMode, setIsDeleteMode] = useState(false);
+
+  // Syncing State
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Copy to JD Modal State
+  const [isCopyToJdModalOpen, setIsCopyToJdModalOpen] = useState(false);
 
   // Data
   const [leads, setLeads] = useState<DailyLeadRow[]>([]);
@@ -53,18 +57,21 @@ export default function DailyLeadsPage() {
     const user = readSessionUser();
     if (user?._id) setCoordinatorId(user._id);
 
-    const active = getActiveCollege();
-    if (active.id && active.id !== 'all') {
-      setSelectedCollegeId(active.id);
-      setSelectedCollegeName(active.name);
-    }
+    // Fetch colleges list for row-level dropdowns
+    apiFetch('/colleges')
+      .then((data) => {
+        if (data.success && Array.isArray((data.data as any)?.colleges)) {
+          setColleges((data.data as any).colleges);
+        }
+      })
+      .catch(console.error);
   }, []);
 
   // Clear selection whenever filters or tab change
   useEffect(() => {
     setSelectedIds([]);
     setIsAllSelected(false);
-  }, [selectedDate, selectedCollegeId, activeTab, searchQuery]);
+  }, [selectedDate, activeTab, searchQuery]);
 
   // Escape exits delete mode (mirrors the "Exit Delete" toggle button)
   useEffect(() => {
@@ -95,15 +102,6 @@ export default function DailyLeadsPage() {
     const today = new Date().toISOString().split('T')[0];
     setSelectedDate(today);
 
-    // Auto-refresh college dropdown to All Colleges
-    setSelectedCollegeId('all');
-    setSelectedCollegeName('All Colleges');
-    try {
-      setActiveCollege('all', 'All Colleges');
-    } catch {
-      // ignore
-    }
-
     // Reset search, delete mode, and selections
     setSearchQuery('');
     setIsDeleteMode(false);
@@ -117,54 +115,77 @@ export default function DailyLeadsPage() {
     }
   };
 
-  // ── Fetch Leads (requires specific college selection)
+  // ── Fetch Leads across all colleges for the selected date
   const loadLeads = useCallback(async (showSpinner = true) => {
-    if (!selectedCollegeId || selectedCollegeId === 'all') {
-      setLeads([]);
-      if (showSpinner) setLoading(false);
-      return;
-    }
     if (showSpinner) setLoading(true);
     try {
       const params = new URLSearchParams({
         date: selectedDate,
         lead_type: activeTab,
-        college_id: selectedCollegeId,
       });
       if (searchQuery.trim()) params.set('search', searchQuery.trim());
 
       const res = await apiFetch(`/daily-leads?${params.toString()}`);
       if (res.success && res.data) {
-        setLeads((res.data as any).leads);
+        setLeads((res.data as any).leads || []);
       }
     } catch (err) {
       console.error('Failed to load daily leads:', err);
     } finally {
       if (showSpinner) setLoading(false);
     }
-  }, [selectedDate, selectedCollegeId, activeTab, searchQuery]);
+  }, [selectedDate, activeTab, searchQuery]);
 
   // ── Fetch Summary Strip Counts
   const loadSummary = useCallback(async () => {
-    if (!selectedCollegeId || selectedCollegeId === 'all') {
-      setSummary({
-        positives_count: 0,
-        jd_received_count: 0,
-        active_colleges_count: 0,
-      });
-      return;
-    }
     try {
-      const params = new URLSearchParams({ date: selectedDate, college_id: selectedCollegeId });
-
+      const params = new URLSearchParams({ date: selectedDate });
       const res = await apiFetch(`/daily-leads/summary?${params.toString()}`);
       if (res.success && res.data) {
-        setSummary((res.data as any).summary);
+        setSummary((res.data as any).summary || {
+          positives_count: 0,
+          jd_received_count: 0,
+          active_colleges_count: 0,
+        });
       }
     } catch (err) {
       console.error('Failed to load leads summary:', err);
     }
-  }, [selectedDate, selectedCollegeId]);
+  }, [selectedDate]);
+
+  // ── Sync Positives (Pulls positive pipeline & calls for the selected date across colleges)
+  const handleSyncPositives = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await apiFetch('/daily-leads/sync-positives', {
+        method: 'POST',
+        body: JSON.stringify({
+          date: selectedDate,
+          college_id: 'all',
+          coordinator_id: coordinatorId,
+        }),
+      });
+
+      if (res.success) {
+        const syncedCount = (res.data as any)?.synced_count ?? 0;
+        toast(
+          syncedCount > 0
+            ? `Successfully synced ${syncedCount} positive lead(s) for ${selectedDate}`
+            : `All positive pipeline leads for ${selectedDate} are already synced`,
+          'success'
+        );
+        await loadLeads(false);
+        await loadSummary();
+        broadcastDailyLeadMutation();
+      } else {
+        toast((res as any)?.error?.message || 'Failed to sync positive leads', 'warning');
+      }
+    } catch (err: any) {
+      toast(err?.message || 'Network error syncing positives', 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   useEffect(() => {
     loadLeads(true);
@@ -381,11 +402,6 @@ export default function DailyLeadsPage() {
       <LeadsHeader
         selectedDate={selectedDate}
         onDateChange={setSelectedDate}
-        selectedCollegeId={selectedCollegeId}
-        onCollegeChange={(id, name) => {
-          setSelectedCollegeId(id);
-          setSelectedCollegeName(name);
-        }}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onOpenAddModal={() => setIsAddModalOpen(true)}
@@ -396,6 +412,10 @@ export default function DailyLeadsPage() {
         }}
         isDeleteMode={isDeleteMode}
         onToggleDeleteMode={handleToggleDeleteMode}
+        onSyncPositives={handleSyncPositives}
+        isSyncing={isSyncing}
+        activeTab={activeTab}
+        onOpenCopyToJdModal={() => setIsCopyToJdModalOpen(true)}
       />
 
       {/* ── Tab Bar (Positives vs JD Received) ────────────────────────────── */}
@@ -415,7 +435,7 @@ export default function DailyLeadsPage() {
           <LeadsTable
             rows={leads}
             activeTab={activeTab}
-            selectedCollegeId={selectedCollegeId}
+            colleges={colleges}
             isDeleteMode={isDeleteMode}
             selectedIds={selectedIds}
             isAllSelected={isAllSelected}
@@ -424,19 +444,35 @@ export default function DailyLeadsPage() {
             onClearSelection={handleClearSelection}
             onBulkDelete={handleBulkDelete}
             onUpdateRow={handleUpdateRow}
+            onDeleteRow={handleDeleteRow}
           />
         </div>
       </div>
 
-      {/* ── Add Entry Modal ───────────────────────────────────────────────── */}
+      {/* ── Add Entry Modal (Dual Property: Positives vs JD Received) ─────── */}
       {isAddModalOpen && (
         <AddLeadModal
           initialLeadType={activeTab}
-          initialCollegeId={selectedCollegeId}
+          initialCollegeId=""
           initialDate={selectedDate === 'all' ? new Date().toISOString().split('T')[0] : selectedDate}
           coordinatorId={coordinatorId}
           onClose={() => setIsAddModalOpen(false)}
           onAdded={() => {
+            loadLeads();
+            loadSummary();
+            broadcastDailyLeadMutation();
+          }}
+        />
+      )}
+
+      {/* ── Copy to JD Modal (Checkboxes for College List) ────────────────── */}
+      {isCopyToJdModalOpen && (
+        <CopyToJdModal
+          selectedDate={selectedDate}
+          colleges={colleges}
+          positiveLeads={leads}
+          onClose={() => setIsCopyToJdModalOpen(false)}
+          onCopied={() => {
             loadLeads();
             loadSummary();
             broadcastDailyLeadMutation();

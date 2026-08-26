@@ -121,7 +121,7 @@ export function ActiveLeadHeader({
             value={selectedYear}
             onChange={onYearChange}
             allowAll
-            allLabel="All Years (2026–2035)"
+            allLabel="Select Year"
           />
 
           {/* Smooth Status Filter */}

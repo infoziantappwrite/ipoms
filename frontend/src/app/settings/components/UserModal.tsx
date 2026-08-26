@@ -242,18 +242,11 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-surface hover:bg-surface-raised text-fg-muted rounded-xl font-medium"
-            >
-              Cancel
-            </button>
+          <div className="flex items-center justify-end pt-3 border-t border-border">
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 bg-primary hover:bg-primary text-white rounded-xl font-bold shadow-2 transition-colors flex items-center gap-1.5"
+              className="w-full sm:w-auto px-6 py-2 bg-primary hover:bg-primary text-white rounded-xl font-bold shadow-2 transition-colors flex items-center justify-center gap-1.5"
             >
               {!loading && !isEditing && <UserPlus size={14} strokeWidth={2.2} aria-hidden />}
               {loading ? 'Saving…' : isEditing ? 'Save User' : 'Create User Account'}

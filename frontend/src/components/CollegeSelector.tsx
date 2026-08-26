@@ -7,6 +7,8 @@ import {
   setActiveCollege,
   getCoordinatorSelectedColleges,
   sortCollegesWithPriority,
+  getCachedColleges,
+  fetchAllCollegesCached,
 } from '@/lib/collegeSession';
 
 export interface College {
@@ -38,11 +40,11 @@ export function CollegeSelector({
   placeholder = '— Select College —',
   align = 'left',
 }: Props) {
-  const [colleges, setColleges] = useState<College[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [colleges, setColleges] = useState<College[]>(() => getCachedColleges());
+  const [loading, setLoading] = useState(() => getCachedColleges().length === 0);
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [coordinatorSelectedIds, setCoordinatorSelectedIds] = useState<string[]>([]);
+  const [coordinatorSelectedIds, setCoordinatorSelectedIds] = useState<string[]>(getCoordinatorSelectedColleges);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -59,14 +61,25 @@ export function CollegeSelector({
     return () => window.removeEventListener('ipoms_coordinator_colleges_changed', handleCollegesChange);
   }, []);
 
+  // Listen to global colleges cache updates
   useEffect(() => {
-    apiFetch('/colleges')
-      .then((data) => {
-        if (data.success && Array.isArray((data.data as any)?.colleges)) {
-          setColleges((data.data as any).colleges);
+    const handleCollegesLoaded = (e: any) => {
+      if (Array.isArray(e.detail?.colleges) && e.detail.colleges.length > 0) {
+        setColleges(e.detail.colleges);
+        setLoading(false);
+      }
+    };
+    window.addEventListener('ipoms_colleges_loaded', handleCollegesLoaded);
+    return () => window.removeEventListener('ipoms_colleges_loaded', handleCollegesLoaded);
+  }, []);
+
+  useEffect(() => {
+    fetchAllCollegesCached()
+      .then((list) => {
+        if (list.length > 0) {
+          setColleges(list);
         }
       })
-      .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
 
@@ -94,7 +107,9 @@ export function CollegeSelector({
   }, [isOpen]);
 
   const isAll = allowAll && selectedCollegeId === 'all';
-  const selected = colleges.find((c) => c._id === selectedCollegeId);
+  const selected = colleges.find(
+    (c) => c._id === selectedCollegeId || c.college_code === selectedCollegeId || c.college_name === selectedCollegeId
+  );
 
   const rawFiltered = colleges.filter((c) => {
     const q = searchTerm.toLowerCase().trim();

@@ -302,13 +302,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
           <div className="text-xs text-fg-muted">
             Total Selected: <strong className="text-primary text-sm font-black ml-1">{selected.size}</strong> contacts
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onClose}
-              className="px-5 py-2.5 rounded-xl bg-surface-sunken hover:bg-surface-raised text-fg border border-border text-xs font-semibold transition-all cursor-pointer shadow-xs"
-            >
-              Cancel
-            </button>
+          <div className="flex items-center">
             <button
               onClick={handleLoad}
               disabled={selected.size === 0}

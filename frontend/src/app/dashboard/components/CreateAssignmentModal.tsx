@@ -211,18 +211,11 @@ export function CreateAssignmentModal({ onClose, onSuccess }: Props) {
           </div>
 
           {/* Submit */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-surface hover:bg-surface-raised text-fg-muted rounded-xl font-medium"
-            >
-              Cancel
-            </button>
+          <div className="flex items-center justify-end pt-2 border-t border-border">
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2 bg-primary hover:bg-blue-700 text-white rounded-xl font-bold shadow-xs transition-colors cursor-pointer"
+              className="w-full sm:w-auto px-6 py-2 bg-primary hover:bg-blue-700 text-white rounded-xl font-bold shadow-xs transition-colors cursor-pointer"
             >
               {loading ? 'Dispatching…' : 'Dispatch Assignment'}
             </button>

@@ -31,9 +31,10 @@ interface Props {
   value?: CallOutcome | null;
   onChange: (val: string) => void;
   disabled?: boolean;
+  placement?: 'bottom' | 'top';
 }
 
-export function RowOutcomeDropdown({ value, onChange, disabled = false }: Props) {
+export function RowOutcomeDropdown({ value, onChange, disabled = false, placement = 'bottom' }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -112,7 +113,11 @@ export function RowOutcomeDropdown({ value, onChange, disabled = false }: Props)
       {isOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="absolute left-0 top-full mt-1 w-52 bg-surface/98 backdrop-blur-md border border-border rounded-2xl shadow-3 z-50 p-1.5 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] text-fg select-none origin-top-left max-h-64 overflow-y-auto custom-scrollbar"
+          className={`absolute ${
+            placement === 'top'
+              ? 'left-0 bottom-full mb-1 origin-bottom-left'
+              : 'left-0 top-full mt-1 origin-top-left'
+          } w-52 bg-surface/98 backdrop-blur-md border border-border rounded-2xl shadow-2xl z-[100] p-1.5 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] text-fg select-none max-h-64 overflow-y-auto custom-scrollbar`}
         >
           {ROW_OUTCOMES.map((opt) => {
             const isSelected = opt.value === value;

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { apiFetch, getAuthToken } from '@/lib/api';
+import { apiFetch, apiFetchBlob } from '@/lib/api';
 import { ActiveLeadHeader } from './components/ActiveLeadHeader';
 import { ActiveLeadTable, ActiveLeadItem } from './components/ActiveLeadTable';
 import { AddActiveLeadModal } from './components/AddActiveLeadModal';
@@ -223,17 +223,7 @@ export default function ActiveLeadsPage() {
       if (selectedMonth !== 'all') params.append('followup_month', selectedMonth);
       if (searchQuery.trim()) params.append('search', searchQuery.trim());
 
-      const token = getAuthToken();
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
-      const downloadUrl = `${apiUrl}/active-leads/export?${params.toString()}`;
-
-      const res = await fetch(downloadUrl, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-
-      if (!res.ok) throw new Error('Export download failed');
-
-      const blob = await res.blob();
+      const blob = await apiFetchBlob(`/active-leads/export?${params.toString()}`);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

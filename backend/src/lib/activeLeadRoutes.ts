@@ -69,7 +69,7 @@ export async function syncLeadFromDailyTracker(data: {
     if (existing) {
       existing.status = status;
       if (status === 'Follow Up' && followupMonth && !existing.followup_month) {
-        existing.followup_month = followupMonth;
+        existing.followup_month = followupMonth as any;
       }
       if (data.daily_tracker_id) existing.daily_tracker_id = data.daily_tracker_id;
       await existing.save();
@@ -468,6 +468,7 @@ export function registerActiveLeadRoutes(app: Express) {
 
       await workbook.xlsx.write(res);
       res.end();
+      return;
     } catch (err: any) {
       console.error('GET /active-leads/export error:', err);
       return res.status(500).json({ success: false, error: { message: err.message || 'Export failed' } });

@@ -16,6 +16,8 @@ import { apiFetch } from '@/lib/api';
 import {
   getCoordinatorSelectedColleges,
   setCoordinatorSelectedColleges,
+  getCachedColleges,
+  fetchAllCollegesCached,
 } from '@/lib/collegeSession';
 import { College } from '@/components/CollegeSelector';
 import { useToast } from '@/components/ui/Toast';
@@ -26,28 +28,29 @@ interface Props {
 
 export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
   const { toast } = useToast();
-  const [colleges, setColleges] = useState<College[]>([]);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [colleges, setColleges] = useState<College[]>(() => getCachedColleges());
+  const [selectedIds, setSelectedIds] = useState<string[]>(() => {
+    const saved = getCoordinatorSelectedColleges();
+    return saved.slice(0, 4);
+  });
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => getCachedColleges().length === 0);
 
   // Load available colleges and coordinator's active focus selection
   useEffect(() => {
     async function loadData() {
       try {
-        setLoading(true);
-        const res = await apiFetch('/colleges');
-        if (res.success && Array.isArray((res.data as any)?.colleges)) {
-          const list: College[] = (res.data as any).colleges;
+        const list = await fetchAllCollegesCached();
+        if (list && list.length > 0) {
           setColleges(list);
 
           const savedIds = getCoordinatorSelectedColleges();
           if (savedIds && savedIds.length > 0) {
             // Verify stored IDs exist in live colleges list
             const validSaved = savedIds.filter((id) => list.some((c) => c._id === id));
-            setSelectedIds(validSaved.slice(0, 3));
-            if (onSelectionChange) onSelectionChange(validSaved.slice(0, 3));
+            setSelectedIds(validSaved.slice(0, 4));
+            if (onSelectionChange) onSelectionChange(validSaved.slice(0, 4));
             setIsEditing(validSaved.length === 0);
           } else {
             // No default selection — start with empty selection in editing mode
@@ -78,9 +81,9 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
       setCoordinatorSelectedColleges(updated);
       if (onSelectionChange) onSelectionChange(updated);
     } else {
-      // Rule: Maximum 3 colleges are allowed
-      if (selectedIds.length >= 3) {
-        toast('Maximum 3 colleges are allowed. Uncheck an existing college to select a different one.', 'error');
+      // Rule: Maximum 4 colleges are allowed
+      if (selectedIds.length >= 4) {
+        toast('Maximum 4 colleges are allowed. Uncheck an existing college to select a different one.', 'error');
         return;
       }
       const updated = [...selectedIds, collegeId];
@@ -115,37 +118,59 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
 
   return (
     <section className="w-full rounded-2xl border border-border bg-surface shadow-xs overflow-hidden transition-all duration-300">
-      {/* ── Section Header ────────────────────────────────────────────── */}
-      <div className="p-5 sm:p-6 border-b border-border bg-gradient-to-r from-surface via-surface to-surface-sunken/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2.5">
+      {/* ── Section Header with Search & Controls ──────── */}
+      <div className="p-4 sm:p-5 border-b border-border bg-gradient-to-r from-surface via-surface to-surface-sunken/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Left Group: Title, Badge & Search Bar */}
+        <div className="flex flex-wrap items-center gap-3.5 flex-1 min-w-0">
+          <div className="flex items-center gap-2.5 shrink-0">
             <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
               <Layers size={18} />
             </div>
-            <h2 className="text-lg sm:text-xl font-bold tracking-tight text-fg">
+            <h2 className="text-base sm:text-lg font-bold tracking-tight text-fg whitespace-nowrap">
               Active College Focus
             </h2>
             <span
-              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono tracking-tight transition-colors ${
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold font-mono tracking-tight transition-colors whitespace-nowrap ${
                 selectedIds.length > 0
                   ? 'bg-primary/15 text-primary border border-primary/25'
                   : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25'
               }`}
             >
-              {selectedIds.length} / 3 Selected
+              {selectedIds.length} / 4 Selected
             </span>
           </div>
-          <p className="text-xs text-fg-subtle max-w-2xl leading-relaxed">
-            Select 1 to 3 partner campuses. Your chosen colleges automatically pin to the top of all trackers and generate dedicated KPI summary sections below.
-          </p>
+
+          {/* Search Input with properly spaced left icon padding */}
+          <div className="relative w-full sm:w-64">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Filter by college code or name…"
+              className="w-full bg-surface-sunken border border-border text-xs text-fg pl-9 pr-3 py-2 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-fg-disabled font-normal shadow-2xs transition-all"
+            />
+          </div>
         </div>
 
-        {/* ── Lock / Edit Action Button ──────────────────────────────────── */}
-        <div className="flex items-center gap-3 shrink-0">
+        {/* Right Group: Status Badge & Edit Action Button */}
+        <div className="flex items-center gap-3 shrink-0 self-start md:self-auto">
+          {isEditing ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-sky-400 text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+              Editing Mode
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-surface-sunken text-fg-muted text-xs font-medium border border-border/50">
+              <Lock size={12} className="text-fg-subtle" />
+              Checkboxes Locked
+            </span>
+          )}
+
           <button
             type="button"
             onClick={handleLockToggle}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer select-none active:scale-95 ${
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer select-none active:scale-95 shrink-0 ${
               isEditing
                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
                 : 'bg-surface-sunken hover:bg-surface-raised border border-border text-fg hover:border-primary/40'
@@ -153,44 +178,16 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
           >
             {isEditing ? (
               <>
-                <CheckCircle2 size={15} className="text-white" />
+                <CheckCircle2 size={14} className="text-white" />
                 <span>Save & Lock Focus</span>
               </>
             ) : (
               <>
-                <Pencil size={14} className="text-primary" />
+                <Pencil size={13} className="text-primary" />
                 <span>Edit College Selection</span>
               </>
             )}
           </button>
-        </div>
-      </div>
-
-      {/* ── Search & Filter Strip ─────────────────────────────────────── */}
-      <div className="px-5 py-3 border-b border-border bg-surface-sunken/40 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="relative w-full sm:w-80">
-          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Filter by college code or name…"
-            className="w-full bg-surface border border-border text-xs text-fg pl-9 pr-3 py-1.5 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-fg-disabled font-normal shadow-2xs"
-          />
-        </div>
-
-        <div className="flex items-center gap-2 text-micro text-fg-subtle w-full sm:w-auto justify-between sm:justify-end">
-          {isEditing ? (
-            <span className="inline-flex items-center gap-1.5 text-blue-600 dark:text-sky-400 font-semibold">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-              Editing Mode: Click any checkbox to check/uncheck
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-fg-muted font-medium">
-              <Lock size={12} className="text-fg-subtle" />
-              Checkboxes Locked — Click &quot;Edit College Selection&quot; to change
-            </span>
-          )}
         </div>
       </div>
 

@@ -49,6 +49,7 @@ const OUTCOME_ROW_COLORS: Record<CallOutcome | 'none', string> = {
 
 interface Props {
   row: TrackerRowType;
+  index?: number;
   isReadOnly: boolean;
   onUpdate: (patch: Partial<TrackerRowType>) => void;
   onDelete: () => void;
@@ -131,7 +132,7 @@ function smartParseTime(input: string): { iso: string; formatted: string } | nul
   };
 }
 
-export function TrackerRow({ row, isReadOnly, onUpdate, onDelete, onCall }: Props) {
+export function TrackerRow({ row, index, isReadOnly, onUpdate, onDelete, onCall }: Props) {
   const startTimeRef = useRef<HTMLInputElement>(null);
   const commentsRef = useRef<HTMLTextAreaElement | HTMLInputElement>(null);
 
@@ -145,7 +146,7 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onDelete, onCall }: Prop
     }
   }, [row.comments]);
 
-  // ── Spacebar handler for Start Time (Spec 11 — Spacebar fills Start Time)
+  // ── Spacebar handler for Start Time (Spacebar fills Start Time)
   const handleStartTimeKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === ' ') {
       e.preventDefault();
@@ -155,7 +156,7 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onDelete, onCall }: Prop
       }
       onUpdate({ call_start_time: now });
     }
-    // Delete key clears the field (spec)
+    // Delete key clears the field
     if (e.key === 'Delete') {
       e.preventDefault();
       if (startTimeRef.current) startTimeRef.current.value = '';
@@ -163,13 +164,13 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onDelete, onCall }: Prop
     }
   }, [onUpdate]);
 
-  // ── Enter key: save row and move focus (Spec 11 — Enter saves & advances)
+  // ── Enter key: save row and move focus
   const handleKeyDownEnter = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       // Trigger blur update explicitly
       handleStartTimeBlur();
-      // Focus next row's Start Time cell — traverse the DOM
+      // Focus next row's Start Time cell
       const currentRow = (e.currentTarget as HTMLElement).closest('[data-row-id]');
       if (currentRow) {
         const nextRow = currentRow.nextElementSibling as HTMLElement;
@@ -195,7 +196,7 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onDelete, onCall }: Prop
     }
   }, [onUpdate]);
 
-  // ── Call Outcome selection: captures End Time automatically (Spec 10.3)
+  // ── Call Outcome selection: captures End Time automatically
   const handleOutcomeChange = useCallback((value: string) => {
     if (!value) return;
     triggerHaptic('selection');
@@ -230,8 +231,8 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onDelete, onCall }: Prop
       className={`grid grid-cols-[48px_110px_95px_95px_240px_140px_150px_180px_180px_150px_minmax(260px,1fr)_64px] divide-x divide-border/60 min-h-[44px] text-xs ${rowBg} hover:bg-primary/5 focus-within:bg-primary/5 transition-colors group border-b border-border`}
     >
       {/* S.No / # */}
-      <div className="px-2 py-2 text-center text-fg-subtle tabular-nums flex items-center justify-center">
-        {row.serial_no}
+      <div className="px-2 py-2 text-center text-fg-subtle tabular-nums flex items-center justify-center font-medium">
+        {index ?? row.serial_no}
       </div>
 
       {/* Start Time */}
@@ -325,7 +326,7 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onDelete, onCall }: Prop
         ) : (
           <RowOutcomeDropdown
             value={row.outcome_status}
-            onChange={(val) => handleOutcomeChange(val)}
+            onChange={(val) => handleOutcomeChange(val as CallOutcome)}
           />
         )}
       </div>
@@ -385,7 +386,7 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onDelete, onCall }: Prop
               onDelete();
             }}
             title="Delete this contact row from today's tracker"
-            className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 transition-all active:scale-90 p-1.5 rounded-lg hover:bg-rose-50 cursor-pointer"
+            className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 transition-all active:scale-90 p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
           >
             <Trash2 size={14} />
           </button>
@@ -395,7 +396,6 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onDelete, onCall }: Prop
   );
 }
 
-// ── Helper: outcome badge for read-only mode
 function OutcomeBadge({ outcome }: { outcome?: CallOutcome }) {
   if (!outcome) return <span className="text-fg-muted italic text-xs px-1">—</span>;
   const o = OUTCOMES.find((o) => o.value === outcome);
@@ -404,22 +404,4 @@ function OutcomeBadge({ outcome }: { outcome?: CallOutcome }) {
       {o?.label ?? outcome}
     </span>
   );
-}
-
-function getOutcomeColor(outcome: CallOutcome): string {
-  const map: Record<CallOutcome, string> = {
-    jd_received: 'text-primary font-bold',
-    hiring_freezed: 'text-warning font-semibold',
-    hiring_completed: 'text-info font-semibold',
-    call_back: 'text-warning font-semibold',
-    hiring: 'text-success font-bold',
-    invite_mail: 'text-primary font-bold',
-    not_hiring: 'text-destructive font-semibold',
-    no_response: 'text-destructive',
-    follow_up: 'text-warning font-bold',
-    in_connect: 'text-primary font-semibold',
-    invalid: 'text-fg-subtle',
-    drive_completed: 'text-success font-bold',
-  };
-  return map[outcome] ?? 'text-fg-muted';
 }

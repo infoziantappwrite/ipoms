@@ -92,6 +92,31 @@ const UserSchema = new mongoose_1.Schema({
         trim: true,
         default: '',
     },
+    address_line: {
+        type: String,
+        trim: true,
+        default: '',
+    },
+    pincode: {
+        type: String,
+        trim: true,
+        default: '',
+    },
+    city: {
+        type: String,
+        trim: true,
+        default: '',
+    },
+    state: {
+        type: String,
+        trim: true,
+        default: '',
+    },
+    linkedin_profile: {
+        type: String,
+        trim: true,
+        default: '',
+    },
     date_of_birth: {
         type: Date,
         default: null,
@@ -107,6 +132,14 @@ const UserSchema = new mongoose_1.Schema({
     photo_last_updated_at: {
         type: Date,
         default: null,
+    },
+    monthly_photo_changes_count: {
+        type: Number,
+        default: 0,
+    },
+    last_photo_change_month: {
+        type: String,
+        default: '',
     },
     is_profile_locked: {
         type: Boolean,

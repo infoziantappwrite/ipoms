@@ -37,9 +37,9 @@ exports.DailyTracker = exports.POSITIVE_OUTCOMES = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 // Outcomes that auto-promote to Weekly Tracker after finalization
 exports.POSITIVE_OUTCOMES = [
+    'jd_received',
+    'hiring',
     'invite_mail',
-    'drive_scheduled',
-    'drive_in_progress',
     'drive_completed',
 ];
 // ─── Schema ──────────────────────────────────────────────────────────────────
@@ -123,22 +123,45 @@ const DailyTrackerSchema = new mongoose_1.Schema({
         default: null,
         min: 0,
     },
-    // ── Outcome (Spec Section 12 — ONLY Response 1)
+    // ── Outcome (Spec Section 12 — 12 Standard Outcomes)
     outcome_status: {
         type: String,
         enum: [
-            'no_response',
-            'invalid',
-            'not_hiring',
-            'already_connected',
-            'follow_up',
+            'jd_received',
+            'hiring_freezed',
+            'hiring_completed',
+            'call_back',
+            'hiring',
             'invite_mail',
-            'drive_scheduled',
-            'drive_in_progress',
+            'not_hiring',
+            'no_response',
+            'follow_up',
+            'in_connect',
+            'invalid',
             'drive_completed',
         ],
         default: null,
         index: true,
+    },
+    follow_up_month: {
+        type: String,
+        enum: [
+            'January',
+            'February',
+            'March',
+            'April',
+            'May',
+            'June',
+            'July',
+            'August',
+            'September',
+            'October',
+            'November',
+            'December',
+            null,
+        ],
+        default: null,
+        trim: true,
     },
     follow_up_date: {
         type: Date,

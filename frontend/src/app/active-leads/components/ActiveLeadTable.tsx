@@ -205,10 +205,14 @@ export function ActiveLeadTable({
                     <div className="flex items-center justify-center gap-1.5">
                       {/* Live Auto-save feedback */}
                       {isSaving && (
-                        <Loader2 size={14} className="animate-spin text-primary" title="Saving changes…" />
+                        <span title="Saving changes…">
+                          <Loader2 size={14} className="animate-spin text-primary" />
+                        </span>
                       )}
                       {isSaved && !isSaving && (
-                        <CheckCircle2 size={14} className="text-emerald-500" title="Auto-saved" />
+                        <span title="Auto-saved">
+                          <CheckCircle2 size={14} className="text-emerald-500" />
+                        </span>
                       )}
 
                       {/* Delete Button */}

@@ -1,8 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Trash2, Calendar, FileText, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Trash2, Calendar, FileText, CheckCircle2, ChevronDown, Pencil } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { InlineCollegeSelector } from './InlineCollegeSelector';
+import { EditLeadModal } from './EditLeadModal';
+
+export interface CollegeOption {
+  _id: string;
+  college_name: string;
+  college_code: string;
+}
 
 export interface DailyLeadRow {
   _id: string;
@@ -31,7 +39,7 @@ const BATCH_YEARS = ['2025', '2026', '2027', '2028', '2029'];
 interface Props {
   rows: DailyLeadRow[];
   activeTab: 'positive' | 'jd_received';
-  selectedCollegeId?: string;
+  colleges: CollegeOption[];
   isDeleteMode?: boolean;
   selectedIds: string[];
   isAllSelected?: boolean;
@@ -40,12 +48,13 @@ interface Props {
   onClearSelection: () => void;
   onBulkDelete: () => Promise<void>;
   onUpdateRow: (rowId: string, patch: Partial<DailyLeadRow>) => Promise<void>;
+  onDeleteRow?: (rowId: string) => Promise<void>;
 }
 
 export function LeadsTable({
   rows,
   activeTab,
-  selectedCollegeId,
+  colleges = [],
   isDeleteMode = false,
   selectedIds,
   isAllSelected = false,
@@ -54,23 +63,9 @@ export function LeadsTable({
   onClearSelection,
   onBulkDelete,
   onUpdateRow,
+  onDeleteRow,
 }: Props) {
-  // Prompt when 'All Colleges' or no college is chosen
-  if (!selectedCollegeId || selectedCollegeId === 'all') {
-    return (
-      <div className="flex flex-col items-center justify-center p-12 text-center bg-surface border border-border rounded-2xl shadow-xs">
-        <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center mb-4 shadow-sm">
-          <Calendar size={28} strokeWidth={2} />
-        </div>
-        <h3 className="text-base font-bold text-fg mb-1">
-          Select a College to View Daily Leads
-        </h3>
-        <p className="text-xs text-fg-subtle max-w-md">
-          Please select a specific college from the top dropdown to view its segregated {activeTab === 'positive' ? 'Positive Leads' : 'JD Received'} for the selected date.
-        </p>
-      </div>
-    );
-  }
+  const [editingRow, setEditingRow] = useState<DailyLeadRow | null>(null);
 
   if (rows.length === 0) {
     return (
@@ -82,8 +77,8 @@ export function LeadsTable({
           <h3 className="text-sm font-bold text-fg">
             No {activeTab === 'positive' ? 'Positive Leads' : 'JD Received Records'} Found
           </h3>
-          <p className="text-xs text-fg-subtle max-w-sm">
-            No opportunities recorded for this college on the selected date. Click <span className="text-primary font-semibold font-mono">+ Add Entry</span> in the header to register new activity.
+          <p className="text-xs text-fg-subtle max-w-sm leading-relaxed">
+            No opportunities recorded for the selected date. Click <span className="text-indigo-600 dark:text-indigo-400 font-bold">Sync Positives</span> in the header to pull pipeline companies for this date, or <span className="text-primary font-semibold font-mono">+ Add Entry</span>.
           </p>
         </div>
       </div>
@@ -112,10 +107,12 @@ export function LeadsTable({
               <th className="py-3 px-3 w-14 text-center font-bold">SI.NO</th>
               <th className="py-3 px-3 min-w-[100px]">Time Stamp</th>
               <th className="py-3 px-3 min-w-[110px]">Date</th>
-              <th className="py-3 px-3 min-w-[240px] text-left">Company Name</th>
-              <th className="py-3 px-3 min-w-[180px]">Role</th>
-              <th className="py-3 px-3 min-w-[120px]">CTC</th>
-              <th className="py-3 px-3 min-w-[120px]">Eligible Batch</th>
+              <th className="py-3 px-3 min-w-[120px]">College</th>
+              <th className="py-3 px-3 min-w-[220px] text-left">Company Name</th>
+              <th className="py-3 px-3 min-w-[170px]">Role</th>
+              <th className="py-3 px-3 min-w-[110px]">CTC</th>
+              <th className="py-3 px-3 min-w-[110px]">Eligible Batch</th>
+              <th className="py-3 px-3 w-10 text-center"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60 font-normal bg-surface">
@@ -126,16 +123,29 @@ export function LeadsTable({
                   key={row._id}
                   row={row}
                   index={idx + 1}
+                  colleges={colleges}
                   isDeleteMode={isDeleteMode}
                   isSelected={isSelected}
                   onToggleSelect={() => onToggleSelect(row._id)}
                   onUpdateRow={onUpdateRow}
+                  onEdit={() => setEditingRow(row)}
                 />
               );
             })}
           </tbody>
         </table>
       </div>
+
+      {/* ── Edit Lead Modal ──────────────────────────────────────────────── */}
+      {editingRow && (
+        <EditLeadModal
+          lead={editingRow}
+          colleges={colleges}
+          onClose={() => setEditingRow(null)}
+          onSave={onUpdateRow}
+          onDelete={onDeleteRow}
+        />
+      )}
     </div>
   );
 }
@@ -143,17 +153,21 @@ export function LeadsTable({
 function TableRow({
   row,
   index,
+  colleges,
   isDeleteMode,
   isSelected,
   onToggleSelect,
   onUpdateRow,
+  onEdit,
 }: {
   row: DailyLeadRow;
   index: number;
+  colleges: CollegeOption[];
   isDeleteMode: boolean;
   isSelected: boolean;
   onToggleSelect: () => void;
   onUpdateRow: (rowId: string, patch: Partial<DailyLeadRow>) => Promise<void>;
+  onEdit: () => void;
 }) {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [tempValue, setTempValue] = useState<string>('');
@@ -179,9 +193,14 @@ function TableRow({
     }
   };
 
+  const currentCollegeId =
+    typeof row.college_id === 'object' && row.college_id?._id
+      ? row.college_id._id
+      : (row.college_id as unknown as string) || '';
+
   return (
     <tr
-      className={`transition-colors ${
+      className={`group transition-colors ${
         isSelected
           ? 'bg-rose-50/60 dark:bg-rose-950/40 hover:bg-rose-50/80 dark:hover:bg-rose-950/60 text-fg'
           : 'hover:bg-surface-sunken/80 text-fg'
@@ -219,7 +238,7 @@ function TableRow({
         ) : (
           <span
             onClick={() => startEdit('event_time', row.event_time)}
-            className="cursor-pointer hover:text-primary transition-colors"
+            className="cursor-pointer hover:text-primary transition-colors font-medium"
             title="Click to edit time"
           >
             {row.event_time || '—'}
@@ -244,7 +263,7 @@ function TableRow({
             onClick={() =>
               startEdit('lead_date', new Date(row.lead_date).toISOString().split('T')[0])
             }
-            className="cursor-pointer hover:text-primary transition-colors"
+            className="cursor-pointer hover:text-primary transition-colors font-medium"
             title="Click to edit date"
           >
             {row.lead_date
@@ -258,8 +277,20 @@ function TableRow({
         )}
       </td>
 
+      {/* College Dropdown Column: Shows ONLY Acronym when closed, Acronym + Name when open */}
+      <td className="py-2.5 px-3 whitespace-nowrap min-w-[130px]">
+        <InlineCollegeSelector
+          value={currentCollegeId}
+          colleges={colleges}
+          onChange={(newCollegeId) => {
+            onUpdateRow(row._id, { college_id: newCollegeId as any });
+          }}
+          disabled={isDeleteMode}
+        />
+      </td>
+
       {/* Company Name */}
-      <td className="py-3 px-3 font-bold text-fg min-w-[240px] break-words leading-snug">
+      <td className="py-3 px-3 font-bold text-fg min-w-[220px] break-words leading-snug">
         {editingField === 'company_name' ? (
           <input
             type="text"
@@ -282,7 +313,7 @@ function TableRow({
       </td>
 
       {/* Job Role */}
-      <td className="py-3 px-3 text-fg-muted whitespace-pre-wrap leading-tight min-w-[180px]">
+      <td className="py-3 px-3 text-fg-muted whitespace-pre-wrap leading-tight min-w-[170px]">
         {editingField === 'job_role' ? (
           <input
             type="text"
@@ -305,7 +336,7 @@ function TableRow({
       </td>
 
       {/* CTC */}
-      <td className="py-3 px-3 whitespace-nowrap font-mono text-micro font-bold text-emerald-600 dark:text-emerald-400">
+      <td className="py-3 px-3 whitespace-nowrap font-mono text-micro font-bold text-emerald-600 dark:text-emerald-400 min-w-[110px]">
         {editingField === 'ctc' ? (
           <input
             type="text"
@@ -328,7 +359,7 @@ function TableRow({
       </td>
 
       {/* Eligible Batch */}
-      <td className="py-3 px-3 text-fg-muted whitespace-nowrap">
+      <td className="py-3 px-3 text-fg-muted whitespace-nowrap min-w-[110px]">
         {editingField === 'eligible_batch' ? (
           <select
             value={tempValue}
@@ -354,6 +385,22 @@ function TableRow({
             {row.eligible_batch}
           </span>
         )}
+      </td>
+
+      {/* Row Edit Pen Icon (Revealed on hover) */}
+      <td className="py-2.5 px-3 text-center whitespace-nowrap w-10">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+          disabled={isDeleteMode}
+          className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity p-1.5 rounded-lg bg-surface-sunken hover:bg-primary/10 text-fg-subtle hover:text-primary border border-border/60 hover:border-primary/30 cursor-pointer shadow-2xs active:scale-95 disabled:opacity-0"
+          title="Edit lead details"
+        >
+          <Pencil size={13} strokeWidth={2.2} />
+        </button>
       </td>
     </tr>
   );

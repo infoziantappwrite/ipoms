@@ -219,7 +219,7 @@ registerAuthRoutes(app);
 // Per-record ownership ("may you see THIS row?") is separate again — see
 // scopeToSelf() at the handlers that take a coordinator_id.
 app.use('/api/v1', (req: Request, res: Response, next: NextFunction) => {
-  if (req.path === '/health' || req.path.startsWith('/auth')) {
+  if (req.path === '/health' || req.path.startsWith('/auth') || req.path === '/colleges') {
     return next();
   }
   return authenticateJWT(req, res, next);
@@ -297,65 +297,58 @@ app.get('/api/v1/companies/search', async (req: Request, res: Response) => {
 // coordinators, and first-run seeding of sane defaults when the roster is empty.
 app.get('/api/v1/colleges', async (req: Request, res: Response) => {
   try {
-    // Ensure NGCE college is active and available in roster
-    const ngceExists = await College.findOne({ college_code: 'NGCE' });
-    if (!ngceExists) {
-      await College.create({
-        college_name: 'Narayana Guru College of Engineering',
-        college_code: 'NGCE',
-        location: 'Kanyakumari / Coimbatore, Tamil Nadu',
-        departments: ['CSE', 'IT', 'AI & DS', 'ECE', 'MECH'],
-        status: 'active',
-        is_deleted: false,
-      });
+    const MASTER_PARTNER_COLLEGES = [
+      { college_name: 'Achariya College of Engineering Technology', college_code: 'ACET', location: 'Puducherry', logo_url: '/college-logos/acet.png' },
+      { college_name: 'Knowledge Institute of Technology', college_code: 'KIOT', location: 'Salem, Tamil Nadu', logo_url: '/college-logos/kiot.jfif' },
+      { college_name: 'Kalasalingam Academy of Research and Education', college_code: 'KLU', location: 'Virudhunagar, Tamil Nadu', logo_url: '/college-logos/klu.png' },
+      { college_name: 'KPR Institute of Engineering and Technology', college_code: 'KPR', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/kpr.png' },
+      { college_name: 'Karpagam College of Engineering', college_code: 'KARPAGAM', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/karpagam.png' },
+      { college_name: 'Anand Institute of Higher Technology', college_code: 'AIHT', location: 'Chennai, Tamil Nadu', logo_url: '/college-logos/aiht.png' },
+      { college_name: 'PSNA College of Engineering and Technology', college_code: 'PSNA', location: 'Dindigul, Tamil Nadu', logo_url: '/college-logos/psna.png' },
+      { college_name: 'Sri Manakula Vinayagar Engineering College', college_code: 'SMVEC', location: 'Puducherry', logo_url: '/college-logos/smvec.png' },
+      { college_name: 'Dhanalakshmi Srinivasan University', college_code: 'DSU', location: 'Perambalur / Trichy, Tamil Nadu', logo_url: '/college-logos/dsu.png' },
+      { college_name: 'M. Kumarasamy College of Engineering', college_code: 'MKCE', location: 'Karur, Tamil Nadu', logo_url: '/college-logos/mkce.png' },
+      { college_name: 'Sona College of Technology', college_code: 'SONA', location: 'Salem, Tamil Nadu', logo_url: '/college-logos/sona.png' },
+      { college_name: 'Karunya Institute of Technology and Sciences', college_code: 'KARUNYA', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/karunya.png' },
+      { college_name: 'Kamaraj College of Engineering and Technology', college_code: 'KAMARAJ', location: 'Virudhunagar, Tamil Nadu', logo_url: '/college-logos/kamaraj.png' },
+      { college_name: 'NPR College of Engineering and Technology', college_code: 'NPR', location: 'Natham / Dindigul, Tamil Nadu', logo_url: '/college-logos/npr.png' },
+      { college_name: 'AVS Engineering College', college_code: 'AVS', location: 'Salem, Tamil Nadu', logo_url: '/college-logos/avs.png' },
+      { college_name: 'AAA College of Engineering and Technology', college_code: 'AAA', location: 'Sivakasi, Tamil Nadu', logo_url: '/college-logos/aaa.png' },
+      { college_name: 'KGiSL Institute of Technology', college_code: 'KGISL', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/kgisl.png' },
+      { college_name: 'Sri Shanmugha College of Engineering and Technology', college_code: 'SSEI', location: 'Salem, Tamil Nadu', logo_url: '/college-logos/sri shanmuga.png' },
+      { college_name: 'Dr. N.G.P. Institute of Technology', college_code: 'NGP', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/ngp.png' },
+      { college_name: 'Hindustan Institute of Technology and Science', college_code: 'HITS', location: 'Chennai, Tamil Nadu', logo_url: '/college-logos/hits.png' },
+      { college_name: 'Nehru Institute of Technology', college_code: 'NEHRU', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/Infozianthead.png' },
+      { college_name: 'Narayana Guru College of Engineering', college_code: 'NGCE', location: 'Kanyakumari / Coimbatore, Tamil Nadu', logo_url: '/college-logos/narayanaguru.png' },
+      { college_name: 'Annai Mira College of Engineering and Technology', college_code: 'ACEW', location: 'Vellore / Kanyakumari', logo_url: '/college-logos/annai mira.png' },
+    ];
+
+    // Ensure all master partner colleges exist in database
+    for (const item of MASTER_PARTNER_COLLEGES) {
+      const exists = await College.findOne({ college_code: item.college_code });
+      if (!exists) {
+        await College.create({
+          college_name: item.college_name,
+          college_code: item.college_code,
+          location: item.location,
+          logo_url: item.logo_url,
+          departments: ['CSE', 'IT', 'AI & DS', 'ECE', 'MECH'],
+          status: 'active',
+          is_deleted: false,
+        });
+      }
     }
 
-    const scopedFilter: any = { status: 'active' };
-    if (!isSupervisor(req) && req.user) {
-      scopedFilter.assigned_coordinator_ids = req.user.userId;
-    }
-
-    let colleges = await College.find(scopedFilter)
+    // Retrieve all active colleges
+    const colleges = await College.find({
+      $or: [
+        { status: 'active' },
+        { status: { $exists: false } },
+        { is_deleted: { $ne: true } },
+      ],
+    })
       .sort({ college_code: 1 })
       .populate('assigned_coordinator_ids', 'full_name official_email primary_mobile');
-
-    // Fallback, not a permanent state: no college in this database currently
-    // has anyone in `assigned_coordinator_ids` — the "Team Leader assigns
-    // colleges" workflow (Module 08 §17) has no endpoint anywhere in this
-    // codebase yet, so real assignment data may not exist for a long while.
-    // Scoping strictly here would leave every coordinator with an empty,
-    // unusable dropdown with no way for them or an admin to fix it. Until
-    // that assignment tooling exists, a coordinator with zero assignments
-    // falls back to the full active roster; a coordinator who DOES have real
-    // assignments is scoped normally above. Remove this fallback once
-    // colleges can actually be assigned to coordinators.
-    if (colleges.length === 0 && !isSupervisor(req)) {
-      colleges = await College.find({ status: 'active' })
-        .sort({ college_code: 1 })
-        .populate('assigned_coordinator_ids', 'full_name official_email primary_mobile');
-    }
-
-    // First-run seeding safety net — only for supervisors, and only when the
-    // (unfiltered, since isSupervisor skips the filter above) roster is truly
-    // empty, so a coordinator with zero assignments never triggers a global seed.
-    if (colleges.length === 0 && isSupervisor(req)) {
-      const defaultColleges = [
-        { college_name: 'Chennai Institute of Technology', college_code: 'CIT', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'IT', 'AI & DS', 'ECE', 'MECH'] },
-        { college_name: 'Anna University - CEG Campus', college_code: 'AU-CEG', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'IT', 'ECE', 'EEE', 'CIVIL'] },
-        { college_name: 'PSG College of Technology', college_code: 'PSG', location: 'Coimbatore, Tamil Nadu', departments: ['CSE', 'IT', 'Robotics', 'ECE', 'EEE'] },
-        { college_name: 'Sri Krishna College of Engineering & Technology', college_code: 'SKCET', location: 'Coimbatore, Tamil Nadu', departments: ['CSE', 'IT', 'AI & DS', 'ECE'] },
-        { college_name: 'SSN College of Engineering', college_code: 'SSN', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'IT', 'ECE', 'EEE', 'BME'] },
-        { college_name: 'Rajalakshmi Engineering College', college_code: 'REC', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'IT', 'AI & ML', 'ECE', 'MECH'] },
-        { college_name: 'Kumaraguru College of Technology', college_code: 'KCT', location: 'Coimbatore, Tamil Nadu', departments: ['CSE', 'IT', 'ECE', 'MECH', 'AERO'] },
-        { college_name: 'Vel Tech Rangarajan Dr. Sagunthala R&D Institute', college_code: 'VELTECH', location: 'Chennai, Tamil Nadu', departments: ['CSE', 'AI & DS', 'IT', 'ECE'] },
-        { college_name: 'Thiagarajar College of Engineering', college_code: 'TCE', location: 'Madurai, Tamil Nadu', departments: ['CSE', 'IT', 'ECE', 'EEE', 'CIVIL'] },
-        { college_name: 'Kongu Engineering College', college_code: 'KEC', location: 'Perundurai, Erode', departments: ['CSE', 'IT', 'ECE', 'MECH', 'CHEMICAL'] },
-      ];
-      await College.insertMany(defaultColleges);
-      colleges = await College.find(scopedFilter)
-        .sort({ college_code: 1 })
-        .populate('assigned_coordinator_ids', 'full_name official_email primary_mobile');
-    }
 
     return res.status(200).json({
       success: true,
@@ -367,10 +360,7 @@ app.get('/api/v1/colleges', async (req: Request, res: Response) => {
   } catch (error: any) {
     return res.status(500).json({
       success: false,
-      error: {
-        code: 'INTERNAL_SERVER_ERROR',
-        message: error.message || 'Failed to fetch colleges',
-      },
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to retrieve colleges' },
     });
   }
 });
@@ -570,6 +560,105 @@ app.post('/api/v1/daily-tracker/load-contacts', async (req: Request, res: Respon
   }
 });
 
+// ── DT-MANUAL: POST /api/v1/daily-tracker/manual-row
+// Manually add an entry directly into today's Daily Tracker
+app.post('/api/v1/daily-tracker/manual-row', async (req: Request, res: Response) => {
+  try {
+    const {
+      coordinator_id,
+      college_id,
+      company_name,
+      hr_name,
+      mobile_number,
+      email_id,
+      call_start_time,
+      outcome_status,
+      follow_up_month,
+      comments,
+      session_date,
+    } = req.body;
+
+    if (!coordinator_id || !college_id || !company_name?.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'Coordinator, College, and Company Name are required' },
+      });
+    }
+
+    if (!outcome_status) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'CALL_STATUS_REQUIRED', message: 'Call Status is mandatory to save this entry' },
+      });
+    }
+
+    if (outcome_status === 'follow_up' && !follow_up_month) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'FOLLOW_UP_MONTH_REQUIRED', message: 'Follow Up Month is mandatory when Call Status is Follow Up' },
+      });
+    }
+
+    const effectiveDate = session_date ? new Date(session_date) : new Date();
+    const today = new Date(Date.UTC(effectiveDate.getUTCFullYear(), effectiveDate.getUTCMonth(), effectiveDate.getUTCDate()));
+    const year = today.getUTCFullYear();
+    const month = today.getUTCMonth() + 1;
+    const day = today.getUTCDate();
+
+    // Find or create CompanyMetadata
+    let company = await CompanyMetadata.findOne({
+      company_name: { $regex: new RegExp(`^${escapeRegex(company_name.trim())}$`, 'i') },
+      is_deleted: false,
+    });
+
+    if (!company) {
+      company = await CompanyMetadata.create({
+        company_name: company_name.trim(),
+        hr_name: hr_name?.trim() || 'HR Contact',
+        primary_mobile: mobile_number?.trim() || '',
+        mobile_numbers: mobile_number ? [mobile_number.trim()] : [],
+        primary_email: email_id?.trim().toLowerCase() || '',
+        email_ids: email_id ? [email_id.trim().toLowerCase()] : [],
+        notes: `Created via Daily Tracker manual entry on ${new Date().toLocaleDateString('en-IN')}`,
+      });
+    }
+
+    const newRow = await DailyTracker.create({
+      coordinator_id: new Types.ObjectId(coordinator_id),
+      college_id: new Types.ObjectId(college_id),
+      company_id: company._id,
+      company_name: company_name.trim(),
+      hr_name: hr_name?.trim() || company.hr_name || 'HR Contact',
+      mobile_number: mobile_number?.trim() || company.primary_mobile || '',
+      email_id: email_id?.trim().toLowerCase() || company.primary_email || '',
+      call_start_time: call_start_time ? new Date(call_start_time) : undefined,
+      outcome_status: outcome_status || null,
+      follow_up_month: outcome_status === 'follow_up' ? (follow_up_month || null) : null,
+      comments: comments?.trim() || '',
+      year,
+      month,
+      day,
+      session_date: today,
+      is_skipped: false,
+      is_promoted_to_weekly: false,
+      is_finalized: false,
+      save_count: 0,
+      duplicate_acknowledged: false,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Contact row added successfully',
+      data: { row: newRow },
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to add manual contact row' },
+    });
+  }
+});
+
 // ── DT-3: PATCH /api/v1/daily-tracker/:id
 // Auto-save a single row — start_time, outcome, comments
 app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
@@ -650,6 +739,45 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
         college_id: row.college_id,
         daily_tracker_id: row._id,
       }).catch((e) => console.error('Auto-lead sync error:', e));
+
+      // Auto-sync into Weekly Tracker (Companies in Pipeline) if positive outcome (invite_mail, hiring, jd_received, in_connect, drive_completed)
+      const POSITIVE_WEEKLY_OUTCOMES = ['invite_mail', 'hiring', 'jd_received', 'drive_completed', 'in_connect'];
+      if (POSITIVE_WEEKLY_OUTCOMES.includes(row.outcome_status)) {
+        (async () => {
+          try {
+            const { startFriday, endThursday, weekNumber } = getFridayWeekBounds(row.session_date || new Date());
+            const existingWeekly = await WeeklyTracker.findOne({
+              college_id: row.college_id,
+              company_name: { $regex: `^${row.company_name.trim()}$`, $options: 'i' },
+              is_deleted: false,
+            });
+
+            if (!existingWeekly) {
+              await WeeklyTracker.create({
+                academic_year: 2026,
+                college_id: row.college_id,
+                coordinator_id: row.coordinator_id,
+                company_id: row.company_id,
+                daily_tracker_id: row._id,
+                company_name: row.company_name,
+                job_role: 'Graduate Trainee',
+                cdc_reference: '',
+                company_type: 'Software / IT',
+                ctc_lpa: '',
+                eligible_batch: '2026 Batch',
+                pipeline_section: 'pipeline',
+                current_status_text: row.comments || `Invite email sent (${(row.outcome_status || 'positive').replace(/_/g, ' ')})`,
+                follow_up_date: row.follow_up_date || null,
+                week_number: weekNumber,
+                week_start_date: startFriday,
+                week_end_date: endThursday,
+              });
+            }
+          } catch (e) {
+            console.error('Auto-sync to WeeklyTracker error:', e);
+          }
+        })();
+      }
     }
 
     return res.status(200).json({
@@ -931,6 +1059,104 @@ app.get('/api/v1/daily-tracker/calendar-activity', async (req: Request, res: Res
     return res.status(500).json({
       success: false,
       error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to fetch calendar activity' },
+    });
+  }
+});
+
+// ── DT-9: GET /api/v1/daily-tracker/pending-followups
+// Fetch all scheduled follow-ups across focused colleges, time-categorized by month
+app.get('/api/v1/daily-tracker/pending-followups', async (req: Request, res: Response) => {
+  try {
+    const coordinatorId = scopeToSelf(req, req.query.coordinator_id as string | undefined);
+    const collegeIdsParam = req.query.college_ids as string | undefined;
+    const collegeIdParam = req.query.college_id as string | undefined;
+
+    const filter: any = {
+      outcome_status: 'follow_up',
+      is_deleted: { $ne: true },
+    };
+
+    if (coordinatorId) {
+      filter.coordinator_id = coordinatorId;
+    }
+
+    if (collegeIdsParam) {
+      const ids = collegeIdsParam.split(',').map((id) => id.trim()).filter(Boolean);
+      if (ids.length > 0) {
+        filter.college_id = { $in: ids };
+      }
+    } else if (collegeIdParam) {
+      filter.college_id = collegeIdParam;
+    }
+
+    const rows = await DailyTracker.find(filter)
+      .populate('company_id', 'company_name hr_name phone_number email_id location domain')
+      .populate('college_id', 'college_name college_code logo_url')
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+
+    const currentMonthIdx = new Date().getMonth(); // 0 to 11
+    const currentMonthName = monthNames[currentMonthIdx];
+
+    const categorized = rows.map((r: any) => {
+      const monthStr = r.follow_up_month ? String(r.follow_up_month).trim() : '';
+      const targetMonthIdx = monthNames.findIndex((m) => m.toLowerCase() === monthStr.toLowerCase());
+
+      let urgency: 'due_now' | 'overdue' | 'upcoming' = 'upcoming';
+      if (targetMonthIdx !== -1) {
+        if (targetMonthIdx === currentMonthIdx) {
+          urgency = 'due_now';
+        } else if (targetMonthIdx < currentMonthIdx) {
+          urgency = 'overdue';
+        } else {
+          urgency = 'upcoming';
+        }
+      } else if (monthStr) {
+        urgency = 'due_now';
+      }
+
+      return {
+        _id: r._id,
+        company_name: r.company_id?.company_name || r.company_name || 'Unknown Company',
+        hr_name: r.company_id?.hr_name || r.hr_name || '',
+        phone_number: r.company_id?.phone_number || r.phone_number || '',
+        email_id: r.company_id?.email_id || r.email_id || '',
+        college_id: r.college_id?._id || r.college_id,
+        college_name: r.college_id?.college_name || '',
+        college_code: r.college_id?.college_code || '',
+        college_logo: r.college_id?.logo_url || '',
+        follow_up_month: monthStr || currentMonthName,
+        comments: r.comments || '',
+        session_date: r.session_date,
+        last_called_at: r.call_start_time || r.updatedAt,
+        urgency,
+      };
+    });
+
+    const dueNow = categorized.filter((c) => c.urgency === 'due_now');
+    const overdue = categorized.filter((c) => c.urgency === 'overdue');
+    const upcoming = categorized.filter((c) => c.urgency === 'upcoming');
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        current_month: currentMonthName,
+        total_pending: categorized.length,
+        due_now_count: dueNow.length,
+        overdue_count: overdue.length,
+        upcoming_count: upcoming.length,
+        follow_ups: [...dueNow, ...overdue, ...upcoming],
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to fetch pending follow-ups' },
     });
   }
 });
@@ -1985,6 +2211,10 @@ app.patch('/api/v1/daily-leads/:id', async (req: Request, res: Response) => {
       lead.lead_date = parseDateParam(String(patchData.lead_date));
     }
 
+    if (patchData.college_id && Types.ObjectId.isValid(String(patchData.college_id))) {
+      lead.college_id = new Types.ObjectId(String(patchData.college_id));
+    }
+
     await lead.save();
 
     const updated = await DailyLead.findById(lead._id)
@@ -2161,6 +2391,301 @@ app.get('/api/v1/daily-leads/daily-tracker-positives', async (req: Request, res:
     return res.status(500).json({
       success: false,
       error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to fetch daily tracker positives' },
+    });
+  }
+});
+
+// ── DL-8: POST /api/v1/daily-leads/sync-positives
+// Ingest positive calls and pipeline opportunities for the given date into Daily Leads
+app.post('/api/v1/daily-leads/sync-positives', async (req: Request, res: Response) => {
+  try {
+    const { date, college_id, coordinator_id } = req.body;
+
+    const targetDate = date ? parseDateParam(String(date)) : getTodayDate();
+    const nextDate = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
+
+    let syncedCount = 0;
+
+    // 1. Pull from DailyTracker calls for this date with positive outcomes
+    const dtFilter: any = {
+      $or: [
+        { session_date: { $gte: targetDate, $lt: nextDate } },
+        { call_start_time: { $gte: targetDate, $lt: nextDate } },
+      ],
+      outcome_status: { $in: ['jd_received', 'hiring', 'drive_completed', 'invite_mail', 'in_connect', 'follow_up'] },
+    };
+    if (college_id && college_id !== 'all' && Types.ObjectId.isValid(String(college_id))) {
+      dtFilter.college_id = new Types.ObjectId(String(college_id));
+    }
+
+    const positiveCalls = await DailyTracker.find(dtFilter);
+
+    for (const call of positiveCalls) {
+      if (!call.company_name || !call.company_name.trim()) continue;
+      const leadType = call.outcome_status === 'jd_received' ? 'jd_received' : 'positive';
+      const escapedCompanyName = call.company_name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      const existing = await DailyLead.findOne({
+        company_name: { $regex: `^${escapedCompanyName}$`, $options: 'i' },
+        lead_date: { $gte: targetDate, $lt: nextDate },
+        lead_type: leadType,
+        is_deleted: false,
+      });
+
+      // Extract accurate call start time from Daily Tracker Time column
+      let callTime = '10:00 AM';
+      const timeSource = call.call_start_time || call.created_at;
+      if (timeSource) {
+        const d = new Date(timeSource);
+        if (!isNaN(d.getTime())) {
+          callTime = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+        }
+      }
+
+      if (!existing) {
+        await DailyLead.create({
+          lead_type: leadType,
+          college_id: call.college_id,
+          coordinator_id: call.coordinator_id || (coordinator_id && Types.ObjectId.isValid(String(coordinator_id)) ? new Types.ObjectId(String(coordinator_id)) : new Types.ObjectId('6a847199fa3bf51271bc14eb')),
+          company_id: call.company_id || null,
+          daily_tracker_id: call._id,
+          company_name: call.company_name.trim(),
+          job_role: 'Graduate Trainee',
+          ctc: '',
+          eligible_batch: '2026 Batch',
+          event_time: callTime,
+          lead_date: targetDate,
+          remarks: call.comments || `From Daily Tracker: ${(call.outcome_status || '').replace(/_/g, ' ')}`,
+          is_deleted: false,
+        });
+        syncedCount++;
+      }
+    }
+
+    // 2. Pull from WeeklyTracker pipeline items that have follow_up_date or drive_date or updated for this date
+    const wtFilter: any = {
+      is_deleted: false,
+      $or: [
+        { follow_up_date: { $gte: targetDate, $lt: nextDate } },
+        { drive_date: { $gte: targetDate, $lt: nextDate } },
+        { created_at: { $gte: targetDate, $lt: nextDate } },
+        { last_status_updated_at: { $gte: targetDate, $lt: nextDate } },
+      ],
+    };
+    if (college_id && college_id !== 'all' && Types.ObjectId.isValid(String(college_id))) {
+      wtFilter.college_id = new Types.ObjectId(String(college_id));
+    }
+
+    const pipelineRows = await WeeklyTracker.find(wtFilter);
+
+    for (const wt of pipelineRows) {
+      if (!wt.company_name || !wt.company_name.trim()) continue;
+      const escapedWtCompany = wt.company_name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const existing = await DailyLead.findOne({
+        company_name: { $regex: `^${escapedWtCompany}$`, $options: 'i' },
+        lead_date: { $gte: targetDate, $lt: nextDate },
+        lead_type: 'positive',
+        is_deleted: false,
+      });
+
+      let wtTime = '10:00 AM';
+      if (wt.daily_tracker_id) {
+        const dtRow = await DailyTracker.findById(wt.daily_tracker_id);
+        const timeRef = dtRow?.call_start_time || dtRow?.created_at;
+        if (timeRef) {
+          const d = new Date(timeRef);
+          if (!isNaN(d.getTime())) {
+            wtTime = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+          }
+        }
+      } else if (wt.created_at) {
+        const d = new Date(wt.created_at);
+        if (!isNaN(d.getTime())) {
+          wtTime = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+        }
+      }
+
+      if (!existing) {
+        await DailyLead.create({
+          lead_type: 'positive',
+          college_id: wt.college_id,
+          coordinator_id: wt.coordinator_id || (coordinator_id && Types.ObjectId.isValid(String(coordinator_id)) ? new Types.ObjectId(String(coordinator_id)) : new Types.ObjectId('6a847199fa3bf51271bc14eb')),
+          company_id: wt.company_id || null,
+          company_name: wt.company_name.trim(),
+          job_role: wt.job_role || 'Graduate Trainee',
+          ctc: wt.ctc_lpa || '',
+          eligible_batch: wt.eligible_batch || '2026 Batch',
+          event_time: wtTime,
+          lead_date: targetDate,
+          remarks: wt.current_status_text || `Pipeline: ${wt.pipeline_section.replace(/_/g, ' ')}`,
+          is_deleted: false,
+        });
+        syncedCount++;
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: syncedCount > 0
+        ? `Successfully synced ${syncedCount} positive lead(s) for ${date || 'today'}`
+        : `All positive pipeline leads for ${date || 'today'} are already up to date`,
+      data: {
+        synced_count: syncedCount,
+        date: targetDate,
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to sync positive leads' },
+    });
+  }
+});
+
+// ── DL-9: POST /api/v1/daily-leads/copy-to-jd
+// Copies a selected positive company (or positive leads) across all selected target colleges into JD Received
+app.post('/api/v1/daily-leads/copy-to-jd', async (req: Request, res: Response) => {
+  try {
+    const { date, company_name, college_ids, lead_id, job_role, ctc, eligible_batch, event_time } = req.body;
+    const targetDate = date ? parseDateParam(String(date)) : getTodayDate();
+    const nextDate = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
+
+    // 1. Single Company Multi-College Copying Flow
+    if (company_name && Array.isArray(college_ids) && college_ids.length > 0) {
+      const escapedCompanyName = company_name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      // Find source positive lead for metadata reference
+      let sourceLead: any = null;
+      if (lead_id && Types.ObjectId.isValid(lead_id)) {
+        sourceLead = await DailyLead.findById(lead_id);
+      }
+      if (!sourceLead) {
+        sourceLead = await DailyLead.findOne({
+          company_name: { $regex: `^${escapedCompanyName}$`, $options: 'i' },
+          lead_type: 'positive',
+          lead_date: { $gte: targetDate, $lt: nextDate },
+          is_deleted: false,
+        });
+      }
+
+      const roleToUse = job_role || sourceLead?.job_role || 'Graduate Trainee';
+      const ctcToUse = ctc !== undefined ? ctc : (sourceLead?.ctc || '');
+      const batchToUse = eligible_batch || sourceLead?.eligible_batch || '2026 Batch';
+      const timeToUse = event_time || sourceLead?.event_time || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+      const validCollegeIds = college_ids
+        .filter((id: string) => Types.ObjectId.isValid(id))
+        .map((id: string) => new Types.ObjectId(id));
+
+      let copiedCount = 0;
+      for (const targetCollegeId of validCollegeIds) {
+        // Check if already present in JD Received for this college & date
+        const existing = await DailyLead.findOne({
+          lead_type: 'jd_received',
+          college_id: targetCollegeId,
+          company_name: { $regex: `^${escapedCompanyName}$`, $options: 'i' },
+          lead_date: { $gte: targetDate, $lt: nextDate },
+          is_deleted: false,
+        });
+
+        if (!existing) {
+          await DailyLead.create({
+            lead_type: 'jd_received',
+            college_id: targetCollegeId,
+            coordinator_id: sourceLead?.coordinator_id || (req as any).user?._id || new Types.ObjectId('6a847199fa3bf51271bc14eb'),
+            company_id: sourceLead?.company_id || null,
+            daily_tracker_id: sourceLead?.daily_tracker_id || null,
+            company_name: company_name.trim(),
+            job_role: roleToUse,
+            ctc: ctcToUse,
+            eligible_batch: batchToUse,
+            event_time: timeToUse,
+            lead_date: targetDate,
+            remarks: 'JD Received copied from Positives',
+            is_jd_received: true,
+            is_deleted: false,
+          });
+          copiedCount++;
+        }
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: copiedCount > 0
+          ? `Successfully copied "${company_name}" to ${copiedCount} college(s) in JD Received`
+          : `"${company_name}" is already present in JD Received for all selected colleges`,
+        data: {
+          copied_count: copiedCount,
+          total_colleges_selected: validCollegeIds.length,
+          company_name,
+        },
+      });
+    }
+
+    // 2. Fallback: Bulk copy all positive leads matching college_ids
+    const filter: any = {
+      lead_type: 'positive',
+      lead_date: { $gte: targetDate, $lt: nextDate },
+      is_deleted: false,
+    };
+    if (Array.isArray(college_ids) && college_ids.length > 0 && !college_ids.includes('all')) {
+      const validCollegeIds = college_ids
+        .filter((id: string) => Types.ObjectId.isValid(id))
+        .map((id: string) => new Types.ObjectId(id));
+      if (validCollegeIds.length > 0) {
+        filter.college_id = { $in: validCollegeIds };
+      }
+    }
+
+    const positiveLeads = await DailyLead.find(filter);
+    let copiedCount = 0;
+    for (const lead of positiveLeads) {
+      const escapedLeadName = lead.company_name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const existing = await DailyLead.findOne({
+        lead_type: 'jd_received',
+        college_id: lead.college_id,
+        company_name: { $regex: `^${escapedLeadName}$`, $options: 'i' },
+        lead_date: { $gte: targetDate, $lt: nextDate },
+        is_deleted: false,
+      });
+
+      if (!existing) {
+        await DailyLead.create({
+          lead_type: 'jd_received',
+          college_id: lead.college_id,
+          coordinator_id: lead.coordinator_id,
+          company_id: lead.company_id,
+          daily_tracker_id: lead.daily_tracker_id,
+          company_name: lead.company_name,
+          job_role: lead.job_role || 'Graduate Trainee',
+          ctc: lead.ctc || '',
+          eligible_batch: lead.eligible_batch || '2026 Batch',
+          event_time: lead.event_time || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+          lead_date: lead.lead_date || targetDate,
+          remarks: lead.remarks || 'Copied from Positives',
+          is_jd_received: true,
+          is_deleted: false,
+        });
+        copiedCount++;
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: copiedCount > 0
+        ? `Successfully copied ${copiedCount} lead(s) to JD Received`
+        : positiveLeads.length === 0
+        ? `No positive leads found on ${date || 'today'}`
+        : `Selected positive leads are already present in JD Received`,
+      data: {
+        copied_count: copiedCount,
+        total_positives_found: positiveLeads.length,
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to copy leads to JD' },
     });
   }
 });
@@ -3051,7 +3576,7 @@ app.get('/api/v1/dashboard/college-kpis', async (req: Request, res: Response) =>
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean)
-        .slice(0, 3);
+        .slice(0, 10);
     }
 
     // If no college IDs provided, return empty list (no forced default selection)

@@ -50,6 +50,7 @@ export function WeeklyTable({
   onEditRow,
 }: Props) {
   const isCompletedSection = sectionKey === 'completed';
+  const hasFollowUpColumn = sectionKey === 'in_progress' || sectionKey === 'pipeline';
 
   if (rows.length === 0) {
     return (
@@ -82,7 +83,10 @@ export function WeeklyTable({
             <th className="py-2.5 px-3 min-w-[200px] text-left">Company Name</th>
             <th className="py-2.5 px-3 min-w-[180px]">Role</th>
             <th className="py-2.5 px-3 min-w-[100px]">CTC</th>
-            <th className="py-2.5 px-3 min-w-[260px]">Status</th>
+            <th className="py-2.5 px-3 min-w-[240px]">Status</th>
+            {hasFollowUpColumn && (
+              <th className="py-2.5 px-3 min-w-[140px] text-center">Follow Up</th>
+            )}
             {isCompletedSection && (
               <th className="py-2.5 px-3 min-w-[120px] text-center">Offers Received</th>
             )}
@@ -96,6 +100,7 @@ export function WeeklyTable({
               row={row}
               index={idx + 1}
               isCompletedSection={isCompletedSection}
+              hasFollowUpColumn={hasFollowUpColumn}
               isDeleteMode={isDeleteMode}
               isSelected={selectedRowIds.includes(row._id)}
               onToggleSelect={() => onToggleSelectRow && onToggleSelectRow(row._id)}
@@ -116,6 +121,7 @@ function TableRow({
   row,
   index,
   isCompletedSection,
+  hasFollowUpColumn,
   isDeleteMode,
   isSelected,
   onToggleSelect,
@@ -128,6 +134,7 @@ function TableRow({
   row: WeeklyRow;
   index: number;
   isCompletedSection: boolean;
+  hasFollowUpColumn: boolean;
   isDeleteMode: boolean;
   isSelected: boolean;
   onToggleSelect: () => void;
@@ -280,6 +287,30 @@ function TableRow({
           </span>
         )}
       </td>
+
+      {/* Follow Up Date Picker (Supported only for In Progress and Pipeline) */}
+      {hasFollowUpColumn && (
+        <td className="py-2.5 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+          <div className="inline-flex items-center justify-center">
+            <input
+              type="date"
+              value={(() => {
+                if (!row.follow_up_date) return '';
+                try {
+                  return new Date(row.follow_up_date).toISOString().split('T')[0];
+                } catch {
+                  return '';
+                }
+              })()}
+              onChange={(e) => {
+                onUpdateRow(row._id, { follow_up_date: e.target.value || undefined });
+              }}
+              className="bg-surface-sunken hover:bg-surface border border-border hover:border-primary focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-2.5 py-1 text-xs text-fg font-medium shadow-2xs outline-none cursor-pointer transition-all font-mono"
+              title="Select date to follow up / call back HR"
+            />
+          </div>
+        </td>
+      )}
 
       {/* 6. Offers Received (Completed Section Only) */}
       {isCompletedSection && (

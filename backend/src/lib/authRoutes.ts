@@ -239,7 +239,7 @@ export function registerAuthRoutes(app: Express) {
   /* ── Sign in ──────────────────────────────────────────────────────────── */
   app.post('/api/v1/auth/login', async (req: Request, res: Response) => {
     try {
-      const rawEmail = String(req.body?.email ?? '').trim().toLowerCase();
+      const rawEmail = String(req.body?.email ?? req.body?.official_email ?? '').trim().toLowerCase();
       const password = String(req.body?.password ?? '');
       const rememberMe = Boolean(req.body?.remember_me);
 

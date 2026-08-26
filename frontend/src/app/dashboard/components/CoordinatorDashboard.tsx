@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { CoordinatorCollegeFocusSection } from './CoordinatorCollegeFocusSection';
 import { CoordinatorCollegeKpiCards } from './CoordinatorCollegeKpiCards';
+import { FollowUpSmartQueueWidget } from './FollowUpSmartQueueWidget';
 import { getCoordinatorSelectedColleges } from '@/lib/collegeSession';
 
 interface Props {
@@ -25,6 +26,11 @@ export function CoordinatorDashboard({ data }: Props) {
 
       {/* ── 2. Dedicated Per-College KPI Analytics Cards (1, 2, or 3 cards) ── */}
       <CoordinatorCollegeKpiCards
+        selectedCollegeIds={selectedCollegeIds}
+      />
+
+      {/* ── 3. Hot Follow-Ups Due — Smart Queue & Alarm ── */}
+      <FollowUpSmartQueueWidget
         selectedCollegeIds={selectedCollegeIds}
       />
     </div>

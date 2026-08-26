@@ -269,7 +269,7 @@ export function EditCompanyModal({
           </div>
 
           {/* Batch & Follow Up Date */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className={`grid gap-3.5 ${pipelineSection === 'in_progress' || pipelineSection === 'pipeline' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
             <div>
               <label className="block text-fg font-semibold mb-1.5">Eligible Batch</label>
               <select
@@ -285,15 +285,17 @@ export function EditCompanyModal({
               </select>
             </div>
 
-            <div>
-              <label className="block text-fg font-semibold mb-1.5">Scheduled Follow-up Date</label>
-              <input
-                type="date"
-                value={followUpDate}
-                onChange={(e) => setFollowUpDate(e.target.value)}
-                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-fg text-xs transition-all cursor-pointer outline-none"
-              />
-            </div>
+            {(pipelineSection === 'in_progress' || pipelineSection === 'pipeline') && (
+              <div>
+                <label className="block text-fg font-semibold mb-1.5">Scheduled Follow-up Date</label>
+                <input
+                  type="date"
+                  value={followUpDate}
+                  onChange={(e) => setFollowUpDate(e.target.value)}
+                  className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-fg text-xs transition-all cursor-pointer outline-none font-mono"
+                />
+              </div>
+            )}
           </div>
 
           {/* Student Candidate Counts (if in progress or completed) */}
@@ -363,7 +365,7 @@ export function EditCompanyModal({
             type="button"
             onClick={handleDelete}
             disabled={deleting}
-            className="flex items-center gap-1.5 px-3 py-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-xs"
           >
             <Trash2 size={14} />
             <span>{deleting ? 'Deleting…' : 'Delete Row'}</span>
@@ -371,17 +373,10 @@ export function EditCompanyModal({
 
           <div className="flex items-center gap-2.5">
             <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 bg-surface hover:bg-surface-raised text-fg font-semibold rounded-xl text-xs border border-border transition-colors cursor-pointer shadow-xs"
-            >
-              Cancel
-            </button>
-            <button
               type="submit"
               form="edit-company-form"
               disabled={loading}
-              className="px-6 py-2.5 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              className="px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 hover:shadow-md hover:shadow-primary/25"
             >
               <CheckCircle2 size={15} />
               <span>{loading ? 'Saving Changes…' : 'Save Changes'}</span>

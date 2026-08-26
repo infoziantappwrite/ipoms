@@ -244,18 +244,11 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-border">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-surface hover:bg-surface-raised text-fg border border-border rounded-xl text-xs font-bold transition-colors cursor-pointer"
-            >
-              Cancel
-            </button>
+          <div className="flex items-center justify-end pt-4 border-t border-border">
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer active:scale-95"
+              className="w-full sm:w-auto px-6 py-2 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
             >
               <Plus size={14} strokeWidth={2.5} />
               <span>{submitting ? 'Saving…' : 'Add Active Lead'}</span>

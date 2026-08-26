@@ -22,6 +22,7 @@ interface Props {
   disabled?: boolean;
   allowAll?: boolean;
   allLabel?: string;
+  placeholder?: string;
   className?: string;
 }
 
@@ -30,7 +31,8 @@ export function SmoothYearDropdown({
   onChange,
   disabled = false,
   allowAll = false,
-  allLabel = 'All Years (2026–2035)',
+  allLabel = 'Select Year',
+  placeholder = 'Select Year',
   className = '',
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
@@ -52,7 +54,7 @@ export function SmoothYearDropdown({
     value === 'all' || !value
       ? allowAll
         ? allLabel
-        : '2026'
+        : placeholder
       : `${value} Graduating`;
 
   return (

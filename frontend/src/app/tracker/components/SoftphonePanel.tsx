@@ -12,7 +12,7 @@ import {
   Building2,
   User,
 } from 'lucide-react';
-import { CallOutcome } from '@/types/tracker';
+import type { CallOutcome } from '../page';
 import { triggerHaptic } from '@/lib/haptics';
 import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
 import { RowOutcomeDropdown } from './RowOutcomeDropdown';
@@ -301,7 +301,7 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
                 Call Outcome <span className="text-rose-500">*</span>
               </label>
               <RowOutcomeDropdown
-                value={outcome}
+                value={outcome || undefined}
                 onChange={(val) => setOutcome(val as CallOutcome)}
               />
             </div>

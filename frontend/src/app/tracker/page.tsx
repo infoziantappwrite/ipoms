@@ -9,9 +9,10 @@ import { CalendarPicker } from './components/CalendarPicker';
 import { SoftphonePanel, SoftphoneCallResult } from './components/SoftphonePanel';
 import { SmoothOutcomeDropdown } from '@/components/ui/SmoothOutcomeDropdown';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
-import { AlertTriangle, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Cloud, Download, Loader2, PhoneCall, RefreshCw, Save } from 'lucide-react';
+import { AlertTriangle, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Cloud, Download, Loader2, PhoneCall, Plus, Save } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
+import { ManualAddRowModal } from './components/ManualAddRowModal';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -84,10 +85,9 @@ export default function DailyTrackerPage() {
   const [historyRows, setHistoryRows] = useState<TrackerRow[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [outcomeFilter, setOutcomeFilter] = useState<CallOutcome | 'all'>('all');
-  const [missingEmailRows, setMissingEmailRows] = useState<string[]>([]);
-  const [showEmailWarning, setShowEmailWarning] = useState(false);
-  const [sessionDate, setSessionDate] = useState<string>('');
   const [activeCallRow, setActiveCallRow] = useState<TrackerRow | null>(null);
+  const [sessionDate, setSessionDate] = useState<string>('');
+  const [isManualAddOpen, setIsManualAddOpen] = useState(false);
 
   // Real signed-in identity. The backend still enforces ownership itself
   // (scopeToSelf pins a coordinator to their own id regardless of what's
@@ -268,17 +268,29 @@ export default function DailyTrackerPage() {
     }
   }, [loadKpi, coordinatorId, selectedCollegeId]);
 
+  // ── Handle manual contact row added
+  const handleManualRowAdded = useCallback((newRow: TrackerRow) => {
+    setRows((prev) => {
+      const next = [...prev, newRow];
+      return next.map((r, idx) => ({ ...r, serial_no: idx + 1 }));
+    });
+    loadKpi();
+  }, [loadKpi]);
+
   // ── Handle Softphone wrap-up save (auto-populates tracker row)
   const handleSoftphoneSave = useCallback(async (result: SoftphoneCallResult) => {
-    await handleRowUpdate(result.rowId, {
-      call_start_time: result.call_start_time,
-      call_end_time: result.call_end_time,
-      duration_seconds: result.duration_seconds,
-      duration_formatted: result.duration_formatted,
-      outcome_status: result.outcome_status,
-      follow_up_month: result.follow_up_month,
+    const patch: Partial<TrackerRow> = {
+      outcome_status: result.outcomeStatus,
+      follow_up_month: result.followUpMonth || null,
       comments: result.comments,
-    });
+    };
+    if (result.callDurationSeconds !== undefined && result.callDurationSeconds > 0) {
+      patch.duration_seconds = result.callDurationSeconds;
+      const mins = Math.floor(result.callDurationSeconds / 60);
+      const secs = result.callDurationSeconds % 60;
+      patch.duration_formatted = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    await handleRowUpdate(result.rowId, patch);
     setActiveCallRow(null);
   }, [handleRowUpdate]);
 
@@ -288,7 +300,7 @@ export default function DailyTrackerPage() {
     try {
       const res = await apiFetch(`/daily-tracker/${rowId}`, { method: 'DELETE' });
       if (res.success) {
-        setRows((prev) => prev.filter((row) => row._id !== rowId));
+        setRows((prev) => prev.filter((row) => row._id !== rowId).map((r, idx) => ({ ...r, serial_no: idx + 1 })));
         await loadKpi();
       }
     } catch (e) { console.error('[DT] Delete failed', e); }
@@ -296,23 +308,16 @@ export default function DailyTrackerPage() {
 
   // ── Save Progress (Ctrl+S)
   const handleSaveProgress = useCallback(async () => {
-    if (!selectedCollegeId) return;
+    if (!selectedCollegeId || !coordinatorId) return;
 
-    // Check for invite_mail rows with missing email — show soft warning
-    const noEmailRows = rows.filter(
-      (r) => r.outcome_status === 'invite_mail' && !r.email_id && !r.is_skipped
-    );
-    if (noEmailRows.length > 0) {
-      setMissingEmailRows(noEmailRows.map((r) => r.company_name));
-      setShowEmailWarning(true);
+    // Verify mandatory Follow Up Month for rows marked as follow_up
+    const missingFollowUp = rows.find((r) => !r.is_skipped && r.outcome_status === 'follow_up' && !r.follow_up_month);
+    if (missingFollowUp) {
+      alert(`Follow Up Month is mandatory for "${missingFollowUp.company_name}" (Row #${missingFollowUp.serial_no}). Please select a month.`);
+      setSaveStatus('idle');
       return;
     }
 
-    await doSaveProgress();
-  }, [selectedCollegeId, rows]);
-
-  const doSaveProgress = async () => {
-    if (!coordinatorId) return;
     setSaveStatus('saving');
     try {
       const res = await apiFetch('/daily-tracker/save-progress', {
@@ -322,7 +327,6 @@ export default function DailyTrackerPage() {
       if (res.success) {
         setSaveStatus('saved');
         setLastSavedAt(new Date());
-        setShowEmailWarning(false);
         const data = res.data as any;
         if (data.positive_promoted > 0) {
           console.log(`${data.positive_promoted} positive outcome(s) queued for Weekly Tracker`);
@@ -332,7 +336,7 @@ export default function DailyTrackerPage() {
       console.error('[DT] Save progress failed', e);
       setSaveStatus('idle');
     }
-  };
+  }, [selectedCollegeId, coordinatorId]);
 
   // ── Ctrl+S keyboard shortcut
   useEffect(() => {
@@ -506,46 +510,15 @@ export default function DailyTrackerPage() {
                   <Download size={14} strokeWidth={2.5} aria-hidden /> Load
                 </button>
 
-                {/* Auto-Save Status Indicator */}
+                {/* Save Button */}
                 <button
                   type="button"
                   onClick={handleSaveProgress}
                   disabled={!selectedCollegeId}
-                  title={lastSavedAt ? `Auto-Saved at ${lastSavedAt.toLocaleTimeString()} • Click to force sync` : 'Auto-Save enabled: all changes save immediately in real-time'}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border shadow-xs transition-all cursor-pointer shrink-0 ${
-                    saveStatus === 'saving'
-                      ? 'bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400 animate-pulse'
-                      : saveStatus === 'saved'
-                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
-                      : 'bg-surface-sunken border-border text-fg-subtle hover:text-fg hover:border-border-strong'
-                  }`}
+                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
+                  title="Save Progress (Ctrl + S)"
                 >
-                  {saveStatus === 'saving' ? (
-                    <>
-                      <Loader2 size={13} className="animate-spin text-blue-500" />
-                      <span>Saving…</span>
-                    </>
-                  ) : saveStatus === 'saved' ? (
-                    <>
-                      <CheckCircle2 size={13} className="text-emerald-500" />
-                      <span>Auto-Saved</span>
-                    </>
-                  ) : (
-                    <>
-                      <Cloud size={13} className="text-emerald-500" />
-                      <span>Auto-Save On</span>
-                    </>
-                  )}
-                </button>
-
-                {/* Refresh (Butter Yellow) */}
-                <button
-                  type="button"
-                  onClick={() => { loadTodayRows(); loadKpi(); }}
-                  className="flex items-center gap-1.5 bg-amber-100 dark:bg-amber-950/80 hover:bg-amber-200 dark:hover:bg-amber-900/80 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700/80 px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
-                  title="Refresh calls table"
-                >
-                  <RefreshCw size={14} strokeWidth={2} aria-hidden /> Refresh
+                  <Save size={14} strokeWidth={2.5} aria-hidden /> Save
                 </button>
 
                 {/* History / Calendar */}
@@ -576,6 +549,16 @@ export default function DailyTrackerPage() {
                     className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 text-fg text-xs px-3.5 py-1.5 rounded-xl outline-none placeholder:text-fg-disabled shadow-xs transition-colors"
                   />
                 </div>
+
+                {/* + Add Manual Row Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsManualAddOpen(true)}
+                  title="Add Custom Entry (Row-wise)"
+                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary hover:bg-blue-700 text-white shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95 shrink-0"
+                >
+                  <Plus size={16} strokeWidth={2.5} aria-hidden />
+                </button>
               </>
             ) : (
               <>
@@ -706,35 +689,17 @@ export default function DailyTrackerPage() {
         />
       )}
 
-      {/* ── Missing Email Warning Dialog ───────────────────────────────────── */}
-      {showEmailWarning && (
-        <div className="fixed inset-0 scrim flex items-center justify-center z-50">
-          <div className="glass-panel rounded-2xl p-6 max-w-md w-full mx-4 border border-warning/30">
-            <h3 className="text-lg font-semibold text-warning mb-3"><AlertTriangle size={15} strokeWidth={2} className="inline shrink-0" aria-hidden />{" "}Missing Email IDs</h3>
-            <p className="text-sm text-fg-muted mb-3">
-              <strong>{missingEmailRows.length}</strong> company(s) with "Invite Mail" outcome are missing Email ID.
-              Progress will be saved — these will appear tomorrow as Pending Information.
-            </p>
-            <ul className="text-xs text-fg-subtle mb-4 list-disc list-inside">
-              {missingEmailRows.map((name) => <li key={name}>{name}</li>)}
-            </ul>
-            <div className="flex gap-3">
-              <button
-                onClick={doSaveProgress}
-                className="flex-1 bg-warning hover:bg-warning text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              >
-                Save Anyway
-              </button>
-              <button
-                onClick={() => setShowEmailWarning(false)}
-                className="flex-1 bg-surface-raised hover:bg-surface-raised text-fg px-4 py-2 rounded-lg text-sm transition-colors"
-              >
-                Go Back
-              </button>
-            </div>
-          </div>
-        </div>
+      {isManualAddOpen && (
+        <ManualAddRowModal
+          coordinatorId={coordinatorId}
+          collegeId={selectedCollegeId}
+          sessionDate={sessionDate}
+          onClose={() => setIsManualAddOpen(false)}
+          onRowAdded={handleManualRowAdded}
+        />
       )}
+
+
       {/* ── Softphone Panel (Click-to-Call) ───────────────────────────────── */}
       <SoftphonePanel
         row={activeCallRow}

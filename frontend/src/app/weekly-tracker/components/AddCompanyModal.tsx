@@ -271,18 +271,7 @@ export function AddCompanyModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {/* Follow-up Date */}
-            <div>
-              <label className="block text-fg font-semibold mb-1.5">Scheduled Follow-up Date</label>
-              <input
-                type="date"
-                value={followUpDate}
-                onChange={(e) => setFollowUpDate(e.target.value)}
-                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-fg text-xs transition-all cursor-pointer outline-none"
-              />
-            </div>
-
+          <div className={`grid gap-3.5 ${pipelineSection === 'in_progress' || pipelineSection === 'pipeline' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
             {/* Eligible Batch (Year Dropdown) */}
             <div>
               <label className="block text-fg font-semibold mb-1.5">Eligible Batch (Year)</label>
@@ -298,6 +287,19 @@ export function AddCompanyModal({
                 ))}
               </select>
             </div>
+
+            {/* Follow-up Date */}
+            {(pipelineSection === 'in_progress' || pipelineSection === 'pipeline') && (
+              <div>
+                <label className="block text-fg font-semibold mb-1.5">Scheduled Follow-up Date</label>
+                <input
+                  type="date"
+                  value={followUpDate}
+                  onChange={(e) => setFollowUpDate(e.target.value)}
+                  className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-fg text-xs transition-all cursor-pointer outline-none font-mono"
+                />
+              </div>
+            )}
           </div>
 
           {/* Status Remarks */}
@@ -315,21 +317,15 @@ export function AddCompanyModal({
         </form>
 
         {/* ── Sticky Footer ──────────────────────────────────── */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border bg-surface-sunken shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2.5 bg-surface hover:bg-surface-raised text-fg font-semibold rounded-xl text-xs border border-border transition-colors cursor-pointer shadow-xs"
-          >
-            Cancel
-          </button>
+        <div className="flex items-center justify-end px-6 py-4 border-t border-border bg-surface-sunken shrink-0">
           <button
             type="submit"
             form="add-company-form"
             disabled={loading}
-            className="px-6 py-2.5 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center cursor-pointer"
+            className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 hover:shadow-md hover:shadow-primary/25"
           >
-            {loading ? 'Adding…' : 'Add'}
+            <Plus size={15} strokeWidth={2.5} />
+            <span>{loading ? 'Adding…' : 'Add'}</span>
           </button>
         </div>
 

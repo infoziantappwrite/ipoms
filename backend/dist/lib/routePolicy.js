@@ -5,6 +5,7 @@ exports.normalizeRole = normalizeRole;
 exports.authorizeRoute = authorizeRoute;
 exports.isSupervisor = isSupervisor;
 exports.scopeToSelf = scopeToSelf;
+exports.refuseForeignOwner = refuseForeignOwner;
 exports.findPolicy = findPolicy;
 const ADMIN = ['ADMINISTRATOR'];
 const TL_ADMIN = ['ADMINISTRATOR', 'TEAM_LEADER'];
@@ -65,14 +66,18 @@ const POLICIES = [
     // TPO is excluded entirely: their access is the finalized Weekly Placement
     // REPORT, not the live operational board (V1_DECISIONS §8.2).
     { method: '*', pattern: /^\/weekly-tracker(\/.*)?$/, roles: STAFF },
-    // ── Daily Leads ───────────────────────────────────────────────────────────
+    // ── Daily Leads & Active Leads ────────────────────────────────────────────
     { method: '*', pattern: /^\/daily-leads(\/.*)?$/, roles: STAFF },
+    { method: '*', pattern: /^\/active-leads(\/.*)?$/, roles: STAFF },
+    // ── Pending Tasks ─────────────────────────────────────────────────────────
+    { method: '*', pattern: /^\/pending-tasks(\/.*)?$/, roles: STAFF },
     // ── Analytics & Reports ───────────────────────────────────────────────────
     { method: '*', pattern: /^\/analytics(\/.*)?$/, roles: STAFF },
     { method: '*', pattern: /^\/reports(\/.*)?$/, roles: STAFF },
     // ── Dashboards ────────────────────────────────────────────────────────────
     { method: 'GET', pattern: /^\/dashboard\/admin\/?$/, roles: ADMIN },
     { method: 'GET', pattern: /^\/dashboard\/team-leader\/?$/, roles: TL_ADMIN },
+    { method: 'GET', pattern: /^\/dashboard\/college-kpis\/?$/, roles: STAFF },
     // Any staff member may call this; WHICH coordinator's data comes back is
     // decided by ownership scoping in the handler, not here.
     { method: 'GET', pattern: /^\/dashboard\/coordinator\/?$/, roles: STAFF },
@@ -101,10 +106,12 @@ const POLICIES = [
     { method: 'PATCH', pattern: /^\/settings\/?$/, roles: ADMIN },
     // Read is open to staff: the UI reads branding and dropdown enums from here.
     { method: 'GET', pattern: /^\/settings\/?$/, roles: STAFF },
+    // ── Active Leads Module ───────────────────────────────────────────────────
+    { method: '*', pattern: /^\/active-leads(\/.*)?$/, roles: STAFF },
 ];
 /** Paths served before authentication; never reach this middleware. */
 function isPublic(path) {
-    return path === '/health' || path.startsWith('/auth');
+    return path === '/health' || path.startsWith('/auth') || path === '/colleges';
 }
 function findPolicy(method, path) {
     return POLICIES.find((p) => (p.method === '*' || p.method === method) && p.pattern.test(path));
@@ -172,6 +179,26 @@ function scopeToSelf(req, requestedId) {
     if (isSupervisor(req))
         return requestedId || self;
     return self;
+}
+/**
+ * Ownership check for a specific document already fetched from the database —
+ * the `:id` in the URL addresses the ROW, not the owner, so unlike
+ * `scopeToSelf` there is no query param to substitute; the caller must look the
+ * record up first and pass whichever field identifies its owner
+ * (`row.coordinator_id`, a profile's own `_id`, etc.).
+ *
+ * Returns true when access is refused (and has already written the 403), so
+ * call sites read as `if (refuseForeignOwner(req, res, row.coordinator_id)) return;`.
+ * A supervisor may always proceed; everyone else must own the record.
+ */
+function refuseForeignOwner(req, res, ownerId, message = 'You do not have access to this record.') {
+    if (isSupervisor(req) || req.user?.userId === String(ownerId))
+        return false;
+    res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN_NOT_OWNER', message },
+    });
+    return true;
 }
 /** Exposed for tests and for the coverage check in verifyRoutePolicy.ts. */
 exports.__policyTable = POLICIES;

@@ -13,7 +13,6 @@ import {
   ChevronUp,
   Trash2,
   X,
-  Pencil,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { WeeklyTable, WeeklyRow } from './WeeklyTable';
@@ -194,20 +193,6 @@ export function WeeklySection({
           ) : (
             rows.length > 0 && (
               <div className="flex items-center gap-1">
-                {/* Pen / Edit Icon next to Delete Bin */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditingRow(rows[0]);
-                  }}
-                  className="p-1.5 rounded-lg text-fg-subtle hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
-                  title={rows.length === 1 ? `Edit ${rows[0].company_name} details` : `Edit first company in ${title}`}
-                  aria-label="Edit company"
-                >
-                  <Pencil size={15} />
-                </button>
-
                 {/* Delete Bin */}
                 <button
                   type="button"

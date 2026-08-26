@@ -8,6 +8,52 @@ export const ACTIVE_COLLEGE_ID_KEY = 'ipoms_active_college_id';
 export const ACTIVE_COLLEGE_NAME_KEY = 'ipoms_active_college_name';
 export const ACTIVE_COLLEGE_OBJ_KEY = 'ipoms_active_college_obj';
 export const COORDINATOR_SELECTED_COLLEGES_KEY = 'ipoms_coordinator_selected_colleges';
+export const ALL_COLLEGES_CACHE_KEY = 'ipoms_cached_all_colleges';
+
+let memoryCachedColleges: College[] = [];
+
+export function getCachedColleges(): College[] {
+  if (memoryCachedColleges && memoryCachedColleges.length > 0) {
+    return memoryCachedColleges;
+  }
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(ALL_COLLEGES_CACHE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        memoryCachedColleges = parsed;
+        return parsed;
+      }
+    }
+  } catch {}
+  return [];
+}
+
+export function setCachedColleges(list: College[]): void {
+  if (!Array.isArray(list) || list.length === 0) return;
+  memoryCachedColleges = list;
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(ALL_COLLEGES_CACHE_KEY, JSON.stringify(list));
+    window.dispatchEvent(new CustomEvent('ipoms_colleges_loaded', { detail: { colleges: list } }));
+  } catch {}
+}
+
+export async function fetchAllCollegesCached(): Promise<College[]> {
+  const cached = getCachedColleges();
+  try {
+    const res = await apiFetch('/colleges');
+    if (res.success && Array.isArray((res.data as any)?.colleges) && (res.data as any).colleges.length > 0) {
+      const liveList: College[] = (res.data as any).colleges;
+      setCachedColleges(liveList);
+      return liveList;
+    }
+  } catch (err) {
+    console.warn('[Colleges] Background fetch failed, using cached list', err);
+  }
+  return cached;
+}
 
 export function getCoordinatorSelectedColleges(): string[] {
   if (typeof window === 'undefined') return [];
@@ -16,7 +62,7 @@ export function getCoordinatorSelectedColleges(): string[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return parsed.slice(0, 3);
+        return parsed.slice(0, 4);
       }
     }
   } catch {}
@@ -25,7 +71,7 @@ export function getCoordinatorSelectedColleges(): string[] {
 
 export function setCoordinatorSelectedColleges(ids: string[]): string[] {
   if (typeof window === 'undefined') return ids;
-  const sanitized = Array.from(new Set(ids.filter(Boolean))).slice(0, 3);
+  const sanitized = Array.from(new Set(ids.filter(Boolean))).slice(0, 4);
   try {
     if (sanitized.length > 0) {
       localStorage.setItem(COORDINATOR_SELECTED_COLLEGES_KEY, JSON.stringify(sanitized));

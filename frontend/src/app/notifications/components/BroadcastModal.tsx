@@ -237,19 +237,12 @@ export function BroadcastModal({ onClose, onSent }: Props) {
         </form>
 
         {/* ── Fixed Footer Actions ──────────────────────────────────────── */}
-        <div className="flex items-center justify-end gap-3 px-6 py-3.5 border-t border-border bg-surface-sunken shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 bg-surface hover:bg-surface-raised border border-border text-fg rounded-xl text-xs font-semibold transition-colors cursor-pointer"
-          >
-            Cancel
-          </button>
+        <div className="flex items-center justify-end px-6 py-3.5 border-t border-border bg-surface-sunken shrink-0">
           <button
             type="submit"
             form="broadcast-form"
             disabled={loading}
-            className="px-6 py-2.5 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center justify-center cursor-pointer"
+            className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center justify-center cursor-pointer"
           >
             {loading ? 'Broadcasting…' : 'Dispatch Broadcast'}
           </button>

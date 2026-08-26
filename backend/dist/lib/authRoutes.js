@@ -67,11 +67,55 @@ const passwordPolicy_1 = require("./passwordPolicy");
  *    usable code.
  */
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'ipoms_dev_access_secret_super_secure_key_2026';
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'ipoms_dev_refresh_secret_super_secure_key_2026';
 /** Consecutive failures allowed. The next failure locks the account. */
 const MAX_FAILED_ATTEMPTS = 3;
 const OTP_TTL_MINUTES = 10;
 const OTP_MAX_ATTEMPTS = 5;
 const STAFF_DOMAIN = 'infoziant.com';
+/**
+ * "Remember this device" support. The access token stays a short-lived
+ * (8h) bearer token used on every request; a long-lived refresh token
+ * rides in an httpOnly cookie instead, so it's invisible to JS/XSS and
+ * only ever sent to the one endpoint that needs it. Scoped to
+ * `/api/v1/auth` via cookie Path so it isn't attached to every ordinary
+ * API call, only to /auth/refresh and /auth/logout.
+ *
+ * This is stateless (no DB-backed session/revocation list) — matches the
+ * rest of the project's auth (the 8h access token isn't blacklistable
+ * either). Practical effect: "sign out" clears the cookie so this
+ * browser stops being able to silently refresh, but a copy of the raw
+ * refresh token taken before sign-out would still work until it expires.
+ * Acceptable for an internal staff tool; revisit if that ever changes.
+ */
+const REFRESH_TOKEN_COOKIE = 'ipoms_refresh';
+const REFRESH_TOKEN_TTL_DAYS = 30;
+const REFRESH_TOKEN_MAX_AGE_MS = REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000;
+const REFRESH_COOKIE_PATH = '/api/v1/auth';
+function signRefreshToken(user) {
+    return jsonwebtoken_1.default.sign({ userId: user._id }, JWT_REFRESH_SECRET, { expiresIn: `${REFRESH_TOKEN_TTL_DAYS}d` });
+}
+function refreshCookieOptions() {
+    return {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: REFRESH_COOKIE_PATH,
+        maxAge: REFRESH_TOKEN_MAX_AGE_MS,
+    };
+}
+function setRefreshCookie(res, user) {
+    res.cookie(REFRESH_TOKEN_COOKIE, signRefreshToken(user), refreshCookieOptions());
+}
+function clearRefreshCookie(res) {
+    res.clearCookie(REFRESH_TOKEN_COOKIE, { path: REFRESH_COOKIE_PATH });
+}
+/**
+ * The only role self-registration is permitted to create (Module 08 §12/§16:
+ * "Role selection at signup... corrected for security — users should never
+ * see those options. The signup page now shows only Placement Coordinator").
+ */
+const SELF_SIGNUP_ROLE = 'PLACEMENT_COORDINATOR';
 const isAdmin = (roles = []) => roles.includes('ADMINISTRATOR') || roles.includes('ADMIN');
 function fail(res, status, code, message, extra = {}) {
     return res.status(status).json({ success: false, error: { code, message, ...extra } });
@@ -91,14 +135,39 @@ function publicUser(user) {
         username: user.username,
         official_email: user.official_email,
         role_codes: user.role_codes,
+        profile_photo_url: user.profile_photo_url || '',
+        designation: user.designation || (user.role_codes?.includes('ADMIN') || user.role_codes?.includes('ADMINISTRATOR') ? 'Administrator' : user.role_codes?.includes('TEAM_LEADER') ? 'Team Leader' : 'Placement Operations Coordinator'),
+        employee_id: user.employee_id || '',
         must_change_password: user.must_change_password,
+        is_profile_locked: Boolean(user.is_profile_locked),
+        profile_locked_at: user.profile_locked_at || null,
+        personal_email: user.personal_email || '',
+        primary_mobile: user.primary_mobile || '',
+        secondary_mobile: user.secondary_mobile || user.alternate_mobile || '',
+        alternate_mobile: user.alternate_mobile || user.secondary_mobile || '',
+        linkedin_profile: user.linkedin_profile || '',
+        date_of_birth: user.date_of_birth || null,
+        date_of_joining: user.date_of_joining || null,
+        address_line: user.address_line || user.residential_address || '',
+        residential_address: user.residential_address || user.address_line || '',
+        pincode: user.pincode || '',
+        city: user.city || '',
+        state: user.state || '',
     };
 }
 function registerAuthRoutes(app) {
     /* ── Staff Self-Registration / Sign Up ────────────────────────────────── */
     app.post('/api/v1/auth/signup', async (req, res) => {
         try {
-            const { full_name = '', username = '', official_email = '', primary_mobile = '', role_codes = ['COORDINATOR'], password = '', } = req.body;
+            const { full_name = '', username = '', official_email = '', primary_mobile = '', password = '',
+            // `role_codes` is deliberately NOT read from req.body. This endpoint is
+            // public and unauthenticated by design (it IS the account-creation
+            // flow), so trusting a client-supplied role here let anyone on the
+            // network POST {"role_codes":["ADMINISTRATOR"]} and receive full
+            // admin access with no verification whatsoever. Self-registration
+            // always creates exactly one role, unconditionally.
+             } = req.body;
+            const role_codes = [SELF_SIGNUP_ROLE];
             const email = String(official_email).trim().toLowerCase();
             const uname = String(username).trim().toLowerCase();
             const name = String(full_name).trim();
@@ -167,8 +236,9 @@ function registerAuthRoutes(app) {
     /* ── Sign in ──────────────────────────────────────────────────────────── */
     app.post('/api/v1/auth/login', async (req, res) => {
         try {
-            const rawEmail = String(req.body?.email ?? '').trim().toLowerCase();
+            const rawEmail = String(req.body?.email ?? req.body?.official_email ?? '').trim().toLowerCase();
             const password = String(req.body?.password ?? '');
+            const rememberMe = Boolean(req.body?.remember_me);
             if (!rawEmail)
                 return fail(res, 400, 'EMAIL_REQUIRED', 'Enter your official email address.');
             if (!password)
@@ -240,6 +310,14 @@ function registerAuthRoutes(app) {
                 performedByRole: user.role_codes?.[0] ?? 'unknown', performedByEmail: user.official_email,
                 module: 'Security & Audit', severity: 'info', summary: 'Signed in successfully', req,
             });
+            if (rememberMe) {
+                setRefreshCookie(res, user);
+            }
+            else {
+                // Guards against a stale 30-day cookie surviving a login where the
+                // user deliberately unchecked "remember me" this time.
+                clearRefreshCookie(res);
+            }
             return res.status(200).json({
                 success: true,
                 message: 'Login successful',
@@ -249,6 +327,47 @@ function registerAuthRoutes(app) {
         catch (error) {
             return fail(res, 500, 'INTERNAL_SERVER_ERROR', error?.message || 'Unexpected error');
         }
+    });
+    /* ── Refresh: exchange the httpOnly "remember me" cookie for a fresh
+       8h access token, without re-entering a password. Silent-called by
+       the frontend when a request comes back 401 (access token expired). */
+    app.post('/api/v1/auth/refresh', async (req, res) => {
+        try {
+            const rawToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
+            if (!rawToken) {
+                return fail(res, 401, 'NO_REFRESH_TOKEN', 'No remembered session for this device.');
+            }
+            let decoded;
+            try {
+                decoded = jsonwebtoken_1.default.verify(rawToken, JWT_REFRESH_SECRET);
+            }
+            catch {
+                clearRefreshCookie(res);
+                return fail(res, 401, 'REFRESH_INVALID', 'Your remembered session has expired. Please sign in again.');
+            }
+            const user = await User_1.User.findOne({ _id: decoded.userId, is_deleted: false });
+            if (!user || user.account_status !== 'active') {
+                clearRefreshCookie(res);
+                return fail(res, 401, 'REFRESH_INVALID', 'Your remembered session is no longer valid. Please sign in again.');
+            }
+            // Sliding window: a device that's actually in use stays remembered
+            // for a full 30 days from its last activity, not just from login.
+            setRefreshCookie(res, user);
+            return res.status(200).json({
+                success: true,
+                data: { token: signToken(user), user: publicUser(user) },
+            });
+        }
+        catch (error) {
+            return fail(res, 500, 'INTERNAL_SERVER_ERROR', error?.message || 'Unexpected error');
+        }
+    });
+    /* ── Sign out: clear the remember-me cookie server-side. Access token
+       revocation itself is out of scope (stateless 8h tokens, same as the
+       rest of the app) — this only stops this device from silently refreshing. */
+    app.post('/api/v1/auth/logout', async (req, res) => {
+        clearRefreshCookie(res);
+        return res.status(200).json({ success: true, message: 'Signed out.' });
     });
     /* ── Request an OTP ───────────────────────────────────────────────────── */
     app.post('/api/v1/auth/request-otp', async (req, res) => {

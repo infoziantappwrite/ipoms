@@ -3,10 +3,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.JWT_ACCESS_SECRET = void 0;
 exports.authenticateJWT = authenticateJWT;
 exports.authorizeRoles = authorizeRoles;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'ipoms_dev_access_secret_super_secure_key_2026';
+// Exported so routes that can't carry an Authorization header (e.g. SSE via
+// the browser's native EventSource, which cannot set custom headers) can
+// verify a token passed another way — see chatRoutes.ts's /chat/stream.
+exports.JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'ipoms_dev_access_secret_super_secure_key_2026';
 // The Express Request augmentation for `req.user` lives in src/types/express.d.ts
 // so that modules compiled in isolation still see it.
 /**
@@ -40,7 +44,7 @@ function authenticateJWT(req, res, next) {
     }
     const token = parts[1];
     try {
-        const decoded = jsonwebtoken_1.default.verify(token, JWT_ACCESS_SECRET);
+        const decoded = jsonwebtoken_1.default.verify(token, exports.JWT_ACCESS_SECRET);
         req.user = decoded;
         next();
     }

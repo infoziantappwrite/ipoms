@@ -8,10 +8,16 @@ export type WhatsAppTarget = 'web' | 'app' | 'universal';
 
 interface WhatsAppButtonProps {
   mobileNumber?: string;
+  phone?: string;
+  phoneNumber?: string;
   contactName?: string;
+  name?: string;
+  hrName?: string;
   companyName?: string;
+  company?: string;
   size?: 'sm' | 'md';
   className?: string;
+  showChoiceDialog?: boolean;
 }
 
 const PREF_KEY = 'ipoms_whatsapp_preference';
@@ -37,13 +43,12 @@ export function formatWhatsAppNumber(phone: string): string {
   return digits;
 }
 
-export function WhatsAppButton({
-  mobileNumber,
-  contactName,
-  companyName,
-  size = 'sm',
-  className = '',
-}: WhatsAppButtonProps) {
+export function WhatsAppButton(props: WhatsAppButtonProps) {
+  const mobileNumber = props.mobileNumber || props.phoneNumber || props.phone || '';
+  const contactName = props.contactName || props.hrName || props.name || '';
+  const companyName = props.companyName || props.company || '';
+  const size = props.size || 'sm';
+  const className = props.className || '';
   const [isOpen, setIsOpen] = useState(false);
   const [rememberChoice, setRememberChoice] = useState(false);
   const [savedPref, setSavedPref] = useState<WhatsAppTarget | null>(null);

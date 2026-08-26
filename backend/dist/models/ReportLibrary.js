@@ -38,6 +38,7 @@ const mongoose_1 = __importStar(require("mongoose"));
 exports.REPORT_TEMPLATE_TYPES = [
     'weekly_placement',
     'monthly_placement',
+    'pending_tasks',
     'college_performance',
     'coordinator_performance',
 ];

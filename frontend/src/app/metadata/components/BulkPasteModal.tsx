@@ -165,19 +165,12 @@ Amazon	Andy Jassy	9876543211	hr@amazon.com"
             )}
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 bg-surface hover:bg-surface-sunken text-fg-muted hover:text-fg rounded-lg text-xs font-medium border border-border transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
+            <div className="flex items-center justify-end pt-3 border-t border-border">
               <button
                 type="button"
                 disabled={loading || parsedRows.length === 0}
                 onClick={handleImport}
-                className="px-5 py-2 bg-primary hover:bg-primary/90 disabled:opacity-40 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-6 py-2 bg-primary hover:bg-primary/90 disabled:opacity-40 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
               >
                 {loading ? 'Importing…' : `Import ${parsedRows.length} Contacts`}
               </button>

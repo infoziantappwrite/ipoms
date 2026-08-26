@@ -2,8 +2,21 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Check, Filter } from 'lucide-react';
-import { CallOutcome } from '@/types/tracker';
 import { triggerHaptic } from '@/lib/haptics';
+
+export type CallOutcome =
+  | 'jd_received'
+  | 'hiring'
+  | 'drive_completed'
+  | 'invite_mail'
+  | 'in_connect'
+  | 'follow_up'
+  | 'call_back'
+  | 'hiring_completed'
+  | 'hiring_freezed'
+  | 'not_hiring'
+  | 'no_response'
+  | 'invalid';
 
 export interface OutcomeOption {
   value: CallOutcome | 'all';
