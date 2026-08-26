@@ -9,7 +9,7 @@ import { CalendarPicker } from './components/CalendarPicker';
 import { SoftphonePanel, SoftphoneCallResult } from './components/SoftphonePanel';
 import { SmoothOutcomeDropdown } from '@/components/ui/SmoothOutcomeDropdown';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
-import { AlertTriangle, BookOpen, CalendarDays, ClipboardList, Download, PhoneCall, RefreshCw, Save } from 'lucide-react';
+import { AlertTriangle, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Cloud, Download, Loader2, PhoneCall, RefreshCw, Save } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
 
@@ -227,6 +227,14 @@ export default function DailyTrackerPage() {
     };
   }, [handleContactsLoaded]);
 
+  // ── Auto-reset saved badge status
+  useEffect(() => {
+    if (saveStatus === 'saved') {
+      const t = setTimeout(() => setSaveStatus('idle'), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [saveStatus]);
+
   // ── Handle row update (auto-save on each change)
   const handleRowUpdate = useCallback(async (rowId: string, patch: Partial<TrackerRow>) => {
     setSaveStatus('saving');
@@ -240,9 +248,15 @@ export default function DailyTrackerPage() {
         await loadKpi();
         setSaveStatus('saved');
         setLastSavedAt(new Date());
+
+        // Automatically background sync progress to Weekly Tracker without manual intervention
+        if (coordinatorId && selectedCollegeId) {
+          apiFetch('/daily-tracker/save-progress', {
+            method: 'POST',
+            body: JSON.stringify({ coordinator_id: coordinatorId, college_id: selectedCollegeId }),
+          }).catch((err) => console.error('[DT] Auto-save progress sync failed', err));
+        }
       } else if (res.error?.code === 'START_TIME_REQUIRED') {
-        // The save was refused, not completed — surfacing it as 'saved' here
-        // used to mislead the coordinator into thinking the row was recorded.
         setSaveStatus('idle');
         alert(res.error?.message || res.message || 'Call start time is required before saving.');
       } else {
@@ -252,7 +266,7 @@ export default function DailyTrackerPage() {
       console.error('[DT] Row update failed', e);
       setSaveStatus('idle');
     }
-  }, [loadKpi]);
+  }, [loadKpi, coordinatorId, selectedCollegeId]);
 
   // ── Handle Softphone wrap-up save (auto-populates tracker row)
   const handleSoftphoneSave = useCallback(async (result: SoftphoneCallResult) => {
@@ -492,15 +506,36 @@ export default function DailyTrackerPage() {
                   <Download size={14} strokeWidth={2.5} aria-hidden /> Load
                 </button>
 
-                {/* Save Button */}
+                {/* Auto-Save Status Indicator */}
                 <button
                   type="button"
                   onClick={handleSaveProgress}
                   disabled={!selectedCollegeId}
-                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
-                  title="You can use Ctrl + S to save the progress"
+                  title={lastSavedAt ? `Auto-Saved at ${lastSavedAt.toLocaleTimeString()} • Click to force sync` : 'Auto-Save enabled: all changes save immediately in real-time'}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border shadow-xs transition-all cursor-pointer shrink-0 ${
+                    saveStatus === 'saving'
+                      ? 'bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400 animate-pulse'
+                      : saveStatus === 'saved'
+                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-surface-sunken border-border text-fg-subtle hover:text-fg hover:border-border-strong'
+                  }`}
                 >
-                  <Save size={14} strokeWidth={2.5} aria-hidden /> Save
+                  {saveStatus === 'saving' ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin text-blue-500" />
+                      <span>Saving…</span>
+                    </>
+                  ) : saveStatus === 'saved' ? (
+                    <>
+                      <CheckCircle2 size={13} className="text-emerald-500" />
+                      <span>Auto-Saved</span>
+                    </>
+                  ) : (
+                    <>
+                      <Cloud size={13} className="text-emerald-500" />
+                      <span>Auto-Save On</span>
+                    </>
+                  )}
                 </button>
 
                 {/* Refresh (Butter Yellow) */}

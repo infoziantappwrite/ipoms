@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FolderOpen, Star } from 'lucide-react';
+import { FolderOpen, Star, Pencil } from 'lucide-react';
 
 export interface WeeklyRow {
   _id: string;
@@ -33,6 +33,7 @@ interface Props {
   onMoveSection: (rowId: string, newSection: string) => Promise<void>;
   onTogglePin: (rowId: string) => Promise<void>;
   onDeleteRow: (rowId: string) => Promise<void>;
+  onEditRow?: (row: WeeklyRow) => void;
 }
 
 export function WeeklyTable({
@@ -46,6 +47,7 @@ export function WeeklyTable({
   onMoveSection,
   onTogglePin,
   onDeleteRow,
+  onEditRow,
 }: Props) {
   const isCompletedSection = sectionKey === 'completed';
 
@@ -84,6 +86,7 @@ export function WeeklyTable({
             {isCompletedSection && (
               <th className="py-2.5 px-3 min-w-[120px] text-center">Offers Received</th>
             )}
+            <th className="py-2.5 px-2 w-12 text-center">Edit</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border/60 font-normal bg-surface">
@@ -100,6 +103,7 @@ export function WeeklyTable({
               onMoveSection={onMoveSection}
               onTogglePin={onTogglePin}
               onDeleteRow={onDeleteRow}
+              onEditRow={onEditRow}
             />
           ))}
         </tbody>
@@ -119,6 +123,7 @@ function TableRow({
   onMoveSection,
   onTogglePin,
   onDeleteRow,
+  onEditRow,
 }: {
   row: WeeklyRow;
   index: number;
@@ -130,6 +135,7 @@ function TableRow({
   onMoveSection: (id: string, targetSection: string) => Promise<void>;
   onTogglePin: (id: string) => Promise<void>;
   onDeleteRow: (id: string) => Promise<void>;
+  onEditRow?: (row: WeeklyRow) => void;
 }) {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [tempValue, setTempValue] = useState<any>('');
@@ -299,6 +305,18 @@ function TableRow({
           )}
         </td>
       )}
+
+      {/* 7. Action: Edit Pen Icon */}
+      <td className="py-2.5 px-2 text-center" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          onClick={() => onEditRow?.(row)}
+          title={`Edit ${row.company_name} (Role, CTC, Company spelling, Status)`}
+          className="p-1.5 rounded-lg text-fg-subtle hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-all cursor-pointer inline-flex items-center justify-center"
+        >
+          <Pencil size={13} strokeWidth={2.25} />
+        </button>
+      </td>
     </tr>
   );
 }

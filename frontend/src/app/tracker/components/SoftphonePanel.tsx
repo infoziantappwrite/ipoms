@@ -13,6 +13,10 @@ import {
   User,
 } from 'lucide-react';
 import { CallOutcome } from '@/types/tracker';
+import { triggerHaptic } from '@/lib/haptics';
+import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
+import { RowOutcomeDropdown } from './RowOutcomeDropdown';
+import { RowMonthDropdown } from './RowMonthDropdown';
 
 const OUTCOMES: { value: CallOutcome; label: string }[] = [
   { value: 'jd_received', label: 'JD Received' },
@@ -110,6 +114,7 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
   const handleCall = () => {
     if (!phoneNumber.trim()) return;
 
+    triggerHaptic('success');
     // Trigger device native call protocol (Phone Link / MicroSIP / Android)
     const cleaned = phoneNumber.replace(/[\s\-()]/g, '');
     window.location.href = `tel:${cleaned}`;
@@ -119,10 +124,12 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
   };
 
   const handleHangUp = () => {
+    triggerHaptic('warning');
     setPanelState('wrapup');
   };
 
   const handleDialpadPress = (key: string) => {
+    triggerHaptic('light');
     if (panelState === 'ready') {
       setPhoneNumber((prev) => prev + key);
     }
@@ -259,9 +266,18 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
                 <span className="truncate">{row.hr_name || 'HR Team'}</span>
               </div>
             </div>
-            <span className="text-[10px] font-mono font-bold bg-surface text-fg-muted border border-border px-2 py-1 rounded-lg shrink-0 shadow-2xs">
-              Row #{row.serial_no}
-            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              {row.mobile_number && (
+                <WhatsAppButton
+                  mobileNumber={row.mobile_number}
+                  contactName={row.hr_name}
+                  companyName={row.company_name}
+                />
+              )}
+              <span className="text-[10px] font-mono font-bold bg-surface text-fg-muted border border-border px-2 py-1 rounded-lg shrink-0 shadow-2xs">
+                Row #{row.serial_no}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -284,16 +300,10 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
               <label className="text-xs font-bold text-fg mb-1.5 block">
                 Call Outcome <span className="text-rose-500">*</span>
               </label>
-              <select
+              <RowOutcomeDropdown
                 value={outcome}
-                onChange={(e) => setOutcome(e.target.value as CallOutcome)}
-                className="w-full bg-surface-sunken border border-border rounded-xl px-3.5 py-2.5 text-xs font-semibold text-fg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-xs cursor-pointer"
-              >
-                <option value="" className="bg-surface text-fg">— Select Outcome —</option>
-                {OUTCOMES.map((o) => (
-                  <option key={o.value} value={o.value} className="bg-surface text-fg">{o.label}</option>
-                ))}
-              </select>
+                onChange={(val) => setOutcome(val as CallOutcome)}
+              />
             </div>
 
             {/* Follow Up Month (Conditional) */}
@@ -302,16 +312,10 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
                 <label className="text-xs font-bold text-fg mb-1.5 block">
                   Follow Up Month
                 </label>
-                <select
+                <RowMonthDropdown
                   value={followUpMonth}
-                  onChange={(e) => setFollowUpMonth(e.target.value)}
-                  className="w-full bg-surface-sunken border border-border rounded-xl px-3.5 py-2.5 text-xs font-semibold text-fg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-xs cursor-pointer"
-                >
-                  <option value="" className="bg-surface text-fg">— Pick Month —</option>
-                  {MONTHS.map((m) => (
-                    <option key={m} value={m} className="bg-surface text-fg">{m}</option>
-                  ))}
-                </select>
+                  onChange={(m) => setFollowUpMonth(m)}
+                />
               </div>
             )}
 
@@ -323,8 +327,9 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
               <input
                 type="text"
                 value={comments}
+                maxLength={200}
                 onChange={(e) => setComments(e.target.value)}
-                placeholder="Optional call summary…"
+                placeholder="Optional call summary (max 200 chars)…"
                 className="w-full bg-surface-sunken border border-border rounded-xl px-3.5 py-2.5 text-xs text-fg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-xs placeholder:text-fg-disabled font-medium"
               />
             </div>
@@ -373,10 +378,11 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
                   {DIALPAD_KEYS.map((key) => (
                     <button
                       key={key}
-                      onClick={() => handleDialpadPress(key)}
-                      className="h-11 rounded-2xl bg-surface-sunken hover:bg-surface-raised active:bg-surface-raised active:scale-95
-                                 border border-border text-sm font-bold text-fg font-mono
-                                 transition-all cursor-pointer shadow-2xs flex items-center justify-center"
+                      type="button"
+                      onPointerDown={() => handleDialpadPress(key)}
+                      className="h-11 rounded-2xl bg-surface-sunken hover:bg-surface-raised active:bg-surface-raised active:scale-90
+                                 border border-border text-sm font-bold text-fg font-mono select-none
+                                 transition-transform duration-100 cursor-pointer shadow-2xs flex items-center justify-center"
                     >
                       {key}
                     </button>

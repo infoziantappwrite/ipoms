@@ -13,9 +13,11 @@ import {
   ChevronUp,
   Trash2,
   X,
+  Pencil,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { WeeklyTable, WeeklyRow } from './WeeklyTable';
+import { EditCompanyModal } from './EditCompanyModal';
 
 interface Props {
   sectionKey: string;
@@ -89,6 +91,7 @@ export function WeeklySection({
   const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [editingRow, setEditingRow] = useState<WeeklyRow | null>(null);
 
   const config = SECTION_CONFIGS[sectionKey] || {
     Icon: Folder,
@@ -152,10 +155,10 @@ export function WeeklySection({
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {/* Summary Metric (Hidden in delete mode) */}
           {!isDeleteMode && (
-            <span className="text-xs font-medium opacity-80 hidden sm:inline">
+            <span className="text-xs font-medium opacity-80 hidden sm:inline mr-1">
               {summaryMetric}
             </span>
           )}
@@ -190,19 +193,36 @@ export function WeeklySection({
             </div>
           ) : (
             rows.length > 0 && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsDeleteMode(true);
-                  setIsCollapsed(false);
-                }}
-                className="p-1.5 rounded-lg text-fg-subtle hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                title="Select and delete rows in this section"
-                aria-label="Select and delete rows"
-              >
-                <Trash2 size={15} />
-              </button>
+              <div className="flex items-center gap-1">
+                {/* Pen / Edit Icon next to Delete Bin */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingRow(rows[0]);
+                  }}
+                  className="p-1.5 rounded-lg text-fg-subtle hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
+                  title={rows.length === 1 ? `Edit ${rows[0].company_name} details` : `Edit first company in ${title}`}
+                  aria-label="Edit company"
+                >
+                  <Pencil size={15} />
+                </button>
+
+                {/* Delete Bin */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsDeleteMode(true);
+                    setIsCollapsed(false);
+                  }}
+                  className="p-1.5 rounded-lg text-fg-subtle hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                  title="Select and delete rows in this section"
+                  aria-label="Select and delete rows"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
             )
           )}
 
@@ -229,6 +249,17 @@ export function WeeklySection({
           onMoveSection={onMoveSection}
           onTogglePin={onTogglePin}
           onDeleteRow={onDeleteRow}
+          onEditRow={(row) => setEditingRow(row)}
+        />
+      )}
+
+      {/* Edit Company Modal */}
+      {editingRow && (
+        <EditCompanyModal
+          row={editingRow}
+          onClose={() => setEditingRow(null)}
+          onUpdated={onUpdateRow}
+          onDeleted={onDeleteRow}
         />
       )}
     </div>

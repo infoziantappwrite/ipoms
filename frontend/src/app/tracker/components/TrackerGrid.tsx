@@ -13,18 +13,18 @@ interface Props {
 }
 
 const COLUMN_HEADERS = [
-  { label: '#', width: 'w-12 text-center shrink-0' },
-  { label: 'Start Time', width: 'w-28 shrink-0' },
-  { label: 'End Time', width: 'w-28 shrink-0' },
-  { label: 'Duration', width: 'w-20 shrink-0' },
-  { label: 'Company Name', width: 'w-[250px] shrink-0' },
-  { label: 'HR Name', width: 'w-36 shrink-0' },
-  { label: 'Contact', width: 'w-32 shrink-0' },
-  { label: 'Email ID', width: 'w-40 shrink-0' },
+  { label: '#', width: 'w-10 text-center shrink-0' },
+  { label: 'Start Time', width: 'w-20 shrink-0' },
+  { label: 'End Time', width: 'w-20 shrink-0' },
+  { label: 'Duration', width: 'w-16 shrink-0' },
+  { label: 'Company Name', width: 'w-[220px] shrink-0' },
+  { label: 'HR Name', width: 'w-32 shrink-0' },
+  { label: 'Contact', width: 'w-36 shrink-0' },
+  { label: 'Email ID', width: 'w-44 shrink-0' },
   { label: 'Call Status', width: 'w-44 shrink-0' },
-  { label: 'Follow Up', width: 'w-36 shrink-0' },
+  { label: 'Follow Up', width: 'w-34 shrink-0' },
   { label: 'Comments', width: 'flex-1 min-w-[200px]' },
-  { label: 'Actions', width: 'w-16 text-center shrink-0' },
+  { label: 'Actions', width: 'w-14 text-center shrink-0' },
 ];
 
 export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onDelete, onCall }: Props) {
@@ -50,19 +50,25 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onDelete, onCall }:
 
   return (
     <div className="flex-1 overflow-auto rounded-xl border border-border bg-surface">
-      <div className="min-w-fit">
-        {/* Sticky Column Headers */}
-        <div className="sticky top-0 z-10 flex items-center gap-1 px-2 py-2.5
-                        bg-surface-sunken border-b border-border text-xs font-semibold text-fg-subtle uppercase tracking-wide min-w-fit">
-          {COLUMN_HEADERS.map((col) => (
-            <div key={col.label} className={`${col.width} px-1 shrink-0`}>
-              {col.label}
-            </div>
-          ))}
+      <div className="min-w-[1720px]">
+        {/* Sticky Column Headers (Exact Sheet-grade CSS Grid - Generous tracks to prevent collision) */}
+        <div className="sticky top-0 z-10 grid grid-cols-[48px_110px_95px_95px_240px_140px_150px_180px_180px_150px_minmax(260px,1fr)_64px] divide-x divide-border bg-surface-sunken border-b border-border text-xs font-semibold text-fg-subtle uppercase tracking-wider shadow-2xs whitespace-nowrap select-none">
+          <div className="px-2 py-2.5 text-center flex items-center justify-center whitespace-nowrap">#</div>
+          <div className="px-2.5 py-2.5 flex items-center whitespace-nowrap">Start Time</div>
+          <div className="px-2.5 py-2.5 flex items-center whitespace-nowrap">End Time</div>
+          <div className="px-2.5 py-2.5 flex items-center whitespace-nowrap">Duration</div>
+          <div className="px-2.5 py-2.5 flex items-center whitespace-nowrap">Company Name</div>
+          <div className="px-2.5 py-2.5 flex items-center whitespace-nowrap">HR Name</div>
+          <div className="px-2.5 py-2.5 flex items-center whitespace-nowrap">Contact</div>
+          <div className="px-2.5 py-2.5 flex items-center whitespace-nowrap">Email ID</div>
+          <div className="px-2.5 py-2.5 flex items-center whitespace-nowrap">Call Status</div>
+          <div className="px-2.5 py-2.5 flex items-center whitespace-nowrap">Follow Up</div>
+          <div className="px-2.5 py-2.5 flex items-center whitespace-nowrap">Comments</div>
+          <div className="px-2 py-2.5 text-center flex items-center justify-center whitespace-nowrap">Actions</div>
         </div>
 
-        {/* Rows */}
-        <div className="divide-y divide-border/60 min-w-fit">
+        {/* Rows with clear bordered separation */}
+        <div className="divide-y divide-border border-b border-border">
           {rows.map((row) => (
             <TrackerRow
               key={row._id}

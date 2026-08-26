@@ -3,6 +3,10 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { Phone, Trash2 } from 'lucide-react';
 import type { TrackerRow as TrackerRowType, CallOutcome } from '../page';
+import { triggerHaptic } from '@/lib/haptics';
+import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
+import { RowOutcomeDropdown } from './RowOutcomeDropdown';
+import { RowMonthDropdown } from './RowMonthDropdown';
 
 const OUTCOMES: { value: CallOutcome; label: string; color: string }[] = [
   { value: 'jd_received', label: 'JD Received', color: 'text-primary' },
@@ -11,7 +15,7 @@ const OUTCOMES: { value: CallOutcome; label: string; color: string }[] = [
   { value: 'call_back', label: 'Call Back', color: 'text-warning' },
   { value: 'hiring', label: 'Hiring', color: 'text-success' },
   { value: 'invite_mail', label: 'Invite Mail', color: 'text-primary' },
-  { value: 'not_hiring', label: 'Not Hiring', color: 'text-fg-subtle' },
+  { value: 'not_hiring', label: 'Not Hiring', color: 'text-destructive font-semibold' },
   { value: 'no_response', label: 'No Response', color: 'text-destructive' },
   { value: 'follow_up', label: 'Follow Up', color: 'text-warning font-semibold' },
   { value: 'in_connect', label: 'In Connect', color: 'text-primary' },
@@ -194,6 +198,7 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onDelete, onCall }: Prop
   // ── Call Outcome selection: captures End Time automatically (Spec 10.3)
   const handleOutcomeChange = useCallback((value: string) => {
     if (!value) return;
+    triggerHaptic('selection');
     const outcome = value as CallOutcome;
     const now = nowISO();
     const startTimePatch = !row.call_start_time ? { call_start_time: now } : {};
@@ -209,161 +214,149 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onDelete, onCall }: Prop
 
   // ── Follow Up Month selection (Only enabled when outcome === follow_up)
   const handleMonthChange = useCallback((month: string) => {
+    triggerHaptic('selection');
     onUpdate({ follow_up_month: month || null });
   }, [onUpdate]);
 
-  // ── Comments blur: persist to server
+  // ── Comments blur: persist to server (max 200 chars)
   const handleCommentsBlur = useCallback(() => {
-    onUpdate({ comments: commentsRef.current?.value ?? '' });
+    const text = (commentsRef.current?.value ?? '').slice(0, 200);
+    onUpdate({ comments: text });
   }, [onUpdate]);
 
   return (
     <div
       data-row-id={row._id}
-      className={`flex items-start gap-1 px-2 py-2 min-h-[42px] text-xs ${rowBg} hover:bg-surface-sunken/40 transition-colors group w-full min-w-fit`}
+      className={`grid grid-cols-[48px_110px_95px_95px_240px_140px_150px_180px_180px_150px_minmax(260px,1fr)_64px] divide-x divide-border/60 min-h-[44px] text-xs ${rowBg} hover:bg-primary/5 focus-within:bg-primary/5 transition-colors group border-b border-border`}
     >
       {/* S.No / # */}
-      <div className="w-12 px-1 text-center text-fg-subtle shrink-0 tabular-nums">{row.serial_no}</div>
+      <div className="px-2 py-2 text-center text-fg-subtle tabular-nums flex items-center justify-center">
+        {row.serial_no}
+      </div>
 
-      {/* Start Time — manual, spacebar inserts now (Spec 10.2) */}
-      <div className="w-28 shrink-0">
+      {/* Start Time */}
+      <div className="px-2 py-1.5 flex items-center">
         {isReadOnly ? (
-          <span className="px-1 text-fg-muted">{formatTime(row.call_start_time)}</span>
+          <span className="text-fg-muted text-xs tabular-nums">{formatTime(row.call_start_time)}</span>
         ) : (
           <input
             ref={startTimeRef}
             data-field="start_time"
             type="text"
             defaultValue={formatTime(row.call_start_time)}
-            placeholder="HH:MM AM"
+            placeholder="Time"
             onKeyDown={(e) => { handleStartTimeKeyDown(e); handleKeyDownEnter(e); }}
             onBlur={handleStartTimeBlur}
             title="Type 8:52, 08:52, or 8:52 AM • Spacebar fills current time"
-            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:bg-surface px-1.5 py-1 rounded text-fg placeholder-fg-subtle
-                       transition-colors cursor-text"
+            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:bg-surface px-1.5 py-1 rounded text-fg placeholder-fg-subtle transition-colors cursor-text text-xs tabular-nums"
           />
         )}
       </div>
 
-      {/* End Time — auto-locked (Spec 10.3) */}
-      <div className="w-28 shrink-0 px-1 text-fg-subtle tabular-nums">
+      {/* End Time */}
+      <div className="px-2.5 py-2 text-fg-subtle tabular-nums text-xs flex items-center truncate">
         {formatTime(row.call_end_time) || (
           <span className="text-fg-muted italic">auto</span>
         )}
       </div>
 
-      {/* Duration — auto-computed (Spec 10.4) */}
-      <div className="w-20 shrink-0 px-1 text-fg-subtle tabular-nums">
+      {/* Duration */}
+      <div className="px-2.5 py-2 text-fg-subtle tabular-nums text-xs flex items-center truncate">
         {row.duration_formatted || (
           <span className="text-fg-muted">—</span>
         )}
       </div>
 
-      {/* Company Name — wraps gracefully beyond 35 chars without overlapping */}
-      <div className="w-[250px] shrink-0 px-1 text-fg font-semibold break-words leading-tight" title={row.company_name}>
+      {/* Company Name */}
+      <div className="px-2.5 py-2 text-fg font-semibold break-words leading-tight flex items-center" title={row.company_name}>
         {row.company_name}
       </div>
 
-      {/* HR Name — pre-filled */}
-      <div className="w-36 shrink-0 px-1 text-fg-muted truncate" title={row.hr_name}>
-        {row.hr_name}
+      {/* HR Name */}
+      <div className="px-2.5 py-2 text-fg-muted overflow-hidden min-w-0 flex items-center" title={row.hr_name}>
+        <span className="truncate block">{row.hr_name || '—'}</span>
       </div>
 
-      {/* Contact (Mobile Number) with 1-Click Call Icon */}
-      <div className="w-32 shrink-0 px-1 text-fg-muted font-mono tabular-nums flex items-center gap-1.5 group/contact">
+      {/* Contact */}
+      <div className="px-2.5 py-2 text-fg-muted font-mono tabular-nums flex items-center gap-1.5 group/contact min-w-0">
         {row.mobile_number && (
-          !isReadOnly ? (
-            <button
-              type="button"
-              onClick={() => onCall?.(row)}
-              title={`Click to call ${row.hr_name || row.company_name} (${row.mobile_number})`}
-              className="w-5 h-5 rounded-md bg-emerald-500/15 hover:bg-emerald-500/30 border border-emerald-500/40 dark:border-emerald-400/60
-                         text-emerald-600 dark:text-emerald-400 flex items-center justify-center transition-all hover:scale-110 cursor-pointer shrink-0 shadow-2xs"
-            >
-              <Phone size={11} strokeWidth={2.5} className="text-emerald-600 dark:text-emerald-400" />
-            </button>
-          ) : (
-            <div
-              className="w-5 h-5 rounded-md bg-emerald-500/15 border border-emerald-500/40 dark:border-emerald-400/60
-                         text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 shadow-2xs"
-            >
-              <Phone size={11} strokeWidth={2.5} className="text-emerald-600 dark:text-emerald-400" />
-            </div>
-          )
+          <div className="flex items-center gap-1 shrink-0">
+            {!isReadOnly ? (
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic('light');
+                  onCall?.(row);
+                }}
+                title={`Click to call ${row.hr_name || row.company_name} (${row.mobile_number})`}
+                className="w-5 h-5 rounded-md bg-blue-500/15 hover:bg-blue-500/30 border border-blue-500/40 dark:border-blue-400/60 text-blue-600 dark:text-blue-400 flex items-center justify-center transition-all hover:scale-110 active:scale-90 cursor-pointer shrink-0 shadow-2xs"
+              >
+                <Phone size={11} strokeWidth={2.5} className="text-blue-600 dark:text-blue-400" />
+              </button>
+            ) : (
+              <div className="w-5 h-5 rounded-md bg-blue-500/15 border border-blue-500/40 dark:border-blue-400/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 shadow-2xs">
+                <Phone size={11} strokeWidth={2.5} className="text-blue-600 dark:text-blue-400" />
+              </div>
+            )}
+
+            <WhatsAppButton
+              mobileNumber={row.mobile_number}
+              contactName={row.hr_name}
+              companyName={row.company_name}
+            />
+          </div>
         )}
-        <span className="truncate">{row.mobile_number}</span>
+        <span className="truncate min-w-0">{row.mobile_number}</span>
       </div>
 
-      {/* Email ID — optional */}
-      <div className="w-40 shrink-0 px-1 truncate" title={row.email_id || ''}>
+      {/* Email ID */}
+      <div className="px-2.5 py-2 overflow-hidden min-w-0 flex items-center" title={row.email_id || ''}>
         {row.email_id ? (
-          <span className="text-fg-subtle">{row.email_id}</span>
+          <span className="text-fg-subtle truncate block text-xs w-full">{row.email_id}</span>
         ) : (
-          <span className="text-fg-muted italic">—</span>
+          <span className="text-fg-muted italic text-xs">—</span>
         )}
       </div>
 
-      {/* Call Status — mandatory before row complete (Spec 12) */}
-      <div className="w-44 shrink-0">
+      {/* Call Status */}
+      <div className="px-2 py-1.5 min-w-0 flex items-center">
         {isReadOnly ? (
           <OutcomeBadge outcome={row.outcome_status} />
         ) : (
-          <select
-            value={row.outcome_status ?? ''}
-            onChange={(e) => handleOutcomeChange(e.target.value)}
-            onKeyDown={handleKeyDownEnter}
-            className={`w-full bg-surface/80 border border-border-strong rounded px-1.5 py-1 text-xs
-                        cursor-pointer
-                        ${row.outcome_status ? getOutcomeColor(row.outcome_status) : 'text-fg-subtle'}`}
-          >
-            <option value="">— Select Call Status —</option>
-            {OUTCOMES.map((o) => (
-              <option key={o.value} value={o.value} className={o.color}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+          <RowOutcomeDropdown
+            value={row.outcome_status}
+            onChange={(val) => handleOutcomeChange(val)}
+          />
         )}
       </div>
 
-      {/* Follow Up — 12 Months Dropdown (Enabled ONLY when Outcome is Follow Up) */}
-      <div className="w-36 shrink-0">
+      {/* Follow Up */}
+      <div className="px-2 py-1.5 min-w-0 flex items-center">
         {isReadOnly ? (
           <span className="text-xs text-fg-subtle px-1">
             {row.outcome_status === 'follow_up' && row.follow_up_month ? row.follow_up_month : '—'}
           </span>
-        ) : row.outcome_status === 'follow_up' ? (
-          <select
-            value={row.follow_up_month ?? ''}
-            onChange={(e) => handleMonthChange(e.target.value)}
-            onKeyDown={handleKeyDownEnter}
-            className="w-full bg-warning-subtle/50 border border-warning/70 text-warning-strong font-medium rounded px-1.5 py-1 text-xs cursor-pointer focus:ring-1 focus:ring-warning"
-          >
-            <option value="">— Pick Month —</option>
-            {MONTHS.map((m) => (
-              <option key={m} value={m} className="text-fg bg-surface">
-                {m}
-              </option>
-            ))}
-          </select>
         ) : (
-          <div className="w-full text-center text-fg-muted/40 text-xs py-1 select-none font-mono">
-            —
-          </div>
+          <RowMonthDropdown
+            value={row.outcome_status === 'follow_up' ? row.follow_up_month : null}
+            disabled={row.outcome_status !== 'follow_up'}
+            onChange={(month) => handleMonthChange(month)}
+          />
         )}
       </div>
 
-      {/* Comments — wraps at ~35 chars, expands height, shows full text */}
-      <div className="flex-1 min-w-[180px] shrink-0">
+      {/* Comments */}
+      <div className="px-2.5 py-1.5 min-w-0 flex items-center">
         {isReadOnly ? (
-          <p className="px-1 text-fg-subtle italic text-xs break-words leading-relaxed whitespace-pre-wrap">
+          <p className="text-fg-subtle italic text-xs break-words leading-relaxed whitespace-pre-wrap">
             {row.comments || '—'}
           </p>
         ) : (
           <textarea
             ref={commentsRef as any}
             defaultValue={row.comments ?? ''}
-            placeholder="Optional notes…"
+            maxLength={200}
+            placeholder="Optional notes (max 200 chars)…"
             rows={row.comments && row.comments.length > 35 ? Math.min(4, Math.ceil(row.comments.length / 35)) : 1}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
@@ -378,20 +371,21 @@ export function TrackerRow({ row, isReadOnly, onUpdate, onDelete, onCall }: Prop
               target.style.height = 'auto';
               target.style.height = `${Math.max(28, target.scrollHeight)}px`;
             }}
-            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:bg-surface px-1.5 py-1 rounded text-fg placeholder-fg-subtle
-                       transition-colors resize-none break-words leading-relaxed text-xs outline-none focus:ring-1 focus:ring-primary/30"
+            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:bg-surface px-1.5 py-1 rounded text-fg placeholder-fg-subtle transition-colors resize-none break-words leading-relaxed text-xs outline-none focus:ring-1 focus:ring-primary/30"
           />
         )}
       </div>
 
-      {/* Actions — Delete button */}
-      <div className="w-16 shrink-0 flex items-center justify-center">
+      {/* Actions */}
+      <div className="px-2 py-2 flex items-center justify-center">
         {!isReadOnly && (
           <button
-            onClick={onDelete}
+            onClick={() => {
+              triggerHaptic('medium');
+              onDelete();
+            }}
             title="Delete this contact row from today's tracker"
-            className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600
-                       transition-all p-1.5 rounded-lg hover:bg-rose-50 cursor-pointer"
+            className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 transition-all active:scale-90 p-1.5 rounded-lg hover:bg-rose-50 cursor-pointer"
           >
             <Trash2 size={14} />
           </button>
@@ -420,7 +414,7 @@ function getOutcomeColor(outcome: CallOutcome): string {
     call_back: 'text-warning font-semibold',
     hiring: 'text-success font-bold',
     invite_mail: 'text-primary font-bold',
-    not_hiring: 'text-fg-subtle',
+    not_hiring: 'text-destructive font-semibold',
     no_response: 'text-destructive',
     follow_up: 'text-warning font-bold',
     in_connect: 'text-primary font-semibold',

@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Check, Filter, Sparkles } from 'lucide-react';
+import { ChevronDown, Check, Filter } from 'lucide-react';
 import { CallOutcome } from '@/types/tracker';
+import { triggerHaptic } from '@/lib/haptics';
 
 export interface OutcomeOption {
   value: CallOutcome | 'all';
@@ -18,12 +19,12 @@ export const CALL_OUTCOME_OPTIONS: OutcomeOption[] = [
   { value: 'hiring', label: 'Hiring', dotColor: 'bg-emerald-500', category: 'Positive' },
   { value: 'drive_completed', label: 'Drive Completed', dotColor: 'bg-emerald-500', category: 'Positive' },
   { value: 'invite_mail', label: 'Invite Mail', dotColor: 'bg-sky-500', category: 'Positive' },
-  { value: 'in_connect', label: 'In Connect', dotColor: 'bg-indigo-500', category: 'In Progress' },
+  { value: 'in_connect', label: 'In Connect', dotColor: 'bg-indigo-500', category: 'Neutral' },
   { value: 'follow_up', label: 'Follow Up', dotColor: 'bg-amber-500', category: 'Action Req' },
   { value: 'call_back', label: 'Call Back', dotColor: 'bg-amber-500', category: 'Action Req' },
   { value: 'hiring_completed', label: 'Hiring Completed', dotColor: 'bg-cyan-500', category: 'Completed' },
   { value: 'hiring_freezed', label: 'Hiring Freezed', dotColor: 'bg-orange-500', category: 'Paused' },
-  { value: 'not_hiring', label: 'Not Hiring', dotColor: 'bg-slate-400', category: 'Closed' },
+  { value: 'not_hiring', label: 'Not Hiring', dotColor: 'bg-rose-500', category: 'Closed' },
   { value: 'no_response', label: 'No Response', dotColor: 'bg-rose-500', category: 'No Ans' },
   { value: 'invalid', label: 'Invalid', dotColor: 'bg-slate-500', category: 'Invalid' },
 ];
@@ -41,7 +42,6 @@ export function SmoothOutcomeDropdown({
   onChange,
   className = '',
   align = 'left',
-  size = 'md',
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -74,8 +74,14 @@ export function SmoothOutcomeDropdown({
     CALL_OUTCOME_OPTIONS.find((o) => o.value === value) || CALL_OUTCOME_OPTIONS[0];
 
   const handleSelect = (val: CallOutcome | 'all') => {
+    triggerHaptic('selection');
     onChange(val);
     setIsOpen(false);
+  };
+
+  const handleToggle = () => {
+    triggerHaptic('light');
+    setIsOpen((prev) => !prev);
   };
 
   return (
@@ -83,10 +89,10 @@ export function SmoothOutcomeDropdown({
       {/* ── Trigger Button (Smooth Pill Style) ─────────────────────────── */}
       <button
         type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={handleToggle}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className={`flex items-center justify-between gap-2.5 px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all shadow-xs cursor-pointer select-none ${
+        className={`flex items-center justify-between gap-2.5 px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-150 active:scale-[0.98] shadow-xs cursor-pointer select-none ${
           value !== 'all'
             ? 'bg-surface-raised border-primary/40 text-fg ring-1 ring-primary/20'
             : 'bg-surface border-border text-fg hover:bg-surface-raised'
@@ -98,30 +104,30 @@ export function SmoothOutcomeDropdown({
               value !== 'all' ? 'shadow-[0_0_8px_currentColor] animate-pulse' : ''
             }`}
           />
-          <span className="truncate">{currentOption.label}</span>
+          <span className="truncate tracking-tight">{currentOption.label}</span>
         </div>
         <ChevronDown
           size={14}
-          className={`text-fg-subtle shrink-0 transition-transform duration-200 ${
+          className={`text-fg-subtle shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
             isOpen ? 'rotate-180' : ''
           }`}
         />
       </button>
 
-      {/* ── Smooth Dropdown Popover ───────────────────────────────────── */}
+      {/* ── Origin-Anchored Dropdown Popover ───────────────────────────── */}
       {isOpen && (
         <div
           role="listbox"
           className={`absolute top-full ${
-            align === 'right' ? 'right-0' : 'left-0'
-          } mt-1.5 w-64 bg-surface border border-border rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150 text-fg select-none`}
+            align === 'right' ? 'right-0 origin-top-right' : 'left-0 origin-top-left'
+          } mt-1.5 w-64 bg-surface/98 backdrop-blur-md border border-border rounded-2xl shadow-3 z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] text-fg select-none`}
         >
           {/* Header ribbon */}
-          <div className="px-3.5 py-2.5 border-b border-border bg-surface-sunken flex items-center justify-between text-micro font-bold text-fg-subtle uppercase tracking-wider">
+          <div className="px-3.5 py-2.5 border-b border-border bg-surface-sunken/80 flex items-center justify-between text-micro font-bold text-fg-subtle uppercase tracking-wider">
             <span className="flex items-center gap-1.5">
               <Filter size={12} className="text-primary" /> Filter By Call Status
             </span>
-            <span className="font-mono text-[10px] text-fg-disabled">{CALL_OUTCOME_OPTIONS.length} statuses</span>
+            <span className="font-mono tabular-nums text-[10px] text-fg-disabled">{CALL_OUTCOME_OPTIONS.length} statuses</span>
           </div>
 
           {/* Status List */}
@@ -133,7 +139,7 @@ export function SmoothOutcomeDropdown({
                   key={opt.value}
                   type="button"
                   onClick={() => handleSelect(opt.value)}
-                  className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between gap-2.5 transition-all cursor-pointer ${
+                  className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between gap-2.5 transition-all active:scale-[0.98] cursor-pointer ${
                     isSelected
                       ? 'bg-primary/15 text-primary font-bold shadow-2xs'
                       : 'hover:bg-surface-raised text-fg'
@@ -165,3 +171,4 @@ export function SmoothOutcomeDropdown({
     </div>
   );
 }
+

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Check, Loader2 } from 'lucide-react';
 
 type SaveStatus = 'saved' | 'saving' | 'idle';
 
@@ -15,9 +16,13 @@ export function AutoSaveBadge({ status, lastSavedAt }: Props) {
   useEffect(() => {
     if (!lastSavedAt) return;
     const update = () => {
-      setTimeStr(lastSavedAt.toLocaleTimeString('en-IN', {
-        hour: 'numeric', minute: '2-digit', hour12: true,
-      }));
+      setTimeStr(
+        lastSavedAt.toLocaleTimeString('en-IN', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        }),
+      );
     };
     update();
     const t = setInterval(update, 30000);
@@ -26,35 +31,38 @@ export function AutoSaveBadge({ status, lastSavedAt }: Props) {
 
   if (status === 'saving') {
     return (
-      <div className="flex items-center gap-1.5 text-xs text-warning">
-        <span className="w-2 h-2 rounded-full bg-warning animate-pulse" />
-        <span>Saving…</span>
+      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-warning/10 border border-warning/30 text-xs font-semibold text-warning transition-all duration-200 animate-in fade-in">
+        <Loader2 size={12} className="animate-spin text-warning shrink-0" />
+        <span className="tracking-tight">Saving…</span>
       </div>
     );
   }
 
   if (status === 'saved' && lastSavedAt) {
     return (
-      <div className="flex items-center gap-1.5 text-xs text-success">
-        <span className="w-2 h-2 rounded-full bg-success" />
-        <span>Saved at {timeStr}</span>
+      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 border border-success/30 text-xs font-semibold text-success transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] animate-in fade-in zoom-in-95">
+        <Check size={12} strokeWidth={3} className="text-success shrink-0" />
+        <span className="tracking-tight">
+          Saved at <span className="tabular-nums font-mono">{timeStr}</span>
+        </span>
       </div>
     );
   }
 
   if (status === 'saved' && !lastSavedAt) {
     return (
-      <div className="flex items-center gap-1.5 text-xs text-success">
-        <span className="w-2 h-2 rounded-full bg-success" />
-        <span>All changes saved</span>
+      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 border border-success/30 text-xs font-semibold text-success transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] animate-in fade-in">
+        <Check size={12} strokeWidth={3} className="text-success shrink-0" />
+        <span className="tracking-tight">All changes saved</span>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-1.5 text-xs text-fg-subtle">
-      <span className="w-2 h-2 rounded-full bg-surface-raised" />
-      <span>Auto-save active</span>
+    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-sunken border border-border text-xs font-medium text-fg-subtle">
+      <span className="w-1.5 h-1.5 rounded-full bg-fg-disabled" />
+      <span className="tracking-tight">Auto-save ready</span>
     </div>
   );
 }
+

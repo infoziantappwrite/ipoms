@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
+import { triggerHaptic } from '@/lib/haptics';
 
 export type CalendarTheme = 'navy' | 'blue' | 'emerald' | 'amber';
 
@@ -84,14 +85,17 @@ export function SmoothCalendar({
 
   // Month navigation
   const handlePrevMonth = () => {
+    triggerHaptic('light');
     setCurrentMonth(new Date(year, monthIndex - 1, 1));
   };
 
   const handleNextMonth = () => {
+    triggerHaptic('light');
     setCurrentMonth(new Date(year, monthIndex + 1, 1));
   };
 
   const handleToday = () => {
+    triggerHaptic('light');
     const now = new Date();
     setCurrentMonth(new Date(now.getFullYear(), now.getMonth(), 1));
     const todayStr = formatDateKey(now.getFullYear(), now.getMonth(), now.getDate());
@@ -121,6 +125,7 @@ export function SmoothCalendar({
 
   // Handle Day Click
   const handleDayClick = (dateStr: string) => {
+    triggerHaptic('selection');
     if (mode === 'single') {
       if (onChangeSingle) onChangeSingle(dateStr);
     } else if (mode === 'range') {
