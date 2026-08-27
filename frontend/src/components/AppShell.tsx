@@ -1,18 +1,22 @@
 'use client';
 
-import { useCallback, useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { useState, useCallback, useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Menu } from 'lucide-react';
 
 import { AppSidebar } from './nav/AppSidebar';
 import { InfoziantMark } from './InfoziantMark';
 import { initTheme } from '@/lib/theme';
+import { isFocusLockedToday } from '@/lib/collegeSession';
+import { useToast } from '@/components/ui/Toast';
 
 /** Routes that render their own full-screen chrome and must not show the drawer. */
 const CHROMELESS = ['/', '/login', '/signup'];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const { toast } = useToast();
   const rawPathname = usePathname();
   // next.config.mjs sets trailingSlash: true (for the Capacitor static export),
   // so usePathname() returns "/login/" not "/login" — normalize before matching.
@@ -25,6 +29,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     initTheme();
   }, []);
+
+  // Enforce focus lockdown: Without locking daily focus, users cannot access operational routes
+  useEffect(() => {
+    const isAllowedRoute =
+      pathname === '/' ||
+      pathname === '/login' ||
+      pathname === '/signup' ||
+      pathname === '/dashboard' ||
+      pathname === '/settings' ||
+      pathname.startsWith('/settings');
+
+    if (!isAllowedRoute && typeof window !== 'undefined') {
+      if (!isFocusLockedToday()) {
+        toast('Please select between 1 and 4 focus colleges on the Dashboard to unlock operational modules.', 'warning');
+        router.replace('/dashboard');
+      }
+    }
+  }, [pathname, router, toast]);
 
   if (CHROMELESS.includes(pathname)) {
     return <main id="main" className="flex min-h-screen flex-1 flex-col">{children}</main>;

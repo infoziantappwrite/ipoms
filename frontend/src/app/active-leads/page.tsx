@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { apiFetch, apiFetchBlob } from '@/lib/api';
+import { useToast } from '@/components/ui/Toast';
 import { ActiveLeadHeader } from './components/ActiveLeadHeader';
 import { ActiveLeadTable, ActiveLeadItem } from './components/ActiveLeadTable';
 import { AddActiveLeadModal } from './components/AddActiveLeadModal';
-import { BulkPasteLeadModal } from './components/BulkPasteLeadModal';
 import { LeadStatus } from '@/components/ui/SmoothLeadStatusDropdown';
 
 export default function ActiveLeadsPage() {
+  const { toast } = useToast();
   const [leads, setLeads] = useState<ActiveLeadItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -19,12 +20,17 @@ export default function ActiveLeadsPage() {
     total: 0,
     hiring: 0,
     follow_up: 0,
-    not_hiring: 0,
+    invite_email: 0,
   });
 
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showBulkModal, setShowBulkModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Batch Delete State
+  const [isDeleteMode, setIsDeleteMode] = useState(false);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [isDeletingSelected, setIsDeletingSelected] = useState(false);
 
   // Fetch leads with active filters
   const fetchLeads = useCallback(async (showSpinner = true) => {
@@ -69,46 +75,53 @@ export default function ActiveLeadsPage() {
       }
     };
 
+    window.addEventListener('visibilitychange', handleVisibilityOrFocus);
     window.addEventListener('focus', handleVisibilityOrFocus);
-    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
 
-    // 3. Cross-tab instant broadcast channel
-    let bc: BroadcastChannel | null = null;
+    // 3. Multi-Tab Instant BroadcastChannel for real-time synchronization
+    let channel: BroadcastChannel | null = null;
     try {
-      bc = new BroadcastChannel('ipoms_active_leads_sync');
-      bc.onmessage = (event) => {
-        if (event.data?.type === 'LEAD_MUTATION') {
-          fetchLeads(false);
-        }
-      };
-    } catch {
-      // BroadcastChannel not supported in older environments
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        channel = new BroadcastChannel('ipoms_active_leads_sync');
+        channel.onmessage = (event) => {
+          if (event.data?.type === 'LEAD_MUTATION') {
+            fetchLeads(false);
+          }
+        };
+      }
+    } catch (e) {
+      console.warn('BroadcastChannel not available:', e);
     }
 
     return () => {
       clearInterval(interval);
+      window.removeEventListener('visibilitychange', handleVisibilityOrFocus);
       window.removeEventListener('focus', handleVisibilityOrFocus);
-      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
-      if (bc) bc.close();
+      if (channel) {
+        channel.close();
+      }
     };
   }, [fetchLeads]);
 
+  // Broadcast helper
   const broadcastMutation = () => {
     try {
-      const bc = new BroadcastChannel('ipoms_active_leads_sync');
-      bc.postMessage({ type: 'LEAD_MUTATION', timestamp: Date.now() });
-      bc.close();
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        const bc = new BroadcastChannel('ipoms_active_leads_sync');
+        bc.postMessage({ type: 'LEAD_MUTATION', timestamp: Date.now() });
+        setTimeout(() => bc.close(), 100);
+      }
     } catch {
       // ignore
     }
   };
 
-  // Update a single lead (Auto-save)
+  // Inline Field Update with optimistic UI updates
   const handleUpdateLead = async (id: string, updates: Partial<ActiveLeadItem>): Promise<boolean> => {
     try {
       // Optimistic update
       setLeads((prev) =>
-        prev.map((item) => (item._id === id ? { ...item, ...updates } : item))
+        prev.map((lead) => (lead._id === id ? { ...lead, ...updates } : lead))
       );
 
       const res = await apiFetch(`/active-leads/${id}`, {
@@ -117,43 +130,19 @@ export default function ActiveLeadsPage() {
       });
 
       if (res.success) {
-        // Refresh stats silently
-        const statsRes = await apiFetch('/active-leads');
+        const statsRes = await apiFetch('/active-leads?academic_year=' + selectedYear);
         if (statsRes.success && statsRes.data?.stats) {
           setStats(statsRes.data.stats);
         }
         broadcastMutation();
         return true;
       }
+      // Revert if failed
+      fetchLeads(false);
       return false;
     } catch (err) {
       console.error('Update lead failed:', err);
-      fetchLeads(); // rollback
-      return false;
-    }
-  };
-
-  // Delete a lead
-  const handleDeleteLead = async (id: string): Promise<boolean> => {
-    if (!window.confirm('Are you sure you want to remove this active lead?')) return false;
-
-    try {
-      setLeads((prev) => prev.filter((item) => item._id !== id));
-      const res = await apiFetch(`/active-leads/${id}`, { method: 'DELETE' });
-      if (res.success) {
-        // Refresh stats
-        const statsRes = await apiFetch('/active-leads');
-        if (statsRes.success && statsRes.data?.stats) {
-          setStats(statsRes.data.stats);
-        }
-        broadcastMutation();
-        return true;
-      }
-      fetchLeads();
-      return false;
-    } catch (err) {
-      console.error('Delete lead failed:', err);
-      fetchLeads();
+      fetchLeads(false);
       return false;
     }
   };
@@ -176,6 +165,7 @@ export default function ActiveLeadsPage() {
       if (res.success) {
         fetchLeads();
         broadcastMutation();
+        toast('Lead added successfully!', 'success');
         return true;
       }
       return false;
@@ -185,31 +175,78 @@ export default function ActiveLeadsPage() {
     }
   };
 
-  // Bulk add leads
-  const handleBulkAdd = async (
-    lines: string[],
-    academicYear: string,
-    defaultStatus: LeadStatus
-  ): Promise<boolean> => {
+  // Toggle Delete Mode
+  const toggleDeleteMode = () => {
+    setIsDeleteMode((prev) => !prev);
+    setSelectedLeadIds([]);
+  };
+
+  // Toggle individual lead selection
+  const handleToggleSelectLead = (id: string) => {
+    setSelectedLeadIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  // Toggle select all visible leads
+  const handleToggleSelectAll = () => {
+    if (selectedLeadIds.length === leads.length && leads.length > 0) {
+      setSelectedLeadIds([]);
+    } else {
+      setSelectedLeadIds(leads.map((l) => l._id));
+    }
+  };
+
+  // Delete selected leads
+  const handleDeleteSelected = async () => {
+    if (selectedLeadIds.length === 0) return;
     try {
-      const res = await apiFetch('/active-leads/bulk', {
+      setIsDeletingSelected(true);
+      const res = await apiFetch('/active-leads/bulk-delete', {
+        method: 'POST',
+        body: JSON.stringify({ ids: selectedLeadIds }),
+      });
+
+      if (res.success) {
+        toast(res.message || `${selectedLeadIds.length} lead(s) deleted successfully!`, 'success');
+        setSelectedLeadIds([]);
+        setIsDeleteMode(false);
+        await fetchLeads(false);
+        broadcastMutation();
+      } else {
+        toast(res.error?.message || 'Failed to delete selected leads', 'error');
+      }
+    } catch (err: any) {
+      console.error('Delete selected error:', err);
+      toast('Failed to delete selected leads. Please try again.', 'error');
+    } finally {
+      setIsDeletingSelected(false);
+    }
+  };
+
+  // Sync leads from Daily Tracker
+  const handleSyncTracker = async () => {
+    try {
+      setIsSyncing(true);
+      const res = await apiFetch('/active-leads/sync', {
         method: 'POST',
         body: JSON.stringify({
-          lines,
-          academic_year: academicYear,
-          default_status: defaultStatus,
+          academic_year: selectedYear !== 'all' ? selectedYear : undefined,
         }),
       });
 
       if (res.success) {
-        fetchLeads();
+        await fetchLeads(false);
         broadcastMutation();
-        return true;
+        toast(res.message || 'Leads synchronized from Daily Tracker successfully!', 'success');
+      } else {
+        toast(res.error?.message || 'Failed to sync leads from Daily Tracker', 'error');
       }
-      return false;
-    } catch (err) {
-      console.error('Bulk add leads failed:', err);
-      return false;
+    } catch (err: any) {
+      console.error('Sync tracker error:', err);
+      toast('Failed to sync leads from Daily Tracker. Please try again.', 'error');
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -254,9 +291,15 @@ export default function ActiveLeadsPage() {
         onMonthChange={setSelectedMonth}
         stats={stats}
         onOpenAddModal={() => setShowAddModal(true)}
-        onOpenBulkPasteModal={() => setShowBulkModal(true)}
         onExportExcel={handleExportExcel}
         isExporting={isExporting}
+        onSyncTracker={handleSyncTracker}
+        isSyncing={isSyncing}
+        isDeleteMode={isDeleteMode}
+        onToggleDeleteMode={toggleDeleteMode}
+        selectedCount={selectedLeadIds.length}
+        onDeleteSelected={handleDeleteSelected}
+        isDeletingSelected={isDeletingSelected}
       />
 
       {/* Main Content Body */}
@@ -265,7 +308,10 @@ export default function ActiveLeadsPage() {
           leads={leads}
           loading={loading}
           onUpdateLead={handleUpdateLead}
-          onDeleteLead={handleDeleteLead}
+          isDeleteMode={isDeleteMode}
+          selectedIds={selectedLeadIds}
+          onToggleSelectLead={handleToggleSelectLead}
+          onToggleSelectAll={handleToggleSelectAll}
         />
       </main>
 
@@ -274,12 +320,6 @@ export default function ActiveLeadsPage() {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSubmit={handleAddLead}
-      />
-
-      <BulkPasteLeadModal
-        isOpen={showBulkModal}
-        onClose={() => setShowBulkModal(false)}
-        onSubmitBulk={handleBulkAdd}
       />
     </div>
   );

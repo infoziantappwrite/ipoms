@@ -24,6 +24,10 @@ interface Props {
   order: number;
   summaryMetric: string;
   rows: WeeklyRow[];
+  isGlobalDeleteMode?: boolean;
+  globalSelectedRowIds?: string[];
+  onToggleSelectRow?: (rowId: string) => void;
+  onToggleSelectSection?: (rowIds: string[]) => void;
   onUpdateRow: (rowId: string, patch: Partial<WeeklyRow>) => Promise<void>;
   onMoveSection: (rowId: string, newSection: string) => Promise<void>;
   onTogglePin: (rowId: string) => Promise<void>;
@@ -81,16 +85,23 @@ export function WeeklySection({
   order,
   summaryMetric,
   rows,
+  isGlobalDeleteMode,
+  globalSelectedRowIds,
+  onToggleSelectRow: onGlobalToggleSelectRow,
+  onToggleSelectSection: onGlobalToggleSelectSection,
   onUpdateRow,
   onMoveSection,
   onTogglePin,
   onDeleteRow,
 }: Props) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isDeleteMode, setIsDeleteMode] = useState(false);
-  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [isLocalDeleteMode, setIsLocalDeleteMode] = useState(false);
+  const [localSelectedRowIds, setLocalSelectedRowIds] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [editingRow, setEditingRow] = useState<WeeklyRow | null>(null);
+
+  const isDeleteMode = isGlobalDeleteMode !== undefined ? isGlobalDeleteMode : isLocalDeleteMode;
+  const selectedRowIds = isGlobalDeleteMode ? (globalSelectedRowIds || []) : localSelectedRowIds;
 
   const config = SECTION_CONFIGS[sectionKey] || {
     Icon: Folder,
@@ -102,16 +113,24 @@ export function WeeklySection({
   const IconComponent = config.Icon;
 
   const handleToggleSelectRow = (id: string) => {
-    setSelectedRowIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+    if (isGlobalDeleteMode && onGlobalToggleSelectRow) {
+      onGlobalToggleSelectRow(id);
+    } else {
+      setLocalSelectedRowIds((prev) =>
+        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      );
+    }
   };
 
   const handleToggleSelectAll = () => {
-    if (selectedRowIds.length === rows.length) {
-      setSelectedRowIds([]);
+    if (isGlobalDeleteMode && onGlobalToggleSelectSection) {
+      onGlobalToggleSelectSection(rows.map((r) => r._id));
     } else {
-      setSelectedRowIds(rows.map((r) => r._id));
+      if (localSelectedRowIds.length === rows.length) {
+        setLocalSelectedRowIds([]);
+      } else {
+        setLocalSelectedRowIds(rows.map((r) => r._id));
+      }
     }
   };
 
@@ -129,8 +148,8 @@ export function WeeklySection({
       for (const id of selectedRowIds) {
         await onDeleteRow(id);
       }
-      setSelectedRowIds([]);
-      setIsDeleteMode(false);
+      setLocalSelectedRowIds([]);
+      setIsLocalDeleteMode(false);
     } catch (err) {
       console.error('Failed to batch delete:', err);
     } finally {
@@ -181,8 +200,12 @@ export function WeeklySection({
               <button
                 type="button"
                 onClick={() => {
-                  setIsDeleteMode(false);
-                  setSelectedRowIds([]);
+                  if (isGlobalDeleteMode && onGlobalToggleSelectSection) {
+                    onGlobalToggleSelectSection([]);
+                  } else {
+                    setIsLocalDeleteMode(false);
+                    setLocalSelectedRowIds([]);
+                  }
                 }}
                 className="p-1 rounded-lg text-fg-subtle hover:text-fg hover:bg-surface-raised transition-colors cursor-pointer"
                 title="Cancel selection"
@@ -198,7 +221,7 @@ export function WeeklySection({
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setIsDeleteMode(true);
+                    setIsLocalDeleteMode(true);
                     setIsCollapsed(false);
                   }}
                   className="p-1.5 rounded-lg text-fg-subtle hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"

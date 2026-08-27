@@ -14,7 +14,7 @@ export function formatPeriodFromDates(startStr: string, endStr: string): string 
   if (!startStr) return '';
   if (!endStr) {
     const s = new Date(startStr + 'T00:00:00');
-    return `Starting ${s.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} (Select End Date)`;
+    return `${s.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`;
   }
   const start = new Date(startStr + 'T00:00:00');
   const end = new Date(endStr + 'T00:00:00');
@@ -22,27 +22,12 @@ export function formatPeriodFromDates(startStr: string, endStr: string): string 
   const optShort: Intl.DateTimeFormatOptions = { day: '2-digit', month: 'short' };
   const sStr = start.toLocaleDateString('en-IN', optShort);
   const eStr = end.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-  const monthName = start.toLocaleDateString('en-IN', { month: 'long' });
-  const year = start.getFullYear();
 
-  // Find Friday week index
-  let fridayCount = 0;
-  const cur = new Date(start.getFullYear(), start.getMonth(), 1);
-  while (cur <= start) {
-    if (cur.getDay() === 5) fridayCount++;
-    cur.setDate(cur.getDate() + 1);
-  }
-  const weekNum = fridayCount > 0 ? fridayCount : 1;
-  const diffDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-  if (diffDays === 7 && start.getDay() === 5) {
-    return `${monthName} ${year} • Week ${weekNum}: ${sStr} – ${eStr}`;
-  } else if (diffDays === 14) {
-    return `${monthName} ${year} • Weeks ${weekNum} & ${weekNum + 1}: ${sStr} – ${eStr}`;
-  } else if (diffDays >= 28 && start.getDate() === 1) {
-    return `${monthName} ${year} Consolidated (01 ${monthName.slice(0, 3)} – ${eStr})`;
+  if (start.getFullYear() === end.getFullYear()) {
+    return `${sStr} – ${eStr}`;
   } else {
-    return `${sStr} ${start.getFullYear()} – ${eStr}`;
+    const sStrFull = start.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    return `${sStrFull} – ${eStr}`;
   }
 }
 

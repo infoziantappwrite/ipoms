@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Pencil, Plus, Search, Lock, AlertTriangle, Unlock, Ban } from 'lucide-react';
+import { Pencil, Plus, Search, Lock, AlertTriangle, Unlock, Ban, Shield } from 'lucide-react';
+import { SmoothSelect } from '@/components/ui/SmoothSelect';
 
 interface Props {
   users: any[];
@@ -29,7 +30,11 @@ export function UserManagementTab({
       u.username?.toLowerCase().includes(search.toLowerCase());
 
     const matchesRole =
-      roleFilter === 'all' || (u.role_codes && u.role_codes.includes(roleFilter));
+      roleFilter === 'all' ||
+      (roleFilter === 'COORDINATOR' && (u.role_id?.role_code === 'COORDINATOR' || u.role_id?.role_code === 'PLACEMENT_COORDINATOR' || u.role === 'COORDINATOR' || u.role === 'PLACEMENT_COORDINATOR')) ||
+      (roleFilter === 'TEAM_LEADER' && (u.role_id?.role_code === 'TEAM_LEADER' || u.role === 'TEAM_LEADER')) ||
+      (roleFilter === 'ADMINISTRATOR' && (u.role_id?.role_code === 'ADMINISTRATOR' || u.role === 'ADMINISTRATOR')) ||
+      (roleFilter === 'TPO' && (u.role_id?.role_code === 'TPO' || u.role === 'TPO'));
 
     return matchesSearch && matchesRole;
   });
@@ -42,14 +47,14 @@ export function UserManagementTab({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
 
-      {/* Control Bar */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2 flex-wrap">
+      {/* Action Header & Search */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
           {/* Search */}
           <div className="relative">
-            <Search size={14} strokeWidth={2} aria-hidden />
+            <Search size={14} strokeWidth={2} aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
             <input
               type="text"
               value={search}
@@ -60,17 +65,21 @@ export function UserManagementTab({
           </div>
 
           {/* Role Filter */}
-          <select
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            className="bg-background border border-border rounded-xl px-3 py-2 text-xs text-fg cursor-pointer"
-          >
-            <option value="all">All Roles</option>
-            <option value="COORDINATOR">Placement Coordinators</option>
-            <option value="TEAM_LEADER">Team Leaders</option>
-            <option value="ADMINISTRATOR">Administrators</option>
-            <option value="TPO">TPOs</option>
-          </select>
+          <div className="w-52">
+            <SmoothSelect
+              value={roleFilter}
+              onChange={setRoleFilter}
+              icon={Shield}
+              title="System Role Filter"
+              options={[
+                { value: 'all', label: 'All Roles' },
+                { value: 'COORDINATOR', label: 'Placement Coordinators' },
+                { value: 'TEAM_LEADER', label: 'Team Leaders' },
+                { value: 'ADMINISTRATOR', label: 'Administrators' },
+                { value: 'TPO', label: 'TPOs' },
+              ]}
+            />
+          </div>
         </div>
 
         <button

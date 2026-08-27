@@ -13,6 +13,7 @@ import {
   Database,
   TrendingUp,
   PanelLeftClose,
+  Lock,
   X,
 } from 'lucide-react';
 
@@ -29,6 +30,8 @@ import {
   type SessionUser,
   type RoleKey,
 } from '@/lib/session';
+import { isFocusLockedToday } from '@/lib/collegeSession';
+import { useToast } from '@/components/ui/Toast';
 import { apiFetch } from '@/lib/api';
 import { updateSessionUser } from '@/lib/session';
 import { triggerHaptic } from '@/lib/haptics';
@@ -62,6 +65,7 @@ interface Props {
 
 export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
   const pathname = usePathname();
+  const { toast } = useToast();
 
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -69,9 +73,21 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
   const [roster, setRoster] = useState<string[]>([]);
   const [hovered, setHovered] = useState<HTMLElement | null>(null);
   const [hoverLabel, setHoverLabel] = useState('');
+  const [isFocusLocked, setIsFocusLocked] = useState<boolean>(true);
 
   const introScheduled = useRef(false);
   const introCancelled = useRef(false);
+
+  // Sync focus lock state on global focus change
+  useEffect(() => {
+    const handleFocusChange = () => {
+      setIsFocusLocked(isFocusLockedToday());
+    };
+    window.addEventListener('ipoms_focus_updated' as any, handleFocusChange);
+    return () => {
+      window.removeEventListener('ipoms_focus_updated' as any, handleFocusChange);
+    };
+  }, []);
 
   /** Ends the intro early and consumes the flag so a reload does not replay it. */
   const cancelIntro = useCallback(() => {
@@ -86,6 +102,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
   // Hydrate user & saved collapsed preference, run intro on fresh sign-in
   useEffect(() => {
     setMounted(true);
+    setIsFocusLocked(isFocusLockedToday());
     const u = readSessionUser();
     setUser(u);
 
@@ -261,34 +278,64 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
           <ul className="space-y-1">
             {items.map(({ href, label, Icon }) => {
               const active = pathname === href || pathname.startsWith(`${href}/`);
+              const isLocked = mounted && href !== '/dashboard' && !isFocusLocked;
+
+              const handleNavClick = (e: React.MouseEvent) => {
+                if (isLocked) {
+                  e.preventDefault();
+                  triggerHaptic('heavy');
+                  toast(
+                    'Please select 1 to 4 focus colleges on the Dashboard to unlock operational pages.',
+                    'warning'
+                  );
+                  return;
+                }
+                // Blur active input to immediately trigger onBlur auto-save before route change
+                if (typeof document !== 'undefined' && document.activeElement && 'blur' in document.activeElement) {
+                  (document.activeElement as HTMLElement).blur();
+                }
+                triggerHaptic('light');
+              };
 
               return (
                 <li key={href}>
                   <Link
                     href={href}
+                    onClick={handleNavClick}
                     aria-current={active ? 'page' : undefined}
-                    onMouseEnter={(e) => showLabel(e.currentTarget, label)}
+                    onMouseEnter={(e) => showLabel(e.currentTarget, isLocked ? `${label} (Locked)` : label)}
                     onMouseLeave={() => setHovered(null)}
-                    onFocus={(e) => showLabel(e.currentTarget, label)}
+                    onFocus={(e) => showLabel(e.currentTarget, isLocked ? `${label} (Locked)` : label)}
                     onBlur={() => setHovered(null)}
-                    onPointerDown={() => triggerHaptic('light')}
-                    className={`group flex items-center gap-3 rounded-control cursor-pointer active:scale-[0.98]
-                      ${mounted ? 'transition-[background-color,box-shadow,color,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]' : ''}
-                      ${active
+                    className={`group flex items-center gap-3 rounded-control cursor-pointer active:scale-[0.98] ${
+                      mounted ? 'transition-[background-color,box-shadow,color,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]' : ''
+                    } ${
+                      isLocked
+                        ? 'text-fg-subtle/50 hover:bg-surface-sunken/60 hover:text-fg-subtle'
+                        : active
                         ? 'bg-primary text-primary-foreground shadow-1'
-                        : 'text-fg-muted hover:bg-surface-sunken hover:text-fg'}`}
+                        : 'text-fg-muted hover:bg-surface-sunken hover:text-fg'
+                    }`}
                   >
                     <span className="relative grid h-10 w-10 shrink-0 place-items-center">
                       <Icon size={20} strokeWidth={2} aria-hidden />
+                      {isLocked && (
+                        <span className="absolute bottom-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                          <Lock size={8} strokeWidth={2.5} />
+                        </span>
+                      )}
                     </span>
                     <span className="flex-1 flex items-center justify-between min-w-0 pr-2">
                       <span
-                        className={`whitespace-nowrap text-body font-semibold
-                          ${mounted ? 'transition-opacity duration-300 ease-in-out' : ''}
-                          ${collapsed ? 'opacity-100 lg:opacity-0' : 'opacity-100'}`}
+                        className={`whitespace-nowrap text-body font-semibold ${
+                          mounted ? 'transition-opacity duration-300 ease-in-out' : ''
+                        } ${collapsed ? 'opacity-100 lg:opacity-0' : 'opacity-100'}`}
                       >
                         {label}
                       </span>
+                      {isLocked && !collapsed && (
+                        <Lock size={12} className="text-amber-500/70 ml-2 shrink-0" />
+                      )}
                     </span>
                   </Link>
                 </li>
@@ -364,6 +411,8 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
         pathname={pathname}
         user={user}
         fullName={fullName}
+        isFocusLocked={isFocusLocked}
+        mounted={mounted}
       />
 
       {/* Rail Tooltip when collapsed */}
@@ -379,6 +428,8 @@ function MobileDrawer({
   pathname,
   user,
   fullName,
+  isFocusLocked,
+  mounted,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -386,7 +437,10 @@ function MobileDrawer({
   pathname: string;
   user: SessionUser | null;
   fullName: string;
+  isFocusLocked: boolean;
+  mounted: boolean;
 }) {
+  const { toast } = useToast();
   const [dragX, setDragX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
@@ -494,22 +548,46 @@ function MobileDrawer({
           <ul className="space-y-1">
             {items.map(({ href, label, Icon }) => {
               const active = pathname === href || pathname.startsWith(`${href}/`);
+              const isLocked = mounted && href !== '/dashboard' && !isFocusLocked;
+
+              const handleClick = (e: React.MouseEvent) => {
+                if (isLocked) {
+                  e.preventDefault();
+                  triggerHaptic('heavy');
+                  toast(
+                    'Please select 1 to 4 focus colleges on the Dashboard to unlock operational pages.',
+                    'warning'
+                  );
+                  return;
+                }
+                // Blur active element to immediately trigger onBlur auto-save
+                if (typeof document !== 'undefined' && document.activeElement && 'blur' in document.activeElement) {
+                  (document.activeElement as HTMLElement).blur();
+                }
+                triggerHaptic('light');
+                onClose();
+              };
+
               return (
                 <li key={href}>
                   <Link
                     href={href}
-                    onClick={() => {
-                      triggerHaptic('light');
-                      onClose();
-                    }}
-                    className={`group flex items-center gap-3 px-3 py-2.5 rounded-control font-semibold text-xs transition-all active:scale-[0.98] ${
-                      active
+                    onClick={handleClick}
+                    className={`group flex items-center justify-between px-3 py-2.5 rounded-control font-semibold text-xs transition-all active:scale-[0.98] ${
+                      isLocked
+                        ? 'text-fg-subtle/50 hover:bg-surface-sunken/60 hover:text-fg-subtle'
+                        : active
                         ? 'bg-primary text-white shadow-xs'
                         : 'text-fg-muted hover:bg-surface-sunken hover:text-fg'
                     }`}
                   >
-                    <Icon size={20} />
-                    <span>{label}</span>
+                    <div className="flex items-center gap-3">
+                      <Icon size={20} />
+                      <span>{label}</span>
+                    </div>
+                    {isLocked && (
+                      <Lock size={13} className="text-amber-500/80 shrink-0" />
+                    )}
                   </Link>
                 </li>
               );

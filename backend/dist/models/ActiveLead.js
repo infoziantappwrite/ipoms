@@ -35,7 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ActiveLead = exports.ACADEMIC_YEARS = exports.FOLLOWUP_MONTHS = exports.ACTIVE_LEAD_STATUSES = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
-exports.ACTIVE_LEAD_STATUSES = ['Hiring', 'Not Hiring', 'Follow Up'];
+exports.ACTIVE_LEAD_STATUSES = ['Hiring', 'Invite Email', 'Follow Up'];
 // ─── Followup Months (12 Calendar Months) ────────────────────────────────────
 exports.FOLLOWUP_MONTHS = [
     'January',
@@ -84,7 +84,7 @@ const ActiveLeadSchema = new mongoose_1.Schema({
     },
     status: {
         type: String,
-        enum: exports.ACTIVE_LEAD_STATUSES,
+        enum: [...exports.ACTIVE_LEAD_STATUSES, 'Not Hiring'],
         required: true,
         default: 'Hiring',
         index: true,

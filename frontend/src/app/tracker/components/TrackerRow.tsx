@@ -219,8 +219,19 @@ export function TrackerRow({ row, index, isReadOnly, onUpdate, onDelete, onCall 
     onUpdate({ follow_up_month: month || null });
   }, [onUpdate]);
 
-  // ── Comments blur: persist to server (max 200 chars)
+  // ── Comments debounced auto-save + blur persist (max 200 chars)
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleCommentsChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const text = e.target.value.slice(0, 200);
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      onUpdate({ comments: text });
+    }, 600);
+  }, [onUpdate]);
+
   const handleCommentsBlur = useCallback(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     const text = (commentsRef.current?.value ?? '').slice(0, 200);
     onUpdate({ comments: text });
   }, [onUpdate]);
@@ -359,6 +370,7 @@ export function TrackerRow({ row, index, isReadOnly, onUpdate, onDelete, onCall 
             maxLength={200}
             placeholder="Optional notes (max 200 chars)…"
             rows={row.comments && row.comments.length > 35 ? Math.min(4, Math.ceil(row.comments.length / 35)) : 1}
+            onChange={handleCommentsChange}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();

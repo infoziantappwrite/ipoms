@@ -35,7 +35,7 @@ export function NightSkyAmbientScene({ forceShow, className = '', customVideoUrl
   return (
     <div
       aria-hidden="true"
-      className={`pointer-events-none select-none absolute right-0 top-0 bottom-0 w-full sm:w-2/3 lg:w-1/2 overflow-hidden z-0 transition-opacity duration-1000 ${className}`}
+      className={`pointer-events-none select-none absolute inset-0 w-full h-full overflow-hidden z-0 transition-opacity duration-1000 ${className}`}
     >
       {/* If user provides a custom video/animation clip */}
       {customVideoUrl ? (
@@ -52,52 +52,56 @@ export function NightSkyAmbientScene({ forceShow, className = '', customVideoUrl
       ) : (
         /* Realistic CSS & SVG Animated Ambient Night Sky (Moon + Billowing Clouds + Twinkling Stars) */
         <div className="relative w-full h-full">
-          {/* 0. Deep Twilight / Midnight Sky Atmosphere (Rich dark sky visible in Light theme as well) */}
-          <div
-            className="absolute inset-0 bg-gradient-to-l from-[#090e1a] via-[#0f172a]/95 to-transparent"
-            style={{
-              maskImage: 'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.3) 20%, black 50%)',
-              WebkitMaskImage: 'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.3) 20%, black 50%)',
-            }}
-          />
+          {/* 0. Atmosphere Gradient: White -> Light Tone -> Gray Shades -> Dark Twilight Sky (Light Theme) | Deep Midnight (Dark Theme) */}
+          <div className="absolute inset-0 bg-gradient-to-r from-white via-slate-100/95 via-30% via-slate-300/80 via-60% to-[#0b1329] dark:from-[#060c1c] dark:via-[#0c1630] dark:to-[#070e24]" />
 
-          {/* 1. Deep Midnight Cosmic Nebula Glow */}
-          <div className="absolute right-12 top-1/4 w-80 h-80 rounded-full bg-blue-900/40 dark:bg-sky-500/20 blur-3xl animate-pulse duration-5000" />
-          <div className="absolute right-24 top-1/3 w-64 h-64 rounded-full bg-indigo-900/50 dark:bg-indigo-500/20 blur-2xl animate-pulse duration-7000" />
+          {/* 1. Deep Midnight Cosmic Nebula Glows in Dark Sector */}
+          <div className="absolute left-1/3 top-1/4 w-72 h-72 rounded-full bg-slate-300/30 dark:bg-blue-900/30 blur-3xl animate-pulse" style={{ animationDuration: '6s' }} />
+          <div className="absolute right-1/4 top-1/3 w-80 h-80 rounded-full bg-slate-400/20 dark:bg-indigo-900/40 blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
+          <div className="absolute right-12 top-1/4 w-80 h-80 rounded-full bg-indigo-900/40 dark:bg-sky-900/35 blur-3xl animate-pulse" style={{ animationDuration: '5s' }} />
 
           {/* 2. Twinkling & Floating Golden / Diamond Stars */}
           <svg className="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
-            {/* Star Clusters with bright contrast */}
-            <circle cx="20%" cy="25%" r="1.2" className="fill-white animate-ping opacity-70" style={{ animationDuration: '3.2s' }} />
-            <circle cx="45%" cy="18%" r="1.8" className="fill-amber-300 animate-pulse opacity-90" style={{ animationDuration: '2.4s' }} />
-            <circle cx="70%" cy="15%" r="1.5" className="fill-sky-200 animate-pulse opacity-85" style={{ animationDuration: '4.1s' }} />
-            <circle cx="85%" cy="30%" r="2.2" className="fill-amber-200 animate-pulse opacity-95" style={{ animationDuration: '2.8s' }} />
-            <circle cx="35%" cy="65%" r="1.2" className="fill-white animate-ping opacity-60" style={{ animationDuration: '5s' }} />
-            <circle cx="60%" cy="75%" r="1.8" className="fill-sky-300 animate-pulse opacity-85" style={{ animationDuration: '3.6s' }} />
-            <circle cx="80%" cy="60%" r="2" className="fill-amber-300 animate-pulse opacity-90" style={{ animationDuration: '2.1s' }} />
-            <circle cx="92%" cy="45%" r="1.8" className="fill-white animate-pulse opacity-95" style={{ animationDuration: '3.9s' }} />
-            <circle cx="15%" cy="50%" r="1" className="fill-white opacity-50 animate-pulse" style={{ animationDuration: '4.5s' }} />
-            <circle cx="50%" cy="40%" r="1.5" className="fill-amber-100 opacity-75 animate-pulse" style={{ animationDuration: '3.1s' }} />
+            {/* Left Sector Stars */}
+            <circle cx="5%" cy="20%" r="1.4" className="fill-amber-200 animate-pulse opacity-90" style={{ animationDuration: '2.5s' }} />
+            <circle cx="10%" cy="65%" r="1.2" className="fill-white animate-ping opacity-60" style={{ animationDuration: '4.2s' }} />
+            <circle cx="16%" cy="32%" r="1.8" className="fill-sky-200 animate-pulse opacity-85" style={{ animationDuration: '3.1s' }} />
+            <circle cx="22%" cy="80%" r="1.3" className="fill-amber-300 animate-pulse opacity-80" style={{ animationDuration: '3.8s' }} />
+            <circle cx="28%" cy="15%" r="1.5" className="fill-white animate-pulse opacity-95" style={{ animationDuration: '2.9s' }} />
 
-            {/* 4-Point Glimmer Star */}
-            <g className="animate-spin-slow origin-center opacity-90" style={{ transformOrigin: '78% 28%', animationDuration: '18s' }}>
+            {/* Center Sector Stars */}
+            <circle cx="38%" cy="25%" r="1.8" className="fill-amber-300 animate-pulse opacity-90" style={{ animationDuration: '2.4s' }} />
+            <circle cx="44%" cy="70%" r="1.2" className="fill-white animate-ping opacity-70" style={{ animationDuration: '5.1s' }} />
+            <circle cx="52%" cy="18%" r="1.6" className="fill-sky-200 animate-pulse opacity-85" style={{ animationDuration: '4.1s' }} />
+            <circle cx="58%" cy="55%" r="1.4" className="fill-amber-200 animate-pulse opacity-90" style={{ animationDuration: '3.3s' }} />
+            <circle cx="65%" cy="30%" r="2.0" className="fill-amber-300 animate-pulse opacity-95" style={{ animationDuration: '2.7s' }} />
+
+            {/* Right Sector Stars */}
+            <circle cx="72%" cy="15%" r="1.5" className="fill-sky-200 animate-pulse opacity-85" style={{ animationDuration: '4.1s' }} />
+            <circle cx="78%" cy="75%" r="1.8" className="fill-sky-300 animate-pulse opacity-85" style={{ animationDuration: '3.6s' }} />
+            <circle cx="84%" cy="58%" r="2.2" className="fill-amber-300 animate-pulse opacity-95" style={{ animationDuration: '2.1s' }} />
+            <circle cx="92%" cy="45%" r="1.8" className="fill-white animate-pulse opacity-95" style={{ animationDuration: '3.9s' }} />
+            <circle cx="96%" cy="22%" r="1.3" className="fill-amber-100 opacity-75 animate-pulse" style={{ animationDuration: '3.1s' }} />
+
+            {/* 4-Point Glimmer Stars */}
+            <g className="animate-spin-slow origin-center opacity-90" style={{ transformOrigin: '82% 24%', animationDuration: '18s' }}>
               <path
                 d="M 0,-10 Q 0,0 10,0 Q 0,0 0,10 Q 0,0 -10,0 Q 0,0 0,-10"
                 fill="#FEF08A"
-                transform="translate(390, 55) scale(0.9)"
+                transform="translate(420, 50) scale(0.9)"
               />
             </g>
-            <g className="animate-pulse opacity-85" style={{ transformOrigin: '55% 45%', animationDuration: '3s' }}>
+            <g className="animate-pulse opacity-85" style={{ transformOrigin: '32% 35%', animationDuration: '3.5s' }}>
               <path
                 d="M 0,-8 Q 0,0 8,0 Q 0,0 0,8 Q 0,0 -8,0 Q 0,0 0,-8"
                 fill="#BAE6FD"
-                transform="translate(280, 85) scale(0.8)"
+                transform="translate(180, 45) scale(0.75)"
               />
             </g>
           </svg>
 
           {/* 3. Glowing Crescent Moon with Deep Radial Luminescence */}
-          <div className="absolute right-16 sm:right-24 top-6 sm:top-10 w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center">
+          <div className="absolute right-12 sm:right-20 top-5 sm:top-8 w-24 h-24 sm:w-28 sm:h-28 flex items-center justify-center">
             {/* Outer Moonlight Aura */}
             <div className="absolute inset-0 rounded-full bg-amber-300/30 blur-2xl animate-pulse duration-4000 scale-125" />
             <div className="absolute inset-2 rounded-full bg-amber-200/40 blur-md" />
@@ -105,7 +109,7 @@ export function NightSkyAmbientScene({ forceShow, className = '', customVideoUrl
             {/* Realistic 3D Glowing Moon SVG */}
             <svg
               viewBox="0 0 100 100"
-              className="w-20 h-20 sm:w-24 sm:h-24 drop-shadow-[0_0_30px_rgba(254,240,138,0.7)] relative z-10"
+              className="w-20 h-20 sm:w-24 sm:h-24 drop-shadow-[0_0_35px_rgba(254,240,138,0.85)] relative z-10"
             >
               <defs>
                 <linearGradient id="moonGlowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -145,7 +149,7 @@ export function NightSkyAmbientScene({ forceShow, className = '', customVideoUrl
 
           {/* 5. Layer 2: Foreground Billowing Night Clouds Passing Near Moon */}
           <div
-            className="absolute top-12 -right-16 w-[480px] h-32 opacity-70"
+            className="absolute top-10 -right-16 w-[480px] h-32 opacity-65"
             style={{
               animation: 'driftCloudFast 26s linear infinite',
             }}
@@ -157,13 +161,13 @@ export function NightSkyAmbientScene({ forceShow, className = '', customVideoUrl
 
           {/* 6. Layer 3: Low Floating Night Mist Wave */}
           <div
-            className="absolute bottom-0 right-8 w-[600px] h-24 opacity-50"
+            className="absolute bottom-0 left-0 right-0 w-full h-20 opacity-40"
             style={{
               animation: 'driftCloudReverse 32s ease-in-out infinite alternate',
             }}
           >
-            <svg viewBox="0 0 600 120" fill="currentColor" className="w-full h-full text-indigo-950/70">
-              <path d="M0 80 C100 40, 200 100, 300 60 C400 20, 500 80, 600 50 L600 120 L0 120 Z" />
+            <svg viewBox="0 0 1200 120" preserveAspectRatio="none" fill="currentColor" className="w-full h-full text-indigo-950/70">
+              <path d="M0 80 C200 40, 400 100, 600 60 C800 20, 1000 80, 1200 50 L1200 120 L0 120 Z" />
             </svg>
           </div>
         </div>

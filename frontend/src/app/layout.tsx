@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { AppShell } from '@/components/AppShell';
 import { ToastProvider } from '@/components/ui/Toast';
+import { AutoSaveFloatingIndicator } from '@/components/AutoSaveFloatingIndicator';
 
 export const metadata: Metadata = {
   title: 'Infoziant iPOMS — Placement Operations Management System',
@@ -46,6 +47,7 @@ export default function RootLayout({
         </a>
         <ToastProvider>
           <AppShell>{children}</AppShell>
+          <AutoSaveFloatingIndicator />
         </ToastProvider>
       </body>
     </html>

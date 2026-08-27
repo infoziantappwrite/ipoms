@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ClipboardList, Plus, Sparkles, Zap, X, CheckCircle2 } from 'lucide-react';
+import { ClipboardList, Plus, Sparkles, Zap, X, CheckCircle2, Building2, GraduationCap } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
+import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
+import { SmoothSelect } from '@/components/ui/SmoothSelect';
 
-const BATCH_YEARS = ['2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030', '2031', '2032'];
+const BATCH_YEARS = ['2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
 
 interface College {
   _id: string;
@@ -284,21 +286,22 @@ export function AddLeadModal({
               <label className="block text-fg font-semibold mb-1.5">
                 College <span className="text-rose-500">*</span>
               </label>
-              <select
-                required
+              <SmoothSelect
                 value={collegeId}
-                onChange={(e) => setCollegeId(e.target.value)}
-                className={`w-full bg-surface-sunken border ${
-                  !collegeId ? 'border-amber-400' : 'border-border'
-                } focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-fg text-xs transition-all cursor-pointer outline-none font-medium`}
-              >
-                <option value="" className="bg-surface text-fg">— Select College (Required) —</option>
-                {colleges.map((c) => (
-                  <option key={c._id} value={c._id} className="bg-surface text-fg">
-                    [{c.college_code}] {c.college_name}
-                  </option>
-                ))}
-              </select>
+                onChange={setCollegeId}
+                searchable={true}
+                searchPlaceholder="Search institution name or code…"
+                icon={Building2}
+                title="Select Associated Institution"
+                options={[
+                  { value: '', label: '— Select College (Required) —' },
+                  ...colleges.map((c) => ({
+                    value: c._id,
+                    label: c.college_name,
+                    badge: c.college_code,
+                  })),
+                ]}
+              />
             </div>
 
             {/* Role Offered */}
@@ -356,17 +359,17 @@ export function AddLeadModal({
             {/* Eligible Batch */}
             <div>
               <label className="block text-fg font-semibold mb-1.5">Eligible Batch (Year)</label>
-              <select
+              <SmoothSelect
                 value={eligibleBatch}
-                onChange={(e) => setEligibleBatch(e.target.value)}
-                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-fg text-xs transition-all cursor-pointer outline-none font-medium"
-              >
-                {BATCH_YEARS.map((year) => (
-                  <option key={year} value={year} className="bg-surface text-fg">
-                    {year}
-                  </option>
-                ))}
-              </select>
+                onChange={setEligibleBatch}
+                icon={GraduationCap}
+                title="Eligible Graduating Batch"
+                options={BATCH_YEARS.map((year) => ({
+                  value: year,
+                  label: `${year} Graduating Batch`,
+                  badge: year,
+                }))}
+              />
             </div>
           </div>
 
@@ -385,12 +388,14 @@ export function AddLeadModal({
 
             {/* Date */}
             <div>
-              <label className="block text-fg font-semibold mb-1.5">Date</label>
-              <input
-                type="date"
+              <SmoothDatePicker
+                label="Date"
                 value={leadDate}
-                onChange={(e) => setLeadDate(e.target.value)}
-                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-fg text-xs transition-all cursor-pointer outline-none"
+                onChange={setLeadDate}
+                variant="input"
+                fullWidth
+                usePortal
+                placeholder="dd-mm-yyyy"
               />
             </div>
           </div>

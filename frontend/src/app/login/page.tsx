@@ -11,6 +11,7 @@ import {
   ShieldAlert, Lock, Unlock, RotateCcw, KeyRound, Eye, EyeOff, Sparkles
 } from 'lucide-react';
 import { armNavIntro } from '@/lib/session';
+import { clearDailyFocusOnLogin } from '@/lib/collegeSession';
 import { isPasswordValid } from '@/lib/passwordPolicy';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
@@ -113,6 +114,7 @@ export default function LoginPage() {
       const { token, user } = data.data;
       localStorage.setItem('ipoms_user', JSON.stringify(user));
       localStorage.setItem('ipoms_token', token);
+      clearDailyFocusOnLogin();
       armNavIntro();
 
       setSuccessMsg(`Welcome back, ${user.full_name}. Opening your dashboard…`);

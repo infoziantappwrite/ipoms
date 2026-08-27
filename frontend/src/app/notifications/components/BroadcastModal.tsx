@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Megaphone, X, Send, AlertCircle, Info, Calendar, Bell, CheckCircle2 } from 'lucide-react';
+import { Megaphone, X, Send, AlertCircle, Info, Calendar, Bell, CheckCircle2, Building2, Users, Flame, Layers } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { SmoothSelect } from '@/components/ui/SmoothSelect';
 
 interface Props {
   onClose: () => void;
@@ -117,30 +118,34 @@ export function BroadcastModal({ onClose, onSent }: Props) {
               <label className="block text-fg font-semibold mb-1">
                 Notification Category <span className="text-rose-500">*</span>
               </label>
-              <select
+              <SmoothSelect
                 value={notificationType}
-                onChange={(e) => setNotificationType(e.target.value)}
-                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-xl px-3.5 py-2 text-fg text-xs cursor-pointer shadow-xs outline-none"
-              >
-                <option value="announcement" className="bg-surface text-fg">Announcement / Policy</option>
-                <option value="meeting" className="bg-surface text-fg">Meeting Invitation</option>
-                <option value="reminder" className="bg-surface text-fg">Operational Reminder</option>
-                <option value="system_alert" className="bg-surface text-fg">System Alert</option>
-                <option value="assignment" className="bg-surface text-fg">Task Assignment</option>
-              </select>
+                onChange={setNotificationType}
+                icon={Layers}
+                title="Notification Category"
+                options={[
+                  { value: 'announcement', label: 'Announcement / Policy' },
+                  { value: 'meeting', label: 'Meeting Invitation' },
+                  { value: 'reminder', label: 'Operational Reminder' },
+                  { value: 'system_alert', label: 'System Alert' },
+                  { value: 'assignment', label: 'Task Assignment' },
+                ]}
+              />
             </div>
 
             <div>
               <label className="block text-fg font-semibold mb-1">Priority Level</label>
-              <select
+              <SmoothSelect
                 value={priority}
-                onChange={(e) => setPriority(e.target.value as any)}
-                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-xl px-3.5 py-2 text-fg text-xs cursor-pointer shadow-xs outline-none"
-              >
-                <option value="high" className="bg-surface text-fg">High Priority (Immediate Notice)</option>
-                <option value="medium" className="bg-surface text-fg">Medium Priority</option>
-                <option value="low" className="bg-surface text-fg">Low Priority</option>
-              </select>
+                onChange={(val) => setPriority(val as any)}
+                icon={Flame}
+                title="Priority Level"
+                options={[
+                  { value: 'high', label: 'High Priority (Immediate Notice)' },
+                  { value: 'medium', label: 'Medium Priority' },
+                  { value: 'low', label: 'Low Priority' },
+                ]}
+              />
             </div>
           </div>
 
@@ -148,32 +153,38 @@ export function BroadcastModal({ onClose, onSent }: Props) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-fg font-semibold mb-1">Target Audience <span className="text-rose-500">*</span></label>
-              <select
+              <SmoothSelect
                 value={audienceType}
-                onChange={(e) => setAudienceType(e.target.value)}
-                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-xl px-3.5 py-2 text-fg text-xs cursor-pointer shadow-xs outline-none"
-              >
-                <option value="everyone" className="bg-surface text-fg">Everyone (All Staff & Leads)</option>
-                <option value="coordinators_only" className="bg-surface text-fg">Placement Coordinators Only</option>
-                <option value="leads_only" className="bg-surface text-fg">Team Leaders Only</option>
-                <option value="directors_only" className="bg-surface text-fg">Directors & Leadership Only</option>
-              </select>
+                onChange={setAudienceType}
+                icon={Users}
+                title="Target Audience"
+                options={[
+                  { value: 'everyone', label: 'Everyone (All Staff & Leads)' },
+                  { value: 'coordinators_only', label: 'Placement Coordinators Only' },
+                  { value: 'leads_only', label: 'Team Leaders Only' },
+                  { value: 'directors_only', label: 'Directors & Leadership Only' },
+                ]}
+              />
             </div>
 
             <div>
               <label className="block text-fg font-semibold mb-1">Target College Scope</label>
-              <select
+              <SmoothSelect
                 value={targetCollegeId}
-                onChange={(e) => setTargetCollegeId(e.target.value)}
-                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-xl px-3.5 py-2 text-fg text-xs cursor-pointer shadow-xs outline-none"
-              >
-                <option value="all" className="bg-surface text-fg">All Assigned Colleges</option>
-                {colleges.map((c) => (
-                  <option key={c._id} value={c._id} className="bg-surface text-fg">
-                    [{c.college_code}] {c.college_name}
-                  </option>
-                ))}
-              </select>
+                onChange={setTargetCollegeId}
+                searchable={true}
+                searchPlaceholder="Search target institution…"
+                icon={Building2}
+                title="Target College Scope"
+                options={[
+                  { value: 'all', label: 'All Assigned Colleges', badge: 'ALL' },
+                  ...colleges.map((c) => ({
+                    value: c._id,
+                    label: c.college_name,
+                    badge: c.college_code,
+                  })),
+                ]}
+              />
             </div>
           </div>
 

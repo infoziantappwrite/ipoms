@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   FileSpreadsheet,
   PenLine,
@@ -8,10 +8,13 @@ import {
   Trophy,
   Rocket,
   Inbox,
+  Star,
+  ListTodo,
+  TrendingUp,
+  Briefcase,
   Calendar,
   User,
   Building2,
-  ListTodo,
   Clock,
   Eye,
 } from 'lucide-react';
@@ -58,6 +61,19 @@ const COLLEGE_LOGO_MAP: Record<string, string> = {
   VCE: '/college-logos/vaigai.png',
 };
 
+export function getCleanPeriod(period?: string): string {
+  if (!period) return '';
+  if (period.includes(': ')) {
+    const parts = period.split(': ');
+    return parts[parts.length - 1].trim();
+  }
+  if (period.includes('(') && period.includes(')')) {
+    const match = period.match(/\((.*?)\)/);
+    if (match && match[1]) return match[1].trim();
+  }
+  return period.trim();
+}
+
 interface NativeReportEditorProps {
   reportData: any;
   onBackToBuilder?: () => void;
@@ -67,6 +83,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
   const [report, setReport] = useState(reportData);
   const [logoFailed, setLogoFailed] = useState(false);
   const [showA4Preview, setShowA4Preview] = useState(false);
+
+  useEffect(() => {
+    setReport(reportData);
+    setLogoFailed(false);
+  }, [reportData]);
 
   if (!report) {
     return (
@@ -104,7 +125,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           <x:ExcelWorkbook>
             <x:ExcelWorksheets>
               <x:ExcelWorksheet>
-                <x:Name>${report.report_title || 'Weekly Report'}</x:Name>
+                <x:Name>${report.report_title || 'Report'}</x:Name>
                 <x:WorksheetOptions>
                   <x:DisplayGridlines/>
                 </x:WorksheetOptions>
@@ -126,61 +147,192 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       </head>
       <body>
         <table>
-          <tr><td colspan="7" class="header-title">${report.branding?.company_name || 'Infoziant IT Solutions'}</td></tr>
-          <tr><td colspan="7" class="header-sub">${report.branding?.college_name || 'Partner Institutions'} — ${report.report_title}</td></tr>
-          <tr><td colspan="7" style="color:#64748b;">Period: ${report.report_period || ''} | Generated: ${report.generated_date || ''}</td></tr>
-          <tr><td colspan="7"></td></tr>
+          <tr><td colspan="8" class="header-title">${report.branding?.company_name || 'Infoziant IT Solutions'}</td></tr>
+          <tr><td colspan="8" class="header-sub">${report.branding?.college_name || 'Partner Institutions'} — ${report.report_title}</td></tr>
+          <tr><td colspan="8" style="color:#64748b;">Period: ${getCleanPeriod(report.report_period)} | Generated: ${report.generated_date || ''}</td></tr>
+          <tr><td colspan="8"></td></tr>
     `;
 
     // KPI Summary
     if (report.kpi_summary) {
-      if (report.kpi_summary.total_pending_tasks !== undefined) {
+      if (report.template_type === 'pending_tasks' || report.kpi_summary.total_pending_tasks !== undefined) {
         html += `
-          <tr><td colspan="7" class="sec-header">PENDING TASKS KPI SUMMARY</td></tr>
+          <tr><td colspan="8" class="sec-header">PENDING TASKS KPI SUMMARY</td></tr>
           <tr>
-            <th colspan="2">Total Tasks</th>
-            <th colspan="2">DB Shared</th>
-            <th colspan="2">DB Pending</th>
-            <th>Drives Scheduled</th>
+            <th>Total Tasks</th>
+            <th>DB Shared</th>
+            <th>DB Pending</th>
+            <th>JDs Received</th>
+            <th>Scheduled</th>
+            <th>In Progress</th>
+            <th>Awaiting TPO</th>
+            <th>Awaiting HR</th>
           </tr>
           <tr>
-            <td colspan="2" style="text-align:center; font-weight:bold;">${report.kpi_summary.total_pending_tasks}</td>
-            <td colspan="2" style="text-align:center; font-weight:bold; color:#059669;">${report.kpi_summary.db_shared_count || 0}</td>
-            <td colspan="2" style="text-align:center; font-weight:bold; color:#d97706;">${report.kpi_summary.db_pending_count || 0}</td>
-            <td style="text-align:center; font-weight:bold; color:#2563eb;">${report.kpi_summary.drives_scheduled || 0}</td>
+            <td style="text-align:center; font-weight:bold;">${report.kpi_summary.total_pending_tasks || 0}</td>
+            <td style="text-align:center; color:#059669;">${report.kpi_summary.db_shared_count || 0}</td>
+            <td style="text-align:center; color:#d97706;">${report.kpi_summary.db_pending_count || 0}</td>
+            <td style="text-align:center;">${report.kpi_summary.jds_received || 0}</td>
+            <td style="text-align:center; color:#7c3aed;">${report.kpi_summary.drives_scheduled || 0}</td>
+            <td style="text-align:center; color:#2563eb;">${report.kpi_summary.drives_in_progress || 0}</td>
+            <td style="text-align:center; color:#ea580c;">${report.kpi_summary.awaiting_tpo || 0}</td>
+            <td style="text-align:center; color:#e11d48;">${report.kpi_summary.awaiting_hr || 0}</td>
           </tr>
-          <tr><td colspan="7"></td></tr>
+          <tr><td colspan="8"></td></tr>
+        `;
+      } else if (report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined) {
+        html += `
+          <tr><td colspan="8" class="sec-header">ACTIVE LEADS KPI SUMMARY</td></tr>
+          <tr>
+            <th colspan="3">Total Active Leads</th>
+            <th colspan="3">Graduating Batch</th>
+            <th colspan="2">Corporate Partners</th>
+          </tr>
+          <tr>
+            <td colspan="3" style="text-align:center; font-weight:bold; font-size:13pt; color:#1e3a8a;">${report.kpi_summary.total_leads || 0}</td>
+            <td colspan="3" style="text-align:center; font-weight:bold; font-size:13pt; color:#059669;">${report.kpi_summary.graduating_year || '2027'}</td>
+            <td colspan="2" style="text-align:center; font-weight:bold; font-size:13pt; color:#d97706;">${report.kpi_summary.active_companies_count || 0}</td>
+          </tr>
+          <tr><td colspan="8"></td></tr>
         `;
       } else {
         html += `
-          <tr><td colspan="7" class="sec-header">EXECUTIVE KPI SUMMARY</td></tr>
+          <tr><td colspan="8" class="sec-header">EXECUTIVE PLACEMENT KPI SUMMARY</td></tr>
           <tr>
-            <th>Total Calls</th>
+            <th>Calls</th>
             <th>Positives</th>
             <th>JDs</th>
             <th>Completed</th>
             <th>In Progress</th>
             <th>Pipeline</th>
+            <th>Top Companies</th>
             <th>Offers Placed</th>
           </tr>
           <tr>
             <td style="text-align:center;">${report.kpi_summary.total_calls || 0}</td>
-            <td style="text-align:center;">${report.kpi_summary.positive_responses || 0}</td>
-            <td style="text-align:center;">${report.kpi_summary.jds_received || 0}</td>
-            <td style="text-align:center;">${report.kpi_summary.drives_completed || 0}</td>
-            <td style="text-align:center;">${report.kpi_summary.drives_in_progress || 0}</td>
-            <td style="text-align:center;">${report.kpi_summary.pipeline_leads || 0}</td>
+            <td style="text-align:center; color:#059669;">${report.kpi_summary.positive_responses || 0}</td>
+            <td style="text-align:center; color:#0891b2;">${report.kpi_summary.jds_received || 0}</td>
+            <td style="text-align:center; color:#059669;">${report.kpi_summary.drives_completed || 0}</td>
+            <td style="text-align:center; color:#2563eb;">${report.kpi_summary.drives_in_progress || 0}</td>
+            <td style="text-align:center; color:#0891b2;">${report.kpi_summary.pipeline_leads || 0}</td>
+            <td style="text-align:center; color:#d97706;">${report.kpi_summary.top_companies_count || 0}</td>
             <td style="text-align:center; font-weight:bold; color:#059669;">${report.kpi_summary.total_offers || 0}</td>
           </tr>
-          <tr><td colspan="7"></td></tr>
+          <tr><td colspan="8"></td></tr>
         `;
       }
     }
 
-    // Section: Pending Tasks
+    // Section 1: Companies Completed
+    if (report.sections?.completed_companies && report.sections.completed_companies.length > 0) {
+      html += `
+        <tr><td colspan="6" class="sec-header">1. COMPANIES COMPLETED (${report.sections.completed_companies.length} Drives)</td></tr>
+        <tr>
+          <th style="width:50px; text-align:center;">#</th>
+          <th>Company Name</th>
+          <th>Role</th>
+          <th>CTC</th>
+          <th>Status</th>
+          <th style="text-align:center;">Offers Received</th>
+        </tr>
+      `;
+      report.sections.completed_companies.forEach((r: any) => {
+        html += `
+          <tr>
+            <td style="text-align:center;">${r.s_no}</td>
+            <td><b>${r.company_name}</b></td>
+            <td>${r.job_role || '—'}</td>
+            <td>${r.ctc_lpa || '—'}</td>
+            <td>${r.current_status_text || '—'}</td>
+            <td style="text-align:center; font-weight:bold; color:#059669;">${r.selected_count || 0}</td>
+          </tr>
+        `;
+      });
+      html += `<tr><td colspan="6"></td></tr>`;
+    }
+
+    // Section 2: Companies In Progress
+    if (report.sections?.in_progress && report.sections.in_progress.length > 0) {
+      html += `
+        <tr><td colspan="5" class="sec-header">2. COMPANIES IN PROGRESS (${report.sections.in_progress.length} Drives)</td></tr>
+        <tr>
+          <th style="width:50px; text-align:center;">#</th>
+          <th>Company Name</th>
+          <th>Role</th>
+          <th>CTC</th>
+          <th>Status</th>
+        </tr>
+      `;
+      report.sections.in_progress.forEach((r: any) => {
+        html += `
+          <tr>
+            <td style="text-align:center;">${r.s_no}</td>
+            <td><b>${r.company_name}</b></td>
+            <td>${r.job_role || '—'}</td>
+            <td>${r.ctc_lpa || '—'}</td>
+            <td>${r.current_status_text || '—'}</td>
+          </tr>
+        `;
+      });
+      html += `<tr><td colspan="5"></td></tr>`;
+    }
+
+    // Section 3: Companies in Pipeline
+    if (report.sections?.pipeline && report.sections.pipeline.length > 0) {
+      html += `
+        <tr><td colspan="5" class="sec-header">3. COMPANIES IN PIPELINE (${report.sections.pipeline.length} Leads)</td></tr>
+        <tr>
+          <th style="width:50px; text-align:center;">#</th>
+          <th>Company Name</th>
+          <th>Role</th>
+          <th>CTC</th>
+          <th>Status</th>
+        </tr>
+      `;
+      report.sections.pipeline.forEach((r: any) => {
+        html += `
+          <tr>
+            <td style="text-align:center;">${r.s_no}</td>
+            <td><b>${r.company_name}</b></td>
+            <td>${r.job_role || '—'}</td>
+            <td>${r.ctc_lpa || '—'}</td>
+            <td>${r.current_status_text || '—'}</td>
+          </tr>
+        `;
+      });
+      html += `<tr><td colspan="5"></td></tr>`;
+    }
+
+    // Section 4: Top Companies
+    if (report.sections?.top_companies && report.sections.top_companies.length > 0) {
+      html += `
+        <tr><td colspan="5" class="sec-header">4. TOP COMPANIES (${report.sections.top_companies.length} Companies)</td></tr>
+        <tr>
+          <th style="width:50px; text-align:center;">#</th>
+          <th>Company Name</th>
+          <th>Role</th>
+          <th>CTC</th>
+          <th>Status</th>
+        </tr>
+      `;
+      report.sections.top_companies.forEach((r: any) => {
+        html += `
+          <tr>
+            <td style="text-align:center;">${r.s_no}</td>
+            <td><b>${r.company_name}</b></td>
+            <td>${r.job_role || '—'}</td>
+            <td style="color:#d97706; font-weight:bold;">${r.ctc_lpa || '—'}</td>
+            <td>${r.current_status_text || '—'}</td>
+          </tr>
+        `;
+      });
+      html += `<tr><td colspan="5"></td></tr>`;
+    }
+
+    // Section: Placement Pending Tasks
     if (report.sections?.pending_tasks && report.sections.pending_tasks.length > 0) {
       html += `
-        <tr><td colspan="7" class="sec-header">PLACEMENT PENDING TASKS (${report.sections.pending_tasks.length} Tasks)</td></tr>
+        <tr><td colspan="8" class="sec-header">PLACEMENT PENDING TASKS (${report.sections.pending_tasks.length} Tasks)</td></tr>
         <tr>
           <th style="width:50px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -189,6 +341,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           <th>Current Status</th>
           <th>Remarks / Next Action</th>
           <th>Drive Date</th>
+          <th>Remarks</th>
         </tr>
       `;
       report.sections.pending_tasks.forEach((r: any) => {
@@ -200,95 +353,40 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             <td>${r.db_shared_date || '—'}</td>
             <td>${r.current_status || '—'}</td>
             <td>${r.action_to_be_taken || '—'}</td>
-            <td>${r.drive_date || '—'}</td>
+            <td style="color:#7c3aed; font-weight:bold;">${r.drive_date || '—'}</td>
+            <td>${r.remarks || '—'}</td>
           </tr>
         `;
       });
-      html += `<tr><td colspan="7"></td></tr>`;
+      html += `<tr><td colspan="8"></td></tr>`;
     }
 
-    // Section 1: Companies Completed
-    if (report.sections?.completed_companies && report.sections.completed_companies.length > 0) {
+    // Section: Active Leads
+    if (report.sections?.active_leads && report.sections.active_leads.length > 0) {
       html += `
-        <tr><td colspan="7" class="sec-header">1. COMPANIES COMPLETED (${report.sections.completed_companies.length} Drives)</td></tr>
+        <tr><td colspan="8" class="sec-header">ACTIVE CORPORATE LEADS (${report.sections.active_leads.length} Leads)</td></tr>
         <tr>
           <th style="width:50px; text-align:center;">#</th>
-          <th>Company Name</th>
-          <th>Role(s)</th>
-          <th>Type</th>
+          <th colspan="2">Company Name</th>
+          <th colspan="2">Role(s)</th>
           <th>CTC</th>
-          <th style="text-align:center;">Offers Placed</th>
-          <th>Status Notes</th>
+          <th>Fall of Month</th>
+          <th>Graduating Batch</th>
         </tr>
       `;
-      report.sections.completed_companies.forEach((r: any) => {
+      report.sections.active_leads.forEach((r: any) => {
         html += `
           <tr>
             <td style="text-align:center;">${r.s_no}</td>
-            <td><b>${r.company_name}</b></td>
-            <td>${r.job_role || '—'}</td>
-            <td>${r.company_type || '—'}</td>
-            <td>${r.ctc_lpa || '—'}</td>
-            <td style="text-align:center; font-weight:bold; color:#059669;">${r.selected_count || 0}</td>
-            <td>${r.current_status_text || '—'}</td>
+            <td colspan="2"><b>${r.company_name}</b></td>
+            <td colspan="2">${r.role || '—'}</td>
+            <td style="color:#059669; font-weight:bold;">${r.ctc || '—'}</td>
+            <td>${r.followup_month || '—'}</td>
+            <td>${r.academic_year || '2027'}</td>
           </tr>
         `;
       });
-      html += `<tr><td colspan="7"></td></tr>`;
-    }
-
-    // Section 2: Companies In Progress
-    if (report.sections?.in_progress && report.sections.in_progress.length > 0) {
-      html += `
-        <tr><td colspan="7" class="sec-header">2. COMPANIES IN PROGRESS (${report.sections.in_progress.length} Drives)</td></tr>
-        <tr>
-          <th style="width:50px; text-align:center;">#</th>
-          <th>Company Name</th>
-          <th>Role(s)</th>
-          <th>Type</th>
-          <th>CTC</th>
-          <th colspan="2">Status Remarks</th>
-        </tr>
-      `;
-      report.sections.in_progress.forEach((r: any) => {
-        html += `
-          <tr>
-            <td style="text-align:center;">${r.s_no}</td>
-            <td><b>${r.company_name}</b></td>
-            <td>${r.job_role || '—'}</td>
-            <td>${r.company_type || '—'}</td>
-            <td>${r.ctc_lpa || '—'}</td>
-            <td colspan="2">${r.current_status_text || '—'}</td>
-          </tr>
-        `;
-      });
-      html += `<tr><td colspan="7"></td></tr>`;
-    }
-
-    // Section 3: Companies in Pipeline
-    if (report.sections?.pipeline && report.sections.pipeline.length > 0) {
-      html += `
-        <tr><td colspan="7" class="sec-header">3. COMPANIES IN PIPELINE (${report.sections.pipeline.length} Leads)</td></tr>
-        <tr>
-          <th style="width:50px; text-align:center;">#</th>
-          <th>Company Name</th>
-          <th>Role(s)</th>
-          <th>Type</th>
-          <th colspan="3">Current Status</th>
-        </tr>
-      `;
-      report.sections.pipeline.forEach((r: any) => {
-        html += `
-          <tr>
-            <td style="text-align:center;">${r.s_no}</td>
-            <td><b>${r.company_name}</b></td>
-            <td>${r.job_role || '—'}</td>
-            <td>${r.company_type || '—'}</td>
-            <td colspan="3">${r.current_status_text || '—'}</td>
-          </tr>
-        `;
-      });
-      html += `<tr><td colspan="7"></td></tr>`;
+      html += `<tr><td colspan="8"></td></tr>`;
     }
 
     // Remarks
@@ -474,72 +572,104 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         </div>
 
         {/* 2. Report Metadata Sub-bar */}
-        <div className="flex items-center justify-between flex-wrap gap-2 text-xs text-fg-muted bg-surface-sunken border border-border rounded-xl px-4 py-2 font-medium print:bg-slate-50 print:text-slate-600 print:border-slate-200">
+        <div className="flex items-center justify-center flex-wrap gap-4 sm:gap-8 text-xs text-fg-muted bg-surface-sunken border border-border rounded-xl px-4 py-2.5 font-medium print:bg-slate-50 print:text-slate-600 print:border-slate-200 text-center">
           <div className="flex items-center gap-1.5">
             <Calendar size={13} className="text-primary shrink-0" />
-            <span>Period: <strong className="text-fg print:text-slate-900 font-semibold">{report.report_period}</strong></span>
+            <span>Period: <strong className="text-fg print:text-slate-900 font-semibold">{getCleanPeriod(report.report_period)}</strong></span>
           </div>
+          <span className="text-border">|</span>
           <div className="flex items-center gap-1.5">
             <Calendar size={13} className="text-fg-subtle print:text-slate-400 shrink-0" />
             <span>Generated Date: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_date}</strong></span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <User size={13} className="text-fg-subtle print:text-slate-400 shrink-0" />
-            <span>Prepared By: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_by}</strong></span>
           </div>
         </div>
 
         {/* 3. Live KPI Summary Strip */}
         {report.included_sections?.kpi_summary && report.kpi_summary && (
           <>
-            {report.kpi_summary.total_pending_tasks !== undefined ? (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                <div className="bg-surface border border-blue-200 dark:border-blue-900/60 p-2.5 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Total Tasks</span>
-                  <span className="text-base font-bold font-mono text-primary tabular-nums">{report.kpi_summary.total_pending_tasks}</span>
-                </div>
-                <div className="bg-surface border border-emerald-200/80 dark:border-emerald-900/60 p-2.5 rounded-xl text-center shadow-2xs bg-emerald-50/20 dark:bg-emerald-950/20">
-                  <span className="text-micro text-emerald-700 dark:text-emerald-400 font-semibold uppercase block">DB Shared</span>
-                  <span className="text-base font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums">{report.kpi_summary.db_shared_count || 0}</span>
-                </div>
-                <div className="bg-surface border border-amber-200/80 dark:border-amber-900/60 p-2.5 rounded-xl text-center shadow-2xs bg-amber-50/20 dark:bg-amber-950/20">
-                  <span className="text-micro text-amber-700 dark:text-amber-400 font-semibold uppercase block">DB Pending</span>
-                  <span className="text-base font-bold font-mono text-amber-700 dark:text-amber-400 tabular-nums">{report.kpi_summary.db_pending_count || 0}</span>
-                </div>
-                <div className="bg-surface border border-purple-200/80 dark:border-purple-900/60 p-2.5 rounded-xl text-center shadow-2xs bg-purple-50/20 dark:bg-purple-950/20">
-                  <span className="text-micro text-purple-700 dark:text-purple-400 font-semibold uppercase block">Drives Scheduled</span>
-                  <span className="text-base font-bold font-mono text-purple-700 dark:text-purple-400 tabular-nums">{report.kpi_summary.drives_scheduled || 0}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 pt-1">
+            {report.template_type === 'pending_tasks' || report.kpi_summary.total_pending_tasks !== undefined ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 pt-1">
                 <div className="bg-surface border border-blue-200 dark:border-blue-900/60 p-2 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Calls</span>
-                  <span className="text-sm font-bold font-mono text-primary tabular-nums">{report.kpi_summary.total_calls}</span>
+                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Total Tasks</span>
+                  <span className="text-sm font-bold font-mono text-primary tabular-nums">{report.kpi_summary.total_pending_tasks}</span>
                 </div>
-                <div className="bg-surface border border-emerald-200/80 dark:border-emerald-900/60 p-2 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Positives</span>
-                  <span className="text-sm font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums">{report.kpi_summary.positive_responses}</span>
+                <div className="bg-surface border border-emerald-200/80 dark:border-emerald-900/60 p-2 rounded-xl text-center shadow-2xs bg-emerald-50/20 dark:bg-emerald-950/20">
+                  <span className="text-micro text-emerald-700 dark:text-emerald-400 font-semibold uppercase block">DB Shared</span>
+                  <span className="text-sm font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums">{report.kpi_summary.db_shared_count || 0}</span>
+                </div>
+                <div className="bg-surface border border-amber-200/80 dark:border-amber-900/60 p-2 rounded-xl text-center shadow-2xs bg-amber-50/20 dark:bg-amber-950/20">
+                  <span className="text-micro text-amber-700 dark:text-amber-400 font-semibold uppercase block">DB Pending</span>
+                  <span className="text-sm font-bold font-mono text-amber-700 dark:text-amber-400 tabular-nums">{report.kpi_summary.db_pending_count || 0}</span>
                 </div>
                 <div className="bg-surface border border-cyan-200/80 dark:border-cyan-900/60 p-2 rounded-xl text-center shadow-2xs">
                   <span className="text-micro text-fg-subtle font-semibold uppercase block">JDs Received</span>
-                  <span className="text-sm font-bold font-mono text-cyan-700 dark:text-cyan-400 tabular-nums">{report.kpi_summary.jds_received}</span>
+                  <span className="text-sm font-bold font-mono text-cyan-700 dark:text-cyan-400 tabular-nums">{report.kpi_summary.jds_received || 0}</span>
                 </div>
-                <div className="bg-surface border border-amber-200/80 dark:border-amber-900/60 p-2 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Completed</span>
-                  <span className="text-sm font-bold font-mono text-amber-700 dark:text-amber-400 tabular-nums">{report.kpi_summary.drives_completed}</span>
+                <div className="bg-surface border border-purple-200/80 dark:border-purple-900/60 p-2 rounded-xl text-center shadow-2xs bg-purple-50/20 dark:bg-purple-950/20">
+                  <span className="text-micro text-purple-700 dark:text-purple-400 font-semibold uppercase block">Scheduled</span>
+                  <span className="text-sm font-bold font-mono text-purple-700 dark:text-purple-400 tabular-nums">{report.kpi_summary.drives_scheduled || 0}</span>
                 </div>
-                <div className="bg-surface border border-purple-200/80 dark:border-purple-900/60 p-2 rounded-xl text-center shadow-2xs">
+                <div className="bg-surface border border-blue-200/80 dark:border-blue-900/60 p-2 rounded-xl text-center shadow-2xs">
                   <span className="text-micro text-fg-subtle font-semibold uppercase block">In Progress</span>
-                  <span className="text-sm font-bold font-mono text-purple-700 dark:text-purple-400 tabular-nums">{report.kpi_summary.drives_in_progress}</span>
+                  <span className="text-sm font-bold font-mono text-blue-700 dark:text-blue-400 tabular-nums">{report.kpi_summary.drives_in_progress || 0}</span>
                 </div>
-                <div className="bg-surface border border-border p-2 rounded-xl text-center shadow-2xs">
+                <div className="bg-surface border border-orange-200/80 dark:border-orange-900/60 p-2 rounded-xl text-center shadow-2xs bg-orange-50/20 dark:bg-orange-950/20">
+                  <span className="text-micro text-orange-700 dark:text-orange-400 font-semibold uppercase block">Awaiting TPO</span>
+                  <span className="text-sm font-bold font-mono text-orange-700 dark:text-orange-400 tabular-nums">{report.kpi_summary.awaiting_tpo || 0}</span>
+                </div>
+                <div className="bg-surface border border-rose-200/80 dark:border-rose-900/60 p-2 rounded-xl text-center shadow-2xs bg-rose-50/20 dark:bg-rose-950/20">
+                  <span className="text-micro text-rose-700 dark:text-rose-400 font-semibold uppercase block">Awaiting HR</span>
+                  <span className="text-sm font-bold font-mono text-rose-700 dark:text-rose-400 tabular-nums">{report.kpi_summary.awaiting_hr || 0}</span>
+                </div>
+              </div>
+            ) : report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                <div className="bg-surface border border-blue-200 dark:border-blue-900/60 p-2.5 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Total Active Leads</span>
+                  <span className="text-base font-bold font-mono text-primary tabular-nums">{report.kpi_summary.total_leads || 0}</span>
+                </div>
+                <div className="bg-surface border border-emerald-200/80 dark:border-emerald-900/60 p-2.5 rounded-xl text-center shadow-2xs bg-emerald-50/20 dark:bg-emerald-950/20">
+                  <span className="text-micro text-emerald-700 dark:text-emerald-400 font-semibold uppercase block">Graduating Batch</span>
+                  <span className="text-base font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums">{report.kpi_summary.graduating_year || '2027'}</span>
+                </div>
+                <div className="bg-surface border border-amber-200/80 dark:border-amber-900/60 p-2.5 rounded-xl text-center shadow-2xs bg-amber-50/20 dark:bg-amber-950/20">
+                  <span className="text-micro text-amber-700 dark:text-amber-400 font-semibold uppercase block">Corporate Partners</span>
+                  <span className="text-base font-bold font-mono text-amber-700 dark:text-amber-400 tabular-nums">{report.kpi_summary.active_companies_count || 0}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 pt-1">
+                <div className="bg-surface border border-blue-200 dark:border-blue-900/60 p-2 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Calls</span>
+                  <span className="text-sm font-bold font-mono text-primary tabular-nums">{report.kpi_summary.total_calls || 0}</span>
+                </div>
+                <div className="bg-surface border border-emerald-200/80 dark:border-emerald-900/60 p-2 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Positives</span>
+                  <span className="text-sm font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums">{report.kpi_summary.positive_responses || 0}</span>
+                </div>
+                <div className="bg-surface border border-cyan-200/80 dark:border-cyan-900/60 p-2 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-fg-subtle font-semibold uppercase block">JDs Received</span>
+                  <span className="text-sm font-bold font-mono text-cyan-700 dark:text-cyan-400 tabular-nums">{report.kpi_summary.jds_received || 0}</span>
+                </div>
+                <div className="bg-surface border border-emerald-200/80 dark:border-emerald-900/60 p-2 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Completed</span>
+                  <span className="text-sm font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums">{report.kpi_summary.drives_completed || 0}</span>
+                </div>
+                <div className="bg-surface border border-blue-200/80 dark:border-blue-900/60 p-2 rounded-xl text-center shadow-2xs">
+                  <span className="text-micro text-fg-subtle font-semibold uppercase block">In Progress</span>
+                  <span className="text-sm font-bold font-mono text-blue-700 dark:text-blue-400 tabular-nums">{report.kpi_summary.drives_in_progress || 0}</span>
+                </div>
+                <div className="bg-surface border border-cyan-200/80 dark:border-cyan-900/60 p-2 rounded-xl text-center shadow-2xs">
                   <span className="text-micro text-fg-subtle font-semibold uppercase block">Pipeline</span>
-                  <span className="text-sm font-bold font-mono text-fg-muted tabular-nums">{report.kpi_summary.pipeline_leads}</span>
+                  <span className="text-sm font-bold font-mono text-cyan-700 dark:text-cyan-400 tabular-nums">{report.kpi_summary.pipeline_leads || 0}</span>
+                </div>
+                <div className="bg-surface border border-amber-200/80 dark:border-amber-900/60 p-2 rounded-xl text-center shadow-2xs bg-amber-50/20 dark:bg-amber-950/20">
+                  <span className="text-micro text-amber-700 dark:text-amber-400 font-semibold uppercase block">Top Companies</span>
+                  <span className="text-sm font-bold font-mono text-amber-700 dark:text-amber-400 tabular-nums">{report.kpi_summary.top_companies_count || 0}</span>
                 </div>
                 <div className="bg-surface border border-emerald-300 dark:border-emerald-700 p-2 rounded-xl text-center shadow-2xs bg-emerald-50/40 dark:bg-emerald-950/40">
                   <span className="text-micro text-emerald-800 dark:text-emerald-300 font-bold uppercase block">Offers</span>
-                  <span className="text-sm font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums">{report.kpi_summary.total_offers}</span>
+                  <span className="text-sm font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums">{report.kpi_summary.total_offers || 0}</span>
                 </div>
               </div>
             )}
@@ -562,44 +692,52 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <p className="text-xs text-fg-subtle italic py-2">No completed drives in this period.</p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-border">
-                <table className="w-full text-xs text-left">
+                <table className="w-full text-xs text-center">
                   <thead>
                     <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
                       <th className="py-2 px-2 w-8 text-center">#</th>
-                      <th className="py-2 px-3">Company Name</th>
-                      <th className="py-2 px-3">Role(s)</th>
-                      <th className="py-2 px-3">Type</th>
-                      <th className="py-2 px-3">CTC</th>
-                      <th className="py-2 px-3 text-center">Offers</th>
-                      <th className="py-2 px-3">Status Notes</th>
+                      <th className="py-2 px-3 text-center">Company Name</th>
+                      <th className="py-2 px-3 text-center">Role</th>
+                      <th className="py-2 px-3 text-center">CTC</th>
+                      <th className="py-2 px-3 text-center">Status</th>
+                      <th className="py-2 px-3 text-center">Offers Received</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/60 font-normal bg-surface">
+                  <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
                     {report.sections.completed_companies.map((r: any, idx: number) => (
                       <tr key={idx} className="hover:bg-surface-sunken/60">
                         <td className="py-2 px-2 text-center text-fg-subtle">{r.s_no}</td>
-                        <td className="py-2 px-3 font-semibold text-fg">
+                        <td className="py-2 px-3 font-semibold text-fg text-center">
                           <input
                             type="text"
                             value={r.company_name}
                             onChange={(e) =>
                               handleUpdateCell('completed_companies', idx, 'company_name', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
+                            className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
                           />
                         </td>
-                        <td className="py-2 px-3 text-fg-muted">
+                        <td className="py-2 px-3 text-fg-muted text-center">
                           <input
                             type="text"
                             value={r.job_role}
                             onChange={(e) =>
                               handleUpdateCell('completed_companies', idx, 'job_role', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-muted"
+                            className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-muted"
                           />
                         </td>
-                        <td className="py-2 px-3 text-fg-subtle">{r.company_type}</td>
-                        <td className="py-2 px-3 text-emerald-600 dark:text-emerald-400 font-medium">{r.ctc_lpa}</td>
+                        <td className="py-2 px-3 text-emerald-600 dark:text-emerald-400 font-medium text-center">{r.ctc_lpa}</td>
+                        <td className="py-2 px-3 text-fg-subtle text-center">
+                          <input
+                            type="text"
+                            value={r.current_status_text}
+                            onChange={(e) =>
+                              handleUpdateCell('completed_companies', idx, 'current_status_text', e.target.value)
+                            }
+                            className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-subtle"
+                          />
+                        </td>
                         <td className="py-2 px-3 text-center font-bold text-emerald-600 dark:text-emerald-400">
                           <input
                             type="number"
@@ -607,17 +745,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                             onChange={(e) =>
                               handleUpdateCell('completed_companies', idx, 'selected_count', Number(e.target.value))
                             }
-                            className="bg-transparent w-14 text-center focus:bg-surface focus:border focus:border-primary rounded px-1 font-bold text-emerald-600 dark:text-emerald-400 outline-none"
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-fg-subtle">
-                          <input
-                            type="text"
-                            value={r.current_status_text}
-                            onChange={(e) =>
-                              handleUpdateCell('completed_companies', idx, 'current_status_text', e.target.value)
-                            }
-                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-subtle"
+                            className="bg-transparent w-14 text-center focus:bg-surface focus:border focus:border-primary rounded px-1 font-bold text-emerald-600 dark:text-emerald-400 outline-none mx-auto"
                           />
                         </td>
                       </tr>
@@ -645,35 +773,33 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <p className="text-xs text-fg-subtle italic py-2">No active drives currently in progress.</p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-border">
-                <table className="w-full text-xs text-left">
+                <table className="w-full text-xs text-center">
                   <thead>
                     <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
                       <th className="py-2 px-2 w-8 text-center">#</th>
-                      <th className="py-2 px-3">Company Name</th>
-                      <th className="py-2 px-3">Role(s)</th>
-                      <th className="py-2 px-3">Type</th>
-                      <th className="py-2 px-3">CTC</th>
-                      <th className="py-2 px-3">Status Remarks</th>
+                      <th className="py-2 px-3 text-center">Company Name</th>
+                      <th className="py-2 px-3 text-center">Role</th>
+                      <th className="py-2 px-3 text-center">CTC</th>
+                      <th className="py-2 px-3 text-center">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/60 font-normal bg-surface">
+                  <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
                     {report.sections.in_progress.map((r: any, idx: number) => (
                       <tr key={idx} className="hover:bg-surface-sunken/60">
                         <td className="py-2 px-2 text-center text-fg-subtle">{r.s_no}</td>
-                        <td className="py-2 px-3 font-semibold text-fg">
+                        <td className="py-2 px-3 font-semibold text-fg text-center">
                           <input
                             type="text"
                             value={r.company_name}
                             onChange={(e) =>
                               handleUpdateCell('in_progress', idx, 'company_name', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
+                            className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
                           />
                         </td>
-                        <td className="py-2 px-3 text-fg-muted">{r.job_role}</td>
-                        <td className="py-2 px-3 text-fg-subtle">{r.company_type}</td>
-                        <td className="py-2 px-3 text-blue-600 dark:text-blue-400 font-medium">{r.ctc_lpa}</td>
-                        <td className="py-2 px-3 text-fg-subtle">{r.current_status_text}</td>
+                        <td className="py-2 px-3 text-fg-muted text-center">{r.job_role}</td>
+                        <td className="py-2 px-3 text-blue-600 dark:text-blue-400 font-medium text-center">{r.ctc_lpa}</td>
+                        <td className="py-2 px-3 text-fg-subtle text-center">{r.current_status_text}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -699,24 +825,24 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <p className="text-xs text-fg-subtle italic py-2">No pipeline leads recorded.</p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-border">
-                <table className="w-full text-xs text-left">
+                <table className="w-full text-xs text-center">
                   <thead>
                     <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
                       <th className="py-2 px-2 w-8 text-center">#</th>
-                      <th className="py-2 px-3">Company Name</th>
-                      <th className="py-2 px-3">Role(s)</th>
-                      <th className="py-2 px-3">Type</th>
-                      <th className="py-2 px-3">Current Status</th>
+                      <th className="py-2 px-3 text-center">Company Name</th>
+                      <th className="py-2 px-3 text-center">Role</th>
+                      <th className="py-2 px-3 text-center">CTC</th>
+                      <th className="py-2 px-3 text-center">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/60 font-normal bg-surface">
+                  <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
                     {report.sections.pipeline.map((r: any, idx: number) => (
                       <tr key={idx} className="hover:bg-surface-sunken/60">
                         <td className="py-2 px-2 text-center text-fg-subtle">{r.s_no}</td>
-                        <td className="py-2 px-3 font-semibold text-fg">{r.company_name}</td>
-                        <td className="py-2 px-3 text-fg-muted">{r.job_role}</td>
-                        <td className="py-2 px-3 text-fg-subtle">{r.company_type}</td>
-                        <td className="py-2 px-3 text-fg-subtle">{r.current_status_text}</td>
+                        <td className="py-2 px-3 font-semibold text-fg text-center">{r.company_name}</td>
+                        <td className="py-2 px-3 text-fg-muted text-center">{r.job_role}</td>
+                        <td className="py-2 px-3 text-cyan-600 dark:text-cyan-400 font-medium text-center">{r.ctc_lpa || '—'}</td>
+                        <td className="py-2 px-3 text-fg-subtle text-center">{r.current_status_text}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -726,7 +852,77 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           </div>
         )}
 
-        {/* 6. Section: Placement Pending Tasks */}
+        {/* 6. Section 4: Top Companies */}
+        {report.included_sections?.top_companies && report.sections?.top_companies && (
+          <div className="space-y-2 pt-2">
+            <div className="px-3 py-1.5 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/70 dark:bg-amber-950/40 font-bold text-xs flex items-center justify-between text-amber-800 dark:text-amber-300">
+              <span className="flex items-center gap-1.5">
+                <Star size={14} strokeWidth={2.25} className="text-amber-600 dark:text-amber-400" /> 4. TOP COMPANIES
+              </span>
+              <span className="font-mono text-micro bg-surface px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800">
+                {report.sections.top_companies.length} Companies
+              </span>
+            </div>
+
+            {report.sections.top_companies.length === 0 ? (
+              <p className="text-xs text-fg-subtle italic py-2">No top companies recorded for this institution.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <table className="w-full text-xs text-center">
+                  <thead>
+                    <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
+                      <th className="py-2 px-2 w-8 text-center">#</th>
+                      <th className="py-2 px-3 text-center">Company Name</th>
+                      <th className="py-2 px-3 text-center">Role</th>
+                      <th className="py-2 px-3 text-center">CTC</th>
+                      <th className="py-2 px-3 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
+                    {report.sections.top_companies.map((r: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-surface-sunken/60">
+                        <td className="py-2 px-2 text-center text-fg-subtle">{r.s_no}</td>
+                        <td className="py-2 px-3 font-semibold text-fg text-center">
+                          <input
+                            type="text"
+                            value={r.company_name}
+                            onChange={(e) =>
+                              handleUpdateCell('top_companies', idx, 'company_name', e.target.value)
+                            }
+                            className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
+                          />
+                        </td>
+                        <td className="py-2 px-3 text-fg-muted text-center">
+                          <input
+                            type="text"
+                            value={r.job_role}
+                            onChange={(e) =>
+                              handleUpdateCell('top_companies', idx, 'job_role', e.target.value)
+                            }
+                            className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-muted"
+                          />
+                        </td>
+                        <td className="py-2 px-3 text-amber-600 dark:text-amber-400 font-medium text-center">{r.ctc_lpa}</td>
+                        <td className="py-2 px-3 text-fg-subtle text-center">
+                          <input
+                            type="text"
+                            value={r.current_status_text}
+                            onChange={(e) =>
+                              handleUpdateCell('top_companies', idx, 'current_status_text', e.target.value)
+                            }
+                            className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-subtle"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Section: Placement Pending Tasks */}
         {report.included_sections?.pending_tasks && report.sections?.pending_tasks && (
           <div className="space-y-2 pt-2">
             <div className="px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800/60 bg-indigo-50/70 dark:bg-indigo-950/40 font-bold text-xs flex items-center justify-between text-indigo-900 dark:text-indigo-300">
@@ -742,91 +938,181 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <p className="text-xs text-fg-subtle italic py-2">No pending tasks recorded for this institution.</p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-border">
-                <table className="w-full text-xs text-left">
+                <table className="w-full text-xs text-center">
                   <thead>
                     <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
                       <th className="py-2 px-2 w-8 text-center">#</th>
-                      <th className="py-2 px-3">Company Name</th>
-                      <th className="py-2 px-3">JD Received Date</th>
-                      <th className="py-2 px-3">DB Shared Date</th>
-                      <th className="py-2 px-3">Current Status</th>
-                      <th className="py-2 px-3">Remarks / Next Action</th>
-                      <th className="py-2 px-3">Drive Date</th>
-                      <th className="py-2 px-3">Remarks</th>
+                      <th className="py-2 px-3 text-center">Company Name</th>
+                      <th className="py-2 px-3 text-center">JD Received Date</th>
+                      <th className="py-2 px-3 text-center">DB Shared Date</th>
+                      <th className="py-2 px-3 text-center">Current Status</th>
+                      <th className="py-2 px-3 text-center">Remarks / Next Action</th>
+                      <th className="py-2 px-3 text-center">Drive Date</th>
+                      <th className="py-2 px-3 text-center">Remarks</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/60 font-normal bg-surface">
+                  <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
                     {report.sections.pending_tasks.map((r: any, idx: number) => (
                       <tr key={idx} className="hover:bg-surface-sunken/60">
                         <td className="py-2 px-2 text-center text-fg-subtle">{r.s_no}</td>
-                        <td className="py-2 px-3 font-semibold text-fg">
+                        <td className="py-2 px-3 font-semibold text-fg text-center">
                           <input
                             type="text"
                             value={r.company_name}
                             onChange={(e) =>
                               handleUpdateCell('pending_tasks', idx, 'company_name', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
+                            className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
                           />
                         </td>
-                        <td className="py-2 px-3 text-fg-muted">
+                        <td className="py-2 px-3 text-fg-muted text-center">
                           <input
                             type="text"
                             value={r.jd_received_date}
                             onChange={(e) =>
                               handleUpdateCell('pending_tasks', idx, 'jd_received_date', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-muted"
+                            className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-muted"
                           />
                         </td>
-                        <td className="py-2 px-3 text-fg-muted">
+                        <td className="py-2 px-3 text-fg-muted text-center">
                           <input
                             type="text"
                             value={r.db_shared_date}
                             onChange={(e) =>
                               handleUpdateCell('pending_tasks', idx, 'db_shared_date', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-muted"
+                            className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-muted"
                           />
                         </td>
-                        <td className="py-2 px-3 text-fg">
+                        <td className="py-2 px-3 text-fg text-center">
                           <input
                             type="text"
                             value={r.current_status}
                             onChange={(e) =>
                               handleUpdateCell('pending_tasks', idx, 'current_status', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
+                            className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
                           />
                         </td>
-                        <td className="py-2 px-3 text-fg font-medium">
+                        <td className="py-2 px-3 text-fg font-medium text-center">
                           <input
                             type="text"
                             value={r.action_to_be_taken}
                             onChange={(e) =>
                               handleUpdateCell('pending_tasks', idx, 'action_to_be_taken', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
+                            className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
                           />
                         </td>
-                        <td className="py-2 px-3 text-indigo-600 dark:text-indigo-400 font-semibold">
+                        <td className="py-2 px-3 text-indigo-600 dark:text-indigo-400 font-semibold text-center">
                           <input
                             type="text"
                             value={r.drive_date}
                             onChange={(e) =>
                               handleUpdateCell('pending_tasks', idx, 'drive_date', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-indigo-600 dark:text-indigo-400"
+                            className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-indigo-600 dark:text-indigo-400"
                           />
                         </td>
-                        <td className="py-2 px-3 text-fg-subtle">
+                        <td className="py-2 px-3 text-fg-subtle text-center">
                           <input
                             type="text"
                             value={r.remarks}
                             onChange={(e) =>
                               handleUpdateCell('pending_tasks', idx, 'remarks', e.target.value)
                             }
-                            className="bg-transparent w-full focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-subtle"
+                            className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-subtle"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Section: Active Corporate Leads */}
+        {report.included_sections?.active_leads && report.sections?.active_leads && (
+          <div className="space-y-2 pt-2">
+            <div className="px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/70 dark:bg-emerald-950/40 font-bold text-xs flex items-center justify-between text-emerald-900 dark:text-emerald-300">
+              <span className="flex items-center gap-1.5">
+                <TrendingUp size={14} strokeWidth={2.25} className="text-emerald-700 dark:text-emerald-400" /> ACTIVE CORPORATE LEADS
+              </span>
+              <span className="font-mono text-micro bg-surface px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-bold">
+                {report.sections.active_leads.length} Leads
+              </span>
+            </div>
+
+            {report.sections.active_leads.length === 0 ? (
+              <p className="text-xs text-fg-subtle italic py-2">No active leads recorded.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <table className="w-full text-xs text-center">
+                  <thead>
+                    <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
+                      <th className="py-2 px-2 w-8 text-center">#</th>
+                      <th className="py-2 px-3 text-center">Company Name</th>
+                      <th className="py-2 px-3 text-center">Role(s)</th>
+                      <th className="py-2 px-3 text-center">CTC</th>
+                      <th className="py-2 px-3 text-center">Fall of Month</th>
+                      <th className="py-2 px-3 text-center">Graduating Batch</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
+                    {report.sections.active_leads.map((r: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-surface-sunken/60">
+                        <td className="py-2 px-2 text-center text-fg-subtle">{r.s_no}</td>
+                        <td className="py-2 px-3 font-semibold text-fg text-center">
+                          <input
+                            type="text"
+                            value={r.company_name}
+                            onChange={(e) =>
+                              handleUpdateCell('active_leads', idx, 'company_name', e.target.value)
+                            }
+                            className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
+                          />
+                        </td>
+                        <td className="py-2 px-3 text-fg-muted text-center">
+                          <input
+                            type="text"
+                            value={r.role}
+                            onChange={(e) =>
+                              handleUpdateCell('active_leads', idx, 'role', e.target.value)
+                            }
+                            className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-muted"
+                          />
+                        </td>
+                        <td className="py-2 px-3 text-emerald-600 dark:text-emerald-400 font-semibold text-center">
+                          <input
+                            type="text"
+                            value={r.ctc}
+                            onChange={(e) =>
+                              handleUpdateCell('active_leads', idx, 'ctc', e.target.value)
+                            }
+                            className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-emerald-600 dark:text-emerald-400 font-semibold"
+                          />
+                        </td>
+                        <td className="py-2 px-3 text-fg-subtle text-center">
+                          <input
+                            type="text"
+                            value={r.followup_month}
+                            onChange={(e) =>
+                              handleUpdateCell('active_leads', idx, 'followup_month', e.target.value)
+                            }
+                            className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-subtle"
+                          />
+                        </td>
+                        <td className="py-2 px-3 text-fg-subtle text-center">
+                          <input
+                            type="text"
+                            value={r.academic_year}
+                            onChange={(e) =>
+                              handleUpdateCell('active_leads', idx, 'academic_year', e.target.value)
+                            }
+                            className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-subtle"
                           />
                         </td>
                       </tr>
@@ -853,9 +1139,9 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           </div>
         )}
 
-        {/* 8. Confidential Footer */}
-        <div className="border-t border-border pt-4 text-center text-micro text-fg-subtle">
-          <p>{report.branding?.confidential_notice || 'CONFIDENTIAL: For placement office & institutional leadership review only.'}</p>
+        {/* 8. Footer */}
+        <div className="border-t border-border pt-4 text-center text-xs text-fg-subtle">
+          <p className="font-medium text-fg-muted">Prepared by Infoziant</p>
           <p className="mt-0.5">© 2026 Infoziant IT Solutions Inc. All rights reserved.</p>
         </div>
 

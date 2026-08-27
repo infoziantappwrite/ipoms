@@ -8,9 +8,19 @@ export const ACTIVE_COLLEGE_ID_KEY = 'ipoms_active_college_id';
 export const ACTIVE_COLLEGE_NAME_KEY = 'ipoms_active_college_name';
 export const ACTIVE_COLLEGE_OBJ_KEY = 'ipoms_active_college_obj';
 export const COORDINATOR_SELECTED_COLLEGES_KEY = 'ipoms_coordinator_selected_colleges';
+export const COORDINATOR_FOCUS_DATE_KEY = 'ipoms_coordinator_focus_date';
+export const COORDINATOR_FOCUS_LOCKED_KEY = 'ipoms_coordinator_focus_locked';
 export const ALL_COLLEGES_CACHE_KEY = 'ipoms_cached_all_colleges';
 
 let memoryCachedColleges: College[] = [];
+
+function getTodayKey(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 
 export function getCachedColleges(): College[] {
   if (memoryCachedColleges && memoryCachedColleges.length > 0) {
@@ -55,6 +65,98 @@ export async function fetchAllCollegesCached(): Promise<College[]> {
   return cached;
 }
 
+/** Check if the user has locked focus for today with 1 to 4 colleges */
+export function isFocusLockedToday(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const locked = localStorage.getItem(COORDINATOR_FOCUS_LOCKED_KEY) === 'true';
+    const date = localStorage.getItem(COORDINATOR_FOCUS_DATE_KEY);
+    const today = getTodayKey();
+    if (!locked || date !== today) {
+      return false;
+    }
+    const selected = getCoordinatorSelectedColleges();
+    return selected.length >= 1 && selected.length <= 4;
+  } catch {
+    return false;
+  }
+}
+
+/** Whether the user has an active daily focus selection (used by navigation guards) */
+export function hasActiveDailyFocus(): boolean {
+  return isFocusLockedToday();
+}
+
+/** Locks daily focus for 1 to 4 colleges for today's session */
+export function lockDailyFocus(ids: string[]): boolean {
+  if (typeof window === 'undefined') return false;
+  const sanitized = Array.from(new Set(ids.filter(Boolean))).slice(0, 4);
+  if (sanitized.length === 0 || sanitized.length > 4) {
+    return false;
+  }
+
+  try {
+    const today = getTodayKey();
+    localStorage.setItem(COORDINATOR_SELECTED_COLLEGES_KEY, JSON.stringify(sanitized));
+    localStorage.setItem(COORDINATOR_FOCUS_DATE_KEY, today);
+    localStorage.setItem(COORDINATOR_FOCUS_LOCKED_KEY, 'true');
+
+    // Auto-set the first selected college as the active college session if not already set
+    const all = getCachedColleges();
+    const firstCol = all.find((c) => c._id === sanitized[0]);
+    if (firstCol) {
+      setActiveCollege(firstCol._id, firstCol.college_name, firstCol);
+    }
+
+    window.dispatchEvent(
+      new CustomEvent('ipoms_focus_updated', {
+        detail: { selectedIds: sanitized, isLocked: true, date: today },
+      })
+    );
+    window.dispatchEvent(
+      new CustomEvent('ipoms_coordinator_colleges_changed', {
+        detail: { selectedIds: sanitized },
+      })
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Unlocks focus so user can modify their selection on the Dashboard */
+export function unlockDailyFocus(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(COORDINATOR_FOCUS_LOCKED_KEY, 'false');
+    window.dispatchEvent(
+      new CustomEvent('ipoms_focus_updated', {
+        detail: { selectedIds: getCoordinatorSelectedColleges(), isLocked: false },
+      })
+    );
+  } catch {}
+}
+
+/** Clears daily focus on fresh login so the user must select colleges again */
+export function clearDailyFocusOnLogin(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(COORDINATOR_SELECTED_COLLEGES_KEY);
+    localStorage.removeItem(COORDINATOR_FOCUS_DATE_KEY);
+    localStorage.removeItem(COORDINATOR_FOCUS_LOCKED_KEY);
+    window.dispatchEvent(
+      new CustomEvent('ipoms_focus_updated', {
+        detail: { selectedIds: [], isLocked: false },
+      })
+    );
+    window.dispatchEvent(
+      new CustomEvent('ipoms_coordinator_colleges_changed', {
+        detail: { selectedIds: [] },
+      })
+    );
+  } catch {}
+}
+
 export function getCoordinatorSelectedColleges(): string[] {
   if (typeof window === 'undefined') return [];
   try {
@@ -75,11 +177,8 @@ export function setCoordinatorSelectedColleges(ids: string[]): string[] {
   try {
     if (sanitized.length > 0) {
       localStorage.setItem(COORDINATOR_SELECTED_COLLEGES_KEY, JSON.stringify(sanitized));
-      // Ensure the first selected college is also the active college session if not already in selection
-      const currentActive = getActiveCollege();
-      if (!currentActive.id || !sanitized.includes(currentActive.id)) {
-        // Will be updated when college list loads
-      }
+    } else {
+      localStorage.removeItem(COORDINATOR_SELECTED_COLLEGES_KEY);
     }
     window.dispatchEvent(
       new CustomEvent('ipoms_coordinator_colleges_changed', {
@@ -118,7 +217,6 @@ export function sortCollegesWithPriority(
   // 2. Sort remaining colleges alphabetically by college_name
   unpinned.sort((a, b) => a.college_name.localeCompare(b.college_name));
 
-  // Pinned colleges appear as the top 1, 2, or 3 items
   return [...pinned, ...unpinned];
 }
 

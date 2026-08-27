@@ -1,5 +1,8 @@
 'use client';
 
+import { SmoothSelect } from '@/components/ui/SmoothSelect';
+import { Briefcase } from 'lucide-react';
+
 interface Props {
   searchQuery: string;
   onSearchChange: (q: string) => void;
@@ -37,17 +40,18 @@ export function WeeklyToolbar({
       {/* Right: Search & Filters */}
       <div className="flex items-center gap-3 flex-wrap">
         {/* Company Type Filter */}
-        <select
-          value={companyTypeFilter}
-          onChange={(e) => onCompanyTypeChange(e.target.value)}
-          className="bg-surface-sunken border border-border text-fg text-xs px-3 py-1.5 rounded-xl font-medium shadow-2xs outline-none cursor-pointer"
-        >
-          {COMPANY_TYPES.map((t) => (
-            <option key={t} value={t === 'All Types' ? 'all' : t} className="bg-surface text-fg">
-              {t}
-            </option>
-          ))}
-        </select>
+        <div className="w-48">
+          <SmoothSelect
+            value={companyTypeFilter || 'all'}
+            onChange={onCompanyTypeChange}
+            icon={Briefcase}
+            title="Company Industry Type"
+            options={COMPANY_TYPES.map((t) => ({
+              value: t === 'All Types' ? 'all' : t,
+              label: t,
+            }))}
+          />
+        </div>
 
         {/* Search */}
         <div className="w-64">

@@ -76,10 +76,10 @@ const POLICIES: Policy[] = [
   // ── Master company database ───────────────────────────────────────────────
   { method: 'GET',    pattern: new RegExp(`^/companies/search/?$`),      roles: STAFF },
   { method: 'DELETE', pattern: new RegExp(`^/metadata/${ID}/purge/?$`),  roles: ADMIN },
-  { method: 'POST',   pattern: new RegExp(`^/metadata/${ID}/restore/?$`), roles: TL_ADMIN },
-  { method: 'POST',   pattern: new RegExp(`^/metadata/bulk-import/?$`),  roles: TL_ADMIN },
-  { method: 'PATCH',  pattern: new RegExp(`^/metadata/${ID}/?$`),        roles: TL_ADMIN },
-  { method: 'DELETE', pattern: new RegExp(`^/metadata/${ID}/?$`),        roles: TL_ADMIN },
+  { method: 'POST',   pattern: new RegExp(`^/metadata/${ID}/restore/?$`), roles: STAFF },
+  { method: 'POST',   pattern: new RegExp(`^/metadata/bulk-import/?$`),  roles: STAFF },
+  { method: 'PATCH',  pattern: new RegExp(`^/metadata/${ID}/?$`),        roles: STAFF },
+  { method: 'DELETE', pattern: new RegExp(`^/metadata/${ID}/?$`),        roles: STAFF },
   // Coordinators add contacts they discover while calling (Module 02 §17).
   { method: 'POST',   pattern: /^\/metadata\/?$/,                        roles: STAFF },
   { method: 'GET',    pattern: /^\/metadata\/?$/,                        roles: STAFF },
@@ -90,6 +90,7 @@ const POLICIES: Policy[] = [
 
   // ── Daily Tracker (own call log) ──────────────────────────────────────────
   { method: '*',      pattern: /^\/daily-tracker(\/.*)?$/,               roles: STAFF },
+  { method: '*',      pattern: /^\/tracker(\/.*)?$/,                     roles: STAFF },
 
   // ── Weekly Tracker ────────────────────────────────────────────────────────
   // TPO is excluded entirely: their access is the finalized Weekly Placement
@@ -150,7 +151,7 @@ const POLICIES: Policy[] = [
 
 /** Paths served before authentication; never reach this middleware. */
 function isPublic(path: string): boolean {
-  return path === '/health' || path.startsWith('/auth') || path === '/colleges';
+  return path === '/health' || path.startsWith('/auth') || path === '/colleges' || path.startsWith('/weekly-tracker-import');
 }
 
 function findPolicy(method: string, path: string): Policy | undefined {

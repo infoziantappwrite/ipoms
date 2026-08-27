@@ -47,6 +47,50 @@ export default function WeeklyTrackerPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [coordinatorId, setCoordinatorId] = useState<string | null>(null);
 
+  // ── Global Delete Mode State ──
+  const [isDeleteMode, setIsDeleteMode] = useState(false);
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleToggleSelectRow = (rowId: string) => {
+    setSelectedRowIds((prev) =>
+      prev.includes(rowId) ? prev.filter((id) => id !== rowId) : [...prev, rowId]
+    );
+  };
+
+  const handleToggleSelectSection = (sectionRowIds: string[]) => {
+    const allSelected = sectionRowIds.every((id) => selectedRowIds.includes(id));
+    if (allSelected) {
+      setSelectedRowIds((prev) => prev.filter((id) => !sectionRowIds.includes(id)));
+    } else {
+      setSelectedRowIds((prev) => Array.from(new Set([...prev, ...sectionRowIds])));
+    }
+  };
+
+  const handleExecuteBulkDelete = async () => {
+    if (selectedRowIds.length === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedRowIds.length} selected row(s)?`)) return;
+
+    setIsDeleting(true);
+    try {
+      const res = await apiFetch('/weekly-tracker/batch-delete', {
+        method: 'POST',
+        body: JSON.stringify({ ids: selectedRowIds }),
+      });
+      if (res.success) {
+        setSelectedRowIds([]);
+        setIsDeleteMode(false);
+        await loadWeeklyTracker();
+        await loadKpi();
+      }
+    } catch (err) {
+      console.error('Failed to bulk delete rows:', err);
+      alert('Failed to delete selected rows. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   useEffect(() => {
     const user = readSessionUser();
     if (user?._id) setCoordinatorId(user._id);
@@ -239,6 +283,14 @@ export default function WeeklyTrackerPage() {
         onExportXlsx={handleExportXlsx}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        isDeleteMode={isDeleteMode}
+        selectedCount={selectedRowIds.length}
+        onToggleDeleteMode={() => {
+          setIsDeleteMode(!isDeleteMode);
+          setSelectedRowIds([]);
+        }}
+        onExecuteBulkDelete={handleExecuteBulkDelete}
+        isDeleting={isDeleting}
       />
 
       {/* ── KPI Cards (Slim Single-Row Profile) ──────────────────────────── */}
@@ -278,6 +330,10 @@ export default function WeeklyTrackerPage() {
               order={sections.completed.order}
               summaryMetric={sections.completed.summary_metric}
               rows={sections.completed.rows}
+              isGlobalDeleteMode={isDeleteMode}
+              globalSelectedRowIds={selectedRowIds}
+              onToggleSelectRow={handleToggleSelectRow}
+              onToggleSelectSection={handleToggleSelectSection}
               onUpdateRow={handleUpdateRow}
               onMoveSection={handleMoveSection}
               onTogglePin={handleTogglePin}
@@ -293,6 +349,10 @@ export default function WeeklyTrackerPage() {
               order={sections.in_progress.order}
               summaryMetric={sections.in_progress.summary_metric}
               rows={sections.in_progress.rows}
+              isGlobalDeleteMode={isDeleteMode}
+              globalSelectedRowIds={selectedRowIds}
+              onToggleSelectRow={handleToggleSelectRow}
+              onToggleSelectSection={handleToggleSelectSection}
               onUpdateRow={handleUpdateRow}
               onMoveSection={handleMoveSection}
               onTogglePin={handleTogglePin}
@@ -308,6 +368,10 @@ export default function WeeklyTrackerPage() {
               order={sections.pipeline.order}
               summaryMetric={sections.pipeline.summary_metric}
               rows={sections.pipeline.rows}
+              isGlobalDeleteMode={isDeleteMode}
+              globalSelectedRowIds={selectedRowIds}
+              onToggleSelectRow={handleToggleSelectRow}
+              onToggleSelectSection={handleToggleSelectSection}
               onUpdateRow={handleUpdateRow}
               onMoveSection={handleMoveSection}
               onTogglePin={handleTogglePin}
@@ -323,6 +387,10 @@ export default function WeeklyTrackerPage() {
               order={sections.top_companies.order}
               summaryMetric={sections.top_companies.summary_metric}
               rows={sections.top_companies.rows}
+              isGlobalDeleteMode={isDeleteMode}
+              globalSelectedRowIds={selectedRowIds}
+              onToggleSelectRow={handleToggleSelectRow}
+              onToggleSelectSection={handleToggleSelectSection}
               onUpdateRow={handleUpdateRow}
               onMoveSection={handleMoveSection}
               onTogglePin={handleTogglePin}
@@ -338,6 +406,10 @@ export default function WeeklyTrackerPage() {
               order={sections.rejected_by_hr.order}
               summaryMetric={sections.rejected_by_hr.summary_metric}
               rows={sections.rejected_by_hr.rows}
+              isGlobalDeleteMode={isDeleteMode}
+              globalSelectedRowIds={selectedRowIds}
+              onToggleSelectRow={handleToggleSelectRow}
+              onToggleSelectSection={handleToggleSelectSection}
               onUpdateRow={handleUpdateRow}
               onMoveSection={handleMoveSection}
               onTogglePin={handleTogglePin}
@@ -353,6 +425,10 @@ export default function WeeklyTrackerPage() {
               order={sections.rejected_by_college.order}
               summaryMetric={sections.rejected_by_college.summary_metric}
               rows={sections.rejected_by_college.rows}
+              isGlobalDeleteMode={isDeleteMode}
+              globalSelectedRowIds={selectedRowIds}
+              onToggleSelectRow={handleToggleSelectRow}
+              onToggleSelectSection={handleToggleSelectSection}
               onUpdateRow={handleUpdateRow}
               onMoveSection={handleMoveSection}
               onTogglePin={handleTogglePin}

@@ -111,7 +111,7 @@ const POLICIES = [
 ];
 /** Paths served before authentication; never reach this middleware. */
 function isPublic(path) {
-    return path === '/health' || path.startsWith('/auth') || path === '/colleges';
+    return path === '/health' || path.startsWith('/auth') || path === '/colleges' || path.startsWith('/weekly-tracker-import');
 }
 function findPolicy(method, path) {
     return POLICIES.find((p) => (p.method === '*' || p.method === method) && p.pattern.test(path));

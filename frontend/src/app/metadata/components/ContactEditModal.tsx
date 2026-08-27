@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Pencil, X, Building2 } from 'lucide-react';
+import { Plus, Pencil, X, Building2, Briefcase } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { SmoothSelect } from '@/components/ui/SmoothSelect';
 
 interface Props {
   initialData?: any | null;
@@ -141,17 +142,16 @@ export function ContactEditModal({
 
             <div>
               <label className="block text-xs font-semibold text-fg-muted mb-1">Company Industry Type</label>
-              <select
+              <SmoothSelect
                 value={companyType}
-                onChange={(e) => setCompanyType(e.target.value)}
-                className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-xs text-fg focus:bg-surface focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all cursor-pointer"
-              >
-                {companyTypes.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
+                onChange={setCompanyType}
+                icon={Briefcase}
+                title="Company Industry Type"
+                options={companyTypes.map((t) => ({
+                  value: t.id,
+                  label: t.label,
+                }))}
+              />
             </div>
           </div>
 

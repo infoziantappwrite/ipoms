@@ -12,6 +12,7 @@ import {
   Building2,
 } from 'lucide-react';
 import { CharCountBadge } from '@/components/ui/CharCountBadge';
+import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import type { PendingTaskRow } from '../types';
 
 interface Props {
@@ -23,24 +24,24 @@ interface Props {
 }
 
 const CURRENT_STATUS_SUGGESTIONS = [
+  'Database Pending',
+  'Database Shared',
   'JD Received',
-  'Awaiting Criteria',
-  'Shortlisting Candidates',
-  'Online Assessment Sent',
-  'HR Round Scheduled',
-  'Shortlist Shared',
-  'Feedback Pending',
   'Drive Scheduled',
+  'Drive in Progress',
+  'Drive Completed',
+  'Awaiting TPO Approval',
+  'Awaiting HR Approval',
 ];
 
 const ACTION_SUGGESTIONS = [
+  'JD approval pending from college',
+  'Eligibility criteria clarification required',
   'DB to be shared',
   'Drive date to be confirmed',
   'Drive date to be scheduled',
-  'JD approval pending from college',
   'Shortlist confirmation awaited',
   'Follow-up with HR for drive slot',
-  'Eligibility criteria clarification required',
 ];
 
 export function BulkEditPendingTasksModal({
@@ -202,11 +203,14 @@ export function BulkEditPendingTasksModal({
             </label>
             {updateJdDate && (
               <div className="pl-6.5 mt-1.5">
-                <input
-                  type="date"
+                <SmoothDatePicker
                   value={jdReceivedDate}
-                  onChange={(e) => setJdReceivedDate(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+                  onChange={setJdReceivedDate}
+                  variant="input"
+                  fullWidth
+                  usePortal
+                  clearable
+                  placeholder="dd-mm-yyyy"
                 />
               </div>
             )}
@@ -225,11 +229,14 @@ export function BulkEditPendingTasksModal({
             </label>
             {updateDbSharedDate && (
               <div className="pl-6.5 mt-1.5">
-                <input
-                  type="date"
+                <SmoothDatePicker
                   value={dbSharedDate}
-                  onChange={(e) => setDbSharedDate(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+                  onChange={setDbSharedDate}
+                  variant="input"
+                  fullWidth
+                  usePortal
+                  clearable
+                  placeholder="dd-mm-yyyy"
                 />
               </div>
             )}
@@ -304,7 +311,7 @@ export function BulkEditPendingTasksModal({
                   type="text"
                   value={currentStatus}
                   onChange={(e) => setCurrentStatus(e.target.value)}
-                  placeholder="e.g. Online Assessment Sent, Drive Scheduled..."
+                  placeholder="e.g. Database Pending, Drive Scheduled..."
                   className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                 />
                 <div className="flex flex-wrap gap-1">
@@ -340,11 +347,14 @@ export function BulkEditPendingTasksModal({
             </label>
             {updateDriveDate && (
               <div className="pl-6.5 mt-1.5">
-                <input
-                  type="date"
+                <SmoothDatePicker
                   value={driveDate}
-                  onChange={(e) => setDriveDate(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
+                  onChange={setDriveDate}
+                  variant="input"
+                  fullWidth
+                  usePortal
+                  clearable
+                  placeholder="dd-mm-yyyy"
                 />
               </div>
             )}

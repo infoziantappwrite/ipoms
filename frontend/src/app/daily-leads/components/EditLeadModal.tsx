@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, CheckCircle2, Pencil, Trash2, Building2, Sparkles, ClipboardList } from 'lucide-react';
+import { X, CheckCircle2, Pencil, Trash2, Building2, Sparkles, ClipboardList, GraduationCap } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
+import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
+import { SmoothSelect } from '@/components/ui/SmoothSelect';
 import type { DailyLeadRow, CollegeOption } from './LeadsTable';
 
-const BATCH_YEARS = ['2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030', '2031', '2032'];
+const BATCH_YEARS = ['2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
 
 interface Props {
   lead: DailyLeadRow;
@@ -190,33 +192,37 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-fg font-semibold mb-1">College</label>
-              <select
+              <SmoothSelect
                 value={collegeId}
-                onChange={(e) => setCollegeId(e.target.value)}
-                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-xl px-3 py-2 text-fg text-xs transition-all outline-none cursor-pointer"
-              >
-                <option value="">— No Specific College —</option>
-                {colleges.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    [{c.college_code}] {c.college_name}
-                  </option>
-                ))}
-              </select>
+                onChange={setCollegeId}
+                searchable={true}
+                searchPlaceholder="Search college…"
+                icon={Building2}
+                title="Select Associated Institution"
+                options={[
+                  { value: '', label: '— No Specific College —' },
+                  ...colleges.map((c) => ({
+                    value: c._id,
+                    label: c.college_name,
+                    badge: c.college_code,
+                  })),
+                ]}
+              />
             </div>
 
             <div>
               <label className="block text-fg font-semibold mb-1">Eligible Batch</label>
-              <select
+              <SmoothSelect
                 value={eligibleBatch}
-                onChange={(e) => setEligibleBatch(e.target.value)}
-                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-xl px-3 py-2 text-fg text-xs transition-all outline-none cursor-pointer"
-              >
-                {BATCH_YEARS.map((y) => (
-                  <option key={y} value={y}>
-                    {y} Batch
-                  </option>
-                ))}
-              </select>
+                onChange={setEligibleBatch}
+                icon={GraduationCap}
+                title="Eligible Graduating Batch"
+                options={BATCH_YEARS.map((y) => ({
+                  value: y,
+                  label: `${y} Batch`,
+                  badge: y,
+                }))}
+              />
             </div>
           </div>
 
@@ -243,14 +249,17 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
                   placeholder="e.g. 4.5"
                   className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-xl px-3 py-2 text-fg placeholder:text-fg-disabled text-xs transition-all outline-none font-mono"
                 />
-                <select
-                  value={ctcUnit}
-                  onChange={(e) => setCtcUnit(e.target.value as any)}
-                  className="bg-surface-sunken border border-border focus:border-primary rounded-xl px-2.5 py-2 text-fg text-xs outline-none cursor-pointer shrink-0 font-medium"
-                >
-                  <option value="LPA">LPA</option>
-                  <option value="/ Month">/ Month</option>
-                </select>
+                <div className="w-28 shrink-0">
+                  <SmoothSelect
+                    value={ctcUnit}
+                    onChange={(v) => setCtcUnit(v as any)}
+                    title="CTC Unit"
+                    options={[
+                      { value: 'LPA', label: 'LPA' },
+                      { value: '/ Month', label: '/ Month' },
+                    ]}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -258,13 +267,14 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
           {/* Date & Time */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-fg font-semibold mb-1">Date</label>
-              <input
-                type="date"
-                required
+              <SmoothDatePicker
+                label="Date"
                 value={leadDate}
-                onChange={(e) => setLeadDate(e.target.value)}
-                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-xl px-3 py-2 text-fg text-xs transition-all outline-none font-mono"
+                onChange={setLeadDate}
+                variant="input"
+                fullWidth
+                usePortal
+                placeholder="dd-mm-yyyy"
               />
             </div>
 

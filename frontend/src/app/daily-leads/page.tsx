@@ -98,9 +98,7 @@ export default function DailyLeadsPage() {
   const handleTabChange = (tab: 'positive' | 'jd_received') => {
     setActiveTab(tab);
 
-    // Auto-refresh calendar date to today's date
-    const today = new Date().toISOString().split('T')[0];
-    setSelectedDate(today);
+    // Keep the currently selected date preserved across tab switches!
 
     // Reset search, delete mode, and selections
     setSearchQuery('');

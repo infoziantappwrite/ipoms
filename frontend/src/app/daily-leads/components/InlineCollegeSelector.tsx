@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Check, Search, Building2 } from 'lucide-react';
+import { ChevronDown, Check, Search } from 'lucide-react';
 import type { CollegeOption } from './LeadsTable';
 
 interface Props {
@@ -22,13 +22,14 @@ export function InlineCollegeSelector({ value, colleges, onChange, disabled = fa
     top: number;
     left: number;
     placement: 'top' | 'bottom';
-  }>({ top: 0, left: 0, placement: 'bottom' });
+    ready: boolean;
+  }>({ top: 0, left: 0, placement: 'bottom', ready: false });
 
   const selectedCollege = colleges.find((c) => c._id === value);
 
   // Position calculation relative to viewport
-  const updateCoords = useCallback(() => {
-    if (!buttonRef.current) return;
+  const calculateCoords = useCallback(() => {
+    if (!buttonRef.current) return null;
     const rect = buttonRef.current.getBoundingClientRect();
     const dropdownHeight = 280;
     const dropdownWidth = 320;
@@ -41,15 +42,38 @@ export function InlineCollegeSelector({ value, colleges, onChange, disabled = fa
     }
     if (left < 16) left = 16;
 
-    setCoords({
+    return {
       top: placeAbove ? rect.top - 6 : rect.bottom + 6,
       left,
-      placement: placeAbove ? 'top' : 'bottom',
-    });
+      placement: placeAbove ? ('top' as const) : ('bottom' as const),
+      ready: true,
+    };
   }, []);
 
-  // Update coordinates on open, resize or scroll
-  useEffect(() => {
+  const updateCoords = useCallback(() => {
+    const newCoords = calculateCoords();
+    if (newCoords) {
+      setCoords(newCoords);
+    }
+  }, [calculateCoords]);
+
+  // Synchronous positioning before display on toggle
+  const handleToggle = () => {
+    if (isOpen) {
+      setIsOpen(false);
+      setCoords((prev) => ({ ...prev, ready: false }));
+      return;
+    }
+
+    const initialCoords = calculateCoords();
+    if (initialCoords) {
+      setCoords(initialCoords);
+    }
+    setIsOpen(true);
+  };
+
+  // Keep coordinates updated during scroll or window resize
+  useLayoutEffect(() => {
     if (!isOpen) return;
     updateCoords();
 
@@ -78,12 +102,14 @@ export function InlineCollegeSelector({ value, colleges, onChange, disabled = fa
         !dropdownRef.current.contains(target)
       ) {
         setIsOpen(false);
+        setCoords((prev) => ({ ...prev, ready: false }));
       }
     }
 
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         setIsOpen(false);
+        setCoords((prev) => ({ ...prev, ready: false }));
       }
     }
 
@@ -110,7 +136,7 @@ export function InlineCollegeSelector({ value, colleges, onChange, disabled = fa
         ref={buttonRef}
         type="button"
         disabled={disabled}
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={handleToggle}
         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer shadow-2xs border select-none group active:scale-95 ${
           selectedCollege
             ? 'bg-blue-50/90 dark:bg-blue-950/40 text-primary dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-100/80 dark:hover:bg-blue-950/70 hover:border-blue-300'
@@ -132,8 +158,9 @@ export function InlineCollegeSelector({ value, colleges, onChange, disabled = fa
         />
       </button>
 
-      {/* ── Floating Portal Popover: Renders Outside the Table ──────────────── */}
+      {/* ── Floating Portal Popover: Renders right at the button position ── */}
       {isOpen &&
+        coords.ready &&
         typeof document !== 'undefined' &&
         createPortal(
           <div
@@ -150,7 +177,7 @@ export function InlineCollegeSelector({ value, colleges, onChange, disabled = fa
               width: '320px',
               maxWidth: 'calc(100vw - 32px)',
             }}
-            className="bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col"
+            className="bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col transition-opacity duration-100"
           >
             {/* Quick Search Header */}
             {colleges.length > 4 && (
@@ -189,6 +216,7 @@ export function InlineCollegeSelector({ value, colleges, onChange, disabled = fa
                         onChange(c._id);
                         setIsOpen(false);
                         setSearch('');
+                        setCoords((prev) => ({ ...prev, ready: false }));
                       }}
                       className={`w-full flex items-center justify-between gap-2.5 px-3 py-2 text-left rounded-xl transition-all cursor-pointer select-none ${
                         isSelected

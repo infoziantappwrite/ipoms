@@ -530,6 +530,16 @@ export default function DailyTrackerPage() {
                   <CalendarDays size={14} strokeWidth={2} aria-hidden /> History
                 </button>
 
+                {/* + Add Manual Row Button (Next to History) */}
+                <button
+                  type="button"
+                  onClick={() => setIsManualAddOpen(true)}
+                  title="Add Custom Entry (Row-wise)"
+                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary hover:bg-blue-700 text-white shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95 shrink-0"
+                >
+                  <Plus size={16} strokeWidth={2.5} aria-hidden />
+                </button>
+
                 {/* Divider */}
                 <div className="h-5 w-px bg-border mx-0.5 shrink-0 hidden sm:block" />
 
@@ -549,16 +559,6 @@ export default function DailyTrackerPage() {
                     className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 text-fg text-xs px-3.5 py-1.5 rounded-xl outline-none placeholder:text-fg-disabled shadow-xs transition-colors"
                   />
                 </div>
-
-                {/* + Add Manual Row Button */}
-                <button
-                  type="button"
-                  onClick={() => setIsManualAddOpen(true)}
-                  title="Add Custom Entry (Row-wise)"
-                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary hover:bg-blue-700 text-white shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95 shrink-0"
-                >
-                  <Plus size={16} strokeWidth={2.5} aria-hidden />
-                </button>
               </>
             ) : (
               <>
@@ -641,32 +641,34 @@ export default function DailyTrackerPage() {
 
       {/* ── Bottom Unified Status Bar ─────────────────────────────────────── */}
       <footer className="bg-surface border-t border-border px-6 py-2.5 flex items-center justify-between gap-4 text-xs text-fg-subtle font-medium shrink-0 flex-wrap shadow-2xs">
-        {/* Left: Row & Outcome Counts */}
-        <div className="flex items-center gap-5">
-          <span>Total: <strong className="text-fg font-bold">{isHistoryMode ? historyRows.length : rows.length}</strong> rows</span>
-          <span>Completed: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{isHistoryMode ? historyCompletedCount : (kpi?.completed ?? 0)}</strong></span>
-          <span>Pending: <strong className="text-amber-600 dark:text-amber-400 font-bold">{isHistoryMode ? Math.max(0, historyTotalLoaded - historyCompletedCount) : (kpi?.pending ?? 0)}</strong></span>
-          {!isHistoryMode && <span>Positive: <strong className="text-primary dark:text-sky-400 font-bold">{kpi?.positive ?? 0}</strong></span>}
-        </div>
-
-        {/* Center: Keyboard Shortcuts (in live mode) */}
-        {!isHistoryMode && (
-          <div className="hidden lg:flex items-center gap-3 text-micro text-fg-subtle font-normal">
-            <span><kbd className="bg-surface-sunken border border-border px-1.5 py-0.5 rounded text-fg font-mono font-medium shadow-2xs">Tab</kbd> Next cell</span>
-            <span><kbd className="bg-surface-sunken border border-border px-1.5 py-0.5 rounded text-fg font-mono font-medium shadow-2xs">Enter</kbd> Save row</span>
-            <span><kbd className="bg-surface-sunken border border-border px-1.5 py-0.5 rounded text-fg font-mono font-medium shadow-2xs">Ctrl+S</kbd> Save all</span>
-            <span><kbd className="bg-surface-sunken border border-border px-1.5 py-0.5 rounded text-fg font-mono font-medium shadow-2xs">Del</kbd> Clear cell</span>
+        {/* Left: Friendly Reminder (in live mode) */}
+        {!isHistoryMode ? (
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 font-semibold text-[11px] shadow-2xs">
+            <Save size={12} className="text-amber-600 dark:text-amber-400 shrink-0" />
+            <span>Don&apos;t forget to save with <kbd className="bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.2 rounded font-mono text-[10.5px]">Ctrl+S</kbd> or the <strong>Save</strong> button to record your call data!</span>
+          </div>
+        ) : (
+          <div className="text-xs text-fg-subtle font-medium flex items-center gap-2">
+            <span className="font-semibold text-fg">Historical Archive</span> (Read-Only)
           </div>
         )}
 
-        {/* Right: Last Saved Timestamp or History Date */}
-        <div className="flex items-center gap-2">
+        {/* Right Corner: Keyboard Shortcuts & Last Saved Timestamp */}
+        <div className="flex items-center gap-4 shrink-0">
+          {!isHistoryMode && (
+            <div className="hidden md:flex items-center gap-3 text-micro text-fg-subtle font-normal">
+              <span><kbd className="bg-surface-sunken border border-border px-1.5 py-0.5 rounded text-fg font-mono font-medium shadow-2xs">Tab</kbd> Next cell</span>
+              <span><kbd className="bg-surface-sunken border border-border px-1.5 py-0.5 rounded text-fg font-mono font-medium shadow-2xs">Enter</kbd> Save row</span>
+              <span><kbd className="bg-surface-sunken border border-border px-1.5 py-0.5 rounded text-fg font-mono font-medium shadow-2xs">Del</kbd> Clear cell</span>
+            </div>
+          )}
+
           {isHistoryMode ? (
             <span className="text-fg-subtle font-medium text-xs">
               {historyDate}
             </span>
           ) : lastSavedAt ? (
-            <span className="text-fg-subtle">
+            <span className="text-fg-subtle text-xs">
               Last saved: <strong className="text-fg font-mono">{lastSavedAt.toLocaleTimeString('en-IN')}</strong>
             </span>
           ) : null}

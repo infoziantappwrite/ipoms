@@ -147,7 +147,7 @@ export function LeadsHeader({
             onClick={onOpenAddModal}
             className="flex items-center gap-1.5 bg-primary hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer active:scale-95"
           >
-            <Plus size={14} strokeWidth={2} /> Add Entry
+            <Plus size={14} strokeWidth={2} /> Add
           </button>
         </div>
       </div>

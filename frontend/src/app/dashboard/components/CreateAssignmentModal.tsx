@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, User, Building2, Flame } from 'lucide-react';
+import { SmoothSelect } from '@/components/ui/SmoothSelect';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -106,34 +107,38 @@ export function CreateAssignmentModal({ onClose, onSuccess }: Props) {
               <label className="block text-fg-muted font-semibold mb-1">
                 Target Coordinator *
               </label>
-              <select
+              <SmoothSelect
                 value={coordinatorId}
-                onChange={(e) => setCoordinatorId(e.target.value)}
-                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
-              >
-                {coordinators.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.full_name} ({c.official_email})
-                  </option>
-                ))}
-              </select>
+                onChange={setCoordinatorId}
+                searchable={true}
+                searchPlaceholder="Search coordinator…"
+                icon={User}
+                title="Target Coordinator"
+                options={coordinators.map((c) => ({
+                  value: c._id,
+                  label: c.full_name,
+                  sublabel: c.official_email,
+                }))}
+              />
             </div>
 
             <div>
               <label className="block text-fg-muted font-semibold mb-1">
                 Assigned College *
               </label>
-              <select
+              <SmoothSelect
                 value={collegeId}
-                onChange={(e) => setCollegeId(e.target.value)}
-                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
-              >
-                {colleges.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    [{c.college_code}] {c.college_name}
-                  </option>
-                ))}
-              </select>
+                onChange={setCollegeId}
+                searchable={true}
+                searchPlaceholder="Search college…"
+                icon={Building2}
+                title="Assigned College"
+                options={colleges.map((c) => ({
+                  value: c._id,
+                  label: c.college_name,
+                  badge: c.college_code,
+                }))}
+              />
             </div>
           </div>
 
@@ -146,22 +151,24 @@ export function CreateAssignmentModal({ onClose, onSuccess }: Props) {
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 placeholder="e.g. Cisco Systems"
-                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
+                className="w-full bg-surface border border-border-strong rounded-xl px-3.5 py-2.5 text-fg text-xs font-semibold shadow-xs"
                 required
               />
             </div>
 
             <div>
               <label className="block text-fg-muted font-semibold mb-1">Priority</label>
-              <select
+              <SmoothSelect
                 value={priority}
-                onChange={(e) => setPriority(e.target.value as any)}
-                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg "
-              >
-                <option value="high">High Priority</option>
-                <option value="medium">Medium Priority</option>
-                <option value="low">Low Priority</option>
-              </select>
+                onChange={(val) => setPriority(val as any)}
+                icon={Flame}
+                title="Priority Level"
+                options={[
+                  { value: 'high', label: 'High Priority' },
+                  { value: 'medium', label: 'Medium Priority' },
+                  { value: 'low', label: 'Low Priority' },
+                ]}
+              />
             </div>
           </div>
 

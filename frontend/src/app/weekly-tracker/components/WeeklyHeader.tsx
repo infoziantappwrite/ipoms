@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Plus, RefreshCw, FileSpreadsheet } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Plus, RefreshCw, FileSpreadsheet, Trash2 } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { CollegeSelector, College } from '@/components/CollegeSelector';
 import { apiFetch } from '@/lib/api';
@@ -16,6 +16,11 @@ interface Props {
   onExportXlsx?: () => void;
   searchQuery?: string;
   onSearchChange?: (q: string) => void;
+  isDeleteMode?: boolean;
+  selectedCount?: number;
+  onToggleDeleteMode?: () => void;
+  onExecuteBulkDelete?: () => void;
+  isDeleting?: boolean;
 }
 
 // Calculate Monthly 4-Week Calendar display (Week 1: 1-7, Week 2: 8-14, Week 3: 15-21, Week 4: 22-MonthEnd)
@@ -84,6 +89,11 @@ export function WeeklyHeader({
   onExportXlsx,
   searchQuery,
   onSearchChange,
+  isDeleteMode,
+  selectedCount,
+  onToggleDeleteMode,
+  onExecuteBulkDelete,
+  isDeleting,
 }: Props) {
   const [selectedCollegeObj, setSelectedCollegeObj] = useState<College | null>(null);
 
@@ -263,6 +273,43 @@ export function WeeklyHeader({
                   <FileSpreadsheet size={13} strokeWidth={2.5} />
                   <span>Export XLSX</span>
                 </button>
+              )}
+
+              {/* ── Bulk Delete Action Button ── */}
+              {onToggleDeleteMode && (
+                !isDeleteMode ? (
+                  <button
+                    type="button"
+                    onClick={onToggleDeleteMode}
+                    className="h-8 px-2.5 bg-[#be123c] hover:bg-[#9f1239] text-white rounded-lg flex items-center gap-1.5 text-[11px] font-bold shadow-xs transition-colors cursor-pointer shrink-0"
+                    title="Delete Rows"
+                    aria-label="Delete Rows"
+                  >
+                    <Trash2 size={13} strokeWidth={2.5} />
+                    <span>Delete</span>
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      disabled={(selectedCount || 0) === 0 || isDeleting}
+                      onClick={onExecuteBulkDelete}
+                      className="h-8 px-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-lg flex items-center gap-1.5 text-[11px] font-bold shadow-xs transition-all cursor-pointer shrink-0 animate-pulse"
+                      title="Confirm Delete Selected Rows"
+                    >
+                      <Trash2 size={13} strokeWidth={2.5} />
+                      <span>{isDeleting ? 'Deleting…' : `Delete Selected (${selectedCount || 0})`}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onToggleDeleteMode}
+                      className="h-8 px-2.5 bg-surface-sunken hover:bg-surface-raised border border-border text-fg rounded-lg flex items-center gap-1 text-[11px] font-semibold transition-colors cursor-pointer shrink-0"
+                      title="Cancel Delete Mode"
+                    >
+                      <span>Cancel</span>
+                    </button>
+                  </div>
+                )
               )}
             </div>
           </div>

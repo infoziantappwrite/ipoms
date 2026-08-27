@@ -5,6 +5,7 @@ import { Sparkles, Trash2, Calendar, FileText, CheckCircle2, ChevronDown, Pencil
 import { apiFetch } from '@/lib/api';
 import { InlineCollegeSelector } from './InlineCollegeSelector';
 import { EditLeadModal } from './EditLeadModal';
+import { SmoothYearDropdown } from '@/components/ui/SmoothYearDropdown';
 
 export interface CollegeOption {
   _id: string;
@@ -78,7 +79,7 @@ export function LeadsTable({
             No {activeTab === 'positive' ? 'Positive Leads' : 'JD Received Records'} Found
           </h3>
           <p className="text-xs text-fg-subtle max-w-sm leading-relaxed">
-            No opportunities recorded for the selected date. Click <span className="text-indigo-600 dark:text-indigo-400 font-bold">Sync Positives</span> in the header to pull pipeline companies for this date, or <span className="text-primary font-semibold font-mono">+ Add Entry</span>.
+            No opportunities recorded for the selected date. Click <span className="text-indigo-600 dark:text-indigo-400 font-bold">Sync Positives</span> in the header to pull pipeline companies for this date, or <span className="text-primary font-semibold font-mono">+ Add</span>.
           </p>
         </div>
       </div>
@@ -87,32 +88,32 @@ export function LeadsTable({
 
   return (
     <div className="overflow-hidden">
-      {/* ── Clean Table Container ─────────────────────────────────────────── */}
+      {/* ── Bordered Table Container ─────────────────────────────────────────── */}
       <div className="overflow-x-auto bg-surface rounded-2xl border border-border shadow-2xs">
-        <table className="w-full text-xs text-left border-collapse">
+        <table className="w-full text-xs text-center border-collapse">
           <thead>
-            <tr className="bg-surface-sunken text-fg-muted font-bold border-b border-border uppercase tracking-wider text-micro select-none">
+            <tr className="bg-surface-sunken/80 text-fg-muted font-bold border-b border-border uppercase tracking-wider text-micro select-none">
               {/* Checkbox Column (Only visible when isDeleteMode is active) */}
               {isDeleteMode && (
-                <th className="py-3 px-3 w-10 text-center">
+                <th className="py-3 px-3 w-10 text-center border-r border-border/80">
                   <input
                     type="checkbox"
                     checked={isAllSelected}
                     onChange={onToggleSelectAll}
-                    className="rounded border-border text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer align-middle"
+                    className="rounded border-border text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer align-middle accent-rose-600"
                     title="Select All Rows"
                   />
                 </th>
               )}
-              <th className="py-3 px-3 w-14 text-center font-bold">SI.NO</th>
-              <th className="py-3 px-3 min-w-[100px]">Time Stamp</th>
-              <th className="py-3 px-3 min-w-[110px]">Date</th>
-              <th className="py-3 px-3 min-w-[120px]">College</th>
-              <th className="py-3 px-3 min-w-[220px] text-left">Company Name</th>
-              <th className="py-3 px-3 min-w-[170px]">Role</th>
-              <th className="py-3 px-3 min-w-[110px]">CTC</th>
-              <th className="py-3 px-3 min-w-[110px]">Eligible Batch</th>
-              <th className="py-3 px-3 w-10 text-center"></th>
+              <th className="py-3 px-3 w-14 text-center font-bold border-r border-border/80">SI.NO</th>
+              <th className="py-3 px-3 min-w-[100px] text-center border-r border-border/80">Time Stamp</th>
+              <th className="py-3 px-3 min-w-[110px] text-center border-r border-border/80">Date</th>
+              <th className="py-3 px-3 min-w-[120px] text-center border-r border-border/80">College</th>
+              <th className="py-3 px-3 min-w-[220px] text-center border-r border-border/80">Company Name</th>
+              <th className="py-3 px-3 min-w-[170px] text-center border-r border-border/80">Role</th>
+              <th className="py-3 px-3 min-w-[110px] text-center border-r border-border/80">CTC</th>
+              <th className="py-3 px-3 min-w-[110px] text-center border-r border-border/80">Eligible Batch</th>
+              <th className="py-3 px-2 w-10 text-center"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60 font-normal bg-surface">
@@ -173,7 +174,7 @@ function TableRow({
   const [tempValue, setTempValue] = useState<string>('');
 
   const startEdit = (field: string, val: string) => {
-    if (isDeleteMode) return; // Disable inline edits during delete selection
+    if (isDeleteMode) return;
     setEditingField(field);
     setTempValue(val ?? '');
   };
@@ -200,31 +201,31 @@ function TableRow({
 
   return (
     <tr
-      className={`group transition-colors ${
+      className={`group transition-colors duration-150 border-b border-border/60 ${
         isSelected
-          ? 'bg-rose-50/60 dark:bg-rose-950/40 hover:bg-rose-50/80 dark:hover:bg-rose-950/60 text-fg'
-          : 'hover:bg-surface-sunken/80 text-fg'
+          ? 'bg-rose-500/15 dark:bg-rose-950/40 hover:bg-rose-500/20 text-fg'
+          : 'hover:bg-blue-50/50 dark:hover:bg-blue-950/30 focus-within:bg-blue-50/80 dark:focus-within:bg-blue-950/50 text-fg'
       }`}
     >
       {/* Row Selection Checkbox (Only when isDeleteMode is active) */}
       {isDeleteMode && (
-        <td className="py-3 px-3 text-center">
+        <td className="py-2.5 px-3 text-center border-r border-border/60">
           <input
             type="checkbox"
             checked={isSelected}
             onChange={onToggleSelect}
-            className="rounded border-border text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer align-middle"
+            className="rounded border-border text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer align-middle accent-rose-600"
           />
         </td>
       )}
 
       {/* Row Index */}
-      <td className="py-3 px-3 text-center text-fg-subtle font-mono text-micro font-medium">
+      <td className="py-2.5 px-3 text-center text-fg-subtle font-mono text-micro font-bold border-r border-border/60">
         {index}
       </td>
 
       {/* Time Stamp */}
-      <td className="py-3 px-3 text-fg-subtle whitespace-nowrap font-mono text-micro">
+      <td className="py-2.5 px-3 text-fg-subtle whitespace-nowrap font-mono text-micro text-center border-r border-border/60">
         {editingField === 'event_time' ? (
           <input
             type="text"
@@ -233,7 +234,7 @@ function TableRow({
             onBlur={() => commitEdit('event_time')}
             onKeyDown={(e) => handleKeyDown(e, 'event_time')}
             autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-20 shadow-xs outline-none"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-20 shadow-xs outline-none text-center mx-auto"
           />
         ) : (
           <span
@@ -247,7 +248,7 @@ function TableRow({
       </td>
 
       {/* Date */}
-      <td className="py-3 px-3 text-fg-muted whitespace-nowrap font-mono text-micro">
+      <td className="py-2.5 px-3 text-fg-muted whitespace-nowrap font-mono text-micro text-center border-r border-border/60">
         {editingField === 'lead_date' ? (
           <input
             type="date"
@@ -256,7 +257,7 @@ function TableRow({
             onBlur={() => commitEdit('lead_date')}
             onKeyDown={(e) => handleKeyDown(e, 'lead_date')}
             autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg shadow-xs outline-none"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg shadow-xs outline-none mx-auto"
           />
         ) : (
           <span
@@ -277,20 +278,22 @@ function TableRow({
         )}
       </td>
 
-      {/* College Dropdown Column: Shows ONLY Acronym when closed, Acronym + Name when open */}
-      <td className="py-2.5 px-3 whitespace-nowrap min-w-[130px]">
-        <InlineCollegeSelector
-          value={currentCollegeId}
-          colleges={colleges}
-          onChange={(newCollegeId) => {
-            onUpdateRow(row._id, { college_id: newCollegeId as any });
-          }}
-          disabled={isDeleteMode}
-        />
+      {/* College Dropdown Column */}
+      <td className="py-2 px-3 whitespace-nowrap min-w-[130px] text-center border-r border-border/60">
+        <div className="flex justify-center items-center">
+          <InlineCollegeSelector
+            value={currentCollegeId}
+            colleges={colleges}
+            onChange={(newCollegeId) => {
+              onUpdateRow(row._id, { college_id: newCollegeId as any });
+            }}
+            disabled={isDeleteMode}
+          />
+        </div>
       </td>
 
       {/* Company Name */}
-      <td className="py-3 px-3 font-bold text-fg min-w-[220px] break-words leading-snug">
+      <td className="py-2.5 px-3 font-bold text-fg min-w-[220px] break-words leading-snug text-center border-r border-border/60">
         {editingField === 'company_name' ? (
           <input
             type="text"
@@ -299,7 +302,7 @@ function TableRow({
             onBlur={() => commitEdit('company_name')}
             onKeyDown={(e) => handleKeyDown(e, 'company_name')}
             autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-full shadow-xs outline-none"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-full shadow-xs outline-none text-center"
           />
         ) : (
           <span
@@ -313,7 +316,7 @@ function TableRow({
       </td>
 
       {/* Job Role */}
-      <td className="py-3 px-3 text-fg-muted whitespace-pre-wrap leading-tight min-w-[170px]">
+      <td className="py-2.5 px-3 text-fg-muted whitespace-pre-wrap leading-tight min-w-[170px] text-center border-r border-border/60">
         {editingField === 'job_role' ? (
           <input
             type="text"
@@ -322,12 +325,12 @@ function TableRow({
             onBlur={() => commitEdit('job_role')}
             onKeyDown={(e) => handleKeyDown(e, 'job_role')}
             autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-full shadow-xs outline-none"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-full shadow-xs outline-none text-center"
           />
         ) : (
           <span
             onClick={() => startEdit('job_role', row.job_role)}
-            className="cursor-pointer hover:text-primary transition-colors"
+            className="cursor-pointer hover:text-primary transition-colors font-medium"
             title="Click to edit job role"
           >
             {row.job_role || '—'}
@@ -336,7 +339,7 @@ function TableRow({
       </td>
 
       {/* CTC */}
-      <td className="py-3 px-3 whitespace-nowrap font-mono text-micro font-bold text-emerald-600 dark:text-emerald-400 min-w-[110px]">
+      <td className="py-2.5 px-3 whitespace-nowrap font-mono text-micro font-bold text-emerald-600 dark:text-emerald-400 min-w-[110px] text-center border-r border-border/60">
         {editingField === 'ctc' ? (
           <input
             type="text"
@@ -345,7 +348,7 @@ function TableRow({
             onBlur={() => commitEdit('ctc')}
             onKeyDown={(e) => handleKeyDown(e, 'ctc')}
             autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-24 shadow-xs outline-none"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-24 shadow-xs outline-none text-center mx-auto"
           />
         ) : (
           <span
@@ -359,36 +362,16 @@ function TableRow({
       </td>
 
       {/* Eligible Batch */}
-      <td className="py-3 px-3 text-fg-muted whitespace-nowrap min-w-[110px]">
-        {editingField === 'eligible_batch' ? (
-          <select
-            value={tempValue}
-            onChange={(e) => {
-              setTempValue(e.target.value);
-            }}
-            onBlur={() => commitEdit('eligible_batch')}
-            autoFocus
-            className="bg-surface border border-primary rounded-lg px-2 py-1 text-xs text-fg shadow-xs cursor-pointer outline-none font-medium"
-          >
-            {BATCH_YEARS.map((y) => (
-              <option key={y} value={y} className="bg-surface text-fg">
-                {y}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <span
-            onClick={() => startEdit('eligible_batch', row.eligible_batch)}
-            className="cursor-pointer hover:text-primary transition-colors font-mono font-medium px-2 py-0.5 rounded bg-surface-sunken border border-border"
-            title="Click to change batch"
-          >
-            {row.eligible_batch}
-          </span>
-        )}
+      <td className="py-2.5 px-3 text-fg-muted whitespace-nowrap min-w-[110px] text-center border-r border-border/60">
+        <SmoothYearDropdown
+          value={row.eligible_batch}
+          onChange={(newYear) => onUpdateLead(row._id, { eligible_batch: newYear })}
+          placeholder="Batch"
+        />
       </td>
 
       {/* Row Edit Pen Icon (Revealed on hover) */}
-      <td className="py-2.5 px-3 text-center whitespace-nowrap w-10">
+      <td className="py-2.5 px-2 text-center whitespace-nowrap w-10">
         <button
           type="button"
           onClick={(e) => {

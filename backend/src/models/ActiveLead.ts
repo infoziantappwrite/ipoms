@@ -1,8 +1,8 @@
 import mongoose, { Document, Schema, Model, Types } from 'mongoose';
 
 // ─── Status Enum (Strictly 3 options per User Directive) ──────────────────────
-export type ActiveLeadStatus = 'Hiring' | 'Not Hiring' | 'Follow Up';
-export const ACTIVE_LEAD_STATUSES: ActiveLeadStatus[] = ['Hiring', 'Not Hiring', 'Follow Up'];
+export type ActiveLeadStatus = 'Hiring' | 'Invite Email' | 'Follow Up';
+export const ACTIVE_LEAD_STATUSES: ActiveLeadStatus[] = ['Hiring', 'Invite Email', 'Follow Up'];
 
 // ─── Followup Months (12 Calendar Months) ────────────────────────────────────
 export const FOLLOWUP_MONTHS = [
@@ -80,7 +80,7 @@ const ActiveLeadSchema: Schema<IActiveLead> = new Schema(
     },
     status: {
       type: String,
-      enum: ACTIVE_LEAD_STATUSES,
+      enum: [...ACTIVE_LEAD_STATUSES, 'Not Hiring'],
       required: true,
       default: 'Hiring',
       index: true,

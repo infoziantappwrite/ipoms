@@ -1,7 +1,8 @@
 import { Express, Request, Response } from 'express';
 import { Types } from 'mongoose';
 import ExcelJS from 'exceljs';
-import { ActiveLead, IActiveLead, ACTIVE_LEAD_STATUSES, ACADEMIC_YEARS, FOLLOWUP_MONTHS } from '../models/ActiveLead';
+import { ActiveLead, IActiveLead, ACTIVE_LEAD_STATUSES, ACADEMIC_YEARS, FOLLOWUP_MONTHS, ActiveLeadStatus } from '../models/ActiveLead';
+import { DailyTracker } from '../models/DailyTracker';
 import { authenticateJWT } from './authMiddleware';
 
 function escapeRegex(str: string): string {
@@ -26,15 +27,22 @@ export async function syncLeadFromDailyTracker(data: {
     if (!normalizedCompany) return null;
 
     const outcome = (data.call_outcome || '').toLowerCase();
-    let status: 'Hiring' | 'Not Hiring' | 'Follow Up' | null = null;
+    let status: ActiveLeadStatus | null = null;
     let followupMonth = '';
 
     if (
-      outcome.includes('hiring') ||
       outcome.includes('invite') ||
+      outcome.includes('mail') ||
+      outcome.includes('email') ||
+      outcome === 'in_connect'
+    ) {
+      status = 'Invite Email';
+    } else if (
+      outcome.includes('hiring') ||
       outcome.includes('jd') ||
       outcome.includes('positive') ||
-      outcome.includes('interested')
+      outcome.includes('interested') ||
+      outcome.includes('drive_completed')
     ) {
       status = 'Hiring';
     } else if (
@@ -44,20 +52,13 @@ export async function syncLeadFromDailyTracker(data: {
       outcome.includes('later')
     ) {
       status = 'Follow Up';
-      // Attempt to extract month from remarks if present
       const currentMonthIndex = new Date().getMonth();
       followupMonth = FOLLOWUP_MONTHS[currentMonthIndex] || 'August';
-    } else if (
-      outcome.includes('not hiring') ||
-      outcome.includes('declined') ||
-      outcome.includes('rejected')
-    ) {
-      status = 'Not Hiring';
     }
 
     if (!status) return null;
 
-    const year = data.academic_year || '2026';
+    const year = (data.academic_year as any) || '2026';
 
     // Find existing lead or upsert (with safe regex escaping)
     const existing = await ActiveLead.findOne({
@@ -72,6 +73,8 @@ export async function syncLeadFromDailyTracker(data: {
         existing.followup_month = followupMonth as any;
       }
       if (data.daily_tracker_id) existing.daily_tracker_id = data.daily_tracker_id;
+      if (data.coordinator_id && !existing.coordinator_id) existing.coordinator_id = data.coordinator_id;
+      if (data.college_id && !existing.college_id) existing.college_id = data.college_id;
       await existing.save();
       return existing;
     }
@@ -79,7 +82,7 @@ export async function syncLeadFromDailyTracker(data: {
     const newLead = await ActiveLead.create({
       company_name: normalizedCompany,
       role: 'Graduate Trainee',
-      ctc: 'Competitive / Best in Industry',
+      ctc: '',
       status,
       followup_month: status === 'Follow Up' ? followupMonth : '',
       academic_year: year,
@@ -156,14 +159,15 @@ export function registerActiveLeadRoutes(app: Express) {
       const stats = {
         total: 0,
         hiring: 0,
-        not_hiring: 0,
+        invite_email: 0,
         follow_up: 0,
       };
 
       allStats.forEach((item) => {
         stats.total += item.count;
         if (item._id === 'Hiring') stats.hiring = item.count;
-        if (item._id === 'Not Hiring') stats.not_hiring = item.count;
+        if (item._id === 'Invite Email') stats.invite_email = item.count;
+        if (item._id === 'Not Hiring') stats.invite_email += item.count;
         if (item._id === 'Follow Up') stats.follow_up = item.count;
       });
 
@@ -178,6 +182,126 @@ export function registerActiveLeadRoutes(app: Express) {
     } catch (err: any) {
       console.error('GET /active-leads error:', err);
       return res.status(500).json({ success: false, error: { message: err.message || 'Failed to fetch active leads' } });
+    }
+  });
+
+  // ── Sync from Daily Tracker (Hiring, Follow Up, Invite Email) ────────────
+  app.post('/api/v1/active-leads/sync', authenticateJWT, async (req: Request, res: Response) => {
+    try {
+      const { academic_year } = req.body || {};
+      const targetYear = academic_year || '2026';
+
+      // Find all Daily Tracker rows with outcomes matching Hiring, Follow Up, or Invite Email
+      const SYNCABLE_OUTCOMES = [
+        'hiring',
+        'jd_received',
+        'drive_completed',
+        'hiring_completed',
+        'invite_mail',
+        'in_connect',
+        'follow_up',
+        'call_back',
+      ];
+
+      const trackerRows = await DailyTracker.find({
+        is_skipped: false,
+        outcome_status: { $in: SYNCABLE_OUTCOMES },
+        company_name: { $exists: true, $ne: '' },
+      }).lean();
+
+      let syncedCount = 0;
+      let createdCount = 0;
+      let updatedCount = 0;
+
+      for (const row of trackerRows) {
+        if (!row.company_name || !row.company_name.trim()) continue;
+        const normalizedCompany = row.company_name.trim();
+        const outcome = (row.outcome_status || '').toLowerCase();
+
+        let status: ActiveLeadStatus | null = null;
+        let followupMonth = '';
+
+        if (
+          outcome.includes('invite') ||
+          outcome.includes('mail') ||
+          outcome.includes('email') ||
+          outcome === 'in_connect'
+        ) {
+          status = 'Invite Email';
+        } else if (
+          outcome.includes('hiring') ||
+          outcome.includes('jd') ||
+          outcome.includes('positive') ||
+          outcome.includes('interested') ||
+          outcome.includes('drive_completed')
+        ) {
+          status = 'Hiring';
+        } else if (
+          outcome.includes('follow') ||
+          outcome.includes('call back') ||
+          outcome.includes('reschedule') ||
+          outcome.includes('later')
+        ) {
+          status = 'Follow Up';
+          followupMonth = row.follow_up_month || FOLLOWUP_MONTHS[new Date().getMonth()] || 'August';
+        }
+
+        if (!status) continue;
+
+        const rowYear = (row.year ? String(row.year) : targetYear) as any;
+
+        const existing = await ActiveLead.findOne({
+          company_name: { $regex: new RegExp(`^${escapeRegex(normalizedCompany)}$`, 'i') },
+          academic_year: rowYear,
+          is_deleted: false,
+        });
+
+        if (existing) {
+          existing.status = status;
+          if (status === 'Follow Up' && followupMonth) {
+            existing.followup_month = followupMonth as any;
+          }
+          if (row.coordinator_id && !existing.coordinator_id) {
+            existing.coordinator_id = row.coordinator_id as any;
+          }
+          if (row.college_id && !existing.college_id) {
+            existing.college_id = row.college_id as any;
+          }
+          existing.daily_tracker_id = row._id as any;
+          await existing.save();
+          updatedCount++;
+        } else {
+          await ActiveLead.create({
+            company_name: normalizedCompany,
+            role: 'Graduate Trainee',
+            ctc: '',
+            status,
+            followup_month: status === 'Follow Up' ? followupMonth : '',
+            academic_year: rowYear,
+            coordinator_id: row.coordinator_id || null,
+            college_id: row.college_id || null,
+            daily_tracker_id: row._id,
+          });
+          createdCount++;
+        }
+        syncedCount++;
+      }
+
+      return res.json({
+        success: true,
+        data: {
+          synced_count: syncedCount,
+          created_count: createdCount,
+          updated_count: updatedCount,
+        },
+        message: `Successfully synced ${syncedCount} leads from Daily Tracker (${createdCount} added, ${updatedCount} updated)`,
+      });
+    } catch (err: any) {
+      console.error('POST /active-leads/sync error:', err);
+      return res.status(500).json({
+        success: false,
+        error: { message: err.message || 'Failed to sync leads from Daily Tracker' },
+      });
     }
   });
 
@@ -334,7 +458,7 @@ export function registerActiveLeadRoutes(app: Express) {
     }
   });
 
-  // ── 5. DELETE /api/v1/active-leads/:id (Soft Delete) ──────────────────────
+  // ── 5. DELETE /api/v1/active-leads/:id (Single Soft Delete) ──────────────
   app.delete('/api/v1/active-leads/:id', authenticateJWT, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
@@ -359,6 +483,35 @@ export function registerActiveLeadRoutes(app: Express) {
     } catch (err: any) {
       console.error('DELETE /active-leads/:id error:', err);
       return res.status(500).json({ success: false, error: { message: err.message || 'Failed to delete active lead' } });
+    }
+  });
+
+  // ── 5.1 POST /api/v1/active-leads/bulk-delete (Bulk Soft Delete) ──────────
+  app.post('/api/v1/active-leads/bulk-delete', authenticateJWT, async (req: Request, res: Response) => {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ success: false, error: { message: 'IDs array is required' } });
+      }
+
+      const validIds = ids.filter((id) => Types.ObjectId.isValid(id));
+      if (validIds.length === 0) {
+        return res.status(400).json({ success: false, error: { message: 'No valid lead IDs provided' } });
+      }
+
+      const result = await ActiveLead.updateMany(
+        { _id: { $in: validIds }, is_deleted: false },
+        { $set: { is_deleted: true, deleted_at: new Date() } }
+      );
+
+      return res.json({
+        success: true,
+        data: { deletedCount: result.modifiedCount },
+        message: `${result.modifiedCount} active lead(s) removed successfully`,
+      });
+    } catch (err: any) {
+      console.error('POST /active-leads/bulk-delete error:', err);
+      return res.status(500).json({ success: false, error: { message: err.message || 'Failed to bulk delete active leads' } });
     }
   });
 
@@ -397,8 +550,8 @@ export function registerActiveLeadRoutes(app: Express) {
       worksheet.columns = [
         { header: 'S.No', key: 'sno', width: 8 },
         { header: 'Company Name', key: 'company_name', width: 32 },
-        { header: 'Role / Designation', key: 'role', width: 26 },
-        { header: 'CTC / Package', key: 'ctc', width: 18 },
+        { header: 'Role', key: 'role', width: 26 },
+        { header: 'CTC', key: 'ctc', width: 18 },
         { header: 'Status', key: 'status', width: 16 },
         { header: 'Followup Month', key: 'followup_month', width: 18 },
         { header: 'Graduating Year', key: 'academic_year', width: 18 },
@@ -440,8 +593,8 @@ export function registerActiveLeadRoutes(app: Express) {
           statusCell.font = { bold: true, color: { argb: 'FF059669' } };
         } else if (l.status === 'Follow Up') {
           statusCell.font = { bold: true, color: { argb: 'FFD97706' } };
-        } else if (l.status === 'Not Hiring') {
-          statusCell.font = { bold: true, color: { argb: 'FFE11D48' } };
+        } else if (l.status === 'Invite Email' || l.status === 'Not Hiring') {
+          statusCell.font = { bold: true, color: { argb: 'FF0284C7' } }; // Sky Blue
         }
       });
 

@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -12,6 +45,7 @@ const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const exceljs_1 = __importDefault(require("exceljs"));
+const xlsx = __importStar(require("xlsx"));
 const database_1 = require("./config/database");
 const CompanyMetadata_1 = require("./models/CompanyMetadata");
 const User_1 = require("./models/User");
@@ -198,7 +232,7 @@ app.get('/api/v1/health/daily-leads-diagnostics', async (req, res) => {
 // Per-record ownership ("may you see THIS row?") is separate again — see
 // scopeToSelf() at the handlers that take a coordinator_id.
 app.use('/api/v1', (req, res, next) => {
-    if (req.path === '/health' || req.path.startsWith('/auth') || req.path === '/colleges') {
+    if (req.path === '/health' || req.path.startsWith('/auth') || req.path === '/colleges' || req.path.startsWith('/weekly-tracker-import')) {
         return next();
     }
     return (0, authMiddleware_1.authenticateJWT)(req, res, next);
@@ -573,6 +607,16 @@ app.post('/api/v1/daily-tracker/manual-row', async (req, res) => {
             save_count: 0,
             duplicate_acknowledged: false,
         });
+        if (newRow.outcome_status && newRow.company_name) {
+            (0, activeLeadRoutes_1.syncLeadFromDailyTracker)({
+                company_name: newRow.company_name,
+                call_outcome: newRow.outcome_status,
+                remarks: newRow.comments,
+                coordinator_id: newRow.coordinator_id,
+                college_id: newRow.college_id,
+                daily_tracker_id: newRow._id,
+            }).catch((e) => console.error('Auto-lead sync error on create:', e));
+        }
         return res.status(201).json({
             success: true,
             message: 'Contact row added successfully',
@@ -1939,6 +1983,9 @@ app.patch('/api/v1/daily-leads/:id', async (req, res) => {
         if (patchData.lead_date) {
             lead.lead_date = parseDateParam(String(patchData.lead_date));
         }
+        if (patchData.college_id && mongoose_1.Types.ObjectId.isValid(String(patchData.college_id))) {
+            lead.college_id = new mongoose_1.Types.ObjectId(String(patchData.college_id));
+        }
         await lead.save();
         const updated = await DailyLead_1.DailyLead.findById(lead._id)
             .populate('college_id', 'college_name college_code')
@@ -2118,10 +2165,12 @@ app.post('/api/v1/daily-leads/sync-positives', async (req, res) => {
         }
         const positiveCalls = await DailyTracker_1.DailyTracker.find(dtFilter);
         for (const call of positiveCalls) {
+            if (!call.company_name || !call.company_name.trim())
+                continue;
             const leadType = call.outcome_status === 'jd_received' ? 'jd_received' : 'positive';
+            const escapedCompanyName = call.company_name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const existing = await DailyLead_1.DailyLead.findOne({
-                college_id: call.college_id,
-                company_name: { $regex: `^${call.company_name.trim()}$`, $options: 'i' },
+                company_name: { $regex: `^${escapedCompanyName}$`, $options: 'i' },
                 lead_date: { $gte: targetDate, $lt: nextDate },
                 lead_type: leadType,
                 is_deleted: false,
@@ -2142,7 +2191,7 @@ app.post('/api/v1/daily-leads/sync-positives', async (req, res) => {
                     coordinator_id: call.coordinator_id || (coordinator_id && mongoose_1.Types.ObjectId.isValid(String(coordinator_id)) ? new mongoose_1.Types.ObjectId(String(coordinator_id)) : new mongoose_1.Types.ObjectId('6a847199fa3bf51271bc14eb')),
                     company_id: call.company_id || null,
                     daily_tracker_id: call._id,
-                    company_name: call.company_name,
+                    company_name: call.company_name.trim(),
                     job_role: 'Graduate Trainee',
                     ctc: '',
                     eligible_batch: '2026 Batch',
@@ -2169,9 +2218,11 @@ app.post('/api/v1/daily-leads/sync-positives', async (req, res) => {
         }
         const pipelineRows = await WeeklyTracker_1.WeeklyTracker.find(wtFilter);
         for (const wt of pipelineRows) {
+            if (!wt.company_name || !wt.company_name.trim())
+                continue;
+            const escapedWtCompany = wt.company_name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const existing = await DailyLead_1.DailyLead.findOne({
-                college_id: wt.college_id,
-                company_name: { $regex: `^${wt.company_name.trim()}$`, $options: 'i' },
+                company_name: { $regex: `^${escapedWtCompany}$`, $options: 'i' },
                 lead_date: { $gte: targetDate, $lt: nextDate },
                 lead_type: 'positive',
                 is_deleted: false,
@@ -2199,7 +2250,7 @@ app.post('/api/v1/daily-leads/sync-positives', async (req, res) => {
                     college_id: wt.college_id,
                     coordinator_id: wt.coordinator_id || (coordinator_id && mongoose_1.Types.ObjectId.isValid(String(coordinator_id)) ? new mongoose_1.Types.ObjectId(String(coordinator_id)) : new mongoose_1.Types.ObjectId('6a847199fa3bf51271bc14eb')),
                     company_id: wt.company_id || null,
-                    company_name: wt.company_name,
+                    company_name: wt.company_name.trim(),
                     job_role: wt.job_role || 'Graduate Trainee',
                     ctc: wt.ctc_lpa || '',
                     eligible_batch: wt.eligible_batch || '2026 Batch',
@@ -2226,6 +2277,143 @@ app.post('/api/v1/daily-leads/sync-positives', async (req, res) => {
         return res.status(500).json({
             success: false,
             error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to sync positive leads' },
+        });
+    }
+});
+// ── DL-9: POST /api/v1/daily-leads/copy-to-jd
+// Copies a selected positive company (or positive leads) across all selected target colleges into JD Received
+app.post('/api/v1/daily-leads/copy-to-jd', async (req, res) => {
+    try {
+        const { date, company_name, college_ids, lead_id, job_role, ctc, eligible_batch, event_time } = req.body;
+        const targetDate = date ? parseDateParam(String(date)) : getTodayDate();
+        const nextDate = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
+        // 1. Single Company Multi-College Copying Flow
+        if (company_name && Array.isArray(college_ids) && college_ids.length > 0) {
+            const escapedCompanyName = company_name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            // Find source positive lead for metadata reference
+            let sourceLead = null;
+            if (lead_id && mongoose_1.Types.ObjectId.isValid(lead_id)) {
+                sourceLead = await DailyLead_1.DailyLead.findById(lead_id);
+            }
+            if (!sourceLead) {
+                sourceLead = await DailyLead_1.DailyLead.findOne({
+                    company_name: { $regex: `^${escapedCompanyName}$`, $options: 'i' },
+                    lead_type: 'positive',
+                    lead_date: { $gte: targetDate, $lt: nextDate },
+                    is_deleted: false,
+                });
+            }
+            const roleToUse = job_role || sourceLead?.job_role || 'Graduate Trainee';
+            const ctcToUse = ctc !== undefined ? ctc : (sourceLead?.ctc || '');
+            const batchToUse = eligible_batch || sourceLead?.eligible_batch || '2026 Batch';
+            const timeToUse = event_time || sourceLead?.event_time || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+            const validCollegeIds = college_ids
+                .filter((id) => mongoose_1.Types.ObjectId.isValid(id))
+                .map((id) => new mongoose_1.Types.ObjectId(id));
+            let copiedCount = 0;
+            for (const targetCollegeId of validCollegeIds) {
+                // Check if already present in JD Received for this college & date
+                const existing = await DailyLead_1.DailyLead.findOne({
+                    lead_type: 'jd_received',
+                    college_id: targetCollegeId,
+                    company_name: { $regex: `^${escapedCompanyName}$`, $options: 'i' },
+                    lead_date: { $gte: targetDate, $lt: nextDate },
+                    is_deleted: false,
+                });
+                if (!existing) {
+                    await DailyLead_1.DailyLead.create({
+                        lead_type: 'jd_received',
+                        college_id: targetCollegeId,
+                        coordinator_id: sourceLead?.coordinator_id || req.user?._id || new mongoose_1.Types.ObjectId('6a847199fa3bf51271bc14eb'),
+                        company_id: sourceLead?.company_id || null,
+                        daily_tracker_id: sourceLead?.daily_tracker_id || null,
+                        company_name: company_name.trim(),
+                        job_role: roleToUse,
+                        ctc: ctcToUse,
+                        eligible_batch: batchToUse,
+                        event_time: timeToUse,
+                        lead_date: targetDate,
+                        remarks: 'JD Received copied from Positives',
+                        is_jd_received: true,
+                        is_deleted: false,
+                    });
+                    copiedCount++;
+                }
+            }
+            return res.status(200).json({
+                success: true,
+                message: copiedCount > 0
+                    ? `Successfully copied "${company_name}" to ${copiedCount} college(s) in JD Received`
+                    : `"${company_name}" is already present in JD Received for all selected colleges`,
+                data: {
+                    copied_count: copiedCount,
+                    total_colleges_selected: validCollegeIds.length,
+                    company_name,
+                },
+            });
+        }
+        // 2. Fallback: Bulk copy all positive leads matching college_ids
+        const filter = {
+            lead_type: 'positive',
+            lead_date: { $gte: targetDate, $lt: nextDate },
+            is_deleted: false,
+        };
+        if (Array.isArray(college_ids) && college_ids.length > 0 && !college_ids.includes('all')) {
+            const validCollegeIds = college_ids
+                .filter((id) => mongoose_1.Types.ObjectId.isValid(id))
+                .map((id) => new mongoose_1.Types.ObjectId(id));
+            if (validCollegeIds.length > 0) {
+                filter.college_id = { $in: validCollegeIds };
+            }
+        }
+        const positiveLeads = await DailyLead_1.DailyLead.find(filter);
+        let copiedCount = 0;
+        for (const lead of positiveLeads) {
+            const escapedLeadName = lead.company_name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const existing = await DailyLead_1.DailyLead.findOne({
+                lead_type: 'jd_received',
+                college_id: lead.college_id,
+                company_name: { $regex: `^${escapedLeadName}$`, $options: 'i' },
+                lead_date: { $gte: targetDate, $lt: nextDate },
+                is_deleted: false,
+            });
+            if (!existing) {
+                await DailyLead_1.DailyLead.create({
+                    lead_type: 'jd_received',
+                    college_id: lead.college_id,
+                    coordinator_id: lead.coordinator_id,
+                    company_id: lead.company_id,
+                    daily_tracker_id: lead.daily_tracker_id,
+                    company_name: lead.company_name,
+                    job_role: lead.job_role || 'Graduate Trainee',
+                    ctc: lead.ctc || '',
+                    eligible_batch: lead.eligible_batch || '2026 Batch',
+                    event_time: lead.event_time || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+                    lead_date: lead.lead_date || targetDate,
+                    remarks: lead.remarks || 'Copied from Positives',
+                    is_jd_received: true,
+                    is_deleted: false,
+                });
+                copiedCount++;
+            }
+        }
+        return res.status(200).json({
+            success: true,
+            message: copiedCount > 0
+                ? `Successfully copied ${copiedCount} lead(s) to JD Received`
+                : positiveLeads.length === 0
+                    ? `No positive leads found on ${date || 'today'}`
+                    : `Selected positive leads are already present in JD Received`,
+            data: {
+                copied_count: copiedCount,
+                total_positives_found: positiveLeads.length,
+            },
+        });
+    }
+    catch (error) {
+        return res.status(500).json({
+            success: false,
+            error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to copy leads to JD' },
         });
     }
 });
@@ -2994,7 +3182,7 @@ app.get('/api/v1/dashboard/college-kpis', async (req, res) => {
                 .split(',')
                 .map((s) => s.trim())
                 .filter(Boolean)
-                .slice(0, 3);
+                .slice(0, 10);
         }
         // If no college IDs provided, return empty list (no forced default selection)
         if (targetCollegeIds.length === 0) {
@@ -4616,6 +4804,294 @@ app.patch('/api/v1/settings', authMiddleware_1.authenticateJWT, (0, authMiddlewa
         });
     }
 });
+// Inspect Weekly Report Excel File
+app.get('/api/v1/weekly-tracker-import/inspect', async (req, res) => {
+    try {
+        const filePath = 'C:\\Users\\admin\\Downloads\\Weekly Report.xlsx';
+        const workbook = xlsx.readFile(filePath);
+        const targetSheet = String(req.query.sheet || '').trim();
+        if (targetSheet && workbook.Sheets[targetSheet]) {
+            const rawData = xlsx.utils.sheet_to_json(workbook.Sheets[targetSheet], { header: 1 });
+            return res.json({
+                success: true,
+                sheetName: targetSheet,
+                totalRows: rawData.length,
+                rows: rawData,
+            });
+        }
+        const summary = workbook.SheetNames.map((sheetName) => {
+            const sheet = workbook.Sheets[sheetName];
+            const rawData = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+            return {
+                sheetName,
+                totalRows: rawData.length,
+                sampleRows: rawData.filter((r) => r && r.length > 0).slice(0, 30),
+            };
+        });
+        return res.json({ success: true, sheetNames: workbook.SheetNames, sheets: summary });
+    }
+    catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
+    }
+});
+const SECTION_HEADERS_MAP = [
+    { pattern: /companies\s+completed/i, section: 'completed' },
+    { pattern: /companies\s+in\s+progress/i, section: 'in_progress' },
+    { pattern: /companies\s+in\s+pipeline/i, section: 'pipeline' },
+    { pattern: /top\s+companies/i, section: 'top_companies' },
+    { pattern: /companies\s+on\s+hold\s+by\s+hr|rejected\s+companies/i, section: 'rejected_by_hr' },
+    { pattern: /companies\s+on\s+hold\s+by\s+college|rejected\s+by\s+college/i, section: 'rejected_by_college' },
+];
+function parseWeeklySheet(sheet) {
+    const rawRows = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    const entries = [];
+    let currentSection = null;
+    let headerMap = {};
+    for (let r = 0; r < rawRows.length; r++) {
+        const row = rawRows[r];
+        if (!row || row.length === 0)
+            continue;
+        const strRow = row.map((cell) => (cell !== undefined && cell !== null ? String(cell).trim() : ''));
+        const joinedRow = strRow.join(' ').trim();
+        if (!joinedRow)
+            continue;
+        // Check if section header
+        let detectedSection = null;
+        for (const mapping of SECTION_HEADERS_MAP) {
+            if (mapping.pattern.test(joinedRow)) {
+                detectedSection = mapping.section;
+                break;
+            }
+        }
+        if (detectedSection) {
+            currentSection = detectedSection;
+            headerMap = {};
+            continue;
+        }
+        // Check if column definition header
+        if (strRow.some((c) => /s\.?\s*no|si\.?\s*no/i.test(c)) &&
+            strRow.some((c) => /company/i.test(c))) {
+            headerMap = {};
+            strRow.forEach((colName, colIdx) => {
+                const lower = colName.toLowerCase().trim();
+                if (/s\.?\s*no|si\.?\s*no/i.test(lower))
+                    headerMap['sNo'] = colIdx;
+                else if (/company\s*name|company/i.test(lower))
+                    headerMap['companyName'] = colIdx;
+                else if (/role/i.test(lower))
+                    headerMap['role'] = colIdx;
+                else if (/ctc/i.test(lower))
+                    headerMap['ctc'] = colIdx;
+                else if (/status/i.test(lower))
+                    headerMap['status'] = colIdx;
+                else if (/offers|no\s+of\s+offers/i.test(lower))
+                    headerMap['offers'] = colIdx;
+                else if (/follow\s*up/i.test(lower))
+                    headerMap['followUp'] = colIdx;
+                else if (/batch/i.test(lower))
+                    headerMap['batch'] = colIdx;
+            });
+            continue;
+        }
+        // Skip summary / stats table at bottom
+        if (/status\s+count|total\s+status|in\s+progress\s+count|pipeline\s+count|completed\s+count/i.test(joinedRow)) {
+            continue;
+        }
+        if (currentSection) {
+            const sNoVal = headerMap['sNo'] !== undefined ? strRow[headerMap['sNo']] : strRow[0];
+            const companyVal = headerMap['companyName'] !== undefined ? strRow[headerMap['companyName']] : strRow[1];
+            const roleVal = headerMap['role'] !== undefined ? strRow[headerMap['role']] : strRow[2];
+            const ctcVal = headerMap['ctc'] !== undefined ? strRow[headerMap['ctc']] : strRow[3];
+            const statusVal = headerMap['status'] !== undefined ? strRow[headerMap['status']] : strRow[4];
+            const offersVal = headerMap['offers'] !== undefined ? strRow[headerMap['offers']] : '';
+            const followUpVal = headerMap['followUp'] !== undefined ? strRow[headerMap['followUp']] : '';
+            const batchVal = headerMap['batch'] !== undefined ? strRow[headerMap['batch']] : '';
+            const cleanCompany = (companyVal || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+            if (!cleanCompany || cleanCompany === '#VALUE!' || cleanCompany.length < 2) {
+                continue;
+            }
+            const cleanRole = (roleVal || 'Graduate Trainee').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+            const lowerComp = cleanCompany.toLowerCase();
+            const lowerRole = cleanRole.toLowerCase();
+            if (lowerComp === 'status' ||
+                lowerComp === 'count' ||
+                lowerComp === 'total' ||
+                lowerComp === 's.no' ||
+                lowerComp === 'si.no' ||
+                lowerComp === 'company name' ||
+                lowerComp === 'role' ||
+                lowerComp === 'ctc' ||
+                lowerComp === 'in progress' ||
+                lowerComp === 'pipeline' ||
+                lowerComp === 'completed' ||
+                lowerComp === 'top companies' ||
+                lowerRole === 'count' ||
+                lowerRole === 'role' ||
+                lowerComp.startsWith('status count') ||
+                lowerComp.startsWith('total status') ||
+                lowerComp.startsWith('in progress count') ||
+                lowerComp.startsWith('pipeline count') ||
+                lowerComp.startsWith('completed count')) {
+                continue;
+            }
+            let offersNum = 0;
+            if (offersVal && !isNaN(Number(offersVal))) {
+                offersNum = Number(offersVal);
+            }
+            let cleanCtc = (ctcVal || '').replace(/[\t\r\n]+/g, ' ').trim();
+            if (cleanCtc.toLowerCase() === 'not mentioned' || cleanCtc === '-') {
+                cleanCtc = '';
+            }
+            const cleanStatus = (statusVal || 'In discussion with HR').replace(/[\t\r\n]+/g, ' ').trim();
+            let parsedFollowUpDate = '';
+            if (followUpVal) {
+                const num = Number(followUpVal);
+                if (!isNaN(num) && num > 40000 && num < 60000) {
+                    const d = new Date(Math.round((num - 25569) * 86400 * 1000));
+                    parsedFollowUpDate = d.toISOString().split('T')[0];
+                }
+                else {
+                    parsedFollowUpDate = String(followUpVal).trim();
+                }
+            }
+            let finalSection = currentSection;
+            if (currentSection === 'rejected_by_hr' &&
+                /rejected by (the )?college|response from (the )?college|college in connect|low package|bda role|tpo/i.test(cleanStatus)) {
+                finalSection = 'rejected_by_college';
+            }
+            entries.push({
+                section: finalSection,
+                sNo: Number(sNoVal) || entries.length + 1,
+                companyName: cleanCompany,
+                role: cleanRole || 'Graduate Trainee',
+                ctc: cleanCtc,
+                status: cleanStatus,
+                offersReceived: offersNum,
+                followUpDate: parsedFollowUpDate,
+                batch: batchVal || '2026 Batch',
+            });
+        }
+    }
+    return entries;
+}
+// Import a Single Sheet for a College
+app.all('/api/v1/weekly-tracker-import/sheet', async (req, res) => {
+    try {
+        const sheetName = String(req.query.name || req.body?.sheetName || '').trim();
+        if (!sheetName) {
+            return res.status(400).json({ success: false, error: 'Sheet name is required (e.g. ?name=KIOT)' });
+        }
+        const filePath = 'C:\\Users\\admin\\Downloads\\Weekly Report.xlsx';
+        const workbook = xlsx.readFile(filePath);
+        const matchedSheetKey = workbook.SheetNames.find((s) => s.trim().toLowerCase() === sheetName.trim().toLowerCase());
+        if (!matchedSheetKey) {
+            return res.status(404).json({
+                success: false,
+                error: `Sheet '${sheetName}' not found. Available sheets: ${workbook.SheetNames.join(', ')}`,
+            });
+        }
+        const sheet = workbook.Sheets[matchedSheetKey];
+        const parsedEntries = parseWeeklySheet(sheet);
+        // Match College in DB
+        const normalizedKey = sheetName.trim().toUpperCase();
+        let college = await College_1.College.findOne({
+            $or: [
+                { college_code: normalizedKey },
+                { college_code: new RegExp(`^${normalizedKey}$`, 'i') },
+                { college_name: new RegExp(normalizedKey, 'i') },
+            ],
+        });
+        if (!college) {
+            const ALIAS_MAP = {
+                ACHARIYA: 'ACET',
+                KARPAGAM: 'KARPAGAM',
+                'MAR EPHRAEM': 'MAR',
+                EGS: 'EGS',
+            };
+            const mappedCode = ALIAS_MAP[normalizedKey];
+            if (mappedCode) {
+                college = await College_1.College.findOne({ college_code: mappedCode });
+            }
+        }
+        if (!college) {
+            college = await College_1.College.findOne();
+        }
+        if (!college) {
+            return res.status(404).json({ success: false, error: `No college record found for sheet '${sheetName}'.` });
+        }
+        // Find Coordinator
+        let coordinator = await User_1.User.findOne({
+            $or: [{ username: 'megaladevi' }, { role_codes: 'PLACEMENT_COORDINATOR' }],
+        });
+        if (!coordinator) {
+            coordinator = await User_1.User.findOne();
+        }
+        // Remove existing entries for this college to prevent duplicate entries
+        await WeeklyTracker_1.WeeklyTracker.deleteMany({
+            college_id: college._id,
+            academic_year: 2026,
+        });
+        const sectionsBreakdown = {
+            completed: 0,
+            in_progress: 0,
+            pipeline: 0,
+            top_companies: 0,
+            rejected_by_hr: 0,
+            rejected_by_college: 0,
+        };
+        for (const entry of parsedEntries) {
+            if (entry.companyName.toLowerCase() === 'status' || entry.companyName.toLowerCase() === 'count') {
+                continue;
+            }
+            let compMeta = await CompanyMetadata_1.CompanyMetadata.findOne({
+                company_name: new RegExp(`^${entry.companyName.trim()}$`, 'i'),
+            });
+            if (!compMeta) {
+                compMeta = await CompanyMetadata_1.CompanyMetadata.create({
+                    company_name: entry.companyName.trim(),
+                    company_type: 'software',
+                    industry_sector: 'Information Technology',
+                });
+            }
+            await WeeklyTracker_1.WeeklyTracker.create({
+                academic_year: 2026,
+                college_id: college._id,
+                coordinator_id: coordinator?._id,
+                company_id: compMeta._id,
+                company_name: entry.companyName.trim(),
+                job_role: entry.role || 'Graduate Trainee',
+                ctc_lpa: entry.ctc || '',
+                eligible_batch: entry.batch?.includes('Batch') ? entry.batch : `${entry.batch || 2026} Batch`,
+                pipeline_section: entry.section,
+                is_pinned_top: entry.section === 'top_companies',
+                current_status_text: entry.status || 'Active engagement',
+                selected_count: entry.offersReceived || 0,
+                registered_count: entry.offersReceived ? entry.offersReceived * 10 : 0,
+                shortlisted_count: entry.offersReceived ? entry.offersReceived * 2 : 0,
+                is_deleted: false,
+            });
+            sectionsBreakdown[entry.section] = (sectionsBreakdown[entry.section] || 0) + 1;
+        }
+        const totalValid = Object.values(sectionsBreakdown).reduce((a, b) => a + b, 0);
+        const validEntries = parsedEntries.filter((e) => e.companyName.toLowerCase() !== 'status' && e.companyName.toLowerCase() !== 'count');
+        console.log(`✅ [Weekly Import] Imported ${totalValid} rows for ${college.college_name} (${matchedSheetKey}):`, sectionsBreakdown);
+        return res.json({
+            success: true,
+            data: {
+                sheetName: matchedSheetKey,
+                collegeName: college.college_name,
+                collegeCode: college.college_code,
+                totalInserted: totalValid,
+                sectionsBreakdown,
+                entries: validEntries,
+            },
+        });
+    }
+    catch (err) {
+        console.error('❌ Weekly import error:', err);
+        return res.status(500).json({ success: false, error: err.message });
+    }
+});
 // Centralized 404 handler
 app.use((req, res) => {
     res.status(404).json({
@@ -4637,6 +5113,82 @@ app.use((err, req, res, next) => {
         },
     });
 });
+// Ensure coordinator account exists with full credentials and college associations
+const ensureCoordinatorAccounts = async () => {
+    try {
+        const fullName = 'Megala Devi P S';
+        const username = 'megaladevi';
+        const email = 'megaladevi_ps@infoziant.com';
+        const mobile = '9976214361';
+        const password = 'iPOMS@123';
+        // 1. Roles
+        const roles = await Role_1.Role.find({
+            role_code: { $in: ['PLACEMENT_COORDINATOR', 'COORDINATOR', 'CAMPUS_COORDINATOR'] },
+        });
+        let roleIds = roles.map((r) => r._id);
+        let roleCodes = roles.map((r) => r.role_code);
+        if (roleCodes.length === 0) {
+            const allRoles = await Role_1.Role.find();
+            const coordRole = allRoles.find((r) => r.role_code.toLowerCase().includes('coord') || r.role_name.toLowerCase().includes('coord'));
+            if (coordRole) {
+                roleIds = [coordRole._id];
+                roleCodes = [coordRole.role_code];
+            }
+        }
+        // 2. Colleges
+        const allColleges = await College_1.College.find({ is_deleted: { $ne: true } });
+        const collegeIds = allColleges.map((c) => c._id);
+        // 3. Hash Password
+        const salt = await bcryptjs_1.default.genSalt(12);
+        const passwordHash = await bcryptjs_1.default.hash(password, salt);
+        // 4. Upsert User
+        let user = await User_1.User.findOne({
+            $or: [{ username }, { official_email: email }],
+        });
+        if (user) {
+            user.full_name = fullName;
+            user.username = username;
+            user.official_email = email;
+            user.primary_mobile = mobile;
+            user.password_hash = passwordHash;
+            user.role_ids = roleIds;
+            user.role_codes = roleCodes.length > 0 ? roleCodes : ['PLACEMENT_COORDINATOR'];
+            user.assigned_college_ids = collegeIds;
+            user.account_status = 'active';
+            user.is_email_verified = true;
+            user.must_change_password = false;
+            user.failed_login_attempts = 0;
+            user.is_deleted = false;
+            user.is_password_locked = false;
+            user.is_profile_locked = false;
+            await user.save();
+        }
+        else {
+            user = await User_1.User.create({
+                full_name: fullName,
+                username: username,
+                official_email: email,
+                primary_mobile: mobile,
+                password_hash: passwordHash,
+                role_ids: roleIds,
+                role_codes: roleCodes.length > 0 ? roleCodes : ['PLACEMENT_COORDINATOR'],
+                assigned_college_ids: collegeIds,
+                account_status: 'active',
+                presence_status: 'available',
+                is_email_verified: true,
+                must_change_password: false,
+                failed_login_attempts: 0,
+                is_deleted: false,
+            });
+        }
+        // 5. Link coordinator to colleges
+        await College_1.College.updateMany({ _id: { $in: collegeIds } }, { $addToSet: { assigned_coordinator_ids: user._id } });
+        console.log(`✅ [iPOMS] Placement Coordinator '${fullName}' verified & active.`);
+    }
+    catch (err) {
+        console.error('❌ Error in ensureCoordinatorAccounts:', err);
+    }
+};
 // Boot Server and Connect Database
 const startServer = async () => {
     await (0, database_1.connectDatabase)();
@@ -4644,6 +5196,7 @@ const startServer = async () => {
     await DailyLead_1.DailyLead.deleteMany({ lead_date: { $lt: new Date('2026-08-01T00:00:00.000Z') } });
     await (0, seedAugustAllCollegesPositives_1.seedAugustAllCollegesPositives)();
     await (0, seedAugustAllCollegesJdReceived_1.seedAugustAllCollegesJdReceived)();
+    await ensureCoordinatorAccounts();
     app.listen(PORT, () => {
         console.log(`🚀 [iPOMS API] Server running on http://localhost:${PORT}`);
         console.log(`📡 [iPOMS API] Health probe: http://localhost:${PORT}/api/v1/health`);

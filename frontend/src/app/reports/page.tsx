@@ -36,12 +36,14 @@ export default function ReportsPage() {
             onBackToBuilder={() => setIsEditingReport(false)}
           />
         ) : (
-          <ReportBuilderWizard
-            initialTemplateType={selectedTemplateType}
-            initialCollegeId={selectedCollegeId}
-            coordinatorId={coordinatorId}
-            onReportGenerated={handleReportGenerated}
-          />
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+            <ReportBuilderWizard
+              initialTemplateType={selectedTemplateType}
+              initialCollegeId={selectedCollegeId}
+              coordinatorId={coordinatorId}
+              onReportGenerated={handleReportGenerated}
+            />
+          </div>
         )}
       </main>
 

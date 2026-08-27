@@ -11,31 +11,49 @@ import {
   AlertCircle,
   CheckCircle2,
   Layers,
+  Unlock,
 } from 'lucide-react';
-import { apiFetch } from '@/lib/api';
 import {
   getCoordinatorSelectedColleges,
   setCoordinatorSelectedColleges,
   getCachedColleges,
   fetchAllCollegesCached,
+  isFocusLockedToday,
+  lockDailyFocus,
+  unlockDailyFocus,
 } from '@/lib/collegeSession';
 import { College } from '@/components/CollegeSelector';
 import { useToast } from '@/components/ui/Toast';
 
 interface Props {
-  onSelectionChange?: (selectedIds: string[]) => void;
+  onSelectionChange?: (selectedIds: string[], isLocked: boolean) => void;
 }
 
 export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
   const { toast } = useToast();
-  const [colleges, setColleges] = useState<College[]>(() => getCachedColleges());
-  const [selectedIds, setSelectedIds] = useState<string[]>(() => {
-    const saved = getCoordinatorSelectedColleges();
-    return saved.slice(0, 4);
-  });
-  const [isEditing, setIsEditing] = useState(false);
+  const [colleges, setColleges] = useState<College[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isLocked, setIsLocked] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(() => getCachedColleges().length === 0);
+  const [loading, setLoading] = useState(true);
+
+  // Sync state with global focus events
+  useEffect(() => {
+    const handleFocusUpdate = () => {
+      const locked = isFocusLockedToday();
+      const current = getCoordinatorSelectedColleges();
+      setIsLocked(locked);
+      setSelectedIds(current);
+      if (onSelectionChange) {
+        onSelectionChange(current, locked);
+      }
+    };
+
+    window.addEventListener('ipoms_focus_updated' as any, handleFocusUpdate);
+    return () => {
+      window.removeEventListener('ipoms_focus_updated' as any, handleFocusUpdate);
+    };
+  }, [onSelectionChange]);
 
   // Load available colleges and coordinator's active focus selection
   useEffect(() => {
@@ -46,17 +64,16 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
           setColleges(list);
 
           const savedIds = getCoordinatorSelectedColleges();
+          const locked = isFocusLockedToday();
+          setIsLocked(locked);
+
           if (savedIds && savedIds.length > 0) {
-            // Verify stored IDs exist in live colleges list
             const validSaved = savedIds.filter((id) => list.some((c) => c._id === id));
             setSelectedIds(validSaved.slice(0, 4));
-            if (onSelectionChange) onSelectionChange(validSaved.slice(0, 4));
-            setIsEditing(validSaved.length === 0);
+            if (onSelectionChange) onSelectionChange(validSaved.slice(0, 4), locked);
           } else {
-            // No default selection — start with empty selection in editing mode
             setSelectedIds([]);
-            setIsEditing(true);
-            if (onSelectionChange) onSelectionChange([]);
+            if (onSelectionChange) onSelectionChange([], false);
           }
         }
       } catch (err) {
@@ -71,7 +88,7 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
 
   // Handle Toggle Checkbox
   const handleToggleCollege = (collegeId: string) => {
-    if (!isEditing) return; // Prevent edits when locked
+    if (isLocked) return; // Prevent edits when locked
 
     const isAlreadySelected = selectedIds.includes(collegeId);
 
@@ -79,31 +96,48 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
       const updated = selectedIds.filter((id) => id !== collegeId);
       setSelectedIds(updated);
       setCoordinatorSelectedColleges(updated);
-      if (onSelectionChange) onSelectionChange(updated);
+      if (onSelectionChange) onSelectionChange(updated, false);
     } else {
       // Rule: Maximum 4 colleges are allowed
       if (selectedIds.length >= 4) {
-        toast('Maximum 4 colleges are allowed. Uncheck an existing college to select a different one.', 'error');
+        toast('Maximum 4 colleges allowed. Uncheck an existing college to choose another.', 'warning');
         return;
       }
       const updated = [...selectedIds, collegeId];
       setSelectedIds(updated);
       setCoordinatorSelectedColleges(updated);
-      if (onSelectionChange) onSelectionChange(updated);
+      if (onSelectionChange) onSelectionChange(updated, false);
     }
   };
 
-  const handleLockToggle = () => {
-    if (isEditing) {
-      if (selectedIds.length === 0) {
-        toast('Please select at least 1 college before locking your focus.', 'warning');
-        return;
-      }
-      setIsEditing(false);
-      toast(`Locked focus to ${selectedIds.length} ${selectedIds.length === 1 ? 'college' : 'colleges'}. Priority applied to all dropdowns.`, 'success');
-    } else {
-      setIsEditing(true);
+  const handleSaveAndLock = () => {
+    if (selectedIds.length === 0) {
+      toast('Please select at least 1 college (Minimum 1, Maximum 4) to activate your dashboard.', 'warning');
+      return;
     }
+    if (selectedIds.length > 4) {
+      toast('Maximum 4 colleges allowed. Please select at most 4.', 'error');
+      return;
+    }
+
+    const ok = lockDailyFocus(selectedIds);
+    if (ok) {
+      setIsLocked(true);
+      toast(
+        `Focus locked with ${selectedIds.length} ${
+          selectedIds.length === 1 ? 'college' : 'colleges'
+        }. Daily Tracker, Weekly Tracker, and all modules are now unlocked!`,
+        'success'
+      );
+      if (onSelectionChange) onSelectionChange(selectedIds, true);
+    }
+  };
+
+  const handleUnlockToEdit = () => {
+    unlockDailyFocus();
+    setIsLocked(false);
+    toast('Editing mode active. You can now adjust your focus colleges (1 to 4).', 'info');
+    if (onSelectionChange) onSelectionChange(selectedIds, false);
   };
 
   const filteredColleges = colleges.filter((c) => {
@@ -118,30 +152,42 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
 
   return (
     <section className="w-full rounded-2xl border border-border bg-surface shadow-xs overflow-hidden transition-all duration-300">
-      {/* ── Section Header with Search & Controls ──────── */}
-      <div className="p-4 sm:p-5 border-b border-border bg-gradient-to-r from-surface via-surface to-surface-sunken/40 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Left Group: Title, Badge & Search Bar */}
-        <div className="flex flex-wrap items-center gap-3.5 flex-1 min-w-0">
-          <div className="flex items-center gap-2.5 shrink-0">
-            <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
-              <Layers size={18} />
-            </div>
-            <h2 className="text-base sm:text-lg font-bold tracking-tight text-fg whitespace-nowrap">
-              Active College Focus
-            </h2>
-            <span
-              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold font-mono tracking-tight transition-colors whitespace-nowrap ${
-                selectedIds.length > 0
-                  ? 'bg-primary/15 text-primary border border-primary/25'
-                  : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25'
-              }`}
-            >
-              {selectedIds.length} / 4 Selected
-            </span>
+      {/* ── Single Unified Title Header with Description & Single Action Button ──────── */}
+      <div className="p-4 sm:p-5 border-b border-border bg-gradient-to-r from-surface via-surface to-surface-sunken/40 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        {/* Left Side: Icon + Title + Badge + Sub-Description */}
+        <div className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0 mt-0.5 sm:mt-0">
+            <Layers size={20} />
           </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="text-base sm:text-lg font-bold tracking-tight text-fg whitespace-nowrap">
+                Active College Focus
+              </h2>
+              <span
+                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold font-mono tracking-tight transition-colors whitespace-nowrap ${
+                  isLocked
+                    ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25'
+                    : selectedIds.length > 0
+                    ? 'bg-primary/15 text-primary border border-primary/25'
+                    : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25'
+                }`}
+              >
+                {selectedIds.length} / 4 Selected {isLocked && '• Locked'}
+              </span>
+            </div>
+            <p className="text-xs text-fg-subtle mt-1 leading-relaxed">
+              {isLocked
+                ? 'Your daily focus colleges are locked for this session. Navigation and tracker operations are active.'
+                : 'Select between 1 and 4 partner institutions below and click Save & Lock Focus to activate your daily dashboard and unlock navigation.'}
+            </p>
+          </div>
+        </div>
 
-          {/* Search Input with properly spaced left icon padding */}
-          <div className="relative w-full sm:w-64">
+        {/* Right Side: Search Input + ONLY ONE Single Action Button */}
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 shrink-0">
+          {/* Search Input */}
+          <div className="relative w-full sm:w-60">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
             <input
               type="text"
@@ -151,47 +197,32 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
               className="w-full bg-surface-sunken border border-border text-xs text-fg pl-9 pr-3 py-2 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-fg-disabled font-normal shadow-2xs transition-all"
             />
           </div>
-        </div>
 
-        {/* Right Group: Status Badge & Edit Action Button */}
-        <div className="flex items-center gap-3 shrink-0 self-start md:self-auto">
-          {isEditing ? (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-sky-400 text-xs font-semibold">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-              Editing Mode
-            </span>
+          {/* Single Save / Unlock Button */}
+          {!isLocked ? (
+            <button
+              type="button"
+              onClick={handleSaveAndLock}
+              disabled={selectedIds.length === 0}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xs cursor-pointer select-none active:scale-95 shrink-0"
+            >
+              <CheckCircle2 size={15} className="text-white" />
+              <span>Save & Lock Focus ({selectedIds.length}/4)</span>
+            </button>
           ) : (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-surface-sunken text-fg-muted text-xs font-medium border border-border/50">
-              <Lock size={12} className="text-fg-subtle" />
-              Checkboxes Locked
-            </span>
+            <button
+              type="button"
+              onClick={handleUnlockToEdit}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-surface-sunken hover:bg-surface-raised border border-border text-fg hover:border-primary/40 hover:text-primary transition-all shadow-xs cursor-pointer select-none active:scale-95 shrink-0"
+            >
+              <Unlock size={14} className="text-amber-500" />
+              <span>Unlock & Edit Focus</span>
+            </button>
           )}
-
-          <button
-            type="button"
-            onClick={handleLockToggle}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer select-none active:scale-95 shrink-0 ${
-              isEditing
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
-                : 'bg-surface-sunken hover:bg-surface-raised border border-border text-fg hover:border-primary/40'
-            }`}
-          >
-            {isEditing ? (
-              <>
-                <CheckCircle2 size={14} className="text-white" />
-                <span>Save & Lock Focus</span>
-              </>
-            ) : (
-              <>
-                <Pencil size={13} className="text-primary" />
-                <span>Edit College Selection</span>
-              </>
-            )}
-          </button>
         </div>
       </div>
 
-      {/* ── 10+ Colleges Checkbox Interactive Grid ────────────────────── */}
+      {/* ── Colleges Checkbox Interactive Grid ────────────────────── */}
       <div className="p-5 sm:p-6">
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -207,7 +238,7 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {filteredColleges.map((college) => {
               const isChecked = selectedIds.includes(college._id);
-              const isDisabled = !isEditing;
+              const isEditing = !isLocked;
 
               return (
                 <div
@@ -215,7 +246,7 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
                   onClick={() => isEditing && handleToggleCollege(college._id)}
                   className={`group relative flex items-start gap-3 p-3.5 rounded-xl border transition-all select-none ${
                     isChecked
-                      ? 'bg-blue-50/70 dark:bg-sky-950/40 border-blue-400/80 dark:border-sky-500/60 shadow-xs ring-1 ring-blue-500/20'
+                      ? 'bg-blue-50/80 dark:bg-sky-950/40 border-blue-400/80 dark:border-sky-500/60 shadow-xs ring-1 ring-blue-500/20'
                       : 'bg-surface border-border hover:border-border-strong hover:bg-surface-raised/60'
                   } ${
                     isEditing
@@ -282,7 +313,7 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
 
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-blue-500" />
-            <span>Alphabetical ordering automatically pinned to dropdown top rows.</span>
+            <span>Rule: Minimum 1 college, Maximum 4 colleges allowed per session.</span>
           </div>
         </div>
       </div>

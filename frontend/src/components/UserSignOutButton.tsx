@@ -6,7 +6,11 @@ import { LogOut } from 'lucide-react';
 import { readSessionUser, type SessionUser } from '@/lib/session';
 import { apiFetch } from '@/lib/api';
 
-export function UserSignOutButton() {
+interface Props {
+  className?: string;
+}
+
+export function UserSignOutButton({ className = '' }: Props) {
   const router = useRouter();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -47,9 +51,9 @@ export function UserSignOutButton() {
       title="Sign Out of iPOMS"
       aria-label="Sign out"
       disabled={isSigningOut}
-      className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-border bg-surface hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:border-rose-300 dark:hover:border-rose-800 text-rose-500 dark:text-rose-400 hover:text-rose-600 dark:hover:text-rose-300 transition-all shadow-2xs select-none group active:scale-95 cursor-pointer flex items-center justify-center"
+      className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-border bg-surface hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:border-rose-300 dark:hover:border-rose-800 text-rose-500 dark:text-rose-400 hover:text-rose-600 dark:hover:text-rose-300 transition-all shadow-2xs select-none group active:scale-95 cursor-pointer flex items-center justify-center ${className}`}
     >
-      <LogOut size={16} strokeWidth={2} className="transition-transform group-hover:translate-x-0.5 text-rose-500 dark:text-rose-400 group-hover:text-rose-600 dark:group-hover:text-rose-300" />
+      <LogOut size={16} strokeWidth={2} className="transition-transform group-hover:translate-x-0.5" />
     </button>
   );
 }

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { CharCountBadge } from '@/components/ui/CharCountBadge';
+import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import type { PendingTaskRow } from '../types';
 
 interface Props {
@@ -28,24 +29,24 @@ interface Props {
 }
 
 const CURRENT_STATUS_SUGGESTIONS = [
+  'Database Pending',
+  'Database Shared',
   'JD Received',
-  'Awaiting Criteria',
-  'Shortlisting Candidates',
-  'Online Assessment Sent',
-  'HR Round Scheduled',
-  'Shortlist Shared',
-  'Feedback Pending',
   'Drive Scheduled',
+  'Drive in Progress',
+  'Drive Completed',
+  'Awaiting TPO Approval',
+  'Awaiting HR Approval',
 ];
 
 const ACTION_SUGGESTIONS = [
+  'JD approval pending from college',
+  'Eligibility criteria clarification required',
   'DB to be shared',
   'Drive date to be confirmed',
   'Drive date to be scheduled',
-  'JD approval pending from college',
   'Shortlist confirmation awaited',
   'Follow-up with HR for drive slot',
-  'Eligibility criteria clarification required',
 ];
 
 export function AddPendingTaskModal({
@@ -279,26 +280,28 @@ export function AddPendingTaskModal({
           {/* Row 2: JD Received Date & DB Shared Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-fg mb-1">
-                JD Received Date
-              </label>
-              <input
-                type="date"
+              <SmoothDatePicker
+                label="JD Received Date"
                 value={jdReceivedDate}
-                onChange={(e) => setJdReceivedDate(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-surface-sunken border border-border rounded-lg text-fg focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
+                onChange={setJdReceivedDate}
+                variant="input"
+                fullWidth
+                usePortal
+                clearable
+                placeholder="dd-mm-yyyy"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-fg mb-1">
-                DB Shared Date
-              </label>
-              <input
-                type="date"
+              <SmoothDatePicker
+                label="DB Shared Date"
                 value={dbSharedDate}
-                onChange={(e) => setDbSharedDate(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-surface-sunken border border-border rounded-lg text-fg focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
+                onChange={setDbSharedDate}
+                variant="input"
+                fullWidth
+                usePortal
+                clearable
+                placeholder="dd-mm-yyyy"
               />
             </div>
           </div>
@@ -312,7 +315,7 @@ export function AddPendingTaskModal({
               type="text"
               value={currentStatus}
               onChange={(e) => setCurrentStatus(e.target.value)}
-              placeholder="e.g. JD Received, Shortlisting Candidates..."
+              placeholder="e.g. Database Pending, Drive Scheduled..."
               className="w-full px-3 py-2 text-xs bg-surface-sunken border border-border rounded-lg text-fg placeholder:text-fg-disabled focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
             <div className="flex flex-wrap gap-1 mt-1.5">
@@ -376,14 +379,15 @@ export function AddPendingTaskModal({
           {/* Row 5: Drive Date & Additional Notes */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-fg mb-1">
-                Drive Date (Scheduled)
-              </label>
-              <input
-                type="date"
+              <SmoothDatePicker
+                label="Drive Date (Scheduled)"
                 value={driveDate}
-                onChange={(e) => setDriveDate(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-surface-sunken border border-border rounded-lg text-fg focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer"
+                onChange={setDriveDate}
+                variant="input"
+                fullWidth
+                usePortal
+                clearable
+                placeholder="dd-mm-yyyy"
               />
             </div>
 

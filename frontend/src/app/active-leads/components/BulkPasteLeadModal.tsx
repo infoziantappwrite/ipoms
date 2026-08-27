@@ -13,7 +13,7 @@ interface Props {
 
 export function BulkPasteLeadModal({ isOpen, onClose, onSubmitBulk }: Props) {
   const [pasteContent, setPasteContent] = useState('');
-  const [academicYear, setAcademicYear] = useState('2026');
+  const [academicYear, setAcademicYear] = useState('2027');
   const [defaultStatus, setDefaultStatus] = useState<LeadStatus>('Hiring');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');

@@ -28,7 +28,7 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
   const [ctcUnit, setCtcUnit] = useState<CtcUnit>('LPA');
   const [status, setStatus] = useState<LeadStatus>('Hiring');
   const [followupMonth, setFollowupMonth] = useState('August');
-  const [academicYear, setAcademicYear] = useState('2026');
+  const [academicYear, setAcademicYear] = useState('2027');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -141,9 +141,9 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
 
           {/* 2. Role & CTC Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {/* Role / Designation */}
+            {/* Role */}
             <div>
-              <label className="block text-xs font-bold text-fg mb-1.5">Role / Designation</label>
+              <label className="block text-xs font-bold text-fg mb-1.5">Role</label>
               <div className="relative">
                 <Briefcase size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
                 <input
@@ -156,12 +156,12 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
               </div>
             </div>
 
-            {/* CTC / Package with Default LPA & Month Toggle */}
+            {/* CTC with LPA & / Month (Internship) Toggle */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold text-fg">CTC / Salary (₹)</label>
+                <label className="block text-xs font-bold text-fg">CTC (₹)</label>
                 
-                {/* Unit Switch: LPA (Default) vs / Month */}
+                {/* Unit Switch: LPA vs / Month (Internship) */}
                 <div className="inline-flex items-center bg-surface-sunken border border-border p-0.5 rounded-lg text-[10px] font-bold shadow-2xs">
                   <button
                     type="button"
@@ -188,6 +188,7 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
                         ? 'bg-primary text-white shadow-xs'
                         : 'text-fg-subtle hover:text-fg'
                     }`}
+                    title="Per month stipend for internships"
                   >
                     / Month
                   </button>
@@ -204,7 +205,7 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
                   placeholder={
                     ctcUnit === 'LPA'
                       ? 'e.g. 3.5, 6, 12.5 (decimals allowed)'
-                      : 'e.g. 15,000, 25000 (whole numbers)'
+                      : 'e.g. 15,000, 25000 (Internship stipend)'
                   }
                   className="w-full bg-surface-sunken border border-border rounded-xl pl-9 pr-20 py-2 text-xs text-fg placeholder:text-fg-disabled outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-2xs font-semibold"
                 />

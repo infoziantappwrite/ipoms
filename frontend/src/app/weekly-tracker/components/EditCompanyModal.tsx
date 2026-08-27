@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { Pencil, X, Building2, Trash2, CheckCircle2 } from 'lucide-react';
+import { Pencil, X, Building2, Trash2, CheckCircle2, Briefcase, Layers, GraduationCap } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { triggerHaptic } from '@/lib/haptics';
+import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
+import { SmoothSelect } from '@/components/ui/SmoothSelect';
 import { WeeklyRow } from './WeeklyTable';
 
-const BATCH_YEARS = ['2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030', '2031', '2032'];
+const BATCH_YEARS = ['2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
 
 const COMPANY_TYPES = [
   'Software / IT',
@@ -243,28 +245,24 @@ export function EditCompanyModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label className="block text-fg font-semibold mb-1.5">Company Type / Domain</label>
-              <select
+              <SmoothSelect
                 value={companyType}
-                onChange={(e) => setCompanyType(e.target.value)}
-                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-fg text-xs transition-all cursor-pointer outline-none font-medium"
-              >
-                {COMPANY_TYPES.map((t) => (
-                  <option key={t} value={t} className="bg-surface text-fg">{t}</option>
-                ))}
-              </select>
+                onChange={setCompanyType}
+                icon={Briefcase}
+                title="Company Industry Type"
+                options={COMPANY_TYPES.map((t) => ({ value: t, label: t }))}
+              />
             </div>
 
             <div>
               <label className="block text-fg font-semibold mb-1.5">Pipeline Section</label>
-              <select
+              <SmoothSelect
                 value={pipelineSection}
-                onChange={(e) => setPipelineSection(e.target.value)}
-                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-fg text-xs transition-all cursor-pointer outline-none font-semibold text-primary"
-              >
-                {SECTIONS.map((s) => (
-                  <option key={s.value} value={s.value} className="bg-surface text-fg">{s.label}</option>
-                ))}
-              </select>
+                onChange={setPipelineSection}
+                icon={Layers}
+                title="Placement Section"
+                options={SECTIONS.map((s) => ({ value: s.value, label: s.label }))}
+              />
             </div>
           </div>
 
@@ -272,27 +270,37 @@ export function EditCompanyModal({
           <div className={`grid gap-3.5 ${pipelineSection === 'in_progress' || pipelineSection === 'pipeline' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
             <div>
               <label className="block text-fg font-semibold mb-1.5">Eligible Batch</label>
-              <select
+              <SmoothSelect
                 value={eligibleBatch}
-                onChange={(e) => setEligibleBatch(e.target.value)}
-                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-fg text-xs transition-all cursor-pointer outline-none font-medium"
-              >
-                {BATCH_YEARS.map((year) => (
-                  <option key={year} value={year} className="bg-surface text-fg">
-                    Batch {year}
-                  </option>
-                ))}
-              </select>
+                onChange={setEligibleBatch}
+                icon={GraduationCap}
+                title="Eligible Graduating Batch"
+                options={BATCH_YEARS.map((year) => ({
+                  value: year,
+                  label: `Batch ${year}`,
+                  badge: year,
+                }))}
+              />
             </div>
 
             {(pipelineSection === 'in_progress' || pipelineSection === 'pipeline') && (
               <div>
-                <label className="block text-fg font-semibold mb-1.5">Scheduled Follow-up Date</label>
-                <input
-                  type="date"
+                <SmoothDatePicker
+                  label="Scheduled Follow-up Date"
                   value={followUpDate}
-                  onChange={(e) => setFollowUpDate(e.target.value)}
-                  className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-fg text-xs transition-all cursor-pointer outline-none font-mono"
+                  onChange={setFollowUpDate}
+                  minDate={(() => {
+                    const now = new Date();
+                    const y = now.getFullYear();
+                    const m = String(now.getMonth() + 1).padStart(2, '0');
+                    const d = String(now.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${d}`;
+                  })()}
+                  variant="input"
+                  fullWidth
+                  usePortal
+                  clearable
+                  placeholder="dd-mm-yyyy"
                 />
               </div>
             )}

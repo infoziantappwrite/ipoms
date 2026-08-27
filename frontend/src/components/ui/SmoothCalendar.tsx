@@ -84,23 +84,46 @@ export function SmoothCalendar({
   const [rangeHoverDate, setRangeHoverDate] = useState<string | null>(null);
 
   // Month navigation
+  const canGoPrev = useMemo(() => {
+    if (!minDate) return true;
+    const [minY, minM] = minDate.split('-').map(Number);
+    if (isNaN(minY) || isNaN(minM)) return true;
+    const prevMonthEnd = new Date(year, monthIndex, 0);
+    const minMonthStart = new Date(minY, minM - 1, 1);
+    return prevMonthEnd >= minMonthStart;
+  }, [minDate, year, monthIndex]);
+
+  const canGoNext = useMemo(() => {
+    if (!maxDate) return true;
+    const [maxY, maxM] = maxDate.split('-').map(Number);
+    if (isNaN(maxY) || isNaN(maxM)) return true;
+    const nextMonthStart = new Date(year, monthIndex + 1, 1);
+    const maxMonthEnd = new Date(maxY, maxM, 0);
+    return nextMonthStart <= maxMonthEnd;
+  }, [maxDate, year, monthIndex]);
+
   const handlePrevMonth = () => {
+    if (!canGoPrev) return;
     triggerHaptic('light');
     setCurrentMonth(new Date(year, monthIndex - 1, 1));
   };
 
   const handleNextMonth = () => {
+    if (!canGoNext) return;
     triggerHaptic('light');
     setCurrentMonth(new Date(year, monthIndex + 1, 1));
   };
 
   const handleToday = () => {
-    triggerHaptic('light');
     const now = new Date();
+    const todayKey = formatDateKey(now.getFullYear(), now.getMonth(), now.getDate());
+    if (minDate && todayKey < minDate) return;
+    if (maxDate && todayKey > maxDate) return;
+
+    triggerHaptic('light');
     setCurrentMonth(new Date(now.getFullYear(), now.getMonth(), 1));
-    const todayStr = formatDateKey(now.getFullYear(), now.getMonth(), now.getDate());
     if (mode === 'single' && onChangeSingle) {
-      onChangeSingle(todayStr);
+      onChangeSingle(todayKey);
     }
   };
 
@@ -125,6 +148,9 @@ export function SmoothCalendar({
 
   // Handle Day Click
   const handleDayClick = (dateStr: string) => {
+    if (minDate && dateStr < minDate) return;
+    if (maxDate && dateStr > maxDate) return;
+
     triggerHaptic('selection');
     if (mode === 'single') {
       if (onChangeSingle) onChangeSingle(dateStr);
@@ -251,6 +277,10 @@ export function SmoothCalendar({
 
         {/* Calendar days */}
         {days.map(({ day, dateStr }) => {
+          const isPastMin = minDate ? dateStr < minDate : false;
+          const isPastMax = maxDate ? dateStr > maxDate : false;
+          const isDisabled = isPastMin || isPastMax;
+
           const isToday = dateStr === todayStr;
           const isSingleSelected = mode === 'single' && value === dateStr;
 
@@ -285,7 +315,7 @@ export function SmoothCalendar({
                 isWithinRange && isRowEnd ? 'rounded-r-full' : ''
               }`}
               onMouseEnter={() => {
-                if (mode === 'range' && startDate && !endDate) {
+                if (mode === 'range' && startDate && !endDate && !isDisabled) {
                   setRangeHoverDate(dateStr);
                 }
               }}
@@ -309,15 +339,18 @@ export function SmoothCalendar({
               {/* Interactive Day Button */}
               <button
                 type="button"
-                onClick={() => handleDayClick(dateStr)}
-                className={`relative z-10 w-7 h-7 flex flex-col items-center justify-center rounded-full text-[11px] transition-all duration-150 cursor-pointer ${
-                  isSingleSelected || isRangeSelectedEndpoint
-                    ? themeStyles.selectedCircle
+                disabled={isDisabled}
+                onClick={() => !isDisabled && handleDayClick(dateStr)}
+                className={`relative z-10 w-7 h-7 flex flex-col items-center justify-center rounded-full text-[11px] transition-all duration-150 ${
+                  isDisabled
+                    ? 'opacity-20 cursor-not-allowed text-fg-disabled pointer-events-none select-none'
+                    : isSingleSelected || isRangeSelectedEndpoint
+                    ? `${themeStyles.selectedCircle} cursor-pointer`
                     : isWithinRange
-                    ? 'text-blue-950 dark:text-slate-100 font-semibold'
+                    ? 'text-blue-950 dark:text-slate-100 font-semibold cursor-pointer'
                     : isToday
-                    ? `${themeStyles.todayRing} ${themeStyles.hoverDay}`
-                    : `text-slate-700 dark:text-slate-200 font-medium ${themeStyles.hoverDay}`
+                    ? `${themeStyles.todayRing} ${themeStyles.hoverDay} cursor-pointer`
+                    : `text-slate-700 dark:text-slate-200 font-medium ${themeStyles.hoverDay} cursor-pointer`
                 }`}
               >
                 <span>{day}</span>

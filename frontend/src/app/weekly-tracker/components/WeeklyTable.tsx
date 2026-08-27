@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { FolderOpen, Star, Pencil } from 'lucide-react';
+import { FolderOpen, Pencil } from 'lucide-react';
+import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 
 export interface WeeklyRow {
   _id: string;
@@ -50,7 +51,7 @@ export function WeeklyTable({
   onEditRow,
 }: Props) {
   const isCompletedSection = sectionKey === 'completed';
-  const hasFollowUpColumn = sectionKey === 'in_progress' || sectionKey === 'pipeline';
+  const hasFollowUpColumn = true;
 
   if (rows.length === 0) {
     return (
@@ -190,9 +191,6 @@ function TableRow({
       {/* 2. Company Name */}
       <td className="py-2.5 px-3 font-semibold text-fg">
         <div className="flex items-center gap-1.5">
-          {row.is_pinned_top && (
-            <Star size={11} className="text-amber-500 fill-amber-500 shrink-0" />
-          )}
           {editingField === 'company_name' ? (
             <input
               type="text"
@@ -288,25 +286,38 @@ function TableRow({
         )}
       </td>
 
-      {/* Follow Up Date Picker (Supported only for In Progress and Pipeline) */}
+      {/* Follow Up Date Picker (Smooth application-themed calendar across all sections) */}
+      {/* Follow Up Date Picker (Smooth application-themed calendar across all sections, strictly today or future) */}
       {hasFollowUpColumn && (
         <td className="py-2.5 px-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
           <div className="inline-flex items-center justify-center">
-            <input
-              type="date"
+            <SmoothDatePicker
               value={(() => {
                 if (!row.follow_up_date) return '';
                 try {
-                  return new Date(row.follow_up_date).toISOString().split('T')[0];
+                  const d = new Date(row.follow_up_date);
+                  if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+                  return row.follow_up_date.length === 10 ? row.follow_up_date : '';
                 } catch {
                   return '';
                 }
               })()}
-              onChange={(e) => {
-                onUpdateRow(row._id, { follow_up_date: e.target.value || undefined });
+              onChange={(newDate) => {
+                onUpdateRow(row._id, { follow_up_date: newDate || undefined });
               }}
-              className="bg-surface-sunken hover:bg-surface border border-border hover:border-primary focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-2.5 py-1 text-xs text-fg font-medium shadow-2xs outline-none cursor-pointer transition-all font-mono"
-              title="Select date to follow up / call back HR"
+              minDate={(() => {
+                const now = new Date();
+                const y = now.getFullYear();
+                const m = String(now.getMonth() + 1).padStart(2, '0');
+                const d = String(now.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+              })()}
+              placeholder="Set date"
+              usePortal={true}
+              clearable={true}
+              variant="pill"
+              size="sm"
+              theme="navy"
             />
           </div>
         </td>

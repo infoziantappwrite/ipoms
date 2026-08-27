@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Pencil, Plus, X, UserPlus } from 'lucide-react';
+import { Pencil, Plus, X, UserPlus, Shield, Activity } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { SmoothSelect } from '@/components/ui/SmoothSelect';
 
 interface Props {
   initialData?: any | null;
@@ -172,30 +173,34 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="block text-fg-muted font-semibold mb-1">System Role *</label>
-              <select
+              <SmoothSelect
                 value={selectedRole}
-                onChange={(e) => setSelectedRole(e.target.value)}
-                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg cursor-pointer"
-              >
-                <option value="PLACEMENT_COORDINATOR">Placement Coordinator</option>
-                <option value="TEAM_LEADER">Team Leader</option>
-                <option value="ADMINISTRATOR">Administrator (CEO / Director)</option>
-                <option value="TPO">Training & Placement Officer (TPO)</option>
-              </select>
+                onChange={setSelectedRole}
+                icon={Shield}
+                title="Select System Role"
+                options={[
+                  { value: 'PLACEMENT_COORDINATOR', label: 'Placement Coordinator' },
+                  { value: 'TEAM_LEADER', label: 'Team Leader' },
+                  { value: 'ADMINISTRATOR', label: 'Administrator (CEO / Director)' },
+                  { value: 'TPO', label: 'Training & Placement Officer (TPO)' },
+                ]}
+              />
             </div>
 
             <div>
               <label className="block text-fg-muted font-semibold mb-1">Account Status</label>
-              <select
+              <SmoothSelect
                 value={accountStatus}
-                onChange={(e) => setAccountStatus(e.target.value)}
-                className="w-full bg-surface border border-border-strong rounded-lg px-3 py-2 text-fg cursor-pointer capitalize"
-              >
-                <option value="active">Active (Full Access)</option>
-                <option value="inactive">Inactive / On Leave</option>
-                <option value="blocked">Blocked</option>
-                <option value="deactivated">Deactivated</option>
-              </select>
+                onChange={setAccountStatus}
+                icon={Activity}
+                title="Account Status"
+                options={[
+                  { value: 'active', label: 'Active (Full Access)' },
+                  { value: 'inactive', label: 'Inactive / On Leave' },
+                  { value: 'blocked', label: 'Blocked' },
+                  { value: 'deactivated', label: 'Deactivated' },
+                ]}
+              />
             </div>
           </div>
 

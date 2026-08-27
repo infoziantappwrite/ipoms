@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Building2, CalendarDays, Settings } from 'lucide-react';
+import { Building2, CalendarDays, Settings, Monitor, Sun } from 'lucide-react';
+import { SmoothSelect } from '@/components/ui/SmoothSelect';
 
 interface Props {
   settingsData: any;
@@ -165,31 +166,35 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-fg-muted font-semibold mb-1">Default Landing Screen</label>
-            <select
+            <SmoothSelect
               value={landingPage}
-              onChange={(e) => setLandingPage(e.target.value)}
-              className="w-full bg-background border border-border-strong rounded-lg px-3 py-2 text-fg cursor-pointer"
-            >
-              <option value="/dashboard">Role-Based Dashboard (/dashboard)</option>
-              <option value="/tracker">Daily Call Tracker (/tracker)</option>
-              <option value="/weekly-tracker">Weekly Tracker Board (/weekly-tracker)</option>
-              <option value="/daily-leads">Daily Leads Register (/daily-leads)</option>
-              <option value="/pending-tasks">Pending Task Register (/pending-tasks)</option>
-              <option value="/reports">Reports & Analytics (/reports)</option>
-            </select>
+              onChange={setLandingPage}
+              icon={Monitor}
+              title="Default Landing Screen"
+              options={[
+                { value: '/dashboard', label: 'Role-Based Dashboard (/dashboard)' },
+                { value: '/tracker', label: 'Daily Call Tracker (/tracker)' },
+                { value: '/weekly-tracker', label: 'Weekly Tracker Board (/weekly-tracker)' },
+                { value: '/daily-leads', label: 'Daily Leads Register (/daily-leads)' },
+                { value: '/pending-tasks', label: 'Pending Task Register (/pending-tasks)' },
+                { value: '/reports', label: 'Reports & Analytics (/reports)' },
+              ]}
+            />
           </div>
 
           <div>
             <label className="block text-fg-muted font-semibold mb-1">Default Theme Style</label>
-            <select
+            <SmoothSelect
               value={themeDefault}
-              onChange={(e) => setThemeDefault(e.target.value)}
-              className="w-full bg-background border border-border-strong rounded-lg px-3 py-2 text-fg cursor-pointer"
-            >
-              <option value="dark">Dark Theme (Standard Executive Slate)</option>
-              <option value="light">Light Theme</option>
-              <option value="system">System Default</option>
-            </select>
+              onChange={setThemeDefault}
+              icon={Sun}
+              title="Default UI Theme"
+              options={[
+                { value: 'dark', label: 'Dark Theme (Standard Executive Slate)' },
+                { value: 'light', label: 'Light Theme' },
+                { value: 'system', label: 'System Default' },
+              ]}
+            />
           </div>
         </div>
 
