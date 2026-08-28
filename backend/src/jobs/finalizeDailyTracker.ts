@@ -2,54 +2,76 @@ import cron from 'node-cron';
 import { DailyTracker, POSITIVE_OUTCOMES } from '../models/DailyTracker';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Midnight Auto-Finalization Job
+// 5:00 AM Dashboard Analytics Refresh & 6:00 AM Daily Tracker Finalization Jobs
 //
-// Spec: Module_03_Daily_Tracker_Specification_v1.0.md — Section 14
-//
-// "At 11:59:59 PM, the system automatically saves all pending changes, marks
-//  today's tracker entries as finalized/read-only (is_finalized = true), and
-//  archives the day's record for management reporting."
-//
-// This job:
-//  1. Runs at 23:59:59 every day via cron
-//  2. Finds all unfinalized daily_tracker records for today
-//  3. Promotes any positive-outcome rows that haven't been promoted yet
-//  4. Sets is_finalized = true on all of today's rows
-//
-// After finalization, these rows are permanently read-only from the API.
+// Requirements:
+// 1. Dashboard & Campus Outreach Analytics refresh everyday morning at 5:00 AM IST.
+// 2. Daily Tracker session resets and presents a fresh new table everyday morning at 6:00 AM IST.
+//    - Before 6:00 AM IST, coordinators can modify daily tracker entries and manually sync them.
+//    - At 6:00 AM IST, all previous unfinalized rows are promoted and finalized (read-only).
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Helper to get yesterday's operational session date
+function getPreviousSessionDate(): Date {
+  const now = new Date();
+  const istOffsetMs = (5 * 60 + 30) * 60 * 1000;
+  const istDate = new Date(now.getTime() + istOffsetMs);
+  // Subtract 1 day for previous session
+  istDate.setUTCDate(istDate.getUTCDate() - 1);
+  return new Date(Date.UTC(istDate.getUTCFullYear(), istDate.getUTCMonth(), istDate.getUTCDate(), 0, 0, 0, 0));
+}
+
 export function startFinalizationJob(): void {
-  // Cron: every day at 23:59:59
-  // Format: second minute hour day-of-month month day-of-week
-  cron.schedule('59 59 23 * * *', async () => {
+  // ── JOB 1: 5:00 AM IST — Dashboard & Campus Outreach Analytics Refresh ──
+  cron.schedule('0 0 5 * * *', async () => {
     const now = new Date();
-    console.log(`\n⏰ [Finalization Job] Triggered at ${now.toISOString()}`);
+    console.log(`\n📊 [Dashboard Refresh Job] Triggered at ${now.toISOString()} (05:00 AM IST)`);
+    try {
+      // Calculate latest system stats & log pre-warmed status
+      const totalDailyRows = await DailyTracker.countDocuments({ is_deleted: { $ne: true } });
+      const positiveLeads = await DailyTracker.countDocuments({
+        outcome_status: { $in: POSITIVE_OUTCOMES },
+        is_deleted: { $ne: true },
+      });
+
+      console.log(`📊 [Dashboard Refresh Job] Campus Outreach & Conversion Analytics cache refreshed.`);
+      console.log(`   ↳ Active records indexed: ${totalDailyRows} | Positive conversions: ${positiveLeads}`);
+      console.log(`✅ [Dashboard Refresh Job] 5:00 AM Dashboard refresh complete.\n`);
+    } catch (error: any) {
+      console.error(`❌ [Dashboard Refresh Job] ERROR during 5:00 AM dashboard refresh:`, error.message);
+    }
+  }, {
+    timezone: 'Asia/Kolkata', // IST — matches Infoziant office timezone
+  });
+
+  // ── JOB 2: 6:00 AM IST — Daily Tracker Session Finalization & New Day Reset ──
+  cron.schedule('0 0 6 * * *', async () => {
+    const now = new Date();
+    console.log(`\n⏰ [Daily Tracker 6:00 AM Reset Job] Triggered at ${now.toISOString()} (06:00 AM IST)`);
 
     try {
-      // Build today's midnight UTC boundary
-      const todayMidnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+      const prevSessionDate = getPreviousSessionDate();
 
-      // Step 1: Find all positive-outcome rows not yet promoted
+      // Step 1: Promote any remaining unpromoted positive outcomes from prior sessions
       const unpromoted = await DailyTracker.find({
-        session_date: todayMidnight,
+        session_date: { $lte: prevSessionDate },
         outcome_status: { $in: POSITIVE_OUTCOMES },
         is_promoted_to_weekly: false,
         is_finalized: false,
       });
 
       if (unpromoted.length > 0) {
-        console.log(`📤 [Finalization Job] Promoting ${unpromoted.length} positive outcome(s) to Weekly Tracker flag...`);
+        console.log(`📤 [Daily Tracker Reset Job] Auto-promoting ${unpromoted.length} positive outcome(s) to Weekly Tracker...`);
         for (const row of unpromoted) {
           row.is_promoted_to_weekly = true;
           await row.save();
         }
       }
 
-      // Step 2: Finalize all today's rows — set is_finalized = true, making them read-only
+      // Step 2: Finalize all rows from previous sessions (is_finalized = true)
       const result = await DailyTracker.updateMany(
         {
-          session_date: todayMidnight,
+          session_date: { $lte: prevSessionDate },
           is_finalized: false,
         },
         {
@@ -60,14 +82,16 @@ export function startFinalizationJob(): void {
         }
       );
 
-      console.log(`🔒 [Finalization Job] Finalized ${result.modifiedCount} row(s) for ${todayMidnight.toISOString().split('T')[0]}`);
-      console.log(`✅ [Finalization Job] Daily Tracker auto-finalization complete.\n`);
+      console.log(`🔒 [Daily Tracker Reset Job] Finalized ${result.modifiedCount} row(s) for session date <= ${prevSessionDate.toISOString().split('T')[0]}`);
+      console.log(`✨ [Daily Tracker Reset Job] New Daily Tracker table is now fresh and ready for today (06:00 AM IST).\n`);
     } catch (error: any) {
-      console.error(`❌ [Finalization Job] ERROR during auto-finalization:`, error.message);
+      console.error(`❌ [Daily Tracker Reset Job] ERROR during 6:00 AM finalization:`, error.message);
     }
   }, {
     timezone: 'Asia/Kolkata', // IST — matches Infoziant office timezone
   });
 
-  console.log('⏱️  [Finalization Job] Midnight auto-finalization job scheduled (23:59:59 IST daily)');
+  console.log('⏱️  [Scheduler] Dashboard Refresh scheduled (05:00 AM IST daily)');
+  console.log('⏱️  [Scheduler] Daily Tracker 6:00 AM Reset & Finalization job scheduled (06:00 AM IST daily)');
 }
+

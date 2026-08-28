@@ -114,7 +114,7 @@ const LOGO_MAP = {
     NEHRU: '/college-logos/Infozianthead.png',
     MAR: '/college-logos/mar ephream.png',
     NGCE: '/college-logos/narayanaguru.png',
-    ACEW: '/college-logos/annai mira.png',
+    ACEW: '/college-logos/ACEW.jfif',
     // Additional partner institutions
     KCT: '/college-logos/kumaraguru.png',
     PSG: '/college-logos/psg.png',

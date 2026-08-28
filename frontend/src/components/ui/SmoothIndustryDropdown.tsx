@@ -87,9 +87,7 @@ export function SmoothIndustryDropdown({
       >
         <div className="flex items-center gap-2 truncate">
           <span
-            className={`w-2.5 h-2.5 rounded-full shrink-0 ${currentOption.dotColor || 'bg-primary'} ${
-              value !== 'all' ? 'shadow-[0_0_8px_currentColor]' : ''
-            }`}
+            className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${currentOption.dotColor || 'bg-primary'} ring-1 ring-black/10 dark:ring-white/20`}
           />
           <span className="truncate">{currentOption.label}</span>
         </div>
@@ -134,8 +132,8 @@ export function SmoothIndustryDropdown({
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span
-                      className={`w-2.5 h-2.5 rounded-full shrink-0 ${opt.dotColor || 'bg-primary'} ${
-                        isSelected ? 'ring-2 ring-primary/40' : ''
+                      className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${opt.dotColor || 'bg-primary'} ring-1 ring-black/10 dark:ring-white/20 ${
+                        isSelected ? 'ring-2 ring-primary/60' : ''
                       }`}
                     />
                     <span className="truncate">{opt.label}</span>

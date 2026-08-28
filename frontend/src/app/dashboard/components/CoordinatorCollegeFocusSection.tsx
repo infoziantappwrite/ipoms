@@ -126,7 +126,7 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
       toast(
         `Focus locked with ${selectedIds.length} ${
           selectedIds.length === 1 ? 'college' : 'colleges'
-        }. Daily Tracker, Weekly Tracker, and all modules are now unlocked!`,
+        }. All modules remain unlocked for the rest of the week (Mon–Sun)!`,
         'success'
       );
       if (onSelectionChange) onSelectionChange(selectedIds, true);
@@ -173,13 +173,13 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
                     : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25'
                 }`}
               >
-                {selectedIds.length} / 4 Selected {isLocked && '• Locked'}
+                {selectedIds.length} / 4 Selected {isLocked && '• Locked for Week'}
               </span>
             </div>
             <p className="text-xs text-fg-subtle mt-1 leading-relaxed">
               {isLocked
-                ? 'Your daily focus colleges are locked for this session. Navigation and tracker operations are active.'
-                : 'Select between 1 and 4 partner institutions below and click Save & Lock Focus to activate your daily dashboard and unlock navigation.'}
+                ? 'Your focus colleges are locked for this week (Mon–Sun). Daily Tracker, Weekly Tracker, and all modules remain active without re-selecting.'
+                : 'Select 1 to 4 partner institutions for this week and click Save & Lock Focus to unlock all navigation modules.'}
             </p>
           </div>
         </div>

@@ -13,6 +13,7 @@ import {
   Database,
   TrendingUp,
   PanelLeftClose,
+  PanelLeftOpen,
   Lock,
   X,
 } from 'lucide-react';
@@ -180,17 +181,25 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
     };
   }, []);
 
-  const toggleCollapsed = () => {
-    cancelIntro();
-    setCollapsed((prev) => {
-      const next = !prev;
-      try {
-        window.localStorage.setItem(NAV_COLLAPSED_KEY, next ? '1' : '0');
-      } catch {
-        /* ignore */
+  const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isHoveringRef = useRef(false);
+
+  const startAutoCloseTimer = (delay = 5000) => {
+    if (autoCloseTimerRef.current) clearTimeout(autoCloseTimerRef.current);
+    autoCloseTimerRef.current = setTimeout(() => {
+      if (!isHoveringRef.current) {
+        setCollapsed(true);
       }
-      return next;
-    });
+    }, delay);
+  };
+
+  const handleLogoClick = (e: React.MouseEvent) => {
+    cancelIntro();
+    if (collapsed) {
+      e.preventDefault();
+      setCollapsed(false);
+      startAutoCloseTimer(5000);
+    }
   };
 
   const userRole = roleOf(user);
@@ -209,34 +218,45 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
 
   return (
     <>
-      {/* ── Desktop Permanent Sidebar ───────────────────────────────────── */}
+      {/* ── Desktop Permanent Sidebar with Smart 5s Auto-Close ────────── */}
       <aside
         aria-label="Primary navigation"
+        onMouseEnter={() => {
+          isHoveringRef.current = true;
+          if (autoCloseTimerRef.current) clearTimeout(autoCloseTimerRef.current);
+        }}
+        onMouseLeave={() => {
+          isHoveringRef.current = false;
+          if (!collapsed) {
+            startAutoCloseTimer(2500);
+          }
+        }}
         className={`hidden lg:flex flex-col bg-surface border-r border-border
-          select-none z-30 shrink-0 sticky top-0 h-screen max-h-screen
+          select-none z-50 shrink-0 sticky top-0 h-screen max-h-screen
           ${mounted ? 'transition-[width] duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]' : ''}
           ${collapsed ? 'w-[72px]' : 'w-64'}`}
       >
-        {/* ── Brand Header Strip ────────────────────────────────────────── */}
-        <div className="flex items-center px-3.5 pt-4 pb-2 relative shrink-0 justify-center">
+        {/* ── Brand Header Strip ── */}
+        <div className="h-20 flex items-center px-4 border-b border-border relative shrink-0 justify-between">
           {collapsed ? (
-            <div className="w-full flex items-center justify-center">
-              <Link
-                href="/dashboard"
-                className="bg-white rounded-xl p-1 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0 hover:scale-105 transition-transform duration-300"
-                title="iPOMS Dashboard"
+            <div className="w-full flex items-center justify-center py-2">
+              <button
+                type="button"
+                onClick={handleLogoClick}
+                className="bg-white rounded-2xl p-1.5 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0 hover:scale-105 active:scale-95 transition-transform duration-300 cursor-pointer"
+                title="Click to open Navigation Drawer"
               >
-                <InfoziantMark size={32} />
-              </Link>
+                <InfoziantMark size={34} />
+              </button>
             </div>
           ) : (
-            <div className="flex w-full items-center justify-between">
+            <div className="flex w-full items-center justify-between py-2">
               <Link
                 href="/dashboard"
                 className="flex items-center gap-3 overflow-hidden focus-visible:outline-hidden"
               >
-                <div className="bg-white rounded-xl p-1 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0">
-                  <InfoziantMark size={32} />
+                <div className="bg-white rounded-2xl p-1.5 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0">
+                  <InfoziantMark size={34} />
                 </div>
                 <div
                   className={`flex flex-col min-w-0
@@ -255,30 +275,13 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
           )}
         </div>
 
-        {/* ── Navigation Drawer Toggle Button Placed Right On The Divider Line ── */}
-        <div className="relative my-4 flex items-center shrink-0">
-          <div className="w-full h-px bg-border" />
-          <button
-            type="button"
-            onClick={toggleCollapsed}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className={`absolute top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-surface hover:bg-surface-raised border border-border text-fg-muted hover:text-fg shadow-xs flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-200 cursor-pointer z-40 ${
-              collapsed
-                ? 'left-1/2 -translate-x-1/2'
-                : '-right-3.5'
-            }`}
-          >
-            <PanelLeftClose size={16} strokeWidth={2} className={`transition-transform duration-300 ${collapsed ? 'rotate-180' : 'rotate-0'}`} />
-          </button>
-        </div>
-
-        {/* ── Main Nav Items ─────────────────────────────────────────────── */}
-        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3.5 pt-2 pb-4 min-h-0">
-          <ul className="space-y-1">
+        {/* ── Main Nav Items (Zero Scrollbar, Generous Top Breathing Room Below Brand Header) ── */}
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 pt-7 pb-4 min-h-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <ul className="space-y-1.5">
             {items.map(({ href, label, Icon }) => {
               const active = pathname === href || pathname.startsWith(`${href}/`);
-              const isLocked = mounted && href !== '/dashboard' && !isFocusLocked;
+              const isCoordinator = userRole === 'coordinator';
+              const isLocked = mounted && href !== '/dashboard' && isCoordinator && !isFocusLocked;
 
               const handleNavClick = (e: React.MouseEvent) => {
                 if (isLocked) {
@@ -295,6 +298,12 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                   (document.activeElement as HTMLElement).blur();
                 }
                 triggerHaptic('light');
+
+                // If collapsed, expand for 5s and then smoothly auto-close
+                if (collapsed) {
+                  setCollapsed(false);
+                }
+                startAutoCloseTimer(5000);
               };
 
               return (
@@ -307,7 +316,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                     onMouseLeave={() => setHovered(null)}
                     onFocus={(e) => showLabel(e.currentTarget, isLocked ? `${label} (Locked)` : label)}
                     onBlur={() => setHovered(null)}
-                    className={`group flex items-center gap-3 rounded-control cursor-pointer active:scale-[0.98] ${
+                    className={`group flex items-center gap-2.5 rounded-control cursor-pointer active:scale-[0.98] ${
                       mounted ? 'transition-[background-color,box-shadow,color,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]' : ''
                     } ${
                       isLocked
@@ -317,17 +326,17 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                         : 'text-fg-muted hover:bg-surface-sunken hover:text-fg'
                     }`}
                   >
-                    <span className="relative grid h-10 w-10 shrink-0 place-items-center">
-                      <Icon size={20} strokeWidth={2} aria-hidden />
+                    <span className="relative grid h-9 w-9 shrink-0 place-items-center">
+                      <Icon size={18} strokeWidth={2} aria-hidden />
                       {isLocked && (
-                        <span className="absolute bottom-1.5 right-1.5 w-3.5 h-3.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                          <Lock size={8} strokeWidth={2.5} />
+                        <span className="absolute bottom-1 right-1 w-3 h-3 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                          <Lock size={7} strokeWidth={2.5} />
                         </span>
                       )}
                     </span>
                     <span className="flex-1 flex items-center justify-between min-w-0 pr-2">
                       <span
-                        className={`whitespace-nowrap text-body font-semibold ${
+                        className={`whitespace-nowrap text-xs font-semibold ${
                           mounted ? 'transition-opacity duration-300 ease-in-out' : ''
                         } ${collapsed ? 'opacity-100 lg:opacity-0' : 'opacity-100'}`}
                       >
@@ -544,11 +553,12 @@ function MobileDrawer({
         </div>
 
         {/* Mobile Nav Links */}
-        <nav className="flex-1 overflow-y-auto px-4 py-3">
+        <nav className="flex-1 overflow-y-auto px-4 pt-5 pb-3">
           <ul className="space-y-1">
             {items.map(({ href, label, Icon }) => {
               const active = pathname === href || pathname.startsWith(`${href}/`);
-              const isLocked = mounted && href !== '/dashboard' && !isFocusLocked;
+              const isCoordinator = roleOf(user) === 'coordinator';
+              const isLocked = mounted && href !== '/dashboard' && isCoordinator && !isFocusLocked;
 
               const handleClick = (e: React.MouseEvent) => {
                 if (isLocked) {

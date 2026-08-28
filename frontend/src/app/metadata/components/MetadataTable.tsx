@@ -65,12 +65,14 @@ export function MetadataTable({
               </tr>
             ) : (
               companies.map((c, idx) => {
-                const serialNo = (page - 1) * limit + idx + 1;
+                const serialNo = c.serial_number ?? ((page - 1) * limit + idx + 1);
                 return (
                   <tr key={c._id} className="hover:bg-surface-sunken/60 transition-colors">
                     {/* Serial Number (#) */}
-                    <td className="py-3.5 px-4 text-center font-mono text-fg-subtle text-[11px] font-semibold">
-                      {serialNo}
+                    <td className="py-3.5 px-4 text-center font-mono text-[11px] font-semibold">
+                      <span className="inline-block px-2 py-0.5 rounded-md bg-surface-sunken/90 border border-border text-fg font-mono text-xs font-bold shadow-2xs">
+                        {serialNo}
+                      </span>
                     </td>
 
                     {/* Company Name */}

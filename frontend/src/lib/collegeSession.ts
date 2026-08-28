@@ -9,17 +9,34 @@ export const ACTIVE_COLLEGE_NAME_KEY = 'ipoms_active_college_name';
 export const ACTIVE_COLLEGE_OBJ_KEY = 'ipoms_active_college_obj';
 export const COORDINATOR_SELECTED_COLLEGES_KEY = 'ipoms_coordinator_selected_colleges';
 export const COORDINATOR_FOCUS_DATE_KEY = 'ipoms_coordinator_focus_date';
+export const COORDINATOR_FOCUS_WEEK_KEY = 'ipoms_coordinator_focus_week';
 export const COORDINATOR_FOCUS_LOCKED_KEY = 'ipoms_coordinator_focus_locked';
 export const ALL_COLLEGES_CACHE_KEY = 'ipoms_cached_all_colleges';
 
 let memoryCachedColleges: College[] = [];
 
+/** Returns YYYY-MM-DD for today */
 function getTodayKey(): string {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+/**
+ * Returns the ISO date (YYYY-MM-DD) of Monday for the given date's week.
+ * Standard work week cycle: Monday (day 1) through Sunday (day 0).
+ */
+export function getCurrentWeekMondayKey(d: Date = new Date()): string {
+  const date = new Date(d);
+  const day = date.getDay(); // 0 is Sunday, 1 is Monday, ..., 6 is Saturday
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(date.setDate(diff));
+  const year = monday.getFullYear();
+  const month = String(monday.getMonth() + 1).padStart(2, '0');
+  const dayStr = String(monday.getDate()).padStart(2, '0');
+  return `${year}-${month}-${dayStr}`;
 }
 
 export function getCachedColleges(): College[] {
@@ -65,29 +82,50 @@ export async function fetchAllCollegesCached(): Promise<College[]> {
   return cached;
 }
 
-/** Check if the user has locked focus for today with 1 to 4 colleges */
+/**
+ * Check if the user has locked focus for the current work week (Monday through Sunday)
+ * - On Monday (new week): Needs lock confirmation
+ * - From Tuesday to Sunday: Persists locked state without repeatedly prompting
+ */
 export function isFocusLockedToday(): boolean {
   if (typeof window === 'undefined') return false;
   try {
     const locked = localStorage.getItem(COORDINATOR_FOCUS_LOCKED_KEY) === 'true';
-    const date = localStorage.getItem(COORDINATOR_FOCUS_DATE_KEY);
-    const today = getTodayKey();
-    if (!locked || date !== today) {
-      return false;
+    if (!locked) return false;
+
+    const currentWeekMonday = getCurrentWeekMondayKey();
+    const weekKey = localStorage.getItem(COORDINATOR_FOCUS_WEEK_KEY);
+    const legacyDate = localStorage.getItem(COORDINATOR_FOCUS_DATE_KEY);
+
+    // If locked for current week Monday-Sunday
+    if (weekKey === currentWeekMonday) {
+      const selected = getCoordinatorSelectedColleges();
+      return selected.length >= 1 && selected.length <= 4;
     }
-    const selected = getCoordinatorSelectedColleges();
-    return selected.length >= 1 && selected.length <= 4;
+
+    // Check legacy single-day date: if it fell in the current week, upgrade it
+    if (legacyDate) {
+      const legacyMonday = getCurrentWeekMondayKey(new Date(legacyDate));
+      if (legacyMonday === currentWeekMonday) {
+        localStorage.setItem(COORDINATOR_FOCUS_WEEK_KEY, currentWeekMonday);
+        const selected = getCoordinatorSelectedColleges();
+        return selected.length >= 1 && selected.length <= 4;
+      }
+    }
+
+    // If a new week (Monday) has started and wasn't locked yet
+    return false;
   } catch {
     return false;
   }
 }
 
-/** Whether the user has an active daily focus selection (used by navigation guards) */
+/** Whether the user has an active focus selection (used by navigation guards) */
 export function hasActiveDailyFocus(): boolean {
   return isFocusLockedToday();
 }
 
-/** Locks daily focus for 1 to 4 colleges for today's session */
+/** Locks focus for 1 to 4 colleges for the entire week (Monday through Sunday) */
 export function lockDailyFocus(ids: string[]): boolean {
   if (typeof window === 'undefined') return false;
   const sanitized = Array.from(new Set(ids.filter(Boolean))).slice(0, 4);
@@ -97,8 +135,10 @@ export function lockDailyFocus(ids: string[]): boolean {
 
   try {
     const today = getTodayKey();
+    const currentWeekMonday = getCurrentWeekMondayKey();
     localStorage.setItem(COORDINATOR_SELECTED_COLLEGES_KEY, JSON.stringify(sanitized));
     localStorage.setItem(COORDINATOR_FOCUS_DATE_KEY, today);
+    localStorage.setItem(COORDINATOR_FOCUS_WEEK_KEY, currentWeekMonday);
     localStorage.setItem(COORDINATOR_FOCUS_LOCKED_KEY, 'true');
 
     // Auto-set the first selected college as the active college session if not already set
@@ -110,7 +150,7 @@ export function lockDailyFocus(ids: string[]): boolean {
 
     window.dispatchEvent(
       new CustomEvent('ipoms_focus_updated', {
-        detail: { selectedIds: sanitized, isLocked: true, date: today },
+        detail: { selectedIds: sanitized, isLocked: true, date: today, weekKey: currentWeekMonday },
       })
     );
     window.dispatchEvent(
@@ -137,21 +177,17 @@ export function unlockDailyFocus(): void {
   } catch {}
 }
 
-/** Clears daily focus on fresh login so the user must select colleges again */
+/** Preserves weekly focus on login if already locked for current week */
 export function clearDailyFocusOnLogin(): void {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.removeItem(COORDINATOR_SELECTED_COLLEGES_KEY);
-    localStorage.removeItem(COORDINATOR_FOCUS_DATE_KEY);
-    localStorage.removeItem(COORDINATOR_FOCUS_LOCKED_KEY);
+    if (isFocusLockedToday()) {
+      return;
+    }
+    localStorage.setItem(COORDINATOR_FOCUS_LOCKED_KEY, 'false');
     window.dispatchEvent(
       new CustomEvent('ipoms_focus_updated', {
-        detail: { selectedIds: [], isLocked: false },
-      })
-    );
-    window.dispatchEvent(
-      new CustomEvent('ipoms_coordinator_colleges_changed', {
-        detail: { selectedIds: [] },
+        detail: { selectedIds: getCoordinatorSelectedColleges(), isLocked: false },
       })
     );
   } catch {}

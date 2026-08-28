@@ -5,9 +5,10 @@ import { X, CheckCircle2, Pencil, Trash2, Building2, Sparkles, ClipboardList, Gr
 import { useToast } from '@/components/ui/Toast';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
+import { SmoothYearDropdown } from '@/components/ui/SmoothYearDropdown';
 import type { DailyLeadRow, CollegeOption } from './LeadsTable';
 
-const BATCH_YEARS = ['2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
+const BATCH_YEARS = ['2025', '2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
 
 interface Props {
   lead: DailyLeadRow;
@@ -69,7 +70,12 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
 
     try {
       setLoading(true);
-      const fullCtc = ctc.trim() ? `${ctc.trim()} ${ctcUnit}` : '';
+      const trimmedCtc = ctc.trim();
+      const fullCtc = trimmedCtc
+        ? ctcUnit && !trimmedCtc.toLowerCase().includes(ctcUnit.toLowerCase().replace('/', '').trim())
+          ? `${trimmedCtc} ${ctcUnit}`
+          : trimmedCtc
+        : '';
 
       await onSave(lead._id, {
         lead_type: leadType,
@@ -212,16 +218,11 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
 
             <div>
               <label className="block text-fg font-semibold mb-1">Eligible Batch</label>
-              <SmoothSelect
+              <SmoothYearDropdown
                 value={eligibleBatch}
                 onChange={setEligibleBatch}
-                icon={GraduationCap}
-                title="Eligible Graduating Batch"
-                options={BATCH_YEARS.map((y) => ({
-                  value: y,
-                  label: `${y} Batch`,
-                  badge: y,
-                }))}
+                placeholder="Select Batch Year(s)"
+                className="w-full"
               />
             </div>
           </div>
@@ -257,6 +258,7 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
                     options={[
                       { value: 'LPA', label: 'LPA' },
                       { value: '/ Month', label: '/ Month' },
+                      { value: '', label: 'Both / Custom' },
                     ]}
                   />
                 </div>

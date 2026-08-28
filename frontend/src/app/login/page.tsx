@@ -298,7 +298,7 @@ export default function LoginPage() {
             iPOMS
           </p>
           <h2 className="mt-2 font-display text-sm font-semibold tracking-normal text-slate-700 whitespace-nowrap">
-            Infoziant Placement Operations Management System
+            Infoziant Placement Operations & Management System
           </h2>
         </div>
 
@@ -333,7 +333,7 @@ export default function LoginPage() {
           <div className="space-y-1">
             <h1 className="text-display font-bold tracking-tight text-fg lg:text-display-lg">{heading}</h1>
             <p className="text-micro text-fg-muted lg:hidden whitespace-nowrap">
-              Infoziant Placement Operations Management System
+              Infoziant Placement Operations & Management System
             </p>
           </div>
 

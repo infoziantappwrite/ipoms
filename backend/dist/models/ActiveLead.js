@@ -95,9 +95,8 @@ const ActiveLeadSchema = new mongoose_1.Schema({
     },
     academic_year: {
         type: String,
-        enum: exports.ACADEMIC_YEARS,
         required: true,
-        default: '2026',
+        default: '2027',
         index: true,
     },
     coordinator_id: {

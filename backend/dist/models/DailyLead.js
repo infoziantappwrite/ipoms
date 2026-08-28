@@ -95,9 +95,9 @@ const DailyLeadSchema = new mongoose_1.Schema({
     // Date & Time
     event_time: {
         type: String,
-        required: [true, 'Event time is required'],
+        required: false,
         trim: true,
-        default: () => new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+        default: '',
     },
     lead_date: {
         type: Date,

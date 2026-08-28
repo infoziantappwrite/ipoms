@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { CloudCheck, CheckCircle2, Sparkles, Zap } from 'lucide-react';
+import { CheckCircle2, Sparkles, Zap } from 'lucide-react';
 import { triggerHaptic } from '@/lib/haptics';
 
 export function AutoSaveFloatingIndicator() {

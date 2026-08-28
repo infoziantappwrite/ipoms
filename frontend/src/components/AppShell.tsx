@@ -11,6 +11,8 @@ import { initTheme } from '@/lib/theme';
 import { isFocusLockedToday } from '@/lib/collegeSession';
 import { useToast } from '@/components/ui/Toast';
 
+import { readSessionUser, roleOf } from '@/lib/session';
+
 /** Routes that render their own full-screen chrome and must not show the drawer. */
 const CHROMELESS = ['/', '/login', '/signup'];
 
@@ -30,8 +32,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     initTheme();
   }, []);
 
-  // Enforce focus lockdown: Without locking daily focus, users cannot access operational routes
+  // Enforce focus lockdown: ONLY Placement Coordinators require locking daily focus
   useEffect(() => {
+    const user = readSessionUser();
+    const userRole = roleOf(user);
+
+    // Team Leaders and Administrators never have locked routes
+    if (userRole !== 'coordinator') {
+      return;
+    }
+
     const isAllowedRoute =
       pathname === '/' ||
       pathname === '/login' ||
@@ -47,6 +57,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       }
     }
   }, [pathname, router, toast]);
+
+  // ── Global Ctrl+S / Cmd+S Shortcut Dispatcher ──────────────────────────────
+  useEffect(() => {
+    const handleGlobalSaveShortcut = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        window.dispatchEvent(
+          new CustomEvent('ipoms_global_save_trigger', {
+            detail: { pathname, timestamp: Date.now() },
+          })
+        );
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalSaveShortcut);
+    return () => window.removeEventListener('keydown', handleGlobalSaveShortcut);
+  }, [pathname]);
 
   if (CHROMELESS.includes(pathname)) {
     return <main id="main" className="flex min-h-screen flex-1 flex-col">{children}</main>;

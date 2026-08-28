@@ -44,7 +44,7 @@ export interface IActiveLead extends Document {
   ctc: string;
   status: ActiveLeadStatus;
   followup_month: FollowupMonth;
-  academic_year: AcademicYear;
+  academic_year: string;
 
   // Ownership & References
   coordinator_id?: Types.ObjectId;
@@ -91,9 +91,8 @@ const ActiveLeadSchema: Schema<IActiveLead> = new Schema(
     },
     academic_year: {
       type: String,
-      enum: ACADEMIC_YEARS,
       required: true,
-      default: '2026',
+      default: '2027',
       index: true,
     },
     coordinator_id: {

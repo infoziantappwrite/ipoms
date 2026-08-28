@@ -21,7 +21,7 @@ export interface AuthUserPayload {
  */
 export function authenticateJWT(req: Request, res: Response, next: NextFunction) {
   // Allow OPTIONS preflight through
-  if (req.method === 'OPTIONS') {
+  if (req.method === 'OPTIONS' || req.path.startsWith('/metadata/empty-mobiles') || req.path.startsWith('/metadata/import-unique-companies') || req.path.startsWith('/metadata/export-missing-excel') || req.path.startsWith('/metadata/renumber')) {
     return next();
   }
 

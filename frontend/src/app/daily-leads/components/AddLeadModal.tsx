@@ -6,8 +6,9 @@ import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
+import { SmoothYearDropdown } from '@/components/ui/SmoothYearDropdown';
 
-const BATCH_YEARS = ['2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
+const BATCH_YEARS = ['2025', '2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
 
 interface College {
   _id: string;
@@ -359,16 +360,11 @@ export function AddLeadModal({
             {/* Eligible Batch */}
             <div>
               <label className="block text-fg font-semibold mb-1.5">Eligible Batch (Year)</label>
-              <SmoothSelect
+              <SmoothYearDropdown
                 value={eligibleBatch}
                 onChange={setEligibleBatch}
-                icon={GraduationCap}
-                title="Eligible Graduating Batch"
-                options={BATCH_YEARS.map((year) => ({
-                  value: year,
-                  label: `${year} Graduating Batch`,
-                  badge: year,
-                }))}
+                placeholder="Select Batch Year(s)"
+                className="w-full"
               />
             </div>
           </div>

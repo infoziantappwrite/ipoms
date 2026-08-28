@@ -3,6 +3,7 @@
 import { FileSpreadsheet, Plus, Target, Trash2, RefreshCw, Copy } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
+import { SmoothExportDropdown } from '@/components/ui/SmoothExportDropdown';
 
 interface Props {
   selectedDate: string;
@@ -10,7 +11,10 @@ interface Props {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   onOpenAddModal: () => void;
-  onExportCsv: () => void;
+  onExportXlsx: () => void;
+  onExportPdf?: () => void;
+  onExportImage?: () => void;
+  isExporting?: boolean;
   onRefresh: () => void;
   onSyncPositives?: () => void;
   isSyncing?: boolean;
@@ -26,7 +30,10 @@ export function LeadsHeader({
   searchQuery,
   onSearchChange,
   onOpenAddModal,
-  onExportCsv,
+  onExportXlsx,
+  onExportPdf,
+  onExportImage,
+  isExporting = false,
   onRefresh,
   onSyncPositives,
   isSyncing = false,
@@ -37,7 +44,7 @@ export function LeadsHeader({
 }: Props) {
 
   return (
-    <header className="bg-surface border-b border-border px-6 py-4 space-y-3 shadow-xs text-fg">
+    <header className="sticky top-0 z-40 bg-surface/95 backdrop-blur-md border-b border-border px-6 py-4 space-y-3 shadow-xs text-fg">
       {/* ── Top Row: Title & Top-Right Sign Out ────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div>
@@ -128,19 +135,19 @@ export function LeadsHeader({
               ) : (
                 <>
                   <RefreshCw size={13} strokeWidth={2.5} />
-                  <span>Sync Positives</span>
+                  <span>Sync</span>
                 </>
               )}
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={onExportCsv}
-            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer active:scale-95"
-          >
-            <FileSpreadsheet size={14} strokeWidth={2} /> Export CSV
-          </button>
+          {/* Solid Export Dropdown Menu (Excel, PDF, Image) */}
+          <SmoothExportDropdown
+            onExportExcel={onExportXlsx}
+            onExportPdf={onExportPdf}
+            onExportImage={onExportImage}
+            isExporting={isExporting}
+          />
 
           <button
             type="button"

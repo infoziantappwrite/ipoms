@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { readSessionUser, updateSessionUser } from '@/lib/session';
 import { apiFetch } from '@/lib/api';
+import { initialsFor } from '@/lib/initials';
 import { PhotoCropModal } from './PhotoCropModal';
 
 interface Props {
@@ -421,7 +422,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
                     />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-primary/30 via-primary/10 to-transparent flex items-center justify-center text-4xl font-black text-primary group-hover:scale-105 transition-transform duration-300">
-                      {effectiveName.charAt(0)}
+                      {initialsFor(effectiveName)}
                     </div>
                   )}
 

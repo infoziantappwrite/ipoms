@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { CalendarDays } from 'lucide-react';
 import { WeeklyHeader } from './components/WeeklyHeader';
 import { WeeklyKpiCards, WeeklyKpiData } from './components/WeeklyKpiCards';
@@ -9,6 +10,8 @@ import { AddCompanyModal } from './components/AddCompanyModal';
 import type { WeeklyRow } from './components/WeeklyTable';
 import { apiFetch, apiFetchBlob } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
+import { useToast } from '@/components/ui/Toast';
+import { getActiveCollege, resolveDefaultCollege } from '@/lib/collegeSession';
 
 interface SectionData {
   title: string;
@@ -27,15 +30,16 @@ interface SectionsResponse {
   rejected_by_college: SectionData;
 }
 
-import { getActiveCollege, resolveDefaultCollege } from '@/lib/collegeSession';
-
 export default function WeeklyTrackerPage() {
+  const router = useRouter();
+  const { toast } = useToast();
   const [selectedCollegeId, setSelectedCollegeId] = useState<string>(() => {
     return getActiveCollege().id || '';
   });
   const [selectedCollegeName, setSelectedCollegeName] = useState<string>(() => {
     return getActiveCollege().name || '';
   });
+  const [academicYear, setAcademicYear] = useState<string>('2027');
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [sections, setSections] = useState<SectionsResponse | null>(null);
   const [kpi, setKpi] = useState<WeeklyKpiData | null>(null);
@@ -110,7 +114,7 @@ export default function WeeklyTrackerPage() {
     try {
       const params = new URLSearchParams({
         college_id: selectedCollegeId,
-        academic_year: '2026',
+        academic_year: academicYear,
       });
       if (searchQuery.trim()) params.set('search', searchQuery.trim());
       if (companyTypeFilter !== 'all') params.set('company_type', companyTypeFilter);
@@ -125,20 +129,20 @@ export default function WeeklyTrackerPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCollegeId, searchQuery, companyTypeFilter]);
+  }, [selectedCollegeId, academicYear, searchQuery, companyTypeFilter]);
 
   // ── Load Live KPI Counts
   const loadKpi = useCallback(async () => {
     if (!selectedCollegeId) return;
     try {
-      const res = await apiFetch(`/weekly-tracker/kpi?college_id=${selectedCollegeId}&academic_year=2026`);
+      const res = await apiFetch(`/weekly-tracker/kpi?college_id=${selectedCollegeId}&academic_year=${academicYear}`);
       if (res.success && res.data) {
         setKpi((res.data as any).kpi);
       }
     } catch (err) {
       console.error('Failed to load weekly KPI:', err);
     }
-  }, [selectedCollegeId]);
+  }, [selectedCollegeId, academicYear]);
 
   // ── Initial load & filter change effects
   useEffect(() => {
@@ -146,7 +150,7 @@ export default function WeeklyTrackerPage() {
       loadWeeklyTracker();
       loadKpi();
     }
-  }, [selectedCollegeId, loadWeeklyTracker, loadKpi]);
+  }, [selectedCollegeId, academicYear, loadWeeklyTracker, loadKpi]);
 
   // ── Row Patch (Inline Edit)
   const handleUpdateRow = async (rowId: string, patch: Partial<WeeklyRow>) => {
@@ -241,13 +245,13 @@ export default function WeeklyTrackerPage() {
     try {
       const q = searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : '';
       const blob = await apiFetchBlob(
-        `/weekly-tracker/export-xlsx?college_id=${selectedCollegeId}&academic_year=2026${q}`
+        `/weekly-tracker/export-xlsx?college_id=${selectedCollegeId}&academic_year=${academicYear}${q}`
       );
 
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Weekly_Tracker_${selectedCollegeName.replace(/\s+/g, '_')}_2026.xlsx`;
+      link.download = `Weekly_Tracker_${selectedCollegeName.replace(/\s+/g, '_')}_${academicYear}.xlsx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -257,6 +261,73 @@ export default function WeeklyTrackerPage() {
       alert('Failed to export XLSX document: ' + (err.message || 'Unknown error'));
     }
   };
+
+  // Helper to extract all rows across sections
+  const getAllWeeklyRows = useCallback(() => {
+    if (!sections) return [];
+    const allRows: (WeeklyRow & { sectionTitle: string })[] = [];
+    (Object.keys(sections) as (keyof SectionsResponse)[]).forEach((k) => {
+      const sec = sections[k];
+      if (sec && Array.isArray(sec.rows)) {
+        sec.rows.forEach((r) => {
+          if (r.company_name) {
+            allRows.push({ ...r, sectionTitle: sec.title });
+          }
+        });
+      }
+    });
+    return allRows;
+  }, [sections]);
+
+  // Trigger direct navigation to Report Builder when clicking PDF or Image from dropdown
+  const handleOpenPdfModal = () => {
+    const collegeQuery = selectedCollegeId || 'all';
+    router.push(`/reports?template=weekly_placement&collegeId=${encodeURIComponent(collegeQuery)}`);
+  };
+
+  const handleOpenImageModal = () => {
+    const collegeQuery = selectedCollegeId || 'all';
+    router.push(`/reports?template=weekly_placement&collegeId=${encodeURIComponent(collegeQuery)}`);
+  };
+
+  // ── Global Save & Sync (Ctrl+S / Cmd+S) ──────────────────────────────────
+  const handleSaveAll = useCallback(async () => {
+    // Commit any currently active input or table cell by unfocusing
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+
+    try {
+      // Refresh and sync weekly tracker state and KPI metrics with backend
+      await Promise.all([loadWeeklyTracker(), loadKpi()]);
+      window.dispatchEvent(new CustomEvent('ipoms_trigger_autosave_banner'));
+    } catch (e) {
+      console.error('Failed to sync weekly tracker on save:', e);
+      toast('Failed to save changes. Please check your connection.', 'error');
+    }
+  }, [loadWeeklyTracker, loadKpi, toast]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        handleSaveAll();
+      }
+    };
+
+    const handleGlobalTrigger = (e: any) => {
+      if (e.detail?.pathname?.includes('/weekly-tracker')) {
+        handleSaveAll();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('ipoms_global_save_trigger' as any, handleGlobalTrigger);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('ipoms_global_save_trigger' as any, handleGlobalTrigger);
+    };
+  }, [handleSaveAll]);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -278,9 +349,13 @@ export default function WeeklyTrackerPage() {
         }}
         weekOffset={weekOffset}
         onWeekChange={setWeekOffset}
+        academicYear={academicYear}
+        onAcademicYearChange={setAcademicYear}
         onOpenAddModal={() => setIsAddModalOpen(true)}
         onSyncDailyPositives={handleSyncDailyPositives}
         onExportXlsx={handleExportXlsx}
+        onExportPdf={handleOpenPdfModal}
+        onExportImage={handleOpenImageModal}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         isDeleteMode={isDeleteMode}
@@ -326,10 +401,10 @@ export default function WeeklyTrackerPage() {
           {shouldRenderSection('completed') && (
             <WeeklySection
               sectionKey="completed"
-              title={sections.completed.title}
-              order={sections.completed.order}
-              summaryMetric={sections.completed.summary_metric}
-              rows={sections.completed.rows}
+              title={sections?.completed?.title || 'Companies Completed'}
+              order={sections?.completed?.order ?? 1}
+              summaryMetric={sections?.completed?.summary_metric || ''}
+              rows={sections?.completed?.rows || []}
               isGlobalDeleteMode={isDeleteMode}
               globalSelectedRowIds={selectedRowIds}
               onToggleSelectRow={handleToggleSelectRow}
@@ -345,10 +420,10 @@ export default function WeeklyTrackerPage() {
           {shouldRenderSection('in_progress') && (
             <WeeklySection
               sectionKey="in_progress"
-              title={sections.in_progress.title}
-              order={sections.in_progress.order}
-              summaryMetric={sections.in_progress.summary_metric}
-              rows={sections.in_progress.rows}
+              title={sections?.in_progress?.title || 'Companies In Progress'}
+              order={sections?.in_progress?.order ?? 2}
+              summaryMetric={sections?.in_progress?.summary_metric || ''}
+              rows={sections?.in_progress?.rows || []}
               isGlobalDeleteMode={isDeleteMode}
               globalSelectedRowIds={selectedRowIds}
               onToggleSelectRow={handleToggleSelectRow}
@@ -364,10 +439,10 @@ export default function WeeklyTrackerPage() {
           {shouldRenderSection('pipeline') && (
             <WeeklySection
               sectionKey="pipeline"
-              title={sections.pipeline.title}
-              order={sections.pipeline.order}
-              summaryMetric={sections.pipeline.summary_metric}
-              rows={sections.pipeline.rows}
+              title={sections?.pipeline?.title || 'Companies in Pipeline'}
+              order={sections?.pipeline?.order ?? 3}
+              summaryMetric={sections?.pipeline?.summary_metric || ''}
+              rows={sections?.pipeline?.rows || []}
               isGlobalDeleteMode={isDeleteMode}
               globalSelectedRowIds={selectedRowIds}
               onToggleSelectRow={handleToggleSelectRow}
@@ -383,10 +458,10 @@ export default function WeeklyTrackerPage() {
           {shouldRenderSection('top_companies') && (
             <WeeklySection
               sectionKey="top_companies"
-              title={sections.top_companies.title}
-              order={sections.top_companies.order}
-              summaryMetric={sections.top_companies.summary_metric}
-              rows={sections.top_companies.rows}
+              title={sections?.top_companies?.title || 'Top Companies'}
+              order={sections?.top_companies?.order ?? 4}
+              summaryMetric={sections?.top_companies?.summary_metric || ''}
+              rows={sections?.top_companies?.rows || []}
               isGlobalDeleteMode={isDeleteMode}
               globalSelectedRowIds={selectedRowIds}
               onToggleSelectRow={handleToggleSelectRow}
@@ -402,10 +477,10 @@ export default function WeeklyTrackerPage() {
           {shouldRenderSection('rejected_by_hr') && (
             <WeeklySection
               sectionKey="rejected_by_hr"
-              title={sections.rejected_by_hr.title}
-              order={sections.rejected_by_hr.order}
-              summaryMetric={sections.rejected_by_hr.summary_metric}
-              rows={sections.rejected_by_hr.rows}
+              title={sections?.rejected_by_hr?.title || 'Rejected by HR'}
+              order={sections?.rejected_by_hr?.order ?? 5}
+              summaryMetric={sections?.rejected_by_hr?.summary_metric || ''}
+              rows={sections?.rejected_by_hr?.rows || []}
               isGlobalDeleteMode={isDeleteMode}
               globalSelectedRowIds={selectedRowIds}
               onToggleSelectRow={handleToggleSelectRow}
@@ -421,10 +496,10 @@ export default function WeeklyTrackerPage() {
           {shouldRenderSection('rejected_by_college') && (
             <WeeklySection
               sectionKey="rejected_by_college"
-              title={sections.rejected_by_college.title}
-              order={sections.rejected_by_college.order}
-              summaryMetric={sections.rejected_by_college.summary_metric}
-              rows={sections.rejected_by_college.rows}
+              title={sections?.rejected_by_college?.title || 'Rejected by College'}
+              order={sections?.rejected_by_college?.order ?? 6}
+              summaryMetric={sections?.rejected_by_college?.summary_metric || ''}
+              rows={sections?.rejected_by_college?.rows || []}
               isGlobalDeleteMode={isDeleteMode}
               globalSelectedRowIds={selectedRowIds}
               onToggleSelectRow={handleToggleSelectRow}

@@ -3,13 +3,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Download, CheckSquare, ChevronLeft, ChevronRight,
-  Search, Sparkles, X, CheckCircle2, Building2, Phone, Mail, User, ArrowLeft
+  Search, Sparkles, X, CheckCircle2, Building2, Phone, Mail, User, ArrowLeft, Clock, Database
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { initTheme } from '@/lib/theme';
+import { SnoRangeSelector } from '@/app/metadata/components/SnoRangeSelector';
 
 interface Company {
   _id: string;
+  serial_number?: number;
   company_name: string;
   hr_name: string;
   hr_designation?: string;
@@ -25,10 +27,15 @@ export default function LoadContactsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
+  const [masterTotal, setMasterTotal] = useState(3823);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [inputPage, setInputPage] = useState<string>('1');
+  const [fromSno, setFromSno] = useState<number | null>(null);
+  const [toSno, setToSno] = useState<number | null>(null);
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   const [importedSuccess, setImportedSuccess] = useState(false);
+  const [isRecent, setIsRecent] = useState(false);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<NodeJS.Timeout>();
@@ -37,17 +44,42 @@ export default function LoadContactsPage() {
     initTheme();
   }, []);
 
-  const fetchCompanies = useCallback(async (q: string, p: number, sector: string) => {
+  useEffect(() => {
+    setInputPage(String(page));
+  }, [page]);
+
+  const handlePageInputSubmit = () => {
+    const p = parseInt(inputPage.trim(), 10);
+    if (!isNaN(p) && totalPages) {
+      const clamped = Math.max(1, Math.min(p, totalPages));
+      setPage(clamped);
+      setInputPage(String(clamped));
+    } else {
+      setInputPage(String(page));
+    }
+  };
+
+  const fetchCompanies = useCallback(async (q: string, p: number, sector: string, recentFlag?: boolean, fSno?: number | null, tSno?: number | null) => {
     setLoading(true);
     try {
-      let url = `/companies/search?q=${encodeURIComponent(q)}&page=${p}&limit=100`;
+      const useRecent = recentFlag !== undefined ? recentFlag : isRecent;
+      const currentFrom = fSno !== undefined ? fSno : fromSno;
+      const currentTo = tSno !== undefined ? tSno : toSno;
+
+      let url = `/companies/search?q=${encodeURIComponent(q)}&page=${p}&limit=100${useRecent ? '&recent=true' : ''}`;
       if (sector !== 'all') url += `&type=${encodeURIComponent(sector)}`;
+      if (currentFrom !== null && currentFrom > 0) url += `&from_sno=${currentFrom}`;
+      if (currentTo !== null && currentTo > 0) url += `&to_sno=${currentTo}`;
 
       const res = await apiFetch(url);
       if (res.success) {
         const data = res.data as any;
+        const count = data.pagination?.total || 0;
         setCompanies(data.companies || []);
-        setTotal(data.pagination?.total || 0);
+        setTotal(count);
+        if (!q && currentFrom === null && currentTo === null && sector === 'all' && !useRecent && count > 0) {
+          setMasterTotal(count);
+        }
         setTotalPages(data.pagination?.totalPages || 1);
       }
     } catch (e) {
@@ -55,22 +87,22 @@ export default function LoadContactsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isRecent, fromSno, toSno]);
 
   // Debounced search & filter
   useEffect(() => {
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      fetchCompanies(query, 1, sectorFilter);
+      fetchCompanies(query, 1, sectorFilter, isRecent, fromSno, toSno);
       setPage(1);
       setLastClickedIndex(null);
     }, 250);
-  }, [query, sectorFilter, fetchCompanies]);
+  }, [query, sectorFilter, isRecent, fromSno, toSno, fetchCompanies]);
 
   useEffect(() => {
-    fetchCompanies(query, page, sectorFilter);
+    fetchCompanies(query, page, sectorFilter, isRecent, fromSno, toSno);
     setLastClickedIndex(null);
-  }, [page]);
+  }, [page, sectorFilter, isRecent, fromSno, toSno]);
 
   useEffect(() => {
     searchRef.current?.focus();
@@ -189,29 +221,50 @@ export default function LoadContactsPage() {
       {/* ── Sticky Top Pinned Section (Header + Search Controls) ──────────── */}
       <div className="sticky top-0 z-30 bg-surface border-b border-border shadow-xs">
         {/* Top Header Bar */}
-        <header className="px-6 py-3.5 border-b border-border/70">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+        <header className="px-6 py-3 border-b border-border/70">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-[inset_1px_1px_3px_rgba(0,0,0,0.05)] shrink-0">
-                <Download size={18} strokeWidth={2} />
+              <div className="w-8 h-8 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-[inset_1px_1px_3px_rgba(0,0,0,0.05)] shrink-0">
+                <Download size={16} strokeWidth={2} />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-lg font-bold text-fg tracking-tight flex items-center gap-2">
-                    <span>Load Today's Contacts</span>
-                  </h1>
-                  <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full font-bold">
-                    Master Database Picker
-                  </span>
-                </div>
-                <p className="text-xs text-fg-subtle mt-0.5">
-                  Select company contacts to populate your active Daily Tracker workspace. Master database records remain protected.
-                </p>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base font-bold text-fg tracking-tight flex items-center gap-2">
+                  <span>Load Today's Contacts</span>
+                </h1>
+                <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full font-bold">
+                  {isRecent ? 'Recent Database (Past 1–2 Weeks)' : 'Master Database Picker'}
+                </span>
               </div>
             </div>
 
-            <div className="text-xs font-bold text-fg w-full md:w-auto">
-              Selected: <span className="text-primary text-base font-black ml-1">{selected.size}</span> contacts
+            {/* Top Right: Recent Data / Metadata Toggle Button */}
+            <div className="flex items-center gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !isRecent;
+                  setIsRecent(next);
+                  setPage(1);
+                }}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer active:scale-95 ${
+                  isRecent
+                    ? 'bg-primary text-white border border-primary shadow-xs ring-1 ring-primary/30'
+                    : 'bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 hover:border-primary/40'
+                }`}
+                title={isRecent ? 'Switch back to all metadata from Serial Number 1' : 'Filter & sort contacts added in the past 1 to 2 weeks'}
+              >
+                {isRecent ? (
+                  <>
+                    <Database size={14} strokeWidth={2.25} />
+                    <span>Metadata</span>
+                  </>
+                ) : (
+                  <>
+                    <Clock size={14} strokeWidth={2.25} />
+                    <span>Recent Data</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </header>
@@ -220,20 +273,41 @@ export default function LoadContactsPage() {
         <div className="bg-surface-sunken px-6 py-2.5">
           <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
             
-            {/* Search Box */}
-            <div className="relative flex-1 max-w-lg">
-              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-fg-subtle" />
-              <input
-                ref={searchRef}
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by company, HR contact name, mobile number, or email…"
-                className="w-full bg-surface border border-border text-fg pl-9 pr-4 py-2 rounded-xl placeholder:text-fg-disabled text-xs shadow-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"
-              />
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {/* Search Box with Clear Leading Space */}
+              <div className="relative w-full sm:w-64 max-w-xs flex items-center">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none shrink-0" />
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search by company, HR, phone…"
+                  className="w-full bg-surface border border-border text-fg pl-9 pr-3 py-1.5 rounded-xl placeholder:text-fg-disabled text-xs shadow-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+                />
+              </div>
+
+              {/* S.No Range Dropdown Selector */}
+              {!isRecent && (
+                <SnoRangeSelector
+                  fromSno={fromSno}
+                  toSno={toSno}
+                  maxSno={masterTotal}
+                  onApplyRange={(f, t) => {
+                    setFromSno(f);
+                    setToSno(t);
+                    setPage(1);
+                  }}
+                  onClearRange={() => {
+                    setFromSno(null);
+                    setToSno(null);
+                    setPage(1);
+                  }}
+                />
+              )}
             </div>
 
-            {/* Quick Action Tools & Top Pagination Icon Pair */}
+            {/* Quick Action Tools & Top Pagination with Jump Input */}
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="text-fg-muted font-semibold text-[11px] mr-1">
                 {loading ? 'Searching…' : `${total.toLocaleString()} total companies`}
@@ -247,35 +321,63 @@ export default function LoadContactsPage() {
               </button>
 
               <button
+                type="button"
+                disabled={selected.size === 0}
                 onClick={handleDeselectAll}
-                className="px-3 py-1.5 rounded-lg bg-surface hover:bg-surface-raised border border-border text-fg-subtle hover:text-fg font-medium transition-all cursor-pointer text-[11px]"
+                className={`px-3 py-1.5 rounded-lg border text-[11px] font-medium transition-all shadow-xs ${
+                  selected.size === 0
+                    ? 'bg-surface/40 border-border/40 text-fg-disabled/40 cursor-not-allowed opacity-40'
+                    : 'bg-surface hover:bg-surface-raised border-border text-fg-subtle hover:text-fg cursor-pointer active:scale-95'
+                }`}
               >
                 Deselect All
               </button>
 
-              {/* Top Pagination Icon Pair */}
+              {/* Top Pagination with Jump-to-Page Input */}
               {totalPages > 1 && (
                 <div className="flex items-center gap-1 ml-2 pl-2 border-l border-border">
                   <button
                     type="button"
-                    disabled={page === 1}
+                    disabled={page <= 1}
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     title="Previous Page"
-                    className="w-7 h-7 rounded-lg bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
+                    className="w-7 h-7 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
                   >
-                    <ChevronLeft size={15} strokeWidth={2.25} />
+                    <ChevronLeft size={14} strokeWidth={2.25} />
                   </button>
-                  <span className="text-[11px] font-mono font-bold text-fg px-1.5">
-                    {page}/{totalPages}
-                  </span>
+
+                  <div
+                    className="flex items-center gap-1 px-2 py-0.5 bg-surface border border-border rounded-full shadow-2xs"
+                    title={`Type a page number (1 to ${totalPages}) and press Enter`}
+                  >
+                    <input
+                      type="number"
+                      min={1}
+                      max={totalPages}
+                      value={inputPage}
+                      onChange={(e) => setInputPage(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handlePageInputSubmit();
+                        }
+                      }}
+                      onBlur={handlePageInputSubmit}
+                      className="w-9 text-center font-mono font-bold text-[11px] bg-surface-sunken border border-border/80 focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-md py-0.5 text-fg outline-none transition-colors"
+                    />
+                    <span className="text-[11px] font-mono font-bold text-fg-subtle select-none">
+                      / {totalPages}
+                    </span>
+                  </div>
+
                   <button
                     type="button"
-                    disabled={page === totalPages}
+                    disabled={page >= totalPages}
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     title="Next Page"
-                    className="w-7 h-7 rounded-lg bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
+                    className="w-7 h-7 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
                   >
-                    <ChevronRight size={15} strokeWidth={2.25} />
+                    <ChevronRight size={14} strokeWidth={2.25} />
                   </button>
                 </div>
               )}
@@ -314,11 +416,11 @@ export default function LoadContactsPage() {
                       />
                     </th>
                     <th className="px-4 py-3.5 min-w-[220px] max-w-[280px]">Company Name</th>
-                    <th className="px-4 py-3.5">HR Contact</th>
+                    <th className="px-4 py-3.5">HR Name</th>
                     <th className="px-4 py-3.5">Designation</th>
-                    <th className="px-4 py-3.5">Mobile Number</th>
+                    <th className="px-4 py-3.5">Contact</th>
                     <th className="px-4 py-3.5">Email ID</th>
-                    <th className="px-4 py-3.5">Sector / Industry</th>
+                    <th className="px-4 py-3.5">Sector</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border font-sans bg-surface">

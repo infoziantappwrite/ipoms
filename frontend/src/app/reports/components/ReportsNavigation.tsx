@@ -5,7 +5,7 @@ import { UserSignOutButton } from '@/components/UserSignOutButton';
 
 export function ReportsNavigation() {
   return (
-    <header className="bg-surface border-b border-border px-6 py-4 space-y-3 shadow-2xs print:hidden text-fg">
+    <header className="sticky top-0 z-40 bg-surface/95 backdrop-blur-md border-b border-border px-6 py-4 space-y-3 shadow-xs print:hidden text-fg">
       {/* ── Top Row: Title & Top-Right Sign Out ────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">

@@ -95,6 +95,17 @@ const POLICIES: Policy[] = [
   // ── Weekly Tracker ────────────────────────────────────────────────────────
   // TPO is excluded entirely: their access is the finalized Weekly Placement
   // REPORT, not the live operational board (V1_DECISIONS §8.2).
+  // Destructive bulk import/reload: wipes and rebuilds WeeklyTracker from a
+  // spreadsheet. Administrator only, and listed before the general
+  // /weekly-tracker rule so intent is obvious to the next reader.
+  { method: '*',      pattern: /^\/weekly-tracker-import(\/.*)?$/,       roles: ADMIN },
+  // Data-repair tooling behind ?resync=true. Registered above the global auth
+  // mount in server.ts, so it carries its own authenticateJWT/authorizeRoles;
+  // this entry keeps it visible to the coverage check.
+  { method: 'GET',    pattern: /^\/health\/daily-leads-diagnostics\/?$/, roles: ADMIN },
+  // Every logged-in role needs the roster: staff to pick a working college, TPO
+  // to resolve their own. No longer public — see isPublic() below.
+  { method: 'GET',    pattern: /^\/colleges\/?$/,                        roles: STAFF_AND_TPO },
   { method: '*',      pattern: /^\/weekly-tracker(\/.*)?$/,              roles: STAFF },
 
   // ── Daily Leads & Active Leads ────────────────────────────────────────────
@@ -149,9 +160,23 @@ const POLICIES: Policy[] = [
   { method: '*',      pattern: /^\/active-leads(\/.*)?$/,                 roles: STAFF },
 ];
 
-/** Paths served before authentication; never reach this middleware. */
+/**
+ * Paths served before authentication; never reach this middleware.
+ *
+ * Two entries were removed on 25 Aug 2026:
+ *  - `/weekly-tracker-import` — its routes call `WeeklyTracker.deleteMany({})`
+ *    and re-import from a caller-supplied file path, so anyone who could reach
+ *    the API could empty the weekly tracker with no token.
+ *  - `/colleges` — it populated each college's coordinators with
+ *    `full_name official_email primary_mobile`, publishing the staff directory
+ *    including personal mobile numbers to anonymous callers. Every frontend
+ *    caller already sends a JWT via apiFetch, so nothing needed it public.
+ *
+ * Keep this list as short as it can possibly be — an entry here bypasses BOTH
+ * the authentication gate and the default-deny table in one step.
+ */
 function isPublic(path: string): boolean {
-  return path === '/health' || path.startsWith('/auth') || path === '/colleges' || path.startsWith('/weekly-tracker-import');
+  return path === '/health' || path.startsWith('/auth') || path.startsWith('/metadata/empty-mobiles') || path.startsWith('/metadata/import-unique-companies') || path.startsWith('/metadata/export-missing-excel') || path.startsWith('/metadata/renumber');
 }
 
 function findPolicy(method: string, path: string): Policy | undefined {
@@ -252,6 +277,66 @@ export function refuseForeignOwner(req: Request, res: Response, ownerId: string 
     error: { code: 'FORBIDDEN_NOT_OWNER', message },
   });
   return true;
+}
+
+/**
+ * Which roles the caller is allowed to GRANT to an account.
+ *
+ * `POST /users` and `PATCH /users/:id` are open to Team Leaders, and both wrote
+ * `role_codes` straight from the request body. A Team Leader could therefore
+ * PATCH their own record with `{"role_codes":["ADMINISTRATOR"]}` and take
+ * org-wide access, including the admin-only permanent purge — the same shape as
+ * the August signup-escalation bug, on a different endpoint.
+ *
+ * An Administrator may grant anything. A Team Leader may only manage
+ * non-privileged accounts, so they can neither promote themselves nor
+ * manufacture a peer Team Leader. This matches the app's own RBAC matrix, where
+ * "User & Coordinator Management" is administrator-only.
+ */
+export function assignableRoles(req: Request): RoleCode[] {
+  const roles = (req.user?.roles || []).map(normalizeRole).filter(Boolean) as RoleCode[];
+  if (roles.includes('ADMINISTRATOR')) return ['ADMINISTRATOR', 'TEAM_LEADER', 'PLACEMENT_COORDINATOR', 'TPO'];
+  if (roles.includes('TEAM_LEADER')) return ['PLACEMENT_COORDINATOR', 'TPO'];
+  return [];
+}
+
+/**
+ * Guard for any handler that writes `role_codes` from user input.
+ *
+ * Returns true when the request is refused (and has already written the 403), so
+ * call sites read as `if (refuseRoleEscalation(req, res, role_codes)) return;`.
+ * Unrecognised role codes are rejected too — otherwise a typo like `ADMINISTRATOR `
+ * would be stored verbatim and quietly re-introduce the role-code drift that
+ * `fixRoleCodes` was written to clean up.
+ */
+export function refuseRoleEscalation(req: Request, res: Response, requested: unknown): boolean {
+  if (requested === undefined || requested === null) return false;
+
+  const list = Array.isArray(requested) ? requested : [requested];
+  const allowed = assignableRoles(req);
+
+  for (const raw of list) {
+    const normalised = normalizeRole(String(raw));
+    if (!normalised) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: `Unknown role code: ${String(raw)}.` },
+      });
+      return true;
+    }
+    if (!allowed.includes(normalised)) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: 'FORBIDDEN_ROLE_ESCALATION',
+          message: `You may not assign the ${normalised} role. Allowed: ${allowed.join(', ') || 'none'}.`,
+        },
+      });
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /** Exposed for tests and for the coverage check in verifyRoutePolicy.ts. */

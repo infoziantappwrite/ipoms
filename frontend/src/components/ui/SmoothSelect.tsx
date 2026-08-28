@@ -150,36 +150,35 @@ export function SmoothSelect({
 
   return (
     <div className={`relative inline-block text-left w-full ${className}`}>
-      {/* ── Trigger Button (Solid Application Theme) ────────────────────── */}
+      {/* ── Trigger Button (Solid Minimal SaaS Theme) ────────────────────── */}
       <button
         ref={triggerRef}
         type="button"
         disabled={disabled}
         onClick={handleToggle}
-        className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-xs select-none ${
+        className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-colors cursor-pointer select-none ${
           isOpen
-            ? 'bg-surface border-primary ring-2 ring-primary/20 text-fg'
-            : 'bg-surface-sunken hover:bg-surface border-border text-fg'
+            ? 'bg-white dark:bg-slate-950 border-blue-600 ring-1 ring-blue-600 text-slate-900 dark:text-slate-100'
+            : 'bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100'
         } disabled:opacity-50 disabled:cursor-not-allowed`}
       >
         <div className="flex items-center gap-2 truncate">
-          {TriggerIcon && <TriggerIcon size={15} className="text-primary shrink-0" />}
+          {TriggerIcon && <TriggerIcon size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />}
           {selectedOption ? (
-            <span className="truncate text-fg font-semibold flex items-center gap-1.5">
+            <span className="truncate text-slate-900 dark:text-slate-100 font-medium flex items-center gap-1.5">
               {selectedOption.badge && (
-                <span className="font-mono text-primary font-bold">[{selectedOption.badge}]</span>
+                <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold">[{selectedOption.badge}]</span>
               )}
               <span className="truncate">{selectedOption.label}</span>
             </span>
           ) : (
-            <span className="text-fg-subtle font-normal">{placeholder}</span>
+            <span className="text-slate-400 dark:text-slate-500 font-normal">{placeholder}</span>
           )}
         </div>
         <ChevronDown
           size={14}
-          strokeWidth={2.5}
-          className={`shrink-0 text-fg-subtle transition-transform duration-200 ${
-            isOpen ? 'rotate-180 text-primary' : ''
+          className={`shrink-0 text-slate-400 dark:text-slate-500 transition-transform duration-150 ${
+            isOpen ? 'rotate-180 text-blue-600' : ''
           }`}
         />
       </button>
@@ -202,32 +201,32 @@ export function SmoothSelect({
               width: `${coords.width}px`,
               zIndex: 99999,
             }}
-            className="rounded-2xl bg-surface border border-border shadow-2xl p-1.5 flex flex-col max-h-72 text-fg animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md"
+            className="rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl p-1 flex flex-col max-h-72 text-slate-900 dark:text-slate-100 animate-in fade-in duration-100"
           >
             {title && (
-              <div className="text-[10px] font-bold text-fg-subtle uppercase px-2.5 py-1 tracking-wider border-b border-border/40 mb-1">
+              <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase px-2 py-1 tracking-wider border-b border-slate-100 dark:border-slate-800 mb-1">
                 {title}
               </div>
             )}
 
             {/* Optional Search Bar */}
             {searchable && (
-              <div className="p-1.5 border-b border-border mb-1">
+              <div className="p-1 border-b border-slate-100 dark:border-slate-800 mb-1">
                 <div className="relative flex items-center">
-                  <Search size={13} className="absolute left-2.5 text-fg-subtle" />
+                  <Search size={13} className="absolute left-2.5 text-slate-400" />
                   <input
                     ref={searchInputRef}
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder={searchPlaceholder}
-                    className="w-full bg-surface-sunken border border-border focus:border-primary rounded-xl pl-8 pr-7 py-1.5 text-xs text-fg outline-none"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-blue-600 rounded-md pl-8 pr-7 py-1.5 text-xs text-slate-900 dark:text-slate-100 outline-none"
                   />
                   {searchQuery && (
                     <button
                       type="button"
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-2 text-fg-subtle hover:text-fg"
+                      className="absolute right-2 text-slate-400 hover:text-slate-600"
                     >
                       <X size={12} />
                     </button>
@@ -237,9 +236,9 @@ export function SmoothSelect({
             )}
 
             {/* Option List */}
-            <div className="overflow-y-auto no-scrollbar space-y-0.5 max-h-60 p-0.5">
+            <div className="overflow-y-auto space-y-0.5 max-h-60 p-0.5">
               {filteredOptions.length === 0 ? (
-                <div className="px-3 py-4 text-center text-xs text-fg-subtle italic">
+                <div className="px-3 py-3 text-center text-xs text-slate-400 italic">
                   No matching options found
                 </div>
               ) : (
@@ -255,34 +254,34 @@ export function SmoothSelect({
                         setIsOpen(false);
                         setSearchQuery('');
                       }}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer text-left select-none ${
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer text-left select-none ${
                         isSelected
-                          ? 'bg-primary/10 text-primary font-bold shadow-2xs'
-                          : 'text-fg-muted hover:bg-surface-sunken hover:text-fg font-medium'
+                          ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-semibold'
+                          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                       }`}
                     >
                       <div className="flex items-center gap-2 truncate">
                         {OptionIcon && (
                           <OptionIcon
                             size={14}
-                            className={isSelected ? 'text-primary' : 'text-fg-subtle'}
+                            className={isSelected ? 'text-blue-600' : 'text-slate-400'}
                           />
                         )}
                         <div className="truncate">
                           <div className="flex items-center gap-1.5 truncate">
                             {opt.badge && (
-                              <span className="font-mono text-primary font-bold">[{opt.badge}]</span>
+                              <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold">[{opt.badge}]</span>
                             )}
                             <span className="truncate">{opt.label}</span>
                           </div>
                           {opt.sublabel && (
-                            <p className="text-[10px] text-fg-subtle font-normal truncate mt-0.5">
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-normal truncate mt-0.5">
                               {opt.sublabel}
                             </p>
                           )}
                         </div>
                       </div>
-                      {isSelected && <Check size={14} className="text-primary shrink-0 ml-2" />}
+                      {isSelected && <Check size={14} className="text-blue-600 dark:text-blue-400 shrink-0 ml-2" />}
                     </button>
                   );
                 })

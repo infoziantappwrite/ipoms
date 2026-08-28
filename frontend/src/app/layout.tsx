@@ -5,7 +5,7 @@ import { ToastProvider } from '@/components/ui/Toast';
 import { AutoSaveFloatingIndicator } from '@/components/AutoSaveFloatingIndicator';
 
 export const metadata: Metadata = {
-  title: 'Infoziant iPOMS — Placement Operations Management System',
+  title: 'Infoziant iPOMS — Placement Operations & Management System',
   description: 'Enterprise Placement Operations, Corporate CRM & Analytics Portal for Infoziant',
 };
 

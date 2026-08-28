@@ -33,6 +33,8 @@ interface Props {
   selectedIds?: string[];
   onToggleSelectLead?: (id: string) => void;
   onToggleSelectAll?: () => void;
+  page?: number;
+  limit?: number;
 }
 
 // Auto-wrapping, auto-resizing text cell that centers text and wraps long values without clipping
@@ -89,35 +91,21 @@ function AutoWrapCell({
   );
 }
 
-// Helper to parse CTC number and unit (LPA vs / month)
-function parseCtc(rawCtc: string) {
-  if (!rawCtc || !rawCtc.trim()) {
-    return { value: '', unit: 'LPA' as 'LPA' | 'Month' };
+// Helper to parse and split composite CTC segments (e.g. "15k/month - Intern, 3.80 - 5.82 LPA")
+function parseCtcSegments(rawCtc: string): string[] {
+  if (!rawCtc || !rawCtc.trim()) return [];
+  const clean = rawCtc.trim();
+  // Split on commas or newlines if present
+  if (clean.includes(',')) {
+    return clean.split(',').map((s) => s.trim()).filter(Boolean);
   }
-  const str = rawCtc.trim();
-  const lower = str.toLowerCase();
-
-  if (
-    lower.includes('month') ||
-    lower.includes('/ mo') ||
-    lower.includes('pm') ||
-    lower.includes('per mo') ||
-    lower.includes('intern')
-  ) {
-    const val = str
-      .replace(/(?:\/|\bper\b)?\s*(?:month|mo|pm)\b/gi, '')
-      .replace(/^₹\s*/, '')
-      .trim();
-    return { value: val || str, unit: 'Month' as const };
-  } else if (lower.includes('lpa')) {
-    const val = str.replace(/\bLPA\b/gi, '').replace(/^₹\s*/, '').trim();
-    return { value: val || str, unit: 'LPA' as const };
+  if (clean.includes('\n')) {
+    return clean.split('\n').map((s) => s.trim()).filter(Boolean);
   }
-
-  return { value: str, unit: 'LPA' as const };
+  return [clean];
 }
 
-// Inline CTC Editor centered with unit toggle (LPA vs / month)
+// Inline CTC Editor centered with multiline support for combined /month + LPA
 function CtcTableCell({
   ctc,
   leadId,
@@ -127,79 +115,97 @@ function CtcTableCell({
   leadId: string;
   onSave: (id: string, field: 'ctc', value: string) => void;
 }) {
-  const parsed = parseCtc(ctc);
-  const [val, setVal] = useState(parsed.value);
-  const [unit, setUnit] = useState<'LPA' | 'Month'>(parsed.unit);
+  const [isEditing, setIsEditing] = useState(false);
+  const [val, setVal] = useState(ctc || '');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const p = parseCtc(ctc);
-    setVal(p.value);
-    setUnit(p.unit);
+    setVal(ctc || '');
   }, [ctc]);
 
-  const commitValue = (nextVal: string, nextUnit: 'LPA' | 'Month') => {
-    const trimmed = nextVal.trim();
-    if (!trimmed) {
-      if (ctc !== '') onSave(leadId, 'ctc', '');
-      return;
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
     }
-
-    if (
-      trimmed.toLowerCase().includes('lpa') ||
-      trimmed.toLowerCase().includes('month') ||
-      trimmed.toLowerCase().includes('best')
-    ) {
-      if (trimmed !== ctc) onSave(leadId, 'ctc', trimmed);
-      return;
-    }
-
-    const formatted = nextUnit === 'LPA' ? `${trimmed} LPA` : `₹${trimmed} / month`;
-    if (formatted !== ctc) {
-      onSave(leadId, 'ctc', formatted);
-    }
-  };
+  }, [isEditing]);
 
   const handleBlur = () => {
-    commitValue(val, unit);
+    setIsEditing(false);
+    const trimmed = val.trim();
+    if (trimmed !== (ctc || '').trim()) {
+      onSave(leadId, 'ctc', trimmed);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      e.currentTarget.blur();
+      handleBlur();
+    } else if (e.key === 'Escape') {
+      setIsEditing(false);
+      setVal(ctc || '');
     }
   };
 
-  const toggleUnit = () => {
-    const nextUnit = unit === 'LPA' ? 'Month' : 'LPA';
-    setUnit(nextUnit);
-    commitValue(val, nextUnit);
-  };
+  const segments = parseCtcSegments(ctc);
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center justify-center gap-1 mx-auto px-1">
+        <input
+          ref={inputRef}
+          type="text"
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          placeholder="e.g. 15k /month, 4-6 LPA"
+          className="bg-surface border-2 border-primary focus:ring-2 focus:ring-primary/20 px-2 py-1 rounded-lg text-xs font-bold text-fg outline-none w-full max-w-[200px] transition-all font-mono text-center shadow-md"
+        />
+      </div>
+    );
+  }
+
+  if (segments.length === 0) {
+    return (
+      <div
+        onClick={() => setIsEditing(true)}
+        className="cursor-pointer hover:bg-surface-sunken/80 px-2 py-1 rounded transition-colors"
+        title="Click to enter CTC"
+      >
+        <span className="text-fg-disabled italic font-normal text-xs">—</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex items-center justify-center gap-1.5 mx-auto">
-      <IndianRupee size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0 opacity-80" />
-      <input
-        type="text"
-        value={val}
-        onChange={(e) => setVal(e.target.value)}
-        onBlur={handleBlur}
-        onKeyDown={handleKeyDown}
-        placeholder={unit === 'LPA' ? 'e.g. 6.5' : 'e.g. 25,000'}
-        className="bg-transparent border border-transparent hover:border-border focus:border-primary focus:bg-surface-sunken px-1.5 py-0.5 rounded text-xs font-bold text-fg outline-none w-16 sm:w-20 transition-all font-mono text-center shadow-2xs"
-      />
-      {/* Unit switch button: LPA vs / month */}
-      <button
-        type="button"
-        onClick={toggleUnit}
-        title="Click to toggle unit between LPA (Full-time) and / month (Internship)"
-        className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer select-none active:scale-90 shrink-0 ${
-          unit === 'LPA'
-            ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20'
-            : 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/30 hover:bg-indigo-500/20'
-        }`}
-      >
-        {unit === 'LPA' ? 'LPA' : '/ month'}
-      </button>
+    <div
+      onClick={() => setIsEditing(true)}
+      className="flex flex-col items-center justify-center gap-1 py-1 px-1.5 rounded-lg hover:bg-surface-sunken/80 transition-all cursor-pointer group mx-auto"
+      title="Click to edit CTC / stipend"
+    >
+      {segments.map((seg, idx) => {
+        const lower = seg.toLowerCase();
+        const isIntern =
+          lower.includes('month') ||
+          lower.includes('intern') ||
+          lower.includes('/ mo') ||
+          lower.includes('pm') ||
+          lower.includes('stipend');
+
+        return (
+          <span
+            key={idx}
+            className={`inline-flex items-center justify-center text-[11px] font-bold font-mono px-2 py-0.5 rounded-md border shadow-2xs whitespace-nowrap transition-transform group-hover:scale-102 ${
+              isIntern
+                ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-500/40 ring-1 ring-indigo-400/20'
+                : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/40 ring-1 ring-emerald-400/20'
+            }`}
+          >
+            {seg}
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -212,6 +218,8 @@ export function ActiveLeadTable({
   selectedIds = [],
   onToggleSelectLead,
   onToggleSelectAll,
+  page = 1,
+  limit = 50,
 }: Props) {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [savedSuccessId, setSavedSuccessId] = useState<string | null>(null);
@@ -283,8 +291,7 @@ export function ActiveLeadTable({
               <th className="py-3 px-4 min-w-[180px] max-w-[240px] text-center border-r border-border/80">Role</th>
               <th className="py-3 px-3.5 min-w-[150px] text-center border-r border-border/80">CTC</th>
               <th className="py-3 px-3.5 min-w-[160px] text-center border-r border-border/80">Followup Month</th>
-              <th className="py-3 px-3.5 min-w-[150px] text-center border-r border-border/80">Academic Year</th>
-              <th className="py-3 px-2.5 w-10 text-center"></th>
+              <th className="py-3 px-3.5 min-w-[150px] text-center">Academic Year</th>
             </tr>
           </thead>
 
@@ -319,7 +326,7 @@ export function ActiveLeadTable({
 
                   {/* 1. S.No */}
                   <td className="py-2.5 px-3 text-center font-mono font-bold text-fg-subtle border-r border-border/60">
-                    {idx + 1}
+                    {(page - 1) * limit + idx + 1}
                   </td>
 
                   {/* 2. Company Name */}
@@ -365,28 +372,22 @@ export function ActiveLeadTable({
                   </td>
 
                   {/* 6. Academic Year */}
-                  <td className="py-2.5 px-3 text-center border-r border-border/60">
-                    <div className="flex justify-center items-center">
+                  <td className="py-2.5 px-3 text-center">
+                    <div className="flex justify-center items-center gap-1.5 relative">
                       <SmoothYearDropdown
                         value={lead.academic_year || '2027'}
                         onChange={(newYear) => {
                           handleFieldChange(lead._id, 'academic_year', newYear);
                         }}
                       />
-                    </div>
-                  </td>
-
-                  {/* Auto-save Indicator */}
-                  <td className="py-2.5 px-2 text-center">
-                    <div className="flex items-center justify-center min-w-[20px]">
                       {isSaving && (
-                        <span className="flex items-center text-[11px] text-primary font-bold animate-pulse" title="Saving changes…">
+                        <span className="absolute right-1 flex items-center text-[11px] text-primary font-bold animate-pulse" title="Saving changes…">
                           <Loader2 size={13} className="animate-spin" />
                         </span>
                       )}
 
                       {isSaved && (
-                        <span className="flex items-center text-[11px] text-emerald-600 dark:text-emerald-400 font-bold animate-in fade-in" title="Saved">
+                        <span className="absolute right-1 flex items-center text-[11px] text-emerald-600 dark:text-emerald-400 font-bold animate-in fade-in" title="Saved">
                           <CheckCircle2 size={13} />
                         </span>
                       )}

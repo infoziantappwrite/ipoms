@@ -1,20 +1,27 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Sparkles,
   Search,
   Plus,
   FileSpreadsheet,
+  FileText,
+  Image as ImageIcon,
+  Download,
+  ChevronDown,
   Trash2,
   X,
   RefreshCw,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { SmoothYearDropdown } from '@/components/ui/SmoothYearDropdown';
 import { SmoothLeadStatusDropdown } from '@/components/ui/SmoothLeadStatusDropdown';
 import { SmoothMonthDropdown } from '@/components/ui/SmoothMonthDropdown';
+import { SmoothExportDropdown } from '@/components/ui/SmoothExportDropdown';
 
 interface Stats {
   total: number;
@@ -35,6 +42,8 @@ interface Props {
   stats: Stats;
   onOpenAddModal: () => void;
   onExportExcel: () => void;
+  onExportPdf?: () => void;
+  onExportImage?: () => void;
   isExporting: boolean;
   onSyncTracker: () => void;
   isSyncing: boolean;
@@ -43,6 +52,10 @@ interface Props {
   selectedCount: number;
   onDeleteSelected: () => void;
   isDeletingSelected?: boolean;
+  page?: number;
+  totalPages?: number;
+  totalCount?: number;
+  onPageChange?: (page: number) => void;
 }
 
 export function ActiveLeadHeader({
@@ -57,6 +70,8 @@ export function ActiveLeadHeader({
   stats,
   onOpenAddModal,
   onExportExcel,
+  onExportPdf,
+  onExportImage,
   isExporting,
   onSyncTracker,
   isSyncing,
@@ -65,9 +80,13 @@ export function ActiveLeadHeader({
   selectedCount,
   onDeleteSelected,
   isDeletingSelected = false,
+  page = 1,
+  totalPages = 1,
+  totalCount,
+  onPageChange,
 }: Props) {
   return (
-    <header className="bg-surface border-b border-border px-6 py-3.5 space-y-3 text-fg">
+    <header className="sticky top-0 z-40 bg-surface/95 backdrop-blur-md border-b border-border px-6 py-3.5 space-y-3 text-fg shadow-xs">
       {/* ── Top Row: Title, Subtitle, Minimal KPI Badges & Sign Out ── */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
@@ -81,13 +100,40 @@ export function ActiveLeadHeader({
           </div>
         </div>
 
-        {/* ── Minimal KPI Badges Strip ── */}
+        {/* ── Minimal KPI Badges Strip & Top Pagination ── */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Total Companies */}
           <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-xl bg-surface-sunken border border-border shadow-2xs">
             <span className="text-[11px] font-semibold text-fg-subtle">Total:</span>
-            <span className="font-mono font-bold text-primary text-xs">{stats.total}</span>
+            <span className="font-mono font-bold text-primary text-xs">{totalCount !== undefined ? totalCount : stats.total}</span>
           </div>
+
+          {/* Top Pagination Navigation Bar */}
+          {totalPages > 1 && onPageChange && (
+            <div className="flex items-center gap-1 bg-surface-sunken px-1.5 py-0.5 rounded-xl border border-border shadow-2xs">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => onPageChange(page - 1)}
+                title="Previous Page"
+                className="w-7 h-7 rounded-lg bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
+              >
+                <ChevronLeft size={14} strokeWidth={2.25} />
+              </button>
+              <span className="text-[11px] font-mono font-bold text-fg px-2 select-none">
+                {page} / {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => onPageChange(page + 1)}
+                title="Next Page"
+                className="w-7 h-7 rounded-lg bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
+              >
+                <ChevronRight size={14} strokeWidth={2.25} />
+              </button>
+            </div>
+          )}
 
           <div className="ml-2 shrink-0">
             <UserSignOutButton />
@@ -134,20 +180,20 @@ export function ActiveLeadHeader({
 
         {/* Right Side: Action Buttons */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Sync Button with Hover Tooltip */}
+          {/* Sync Button */}
           <div className="relative group/sync shrink-0">
             <button
               type="button"
-              onClick={onSyncTracker}
               disabled={isSyncing}
-              className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-500/50 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50 ring-1 ring-indigo-400/30 dark:ring-indigo-400/20 whitespace-nowrap"
+              onClick={onSyncTracker}
+              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 hover:shadow-indigo-500/20 whitespace-nowrap"
               title="Datas will be synced from the daily tracker for the status follow, hiring and invite email"
               aria-label="Sync leads from Daily Tracker"
             >
               <RefreshCw
                 size={13}
                 strokeWidth={2.2}
-                className={`text-indigo-600 dark:text-indigo-400 transition-transform duration-500 shrink-0 ${
+                className={`text-white transition-transform duration-500 shrink-0 ${
                   isSyncing ? 'animate-spin' : 'group-hover/sync:rotate-180'
                 }`}
               />
@@ -163,16 +209,13 @@ export function ActiveLeadHeader({
             </div>
           </div>
 
-          {/* Export Excel */}
-          <button
-            type="button"
-            onClick={onExportExcel}
-            disabled={isExporting}
-            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 whitespace-nowrap shrink-0"
-          >
-            <FileSpreadsheet size={13} strokeWidth={2} className="shrink-0" />
-            <span>{isExporting ? 'Exporting…' : 'Export Excel'}</span>
-          </button>
+          {/* Solid Export Dropdown Menu (Excel, PDF, Image) using Body Portal */}
+          <SmoothExportDropdown
+            onExportExcel={onExportExcel}
+            onExportPdf={onExportPdf}
+            onExportImage={onExportImage}
+            isExporting={isExporting}
+          />
 
           {/* Delete Mode Toggle / Delete Selected Actions */}
           {!isDeleteMode ? (

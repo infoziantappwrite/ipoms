@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { LeadsHeader } from './components/LeadsHeader';
 import type { LeadsSummaryData } from './components/LeadsSummaryStrip';
 import { LeadsTabBar } from './components/LeadsTabBar';
@@ -9,10 +10,12 @@ import { AddLeadModal } from './components/AddLeadModal';
 import { CopyToJdModal } from './components/CopyToJdModal';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
-import { useToast } from '@/components/ui/Toast';
 import { getActiveCollege, setActiveCollege } from '@/lib/collegeSession';
+import { exportToXlsx } from '@/lib/exportExcel';
+import { useToast } from '@/components/ui/Toast';
 
 export default function DailyLeadsPage() {
+  const router = useRouter();
   const { toast } = useToast();
 
   // Date State (Defaults to today in YYYY-MM-DD)
@@ -258,6 +261,25 @@ export default function DailyLeadsPage() {
     }
   };
 
+  // ── 1-Click Move from Positives to JD Received
+  const handleMoveToJd = async (rowId: string) => {
+    try {
+      const res = await apiFetch(`/daily-leads/${rowId}/move-to-jd`, {
+        method: 'POST',
+      });
+      if (res.success) {
+        toast((res as any)?.message || 'Lead moved to JD Received successfully', 'success');
+        await loadLeads();
+        await loadSummary();
+        broadcastDailyLeadMutation();
+      } else {
+        toast((res as any)?.error?.message || 'Failed to move lead to JD', 'error');
+      }
+    } catch (err: any) {
+      toast(err?.message || 'Network error moving lead to JD', 'error');
+    }
+  };
+
   // ── Delete Single Row (Soft Delete)
   const handleDeleteRow = async (rowId: string) => {
     try {
@@ -352,46 +374,41 @@ export default function DailyLeadsPage() {
     }
   };
 
-  // ── Export CSV
-  const handleExportCsv = () => {
+  // ── Export XLSX
+  const handleExportXlsx = () => {
     if (leads.length === 0) {
       alert('No data to export.');
       return;
     }
 
-    const rows = leads.map((r, idx) => {
-      const base: any = {
-        'SI.NO': idx + 1,
-        'Time Stamp': r.event_time,
-        Date: r.lead_date ? new Date(r.lead_date).toISOString().split('T')[0] : '',
-        'Company Name': r.company_name,
-        Role: r.job_role,
-        CTC: r.ctc,
-        'Eligible Batch': r.eligible_batch,
-        Tab: r.lead_type === 'positive' ? 'Positives' : 'JD Received',
-      };
-      return base;
+    const headers = ['SI.NO', 'Time Stamp', 'Date', 'Company Name', 'Role', 'CTC', 'Eligible Batch', 'Lead Type'];
+    const rows = leads.map((r, idx) => [
+      idx + 1,
+      r.event_time || '',
+      r.lead_date ? new Date(r.lead_date).toISOString().split('T')[0] : '',
+      r.company_name || '',
+      r.job_role || '',
+      r.ctc || '',
+      r.eligible_batch || '',
+      r.lead_type === 'positive' ? 'Positives' : 'JD Received',
+    ]);
+
+    exportToXlsx(`Daily_Leads_${activeTab.toUpperCase()}_${selectedDate}`, {
+      name: activeTab === 'positive' ? 'Positives' : 'JD Received',
+      headers,
+      rows,
     });
+  };
 
-    const headers = Object.keys(rows[0]);
-    const csvContent = [
-      headers.join(','),
-      ...rows.map((row: any) =>
-        headers.map((h) => `"${String(row[h] || '').replace(/"/g, '""')}"`).join(',')
-      ),
-    ].join('\n');
+  // Trigger direct navigation to Report Builder when clicking PDF or Image from dropdown
+  const handleOpenPdfModal = () => {
+    const collegeQuery = getActiveCollege()?.id || 'all';
+    router.push(`/reports?template=weekly_placement&collegeId=${encodeURIComponent(collegeQuery)}`);
+  };
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute(
-      'download',
-      `Daily_Leads_${activeTab.toUpperCase()}_${selectedDate}.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleOpenImageModal = () => {
+    const collegeQuery = getActiveCollege()?.id || 'all';
+    router.push(`/reports?template=weekly_placement&collegeId=${encodeURIComponent(collegeQuery)}`);
   };
 
   return (
@@ -403,7 +420,9 @@ export default function DailyLeadsPage() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onOpenAddModal={() => setIsAddModalOpen(true)}
-        onExportCsv={handleExportCsv}
+        onExportXlsx={handleExportXlsx}
+        onExportPdf={handleOpenPdfModal}
+        onExportImage={handleOpenImageModal}
         onRefresh={() => {
           loadLeads();
           loadSummary();
@@ -443,6 +462,7 @@ export default function DailyLeadsPage() {
             onBulkDelete={handleBulkDelete}
             onUpdateRow={handleUpdateRow}
             onDeleteRow={handleDeleteRow}
+            onMoveToJd={handleMoveToJd}
           />
         </div>
       </div>
@@ -477,6 +497,7 @@ export default function DailyLeadsPage() {
           }}
         />
       )}
+
     </div>
   );
 }

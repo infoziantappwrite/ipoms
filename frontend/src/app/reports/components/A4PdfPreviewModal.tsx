@@ -44,7 +44,7 @@ const COLLEGE_LOGO_MAP: Record<string, string> = {
   HITS: '/college-logos/hits.png',
   MAR: '/college-logos/mar ephream.png',
   NGCE: '/college-logos/narayanaguru.png',
-  ACEW: '/college-logos/annai mira.png',
+  ACEW: '/college-logos/ACEW.jfif',
   KCT: '/college-logos/kumaraguru.png',
   PSG: '/college-logos/psg.png',
   LICET: '/college-logos/layola.png',
@@ -192,10 +192,10 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
           {/* Main Paper Content */}
           <div className="space-y-6">
 
-            {/* 1. Header Branding Strip */}
+            {/* 1. Header Branding Strip with Infoziant Logo (Left), Centered Title & Subtitle, & Target College Logo (Right) */}
             <div className="flex items-center justify-between border-b-2 border-slate-300 pb-4 gap-4">
               {/* Left: Infoziant Corporate Header */}
-              <div className="flex items-center gap-3.5">
+              <div className="flex items-center shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/infoziant-head.png"
@@ -205,18 +205,20 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                     (e.target as HTMLImageElement).src = '/college-logos/Infozianthead.png';
                   }}
                 />
-                <div>
-                  <h1 className="text-lg font-bold text-blue-900 tracking-tight font-sans">
-                    {report.report_title || 'Weekly Placement Report'}
-                  </h1>
-                  <p className="text-xs font-semibold text-slate-700 mt-0.5">
-                    {collegeName}
-                  </p>
-                </div>
+              </div>
+
+              {/* Center: Main Title and Subtitle (Center-Aligned) */}
+              <div className="flex-1 text-center min-w-0 px-2 flex flex-col items-center justify-center">
+                <h1 className="text-lg font-bold text-blue-900 tracking-tight font-sans text-center">
+                  {report.report_title || (report.template_type === 'pending_tasks' ? 'Pending Tasks Action Report' : report.template_type === 'active_leads' ? 'Active Leads Pipeline Report' : 'Weekly Placement Report')}
+                </h1>
+                <p className="text-xs font-semibold text-slate-700 mt-0.5 text-center">
+                  {collegeName}
+                </p>
               </div>
 
               {/* Right: Target College Logo */}
-              <div className="flex items-center shrink-0">
+              <div className="flex items-center shrink-0 justify-end">
                 {!isConsolidated && !logoFailed ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -237,56 +239,25 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
 
             {/* 2. Report Metadata Ribbon */}
             <div className="flex items-center justify-center flex-wrap gap-4 sm:gap-8 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 font-medium text-center">
-              <div className="flex items-center gap-1.5">
-                <Calendar size={13} className="text-blue-700 shrink-0" />
-                <span>Period: <strong className="text-slate-900 font-semibold">{getCleanPeriod(report.report_period)}</strong></span>
-              </div>
-              <span className="text-slate-300">|</span>
+              {report.template_type !== 'pending_tasks' && (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <Calendar size={13} className="text-blue-700 shrink-0" />
+                    <span>Period: <strong className="text-slate-900 font-semibold">{getCleanPeriod(report.report_period)}</strong></span>
+                  </div>
+                  <span className="text-slate-300">|</span>
+                </>
+              )}
               <div className="flex items-center gap-1.5">
                 <Calendar size={13} className="text-slate-400 shrink-0" />
                 <span>Generated: <strong className="text-slate-900 font-semibold">{report.generated_date}</strong></span>
               </div>
             </div>
 
-            {/* 3. KPI Summary Strip */}
-            {report.included_sections?.kpi_summary && report.kpi_summary && (
+            {/* 3. KPI Summary Strip (Excluded for Pending Tasks) */}
+            {report.template_type !== 'pending_tasks' && report.included_sections?.kpi_summary && report.kpi_summary && (
               <>
-                {report.template_type === 'pending_tasks' || report.kpi_summary.total_pending_tasks !== undefined ? (
-                  <div className="grid grid-cols-8 gap-1.5">
-                    <div className="bg-slate-50 border border-blue-200 p-1.5 rounded-lg text-center">
-                      <span className="text-[9px] text-slate-500 font-semibold uppercase block">Total Tasks</span>
-                      <span className="text-xs font-bold font-mono text-blue-900">{report.kpi_summary.total_pending_tasks || 0}</span>
-                    </div>
-                    <div className="bg-emerald-50 border border-emerald-200 p-1.5 rounded-lg text-center">
-                      <span className="text-[9px] text-emerald-800 font-semibold uppercase block">DB Shared</span>
-                      <span className="text-xs font-bold font-mono text-emerald-700">{report.kpi_summary.db_shared_count || 0}</span>
-                    </div>
-                    <div className="bg-amber-50 border border-amber-200 p-1.5 rounded-lg text-center">
-                      <span className="text-[9px] text-amber-800 font-semibold uppercase block">DB Pending</span>
-                      <span className="text-xs font-bold font-mono text-amber-700">{report.kpi_summary.db_pending_count || 0}</span>
-                    </div>
-                    <div className="bg-cyan-50 border border-cyan-200 p-1.5 rounded-lg text-center">
-                      <span className="text-[9px] text-cyan-800 font-semibold uppercase block">JDs Received</span>
-                      <span className="text-xs font-bold font-mono text-cyan-700">{report.kpi_summary.jds_received || 0}</span>
-                    </div>
-                    <div className="bg-purple-50 border border-purple-200 p-1.5 rounded-lg text-center">
-                      <span className="text-[9px] text-purple-800 font-semibold uppercase block">Scheduled</span>
-                      <span className="text-xs font-bold font-mono text-purple-700">{report.kpi_summary.drives_scheduled || 0}</span>
-                    </div>
-                    <div className="bg-blue-50 border border-blue-200 p-1.5 rounded-lg text-center">
-                      <span className="text-[9px] text-blue-800 font-semibold uppercase block">In Progress</span>
-                      <span className="text-xs font-bold font-mono text-blue-700">{report.kpi_summary.drives_in_progress || 0}</span>
-                    </div>
-                    <div className="bg-orange-50 border border-orange-200 p-1.5 rounded-lg text-center">
-                      <span className="text-[9px] text-orange-800 font-semibold uppercase block">Awaiting TPO</span>
-                      <span className="text-xs font-bold font-mono text-orange-700">{report.kpi_summary.awaiting_tpo || 0}</span>
-                    </div>
-                    <div className="bg-rose-50 border border-rose-200 p-1.5 rounded-lg text-center">
-                      <span className="text-[9px] text-rose-800 font-semibold uppercase block">Awaiting HR</span>
-                      <span className="text-xs font-bold font-mono text-rose-700">{report.kpi_summary.awaiting_hr || 0}</span>
-                    </div>
-                  </div>
-                ) : report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined ? (
+                {report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined ? (
                   <div className="grid grid-cols-3 gap-2">
                     <div className="bg-slate-50 border border-blue-200 p-2 rounded-lg text-center">
                       <span className="text-[10px] text-slate-500 font-semibold uppercase block">Total Active Leads</span>
@@ -614,7 +585,7 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
           <div className="border-t border-slate-300 pt-4 mt-8 flex items-center justify-between text-[10px] text-slate-500">
             <div>
               <p className="font-medium text-slate-700">Prepared by Infoziant</p>
-              <p className="mt-0.5">© 2026 Infoziant IT Solutions Inc. All rights reserved.</p>
+              <p className="mt-0.5">© 2026 Infoziant. All rights reserved.</p>
             </div>
             <div className="font-mono text-slate-400 font-medium">
               Page 1 of 1

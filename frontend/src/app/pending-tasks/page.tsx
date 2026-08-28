@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { PendingTaskHeader } from './components/PendingTaskHeader';
 import { PendingTaskKpiCards } from './components/PendingTaskKpiCards';
 import { PendingTaskTable } from './components/PendingTaskTable';
@@ -12,8 +13,11 @@ import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
 import { getActiveCollege, setActiveCollege, resolveDefaultCollege } from '@/lib/collegeSession';
 import { College } from '@/components/CollegeSelector';
+import { exportToXlsx } from '@/lib/exportExcel';
 
 export default function PendingTasksPage() {
+  const router = useRouter();
+
   // ── College State (Active College from Session / Dropdown)
   const [selectedCollegeId, setSelectedCollegeId] = useState<string>(() => {
     return getActiveCollege().id || '';
@@ -296,8 +300,8 @@ export default function PendingTasksPage() {
     }
   };
 
-  // ── Export Table to CSV
-  const handleExportCsv = () => {
+  // ── Export Table to XLSX
+  const handleExportXlsx = () => {
     if (tasks.length === 0) {
       alert('No data available to export.');
       return;
@@ -314,31 +318,33 @@ export default function PendingTasksPage() {
       'Remarks',
     ];
 
-    const csvRows = tasks.map((t, idx) => [
+    const rows = tasks.map((t, idx) => [
       t.serial_no || idx + 1,
-      `"${(t.company_name || '').replace(/"/g, '""')}"`,
+      t.company_name || '',
       t.jd_received_date ? new Date(t.jd_received_date).toLocaleDateString('en-IN') : '',
       t.db_shared_date ? new Date(t.db_shared_date).toLocaleDateString('en-IN') : '',
-      `"${(t.current_status || '').replace(/"/g, '""')}"`,
-      `"${(t.action_to_be_taken || '').replace(/"/g, '""')}"`,
+      t.current_status || '',
+      t.action_to_be_taken || '',
       t.drive_date ? new Date(t.drive_date).toLocaleDateString('en-IN') : '',
-      `"${(t.remarks || '').replace(/"/g, '""')}"`,
+      t.remarks || '',
     ]);
 
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...csvRows.map((e) => e.join(','))].join('\n');
+    exportToXlsx(`Pending_Tasks_${(selectedCollegeName || 'All_Colleges').replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}`, {
+      name: 'Pending Tasks',
+      headers,
+      rows,
+    });
+  };
 
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute(
-      'download',
-      `Pending_Tasks_${selectedCollegeName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`
-    );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // Trigger direct navigation to Report Builder when clicking PDF or Image from dropdown
+  const handleOpenPdfModal = () => {
+    const collegeQuery = selectedCollegeId || 'all';
+    router.push(`/reports?template=pending_tasks&collegeId=${encodeURIComponent(collegeQuery)}`);
+  };
+
+  const handleOpenImageModal = () => {
+    const collegeQuery = selectedCollegeId || 'all';
+    router.push(`/reports?template=pending_tasks&collegeId=${encodeURIComponent(collegeQuery)}`);
   };
 
   const selectedTasks = tasks.filter((t) => selectedIds.includes(t._id));
@@ -361,7 +367,9 @@ export default function PendingTasksPage() {
           loadTasks();
           loadKpi();
         }}
-        onExportCsv={handleExportCsv}
+        onExportXlsx={handleExportXlsx}
+        onExportPdf={handleOpenPdfModal}
+        onExportImage={handleOpenImageModal}
         loading={loading}
       />
 
@@ -425,6 +433,7 @@ export default function PendingTasksPage() {
         itemCount={isBulkDelete ? selectedIds.length : 1}
         loading={deleting}
       />
+
     </div>
   );
 }

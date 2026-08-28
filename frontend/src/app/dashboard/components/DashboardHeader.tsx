@@ -17,6 +17,7 @@ import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { DashboardAmbientScene } from '@/components/dashboard/DashboardAmbientScene';
 import { readSessionUser, roleOf, updateSessionUser, type SessionUser } from '@/lib/session';
 import { apiFetch } from '@/lib/api';
+import { initialsFor } from '@/lib/initials';
 
 export type DashboardRole = 'coordinator' | 'team_leader' | 'admin';
 
@@ -155,13 +156,7 @@ export function DashboardHeader() {
   const PeriodIcon = PERIOD_ICON[period] || Sun;
 
   const fullName = user?.full_name || 'Placement Coordinator';
-  const initials = fullName
-    .split(' ')
-    .filter(Boolean)
-    .map((n) => n[0])
-    .join('')
-    .substring(0, 2)
-    .toUpperCase() || 'PC';
+  const initials = initialsFor(fullName);
 
   // Format today's date
   const todayFormatted = new Intl.DateTimeFormat('en-IN', {

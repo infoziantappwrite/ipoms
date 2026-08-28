@@ -7,6 +7,7 @@ import {
   Trash2,
   RefreshCw,
   Download,
+  FileSpreadsheet,
   Search,
   CheckCircle2,
   Clock,
@@ -18,6 +19,7 @@ import {
 import { CollegeSelector, College } from '@/components/CollegeSelector';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { AnimatedTrashIcon } from '@/components/icons/AnimatedIcons';
+import { SmoothExportDropdown } from '@/components/ui/SmoothExportDropdown';
 import { apiFetch } from '@/lib/api';
 
 interface Props {
@@ -32,7 +34,10 @@ interface Props {
   onEditSelected?: () => void;
   onDeleteSelected: () => void;
   onRefresh: () => void;
-  onExportCsv: () => void;
+  onExportXlsx: () => void;
+  onExportPdf?: () => void;
+  onExportImage?: () => void;
+  isExporting?: boolean;
   loading: boolean;
 }
 
@@ -48,7 +53,10 @@ export function PendingTaskHeader({
   onEditSelected,
   onDeleteSelected,
   onRefresh,
-  onExportCsv,
+  onExportXlsx,
+  onExportPdf,
+  onExportImage,
+  isExporting = false,
   loading,
 }: Props) {
   const [selectedCollegeObj, setSelectedCollegeObj] = useState<College | null>(null);
@@ -69,7 +77,7 @@ export function PendingTaskHeader({
   }, [selectedCollegeId]);
 
   return (
-    <header className="bg-surface border-b border-border px-6 py-4 space-y-3 shadow-xs text-fg">
+    <header className="sticky top-0 z-40 bg-surface/95 backdrop-blur-md border-b border-border px-6 py-4 space-y-3 shadow-xs text-fg">
       {/* ── Top Row: Header Info, College Logo, Top-Right Sign Out ── */}
       <div className="flex items-center justify-between gap-4">
         {/* Left: Title & College-Wise Tracker Badge */}
@@ -177,25 +185,22 @@ export function PendingTaskHeader({
             </button>
           )}
 
-          {/* Export CSV */}
-          <button
-            type="button"
-            onClick={onExportCsv}
-            title="Export tasks to CSV"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-fg bg-surface hover:bg-surface-raised border border-border rounded-lg shadow-2xs transition-colors cursor-pointer"
-          >
-            <Download size={14} className="text-fg-subtle" />
-            <span className="hidden sm:inline">Export</span>
-          </button>
+          {/* Solid Export Dropdown Menu (Excel, PDF, Image) */}
+          <SmoothExportDropdown
+            onExportExcel={onExportXlsx}
+            onExportPdf={onExportPdf}
+            onExportImage={onExportImage}
+            isExporting={isExporting}
+          />
 
-          {/* + Add Task Button */}
+          {/* + Add Button */}
           <button
             type="button"
             onClick={onOpenAddModal}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-primary hover:bg-primary-hover border border-primary/40 rounded-lg shadow-2xs transition-colors cursor-pointer"
           >
             <Plus size={15} strokeWidth={2.5} />
-            <span>Add Task</span>
+            <span>Add</span>
           </button>
         </div>
       </div>

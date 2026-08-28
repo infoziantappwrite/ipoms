@@ -6,7 +6,7 @@ import { SmoothLeadStatusDropdown, LeadStatus } from '@/components/ui/SmoothLead
 import { SmoothMonthDropdown } from '@/components/ui/SmoothMonthDropdown';
 import { SmoothYearDropdown } from '@/components/ui/SmoothYearDropdown';
 
-type CtcUnit = 'LPA' | 'Month';
+type CtcUnit = 'LPA' | 'Month' | 'Both';
 
 interface Props {
   isOpen: boolean;
@@ -34,21 +34,17 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
 
   if (!isOpen) return null;
 
-  // Handle number & decimal formatting according to selected unit
   const handleCtcChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    if (ctcUnit === 'LPA') {
-      // Allow only numbers and a single decimal point (e.g. 3, 3.5, 12.25)
-      const sanitized = raw.replace(/[^0-9.]/g, '');
-      const parts = sanitized.split('.');
-      if (parts.length > 2) {
-        setCtcValue(parts[0] + '.' + parts.slice(1).join(''));
-      } else {
-        setCtcValue(sanitized);
-      }
+    if (ctcUnit === 'Both') {
+      setCtcValue(raw);
+    } else if (ctcUnit === 'LPA') {
+      // Allow only numbers and a single decimal point or ranges (e.g. 3.5, 3.80 - 5.82)
+      const sanitized = raw.replace(/[^0-9.\-\s]/g, '');
+      setCtcValue(sanitized);
     } else {
-      // Month: Allow only whole numbers and commas (e.g. 15000 or 15,325)
-      const sanitized = raw.replace(/[^0-9,]/g, '');
+      // Month: Allow numbers, k, and commas (e.g. 15k, 15000)
+      const sanitized = raw.replace(/[^0-9,kK\-\s]/g, '');
       setCtcValue(sanitized);
     }
   };
@@ -63,10 +59,12 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
     // Format CTC based on unit
     let formattedCtc = '';
     if (ctcValue.trim()) {
-      if (ctcUnit === 'LPA') {
-        formattedCtc = `${ctcValue.trim()} LPA`;
+      if (ctcUnit === 'Both') {
+        formattedCtc = ctcValue.trim();
+      } else if (ctcUnit === 'LPA') {
+        formattedCtc = ctcValue.toLowerCase().includes('lpa') ? ctcValue.trim() : `${ctcValue.trim()} LPA`;
       } else {
-        formattedCtc = `₹${ctcValue.trim()} / month`;
+        formattedCtc = ctcValue.toLowerCase().includes('month') ? ctcValue.trim() : `${ctcValue.trim()} / month`;
       }
     }
 
@@ -161,7 +159,7 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-bold text-fg">CTC (₹)</label>
                 
-                {/* Unit Switch: LPA vs / Month (Internship) */}
+                {/* Unit Switch: LPA vs / Month (Internship) vs Both */}
                 <div className="inline-flex items-center bg-surface-sunken border border-border p-0.5 rounded-lg text-[10px] font-bold shadow-2xs">
                   <button
                     type="button"
@@ -169,7 +167,7 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
                       setCtcUnit('LPA');
                       setCtcValue('');
                     }}
-                    className={`px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
+                    className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
                       ctcUnit === 'LPA'
                         ? 'bg-primary text-white shadow-xs'
                         : 'text-fg-subtle hover:text-fg'
@@ -183,7 +181,7 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
                       setCtcUnit('Month');
                       setCtcValue('');
                     }}
-                    className={`px-2.5 py-0.5 rounded-md transition-all cursor-pointer ${
+                    className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
                       ctcUnit === 'Month'
                         ? 'bg-primary text-white shadow-xs'
                         : 'text-fg-subtle hover:text-fg'
@@ -192,6 +190,21 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
                   >
                     / Month
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCtcUnit('Both');
+                      setCtcValue('');
+                    }}
+                    className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
+                      ctcUnit === 'Both'
+                        ? 'bg-primary text-white shadow-xs'
+                        : 'text-fg-subtle hover:text-fg'
+                    }`}
+                    title="Both Internship Stipend & Full-time LPA"
+                  >
+                    Both
+                  </button>
                 </div>
               </div>
 
@@ -199,18 +212,19 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
                 <IndianRupee size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500" />
                 <input
                   type="text"
-                  inputMode={ctcUnit === 'LPA' ? 'decimal' : 'numeric'}
                   value={ctcValue}
                   onChange={handleCtcChange}
                   placeholder={
-                    ctcUnit === 'LPA'
+                    ctcUnit === 'Both'
+                      ? 'e.g. 15k /month, 3.80 - 5.82 LPA'
+                      : ctcUnit === 'LPA'
                       ? 'e.g. 3.5, 6, 12.5 (decimals allowed)'
                       : 'e.g. 15,000, 25000 (Internship stipend)'
                   }
                   className="w-full bg-surface-sunken border border-border rounded-xl pl-9 pr-20 py-2 text-xs text-fg placeholder:text-fg-disabled outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-2xs font-semibold"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-fg-subtle bg-surface px-1.5 py-0.5 rounded-md border border-border/50 pointer-events-none select-none">
-                  {ctcUnit === 'LPA' ? 'LPA' : '/ Month'}
+                  {ctcUnit === 'Both' ? 'Both' : ctcUnit === 'LPA' ? 'LPA' : '/ Month'}
                 </span>
               </div>
             </div>
@@ -252,7 +266,7 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
               className="w-full sm:w-auto px-6 py-2 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
             >
               <Plus size={14} strokeWidth={2.5} />
-              <span>{submitting ? 'Saving…' : 'Add Active Lead'}</span>
+              <span>{submitting ? 'Saving…' : 'Add'}</span>
             </button>
           </div>
         </form>

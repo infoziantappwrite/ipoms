@@ -83,15 +83,25 @@ export function EditCompanyModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!companyName.trim()) {
-      alert('Company Name is required');
+      alert('Company Name is mandatory.');
+      return;
+    }
+    if (!jobRole.trim()) {
+      alert('Job Role is mandatory.');
+      return;
+    }
+    if (!ctcValue.trim()) {
+      alert('CTC is mandatory.');
+      return;
+    }
+    if (!currentStatusText.trim()) {
+      alert('Current Status Remarks & Notes is mandatory.');
       return;
     }
 
-    const formattedCtc = ctcValue.trim()
-      ? (ctcValue.includes('LPA') || ctcValue.toLowerCase().includes('month')
-          ? ctcValue.trim()
-          : `${ctcValue.trim()} ${ctcUnit}`)
-      : '';
+    const formattedCtc = ctcValue.includes('LPA') || ctcValue.toLowerCase().includes('month')
+      ? ctcValue.trim()
+      : `${ctcValue.trim()} ${ctcUnit}`;
 
     setLoading(true);
     triggerHaptic('medium');
@@ -191,7 +201,7 @@ export function EditCompanyModal({
           {/* Job Role(s) */}
           <div>
             <label className="block text-fg font-semibold mb-1.5">
-              Job Role(s) <span className="text-fg-subtle font-normal">(comma-separated for multi-roles)</span>
+              Job Role(s) <span className="text-rose-500">*</span> <span className="text-fg-subtle font-normal">(comma-separated for multi-roles)</span>
             </label>
             <input
               type="text"
@@ -205,10 +215,13 @@ export function EditCompanyModal({
 
           {/* CTC Offered with Unit Switcher */}
           <div>
-            <label className="block text-fg font-semibold mb-1.5">CTC Offered</label>
+            <label className="block text-fg font-semibold mb-1.5">
+              CTC Offered <span className="text-rose-500">*</span>
+            </label>
             <div className="flex items-center gap-2">
               <input
                 type="text"
+                required
                 value={ctcValue}
                 onChange={(e) => setCtcValue(e.target.value)}
                 placeholder={ctcUnit === 'LPA' ? 'e.g. 6.5 or 5 - 8' : 'e.g. 15,000 or 25k'}
@@ -277,8 +290,7 @@ export function EditCompanyModal({
                 title="Eligible Graduating Batch"
                 options={BATCH_YEARS.map((year) => ({
                   value: year,
-                  label: `Batch ${year}`,
-                  badge: year,
+                  label: year,
                 }))}
               />
             </div>
@@ -342,9 +354,12 @@ export function EditCompanyModal({
 
           {/* Current Status Remarks */}
           <div>
-            <label className="block text-fg font-semibold mb-1.5">Current Status Remarks & Notes</label>
+            <label className="block text-fg font-semibold mb-1.5">
+              Current Status Remarks & Notes <span className="text-rose-500">*</span>
+            </label>
             <textarea
               rows={3}
+              required
               value={currentStatusText}
               onChange={(e) => setCurrentStatusText(e.target.value)}
               placeholder="e.g. Invite email sent (invite mail), awaiting JD from HR, drive scheduled for next Monday"

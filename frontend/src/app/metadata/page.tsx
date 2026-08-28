@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { MetadataHeader } from './components/MetadataHeader';
 import { MetadataTable } from './components/MetadataTable';
 import { ContactEditModal } from './components/ContactEditModal';
@@ -8,8 +9,12 @@ import { DuplicateWarningModal } from './components/DuplicateWarningModal';
 import { BulkPasteModal } from './components/BulkPasteModal';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { exportToXlsx } from '@/lib/exportExcel';
+import { useToast } from '@/components/ui/Toast';
 
 export default function MetadataPage() {
+  const router = useRouter();
+  const { toast } = useToast();
   const [companies, setCompanies] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(1);
@@ -17,6 +22,9 @@ export default function MetadataPage() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [isRecycleBin, setIsRecycleBin] = useState<boolean>(false);
+  const [isRecent, setIsRecent] = useState<boolean>(false);
+  const [fromSno, setFromSno] = useState<number | null>(null);
+  const [toSno, setToSno] = useState<number | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Modals state
@@ -36,6 +44,9 @@ export default function MetadataPage() {
       let endpoint = `/metadata?page=${page}&limit=50&is_deleted=${isRecycleBin}`;
       if (searchQuery.trim()) endpoint += `&q=${encodeURIComponent(searchQuery.trim())}`;
       if (selectedType !== 'all') endpoint += `&type=${selectedType}`;
+      if (isRecent) endpoint += '&recent=true';
+      if (fromSno !== null && fromSno > 0) endpoint += `&from_sno=${fromSno}`;
+      if (toSno !== null && toSno > 0) endpoint += `&to_sno=${toSno}`;
 
       const res = await apiFetch<any>(endpoint);
       if (res.success && res.data) {
@@ -50,10 +61,38 @@ export default function MetadataPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, searchQuery, selectedType, isRecycleBin]);
+  }, [page, searchQuery, selectedType, isRecycleBin, isRecent, fromSno, toSno]);
 
   useEffect(() => {
     loadMetadata();
+  }, [loadMetadata]);
+
+  // ── Global Save & Sync Shortcut (Ctrl+S / Cmd+S) ──
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+        loadMetadata();
+        window.dispatchEvent(new CustomEvent('ipoms_trigger_autosave_banner'));
+      }
+    };
+
+    const handleGlobalTrigger = (e: any) => {
+      if (e.detail?.pathname?.includes('/metadata')) {
+        loadMetadata();
+        window.dispatchEvent(new CustomEvent('ipoms_trigger_autosave_banner'));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('ipoms_global_save_trigger' as any, handleGlobalTrigger);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('ipoms_global_save_trigger' as any, handleGlobalTrigger);
+    };
   }, [loadMetadata]);
 
   // Reset page to 1 on filter/search change
@@ -69,6 +108,18 @@ export default function MetadataPage() {
 
   const handleToggleRecycleBin = () => {
     setIsRecycleBin(!isRecycleBin);
+    setPage(1);
+  };
+
+  const handleRangeChange = (from: number | null, to: number | null) => {
+    setFromSno(from);
+    setToSno(to);
+    setPage(1);
+  };
+
+  const handleClearRange = () => {
+    setFromSno(null);
+    setToSno(null);
     setPage(1);
   };
 
@@ -153,7 +204,7 @@ export default function MetadataPage() {
     }
   };
 
-  // Export to CSV
+  // Export to XLSX
   const handleExport = () => {
     if (companies.length === 0) {
       alert('No data available to export');
@@ -162,26 +213,34 @@ export default function MetadataPage() {
 
     const headers = ['Company Name', 'HR Name', 'Designation', 'Primary Mobile', 'All Mobiles', 'Primary Email', 'Industry Type', 'Notes'];
     const rows = companies.map((c) => [
-      `"${c.company_name}"`,
-      `"${c.hr_name || ''}"`,
-      `"${c.hr_designation || ''}"`,
-      `"${c.primary_mobile || ''}"`,
-      `"${(c.mobile_numbers || []).join('; ')}"`,
-      `"${c.primary_email || ''}"`,
-      `"${c.company_type || ''}"`,
-      `"${(c.notes || '').replace(/"/g, '""')}"`,
+      c.company_name || '',
+      c.hr_name || '',
+      c.hr_designation || '',
+      c.primary_mobile || '',
+      (c.mobile_numbers || []).join('; '),
+      c.primary_email || '',
+      c.company_type || '',
+      c.notes || '',
     ]);
 
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `iPOMS_Master_Company_Metadata_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const rangeSuffix = (fromSno || toSno) ? `_SNo_${fromSno || 1}_to_${toSno || 'End'}` : '';
+    exportToXlsx(`iPOMS_Master_Company_Metadata${rangeSuffix}_${new Date().toISOString().slice(0, 10)}`, {
+      name: 'Master Companies',
+      headers,
+      rows,
+    });
   };
+
+  // Trigger direct navigation to Report Builder when clicking PDF or Image from dropdown
+  const handleOpenPdfModal = () => {
+    router.push('/reports?template=weekly_placement');
+  };
+
+  const handleOpenImageModal = () => {
+    router.push('/reports?template=weekly_placement');
+  };
+
+  const isRangeActive = fromSno !== null || toSno !== null;
 
   return (
     <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
@@ -194,45 +253,57 @@ export default function MetadataPage() {
         onTypeChange={handleTypeChange}
         isRecycleBin={isRecycleBin}
         onToggleRecycleBin={handleToggleRecycleBin}
+        isRecent={isRecent}
+        onToggleRecent={() => {
+          setIsRecent(!isRecent);
+          setPage(1);
+        }}
+        fromSno={fromSno}
+        toSno={toSno}
+        onApplyRange={handleRangeChange}
+        onClearRange={handleClearRange}
         onOpenAddModal={handleOpenAdd}
         onOpenBulkPasteModal={() => setShowBulkPasteModal(true)}
         onExport={handleExport}
+        onExportPdf={handleOpenPdfModal}
+        onExportImage={handleOpenImageModal}
         totalCount={totalCount}
+        page={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
       />
 
       {/* ── Main Working Table View ───────────────────────────────────────── */}
       <div className="p-6 max-w-7xl mx-auto w-full space-y-4 flex-1">
-        {/* Top Pagination Pair */}
-        {totalPages > 1 && !loading && (
-          <div className="flex items-center justify-between px-2 text-xs text-fg-muted">
-            <span className="text-[11px]">
-              Page <strong className="text-fg">{page}</strong> of <strong className="text-fg">{totalPages}</strong> ({totalCount.toLocaleString()} companies)
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
-                title="Previous Page"
-                className="w-8 h-8 rounded-xl bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
-              >
-                <ChevronLeft size={16} strokeWidth={2.25} />
-              </button>
-              <span className="text-xs font-mono font-bold text-fg px-2.5 py-1 bg-surface border border-border rounded-lg shadow-2xs">
-                {page} / {totalPages}
+        {/* Active Range Highlight Banner */}
+        {isRangeActive && (
+          <div className="bg-primary/10 border border-primary/30 rounded-2xl p-3 px-4.5 flex items-center justify-between gap-4 text-xs shadow-xs animate-in fade-in duration-200">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
               </span>
-              <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => setPage(page + 1)}
-                title="Next Page"
-                className="w-8 h-8 rounded-xl bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
-              >
-                <ChevronRight size={16} strokeWidth={2.25} />
-              </button>
+              <span className="font-bold text-fg">
+                Target Calling Range Active:
+              </span>
+              <span className="font-mono text-primary font-bold px-2.5 py-0.5 bg-primary/15 rounded-lg border border-primary/30 text-xs">
+                S.No #{fromSno ?? 1} — #{toSno ?? 'End'}
+              </span>
+              <span className="text-fg-subtle text-xs">
+                ({totalCount.toLocaleString()} {totalCount === 1 ? 'company contact' : 'company contacts'} ready in batch)
+              </span>
             </div>
+            <button
+              type="button"
+              onClick={handleClearRange}
+              className="text-xs text-rose-500 hover:text-rose-600 font-bold hover:underline cursor-pointer flex items-center gap-1 bg-surface px-2.5 py-1 rounded-lg border border-border hover:border-rose-500/40 transition-colors shrink-0 shadow-2xs"
+            >
+              Reset to Full Directory
+            </button>
           </div>
         )}
+
+
 
         {loading ? (
           <div className="p-12 text-center text-fg-subtle italic text-xs">
@@ -251,37 +322,7 @@ export default function MetadataPage() {
           />
         )}
 
-        {/* Bottom Pagination Bar with Minimal Icon-Only Buttons */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-2 pt-2 text-xs text-fg-subtle">
-            <span>
-              Showing Page <strong>{page}</strong> of <strong>{totalPages}</strong> ({totalCount.toLocaleString()} total contacts)
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
-                title="Previous Page"
-                className="w-8 h-8 rounded-xl bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
-              >
-                <ChevronLeft size={16} strokeWidth={2.25} />
-              </button>
-              <span className="text-xs font-mono font-bold text-fg px-2.5 py-1 bg-surface border border-border rounded-lg shadow-2xs">
-                {page} / {totalPages}
-              </span>
-              <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => setPage(page + 1)}
-                title="Next Page"
-                className="w-8 h-8 rounded-xl bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
-              >
-                <ChevronRight size={16} strokeWidth={2.25} />
-              </button>
-            </div>
-          </div>
-        )}
+
       </div>
 
       {/* ── Modals ────────────────────────────────────────────────────────── */}

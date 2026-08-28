@@ -49,7 +49,7 @@ export function SplashScreen({ onSkip }: Props) {
             iPOMS
           </h1>
           <p className="font-display text-xs font-semibold text-slate-500 tracking-normal whitespace-nowrap">
-            Infoziant Placement Operations Management System
+            Infoziant Placement Operations & Management System
           </p>
         </div>
       </div>

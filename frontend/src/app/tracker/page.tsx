@@ -396,7 +396,7 @@ export default function DailyTrackerPage() {
     <div className="min-h-screen bg-background text-fg flex flex-col font-sans">
 
       {/* ── Top Section: Title & Top-Right Header ───────────────────────── */}
-      <header className="bg-surface border-b border-border px-6 py-4 space-y-3 shrink-0 shadow-xs text-fg">
+      <header className="sticky top-0 z-40 bg-surface/95 backdrop-blur-md border-b border-border px-6 py-4 space-y-3 shrink-0 shadow-xs text-fg">
         <div className="flex items-center justify-between gap-4">
           {/* Left: Tracker title + date */}
           <div>
@@ -416,6 +416,11 @@ export default function DailyTrackerPage() {
                 </span>
               )}
             </div>
+            <p className="text-xs text-fg-subtle mt-0.5">
+              {isHistoryMode
+                ? `Viewing archived records for ${historyDisplayDate}`
+                : `Active Session: ${sessionDate ? new Date(sessionDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : todayDisplay} • Auto-resets at 6:00 AM IST`}
+            </p>
           </div>
 
           {/* Right: Back to Today (in history) + Selected College Logo Badge + Sign Out */}

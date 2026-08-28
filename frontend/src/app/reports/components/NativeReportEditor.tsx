@@ -43,7 +43,7 @@ const COLLEGE_LOGO_MAP: Record<string, string> = {
   HITS: '/college-logos/hits.png',
   MAR: '/college-logos/mar ephream.png',
   NGCE: '/college-logos/narayanaguru.png',
-  ACEW: '/college-logos/annai mira.png',
+  ACEW: '/college-logos/ACEW.jfif',
   KCT: '/college-logos/kumaraguru.png',
   PSG: '/college-logos/psg.png',
   LICET: '/college-logos/layola.png',
@@ -147,40 +147,15 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       </head>
       <body>
         <table>
-          <tr><td colspan="8" class="header-title">${report.branding?.company_name || 'Infoziant IT Solutions'}</td></tr>
+          <tr><td colspan="8" class="header-title">${report.branding?.company_name || 'Infoziant'}</td></tr>
           <tr><td colspan="8" class="header-sub">${report.branding?.college_name || 'Partner Institutions'} — ${report.report_title}</td></tr>
-          <tr><td colspan="8" style="color:#64748b;">Period: ${getCleanPeriod(report.report_period)} | Generated: ${report.generated_date || ''}</td></tr>
+          <tr><td colspan="8" style="color:#64748b;">${report.template_type !== 'pending_tasks' ? `Period: ${getCleanPeriod(report.report_period)} | ` : ''}Generated: ${report.generated_date || ''}</td></tr>
           <tr><td colspan="8"></td></tr>
     `;
 
-    // KPI Summary
-    if (report.kpi_summary) {
-      if (report.template_type === 'pending_tasks' || report.kpi_summary.total_pending_tasks !== undefined) {
-        html += `
-          <tr><td colspan="8" class="sec-header">PENDING TASKS KPI SUMMARY</td></tr>
-          <tr>
-            <th>Total Tasks</th>
-            <th>DB Shared</th>
-            <th>DB Pending</th>
-            <th>JDs Received</th>
-            <th>Scheduled</th>
-            <th>In Progress</th>
-            <th>Awaiting TPO</th>
-            <th>Awaiting HR</th>
-          </tr>
-          <tr>
-            <td style="text-align:center; font-weight:bold;">${report.kpi_summary.total_pending_tasks || 0}</td>
-            <td style="text-align:center; color:#059669;">${report.kpi_summary.db_shared_count || 0}</td>
-            <td style="text-align:center; color:#d97706;">${report.kpi_summary.db_pending_count || 0}</td>
-            <td style="text-align:center;">${report.kpi_summary.jds_received || 0}</td>
-            <td style="text-align:center; color:#7c3aed;">${report.kpi_summary.drives_scheduled || 0}</td>
-            <td style="text-align:center; color:#2563eb;">${report.kpi_summary.drives_in_progress || 0}</td>
-            <td style="text-align:center; color:#ea580c;">${report.kpi_summary.awaiting_tpo || 0}</td>
-            <td style="text-align:center; color:#e11d48;">${report.kpi_summary.awaiting_hr || 0}</td>
-          </tr>
-          <tr><td colspan="8"></td></tr>
-        `;
-      } else if (report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined) {
+    // KPI Summary (Excluded for Pending Tasks Report)
+    if (report.kpi_summary && report.template_type !== 'pending_tasks') {
+      if (report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined) {
         html += `
           <tr><td colspan="8" class="sec-header">ACTIVE LEADS KPI SUMMARY</td></tr>
           <tr>
@@ -427,84 +402,161 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
     if (!el) return;
 
     setExportingImage(true);
+    const sanitizedTitle = (report.report_title || 'Weekly_Placement_Report')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .replace(/_+/g, '_');
+
     try {
       const width = el.scrollWidth || el.offsetWidth || 800;
       const height = el.scrollHeight || el.offsetHeight || 1100;
+      // High-resolution 3x Retina / 300 DPI multiplier
+      const scale = 3;
 
       const clone = el.cloneNode(true) as HTMLElement;
       
-      // Replace input values with clean text spans in clone
+      // Replace input & textarea values with static styled text spans
       const inputs = el.querySelectorAll('input, textarea');
       const cloneInputs = clone.querySelectorAll('input, textarea');
       inputs.forEach((orig: any, idx: number) => {
         if (cloneInputs[idx]) {
           const span = document.createElement('span');
           span.textContent = orig.value || '';
-          span.style.fontWeight = window.getComputedStyle(orig).fontWeight;
-          span.style.color = window.getComputedStyle(orig).color;
-          span.style.fontSize = window.getComputedStyle(orig).fontSize;
+          span.style.fontWeight = window.getComputedStyle(orig).fontWeight || 'bold';
+          span.style.color = window.getComputedStyle(orig).color || '#0f172a';
+          span.style.fontSize = window.getComputedStyle(orig).fontSize || '16px';
+          span.style.display = 'inline-block';
+          span.style.textAlign = 'center';
+          span.style.width = '100%';
           cloneInputs[idx].parentNode?.replaceChild(span, cloneInputs[idx]);
         }
       });
+
+      // Ensure all embedded SVG elements have valid xmlns
+      const svgEls = clone.querySelectorAll('svg');
+      svgEls.forEach((s) => {
+        if (!s.getAttribute('xmlns')) {
+          s.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        }
+      });
+
+      // Convert all images to Base64 Data URLs so canvas is 100% untainted
+      const cloneImages = Array.from(clone.querySelectorAll('img'));
+      await Promise.all(
+        cloneImages.map(async (cloneImg) => {
+          try {
+            if (cloneImg.src && !cloneImg.src.startsWith('data:')) {
+              const res = await fetch(cloneImg.src);
+              const blob = await res.blob();
+              const reader = new FileReader();
+              const dataUrl = await new Promise<string>((resolve, reject) => {
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+              });
+              cloneImg.src = dataUrl;
+            }
+          } catch (imgErr) {
+            console.warn('Image inlining skipped:', imgErr);
+          }
+        })
+      );
 
       const htmlContent = new XMLSerializer().serializeToString(clone);
       const svgString = `
         <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
           <foreignObject width="100%" height="100%">
-            <div xmlns="http://www.w3.org/1999/xhtml" style="background:#ffffff; font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+            <div xmlns="http://www.w3.org/1999/xhtml" style="background:#ffffff; color:#0f172a; font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; -webkit-font-smoothing:antialiased;">
               ${htmlContent}
             </div>
           </foreignObject>
         </svg>
       `;
 
-      const img = new window.Image();
       const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-      const url = URL.createObjectURL(svgBlob);
+      const svgUrl = URL.createObjectURL(svgBlob);
+      const img = new window.Image();
 
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = width * 2;
-        canvas.height = height * 2;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.scale(2, 2);
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, width, height);
-          ctx.drawImage(img, 0, 0);
-
-          canvas.toBlob((blob) => {
-            if (blob) {
-              const pngUrl = URL.createObjectURL(blob);
-              const link = document.createElement('a');
-              link.href = pngUrl;
-              link.download = `${(report.report_title || 'Weekly_Report').replace(/\s+/g, '_')}.png`;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              URL.revokeObjectURL(pngUrl);
-            }
-          }, 'image/png');
-        }
-        URL.revokeObjectURL(url);
-        setExportingImage(false);
-      };
-
-      img.onerror = () => {
+      // Download helper strictly for PNG / JPEG
+      const triggerRasterDownload = (blobOrDataUrl: Blob | string, extension = 'png') => {
         const link = document.createElement('a');
-        link.href = url;
-        link.download = `${(report.report_title || 'Weekly_Report').replace(/\s+/g, '_')}.svg`;
+        if (typeof blobOrDataUrl === 'string') {
+          link.href = blobOrDataUrl;
+        } else {
+          link.href = URL.createObjectURL(blobOrDataUrl);
+        }
+        link.download = `${sanitizedTitle}.${extension}`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        setExportingImage(false);
+        if (typeof blobOrDataUrl !== 'string') {
+          URL.revokeObjectURL(link.href);
+        }
       };
 
-      img.src = url;
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(width * scale);
+          canvas.height = Math.round(height * scale);
+          const ctx = canvas.getContext('2d', { alpha: false });
+          if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.scale(scale, scale);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
+            ctx.drawImage(img, 0, 0);
+
+            // Export as Ultra High-Definition PNG (or fallback JPEG)
+            canvas.toBlob((blob) => {
+              if (blob) {
+                triggerRasterDownload(blob, 'png');
+              } else {
+                // Fallback to high quality JPEG DataURL
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.98);
+                triggerRasterDownload(dataUrl, 'jpg');
+              }
+              URL.revokeObjectURL(svgUrl);
+              setExportingImage(false);
+            }, 'image/png');
+          } else {
+            URL.revokeObjectURL(svgUrl);
+            setExportingImage(false);
+          }
+        } catch (canvasErr) {
+          console.error('Canvas processing error:', canvasErr);
+          // Fallback to direct canvas DataURL export
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = width * 2;
+            canvas.height = height * 2;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.scale(2, 2);
+              ctx.drawImage(img, 0, 0);
+              const dataUrl = canvas.toDataURL('image/png');
+              triggerRasterDownload(dataUrl, 'png');
+            }
+          } catch {
+            alert('High-resolution image generation encountered a browser canvas restriction. Please use Save PDF.');
+          }
+          URL.revokeObjectURL(svgUrl);
+          setExportingImage(false);
+        }
+      };
+
+      img.onerror = (e) => {
+        console.error('SVG rendering to raster image failed:', e);
+        URL.revokeObjectURL(svgUrl);
+        setExportingImage(false);
+        alert('Could not render high-resolution PNG image. Please use Save PDF to export.');
+      };
+
+      img.src = svgUrl;
     } catch (err) {
-      console.error('Image export failed:', err);
+      console.error('High-res image export failed:', err);
       setExportingImage(false);
-      alert('Could not export image. Please use Save PDF.');
+      alert('Could not export high-resolution image. Please use Save PDF.');
     }
   };
 
@@ -522,10 +574,10 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         className="printable-report-canvas bg-surface border border-border rounded-2xl shadow-xs p-8 space-y-6 text-fg print:w-full print:p-0 print:border-none print:shadow-none print:bg-white print:text-black"
       >
 
-        {/* 1. Header Branding Strip with Infoziant Logo (Left) & Target College Logo (Right) */}
+        {/* 1. Header Branding Strip with Infoziant Logo (Left), Centered Title & Subtitle, & Target College Logo (Right) */}
         <div className="flex items-center justify-between border-b-2 border-border print:border-slate-300 pb-4 gap-4">
-          {/* Left: Infoziant Logo & Report Title + College Name with Acronym */}
-          <div className="flex items-center gap-3.5">
+          {/* Left: Infoziant Logo */}
+          <div className="flex items-center shrink-0">
             {/* Smooth square white base for high contrast in dark mode */}
             <div className="bg-white rounded-xl p-1.5 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -538,21 +590,23 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                 }}
               />
             </div>
-            <div>
-              <input
-                type="text"
-                value={report.report_title || 'Weekly Report'}
-                onChange={(e) => setReport({ ...report, report_title: e.target.value })}
-                className="text-base sm:text-lg font-bold text-fg print:text-slate-900 bg-transparent border-b border-transparent hover:border-border focus:border-primary focus:bg-surface-sunken px-1 rounded transition-colors outline-none tracking-tight font-sans"
-              />
-              <p className="text-xs font-semibold text-fg-muted print:text-slate-700 mt-0.5 px-1">
-                {collegeName}
-              </p>
-            </div>
+          </div>
+
+          {/* Center: Main Title and Subtitle (Center-Aligned) */}
+          <div className="flex-1 text-center min-w-0 px-2 flex flex-col items-center justify-center">
+            <input
+              type="text"
+              value={report.report_title || (report.template_type === 'pending_tasks' ? 'Pending Tasks Action Report' : report.template_type === 'active_leads' ? 'Active Leads Pipeline Report' : 'Weekly Placement Report')}
+              onChange={(e) => setReport({ ...report, report_title: e.target.value })}
+              className="text-base sm:text-lg font-bold text-fg print:text-slate-900 bg-transparent border-b border-transparent hover:border-border focus:border-primary focus:bg-surface-sunken px-2 rounded transition-colors outline-none tracking-tight font-sans text-center w-full max-w-lg"
+            />
+            <p className="text-xs font-semibold text-fg-muted print:text-slate-700 mt-0.5 px-1 text-center">
+              {collegeName}
+            </p>
           </div>
 
           {/* Right: Target College Logo */}
-          <div className="flex items-center shrink-0">
+          <div className="flex items-center shrink-0 justify-end">
             {!isConsolidated && !logoFailed ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -573,56 +627,25 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
 
         {/* 2. Report Metadata Sub-bar */}
         <div className="flex items-center justify-center flex-wrap gap-4 sm:gap-8 text-xs text-fg-muted bg-surface-sunken border border-border rounded-xl px-4 py-2.5 font-medium print:bg-slate-50 print:text-slate-600 print:border-slate-200 text-center">
-          <div className="flex items-center gap-1.5">
-            <Calendar size={13} className="text-primary shrink-0" />
-            <span>Period: <strong className="text-fg print:text-slate-900 font-semibold">{getCleanPeriod(report.report_period)}</strong></span>
-          </div>
-          <span className="text-border">|</span>
+          {report.template_type !== 'pending_tasks' && (
+            <>
+              <div className="flex items-center gap-1.5">
+                <Calendar size={13} className="text-primary shrink-0" />
+                <span>Period: <strong className="text-fg print:text-slate-900 font-semibold">{getCleanPeriod(report.report_period)}</strong></span>
+              </div>
+              <span className="text-border">|</span>
+            </>
+          )}
           <div className="flex items-center gap-1.5">
             <Calendar size={13} className="text-fg-subtle print:text-slate-400 shrink-0" />
             <span>Generated Date: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_date}</strong></span>
           </div>
         </div>
 
-        {/* 3. Live KPI Summary Strip */}
-        {report.included_sections?.kpi_summary && report.kpi_summary && (
+        {/* 3. Live KPI Summary Strip (Excluded for Pending Tasks) */}
+        {report.template_type !== 'pending_tasks' && report.included_sections?.kpi_summary && report.kpi_summary && (
           <>
-            {report.template_type === 'pending_tasks' || report.kpi_summary.total_pending_tasks !== undefined ? (
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 pt-1">
-                <div className="bg-surface border border-blue-200 dark:border-blue-900/60 p-2 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Total Tasks</span>
-                  <span className="text-sm font-bold font-mono text-primary tabular-nums">{report.kpi_summary.total_pending_tasks}</span>
-                </div>
-                <div className="bg-surface border border-emerald-200/80 dark:border-emerald-900/60 p-2 rounded-xl text-center shadow-2xs bg-emerald-50/20 dark:bg-emerald-950/20">
-                  <span className="text-micro text-emerald-700 dark:text-emerald-400 font-semibold uppercase block">DB Shared</span>
-                  <span className="text-sm font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums">{report.kpi_summary.db_shared_count || 0}</span>
-                </div>
-                <div className="bg-surface border border-amber-200/80 dark:border-amber-900/60 p-2 rounded-xl text-center shadow-2xs bg-amber-50/20 dark:bg-amber-950/20">
-                  <span className="text-micro text-amber-700 dark:text-amber-400 font-semibold uppercase block">DB Pending</span>
-                  <span className="text-sm font-bold font-mono text-amber-700 dark:text-amber-400 tabular-nums">{report.kpi_summary.db_pending_count || 0}</span>
-                </div>
-                <div className="bg-surface border border-cyan-200/80 dark:border-cyan-900/60 p-2 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-fg-subtle font-semibold uppercase block">JDs Received</span>
-                  <span className="text-sm font-bold font-mono text-cyan-700 dark:text-cyan-400 tabular-nums">{report.kpi_summary.jds_received || 0}</span>
-                </div>
-                <div className="bg-surface border border-purple-200/80 dark:border-purple-900/60 p-2 rounded-xl text-center shadow-2xs bg-purple-50/20 dark:bg-purple-950/20">
-                  <span className="text-micro text-purple-700 dark:text-purple-400 font-semibold uppercase block">Scheduled</span>
-                  <span className="text-sm font-bold font-mono text-purple-700 dark:text-purple-400 tabular-nums">{report.kpi_summary.drives_scheduled || 0}</span>
-                </div>
-                <div className="bg-surface border border-blue-200/80 dark:border-blue-900/60 p-2 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-fg-subtle font-semibold uppercase block">In Progress</span>
-                  <span className="text-sm font-bold font-mono text-blue-700 dark:text-blue-400 tabular-nums">{report.kpi_summary.drives_in_progress || 0}</span>
-                </div>
-                <div className="bg-surface border border-orange-200/80 dark:border-orange-900/60 p-2 rounded-xl text-center shadow-2xs bg-orange-50/20 dark:bg-orange-950/20">
-                  <span className="text-micro text-orange-700 dark:text-orange-400 font-semibold uppercase block">Awaiting TPO</span>
-                  <span className="text-sm font-bold font-mono text-orange-700 dark:text-orange-400 tabular-nums">{report.kpi_summary.awaiting_tpo || 0}</span>
-                </div>
-                <div className="bg-surface border border-rose-200/80 dark:border-rose-900/60 p-2 rounded-xl text-center shadow-2xs bg-rose-50/20 dark:bg-rose-950/20">
-                  <span className="text-micro text-rose-700 dark:text-rose-400 font-semibold uppercase block">Awaiting HR</span>
-                  <span className="text-sm font-bold font-mono text-rose-700 dark:text-rose-400 tabular-nums">{report.kpi_summary.awaiting_hr || 0}</span>
-                </div>
-              </div>
-            ) : report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined ? (
+            {report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined ? (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
                 <div className="bg-surface border border-blue-200 dark:border-blue-900/60 p-2.5 rounded-xl text-center shadow-2xs">
                   <span className="text-micro text-fg-subtle font-semibold uppercase block">Total Active Leads</span>
@@ -1142,7 +1165,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         {/* 8. Footer */}
         <div className="border-t border-border pt-4 text-center text-xs text-fg-subtle">
           <p className="font-medium text-fg-muted">Prepared by Infoziant</p>
-          <p className="mt-0.5">© 2026 Infoziant IT Solutions Inc. All rights reserved.</p>
+          <p className="mt-0.5">© 2026 Infoziant. All rights reserved.</p>
         </div>
 
       </div>
@@ -1174,7 +1197,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           onClick={handleExportExcel}
           className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.98]"
         >
-          <FileSpreadsheet size={14} strokeWidth={2} aria-hidden /> Export Excel
+          <FileSpreadsheet size={14} strokeWidth={2} aria-hidden /> Export XLSX
         </button>
 
         {/* 4. Save Image (Infoziant Sky / Cyan) */}

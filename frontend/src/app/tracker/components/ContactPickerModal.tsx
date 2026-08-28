@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { CheckSquare, ChevronLeft, ChevronRight, Download, Loader2, Sparkles, X } from 'lucide-react';
+import { CheckSquare, ChevronLeft, ChevronRight, Download, Loader2, Sparkles, X, Search, Clock, Database } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { SnoRangeSelector } from '@/app/metadata/components/SnoRangeSelector';
 
 interface Company {
   _id: string;
+  serial_number?: number;
   company_name: string;
   hr_name: string;
   hr_designation?: string;
@@ -25,21 +27,54 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
+  const [masterTotal, setMasterTotal] = useState(3823);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [inputPage, setInputPage] = useState<string>('1');
+  const [fromSno, setFromSno] = useState<number | null>(null);
+  const [toSno, setToSno] = useState<number | null>(null);
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
+  const [isRecent, setIsRecent] = useState(false);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<NodeJS.Timeout>();
 
-  const fetchCompanies = useCallback(async (q: string, p: number) => {
+  useEffect(() => {
+    setInputPage(String(page));
+  }, [page]);
+
+  const handlePageInputSubmit = () => {
+    const p = parseInt(inputPage.trim(), 10);
+    if (!isNaN(p) && totalPages) {
+      const clamped = Math.max(1, Math.min(p, totalPages));
+      setPage(clamped);
+      setInputPage(String(clamped));
+    } else {
+      setInputPage(String(page));
+    }
+  };
+
+  const fetchCompanies = useCallback(async (q: string, p: number, recentFlag?: boolean, fSno?: number | null, tSno?: number | null) => {
     setLoading(true);
     try {
-      const res = await apiFetch(`/companies/search?q=${encodeURIComponent(q)}&page=${p}&limit=100`);
+      const useRecent = recentFlag !== undefined ? recentFlag : isRecent;
+      const recentParam = useRecent ? '&recent=true' : '';
+      const currentFrom = fSno !== undefined ? fSno : fromSno;
+      const currentTo = tSno !== undefined ? tSno : toSno;
+
+      let url = `/companies/search?q=${encodeURIComponent(q)}&page=${p}&limit=100${recentParam}`;
+      if (currentFrom !== null && currentFrom > 0) url += `&from_sno=${currentFrom}`;
+      if (currentTo !== null && currentTo > 0) url += `&to_sno=${currentTo}`;
+
+      const res = await apiFetch(url);
       if (res.success) {
         const data = res.data as any;
+        const count = data.pagination?.total || 0;
         setCompanies(data.companies || []);
-        setTotal(data.pagination?.total || 0);
+        setTotal(count);
+        if (!q && currentFrom === null && currentTo === null && !useRecent && count > 0) {
+          setMasterTotal(count);
+        }
         setTotalPages(data.pagination?.totalPages || 1);
       }
     } catch (e) {
@@ -47,22 +82,22 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isRecent, fromSno, toSno]);
 
   // Initial load + debounced search
   useEffect(() => {
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      fetchCompanies(query, 1);
+      fetchCompanies(query, 1, isRecent, fromSno, toSno);
       setPage(1);
       setLastClickedIndex(null);
     }, 250);
-  }, [query, fetchCompanies]);
+  }, [query, isRecent, fromSno, toSno, fetchCompanies]);
 
   useEffect(() => {
-    fetchCompanies(query, page);
+    fetchCompanies(query, page, isRecent, fromSno, toSno);
     setLastClickedIndex(null);
-  }, [page]);
+  }, [page, isRecent, fromSno, toSno]);
 
   useEffect(() => {
     setTimeout(() => searchRef.current?.focus(), 50);
@@ -134,46 +169,93 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
       <div className="bg-surface border border-border rounded-3xl w-full max-w-6xl h-[92vh] flex flex-col shadow-2xl overflow-hidden text-fg">
 
         {/* Top Header Bar */}
-        <div className="flex items-center justify-between px-6 py-4 bg-surface-sunken border-b border-border shrink-0">
+        <div className="flex items-center justify-between px-6 py-3.5 bg-surface-sunken border-b border-border shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-[inset_1px_1px_2px_rgba(0,0,0,0.04)]">
-              <Download size={18} strokeWidth={2} />
+            <div className="w-8 h-8 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-[inset_1px_1px_2px_rgba(0,0,0,0.04)]">
+              <Download size={16} strokeWidth={2} />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-fg tracking-tight">Load Today's Contacts</h2>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                  Read-Only Master Picker
-                </span>
-              </div>
-              <p className="text-xs text-fg-subtle mt-0.5">
-                Select company contacts to populate your active Daily Tracker workspace. Master records remain protected.
-              </p>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-fg tracking-tight">Load Today's Contacts</h2>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                Master Database Picker
+              </span>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="w-8 h-8 rounded-lg bg-surface hover:bg-surface-raised border border-border text-fg-subtle hover:text-fg flex items-center justify-center transition-all cursor-pointer shadow-sm"
-          >
-            <X size={16} strokeWidth={2} />
-          </button>
+
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                const next = !isRecent;
+                setIsRecent(next);
+                setPage(1);
+              }}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer active:scale-95 ${
+                isRecent
+                  ? 'bg-primary text-white border border-primary shadow-xs ring-1 ring-primary/30'
+                  : 'bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 hover:border-primary/40'
+              }`}
+              title={isRecent ? 'Switch back to all metadata from Serial Number 1' : 'Toggle to view recently added contacts'}
+            >
+              {isRecent ? (
+                <>
+                  <Database size={13} strokeWidth={2.25} />
+                  <span>Metadata</span>
+                </>
+              ) : (
+                <>
+                  <Clock size={13} strokeWidth={2.25} />
+                  <span>Recent Data</span>
+                </>
+              )}
+            </button>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="w-8 h-8 rounded-lg bg-surface hover:bg-surface-raised border border-border text-fg-subtle hover:text-fg flex items-center justify-center transition-all cursor-pointer shadow-sm"
+            >
+              <X size={16} strokeWidth={2} />
+            </button>
+          </div>
         </div>
 
         {/* Search & Selection Controls */}
-        <div className="px-6 py-3 bg-surface border-b border-border shrink-0 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="w-full sm:max-w-md">
-            <input
-              ref={searchRef}
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by company, HR name, mobile, or email…"
-              className="w-full bg-surface-sunken border border-border text-fg px-3.5 py-2 rounded-xl placeholder:text-fg-disabled text-xs shadow-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"
-            />
+        <div className="px-6 py-2.5 bg-surface border-b border-border shrink-0 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {/* Medium Sized Search Bar */}
+            <div className="relative w-full sm:w-64 max-w-xs flex items-center">
+              <Search size={14} className="absolute left-3 text-fg-disabled pointer-events-none" />
+              <input
+                ref={searchRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search contacts, HR, mobile…"
+                className="w-full bg-surface-sunken border border-border text-fg pl-9 pr-3 py-1.5 rounded-xl placeholder:text-fg-disabled text-xs shadow-xs focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+              />
+            </div>
+
+            {/* S.No Range Dropdown Selector */}
+            {!isRecent && (
+              <SnoRangeSelector
+                fromSno={fromSno}
+                toSno={toSno}
+                maxSno={masterTotal}
+                onApplyRange={(f, t) => {
+                  setFromSno(f);
+                  setToSno(t);
+                  setPage(1);
+                }}
+                onClearRange={() => {
+                  setFromSno(null);
+                  setToSno(null);
+                  setPage(1);
+                }}
+              />
+            )}
           </div>
 
-          {/* Quick Selection Actions & Top Pagination Pair */}
+          {/* Quick Selection Actions & Top Pagination with Jump Input */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="text-fg-muted font-medium mr-1 text-[11px]">
               {loading ? 'Searching…' : `${total.toLocaleString()} companies`}
@@ -185,35 +267,63 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
               Select All on Page ({companies.length})
             </button>
             <button
+              type="button"
+              disabled={selected.size === 0}
               onClick={handleDeselectAll}
-              className="px-2.5 py-1.5 rounded-lg bg-surface hover:bg-surface-raised border border-border text-fg-subtle hover:text-fg font-medium transition-all cursor-pointer text-[11px]"
+              className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-medium transition-all shadow-xs ${
+                selected.size === 0
+                  ? 'bg-surface/40 border-border/40 text-fg-disabled/40 cursor-not-allowed opacity-40'
+                  : 'bg-surface hover:bg-surface-raised border-border text-fg-subtle hover:text-fg cursor-pointer active:scale-95'
+              }`}
             >
               Deselect All
             </button>
 
-            {/* Top Pagination Icon Pair */}
+            {/* Top Pagination with Jump-to-Page Input */}
             {totalPages > 1 && (
               <div className="flex items-center gap-1 ml-2 pl-2 border-l border-border">
                 <button
                   type="button"
-                  disabled={page === 1}
+                  disabled={page <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   title="Previous Page"
-                  className="w-7 h-7 rounded-lg bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
+                  className="w-7 h-7 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
                 >
-                  <ChevronLeft size={15} strokeWidth={2.25} />
+                  <ChevronLeft size={14} strokeWidth={2.25} />
                 </button>
-                <span className="text-[11px] font-mono font-bold text-fg px-1.5">
-                  {page}/{totalPages}
-                </span>
+
+                <div
+                  className="flex items-center gap-1 px-2 py-0.5 bg-surface border border-border rounded-full shadow-2xs"
+                  title={`Type a page number (1 to ${totalPages}) and press Enter`}
+                >
+                  <input
+                    type="number"
+                    min={1}
+                    max={totalPages}
+                    value={inputPage}
+                    onChange={(e) => setInputPage(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handlePageInputSubmit();
+                      }
+                    }}
+                    onBlur={handlePageInputSubmit}
+                    className="w-9 text-center font-mono font-bold text-[11px] bg-surface-sunken border border-border/80 focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-md py-0.5 text-fg outline-none transition-colors"
+                  />
+                  <span className="text-[11px] font-mono font-bold text-fg-subtle select-none">
+                    / {totalPages}
+                  </span>
+                </div>
+
                 <button
                   type="button"
-                  disabled={page === totalPages}
+                  disabled={page >= totalPages}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   title="Next Page"
-                  className="w-7 h-7 rounded-lg bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
+                  className="w-7 h-7 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
                 >
-                  <ChevronRight size={15} strokeWidth={2.25} />
+                  <ChevronRight size={14} strokeWidth={2.25} />
                 </button>
               </div>
             )}
@@ -246,11 +356,11 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
                     />
                   </th>
                   <th className="px-4 py-3 min-w-[220px] max-w-[280px]">Company Name</th>
-                  <th className="px-4 py-3">HR Contact</th>
+                  <th className="px-4 py-3">HR Name</th>
                   <th className="px-4 py-3">Designation</th>
-                  <th className="px-4 py-3">Mobile Number</th>
+                  <th className="px-4 py-3">Contact</th>
                   <th className="px-4 py-3">Email ID</th>
-                  <th className="px-4 py-3">Sector / Type</th>
+                  <th className="px-4 py-3">Sector</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border font-sans bg-surface">

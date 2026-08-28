@@ -4,6 +4,7 @@ import ExcelJS from 'exceljs';
 import { ActiveLead, IActiveLead, ACTIVE_LEAD_STATUSES, ACADEMIC_YEARS, FOLLOWUP_MONTHS, ActiveLeadStatus } from '../models/ActiveLead';
 import { DailyTracker } from '../models/DailyTracker';
 import { authenticateJWT } from './authMiddleware';
+import { seedActiveLeadsFromMasterPositives } from './seedActiveLeadsFromMasterPositives';
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -102,6 +103,11 @@ export function registerActiveLeadRoutes(app: Express) {
   // ── 1. GET /api/v1/active-leads (List with stats & search) ─────────────────
   app.get('/api/v1/active-leads', authenticateJWT, async (req: Request, res: Response) => {
     try {
+      const totalCount = await ActiveLead.countDocuments({ is_deleted: false });
+      if (totalCount === 0) {
+        await seedActiveLeadsFromMasterPositives();
+      }
+
       const {
         academic_year,
         status,
@@ -114,7 +120,7 @@ export function registerActiveLeadRoutes(app: Express) {
       const filter: Record<string, any> = { is_deleted: false };
 
       if (academic_year && academic_year !== 'all') {
-        filter.academic_year = String(academic_year);
+        filter.academic_year = { $regex: escapeRegex(String(academic_year)), $options: 'i' };
       }
       if (status && status !== 'all') {
         filter.status = String(status);
@@ -143,7 +149,7 @@ export function registerActiveLeadRoutes(app: Express) {
       // Compute statistics across the entire unfiltered dataset (or year-scoped)
       const baseFilter: Record<string, any> = { is_deleted: false };
       if (academic_year && academic_year !== 'all') {
-        baseFilter.academic_year = String(academic_year);
+        baseFilter.academic_year = { $regex: escapeRegex(String(academic_year)), $options: 'i' };
       }
 
       const allStats = await ActiveLead.aggregate([

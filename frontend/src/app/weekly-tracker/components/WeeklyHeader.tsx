@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { CalendarDays, ChevronLeft, ChevronRight, Plus, RefreshCw, FileSpreadsheet, Trash2 } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { CollegeSelector, College } from '@/components/CollegeSelector';
+import { SmoothExportDropdown } from '@/components/ui/SmoothExportDropdown';
 import { apiFetch } from '@/lib/api';
 
 interface Props {
@@ -11,9 +12,14 @@ interface Props {
   onSelectCollege: (id: string, name: string) => void;
   weekOffset: number;
   onWeekChange: (offset: number) => void;
+  academicYear?: string;
+  onAcademicYearChange?: (yr: string) => void;
   onOpenAddModal?: () => void;
   onSyncDailyPositives?: () => void;
   onExportXlsx?: () => void;
+  onExportPdf?: () => void;
+  onExportImage?: () => void;
+  isExporting?: boolean;
   searchQuery?: string;
   onSearchChange?: (q: string) => void;
   isDeleteMode?: boolean;
@@ -84,9 +90,14 @@ export function WeeklyHeader({
   onSelectCollege,
   weekOffset,
   onWeekChange,
+  academicYear = '2027',
+  onAcademicYearChange,
   onOpenAddModal,
   onSyncDailyPositives,
   onExportXlsx,
+  onExportPdf,
+  onExportImage,
+  isExporting = false,
   searchQuery,
   onSearchChange,
   isDeleteMode,
@@ -113,7 +124,7 @@ export function WeeklyHeader({
   const weekInfo = formatWeekDisplay(weekOffset);
 
   return (
-    <header className="bg-surface border-b border-border px-6 py-4 space-y-3 shadow-xs text-fg">
+    <header className="sticky top-0 z-40 bg-surface/95 backdrop-blur-md border-b border-border px-6 py-4 space-y-3 shadow-xs text-fg">
       {/* ── Top Row: Title & Top-Right Sign Out ────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div>
@@ -254,25 +265,21 @@ export function WeeklyHeader({
                   type="button"
                   onClick={onSyncDailyPositives}
                   className="h-8 px-2.5 bg-[#4f46e5] hover:bg-[#4338ca] text-white rounded-lg flex items-center gap-1.5 text-[11px] font-bold shadow-xs transition-colors cursor-pointer shrink-0"
-                  title="Sync Daily Positives"
-                  aria-label="Sync Daily Positives"
+                  title="Sync Daily Tracker Positives"
+                  aria-label="Sync"
                 >
                   <RefreshCw size={13} strokeWidth={2.5} />
-                  <span>Sync Positives</span>
+                  <span>Sync</span>
                 </button>
               )}
 
               {onExportXlsx && (
-                <button
-                  type="button"
-                  onClick={onExportXlsx}
-                  className="h-8 px-2.5 bg-[#047857] hover:bg-[#065f46] text-white rounded-lg flex items-center gap-1.5 text-[11px] font-bold shadow-xs transition-colors cursor-pointer shrink-0"
-                  title="Export XLSX Document"
-                  aria-label="Export XLSX Document"
-                >
-                  <FileSpreadsheet size={13} strokeWidth={2.5} />
-                  <span>Export XLSX</span>
-                </button>
+                <SmoothExportDropdown
+                  onExportExcel={onExportXlsx}
+                  onExportPdf={onExportPdf}
+                  onExportImage={onExportImage}
+                  isExporting={isExporting}
+                />
               )}
 
               {/* ── Bulk Delete Action Button ── */}

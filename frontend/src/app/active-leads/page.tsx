@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiFetch, apiFetchBlob } from '@/lib/api';
 import { useToast } from '@/components/ui/Toast';
 import { ActiveLeadHeader } from './components/ActiveLeadHeader';
@@ -9,6 +11,7 @@ import { AddActiveLeadModal } from './components/AddActiveLeadModal';
 import { LeadStatus } from '@/components/ui/SmoothLeadStatusDropdown';
 
 export default function ActiveLeadsPage() {
+  const router = useRouter();
   const { toast } = useToast();
   const [leads, setLeads] = useState<ActiveLeadItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -16,6 +19,9 @@ export default function ActiveLeadsPage() {
   const [selectedYear, setSelectedYear] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedMonth, setSelectedMonth] = useState('all');
+  const [page, setPage] = useState(1);
+  const limit = 50;
+
   const [stats, setStats] = useState({
     total: 0,
     hiring: 0,
@@ -31,6 +37,11 @@ export default function ActiveLeadsPage() {
   const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [isDeletingSelected, setIsDeletingSelected] = useState(false);
+
+  // Reset page to 1 when filters or search changes
+  useEffect(() => {
+    setPage(1);
+  }, [selectedYear, selectedStatus, selectedMonth, searchQuery]);
 
   // Fetch leads with active filters
   const fetchLeads = useCallback(async (showSpinner = true) => {
@@ -250,6 +261,32 @@ export default function ActiveLeadsPage() {
     }
   };
 
+  // ── Global Save & Sync Shortcut (Ctrl+S / Cmd+S) ──────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+        handleSyncTracker();
+      }
+    };
+
+    const handleGlobalTrigger = (e: any) => {
+      if (e.detail?.pathname?.includes('/active-leads')) {
+        handleSyncTracker();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('ipoms_global_save_trigger' as any, handleGlobalTrigger);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('ipoms_global_save_trigger' as any, handleGlobalTrigger);
+    };
+  }, [handleSyncTracker]);
+
   // Export Excel
   const handleExportExcel = async () => {
     try {
@@ -277,9 +314,21 @@ export default function ActiveLeadsPage() {
     }
   };
 
+  // Trigger direct navigation to Report Builder when clicking PDF or Image from dropdown
+  const handleOpenPdfModal = () => {
+    router.push(`/reports?template=active_leads&academicYear=${encodeURIComponent(selectedYear || 'all')}`);
+  };
+
+  const handleOpenImageModal = () => {
+    router.push(`/reports?template=active_leads&academicYear=${encodeURIComponent(selectedYear || 'all')}`);
+  };
+
+  const totalPages = Math.ceil(leads.length / limit) || 1;
+  const paginatedLeads = leads.slice((page - 1) * limit, page * limit);
+
   return (
     <div className="min-h-screen bg-background text-fg selection:bg-primary selection:text-white flex flex-col">
-      {/* Header */}
+      {/* Header (Sticky / Frozen at Top) */}
       <ActiveLeadHeader
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -292,6 +341,8 @@ export default function ActiveLeadsPage() {
         stats={stats}
         onOpenAddModal={() => setShowAddModal(true)}
         onExportExcel={handleExportExcel}
+        onExportPdf={handleOpenPdfModal}
+        onExportImage={handleOpenImageModal}
         isExporting={isExporting}
         onSyncTracker={handleSyncTracker}
         isSyncing={isSyncing}
@@ -300,19 +351,57 @@ export default function ActiveLeadsPage() {
         selectedCount={selectedLeadIds.length}
         onDeleteSelected={handleDeleteSelected}
         isDeletingSelected={isDeletingSelected}
+        page={page}
+        totalPages={totalPages}
+        totalCount={leads.length}
+        onPageChange={setPage}
       />
 
       {/* Main Content Body */}
       <main className="flex-1 p-6 space-y-4 max-w-7xl w-full mx-auto">
         <ActiveLeadTable
-          leads={leads}
+          leads={paginatedLeads}
           loading={loading}
           onUpdateLead={handleUpdateLead}
           isDeleteMode={isDeleteMode}
           selectedIds={selectedLeadIds}
           onToggleSelectLead={handleToggleSelectLead}
           onToggleSelectAll={handleToggleSelectAll}
+          page={page}
+          limit={limit}
         />
+
+        {/* Bottom Pagination Bar */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-2 pt-2 text-xs text-fg-subtle">
+            <span>
+              Showing <strong>{(page - 1) * limit + 1}</strong>–<strong>{Math.min(page * limit, leads.length)}</strong> of <strong>{leads.length.toLocaleString()}</strong> active leads (Page {page} of {totalPages})
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+                title="Previous Page"
+                className="w-8 h-8 rounded-xl bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
+              >
+                <ChevronLeft size={16} strokeWidth={2.25} />
+              </button>
+              <span className="text-xs font-mono font-bold text-fg px-2.5 py-1 bg-surface border border-border rounded-lg shadow-2xs">
+                {page} / {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => setPage(page + 1)}
+                title="Next Page"
+                className="w-8 h-8 rounded-xl bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
+              >
+                <ChevronRight size={16} strokeWidth={2.25} />
+              </button>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Modals */}

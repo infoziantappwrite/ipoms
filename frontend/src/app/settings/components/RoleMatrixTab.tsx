@@ -10,7 +10,7 @@ export function RoleMatrixTab() {
     { feature: 'Positive Leads & JD Register', coord: true, tl: true, admin: true, tpo: true },
     { feature: 'Weekly Tracker Pipeline Board', coord: true, tl: true, admin: true, tpo: true },
     { feature: 'Reports & Analytics Center', coord: true, tl: true, admin: true, tpo: true },
-    { feature: 'Export Reports (PDF / Excel / CSV)', coord: false, tl: true, admin: true, tpo: true },
+    { feature: 'Export Reports (PDF / Excel XLSX)', coord: false, tl: true, admin: true, tpo: true },
     { feature: 'Search Master Company Directory', coord: true, tl: true, admin: true, tpo: false },
     { feature: 'Edit Contact Details (Operational)', coord: true, tl: true, admin: true, tpo: false },
     { feature: 'Delete / Archive Company Records', coord: false, tl: true, admin: true, tpo: false },

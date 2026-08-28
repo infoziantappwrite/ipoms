@@ -143,6 +143,37 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
    sends, per Module 08 §12/§16 ("users should never see \[role] options... signup page
    shows only Placement Coordinator"). If anyone ever reports an unexplained admin
    account, this is the first thing to suspect had been exploited before the fix.
+0b. ~~**Unauthenticated destructive endpoints + Team Leader → Administrator escalation.**~~
+   **FIXED 25 Aug 2026.** Two separate holes, both now closed and verified with live requests:
+   (a) `isPublic()` — in **both** `server.ts` and `routePolicy.ts`, which must stay in step —
+   allowlisted `/weekly-tracker-import*`, whose routes call `WeeklyTracker.deleteMany({})` and
+   re-import from a caller-supplied file path. Anyone reachable on the network could empty the
+   weekly tracker with no token. Separately `GET /health/daily-leads-diagnostics` is registered
+   *above* the `app.use('/api/v1', authenticateJWT)` mount, so the global gate never saw it, and
+   it deleted colleges and reassigned `college_id` on **every plain GET**. Both are now
+   ADMINISTRATOR-only (the diagnostics route carries its own per-route middleware because of
+   its position), and all its mutations sit behind `?resync=true`.
+   (b) `POST /users` and `PATCH /users/:id` admit `TEAM_LEADER` and wrote `role_codes` straight
+   from the body — a Team Leader could PATCH themselves to `ADMINISTRATOR`. Now guarded by
+   `refuseRoleEscalation()` / `assignableRoles()` in `routePolicy.ts`: an Administrator may
+   grant anything, a Team Leader only `PLACEMENT_COORDINATOR`/`TPO`. A second check refuses
+   editing an account that already outranks you, so a TL cannot demote or lock out the admin
+   either. `POST /users` also defaulted `role_codes` to the drifted `COORDINATOR` alias —
+   now `PLACEMENT_COORDINATOR`. **`npm run verify:policy` is now 78/78 with one public route.**
+0c. ~~**`GET /colleges` published the staff directory anonymously.**~~ **FIXED 25 Aug 2026.**
+   It was in `isPublic()` and populated `assigned_coordinator_ids` with
+   `full_name official_email primary_mobile`, so an unauthenticated request returned every
+   coordinator's work email and personal mobile. Now authenticated (`STAFF_AND_TPO`), and the
+   populate is **removed entirely** — no frontend caller ever read that field (all 10 call sites
+   use `apiFetch`, so nothing needed the route public). Two more bugs fixed in the same handler:
+   it looped 23 `College.findOne` + `create`/`save` on **every request** (a write on every read),
+   now a single `estimatedDocumentCount()` guard that seeds only when the roster is empty; and
+   its filter was an `$or` whose `is_deleted: {$ne: true}` clause matched nearly everything,
+   so `inactive`/`on_hold` colleges were returned — now `{ status: 'active' }`.
+   **Still open:** the handler's own comment promises coordinator-scoped results, but that was
+   never enforced. It cannot be turned on until `users.assigned_college_ids` is corrected —
+   every account currently holds all 25 colleges (fallout from the boot bug in trap 10) except
+   Lizenya R, who has 0 and would see an empty app. A coordinator should hold 3, max 4.
 1. ~~**Role-code drift corrupts RBAC.**~~ **FIXED 21 Aug 2026.** `users.role_codes` held
    values absent from `roles` (Sujitha `TEAM_LEAD`, two accounts `COORDINATOR`), so an
    active Team Leader silently failed every Team Leader check. Repaired with
@@ -182,11 +213,31 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
    the wrong role code through this form. Fixed to `PLACEMENT_COORDINATOR`.
 7. **`College` has no `is_deleted` field**, yet code queries
    `College.countDocuments({ is_deleted: false })` → always 0.
-8. **Exports are fake.** CSV is labelled Excel; `window.print()` stands in for PDF. Real
-   PDF/Excel/PNG export is unbuilt (Module 06 requires all three).
+8. **Excel export is real; PDF is not.** `frontend/src/lib/exportExcel.ts` uses the `xlsx`
+   library and produces genuine `.xlsx`. **PDF is still `window.print()`** in three places
+   (`NativeReportEditor.tsx:394`, `universalExport.ts:230`, `activeLeadsExport.ts:226`), and
+   `NativeReportEditor` also writes an HTML `<table>` labelled `.xls` with unescaped values —
+   a company name containing `&` corrupts that file. PNG export is unbuilt.
 9. **`--fg-subtle` must clear AA on `--surface-sunken`, not just white.** It was `#64748B`
    (4.34:1 on sunken — failing); now `#5D6B80` (4.94:1). Judge foreground tokens by their
    worst surface.
+10. ~~**Every server restart destroyed live data.**~~ **FIXED 25 Aug 2026 — this was the most
+    destructive bug found in the project.** `startServer()` ran five seed routines that each
+    began by emptying their collection (`DailyLead` positives, `DailyLead` jd_received,
+    `ActiveLead`, `WeeklyTracker`, and all 3,560 of `CompanyMetadata`), then refilled from
+    hardcoded arrays and Excel files in `C:\Users\admin\Downloads`. Separately,
+    `ensureDefaultAccounts()` rewrote every seeded user's `password_hash` and forced
+    `failed_login_attempts=0`, `is_password_locked=false`, `is_profile_locked=false`,
+    `is_deleted=false` — so **a restart silently undid the 3-strike lockout, profile locks,
+    password changes and user soft-deletion**, and re-linked every coordinator to every college.
+    Now: the five seeds are gated behind **`SEED_ON_BOOT=true`** and the account rewrite behind
+    **`RESET_ACCOUNTS_ON_BOOT=true`**, both default-off (`server.ts:52-66`). Existing accounts
+    are left alone apart from repairing an empty `role_ids` link, derived from the user's *own*
+    `role_codes` so an admin's role change survives; only accounts created on that boot get
+    linked to colleges. `startServer()` now has a `.catch()` that exits non-zero instead of
+    leaving the process alive with no listener. Verified by snapshotting all collection counts
+    and the admin password hash across a restart — identical. **Never re-enable either flag
+    against a database with real data, and never add a new destructive routine to boot.**
 
 ---
 

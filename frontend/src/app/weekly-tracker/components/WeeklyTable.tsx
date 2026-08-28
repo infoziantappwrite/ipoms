@@ -81,10 +81,18 @@ export function WeeklyTable({
               </th>
             )}
             <th className="py-2.5 px-3 w-12 text-center">S.No</th>
-            <th className="py-2.5 px-3 min-w-[200px] text-left">Company Name</th>
-            <th className="py-2.5 px-3 min-w-[180px]">Role</th>
-            <th className="py-2.5 px-3 min-w-[100px]">CTC</th>
-            <th className="py-2.5 px-3 min-w-[240px]">Status</th>
+            <th className="py-2.5 px-3 min-w-[200px] text-left">
+              Company Name <span className="text-rose-500 font-bold">*</span>
+            </th>
+            <th className="py-2.5 px-3 min-w-[180px]">
+              Role <span className="text-rose-500 font-bold">*</span>
+            </th>
+            <th className="py-2.5 px-3 min-w-[100px]">
+              CTC <span className="text-rose-500 font-bold">*</span>
+            </th>
+            <th className="py-2.5 px-3 min-w-[240px]">
+              Status <span className="text-rose-500 font-bold">*</span>
+            </th>
             {hasFollowUpColumn && (
               <th className="py-2.5 px-3 min-w-[140px] text-center">Follow Up</th>
             )}
@@ -155,7 +163,20 @@ function TableRow({
 
   const commitEdit = (field: string) => {
     if (editingField === field) {
-      onUpdateRow(row._id, { [field]: tempValue });
+      if (['company_name', 'job_role', 'ctc_lpa', 'current_status_text'].includes(field)) {
+        const strVal = String(tempValue ?? '').trim();
+        if (!strVal) {
+          const fieldLabels: Record<string, string> = {
+            company_name: 'Company Name',
+            job_role: 'Role',
+            ctc_lpa: 'CTC',
+            current_status_text: 'Status',
+          };
+          alert(`${fieldLabels[field] || field} is mandatory and cannot be empty.`);
+          return;
+        }
+      }
+      onUpdateRow(row._id, { [field]: typeof tempValue === 'string' ? tempValue.trim() : tempValue });
       setEditingField(null);
     }
   };

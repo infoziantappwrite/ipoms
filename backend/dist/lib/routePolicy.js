@@ -6,6 +6,8 @@ exports.authorizeRoute = authorizeRoute;
 exports.isSupervisor = isSupervisor;
 exports.scopeToSelf = scopeToSelf;
 exports.refuseForeignOwner = refuseForeignOwner;
+exports.assignableRoles = assignableRoles;
+exports.refuseRoleEscalation = refuseRoleEscalation;
 exports.findPolicy = findPolicy;
 const ADMIN = ['ADMINISTRATOR'];
 const TL_ADMIN = ['ADMINISTRATOR', 'TEAM_LEADER'];
@@ -50,10 +52,10 @@ const POLICIES = [
     // ── Master company database ───────────────────────────────────────────────
     { method: 'GET', pattern: new RegExp(`^/companies/search/?$`), roles: STAFF },
     { method: 'DELETE', pattern: new RegExp(`^/metadata/${ID}/purge/?$`), roles: ADMIN },
-    { method: 'POST', pattern: new RegExp(`^/metadata/${ID}/restore/?$`), roles: TL_ADMIN },
-    { method: 'POST', pattern: new RegExp(`^/metadata/bulk-import/?$`), roles: TL_ADMIN },
-    { method: 'PATCH', pattern: new RegExp(`^/metadata/${ID}/?$`), roles: TL_ADMIN },
-    { method: 'DELETE', pattern: new RegExp(`^/metadata/${ID}/?$`), roles: TL_ADMIN },
+    { method: 'POST', pattern: new RegExp(`^/metadata/${ID}/restore/?$`), roles: STAFF },
+    { method: 'POST', pattern: new RegExp(`^/metadata/bulk-import/?$`), roles: STAFF },
+    { method: 'PATCH', pattern: new RegExp(`^/metadata/${ID}/?$`), roles: STAFF },
+    { method: 'DELETE', pattern: new RegExp(`^/metadata/${ID}/?$`), roles: STAFF },
     // Coordinators add contacts they discover while calling (Module 02 §17).
     { method: 'POST', pattern: /^\/metadata\/?$/, roles: STAFF },
     { method: 'GET', pattern: /^\/metadata\/?$/, roles: STAFF },
@@ -62,9 +64,14 @@ const POLICIES = [
     { method: 'GET', pattern: /^\/coordinators\/?$/, roles: TL_ADMIN },
     // ── Daily Tracker (own call log) ──────────────────────────────────────────
     { method: '*', pattern: /^\/daily-tracker(\/.*)?$/, roles: STAFF },
+    { method: '*', pattern: /^\/tracker(\/.*)?$/, roles: STAFF },
     // ── Weekly Tracker ────────────────────────────────────────────────────────
     // TPO is excluded entirely: their access is the finalized Weekly Placement
     // REPORT, not the live operational board (V1_DECISIONS §8.2).
+    // Destructive bulk import/reload: wipes and rebuilds WeeklyTracker from a
+    // spreadsheet. Administrator only, and listed before the general
+    // /weekly-tracker rule so intent is obvious to the next reader.
+    { method: '*', pattern: /^\/weekly-tracker-import(\/.*)?$/, roles: ADMIN },
     { method: '*', pattern: /^\/weekly-tracker(\/.*)?$/, roles: STAFF },
     // ── Daily Leads & Active Leads ────────────────────────────────────────────
     { method: '*', pattern: /^\/daily-leads(\/.*)?$/, roles: STAFF },
@@ -109,9 +116,19 @@ const POLICIES = [
     // ── Active Leads Module ───────────────────────────────────────────────────
     { method: '*', pattern: /^\/active-leads(\/.*)?$/, roles: STAFF },
 ];
-/** Paths served before authentication; never reach this middleware. */
+/**
+ * Paths served before authentication; never reach this middleware.
+ *
+ * `/weekly-tracker-import` was removed on 25 Aug 2026: the routes behind it call
+ * `WeeklyTracker.deleteMany({})` and re-import from a caller-supplied file path,
+ * so anyone who could reach the API could empty the weekly tracker with no
+ * token. They are administrator-only now (see the policy table above).
+ *
+ * Keep this list as short as it can possibly be — an entry here bypasses BOTH
+ * the authentication gate and the default-deny table in one step.
+ */
 function isPublic(path) {
-    return path === '/health' || path.startsWith('/auth') || path === '/colleges' || path.startsWith('/weekly-tracker-import');
+    return path === '/health' || path.startsWith('/auth') || path === '/colleges';
 }
 function findPolicy(method, path) {
     return POLICIES.find((p) => (p.method === '*' || p.method === method) && p.pattern.test(path));
@@ -199,6 +216,64 @@ function refuseForeignOwner(req, res, ownerId, message = 'You do not have access
         error: { code: 'FORBIDDEN_NOT_OWNER', message },
     });
     return true;
+}
+/**
+ * Which roles the caller is allowed to GRANT to an account.
+ *
+ * `POST /users` and `PATCH /users/:id` are open to Team Leaders, and both wrote
+ * `role_codes` straight from the request body. A Team Leader could therefore
+ * PATCH their own record with `{"role_codes":["ADMINISTRATOR"]}` and take
+ * org-wide access, including the admin-only permanent purge — the same shape as
+ * the August signup-escalation bug, on a different endpoint.
+ *
+ * An Administrator may grant anything. A Team Leader may only manage
+ * non-privileged accounts, so they can neither promote themselves nor
+ * manufacture a peer Team Leader. This matches the app's own RBAC matrix, where
+ * "User & Coordinator Management" is administrator-only.
+ */
+function assignableRoles(req) {
+    const roles = (req.user?.roles || []).map(normalizeRole).filter(Boolean);
+    if (roles.includes('ADMINISTRATOR'))
+        return ['ADMINISTRATOR', 'TEAM_LEADER', 'PLACEMENT_COORDINATOR', 'TPO'];
+    if (roles.includes('TEAM_LEADER'))
+        return ['PLACEMENT_COORDINATOR', 'TPO'];
+    return [];
+}
+/**
+ * Guard for any handler that writes `role_codes` from user input.
+ *
+ * Returns true when the request is refused (and has already written the 403), so
+ * call sites read as `if (refuseRoleEscalation(req, res, role_codes)) return;`.
+ * Unrecognised role codes are rejected too — otherwise a typo like `ADMINISTRATOR `
+ * would be stored verbatim and quietly re-introduce the role-code drift that
+ * `fixRoleCodes` was written to clean up.
+ */
+function refuseRoleEscalation(req, res, requested) {
+    if (requested === undefined || requested === null)
+        return false;
+    const list = Array.isArray(requested) ? requested : [requested];
+    const allowed = assignableRoles(req);
+    for (const raw of list) {
+        const normalised = normalizeRole(String(raw));
+        if (!normalised) {
+            res.status(400).json({
+                success: false,
+                error: { code: 'VALIDATION_ERROR', message: `Unknown role code: ${String(raw)}.` },
+            });
+            return true;
+        }
+        if (!allowed.includes(normalised)) {
+            res.status(403).json({
+                success: false,
+                error: {
+                    code: 'FORBIDDEN_ROLE_ESCALATION',
+                    message: `You may not assign the ${normalised} role. Allowed: ${allowed.join(', ') || 'none'}.`,
+                },
+            });
+            return true;
+        }
+    }
+    return false;
 }
 /** Exposed for tests and for the coverage check in verifyRoutePolicy.ts. */
 exports.__policyTable = POLICIES;

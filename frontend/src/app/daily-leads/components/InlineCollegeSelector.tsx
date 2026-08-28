@@ -6,13 +6,28 @@ import { ChevronDown, Check, Search } from 'lucide-react';
 import type { CollegeOption } from './LeadsTable';
 
 interface Props {
-  value: string;
+  value?: string;
+  currentCollegeId?: string;
+  collegeObj?: {
+    _id?: string;
+    college_name?: string;
+    college_code?: string;
+  };
   colleges: CollegeOption[];
-  onChange: (collegeId: string) => void;
+  onChange?: (collegeId: string) => void;
+  onSelect?: (collegeId: string) => void;
   disabled?: boolean;
 }
 
-export function InlineCollegeSelector({ value, colleges, onChange, disabled = false }: Props) {
+export function InlineCollegeSelector({
+  value,
+  currentCollegeId,
+  collegeObj,
+  colleges,
+  onChange,
+  onSelect,
+  disabled = false,
+}: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -25,7 +40,21 @@ export function InlineCollegeSelector({ value, colleges, onChange, disabled = fa
     ready: boolean;
   }>({ top: 0, left: 0, placement: 'bottom', ready: false });
 
-  const selectedCollege = colleges.find((c) => c._id === value);
+  const effectiveId = value || currentCollegeId || collegeObj?._id || '';
+  const selectedCollege =
+    colleges.find(
+      (c) =>
+        c._id === effectiveId ||
+        c.college_code === effectiveId ||
+        c.college_name === effectiveId
+    ) ||
+    (collegeObj?.college_code
+      ? {
+          _id: collegeObj._id || '',
+          college_name: collegeObj.college_name || '',
+          college_code: collegeObj.college_code,
+        }
+      : undefined);
 
   // Position calculation relative to viewport
   const calculateCoords = useCallback(() => {
@@ -59,6 +88,7 @@ export function InlineCollegeSelector({ value, colleges, onChange, disabled = fa
 
   // Synchronous positioning before display on toggle
   const handleToggle = () => {
+    if (disabled) return;
     if (isOpen) {
       setIsOpen(false);
       setCoords((prev) => ({ ...prev, ready: false }));
@@ -102,14 +132,14 @@ export function InlineCollegeSelector({ value, colleges, onChange, disabled = fa
         !dropdownRef.current.contains(target)
       ) {
         setIsOpen(false);
-        setCoords((prev) => ({ ...prev, ready: false }));
+        setSearch('');
       }
     }
 
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         setIsOpen(false);
-        setCoords((prev) => ({ ...prev, ready: false }));
+        setSearch('');
       }
     }
 
@@ -128,6 +158,13 @@ export function InlineCollegeSelector({ value, colleges, onChange, disabled = fa
           c.college_name.toLowerCase().includes(search.toLowerCase())
       )
     : colleges;
+
+  const handleSelectCollege = (collegeId: string) => {
+    if (onChange) onChange(collegeId);
+    if (onSelect) onSelect(collegeId);
+    setIsOpen(false);
+    setSearch('');
+  };
 
   return (
     <div className="relative inline-block text-left">
@@ -173,71 +210,57 @@ export function InlineCollegeSelector({ value, colleges, onChange, disabled = fa
                   ? `${window.innerHeight - coords.top}px`
                   : 'auto',
               left: `${coords.left}px`,
-              zIndex: 99999,
+              zIndex: 999999,
               width: '320px',
-              maxWidth: 'calc(100vw - 32px)',
             }}
-            className="bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col transition-opacity duration-100"
+            className="rounded-2xl bg-surface border border-border shadow-2xl p-2 max-h-72 flex flex-col text-fg animate-in fade-in zoom-in-95 duration-100 overflow-hidden"
           >
-            {/* Quick Search Header */}
-            {colleges.length > 4 && (
-              <div className="p-2.5 border-b border-border/80 bg-surface-sunken/80">
-                <div className="relative">
-                  <Search
-                    size={12}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-disabled"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Search college or acronym…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    autoFocus
-                    className="w-full bg-surface border border-border focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-xl pl-8 pr-3 py-1.5 text-xs text-fg placeholder:text-fg-disabled outline-none font-sans"
-                  />
-                </div>
-              </div>
-            )}
+            {/* Search Input */}
+            <div className="relative mb-2 shrink-0">
+              <Search
+                size={13}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-disabled pointer-events-none"
+              />
+              <input
+                type="text"
+                autoFocus
+                placeholder="Search college or code..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs bg-surface-sunken border border-border text-fg placeholder:text-fg-disabled outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all font-sans"
+              />
+            </div>
 
-            {/* List of Colleges with Acronym Badge and Full Name */}
-            <div className="max-h-60 overflow-y-auto divide-y divide-border/40 p-1.5 space-y-0.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            {/* College List */}
+            <div className="overflow-y-auto max-h-52 space-y-1 pr-1 no-scrollbar flex-1">
               {filteredColleges.length === 0 ? (
-                <div className="p-4 text-center text-fg-disabled text-xs font-medium">
-                  No matching colleges
+                <div className="py-4 text-center text-xs text-fg-disabled">
+                  No college found
                 </div>
               ) : (
                 filteredColleges.map((c) => {
-                  const isSelected = c._id === value;
+                  const isSelected = selectedCollege?._id === c._id || selectedCollege?.college_code === c.college_code;
                   return (
                     <button
                       key={c._id}
                       type="button"
-                      onClick={() => {
-                        onChange(c._id);
-                        setIsOpen(false);
-                        setSearch('');
-                        setCoords((prev) => ({ ...prev, ready: false }));
-                      }}
-                      className={`w-full flex items-center justify-between gap-2.5 px-3 py-2 text-left rounded-xl transition-all cursor-pointer select-none ${
+                      onClick={() => handleSelectCollege(c._id)}
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-left transition-all cursor-pointer ${
                         isSelected
-                          ? 'bg-primary/10 text-primary font-bold shadow-2xs'
+                          ? 'bg-primary/10 text-primary font-bold border border-primary/20'
                           : 'hover:bg-surface-sunken text-fg-muted hover:text-fg'
                       }`}
                     >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-mono font-bold text-micro shrink-0">
-                          {c.college_code}
-                        </span>
-                        <span className="text-xs truncate font-medium text-fg">
+                      <div className="flex flex-col min-w-0 pr-2">
+                        <span className="text-xs font-semibold truncate leading-tight font-sans">
                           {c.college_name}
+                        </span>
+                        <span className="text-[10px] font-mono text-fg-subtle">
+                          {c.college_code}
                         </span>
                       </div>
                       {isSelected && (
-                        <Check
-                          size={14}
-                          strokeWidth={2.5}
-                          className="text-primary shrink-0"
-                        />
+                        <Check size={14} strokeWidth={3} className="text-primary shrink-0 ml-1.5" />
                       )}
                     </button>
                   );

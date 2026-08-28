@@ -213,26 +213,7 @@ export function WeeklySection({
                 <X size={14} />
               </button>
             </div>
-          ) : (
-            rows.length > 0 && (
-              <div className="flex items-center gap-1">
-                {/* Delete Bin */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsLocalDeleteMode(true);
-                    setIsCollapsed(false);
-                  }}
-                  className="p-1.5 rounded-lg text-fg-subtle hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                  title="Select and delete rows in this section"
-                  aria-label="Select and delete rows"
-                >
-                  <Trash2 size={15} />
-                </button>
-              </div>
-            )
-          )}
+          ) : null}
 
           <button
             type="button"

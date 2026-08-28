@@ -78,15 +78,25 @@ export function AddCompanyModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!companyName.trim()) {
-      alert('Company Name is required');
+      alert('Company Name is mandatory.');
+      return;
+    }
+    if (!jobRole.trim()) {
+      alert('Job Role is mandatory.');
+      return;
+    }
+    if (!ctcValue.trim()) {
+      alert('CTC is mandatory.');
+      return;
+    }
+    if (!currentStatusText.trim()) {
+      alert('Current Status Remarks is mandatory.');
       return;
     }
 
-    const formattedCtc = ctcValue.trim()
-      ? (ctcValue.includes('LPA') || ctcValue.toLowerCase().includes('month')
-          ? ctcValue.trim()
-          : `${ctcValue.trim()} ${ctcUnit}`)
-      : '';
+    const formattedCtc = ctcValue.includes('LPA') || ctcValue.toLowerCase().includes('month')
+      ? ctcValue.trim()
+      : `${ctcValue.trim()} ${ctcUnit}`;
 
     setLoading(true);
     try {
@@ -111,7 +121,7 @@ export function AddCompanyModal({
         onAdded();
         onClose();
       } else {
-        alert(res.message || 'Failed to add company');
+        alert(res.message || (res as any)?.error?.message || 'Failed to add company');
       }
     } catch (err: any) {
       console.error('Add company error:', err);
@@ -193,7 +203,7 @@ export function AddCompanyModal({
           {/* Role(s) */}
           <div>
             <label className="block text-fg font-semibold mb-1.5">
-              Job Role(s) <span className="text-fg-subtle font-normal">(comma-separated for multi-roles)</span>
+              Job Role(s) <span className="text-rose-500">*</span> <span className="text-fg-subtle font-normal">(comma-separated for multi-roles)</span>
             </label>
             <input
               type="text"
@@ -207,10 +217,13 @@ export function AddCompanyModal({
 
           {/* CTC Offered with Integrated Unit Switcher */}
           <div>
-            <label className="block text-fg font-semibold mb-1.5">CTC Offered</label>
+            <label className="block text-fg font-semibold mb-1.5">
+              CTC Offered <span className="text-rose-500">*</span>
+            </label>
             <div className="flex items-center gap-2">
               <input
                 type="text"
+                required
                 value={ctcValue}
                 onChange={(e) => setCtcValue(e.target.value)}
                 placeholder={ctcUnit === 'LPA' ? 'e.g. 5 or 6.5 or 5 - 8' : 'e.g. 10,000 or 12,000 or 15k'}
@@ -280,8 +293,7 @@ export function AddCompanyModal({
                 title="Eligible Graduating Batch"
                 options={BATCH_YEARS.map((year) => ({
                   value: year,
-                  label: `${year} Graduating Batch`,
-                  badge: year,
+                  label: year,
                 }))}
               />
             </div>
@@ -312,9 +324,12 @@ export function AddCompanyModal({
 
           {/* Status Remarks */}
           <div>
-            <label className="block text-fg font-semibold mb-1.5">Current Status Remarks</label>
+            <label className="block text-fg font-semibold mb-1.5">
+              Current Status Remarks <span className="text-rose-500">*</span>
+            </label>
             <textarea
               rows={2}
+              required
               value={currentStatusText}
               onChange={(e) => setCurrentStatusText(e.target.value)}
               placeholder="e.g. Invite email sent, awaiting JD from HR"
