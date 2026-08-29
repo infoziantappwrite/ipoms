@@ -39,7 +39,7 @@ export const NAV_COLLAPSED_KEY = 'ipoms_nav_collapsed';
 export function readSessionUser(): SessionUser | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = window.localStorage.getItem(USER_KEY);
+    const raw = window.localStorage.getItem(USER_KEY) || window.sessionStorage.getItem(USER_KEY);
     return raw ? (JSON.parse(raw) as SessionUser) : null;
   } catch {
     return null;
@@ -72,7 +72,9 @@ export function updateSessionUser(patch: Partial<SessionUser> & Record<string, a
   try {
     const current = readSessionUser() || ({} as SessionUser);
     const updated = { ...current, ...patch };
-    window.localStorage.setItem(USER_KEY, JSON.stringify(updated));
+    const raw = JSON.stringify(updated);
+    window.localStorage.setItem(USER_KEY, raw);
+    window.sessionStorage.setItem(USER_KEY, raw);
     if (emitEvents) {
       window.dispatchEvent(new CustomEvent('ipoms_user_updated', { detail: updated }));
     }

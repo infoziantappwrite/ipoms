@@ -96,6 +96,31 @@ const SystemSettingsSchema = new mongoose_1.Schema({
         default: '',
         trim: true,
     },
+    // ── Maintenance Mode (Module 10 §8) ──────────────────────────────────
+    // Administrator only stayed excluded on purpose: it must always be
+    // possible to log in as Administrator and switch this back off, even if
+    // every other role is currently locked out.
+    maintenance_mode_enabled: {
+        type: Boolean,
+        default: false,
+    },
+    maintenance_affected_roles: {
+        type: [String],
+        default: ['TEAM_LEADER', 'PLACEMENT_COORDINATOR'],
+    },
+    maintenance_reason: {
+        type: String,
+        default: '',
+        trim: true,
+    },
+    maintenance_start_time: {
+        type: Date,
+        default: null,
+    },
+    maintenance_end_time: {
+        type: Date,
+        default: null,
+    },
 }, {
     collection: 'system_settings',
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },

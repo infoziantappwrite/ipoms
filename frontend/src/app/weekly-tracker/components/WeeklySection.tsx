@@ -65,17 +65,35 @@ const SECTION_CONFIGS: Record<string, { Icon: any; headerBg: string; badgeClass:
     badgeClass: 'bg-purple-100 dark:bg-purple-950/60 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-700/60',
     iconClass: 'text-purple-600 dark:text-purple-400',
   },
+  rejected_companies: {
+    Icon: XCircle,
+    headerBg: 'bg-rose-50/80 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900/40 text-rose-900 dark:text-rose-300',
+    badgeClass: 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-700/60',
+    iconClass: 'text-rose-600 dark:text-rose-400',
+  },
+  on_hold_by_college: {
+    Icon: Clock,
+    headerBg: 'bg-orange-50/80 dark:bg-orange-950/40 border-orange-200 dark:border-orange-900/40 text-orange-900 dark:text-orange-300',
+    badgeClass: 'bg-orange-100 dark:bg-orange-950/60 text-orange-800 dark:text-orange-300 border-orange-300 dark:border-orange-700/60',
+    iconClass: 'text-orange-600 dark:text-orange-400',
+  },
+  on_hold_by_hr: {
+    Icon: Clock,
+    headerBg: 'bg-slate-100/80 dark:bg-slate-900/60 border-slate-300 dark:border-slate-800 text-slate-800 dark:text-slate-300',
+    badgeClass: 'bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700',
+    iconClass: 'text-slate-600 dark:text-slate-400',
+  },
   rejected_by_hr: {
     Icon: XCircle,
-    headerBg: 'bg-surface-sunken border-border text-fg-muted',
-    badgeClass: 'bg-surface text-fg-muted border-border',
-    iconClass: 'text-fg-subtle',
+    headerBg: 'bg-rose-50/80 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900/40 text-rose-900 dark:text-rose-300',
+    badgeClass: 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-700/60',
+    iconClass: 'text-rose-600 dark:text-rose-400',
   },
   rejected_by_college: {
-    Icon: XCircle,
-    headerBg: 'bg-surface-sunken border-border text-fg-muted',
-    badgeClass: 'bg-surface text-fg-muted border-border',
-    iconClass: 'text-fg-subtle',
+    Icon: Clock,
+    headerBg: 'bg-orange-50/80 dark:bg-orange-950/40 border-orange-200 dark:border-orange-900/40 text-orange-900 dark:text-orange-300',
+    badgeClass: 'bg-orange-100 dark:bg-orange-950/60 text-orange-800 dark:text-orange-300 border-orange-300 dark:border-orange-700/60',
+    iconClass: 'text-orange-600 dark:text-orange-400',
   },
 };
 

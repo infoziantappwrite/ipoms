@@ -29,8 +29,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const closeMobile = useCallback(() => setMobileOpen(false), []);
 
   useEffect(() => {
-    initTheme();
-  }, []);
+    initTheme(pathname);
+  }, [pathname]);
 
   // Enforce focus lockdown: ONLY Placement Coordinators require locking daily focus
   useEffect(() => {

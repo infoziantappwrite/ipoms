@@ -20,8 +20,18 @@ export interface AuthUserPayload {
  * Middleware to authenticate requests using JWT Bearer Token.
  */
 export function authenticateJWT(req: Request, res: Response, next: NextFunction) {
-  // Allow OPTIONS preflight through
-  if (req.method === 'OPTIONS' || req.path.startsWith('/metadata/empty-mobiles') || req.path.startsWith('/metadata/import-unique-companies') || req.path.startsWith('/metadata/export-missing-excel') || req.path.startsWith('/metadata/renumber')) {
+  // Allow OPTIONS preflight through.
+  //
+  // The four /metadata/{empty-mobiles,import-unique-companies,export-missing-excel,
+  // renumber} exemptions that used to live here were removed 29 Aug 2026 — they let
+  // ANYONE, with no token at all, trigger admin data-repair tooling, including
+  // import-unique-companies which deletes CompanyMetadata records
+  // (serial_number >= 3574) and re-imports from a local file path that won't even
+  // exist once this backend is deployed off this laptop. Verified live: an
+  // anonymous POST to /metadata/renumber returned 200 before this fix. These four
+  // routes are now ADMINISTRATOR-only via the policy table in routePolicy.ts,
+  // same as the other admin-only data-repair endpoints.
+  if (req.method === 'OPTIONS') {
     return next();
   }
 

@@ -19,6 +19,8 @@ import {
   Building2,
   FileSpreadsheet,
   PenLine,
+  XCircle,
+  Clock,
 } from 'lucide-react';
 
 const COLLEGE_LOGO_MAP: Record<string, string> = {
@@ -255,61 +257,51 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
             </div>
 
             {/* 3. KPI Summary Strip (Excluded for Pending Tasks) */}
-            {report.template_type !== 'pending_tasks' && report.included_sections?.kpi_summary && report.kpi_summary && (
-              <>
-                {report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined ? (
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="bg-slate-50 border border-blue-200 p-2 rounded-lg text-center">
-                      <span className="text-[10px] text-slate-500 font-semibold uppercase block">Total Active Leads</span>
-                      <span className="text-sm font-bold font-mono text-blue-900">{report.kpi_summary.total_leads || 0}</span>
-                    </div>
-                    <div className="bg-emerald-50 border border-emerald-200 p-2 rounded-lg text-center">
-                      <span className="text-[10px] text-emerald-800 font-semibold uppercase block">Graduating Batch</span>
-                      <span className="text-sm font-bold font-mono text-emerald-700">{report.kpi_summary.graduating_year || '2027'}</span>
-                    </div>
-                    <div className="bg-amber-50 border border-amber-200 p-2 rounded-lg text-center">
-                      <span className="text-[10px] text-amber-800 font-semibold uppercase block">Corporate Partners</span>
-                      <span className="text-sm font-bold font-mono text-amber-700">{report.kpi_summary.active_companies_count || 0}</span>
-                    </div>
+            {report.template_type !== 'pending_tasks' && report.included_sections?.kpi_summary && report.kpi_summary && (() => {
+              const activeKpis = report.included_kpi_cards || report.included_sections?.kpi_cards || {};
+              if (report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined) {
+                const alCards = [
+                  { key: 'total_leads', label: 'Total Active Leads', val: report.kpi_summary.total_leads || 0, bg: 'bg-slate-50 border-blue-200', text: 'text-blue-900', labelText: 'text-slate-500' },
+                  { key: 'graduating_year', label: 'Graduating Batch', val: report.kpi_summary.graduating_year || '2027', bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700', labelText: 'text-emerald-800' },
+                  { key: 'active_companies_count', label: 'Corporate Partners', val: report.kpi_summary.active_companies_count || 0, bg: 'bg-amber-50 border-amber-200', text: 'text-amber-700', labelText: 'text-amber-800' },
+                ].filter((c) => activeKpis[c.key] !== false);
+
+                if (alCards.length === 0) return null;
+                return (
+                  <div className="flex flex-wrap gap-2">
+                    {alCards.map((c) => (
+                      <div key={c.key} className={`flex-1 min-w-[100px] border p-2 rounded-lg text-center ${c.bg}`}>
+                        <span className={`text-[10px] font-semibold uppercase block ${c.labelText}`}>{c.label}</span>
+                        <span className={`text-sm font-bold font-mono ${c.text}`}>{c.val}</span>
+                      </div>
+                    ))}
                   </div>
-                ) : (
-                  <div className="grid grid-cols-8 gap-1.5">
-                    <div className="bg-slate-50 border border-blue-200 p-1.5 rounded-lg text-center">
-                      <span className="text-[9px] text-slate-500 font-semibold uppercase block">Calls</span>
-                      <span className="text-xs font-bold font-mono text-blue-900">{report.kpi_summary.total_calls || 0}</span>
-                    </div>
-                    <div className="bg-slate-50 border border-emerald-200 p-1.5 rounded-lg text-center">
-                      <span className="text-[9px] text-slate-500 font-semibold uppercase block">Positives</span>
-                      <span className="text-xs font-bold font-mono text-emerald-700">{report.kpi_summary.positive_responses || 0}</span>
-                    </div>
-                    <div className="bg-slate-50 border border-cyan-200 p-1.5 rounded-lg text-center">
-                      <span className="text-[9px] text-slate-500 font-semibold uppercase block">JDs</span>
-                      <span className="text-xs font-bold font-mono text-cyan-700">{report.kpi_summary.jds_received || 0}</span>
-                    </div>
-                    <div className="bg-slate-50 border border-emerald-200 p-1.5 rounded-lg text-center">
-                      <span className="text-[9px] text-slate-500 font-semibold uppercase block">Completed</span>
-                      <span className="text-xs font-bold font-mono text-emerald-700">{report.kpi_summary.drives_completed || 0}</span>
-                    </div>
-                    <div className="bg-slate-50 border border-blue-200 p-1.5 rounded-lg text-center">
-                      <span className="text-[9px] text-slate-500 font-semibold uppercase block">In Progress</span>
-                      <span className="text-xs font-bold font-mono text-blue-700">{report.kpi_summary.drives_in_progress || 0}</span>
-                    </div>
-                    <div className="bg-slate-50 border border-cyan-200 p-1.5 rounded-lg text-center">
-                      <span className="text-[9px] text-slate-500 font-semibold uppercase block">Pipeline</span>
-                      <span className="text-xs font-bold font-mono text-cyan-700">{report.kpi_summary.pipeline_leads || 0}</span>
-                    </div>
-                    <div className="bg-amber-50/50 border border-amber-200 p-1.5 rounded-lg text-center">
-                      <span className="text-[9px] text-amber-800 font-semibold uppercase block">Top Cos</span>
-                      <span className="text-xs font-bold font-mono text-amber-700">{report.kpi_summary.top_companies_count || 0}</span>
-                    </div>
-                    <div className="bg-emerald-50 border border-emerald-300 p-1.5 rounded-lg text-center">
-                      <span className="text-[9px] text-emerald-800 font-bold uppercase block">Offers</span>
-                      <span className="text-xs font-bold font-mono text-emerald-700">{report.kpi_summary.total_offers || 0}</span>
-                    </div>
+                );
+              } else {
+                const wpCards = [
+                  { key: 'total_calls', label: 'Calls', val: report.kpi_summary.total_calls || 0, bg: 'bg-slate-50 border-blue-200', text: 'text-blue-900' },
+                  { key: 'positive_responses', label: 'Positives', val: report.kpi_summary.positive_responses || 0, bg: 'bg-slate-50 border-emerald-200', text: 'text-emerald-700' },
+                  { key: 'jds_received', label: 'JDs', val: report.kpi_summary.jds_received || 0, bg: 'bg-slate-50 border-cyan-200', text: 'text-cyan-700' },
+                  { key: 'drives_completed', label: 'Completed', val: report.kpi_summary.drives_completed || 0, bg: 'bg-slate-50 border-emerald-200', text: 'text-emerald-700' },
+                  { key: 'drives_in_progress', label: 'In Progress', val: report.kpi_summary.drives_in_progress || 0, bg: 'bg-slate-50 border-blue-200', text: 'text-blue-700' },
+                  { key: 'pipeline_leads', label: 'Pipeline', val: report.kpi_summary.pipeline_leads || 0, bg: 'bg-slate-50 border-cyan-200', text: 'text-cyan-700' },
+                  { key: 'top_companies_count', label: 'Top Cos', val: report.kpi_summary.top_companies_count || 0, bg: 'bg-amber-50/50 border-amber-200', text: 'text-amber-700' },
+                  { key: 'total_offers', label: 'Offers', val: report.kpi_summary.total_offers || 0, bg: 'bg-emerald-50 border-emerald-300', text: 'text-emerald-700' },
+                ].filter((c) => activeKpis[c.key] !== false);
+
+                if (wpCards.length === 0) return null;
+                return (
+                  <div className="flex flex-wrap gap-1.5">
+                    {wpCards.map((c) => (
+                      <div key={c.key} className={`flex-1 min-w-[70px] border p-1.5 rounded-lg text-center ${c.bg}`}>
+                        <span className="text-[9px] text-slate-500 font-semibold uppercase block truncate">{c.label}</span>
+                        <span className={`text-xs font-bold font-mono ${c.text}`}>{c.val}</span>
+                      </div>
+                    ))}
                   </div>
-                )}
-              </>
-            )}
+                );
+              }
+            })()}
 
             {/* 4. Section 1: Companies Completed */}
             {report.included_sections?.completed_companies && report.sections?.completed_companies && (
@@ -474,6 +466,119 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                     </tbody>
                   </table>
                 )}
+              </div>
+            )}
+
+            {/* 8. Section 5: Rejected Companies */}
+            {((report.included_sections?.rejected_companies && report.sections?.rejected_companies && report.sections.rejected_companies.length > 0) ||
+              (report.included_sections?.rejected_by_hr && report.sections?.rejected_by_hr && report.sections.rejected_by_hr.length > 0)) && (
+              <div className="space-y-1.5">
+                <div className="px-3 py-1 rounded-md bg-rose-50 border border-rose-200 font-bold text-[11px] flex items-center justify-between text-rose-900">
+                  <span className="flex items-center gap-1.5">
+                    <XCircle size={13} className="text-rose-600" /> 5. REJECTED COMPANIES
+                  </span>
+                  <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded border border-rose-200 text-rose-700 font-bold">
+                    {(report.sections.rejected_companies || report.sections.rejected_by_hr).length} Declined
+                  </span>
+                </div>
+
+                <table className="w-full text-[11px] text-center border-collapse border border-slate-200">
+                  <thead>
+                    <tr className="bg-rose-100/60 text-rose-900 font-semibold text-[10px] uppercase border-b border-rose-200">
+                      <th className="py-1.5 px-2 w-8 text-center border-r border-rose-200">#</th>
+                      <th className="py-1.5 px-2.5 text-center border-r border-rose-200">Company Name</th>
+                      <th className="py-1.5 px-2.5 text-center border-r border-rose-200">Role</th>
+                      <th className="py-1.5 px-2 text-center border-r border-rose-200">CTC</th>
+                      <th className="py-1.5 px-2.5 text-center">Status / Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-rose-200 text-center">
+                    {(report.sections.rejected_companies || report.sections.rejected_by_hr).map((r: any, idx: number) => (
+                      <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-rose-50/30'}>
+                        <td className="py-1.5 px-2 text-center text-slate-500 font-mono border-r border-slate-200">{r.s_no}</td>
+                        <td className="py-1.5 px-2.5 text-center font-bold text-slate-900 border-r border-slate-200">{r.company_name}</td>
+                        <td className="py-1.5 px-2.5 text-center text-slate-700 border-r border-slate-200">{r.job_role}</td>
+                        <td className="py-1.5 px-2 text-center text-rose-700 font-semibold border-r border-slate-200">{r.ctc_lpa || '—'}</td>
+                        <td className="py-1.5 px-2.5 text-center text-rose-700 font-medium">{r.current_status_text}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* 9. Section 6: Companies On Hold By College */}
+            {((report.included_sections?.on_hold_by_college && report.sections?.on_hold_by_college && report.sections.on_hold_by_college.length > 0) ||
+              (report.included_sections?.rejected_by_college && report.sections?.rejected_by_college && report.sections.rejected_by_college.length > 0)) && (
+              <div className="space-y-1.5">
+                <div className="px-3 py-1 rounded-md bg-orange-50 border border-orange-200 font-bold text-[11px] flex items-center justify-between text-orange-900">
+                  <span className="flex items-center gap-1.5">
+                    <Clock size={13} className="text-orange-600" /> 6. COMPANIES ON HOLD BY COLLEGE
+                  </span>
+                  <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded border border-orange-200 text-orange-700 font-bold">
+                    {(report.sections.on_hold_by_college || report.sections.rejected_by_college).length} Holds
+                  </span>
+                </div>
+
+                <table className="w-full text-[11px] text-center border-collapse border border-slate-200">
+                  <thead>
+                    <tr className="bg-orange-100/60 text-orange-900 font-semibold text-[10px] uppercase border-b border-orange-200">
+                      <th className="py-1.5 px-2 w-8 text-center border-r border-orange-200">#</th>
+                      <th className="py-1.5 px-2.5 text-center border-r border-orange-200">Company Name</th>
+                      <th className="py-1.5 px-2.5 text-center border-r border-orange-200">Role</th>
+                      <th className="py-1.5 px-2 text-center border-r border-orange-200">CTC</th>
+                      <th className="py-1.5 px-2.5 text-center">Status / Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-orange-200 text-center">
+                    {(report.sections.on_hold_by_college || report.sections.rejected_by_college).map((r: any, idx: number) => (
+                      <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-orange-50/30'}>
+                        <td className="py-1.5 px-2 text-center text-slate-500 font-mono border-r border-slate-200">{r.s_no}</td>
+                        <td className="py-1.5 px-2.5 text-center font-bold text-slate-900 border-r border-slate-200">{r.company_name}</td>
+                        <td className="py-1.5 px-2.5 text-center text-slate-700 border-r border-slate-200">{r.job_role}</td>
+                        <td className="py-1.5 px-2 text-center text-orange-700 font-semibold border-r border-slate-200">{r.ctc_lpa || '—'}</td>
+                        <td className="py-1.5 px-2.5 text-center text-orange-700 font-medium">{r.current_status_text}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* 10. Section 7: Companies On Hold By HR */}
+            {report.included_sections?.on_hold_by_hr && report.sections?.on_hold_by_hr && report.sections.on_hold_by_hr.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="px-3 py-1 rounded-md bg-slate-100 border border-slate-300 font-bold text-[11px] flex items-center justify-between text-slate-800">
+                  <span className="flex items-center gap-1.5">
+                    <Clock size={13} className="text-slate-600" /> 7. COMPANIES ON HOLD BY HR
+                  </span>
+                  <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded border border-slate-300 text-slate-700 font-bold">
+                    {report.sections.on_hold_by_hr.length} Holds
+                  </span>
+                </div>
+
+                <table className="w-full text-[11px] text-center border-collapse border border-slate-200">
+                  <thead>
+                    <tr className="bg-slate-200/70 text-slate-800 font-semibold text-[10px] uppercase border-b border-slate-300">
+                      <th className="py-1.5 px-2 w-8 text-center border-r border-slate-300">#</th>
+                      <th className="py-1.5 px-2.5 text-center border-r border-slate-300">Company Name</th>
+                      <th className="py-1.5 px-2.5 text-center border-r border-slate-300">Role</th>
+                      <th className="py-1.5 px-2 text-center border-r border-slate-300">CTC</th>
+                      <th className="py-1.5 px-2.5 text-center">Status / Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 text-center">
+                    {report.sections.on_hold_by_hr.map((r: any, idx: number) => (
+                      <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                        <td className="py-1.5 px-2 text-center text-slate-500 font-mono border-r border-slate-200">{r.s_no}</td>
+                        <td className="py-1.5 px-2.5 text-center font-bold text-slate-900 border-r border-slate-200">{r.company_name}</td>
+                        <td className="py-1.5 px-2.5 text-center text-slate-700 border-r border-slate-200">{r.job_role}</td>
+                        <td className="py-1.5 px-2 text-center text-slate-700 font-semibold border-r border-slate-200">{r.ctc_lpa || '—'}</td>
+                        <td className="py-1.5 px-2.5 text-center text-slate-700 font-medium">{r.current_status_text}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
 

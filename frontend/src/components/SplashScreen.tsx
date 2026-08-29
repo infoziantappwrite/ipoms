@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { InfoziantMark } from './InfoziantMark';
 import { WaveLoader } from './WaveLoader';
+import { isAuthRoute } from '@/lib/theme';
 
 interface Props {
   /** Fired when the user advances early (click anywhere, or any keypress — see EntryPage). */
@@ -23,8 +24,8 @@ export function SplashScreen({ onSkip }: Props) {
     root.style.colorScheme = 'light';
 
     return () => {
-      // Revert when unmounting if dark was active
-      if (previousWasDark) {
+      // Revert only if next destination is an authenticated portal page and previously dark
+      if (!isAuthRoute() && previousWasDark) {
         root.classList.add('dark');
         root.classList.remove('light');
         root.style.colorScheme = 'dark';
@@ -45,7 +46,7 @@ export function SplashScreen({ onSkip }: Props) {
         <InfoziantMark size={160} />
 
         <div className="space-y-1">
-          <h1 className="font-display text-3xl font-bold tracking-tight text-primary drop-shadow-sm">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-primary drop-shadow-xs">
             iPOMS
           </h1>
           <p className="font-display text-xs font-semibold text-slate-500 tracking-normal whitespace-nowrap">

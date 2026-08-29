@@ -92,8 +92,12 @@ async function seedMetaDatabase() {
     try {
         // 1. Connect to MongoDB
         await (0, database_1.connectDatabase)();
-        // 2. Locate and load Meta Database.xlsx
-        const excelPath = path_1.default.resolve(__dirname, '../../../Meta Database.xlsx');
+        // 2. Locate and load Meta Database.xlsx or Meta_Database.xlsx
+        let excelPath = path_1.default.resolve(__dirname, '../../../Meta Database.xlsx');
+        const fs = require('fs');
+        if (!fs.existsSync(excelPath)) {
+            excelPath = path_1.default.resolve(__dirname, '../../../Meta_Database.xlsx');
+        }
         console.log(`📖 [Excel] Reading workbook from: ${excelPath}`);
         const workbook = xlsx.readFile(excelPath);
         const sheetName = workbook.SheetNames.includes('Meta Database')

@@ -18,14 +18,24 @@ import { Request, Response, NextFunction } from 'express';
  * ownership scoping, which lives in the handlers (see `scopeToSelf`).
  */
 
-/** Canonical role codes. Everything else normalises into one of these. */
-export type RoleCode = 'ADMINISTRATOR' | 'TEAM_LEADER' | 'PLACEMENT_COORDINATOR' | 'TPO';
+/**
+ * Canonical role codes. Everything else normalises into one of these.
+ *
+ * TPO (Training & Placement Officer — an external, read-only college contact)
+ * was removed 29 Aug 2026: the frontend never actually built a scoped
+ * experience for it, so any TPO account fell through to the full internal
+ * coordinator dashboard, which the backend then correctly 403'd on every real
+ * request — a broken account type nobody could use. Zero live accounts held
+ * this role at removal time (verified against the database). Re-add it here,
+ * in `ROLE_ALIASES`, `STAFF_AND_TPO` (call it that again), the `/colleges`
+ * policy, and `assignableRoles()` if TPO support is built for real later —
+ * this was a deliberate removal, not an oversight.
+ */
+export type RoleCode = 'ADMINISTRATOR' | 'TEAM_LEADER' | 'PLACEMENT_COORDINATOR';
 
 const ADMIN: RoleCode[] = ['ADMINISTRATOR'];
 const TL_ADMIN: RoleCode[] = ['ADMINISTRATOR', 'TEAM_LEADER'];
-/** Internal operational staff. Deliberately excludes TPO, who is external. */
 const STAFF: RoleCode[] = ['ADMINISTRATOR', 'TEAM_LEADER', 'PLACEMENT_COORDINATOR'];
-const STAFF_AND_TPO: RoleCode[] = [...STAFF, 'TPO'];
 
 /**
  * Legacy/misspelled role codes found in live `users.role_codes`.
@@ -45,7 +55,6 @@ const ROLE_ALIASES: Record<string, RoleCode> = {
   TEAM_LEADER: 'TEAM_LEADER',
   COORDINATOR: 'PLACEMENT_COORDINATOR',
   PLACEMENT_COORDINATOR: 'PLACEMENT_COORDINATOR',
-  TPO: 'TPO',
 };
 
 export function normalizeRole(raw: string): RoleCode | null {
@@ -75,6 +84,16 @@ const ID = '[a-f0-9]{24}';
 const POLICIES: Policy[] = [
   // ── Master company database ───────────────────────────────────────────────
   { method: 'GET',    pattern: new RegExp(`^/companies/search/?$`),      roles: STAFF },
+  // Bulk data-repair tooling — until 29 Aug 2026 these four bypassed BOTH
+  // authenticateJWT (a hardcoded exemption in authMiddleware.ts) and this
+  // policy table (via isPublic() below), so anyone with no account at all
+  // could trigger them. import-unique-companies is destructive: it deletes
+  // CompanyMetadata records with serial_number >= 3574. Administrator only,
+  // listed before the general /metadata rules so intent is unambiguous.
+  { method: 'GET',    pattern: /^\/metadata\/empty-mobiles\/?$/,          roles: ADMIN },
+  { method: '*',      pattern: /^\/metadata\/import-unique-companies\/?$/, roles: ADMIN },
+  { method: '*',      pattern: /^\/metadata\/export-missing-excel\/?$/,   roles: ADMIN },
+  { method: '*',      pattern: /^\/metadata\/renumber\/?$/,               roles: ADMIN },
   { method: 'DELETE', pattern: new RegExp(`^/metadata/${ID}/purge/?$`),  roles: ADMIN },
   { method: 'POST',   pattern: new RegExp(`^/metadata/${ID}/restore/?$`), roles: STAFF },
   { method: 'POST',   pattern: new RegExp(`^/metadata/bulk-import/?$`),  roles: STAFF },
@@ -85,7 +104,7 @@ const POLICIES: Policy[] = [
   { method: 'GET',    pattern: /^\/metadata\/?$/,                        roles: STAFF },
 
   // ── Colleges & staff directory ────────────────────────────────────────────
-  { method: 'GET',    pattern: /^\/colleges\/?$/,                        roles: STAFF_AND_TPO },
+  { method: 'GET',    pattern: /^\/colleges\/?$/,                        roles: STAFF },
   { method: 'GET',    pattern: /^\/coordinators\/?$/,                    roles: TL_ADMIN },
 
   // ── Daily Tracker (own call log) ──────────────────────────────────────────
@@ -93,8 +112,6 @@ const POLICIES: Policy[] = [
   { method: '*',      pattern: /^\/tracker(\/.*)?$/,                     roles: STAFF },
 
   // ── Weekly Tracker ────────────────────────────────────────────────────────
-  // TPO is excluded entirely: their access is the finalized Weekly Placement
-  // REPORT, not the live operational board (V1_DECISIONS §8.2).
   // Destructive bulk import/reload: wipes and rebuilds WeeklyTracker from a
   // spreadsheet. Administrator only, and listed before the general
   // /weekly-tracker rule so intent is obvious to the next reader.
@@ -103,9 +120,6 @@ const POLICIES: Policy[] = [
   // mount in server.ts, so it carries its own authenticateJWT/authorizeRoles;
   // this entry keeps it visible to the coverage check.
   { method: 'GET',    pattern: /^\/health\/daily-leads-diagnostics\/?$/, roles: ADMIN },
-  // Every logged-in role needs the roster: staff to pick a working college, TPO
-  // to resolve their own. No longer public — see isPublic() below.
-  { method: 'GET',    pattern: /^\/colleges\/?$/,                        roles: STAFF_AND_TPO },
   { method: '*',      pattern: /^\/weekly-tracker(\/.*)?$/,              roles: STAFF },
 
   // ── Daily Leads & Active Leads ────────────────────────────────────────────
@@ -140,6 +154,7 @@ const POLICIES: Policy[] = [
   { method: '*',      pattern: /^\/notifications(\/.*)?$/,               roles: STAFF },
 
   // ── Users, profiles, roles ────────────────────────────────────────────────
+  { method: 'PATCH',  pattern: new RegExp(`^/users/${ID}/restore/?$`), roles: ADMIN },
   { method: 'PATCH',  pattern: new RegExp(`^/users/${ID}/unlock-profile/?$`), roles: TL_ADMIN },
   { method: 'DELETE', pattern: new RegExp(`^/users/${ID}/?$`),           roles: ADMIN },
   { method: 'PATCH',  pattern: new RegExp(`^/users/${ID}/?$`),           roles: TL_ADMIN },
@@ -176,7 +191,7 @@ const POLICIES: Policy[] = [
  * the authentication gate and the default-deny table in one step.
  */
 function isPublic(path: string): boolean {
-  return path === '/health' || path.startsWith('/auth') || path.startsWith('/metadata/empty-mobiles') || path.startsWith('/metadata/import-unique-companies') || path.startsWith('/metadata/export-missing-excel') || path.startsWith('/metadata/renumber');
+  return path === '/health' || path.startsWith('/auth');
 }
 
 function findPolicy(method: string, path: string): Policy | undefined {
@@ -295,8 +310,8 @@ export function refuseForeignOwner(req: Request, res: Response, ownerId: string 
  */
 export function assignableRoles(req: Request): RoleCode[] {
   const roles = (req.user?.roles || []).map(normalizeRole).filter(Boolean) as RoleCode[];
-  if (roles.includes('ADMINISTRATOR')) return ['ADMINISTRATOR', 'TEAM_LEADER', 'PLACEMENT_COORDINATOR', 'TPO'];
-  if (roles.includes('TEAM_LEADER')) return ['PLACEMENT_COORDINATOR', 'TPO'];
+  if (roles.includes('ADMINISTRATOR')) return ['ADMINISTRATOR', 'TEAM_LEADER', 'PLACEMENT_COORDINATOR'];
+  if (roles.includes('TEAM_LEADER')) return ['PLACEMENT_COORDINATOR'];
   return [];
 }
 

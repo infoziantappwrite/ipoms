@@ -1,8 +1,6 @@
-import mongoose from 'mongoose';
+import { connectDatabase, disconnectDatabase } from '../config/database';
 import { ActiveLead } from '../models/ActiveLead';
 import { User } from '../models/User';
-
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/ipoms_db';
 
 const LEADS_2027 = [
   {
@@ -145,10 +143,9 @@ const LEADS_2027 = [
 
 async function seedActiveLeads2027() {
   try {
-    await mongoose.connect(MONGODB_URI);
-    console.log('Connected to MongoDB');
+    await connectDatabase();
 
-    const coordinator = await User.findOne({ email: 'megaladevi@infoziant.com' }) || await User.findOne({});
+    const coordinator = await User.findOne({ official_email: 'megaladevi@infoziant.com' }) || await User.findOne({});
     const coordinatorId = coordinator?._id;
 
     console.log(`Clearing existing 2027 active leads to avoid duplicates...`);
@@ -167,7 +164,7 @@ async function seedActiveLeads2027() {
     const total2027 = await ActiveLead.countDocuments({ academic_year: '2027', is_deleted: false });
     console.log(`\n🎉 Success: ${total2027} Active Leads currently loaded for 2027 batch!`);
 
-    await mongoose.disconnect();
+    await disconnectDatabase();
     process.exit(0);
   } catch (err: any) {
     console.error('Error seeding active leads:', err);

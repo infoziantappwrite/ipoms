@@ -29,58 +29,46 @@ interface Props {
   isDeleting?: boolean;
 }
 
-// Calculate Monthly 4-Week Calendar display (Week 1: 1-7, Week 2: 8-14, Week 3: 15-21, Week 4: 22-MonthEnd)
+// Friday-to-Thursday week display, mirroring the backend's own week boundary
+// (getFridayWeekBounds() in server.ts) so the label always matches what
+// /weekly-tracker actually filters by for this offset. The previous version
+// computed calendar weeks (1st-7th, 8th-14th, ...) — a different boundary
+// than the Friday-Thursday weeks every row is actually stored against, so
+// the label never matched the real data even after the data itself is
+// correctly filtered.
 function formatWeekDisplay(offset: number) {
-  const now = new Date();
-  const currentDay = now.getDate();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
+  const targetDate = new Date();
+  targetDate.setDate(targetDate.getDate() + offset * 7);
 
-  // Current week index in current month (0: Week 1, 1: Week 2, 2: Week 3, 3: Week 4)
-  let currentWeekIndex = 0;
-  if (currentDay >= 1 && currentDay <= 7) currentWeekIndex = 0;
-  else if (currentDay >= 8 && currentDay <= 14) currentWeekIndex = 1;
-  else if (currentDay >= 15 && currentDay <= 21) currentWeekIndex = 2;
-  else currentWeekIndex = 3;
+  const day = targetDate.getDay(); // 0=Sun ... 5=Fri, 6=Sat
+  const diffToFriday = day >= 5 ? day - 5 : day + 2;
+  const startFriday = new Date(targetDate);
+  startFriday.setDate(targetDate.getDate() - diffToFriday);
 
-  // Calculate target absolute 4-week index
-  const currentAbsoluteWeek = (currentYear * 12 + currentMonth) * 4 + currentWeekIndex;
-  const targetAbsoluteWeek = currentAbsoluteWeek + offset;
+  const endThursday = new Date(startFriday);
+  endThursday.setDate(startFriday.getDate() + 6);
 
-  // Derive target year, month, and week number
-  const targetWeekIndex = ((targetAbsoluteWeek % 4) + 4) % 4; // 0, 1, 2, 3
-  const totalMonths = Math.floor(targetAbsoluteWeek / 4);
-  const targetYear = Math.floor(totalMonths / 12);
-  const targetMonth = ((totalMonths % 12) + 12) % 12; // 0 to 11
+  const startOfYear = new Date(startFriday.getFullYear(), 0, 1);
+  const pastDaysOfYear = (startFriday.getTime() - startOfYear.getTime()) / 86400000;
+  const weekNumber = Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
 
-  // Days range within month
-  const lastDayOfMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
-  let startDay = 1;
-  let endDay = 7;
+  const startDay = startFriday.getDate();
+  const endDay = endThursday.getDate();
+  const monthName = startFriday.toLocaleDateString('en-IN', { month: 'long' });
+  const startMonthShort = startFriday.toLocaleDateString('en-IN', { month: 'short' });
+  const endMonthShort = endThursday.toLocaleDateString('en-IN', { month: 'short' });
+  const year = startFriday.getFullYear();
 
-  if (targetWeekIndex === 0) {
-    startDay = 1;
-    endDay = 7;
-  } else if (targetWeekIndex === 1) {
-    startDay = 8;
-    endDay = 14;
-  } else if (targetWeekIndex === 2) {
-    startDay = 15;
-    endDay = 21;
-  } else {
-    startDay = 22;
-    endDay = lastDayOfMonth; // Stops exactly at the end of the month (e.g. 31 Aug)!
-  }
-
-  const startDate = new Date(targetYear, targetMonth, startDay);
-  const monthName = startDate.toLocaleDateString('en-IN', { month: 'long' });
-  const monthShort = startDate.toLocaleDateString('en-IN', { month: 'short' });
+  const rangeStr =
+    startFriday.getMonth() === endThursday.getMonth()
+      ? `${startDay} – ${endDay} ${endMonthShort} ${year}`
+      : `${startDay} ${startMonthShort} – ${endDay} ${endMonthShort} ${year}`;
 
   return {
-    monthlyWeekNumber: targetWeekIndex + 1,
+    monthlyWeekNumber: weekNumber,
     monthName,
-    year: targetYear,
-    rangeStr: `${startDay} ${monthShort} ${targetYear} – ${endDay} ${monthShort} ${targetYear}`,
+    year,
+    rangeStr,
     isCurrent: offset === 0,
   };
 }

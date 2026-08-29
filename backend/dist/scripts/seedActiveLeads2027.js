@@ -1,12 +1,8 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-const mongoose_1 = __importDefault(require("mongoose"));
+const database_1 = require("../config/database");
 const ActiveLead_1 = require("../models/ActiveLead");
 const User_1 = require("../models/User");
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/ipoms_db';
 const LEADS_2027 = [
     {
         company_name: 'Strategy',
@@ -147,9 +143,8 @@ const LEADS_2027 = [
 ];
 async function seedActiveLeads2027() {
     try {
-        await mongoose_1.default.connect(MONGODB_URI);
-        console.log('Connected to MongoDB');
-        const coordinator = await User_1.User.findOne({ email: 'megaladevi@infoziant.com' }) || await User_1.User.findOne({});
+        await (0, database_1.connectDatabase)();
+        const coordinator = await User_1.User.findOne({ official_email: 'megaladevi@infoziant.com' }) || await User_1.User.findOne({});
         const coordinatorId = coordinator?._id;
         console.log(`Clearing existing 2027 active leads to avoid duplicates...`);
         await ActiveLead_1.ActiveLead.deleteMany({ academic_year: '2027' });
@@ -164,7 +159,7 @@ async function seedActiveLeads2027() {
         }
         const total2027 = await ActiveLead_1.ActiveLead.countDocuments({ academic_year: '2027', is_deleted: false });
         console.log(`\n🎉 Success: ${total2027} Active Leads currently loaded for 2027 batch!`);
-        await mongoose_1.default.disconnect();
+        await (0, database_1.disconnectDatabase)();
         process.exit(0);
     }
     catch (err) {

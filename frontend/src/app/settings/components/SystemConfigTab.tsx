@@ -1,7 +1,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Building2, CalendarDays, Settings, Monitor, Sun } from 'lucide-react';
+import {
+  Building2,
+  CalendarDays,
+  Settings,
+  Monitor,
+  Sun,
+  Megaphone,
+  Wrench,
+  ShieldCheck,
+  Clock,
+  Send,
+  AlertTriangle,
+} from 'lucide-react';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
 
 interface Props {
@@ -10,35 +22,85 @@ interface Props {
 }
 
 export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
-  const [academicYear, setAcademicYear] = useState(settingsData?.academic_year || '2025-2026');
-  const [seasonName, setSeasonName] = useState(settingsData?.season_name || 'Campus Recruitment Season 2025-26');
+  const [academicYear, setAcademicYear] = useState(settingsData?.academic_year || '2026-2027');
+  const [seasonName, setSeasonName] = useState(settingsData?.season_name || 'Campus Recruitment Season 2026-27');
   const [dailyTarget, setDailyTarget] = useState(settingsData?.daily_calling_target || 30);
   const [orgName, setOrgName] = useState(settingsData?.org_name || 'Infoziant Placement Operations');
   const [supportEmail, setSupportEmail] = useState(settingsData?.org_support_email || 'support@infoziant.com');
   const [supportPhone, setSupportPhone] = useState(settingsData?.org_support_phone || '+91 98401 23456');
-  const [themeDefault, setThemeDefault] = useState(settingsData?.theme_default || 'dark');
+  const [themeDefault, setThemeDefault] = useState(settingsData?.theme_default || 'light');
   const [landingPage, setLandingPage] = useState(settingsData?.default_landing_page || '/dashboard');
   const [emailNotifs, setEmailNotifs] = useState(settingsData?.enable_email_notifications ?? true);
   const [systemNotifs, setSystemNotifs] = useState(settingsData?.enable_system_notifications ?? true);
   const [dashboardPopups, setDashboardPopups] = useState(settingsData?.enable_dashboard_popups ?? true);
-  const [banner, setBanner] = useState(settingsData?.system_announcement_banner || '');
+
+  // Structured Announcement State (Item #7)
+  const [announcementTitle, setAnnouncementTitle] = useState(settingsData?.announcement_title || '');
+  const [announcementMsg, setAnnouncementMsg] = useState(settingsData?.announcement_message || settingsData?.system_announcement_banner || '');
+  const [announcementStartDate, setAnnouncementStartDate] = useState(
+    settingsData?.announcement_start_date ? new Date(settingsData.announcement_start_date).toISOString().slice(0, 10) : ''
+  );
+  const [announcementEndDate, setAnnouncementEndDate] = useState(
+    settingsData?.announcement_end_date ? new Date(settingsData.announcement_end_date).toISOString().slice(0, 10) : ''
+  );
+  const [announcementPublished, setAnnouncementPublished] = useState(settingsData?.announcement_is_published ?? false);
+
+  // Maintenance Mode State (Item #6)
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(settingsData?.maintenance_mode_enabled ?? false);
+  const [maintenanceReason, setMaintenanceReason] = useState(settingsData?.maintenance_reason || '');
+  const [affectedRoles, setAffectedRoles] = useState<string[]>(
+    settingsData?.maintenance_affected_roles || ['PLACEMENT_COORDINATOR', 'TEAM_LEADER']
+  );
+  const [maintenanceStartTime, setMaintenanceStartTime] = useState(
+    settingsData?.maintenance_start_time ? new Date(settingsData.maintenance_start_time).toISOString().slice(0, 16) : ''
+  );
+  const [maintenanceEndTime, setMaintenanceEndTime] = useState(
+    settingsData?.maintenance_end_time ? new Date(settingsData.maintenance_end_time).toISOString().slice(0, 16) : ''
+  );
 
   useEffect(() => {
     if (settingsData) {
-      setAcademicYear(settingsData.academic_year || '2025-2026');
-      setSeasonName(settingsData.season_name || 'Campus Recruitment Season 2025-26');
+      setAcademicYear(settingsData.academic_year || '2026-2027');
+      setSeasonName(settingsData.season_name || 'Campus Recruitment Season 2026-27');
       setDailyTarget(settingsData.daily_calling_target || 30);
       setOrgName(settingsData.org_name || 'Infoziant Placement Operations');
       setSupportEmail(settingsData.org_support_email || 'support@infoziant.com');
       setSupportPhone(settingsData.org_support_phone || '+91 98401 23456');
-      setThemeDefault(settingsData.theme_default || 'dark');
+      setThemeDefault(settingsData.theme_default || 'light');
       setLandingPage(settingsData.default_landing_page || '/dashboard');
       setEmailNotifs(settingsData.enable_email_notifications ?? true);
       setSystemNotifs(settingsData.enable_system_notifications ?? true);
       setDashboardPopups(settingsData.enable_dashboard_popups ?? true);
-      setBanner(settingsData.system_announcement_banner || '');
+
+      setAnnouncementTitle(settingsData.announcement_title || '');
+      setAnnouncementMsg(settingsData.announcement_message || settingsData.system_announcement_banner || '');
+      setAnnouncementStartDate(
+        settingsData.announcement_start_date ? new Date(settingsData.announcement_start_date).toISOString().slice(0, 10) : ''
+      );
+      setAnnouncementEndDate(
+        settingsData.announcement_end_date ? new Date(settingsData.announcement_end_date).toISOString().slice(0, 10) : ''
+      );
+      setAnnouncementPublished(settingsData.announcement_is_published ?? false);
+
+      setMaintenanceEnabled(settingsData.maintenance_mode_enabled ?? false);
+      setMaintenanceReason(settingsData.maintenance_reason || '');
+      setAffectedRoles(settingsData.maintenance_affected_roles || ['PLACEMENT_COORDINATOR', 'TEAM_LEADER']);
+      setMaintenanceStartTime(
+        settingsData.maintenance_start_time ? new Date(settingsData.maintenance_start_time).toISOString().slice(0, 16) : ''
+      );
+      setMaintenanceEndTime(
+        settingsData.maintenance_end_time ? new Date(settingsData.maintenance_end_time).toISOString().slice(0, 16) : ''
+      );
     }
   }, [settingsData]);
+
+  const handleToggleRole = (roleCode: string) => {
+    if (affectedRoles.includes(roleCode)) {
+      setAffectedRoles(affectedRoles.filter((r) => r !== roleCode));
+    } else {
+      setAffectedRoles([...affectedRoles, roleCode]);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,18 +116,202 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
       enable_email_notifications: emailNotifs,
       enable_system_notifications: systemNotifs,
       enable_dashboard_popups: dashboardPopups,
-      system_announcement_banner: banner.trim(),
+      system_announcement_banner: announcementMsg.trim(),
+      announcement_title: announcementTitle.trim(),
+      announcement_message: announcementMsg.trim(),
+      announcement_start_date: announcementStartDate || null,
+      announcement_end_date: announcementEndDate || null,
+      announcement_is_published: announcementPublished,
+      maintenance_mode_enabled: maintenanceEnabled,
+      maintenance_affected_roles: affectedRoles,
+      maintenance_reason: maintenanceReason.trim(),
+      maintenance_start_time: maintenanceStartTime ? new Date(maintenanceStartTime).toISOString() : null,
+      maintenance_end_time: maintenanceEndTime ? new Date(maintenanceEndTime).toISOString() : null,
     });
-    alert('Global System Settings updated successfully! ⚙️');
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 text-xs max-w-4xl">
+    <form onSubmit={handleSubmit} className="space-y-6 text-xs max-w-4xl mx-auto w-full">
+      {/* ── 1. Structured Organization Announcement Management (Module 10 §7) ── */}
+      <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-4">
+        <div className="border-b border-border pb-3 flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h3 className="text-xs font-bold text-fg flex items-center gap-2">
+              <Megaphone size={15} className="text-primary" /> Organization Announcement Broadcaster
+            </h3>
+            <p className="text-micro text-fg-subtle mt-0.5">
+              Publish timed global announcement banners to coordinators and team leaders
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                announcementPublished
+                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                  : 'bg-surface-sunken text-fg-subtle border-border'
+              }`}
+            >
+              {announcementPublished ? 'Live on Dashboards' : 'Draft / Inactive'}
+            </span>
+          </div>
+        </div>
 
-      {/* Season & Daily Target Configuration (Spec Section 2) */}
+        <div className="space-y-3">
+          <div>
+            <label className="block text-fg-muted font-semibold mb-1">Announcement Title</label>
+            <input
+              type="text"
+              placeholder="e.g. End-of-Week Placement Drive Notice"
+              value={announcementTitle}
+              onChange={(e) => setAnnouncementTitle(e.target.value)}
+              className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-fg text-xs focus:border-primary focus:outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-fg-muted font-semibold mb-1">Announcement Message Body</label>
+            <textarea
+              rows={2}
+              placeholder="Enter message to broadcast across all coordinator and team leader screens…"
+              value={announcementMsg}
+              onChange={(e) => setAnnouncementMsg(e.target.value)}
+              className="w-full bg-surface-sunken border border-border rounded-lg p-3 text-fg text-xs focus:border-primary focus:outline-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center pt-1">
+            <div>
+              <label className="block text-fg-muted font-semibold mb-1">Start Date</label>
+              <input
+                type="date"
+                value={announcementStartDate}
+                onChange={(e) => setAnnouncementStartDate(e.target.value)}
+                className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-1.5 text-fg text-xs font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-fg-muted font-semibold mb-1">End Date</label>
+              <input
+                type="date"
+                value={announcementEndDate}
+                onChange={(e) => setAnnouncementEndDate(e.target.value)}
+                className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-1.5 text-fg text-xs font-mono"
+              />
+            </div>
+
+            <div className="pt-4">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={announcementPublished}
+                  onChange={(e) => setAnnouncementPublished(e.target.checked)}
+                  className="rounded bg-surface border-border-strong text-primary "
+                />
+                <span className="text-fg font-bold">Publish to All Portals</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 2. Maintenance Mode Controller (Module 10 §6) ── */}
+      <div className={`glass-panel rounded-2xl border p-6 space-y-4 shadow-4 transition-colors ${maintenanceEnabled ? 'border-amber-500/40 bg-amber-500/5' : 'border-border'}`}>
+        <div className="border-b border-border pb-3 flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h3 className="text-xs font-bold text-fg flex items-center gap-2">
+              <Wrench size={15} className={maintenanceEnabled ? 'text-amber-500' : 'text-primary'} /> System Maintenance Mode Controller
+            </h3>
+            <p className="text-micro text-fg-subtle mt-0.5">
+              Temporarily restrict access for operational staff during database upgrades or migrations
+            </p>
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={maintenanceEnabled}
+              onChange={(e) => setMaintenanceEnabled(e.target.checked)}
+              className="rounded bg-surface border-border-strong text-amber-500 h-4 w-4"
+            />
+            <span className={`text-xs font-bold ${maintenanceEnabled ? 'text-amber-600 dark:text-amber-400' : 'text-fg-subtle'}`}>
+              {maintenanceEnabled ? 'Maintenance Enabled' : 'Maintenance Disabled'}
+            </span>
+          </label>
+        </div>
+
+        {maintenanceEnabled && (
+          <div className="space-y-3 pt-1">
+            <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 text-micro text-amber-700 dark:text-amber-300 flex items-center gap-2">
+              <ShieldCheck size={16} className="text-emerald-500 shrink-0" />
+              <span>Administrator accounts remain strictly exempt and can log in at any time to administer the platform.</span>
+            </div>
+
+            <div>
+              <label className="block text-fg-muted font-semibold mb-1">Maintenance Reason (Shown to Users)</label>
+              <input
+                type="text"
+                placeholder="e.g. Scheduled database optimization and quarterly index rebalancing."
+                value={maintenanceReason}
+                onChange={(e) => setMaintenanceReason(e.target.value)}
+                className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-fg text-xs focus:border-amber-500 focus:outline-none"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-fg-muted font-semibold mb-1">Window Start (Date & Time)</label>
+                <input
+                  type="datetime-local"
+                  value={maintenanceStartTime}
+                  onChange={(e) => setMaintenanceStartTime(e.target.value)}
+                  className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-1.5 text-fg text-xs font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-fg-muted font-semibold mb-1">Window End (Expected Completion)</label>
+                <input
+                  type="datetime-local"
+                  value={maintenanceEndTime}
+                  onChange={(e) => setMaintenanceEndTime(e.target.value)}
+                  className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-1.5 text-fg text-xs font-mono"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-fg-muted font-semibold mb-1.5">Affected User Roles</label>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 cursor-pointer text-micro text-fg">
+                  <input
+                    type="checkbox"
+                    checked={affectedRoles.includes('PLACEMENT_COORDINATOR')}
+                    onChange={() => handleToggleRole('PLACEMENT_COORDINATOR')}
+                    className="rounded bg-surface border-border-strong text-primary"
+                  />
+                  <span>Placement Coordinators</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer text-micro text-fg">
+                  <input
+                    type="checkbox"
+                    checked={affectedRoles.includes('TEAM_LEADER')}
+                    onChange={() => handleToggleRole('TEAM_LEADER')}
+                    className="rounded bg-surface border-border-strong text-primary"
+                  />
+                  <span>Team Leaders</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── 3. Season & Daily Target Configuration ── */}
       <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-4">
         <div className="border-b border-border pb-3">
-          <h3 className="text-xs font-bold text-white flex items-center gap-2">
+          <h3 className="text-xs font-bold text-fg flex items-center gap-2">
             <CalendarDays size={14} strokeWidth={2} aria-hidden /> Placement Season & Operational Targets
           </h3>
           <p className="text-micro text-fg-subtle mt-0.5">
@@ -80,7 +326,7 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
               type="text"
               value={academicYear}
               onChange={(e) => setAcademicYear(e.target.value)}
-              className="w-full bg-background border border-border-strong rounded-lg px-3 py-2 text-fg font-mono"
+              className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-fg font-mono text-xs"
             />
           </div>
 
@@ -90,7 +336,7 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
               type="text"
               value={seasonName}
               onChange={(e) => setSeasonName(e.target.value)}
-              className="w-full bg-background border border-border-strong rounded-lg px-3 py-2 text-fg "
+              className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-fg text-xs"
             />
           </div>
 
@@ -102,16 +348,16 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
               max={100}
               value={dailyTarget}
               onChange={(e) => setDailyTarget(Number(e.target.value))}
-              className="w-full bg-background border border-border-strong rounded-lg px-3 py-2 text-fg font-mono"
+              className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-fg font-mono text-xs"
             />
           </div>
         </div>
       </div>
 
-      {/* Organization Branding & Support (Spec Section 12) */}
+      {/* ── 4. Organization Branding & Support ── */}
       <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-4">
         <div className="border-b border-border pb-3">
-          <h3 className="text-xs font-bold text-white flex items-center gap-2">
+          <h3 className="text-xs font-bold text-fg flex items-center gap-2">
             <Building2 size={14} strokeWidth={2} aria-hidden /> Organization Branding & Support
           </h3>
           <p className="text-micro text-fg-subtle mt-0.5">
@@ -126,7 +372,7 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
               type="text"
               value={orgName}
               onChange={(e) => setOrgName(e.target.value)}
-              className="w-full bg-background border border-border-strong rounded-lg px-3 py-2 text-fg "
+              className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-fg text-xs"
             />
           </div>
 
@@ -136,7 +382,7 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
               type="email"
               value={supportEmail}
               onChange={(e) => setSupportEmail(e.target.value)}
-              className="w-full bg-background border border-border-strong rounded-lg px-3 py-2 text-fg font-mono"
+              className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-fg font-mono text-xs"
             />
           </div>
 
@@ -146,16 +392,16 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
               type="text"
               value={supportPhone}
               onChange={(e) => setSupportPhone(e.target.value)}
-              className="w-full bg-background border border-border-strong rounded-lg px-3 py-2 text-fg font-mono"
+              className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-fg font-mono text-xs"
             />
           </div>
         </div>
       </div>
 
-      {/* Preferences & Notifications (Spec Section 10 & 11) */}
+      {/* ── 5. Preferences & Notification Channels ── */}
       <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-4">
         <div className="border-b border-border pb-3">
-          <h3 className="text-xs font-bold text-white flex items-center gap-2">
+          <h3 className="text-xs font-bold text-fg flex items-center gap-2">
             <Settings size={14} strokeWidth={2} aria-hidden /> Application Delivery & Preferences
           </h3>
           <p className="text-micro text-fg-subtle mt-0.5">
@@ -190,8 +436,8 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
               icon={Sun}
               title="Default UI Theme"
               options={[
-                { value: 'dark', label: 'Dark Theme (Standard Executive Slate)' },
-                { value: 'light', label: 'Light Theme' },
+                { value: 'light', label: 'Light Theme (Clean Crisp Minimal)' },
+                { value: 'dark', label: 'Dark Theme' },
                 { value: 'system', label: 'System Default' },
               ]}
             />
@@ -199,13 +445,13 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
         </div>
 
         {/* Notification Switches */}
-        <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-border/80">
+        <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-border">
           <label className="flex items-center gap-2 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={emailNotifs}
               onChange={(e) => setEmailNotifs(e.target.checked)}
-              className="rounded bg-surface border-border-strong text-primary "
+              className="rounded bg-surface border-border-strong text-primary"
             />
             <span className="text-fg-muted font-semibold">Email Alerts Active</span>
           </label>
@@ -215,7 +461,7 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
               type="checkbox"
               checked={systemNotifs}
               onChange={(e) => setSystemNotifs(e.target.checked)}
-              className="rounded bg-surface border-border-strong text-primary "
+              className="rounded bg-surface border-border-strong text-primary"
             />
             <span className="text-fg-muted font-semibold">In-App Notifications</span>
           </label>
@@ -225,23 +471,22 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
               type="checkbox"
               checked={dashboardPopups}
               onChange={(e) => setDashboardPopups(e.target.checked)}
-              className="rounded bg-surface border-border-strong text-primary "
+              className="rounded bg-surface border-border-strong text-primary"
             />
             <span className="text-fg-muted font-semibold">Dashboard Popups</span>
           </label>
         </div>
       </div>
 
-      {/* Save Button */}
+      {/* ── Save Settings Button ── */}
       <div className="flex justify-end pt-2">
         <button
           type="submit"
-          className="px-6 py-2.5 bg-primary hover:bg-primary text-white rounded-xl font-bold shadow-3 transition-colors text-xs flex items-center gap-1.5"
+          className="px-6 py-2.5 bg-primary hover:bg-primary text-white rounded-xl font-bold shadow-3 transition-colors text-xs flex items-center gap-1.5 cursor-pointer"
         >
           <Settings size={14} strokeWidth={2.2} aria-hidden /> Save System Configuration
         </button>
       </div>
-
     </form>
   );
 }

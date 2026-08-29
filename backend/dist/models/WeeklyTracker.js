@@ -36,10 +36,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.WeeklyTracker = exports.PIPELINE_SECTIONS = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 exports.PIPELINE_SECTIONS = [
-    'pipeline',
-    'in_progress',
     'completed',
+    'in_progress',
+    'pipeline',
     'top_companies',
+    'rejected_companies',
+    'on_hold_by_college',
+    'on_hold_by_hr',
     'rejected_by_hr',
     'rejected_by_college',
 ];

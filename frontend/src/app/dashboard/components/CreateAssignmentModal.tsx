@@ -7,15 +7,16 @@ import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
 
 interface Props {
+  initialCoordinatorId?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function CreateAssignmentModal({ onClose, onSuccess }: Props) {
+export function CreateAssignmentModal({ initialCoordinatorId, onClose, onSuccess }: Props) {
   const [coordinators, setCoordinators] = useState<any[]>([]);
   const [colleges, setColleges] = useState<any[]>([]);
 
-  const [coordinatorId, setCoordinatorId] = useState('');
+  const [coordinatorId, setCoordinatorId] = useState(initialCoordinatorId || '');
   const [collegeId, setCollegeId] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [hrName, setHrName] = useState('');
@@ -36,7 +37,11 @@ export function CreateAssignmentModal({ onClose, onSuccess }: Props) {
 
         if (corRes.success && corRes.data?.coordinators?.length > 0) {
           setCoordinators(corRes.data.coordinators);
-          setCoordinatorId(corRes.data.coordinators[0]._id);
+          if (!initialCoordinatorId) {
+            setCoordinatorId(corRes.data.coordinators[0]._id);
+          } else {
+            setCoordinatorId(initialCoordinatorId);
+          }
         }
         if (colRes.success && colRes.data?.colleges?.length > 0) {
           setColleges(colRes.data.colleges);
@@ -48,7 +53,7 @@ export function CreateAssignmentModal({ onClose, onSuccess }: Props) {
     };
 
     fetchData();
-  }, []);
+  }, [initialCoordinatorId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

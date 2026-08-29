@@ -178,11 +178,13 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
                 onChange={setSelectedRole}
                 icon={Shield}
                 title="Select System Role"
+                // TPO removed 29 Aug 2026 — no dashboard experience exists for
+                // it, so creating one produced an unusable account. Re-add
+                // once TPO gets a real, scoped frontend (see routePolicy.ts).
                 options={[
                   { value: 'PLACEMENT_COORDINATOR', label: 'Placement Coordinator' },
                   { value: 'TEAM_LEADER', label: 'Team Leader' },
                   { value: 'ADMINISTRATOR', label: 'Administrator (CEO / Director)' },
-                  { value: 'TPO', label: 'Training & Placement Officer (TPO)' },
                 ]}
               />
             </div>
@@ -195,9 +197,11 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
                 icon={Activity}
                 title="Account Status"
                 options={[
-                  { value: 'active', label: 'Active (Full Access)' },
-                  { value: 'inactive', label: 'Inactive / On Leave' },
-                  { value: 'blocked', label: 'Blocked' },
+                  { value: 'active', label: 'Active (Full Working)' },
+                  { value: 'partial_working', label: 'Partial Working (Reduced Load / Shift)' },
+                  { value: 'on_leave', label: 'On Leave (Approved Leave)' },
+                  { value: 'inactive', label: 'Inactive' },
+                  { value: 'blocked', label: 'Blocked / Locked Out' },
                   { value: 'deactivated', label: 'Deactivated' },
                 ]}
               />

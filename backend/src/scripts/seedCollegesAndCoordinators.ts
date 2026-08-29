@@ -181,7 +181,7 @@ async function seedCollegesAndCoordinators() {
     console.log(`\n👥 [Coordinators] Found ${rawCoordinators.length} coordinators in Excel sheet...`);
 
     const coordinatorRole = await Role.findOne({ role_code: 'PLACEMENT_COORDINATOR' });
-    const teamLeadRole = await Role.findOne({ role_code: 'TEAM_LEAD' });
+    const teamLeadRole = await Role.findOne({ role_code: { $in: ['TEAM_LEADER', 'TEAM_LEAD'] } });
     const defaultPasswordHash = await bcrypt.hash('iPOMS@123', 12);
 
     function deriveCleanUsername(fullName: string): string {
@@ -205,10 +205,10 @@ async function seedCollegesAndCoordinators() {
 
       const cleanUsername = deriveCleanUsername(fullName);
       const isTeamLead = fullName.toLowerCase().includes('sujitha') || email.toLowerCase().includes('sujitha');
-      const roleCode = isTeamLead ? 'TEAM_LEAD' : 'PLACEMENT_COORDINATOR';
+      const roleCode = isTeamLead ? (teamLeadRole?.role_code || 'TEAM_LEADER') : 'PLACEMENT_COORDINATOR';
       const roleObj = isTeamLead ? teamLeadRole : coordinatorRole;
 
-      let userDoc = await User.findOne({ official_email: email });
+      let userDoc = await User.findOne({ $or: [{ official_email: email }, { username: cleanUsername }] });
 
       if (!userDoc) {
         userDoc = await User.create({

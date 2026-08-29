@@ -3,18 +3,24 @@ import mongoose, { Document, Schema, Model, Types } from 'mongoose';
 // ─── Pipeline Section Enum ──────────────────────────────────────────────────
 // Spec: Module_04_Weekly_Tracker_Specification_v1.0.md — Section 7 & 8
 export type PipelineSection =
-  | 'pipeline'
-  | 'in_progress'
   | 'completed'
+  | 'in_progress'
+  | 'pipeline'
   | 'top_companies'
+  | 'rejected_companies'
+  | 'on_hold_by_college'
+  | 'on_hold_by_hr'
   | 'rejected_by_hr'
   | 'rejected_by_college';
 
 export const PIPELINE_SECTIONS: PipelineSection[] = [
-  'pipeline',
-  'in_progress',
   'completed',
+  'in_progress',
+  'pipeline',
   'top_companies',
+  'rejected_companies',
+  'on_hold_by_college',
+  'on_hold_by_hr',
   'rejected_by_hr',
   'rejected_by_college',
 ];

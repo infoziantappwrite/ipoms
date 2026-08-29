@@ -68,18 +68,9 @@ const SYSTEM_ROLES = [
             'reports:generate_assigned',
         ],
     },
-    {
-        role_code: 'TPO',
-        role_name: 'Training & Placement Officer',
-        description: 'External institutional placement officer with read-only report access',
-        status: 'active',
-        is_system_role: true,
-        permissions: [
-            'colleges:read_own',
-            'reports:read_weekly_placement_own',
-        ],
-    },
 ];
+// TPO removed 29 Aug 2026 — no frontend experience was ever built for it. See
+// the RoleCode comment in routePolicy.ts for the full reasoning.
 async function seedRolesAndAdmin() {
     console.log('\n=============================================================');
     console.log('👤 INFOZIANT iPOMS — ROLES & MASTER ADMIN SEEDING ENGINE');

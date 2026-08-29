@@ -16,7 +16,9 @@ interface Company {
   hr_name: string;
   hr_designation?: string;
   primary_mobile: string;
+  mobile_numbers?: string[];
   primary_email?: string;
+  email_ids?: string[];
   company_type?: string;
 }
 
@@ -106,6 +108,17 @@ export default function LoadContactsPage() {
 
   useEffect(() => {
     searchRef.current?.focus();
+  }, []);
+
+  // Keyboard: Escape key triggers Deselect All
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelected(new Set());
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   // ─── Shift + Click & Ctrl / Cmd Multi-Selection (Google Sheets / Excel Style) ───
@@ -232,7 +245,7 @@ export default function LoadContactsPage() {
                   <span>Load Today's Contacts</span>
                 </h1>
                 <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full font-bold">
-                  {isRecent ? 'Recent Database (Past 1–2 Weeks)' : 'Master Database Picker'}
+                  {isRecent ? 'Recent Data (S.No 3548+)' : 'Master Database Picker'}
                 </span>
               </div>
             </div>
@@ -320,19 +333,6 @@ export default function LoadContactsPage() {
                 Select All on Page ({companies.length})
               </button>
 
-              <button
-                type="button"
-                disabled={selected.size === 0}
-                onClick={handleDeselectAll}
-                className={`px-3 py-1.5 rounded-lg border text-[11px] font-medium transition-all shadow-xs ${
-                  selected.size === 0
-                    ? 'bg-surface/40 border-border/40 text-fg-disabled/40 cursor-not-allowed opacity-40'
-                    : 'bg-surface hover:bg-surface-raised border-border text-fg-subtle hover:text-fg cursor-pointer active:scale-95'
-                }`}
-              >
-                Deselect All
-              </button>
-
               {/* Top Pagination with Jump-to-Page Input */}
               {totalPages > 1 && (
                 <div className="flex items-center gap-1 ml-2 pl-2 border-l border-border">
@@ -415,17 +415,18 @@ export default function LoadContactsPage() {
                         className="rounded border-border text-primary focus:ring-primary cursor-pointer w-4 h-4"
                       />
                     </th>
-                    <th className="px-4 py-3.5 min-w-[220px] max-w-[280px]">Company Name</th>
-                    <th className="px-4 py-3.5">HR Name</th>
-                    <th className="px-4 py-3.5">Designation</th>
-                    <th className="px-4 py-3.5">Contact</th>
-                    <th className="px-4 py-3.5">Email ID</th>
-                    <th className="px-4 py-3.5">Sector</th>
+                    <th className="w-14 px-3 py-3.5 text-center font-mono text-[11px]">#</th>
+                    <th className="px-4 py-3.5 min-w-[200px] max-w-[280px] text-left">Company Name</th>
+                    <th className="px-4 py-3.5 min-w-[130px] max-w-[200px]">HR Name</th>
+                    <th className="px-4 py-3.5 whitespace-nowrap min-w-[150px]">Contact</th>
+                    <th className="px-4 py-3.5 min-w-[180px] max-w-[280px]">Email ID</th>
+                    <th className="px-4 py-3.5 whitespace-nowrap">Sector</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border font-sans bg-surface">
                   {companies.map((c, index) => {
                     const isSelected = selected.has(c._id);
+                    const serialNo = c.serial_number ?? ((page - 1) * 100 + index + 1);
                     return (
                       <tr
                         key={c._id}
@@ -436,7 +437,7 @@ export default function LoadContactsPage() {
                             : 'hover:bg-surface-sunken/80 text-fg'
                         }`}
                       >
-                        <td className="w-12 px-4 py-3 text-center">
+                        <td className="w-12 px-4 py-3 text-center whitespace-nowrap">
                           <input
                             type="checkbox"
                             checked={isSelected}
@@ -448,17 +449,55 @@ export default function LoadContactsPage() {
                             className="rounded border-border text-primary focus:ring-primary cursor-pointer w-4 h-4"
                           />
                         </td>
-                        <td className="px-4 py-3 font-bold text-fg min-w-[220px] max-w-[280px] break-words leading-snug">
+                        {/* Serial Number (#) - Numerical alone */}
+                        <td className="w-14 px-3 py-3 text-center font-mono text-xs font-bold text-fg-muted whitespace-nowrap tabular-nums">
+                          {serialNo}
+                        </td>
+                        {/* Company Name - Wrap Allowed */}
+                        <td className="px-4 py-3 font-bold text-fg min-w-[200px] max-w-[280px] break-words leading-snug text-xs">
                           {c.company_name}
                         </td>
-                        <td className="px-4 py-3 text-fg-muted font-medium">{c.hr_name || '—'}</td>
-                        <td className="px-4 py-3 text-fg-subtle text-[11px]">{c.hr_designation || 'HR'}</td>
-                        <td className="px-4 py-3 font-mono text-fg tabular-nums font-semibold">{c.primary_mobile || '—'}</td>
-                        <td className="px-4 py-3 text-fg-muted truncate max-w-[200px]" title={c.primary_email}>
-                          {c.primary_email || '—'}
+                        {/* HR Name - Wrap Allowed */}
+                        <td className="px-4 py-3 text-fg font-medium min-w-[130px] max-w-[200px]">
+                          <span className="break-words">{c.hr_name || '—'}</span>
                         </td>
-                        <td className="px-4 py-3">
-                          <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-surface-sunken text-fg-muted border border-border">
+                        {/* Mobile Number - NEVER Wrap Numbers */}
+                        <td className="px-4 py-3 font-mono text-fg tabular-nums font-semibold whitespace-nowrap min-w-[150px]">
+                          <div className="flex flex-col gap-1 items-start">
+                            {c.primary_mobile ? (
+                              <span className="whitespace-nowrap tabular-nums">{c.primary_mobile}</span>
+                            ) : (
+                              <span className="text-fg-subtle">—</span>
+                            )}
+                            {c.mobile_numbers
+                              ?.filter((m: string) => m !== c.primary_mobile)
+                              .map((m: string, i: number) => (
+                                <span key={i} className="text-fg-subtle text-[11px] whitespace-nowrap tabular-nums">
+                                  {m}
+                                </span>
+                              ))}
+                          </div>
+                        </td>
+                        {/* Email ID(s) - Wraps Multiple Emails Cleanly */}
+                        <td className="px-4 py-3 text-fg-muted min-w-[180px] max-w-[280px]">
+                          {c.email_ids && c.email_ids.length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              {c.email_ids.map((email: string, i: number) => (
+                                <span key={i} className="text-xs break-all leading-tight font-mono text-primary" title={email}>
+                                  {email}
+                                </span>
+                              ))}
+                            </div>
+                          ) : c.primary_email ? (
+                            <span className="text-xs break-all leading-tight font-mono text-primary" title={c.primary_email}>
+                              {c.primary_email}
+                            </span>
+                          ) : (
+                            <span className="text-fg-subtle">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-surface-sunken text-fg-muted border border-border whitespace-nowrap">
                             {c.company_type || 'General'}
                           </span>
                         </td>

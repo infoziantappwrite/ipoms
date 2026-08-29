@@ -90,6 +90,8 @@ const ReportLibrarySchema = new mongoose_1.Schema({
         completed_companies: { type: Boolean, default: true },
         in_progress: { type: Boolean, default: true },
         pipeline: { type: Boolean, default: true },
+        top_companies: { type: Boolean, default: true },
+        rejected_by_college: { type: Boolean, default: true },
         charts: { type: Boolean, default: true },
         insights: { type: Boolean, default: true },
         remarks: { type: Boolean, default: true },

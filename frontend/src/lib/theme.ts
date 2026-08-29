@@ -12,6 +12,17 @@ declare global {
 }
 
 /**
+ * Checks if the current pathname is an entry/auth screen (Splash, Login, Signup).
+ * Per design specification: Splash screen, Login, and Signup MUST ALWAYS be in Light Theme by default.
+ */
+export function isAuthRoute(pathname?: string): boolean {
+  if (typeof window === 'undefined') return false;
+  const path = pathname || window.location.pathname || '';
+  const cleanPath = path.length > 1 ? path.replace(/\/$/, '') : path;
+  return cleanPath === '' || cleanPath === '/' || cleanPath === '/login' || cleanPath === '/signup';
+}
+
+/**
  * Evaluates the time-based auto theme schedule:
  * - 7:00 PM (19:00) to 5:59:59 AM (05:59) -> Dark theme
  * - 6:00 AM (06:00) to 6:59:59 PM (18:59) -> Light theme
@@ -85,6 +96,7 @@ export function getResolvedTheme(theme?: Theme): 'light' | 'dark' {
 
 /**
  * Applies the given theme to the <html> document element and persists it.
+ * Note: Splash screen, Login, and Signup are permanently guaranteed to stay in Light Theme.
  * @param theme 'light' | 'dark' | 'system'
  * @param isManual boolean - if true, locks the theme fixed until toggled again
  */
@@ -100,8 +112,17 @@ export function applyTheme(theme: Theme, isManual: boolean = false) {
     // ignore
   }
 
-  const resolved = getResolvedTheme(theme);
   const root = document.documentElement;
+
+  // Enforce Light Theme on Splash, Login, and Signup pages
+  if (isAuthRoute()) {
+    root.classList.remove('dark');
+    root.classList.add('light');
+    root.style.colorScheme = 'light';
+    return;
+  }
+
+  const resolved = getResolvedTheme(theme);
 
   if (resolved === 'dark') {
     root.classList.add('dark');
@@ -132,23 +153,41 @@ export function toggleTheme(): 'light' | 'dark' {
 
 /**
  * Initializes theme engine on mount:
- * - Respects manual overrides if set
- * - Auto-applies 7:00 PM - 6:00 AM dark schedule if on default mode
+ * - Guarantees Light Theme on Splash, Login, and Signup pages
+ * - Respects manual overrides if set on portal routes
+ * - Auto-applies 7:00 PM - 6:00 AM dark schedule if on default mode on portal routes
  * - Runs a 30-second background watchdog to transition smoothly at 7:00 PM and 6:00 AM
  */
-export function initTheme() {
+export function initTheme(pathname?: string) {
   if (typeof window === 'undefined') return;
 
-  const current = getStoredTheme();
-  applyTheme(current, hasManualOverride());
+  const root = document.documentElement;
+
+  if (isAuthRoute(pathname)) {
+    root.classList.remove('dark');
+    root.classList.add('light');
+    root.style.colorScheme = 'light';
+  } else {
+    const current = getStoredTheme();
+    applyTheme(current, hasManualOverride());
+  }
 
   // 30-Second watchdog for time-based schedule transition
   if (!window.__ipoms_theme_interval_set) {
     window.__ipoms_theme_interval_set = true;
     setInterval(() => {
+      if (isAuthRoute()) {
+        const r = document.documentElement;
+        if (r.classList.contains('dark')) {
+          r.classList.remove('dark');
+          r.classList.add('light');
+          r.style.colorScheme = 'light';
+        }
+        return;
+      }
+
       if (!hasManualOverride()) {
         const scheduled = getScheduledTheme();
-        const root = document.documentElement;
         const isCurrentlyDark = root.classList.contains('dark');
         if ((scheduled === 'dark' && !isCurrentlyDark) || (scheduled === 'light' && isCurrentlyDark)) {
           applyTheme(scheduled, false);
@@ -160,7 +199,9 @@ export function initTheme() {
   // Cross-tab synchronization
   const handleStorage = (e: StorageEvent) => {
     if ((e.key === THEME_STORAGE_KEY || e.key === MANUAL_OVERRIDE_KEY) && e.newValue) {
-      applyTheme(getStoredTheme(), hasManualOverride());
+      if (!isAuthRoute()) {
+        applyTheme(getStoredTheme(), hasManualOverride());
+      }
     }
   };
   window.addEventListener('storage', handleStorage);
@@ -169,7 +210,7 @@ export function initTheme() {
   if (window.matchMedia) {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     const listener = () => {
-      if (getStoredTheme() === 'system' && !hasManualOverride()) {
+      if (!isAuthRoute() && getStoredTheme() === 'system' && !hasManualOverride()) {
         applyTheme('system', false);
       }
     };

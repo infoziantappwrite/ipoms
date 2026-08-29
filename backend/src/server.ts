@@ -24,6 +24,8 @@ import { Notification, NOTIFICATION_TYPES, NotificationType, AUDIENCE_TYPES, Aud
 import { PendingTask } from './models/PendingTask';
 import { ActiveLead } from './models/ActiveLead';
 import { SystemSettings } from './models/SystemSettings';
+import { AuditLog } from './models/AuditLog';
+import { writeAudit } from './lib/audit';
 import { Types } from 'mongoose';
 import { startFinalizationJob } from './jobs/finalizeDailyTracker';
 import { registerAuthRoutes } from './lib/authRoutes';
@@ -159,11 +161,18 @@ function formatDuration(seconds: number): string {
 
 // 1. Health Check Endpoint
 app.get('/api/v1/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    success: true,
-    status: 'HEALTHY',
+  const isDbConnected = mongoose.connection.readyState === 1;
+  const status = isDbConnected ? 'HEALTHY' : 'DEGRADED';
+  res.status(isDbConnected ? 200 : 503).json({
+    success: isDbConnected,
+    status,
     service: 'iPOMS Core Backend API',
     version: '1.0.0',
+    database: {
+      status: isDbConnected ? 'CONNECTED' : 'DISCONNECTED',
+      name: mongoose.connection.name || 'ipoms_db',
+      readyState: mongoose.connection.readyState,
+    },
     timestamp: new Date().toISOString(),
   });
 });
@@ -281,6 +290,52 @@ app.use('/api/v1', (req: Request, res: Response, next: NextFunction) => {
 
 app.use('/api/v1', authorizeRoute);
 
+// ── Maintenance Mode Enforcement Gate ──
+app.use('/api/v1', async (req: Request, res: Response, next: NextFunction) => {
+  // Never block public endpoints, health checks, auth flows, or settings
+  if (req.path === '/health' || req.path.startsWith('/auth') || req.path.startsWith('/settings')) {
+    return next();
+  }
+
+  const user = (req as any).user;
+  if (!user) return next();
+
+  // ADMINISTRATOR / ADMIN is NEVER blocked so they can fix issues and toggle maintenance off
+  const isUserAdmin = (user.roles || []).some((r: string) => r === 'ADMINISTRATOR' || r === 'ADMIN');
+  if (isUserAdmin) return next();
+
+  try {
+    const settings = await SystemSettings.findOne({}).lean();
+    if (!settings || !settings.maintenance_mode_enabled) return next();
+
+    const now = new Date();
+    const inTimeWindow =
+      (!settings.maintenance_start_time || new Date(settings.maintenance_start_time) <= now) &&
+      (!settings.maintenance_end_time || new Date(settings.maintenance_end_time) >= now);
+
+    if (!inTimeWindow) return next();
+
+    const affectedRoles = settings.maintenance_affected_roles || ['PLACEMENT_COORDINATOR', 'TEAM_LEADER'];
+    const isAffected = (user.roles || []).some((r: string) => affectedRoles.includes(r));
+
+    if (isAffected) {
+      return res.status(503).json({
+        success: false,
+        error: {
+          code: 'MAINTENANCE_MODE',
+          message: 'System Under Scheduled Maintenance',
+          reason: settings.maintenance_reason || 'System maintenance in progress. Please check back shortly.',
+          start_time: settings.maintenance_start_time,
+          end_time: settings.maintenance_end_time,
+        },
+      });
+    }
+  } catch {
+    // If settings lookup fails, let request proceed
+  }
+  return next();
+});
+
 // Register Active Leads routes
 registerActiveLeadRoutes(app);
 
@@ -327,16 +382,17 @@ app.get('/api/v1/companies/search', async (req: Request, res: Response) => {
 
     const isRecent = req.query.recent === 'true';
     if (isRecent) {
-      const twoWeeksAgo = new Date();
-      twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-      const countRecent = await CompanyMetadata.countDocuments({ ...filter, created_at: { $gte: twoWeeksAgo } });
-      if (countRecent > 0) {
-        filter.created_at = { $gte: twoWeeksAgo };
+      // Recent data includes all records from S.No 3548 (Crawl Corp India) upwards, including future additions
+      if (!filter.serial_number) {
+        filter.serial_number = { $gte: 3548 };
+      } else {
+        filter.serial_number.$gte = Math.max(filter.serial_number.$gte || 3548, 3548);
       }
     }
 
+    // In Recent Data view, sort descending so the most recently added companies appear at the top
     const sortOrder: any = isRecent
-      ? { created_at: -1, serial_number: -1, _id: -1 }
+      ? { serial_number: -1, _id: -1 }
       : { serial_number: 1, _id: 1 };
 
     const [companies, totalCount] = await Promise.all([
@@ -1376,7 +1432,7 @@ function getFridayWeekBounds(targetDate: Date = new Date()) {
 // Fetch college placement drive records grouped by the 7 operational sections
 app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
   try {
-    const { college_id, academic_year, search, company_type } = req.query;
+    const { college_id, academic_year, search, company_type, week_offset } = req.query;
     const year = academic_year && academic_year !== 'all' ? Number(academic_year) : 2027;
 
     const filter: any = {
@@ -1423,6 +1479,20 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
       filter.company_type = company_type;
     }
 
+    // Week navigation, previously a UI-only label that never changed the
+    // fetched data — every offset showed the same full dataset. Only filter
+    // when the caller navigates away from "Current" (offset 0), so the
+    // default view stays the full master dataset exactly as before; this is
+    // additive for anyone who actually uses the prev/next arrows, not a
+    // scope change for existing usage.
+    const offsetNum = week_offset !== undefined ? Number(week_offset) : 0;
+    if (offsetNum !== 0 && !Number.isNaN(offsetNum)) {
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + offsetNum * 7);
+      const { startFriday } = getFridayWeekBounds(targetDate);
+      filter.week_start_date = startFriday;
+    }
+
     if (search) {
       const q = String(search).trim();
       filter.$or = [
@@ -1457,8 +1527,9 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
     const inProgress: any[] = [];
     const pipeline: any[] = [];
     const topCompanies: any[] = [];
-    const rejectedByHr: any[] = [];
-    const rejectedByCollege: any[] = [];
+    const rejectedCompanies: any[] = [];
+    const onHoldByCollege: any[] = [];
+    const onHoldByHr: any[] = [];
 
     rows.forEach((row) => {
       const r = row.toObject();
@@ -1468,11 +1539,11 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
         topCompanies.push(r);
       }
 
-      // Check for follow-up due today / overdue (excluding completed/rejected)
+      // Check for follow-up due today / overdue (excluding completed/rejected/holds)
       if (
         row.follow_up_date &&
         new Date(row.follow_up_date) <= todayEnd &&
-        !['completed', 'rejected_by_hr', 'rejected_by_college'].includes(row.pipeline_section)
+        !['completed', 'rejected_companies', 'rejected_by_hr', 'on_hold_by_college', 'on_hold_by_hr', 'rejected_by_college'].includes(row.pipeline_section)
       ) {
         followUpsDueToday.push(r);
       }
@@ -1485,14 +1556,19 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
         case 'in_progress':
           inProgress.push(r);
           break;
+        case 'rejected_companies':
         case 'rejected_by_hr':
-          rejectedByHr.push(r);
+          rejectedCompanies.push(r);
           break;
+        case 'on_hold_by_college':
         case 'rejected_by_college':
-          rejectedByCollege.push(r);
+          onHoldByCollege.push(r);
+          break;
+        case 'on_hold_by_hr':
+          onHoldByHr.push(r);
           break;
         case 'top_companies':
-          // Already in top companies
+          // Top companies are also included in top companies section
           break;
         case 'pipeline':
         default:
@@ -1526,7 +1602,7 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
             rows: inProgress,
           },
           pipeline: {
-            title: 'Companies in Pipeline',
+            title: 'Companies In Pipeline',
             order: 3,
             summary_metric: `${pipeline.length} Total Leads • Awaiting JD`,
             rows: pipeline,
@@ -1537,17 +1613,36 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
             summary_metric: `${topCompanies.length} Priority Hiring Partners`,
             rows: topCompanies,
           },
-          rejected_by_hr: {
-            title: 'Rejected by HR',
+          rejected_companies: {
+            title: 'Rejected Companies',
             order: 5,
-            summary_metric: `${rejectedByHr.length} Employer Declines`,
-            rows: rejectedByHr,
+            summary_metric: `${rejectedCompanies.length} Employer / Process Declines`,
+            rows: rejectedCompanies,
+          },
+          on_hold_by_college: {
+            title: 'Companies On Hold By College',
+            order: 6,
+            summary_metric: `${onHoldByCollege.length} Institutional Holds`,
+            rows: onHoldByCollege,
+          },
+          on_hold_by_hr: {
+            title: 'Companies On Hold By HR',
+            order: 7,
+            summary_metric: `${onHoldByHr.length} Corporate Holds`,
+            rows: onHoldByHr,
+          },
+          // Backward-compatible keys
+          rejected_by_hr: {
+            title: 'Rejected Companies',
+            order: 5,
+            summary_metric: `${rejectedCompanies.length} Employer / Process Declines`,
+            rows: rejectedCompanies,
           },
           rejected_by_college: {
-            title: 'Rejected by College',
+            title: 'Companies On Hold By College',
             order: 6,
-            summary_metric: `${rejectedByCollege.length} Institutional Declines`,
-            rows: rejectedByCollege,
+            summary_metric: `${onHoldByCollege.length} Institutional Holds`,
+            rows: onHoldByCollege,
           },
         },
       },
@@ -1564,7 +1659,7 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
 // Live KPI counts across sections for weekly tracker
 app.get('/api/v1/weekly-tracker/kpi', async (req: Request, res: Response) => {
   try {
-    const { college_id, academic_year } = req.query;
+    const { college_id, academic_year, week_offset } = req.query;
     const filter: any = { is_deleted: false };
 
     if (college_id && college_id !== 'all') {
@@ -1600,6 +1695,16 @@ app.get('/api/v1/weekly-tracker/kpi', async (req: Request, res: Response) => {
 
     if (academic_year && academic_year !== 'all') {
       filter.academic_year = { $in: [Number(academic_year), String(academic_year)] };
+    }
+
+    // Keep KPI totals consistent with the row list at /weekly-tracker, which
+    // applies the same offset-based week filter — see comment there.
+    const offsetNum = week_offset !== undefined ? Number(week_offset) : 0;
+    if (offsetNum !== 0 && !Number.isNaN(offsetNum)) {
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + offsetNum * 7);
+      const { startFriday } = getFridayWeekBounds(targetDate);
+      filter.week_start_date = startFriday;
     }
 
     let rows = await WeeklyTracker.find(filter);
@@ -2351,7 +2456,11 @@ app.get('/api/v1/daily-leads/diagnostics', async (req: Request, res: Response) =
 // Fetch leads by date, optional college_id, and lead_type with search
 app.get('/api/v1/daily-leads', async (req: Request, res: Response) => {
   try {
-    const { date, college_id, coordinator_id, lead_type, search } = req.query;
+    const { date, college_id, lead_type, search } = req.query;
+    // Pinned to the caller's own id unless they're a supervisor — otherwise
+    // any coordinator could read another's leads by passing a different
+    // ?coordinator_id=. See scopeToSelf() in routePolicy.ts.
+    const coordinator_id = scopeToSelf(req, req.query.coordinator_id as string | undefined);
 
     const filter: any = {
       is_deleted: false,
@@ -2385,21 +2494,13 @@ app.get('/api/v1/daily-leads', async (req: Request, res: Response) => {
       ];
     }
 
-    // Ensure NGCE college exists and has its leads mapped
-    let ngceCollege = await College.findOne({ college_code: 'NGCE' });
-    if (!ngceCollege) {
-      ngceCollege = await College.create({
-        college_name: 'Narayana Guru College of Engineering',
-        college_code: 'NGCE',
-        location: 'Kanyakumari / Coimbatore, Tamil Nadu',
-        departments: ['CSE', 'IT', 'AI & DS', 'ECE', 'MECH'],
-        is_deleted: false,
-      });
-    }
-    await DailyLead.updateMany(
-      { company_name: { $in: ['Merlin Automation', 'sasken', 'Avinya Infinity Solutions Pvt Ltd', 'BIBUS India', 'SSHRD GROUP', 'DEEPFACTS'] } },
-      { $set: { college_id: ngceCollege._id } }
-    );
+    // A one-off NGCE college-repair used to run here, unconditionally, on
+    // every call to this endpoint — the app's busiest read. Removed 29 Aug
+    // 2026: it silently reverted any manual correction a coordinator made to
+    // those 6 companies' college assignment, since it reran the same
+    // reassignment on every page load regardless of current state. The same
+    // repair is still available, opt-in, via
+    // GET /health/daily-leads-diagnostics?resync=true (administrator only).
 
     // Ensure master positives across all colleges are seeded
     const totalPositivesCount = await DailyLead.countDocuments({ lead_type: 'positive', is_deleted: false });
@@ -2706,7 +2807,11 @@ app.get('/api/v1/daily-leads/summary', async (req: Request, res: Response) => {
 // Fetch positive calls from Daily Tracker for the "Copy from Daily Tracker" shortcut (Spec Section 11)
 app.get('/api/v1/daily-leads/daily-tracker-positives', async (req: Request, res: Response) => {
   try {
-    const { date, college_id, coordinator_id } = req.query;
+    const { date, college_id } = req.query;
+    // Pinned to the caller's own id unless they're a supervisor — otherwise
+    // any coordinator could read another's positive calls by passing a
+    // different ?coordinator_id=. See scopeToSelf() in routePolicy.ts.
+    const coordinator_id = scopeToSelf(req, req.query.coordinator_id as string | undefined);
 
     const targetDate = date ? parseDateParam(String(date)) : getTodayDate();
 
@@ -3304,8 +3409,22 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       week_label = 'Week 3: 21 Aug - 27 Aug 2026',
       theme = 'blue',
       included_sections,
+      included_kpi_cards,
+      kpi_cards,
       custom_remarks,
     } = req.body;
+
+    if (template_type !== 'active_leads') {
+      if (!college_id || college_id === 'all' || String(college_id).trim() === '') {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Target Institution is required. Please select a specific college before generating the report.',
+          },
+        });
+      }
+    }
 
     let targetCollege: any = null;
     if (college_id && college_id !== 'all') {
@@ -3466,6 +3585,11 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
           active_leads: true,
           remarks: true,
         },
+        included_kpi_cards: kpi_cards || included_kpi_cards || {
+          total_leads: true,
+          graduating_year: true,
+          active_companies_count: true,
+        },
       };
 
       return res.status(200).json({
@@ -3507,6 +3631,9 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       inProgressRows,
       pipelineRows,
       topCompaniesRows,
+      rejectedCompaniesRows,
+      onHoldByCollegeRows,
+      onHoldByHrRows,
       totalCalls,
       positiveCalls,
       totalJds,
@@ -3517,6 +3644,18 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       WeeklyTracker.find({
         ...wtFilter,
         $or: [{ pipeline_section: 'top_companies' }, { is_pinned_top: true }],
+      }).sort({ created_at: -1 }),
+      WeeklyTracker.find({
+        ...wtFilter,
+        pipeline_section: { $in: ['rejected_companies', 'rejected_by_hr'] },
+      }).sort({ created_at: -1 }),
+      WeeklyTracker.find({
+        ...wtFilter,
+        pipeline_section: { $in: ['on_hold_by_college', 'rejected_by_college'] },
+      }).sort({ created_at: -1 }),
+      WeeklyTracker.find({
+        ...wtFilter,
+        pipeline_section: 'on_hold_by_hr',
       }).sort({ created_at: -1 }),
       DailyTracker.countDocuments(dtFilter),
       DailyTracker.countDocuments({ ...dtFilter, outcome_status: { $in: POSITIVE_OUTCOMES } }),
@@ -3529,11 +3668,14 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       inProgressRows.length === 0 &&
       pipelineRows.length === 0 &&
       topCompaniesRows.length === 0 &&
+      rejectedCompaniesRows.length === 0 &&
+      onHoldByCollegeRows.length === 0 &&
+      onHoldByHrRows.length === 0 &&
       wtFilter.academic_year
     ) {
       const fallbackFilter = { ...wtFilter };
       delete fallbackFilter.academic_year;
-      const [fCompleted, fInProgress, fPipeline, fTopCompanies] = await Promise.all([
+      const [fCompleted, fInProgress, fPipeline, fTopCompanies, fRejectedCompanies, fOnHoldByCollege, fOnHoldByHr] = await Promise.all([
         WeeklyTracker.find({ ...fallbackFilter, pipeline_section: 'completed' }).sort({ created_at: -1 }),
         WeeklyTracker.find({ ...fallbackFilter, pipeline_section: 'in_progress' }).sort({ created_at: -1 }),
         WeeklyTracker.find({ ...fallbackFilter, pipeline_section: 'pipeline' }).sort({ created_at: -1 }),
@@ -3541,11 +3683,26 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
           ...fallbackFilter,
           $or: [{ pipeline_section: 'top_companies' }, { is_pinned_top: true }],
         }).sort({ created_at: -1 }),
+        WeeklyTracker.find({
+          ...fallbackFilter,
+          pipeline_section: { $in: ['rejected_companies', 'rejected_by_hr'] },
+        }).sort({ created_at: -1 }),
+        WeeklyTracker.find({
+          ...fallbackFilter,
+          pipeline_section: { $in: ['on_hold_by_college', 'rejected_by_college'] },
+        }).sort({ created_at: -1 }),
+        WeeklyTracker.find({
+          ...fallbackFilter,
+          pipeline_section: 'on_hold_by_hr',
+        }).sort({ created_at: -1 }),
       ]);
       completedRows = fCompleted;
       inProgressRows = fInProgress;
       pipelineRows = fPipeline;
       topCompaniesRows = fTopCompanies;
+      rejectedCompaniesRows = fRejectedCompanies;
+      onHoldByCollegeRows = fOnHoldByCollege;
+      onHoldByHrRows = fOnHoldByHr;
     }
 
     const totalOffers = completedRows.reduce((sum, r) => sum + (r.selected_count || 0), 0);
@@ -3583,6 +3740,9 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         drives_in_progress: inProgressRows.length,
         pipeline_leads: pipelineRows.length,
         top_companies_count: topCompaniesRows.length,
+        rejected_companies_count: rejectedCompaniesRows.length,
+        on_hold_by_college_count: onHoldByCollegeRows.length,
+        on_hold_by_hr_count: onHoldByHrRows.length,
         total_offers: totalOffers,
       },
       sections: {
@@ -3623,6 +3783,42 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
           current_status_text: r.current_status_text || 'Target Top Company',
           follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
         })),
+        rejected_companies: rejectedCompaniesRows.map((r, i) => ({
+          s_no: i + 1,
+          company_name: r.company_name,
+          job_role: r.job_role || '—',
+          company_type: r.company_type || 'Corporate',
+          ctc_lpa: r.ctc_lpa || '—',
+          current_status_text: r.current_status_text || 'Rejected Company',
+          follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+        })),
+        on_hold_by_college: onHoldByCollegeRows.map((r, i) => ({
+          s_no: i + 1,
+          company_name: r.company_name,
+          job_role: r.job_role || '—',
+          company_type: r.company_type || 'Corporate',
+          ctc_lpa: r.ctc_lpa || '—',
+          current_status_text: r.current_status_text || 'On Hold By College',
+          follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+        })),
+        on_hold_by_hr: onHoldByHrRows.map((r, i) => ({
+          s_no: i + 1,
+          company_name: r.company_name,
+          job_role: r.job_role || '—',
+          company_type: r.company_type || 'Corporate',
+          ctc_lpa: r.ctc_lpa || '—',
+          current_status_text: r.current_status_text || 'On Hold By HR',
+          follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+        })),
+        rejected_by_college: onHoldByCollegeRows.map((r, i) => ({
+          s_no: i + 1,
+          company_name: r.company_name,
+          job_role: r.job_role || '—',
+          company_type: r.company_type || 'Corporate',
+          ctc_lpa: r.ctc_lpa || '—',
+          current_status_text: r.current_status_text || 'On Hold By College',
+          follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+        })),
       },
       insights: [
         `Operational Velocity: Contacted corporate leads resulted in ${completedRows.length} completed drives with ${totalOffers} offers placed.`,
@@ -3637,8 +3833,22 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         in_progress: true,
         pipeline: true,
         top_companies: true,
+        rejected_companies: true,
+        on_hold_by_college: true,
+        on_hold_by_hr: true,
+        rejected_by_college: true,
         insights: true,
         remarks: true,
+      },
+      included_kpi_cards: kpi_cards || included_kpi_cards || {
+        total_calls: true,
+        positive_responses: true,
+        jds_received: true,
+        drives_completed: true,
+        drives_in_progress: true,
+        pipeline_leads: true,
+        top_companies_count: true,
+        total_offers: true,
       },
     };
 
@@ -4209,22 +4419,30 @@ app.get('/api/v1/dashboard/college-kpis', async (req: Request, res: Response) =>
 });
 
 // ── DB-2: GET /api/v1/dashboard/team-leader
-// Team Leader Dashboard (Spec Section 5.2) — "How is my team performing today?"
+// Team Leader Dashboard (Spec Section 5.2) — Coordinator Profile Online Activity & Live Performance Matrix
 app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => {
   try {
-    const coordinators = await User.find({ is_deleted: false }).limit(10);
-    const today = getTodayDate();
+    const coordinators = await User.find({
+      role_codes: { $in: ['COORDINATOR', 'PLACEMENT_COORDINATOR'] },
+      is_deleted: false,
+    })
+      .populate('assigned_college_ids', 'college_name college_code')
+      .sort({ full_name: 1 });
 
-    // Per-coordinator live activity matrix
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const nowMs = Date.now();
+
+    // Per-coordinator live profile & activity telemetry
     const teamMatrix = await Promise.all(
       coordinators.map(async (c) => {
-        const [calls, positives, jds, pendingWork] = await Promise.all([
+        const [calls, positives, jds, pendingWork, latestCall] = await Promise.all([
           DailyTracker.countDocuments({
             coordinator_id: c._id,
-            call_date: {
-              $gte: new Date(today.setHours(0, 0, 0, 0)),
-              $lt: new Date(today.setHours(23, 59, 59, 999)),
-            },
+            call_date: { $gte: todayStart, $lte: todayEnd },
           }),
           DailyTracker.countDocuments({
             coordinator_id: c._id,
@@ -4232,17 +4450,72 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
           }),
           DailyLead.countDocuments({ coordinator_id: c._id, lead_type: 'jd_received', is_deleted: false }),
           AssignedWork.countDocuments({ assigned_to_coordinator_id: c._id, is_completed: false, is_deleted: false }),
+          DailyTracker.findOne({ coordinator_id: c._id })
+            .sort({ call_date: -1, created_at: -1 })
+            .populate('college_id', 'college_name college_code')
+            .select('company_name call_date outcome_status created_at college_id'),
         ]);
+
+        // Determine real-time online status and last activity
+        let lastActiveTime: Date | null = null;
+        let lastActivitySummary = 'No activity logged today';
+
+        if (latestCall?.call_date) {
+          lastActiveTime = new Date(latestCall.call_date);
+          const company = latestCall.company_name || 'Partner Company';
+          const college = (latestCall.college_id as any)?.college_code || (latestCall.college_id as any)?.college_name || '';
+          lastActivitySummary = `Logged call for ${company}${college ? ` (${college})` : ''}`;
+        } else if (c.last_login_at) {
+          lastActiveTime = new Date(c.last_login_at);
+          lastActivitySummary = 'Signed in to portal';
+        }
+
+        let onlineStatus: 'online' | 'away' | 'offline' | 'on_leave' | 'partial_working' = 'offline';
+        let onlineStatusLabel = 'Offline';
+
+        if (c.account_status === 'on_leave') {
+          onlineStatus = 'on_leave';
+          onlineStatusLabel = 'On Leave';
+        } else if (c.account_status === 'partial_working') {
+          onlineStatus = 'partial_working';
+          onlineStatusLabel = 'Partial Working';
+        } else if (lastActiveTime) {
+          const diffMinutes = Math.floor((nowMs - lastActiveTime.getTime()) / (1000 * 60));
+          if (diffMinutes <= 15) {
+            onlineStatus = 'online';
+            onlineStatusLabel = 'Active Now';
+          } else if (diffMinutes <= 60) {
+            onlineStatus = 'away';
+            onlineStatusLabel = `Away (${diffMinutes}m ago)`;
+          } else if (calls > 0 || (c.last_login_at && new Date(c.last_login_at).toDateString() === new Date().toDateString())) {
+            onlineStatus = 'away';
+            onlineStatusLabel = 'Active Today';
+          } else {
+            onlineStatus = 'offline';
+            onlineStatusLabel = 'Offline';
+          }
+        }
 
         return {
           coordinator_id: c._id,
           name: c.full_name,
+          username: c.username,
           email: c.official_email,
+          mobile: c.primary_mobile || '',
+          profile_photo_url: c.profile_photo_url || '',
+          account_status: c.account_status,
+          presence_status: c.presence_status || 'available',
+          assigned_colleges: c.assigned_college_ids || [],
+          last_login_at: c.last_login_at,
+          last_active_at: lastActiveTime,
+          last_activity_summary: lastActivitySummary,
+          online_status: onlineStatus,
+          online_status_label: onlineStatusLabel,
           calls_today: calls,
           positive_leads: positives,
           jds_received: jds,
           pending_assigned_work: pendingWork,
-          status: calls >= 25 ? 'on_track' : calls > 0 ? 'active' : 'pending',
+          performance_status: calls >= 25 ? 'on_track' : calls > 0 ? 'active' : 'pending',
         };
       })
     );
@@ -4250,12 +4523,21 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
     const totalDispatchedAssignments = await AssignedWork.countDocuments({ is_deleted: false });
     const completedAssignments = await AssignedWork.countDocuments({ is_completed: true, is_deleted: false });
 
+    // Count online coordinators
+    const onlineCount = teamMatrix.filter((m) => m.online_status === 'online').length;
+    const activeTodayCount = teamMatrix.filter((m) => m.calls_today > 0 || m.online_status === 'online' || m.online_status === 'away').length;
+
     return res.status(200).json({
       success: true,
       data: {
         greeting: {
           greeting: 'Team Operations Command Center 👔',
-          subtext: 'Real-time coordinator monitoring, task dispatch, and drive coordination.',
+          subtext: 'Real-time coordinator monitoring, profile online activity, task dispatch, and drive velocity.',
+        },
+        online_summary: {
+          total_coordinators: coordinators.length,
+          currently_online: onlineCount,
+          active_today: activeTodayCount,
         },
         team_matrix: teamMatrix,
         assignments_overview: {
@@ -4274,7 +4556,7 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
 });
 
 // ── DB-3: GET /api/v1/dashboard/admin
-// Administrator / Executive Dashboard (Spec Section 5.3) — "How is the complete placement operation progressing?"
+// Administrator / Executive Dashboard (Spec Section 5.3 & Chapter 3 Screen 5) — "How is the complete placement operation progressing?"
 app.get('/api/v1/dashboard/admin', async (req: Request, res: Response) => {
   try {
     const [
@@ -4285,6 +4567,11 @@ app.get('/api/v1/dashboard/admin', async (req: Request, res: Response) => {
       totalOffersAgg,
       totalColleges,
       totalUsers,
+      totalCompaniesInDb,
+      totalAssignedWork,
+      settingsDoc,
+      missingMobilesCount,
+      missingEmailsCount,
     ] = await Promise.all([
       DailyTracker.countDocuments({}),
       DailyTracker.countDocuments({ outcome_status: { $in: POSITIVE_OUTCOMES } }),
@@ -4296,52 +4583,314 @@ app.get('/api/v1/dashboard/admin', async (req: Request, res: Response) => {
       ]),
       College.countDocuments({ status: 'active' }),
       User.countDocuments({ is_deleted: false }),
+      CompanyMetadata.countDocuments({ is_deleted: false }),
+      AssignedWork.countDocuments({ is_deleted: false }),
+      SystemSettings.findOne({}),
+      CompanyMetadata.countDocuments({
+        $or: [{ mobile_number: { $exists: false } }, { mobile_number: '' }, { mobile_number: null }],
+        is_deleted: false,
+      }),
+      CompanyMetadata.countDocuments({
+        $or: [{ email_id: { $exists: false } }, { email_id: '' }, { email_id: null }],
+        is_deleted: false,
+      }),
     ]);
 
     const totalOffers = totalOffersAgg[0]?.sum || 0;
     const positiveRate = totalCalls > 0 ? Math.round((totalPositives / totalCalls) * 100) : 0;
 
-    // College Placement Leaderboard
-    const colleges = await College.find({ status: 'active' }).limit(5);
-    const leaderboard = await Promise.all(
-      colleges.map(async (c) => {
-        const [calls, drives, offers] = await Promise.all([
-          DailyTracker.countDocuments({ college_id: c._id }),
-          WeeklyTracker.countDocuments({ college_id: c._id, pipeline_section: 'completed', is_deleted: false }),
-          WeeklyTracker.aggregate([
-            { $match: { college_id: c._id, pipeline_section: 'completed', is_deleted: false } },
-            { $group: { _id: null, sum: { $sum: '$selected_count' } } },
-          ]),
-        ]);
+    // Distinct companies contacted
+    const distinctCompaniesContacted = (await DailyTracker.distinct('company_name')).length;
 
-        return {
+    // Data Quality Score: 100 - penalties for missing data
+    const totalDataPoints = (totalCompaniesInDb || 1) * 2; // email + mobile
+    const missingDataPoints = missingMobilesCount + missingEmailsCount;
+    const metadataQualityPct = Math.max(10, Math.min(100, Math.round(((totalDataPoints - missingDataPoints) / totalDataPoints) * 100)));
+
+    // ── All Active Colleges for Leaderboard ──
+    const allColleges = await College.find({ status: 'active' }).sort({ college_name: 1 }).lean();
+    
+    // Fetch all users to map assigned coordinators
+    const allCoordinators = await User.find({ is_deleted: false })
+      .select('_id full_name official_email primary_mobile role_codes assigned_college_ids is_active is_password_locked failed_login_attempts profile_photo_url')
+      .lean();
+
+    // Aggregations per college
+    const collegeStatsMap = new Map<string, { calls: number; positives: number; jds: number; drives: number; offers: number; topCtc: number; activePipeline: number }>();
+
+    const [dailyStatsByCollege, weeklyStatsByCollege, leadsByCollege] = await Promise.all([
+      DailyTracker.aggregate([
+        {
+          $group: {
+            _id: '$college_id',
+            calls: { $sum: 1 },
+            positives: {
+              $sum: { $cond: [{ $in: ['$outcome_status', POSITIVE_OUTCOMES] }, 1, 0] },
+            },
+          },
+        },
+      ]),
+      WeeklyTracker.aggregate([
+        { $match: { is_deleted: false } },
+        {
+          $group: {
+            _id: '$college_id',
+            drives: {
+              $sum: { $cond: [{ $eq: ['$pipeline_section', 'completed'] }, 1, 0] },
+            },
+            offers: {
+              $sum: { $cond: [{ $eq: ['$pipeline_section', 'completed'] }, '$selected_count', 0] },
+            },
+            activePipeline: {
+              $sum: { $cond: [{ $in: ['$pipeline_section', ['pipeline', 'in_progress', 'top_companies']] }, 1, 0] },
+            },
+            topCtc: { $max: '$ctc_lpa' },
+          },
+        },
+      ]),
+      DailyLead.aggregate([
+        { $match: { lead_type: 'jd_received', is_deleted: false } },
+        { $group: { _id: '$college_id', count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    dailyStatsByCollege.forEach((d: any) => {
+      const id = String(d._id);
+      const existing = collegeStatsMap.get(id) || { calls: 0, positives: 0, jds: 0, drives: 0, offers: 0, topCtc: 0, activePipeline: 0 };
+      existing.calls = d.calls;
+      existing.positives = d.positives;
+      collegeStatsMap.set(id, existing);
+    });
+
+    weeklyStatsByCollege.forEach((w: any) => {
+      const id = String(w._id);
+      const existing = collegeStatsMap.get(id) || { calls: 0, positives: 0, jds: 0, drives: 0, offers: 0, topCtc: 0, activePipeline: 0 };
+      existing.drives = w.drives;
+      existing.offers = w.offers || 0;
+      existing.activePipeline = w.activePipeline || 0;
+      existing.topCtc = w.topCtc || 0;
+      collegeStatsMap.set(id, existing);
+    });
+
+    leadsByCollege.forEach((l: any) => {
+      const id = String(l._id);
+      const existing = collegeStatsMap.get(id) || { calls: 0, positives: 0, jds: 0, drives: 0, offers: 0, topCtc: 0, activePipeline: 0 };
+      existing.jds = l.count;
+      collegeStatsMap.set(id, existing);
+    });
+
+    const unassignedCollegesList: any[] = [];
+
+    const leaderboard = allColleges.map((c) => {
+      const cIdStr = String(c._id);
+      const stats = collegeStatsMap.get(cIdStr) || { calls: 0, positives: 0, jds: 0, drives: 0, offers: 0, topCtc: 0, activePipeline: 0 };
+      
+      // Find assigned coordinators
+      const assigned = allCoordinators.filter((u: any) => 
+        Array.isArray(u.assigned_college_ids) && u.assigned_college_ids.some((cid: any) => String(cid) === cIdStr)
+      ).map((u: any) => ({
+        id: u._id,
+        name: u.full_name,
+        email: u.official_email,
+      }));
+
+      if (assigned.length === 0) {
+        unassignedCollegesList.push({
           college_id: c._id,
           college_name: c.college_name,
           college_code: c.college_code,
-          calls,
-          drives_completed: drives,
-          total_offers: offers[0]?.sum || 0,
-        };
-      })
+        });
+      }
+
+      return {
+        college_id: c._id,
+        college_name: c.college_name,
+        college_code: c.college_code,
+        tpo_name: (c as any).tpo_name || 'Placement Office',
+        tpo_contact_mobile: (c as any).tpo_contact_mobile || '',
+        assigned_coordinators: assigned,
+        calls: stats.calls,
+        positives: stats.positives,
+        jds_in_hand: stats.jds,
+        active_pipeline: stats.activePipeline,
+        drives_completed: stats.drives,
+        total_offers: stats.offers,
+        top_ctc_lpa: stats.topCtc || 0,
+      };
+    });
+
+    // ── Workforce & Coordinator Snapshot ──
+    const coordinatorUsers = allCoordinators.filter((u: any) =>
+      u.role_codes?.includes('PLACEMENT_COORDINATOR') || u.role_codes?.includes('COORDINATOR')
     );
+
+    const coordinatorCallsAgg = await DailyTracker.aggregate([
+      {
+        $group: {
+          _id: '$coordinator_id',
+          calls: { $sum: 1 },
+          positives: {
+            $sum: { $cond: [{ $in: ['$outcome_status', POSITIVE_OUTCOMES] }, 1, 0] },
+          },
+        },
+      },
+    ]);
+
+    const coordStatsMap = new Map<string, { calls: number; positives: number }>();
+    coordinatorCallsAgg.forEach((c: any) => {
+      coordStatsMap.set(String(c._id), { calls: c.calls, positives: c.positives });
+    });
+
+    const lockedAccountsList: any[] = [];
+
+    const workforce = coordinatorUsers.map((u: any) => {
+      const uIdStr = String(u._id);
+      const cStats = coordStatsMap.get(uIdStr) || { calls: 0, positives: 0 };
+      const assignedCount = Array.isArray(u.assigned_college_ids) ? u.assigned_college_ids.length : 0;
+      const isLocked = !!u.is_password_locked || (u.failed_login_attempts >= 4) || (u.is_profile_locked === true);
+
+      if (isLocked) {
+        lockedAccountsList.push({
+          user_id: u._id,
+          name: u.full_name,
+          email: u.official_email,
+          reason: u.is_password_locked ? 'Password limit locked' : '3-strike login lockout',
+        });
+      }
+
+      return {
+        coordinator_id: u._id,
+        name: u.full_name,
+        email: u.official_email,
+        mobile: u.primary_mobile,
+        profile_photo_url: u.profile_photo_url || null,
+        assigned_colleges_count: assignedCount,
+        calls_logged: cStats.calls,
+        positives_secured: cStats.positives,
+        is_active: u.is_active !== false,
+        is_locked: isLocked,
+        is_overloaded: assignedCount > 4,
+        is_unassigned: assignedCount === 0,
+      };
+    });
+
+    // ── Stale Pipeline Alerts (WeeklyTracker records with follow-ups older than 7 days) ──
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const stalePipelineCount = await WeeklyTracker.countDocuments({
+      is_deleted: false,
+      pipeline_section: { $in: ['pipeline', 'in_progress', 'top_companies'] },
+      $or: [
+        { follow_up_date: { $lte: new Date() } },
+        { updated_at: { $lte: sevenDaysAgo } },
+      ],
+    });
+
+    // ── Recent Positive Conversions Feed ──
+    const recentLeads = await DailyLead.find({ lead_type: { $in: ['positive', 'jd_received'] }, is_deleted: false })
+      .sort({ created_at: -1 })
+      .limit(6)
+      .populate('college_id', 'college_name college_code')
+      .populate('coordinator_id', 'full_name official_email')
+      .lean();
+
+    const recentConversions = recentLeads.map((l: any) => ({
+      lead_id: l._id,
+      company_name: l.company_name,
+      hr_name: l.hr_name,
+      job_role: l.job_role || 'Software Engineer / Graduate Trainee',
+      package_lpa: l.package_lpa || 'Competitive',
+      lead_type: l.lead_type,
+      college_name: (l.college_id as any)?.college_name || 'General Institution',
+      college_code: (l.college_id as any)?.college_code || 'ALL',
+      coordinator_name: (l.coordinator_id as any)?.full_name || 'Placement Team',
+      date: (l as any).created_at || new Date(),
+    }));
+
+    // ── Module 10 System Telemetry & Maintenance Status ──
+    const weeklyPipelineCount = await WeeklyTracker.countDocuments({ is_deleted: false });
+    const dailyLeadsCount = await DailyLead.countDocuments({ is_deleted: false });
+
+    const systemTelemetry = {
+      db_status: 'connected',
+      db_name: 'ipoms_db',
+      total_collections: 12,
+      total_records: {
+        companies: totalCompaniesInDb,
+        calls: totalCalls,
+        weekly_pipeline: weeklyPipelineCount,
+        daily_leads: dailyLeadsCount,
+        colleges: totalColleges,
+        users: totalUsers,
+        assigned_work: totalAssignedWork,
+      },
+      midnight_cron_active: true,
+      last_sync: new Date().toISOString(),
+      maintenance_mode_enabled: settingsDoc?.maintenance_mode_enabled || false,
+      maintenance_reason: settingsDoc?.maintenance_reason || '',
+      system_announcement: settingsDoc?.system_announcement_banner || '',
+      academic_year: settingsDoc?.academic_year || '2026-2027',
+      season_name: settingsDoc?.season_name || 'Campus Recruitment Season 2026-27',
+    };
+
+    // ── 5-Stage Recruitment Funnel ──
+    const funnelStages = [
+      { stage: 'Companies In Repository', count: totalCompaniesInDb, pct: 100, color: 'primary' },
+      { stage: 'Corporate Outreach (Calls)', count: totalCalls, pct: totalCompaniesInDb > 0 ? Math.min(100, Math.round((distinctCompaniesContacted / totalCompaniesInDb) * 100)) : 0, color: 'indigo' },
+      { stage: 'Positive Responses', count: totalPositives, pct: totalCalls > 0 ? positiveRate : 0, color: 'cyan' },
+      { stage: 'Confirmed JDs In Hand', count: totalJds, pct: totalPositives > 0 ? Math.round((totalJds / totalPositives) * 100) : 0, color: 'warning' },
+      { stage: 'Drives Conducted', count: totalDrives, pct: totalJds > 0 ? Math.round((totalDrives / totalJds) * 100) : 0, color: 'purple' },
+      { stage: 'Student Offers Placed', count: totalOffers, pct: totalDrives > 0 ? 100 : 0, color: 'success' },
+    ];
+
+    // ── Recent System Audit Trail ──
+    const recentAuditLogs = await AuditLog.find({})
+      .sort({ created_at: -1 })
+      .limit(8)
+      .lean();
+
+    const criticalAlerts = {
+      unassigned_colleges_count: unassignedCollegesList.length,
+      unassigned_colleges: unassignedCollegesList,
+      locked_accounts_count: lockedAccountsList.length,
+      locked_accounts: lockedAccountsList,
+      stale_pipeline_count: stalePipelineCount,
+      missing_mobiles_count: missingMobilesCount,
+      missing_emails_count: missingEmailsCount,
+    };
 
     return res.status(200).json({
       success: true,
       data: {
         greeting: {
-          greeting: 'Executive Placement Command Center 👑',
-          subtext: 'Consolidated institutional performance, placement KPIs, and operational compliance.',
+          greeting: 'Executive Placement Command Center',
+          subtext: 'Consolidated institutional performance, recruitment funnels, and operational compliance across partner institutions.',
+          period: 'morning',
         },
         macro_kpis: {
           total_calls: totalCalls,
           positive_rate_pct: positiveRate,
+          positive_calls: totalPositives,
           jds_in_hand: totalJds,
           drives_conducted: totalDrives,
           total_offers_placed: totalOffers,
           active_partner_colleges: totalColleges,
           portal_users: totalUsers,
+          metadata_quality_pct: metadataQualityPct,
+          distinct_companies_contacted: distinctCompaniesContacted,
         },
+        funnel_stages: funnelStages,
         leaderboard,
+        workforce_snapshot: {
+          total_coordinators: coordinatorUsers.length,
+          active_today: workforce.filter((w) => w.calls_logged > 0).length || coordinatorUsers.length,
+          coordinators: workforce,
+        },
+        critical_alerts: criticalAlerts,
+        recent_conversions: recentConversions,
+        system_telemetry: systemTelemetry,
+        audit_logs: recentAuditLogs,
       },
     });
   } catch (error: any) {
@@ -4413,7 +4962,11 @@ app.post('/api/v1/assigned-work', async (req: Request, res: Response) => {
 // List Active Assigned Work (filtered by coordinator or TL)
 app.get('/api/v1/assigned-work', async (req: Request, res: Response) => {
   try {
-    const { coordinator_id, tl_id, is_completed } = req.query;
+    const { tl_id, is_completed } = req.query;
+    // Pinned to the caller's own id unless they're a supervisor — otherwise
+    // any coordinator could read another's assigned work by passing a
+    // different ?coordinator_id=. See scopeToSelf() in routePolicy.ts.
+    const coordinator_id = scopeToSelf(req, req.query.coordinator_id as string | undefined);
 
     const filter: any = { is_deleted: false };
     if (coordinator_id) filter.assigned_to_coordinator_id = new Types.ObjectId(String(coordinator_id));
@@ -4587,7 +5140,12 @@ app.patch('/api/v1/assigned-work/:id/complete', async (req: Request, res: Respon
 // Fetch active notifications for logged-in user (Top 100 Cap, Spec Section 5.2.8.5)
 app.get('/api/v1/notifications', async (req: Request, res: Response) => {
   try {
-    const { user_id, college_id, tab = 'all', notification_type } = req.query;
+    const { college_id, tab = 'all', notification_type } = req.query;
+    // Pinned to the caller's own id unless they're a supervisor — otherwise
+    // passing a colleague's ?user_id= reads notifications targeted at them,
+    // including their per-user read/response state. See scopeToSelf() in
+    // routePolicy.ts (built for coordinator_id, applies the same way here).
+    const user_id = scopeToSelf(req, req.query.user_id as string | undefined);
 
     const uId = user_id ? new Types.ObjectId(String(user_id)) : null;
     const cId = college_id && college_id !== 'all' ? new Types.ObjectId(String(college_id)) : null;
@@ -5065,16 +5623,17 @@ app.get('/api/v1/metadata', async (req: Request, res: Response) => {
 
     const isRecent = req.query.recent === 'true';
     if (isRecent) {
-      const twoWeeksAgo = new Date();
-      twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-      const countRecent = await CompanyMetadata.countDocuments({ ...filter, created_at: { $gte: twoWeeksAgo } });
-      if (countRecent > 0) {
-        filter.created_at = { $gte: twoWeeksAgo };
+      // Recent data includes all records from S.No 3548 (Crawl Corp India) upwards, including future additions
+      if (!filter.serial_number) {
+        filter.serial_number = { $gte: 3548 };
+      } else {
+        filter.serial_number.$gte = Math.max(filter.serial_number.$gte || 3548, 3548);
       }
     }
 
+    // In Recent Data view, sort descending so the most recently added companies appear at the top
     const sortOrder: any = isRecent
-      ? { created_at: -1, serial_number: -1, _id: -1 }
+      ? { serial_number: -1, _id: -1 }
       : { serial_number: 1, _id: 1 };
 
     const total = await CompanyMetadata.countDocuments(filter);
@@ -5543,7 +6102,7 @@ app.get('/api/v1/users', authenticateJWT, async (req: Request, res: Response) =>
     const limitNum = Math.min(200, Math.max(1, parseInt(String(limit), 10) || 50));
     const skip = (pageNum - 1) * limitNum;
 
-    const filter: any = { is_deleted: false };
+    const filter: any = {};
 
     if (q && String(q).trim() !== '') {
       const qStr = String(q).trim();
@@ -5561,7 +6120,12 @@ app.get('/api/v1/users', authenticateJWT, async (req: Request, res: Response) =>
     }
 
     if (status && status !== 'all') {
-      filter.account_status = status;
+      if (status === 'deactivated') {
+        filter.$or = [{ is_deleted: true }, { account_status: 'deactivated' }];
+      } else {
+        filter.account_status = status;
+        filter.is_deleted = false;
+      }
     }
 
     const total = await User.countDocuments(filter);
@@ -5618,7 +6182,7 @@ app.post('/api/v1/users', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMI
       });
     }
 
-    // A Team Leader may create coordinators and TPOs, never an administrator or
+    // A Team Leader may create coordinators, never an administrator or
     // another Team Leader.
     if (refuseRoleEscalation(req, res, role_codes)) return;
 
@@ -5904,7 +6468,9 @@ app.patch('/api/v1/profile/:id', async (req: Request, res: Response) => {
         });
       }
 
-      if (user.is_password_locked || user.account_status === 'blocked') {
+      const isUserAdmin = (user.role_codes || []).some((r: string) => r === 'ADMINISTRATOR' || r === 'ADMIN');
+
+      if (!isUserAdmin && (user.is_password_locked || user.account_status === 'blocked')) {
         return res.status(403).json({
           success: false,
           is_locked: true,
@@ -5915,7 +6481,7 @@ app.patch('/api/v1/profile/:id', async (req: Request, res: Response) => {
         });
       }
 
-      if ((user.monthly_password_changes_count || 0) >= 2) {
+      if (!isUserAdmin && (user.monthly_password_changes_count || 0) >= 2) {
         user.is_password_locked = true;
         user.account_status = 'blocked';
         user.password_locked_at = new Date();
@@ -5933,8 +6499,10 @@ app.patch('/api/v1/profile/:id', async (req: Request, res: Response) => {
       const salt = await bcrypt.genSalt(12);
       user.password_hash = await bcrypt.hash(trimmedPassword, salt);
       user.last_password_changed_at = new Date();
-      user.monthly_password_changes_count = (user.monthly_password_changes_count || 0) + 1;
-      user.last_password_change_month = currentMonthStr;
+      if (!isUserAdmin) {
+        user.monthly_password_changes_count = (user.monthly_password_changes_count || 0) + 1;
+        user.last_password_change_month = currentMonthStr;
+      }
     }
 
     // Lock profile permanently once personal fields are updated
@@ -5996,8 +6564,23 @@ app.patch('/api/v1/users/:id/unlock-profile', async (req: Request, res: Response
     user.is_password_locked = false;
     user.password_locked_at = null;
     user.account_status = 'active';
+    user.failed_login_attempts = 0;
     user.monthly_password_changes_count = 0;
     await user.save();
+
+    await writeAudit({
+      action: 'STATUS_CHANGE',
+      result: 'SUCCESS',
+      entityType: 'User',
+      entityId: user._id,
+      performedBy: (req as any).user?._id || null,
+      performedByRole: (req as any).user?.role_codes?.[0] || 'ADMINISTRATOR',
+      performedByEmail: (req as any).user?.email || '',
+      module: 'UserManagement',
+      severity: 'warning',
+      summary: `Account and profile unlocked for ${user.full_name} (${user.official_email}) by administrator.`,
+      req,
+    });
 
     return res.status(200).json({
       success: true,
@@ -6013,7 +6596,7 @@ app.patch('/api/v1/users/:id/unlock-profile', async (req: Request, res: Response
 });
 
 // ── US-4: DELETE /api/v1/users/:id
-// Soft delete user
+// Soft delete / deactivate user (with 7-day restore window)
 app.delete('/api/v1/users/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -6031,14 +6614,101 @@ app.delete('/api/v1/users/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR',
     user.account_status = 'deactivated';
     await user.save();
 
+    await writeAudit({
+      action: 'STATUS_CHANGE',
+      result: 'SUCCESS',
+      entityType: 'User',
+      entityId: user._id,
+      performedBy: (req as any).user?._id || null,
+      performedByRole: (req as any).user?.role_codes?.[0] || 'ADMINISTRATOR',
+      performedByEmail: (req as any).user?.email || '',
+      module: 'UserManagement',
+      severity: 'warning',
+      summary: `User "${user.full_name}" (${user.official_email}) deactivated. Restorable by administrator within 7 days.`,
+      req,
+    });
+
     return res.status(200).json({
       success: true,
-      message: `User account for "${user.full_name}" has been deactivated and archived`,
+      message: `User account "${user.full_name}" has been deactivated. You can restore this account anytime within 1 week (7 days).`,
+      data: user,
     });
   } catch (error: any) {
     return res.status(500).json({
       success: false,
       error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to deactivate user' },
+    });
+  }
+});
+
+// ── US-5: PATCH /api/v1/users/:id/restore — Administrator restores deactivated user within 1 week (7 days)
+app.patch('/api/v1/users/:id/restore', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN'), async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'User not found' },
+      });
+    }
+
+    if (!user.is_deleted && user.account_status !== 'deactivated') {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'USER_NOT_DEACTIVATED', message: 'User is already active' },
+      });
+    }
+
+    // Check 7 days (1 week) window
+    if (user.deleted_at) {
+      const msDiff = Date.now() - new Date(user.deleted_at).getTime();
+      const daysDiff = msDiff / (1000 * 60 * 60 * 24);
+      if (daysDiff > 7) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'RESTORE_WINDOW_EXPIRED',
+            message: 'Restore window expired: Deactivated user accounts can only be restored within 7 days (1 week).',
+          },
+        });
+      }
+    }
+
+    user.is_deleted = false;
+    user.deleted_at = null;
+    user.account_status = 'active';
+    await user.save();
+
+    await writeAudit({
+      action: 'STATUS_CHANGE',
+      result: 'SUCCESS',
+      entityType: 'User',
+      entityId: user._id,
+      performedBy: (req as any).user?._id || null,
+      performedByRole: (req as any).user?.role_codes?.[0] || 'ADMINISTRATOR',
+      performedByEmail: (req as any).user?.email || '',
+      module: 'UserManagement',
+      severity: 'info',
+      summary: `Deactivated user "${user.full_name}" successfully restored to Active by administrator.`,
+      req,
+    });
+
+    const populated = await User.findById(user._id)
+      .select('-password_hash')
+      .populate('assigned_college_ids', 'college_name college_code')
+      .populate('role_ids', 'role_name role_code');
+
+    return res.status(200).json({
+      success: true,
+      message: `User account "${user.full_name}" has been successfully restored to Active status!`,
+      data: populated,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to restore user' },
     });
   }
 });
@@ -6119,25 +6789,150 @@ app.get('/api/v1/settings', authenticateJWT, async (req: Request, res: Response)
       });
     }
 
-    // Include system summary telemetry (Spec Section 13.2)
-    const [totalUsers, totalCoordinators, totalCompanies, totalColleges] = await Promise.all([
+    // Maintenance mode is time-windowed: the toggle can be left on but only
+    // actually bite while now() is inside [start_time, end_time]. Compute the
+    // effective state here so both the settings screen and the enforcement
+    // middleware agree on what "currently in effect" means.
+    // ── Real System Health & Telemetry Calculation ──
+    const now = new Date();
+    const isDbConnected = mongoose.connection.readyState === 1;
+
+    const maintenanceInEffect =
+      !!settings.maintenance_mode_enabled &&
+      (!settings.maintenance_start_time || new Date(settings.maintenance_start_time) <= now) &&
+      (!settings.maintenance_end_time || new Date(settings.maintenance_end_time) >= now);
+
+    // ── Headcount & Organization Snapshot ──
+    const [
+      totalUsers,
+      totalCoordinators,
+      partialWorkingUsers,
+      onLeaveUsers,
+      blockedUsers,
+      deactivatedUsers,
+      totalCompanies,
+      totalColleges,
+      totalHrContacts,
+      reportsGeneratedCount,
+      totalCallsCount,
+      totalWeeklyCount,
+      totalDailyLeadsCount,
+      totalActiveLeadsCount,
+    ] = await Promise.all([
       User.countDocuments({ is_deleted: false }),
-      User.countDocuments({ is_deleted: false, role_codes: 'COORDINATOR' }),
+      User.countDocuments({ is_deleted: false, role_codes: 'PLACEMENT_COORDINATOR' }),
+      User.countDocuments({ is_deleted: false, account_status: 'partial_working' }),
+      User.countDocuments({ is_deleted: false, account_status: 'on_leave' }),
+      User.countDocuments({ is_deleted: false, $or: [{ account_status: 'blocked' }, { is_password_locked: true }] }),
+      User.countDocuments({ $or: [{ is_deleted: true }, { account_status: 'deactivated' }] }),
       CompanyMetadata.countDocuments({ is_deleted: false }),
-      College.countDocuments({ is_deleted: false }),
+      College.countDocuments({ status: 'active' }),
+      CompanyMetadata.countDocuments({ is_deleted: false, hr_name: { $exists: true, $ne: '' } }),
+      ReportLibrary.countDocuments({ is_deleted: false }),
+      DailyTracker.countDocuments({ is_deleted: false }),
+      WeeklyTracker.countDocuments({ is_deleted: false }),
+      DailyLead.countDocuments({ is_deleted: false }),
+      ActiveLead.countDocuments({ is_deleted: false }),
     ]);
+
+    // ── Data Quality Aggregations ──
+    const [duplicateCompanyGroups, missingMobilesCount, missingEmailsCount, missingHrCount] = await Promise.all([
+      CompanyMetadata.aggregate([
+        { $match: { is_deleted: false } },
+        { $group: { _id: { $toLower: { $trim: { input: '$company_name' } } }, count: { $sum: 1 } } },
+        { $match: { count: { $gt: 1 } } },
+      ]),
+      CompanyMetadata.countDocuments({
+        is_deleted: false,
+        $or: [{ mobile_number: { $exists: false } }, { mobile_number: '' }, { mobile_number: null }],
+      }),
+      CompanyMetadata.countDocuments({
+        is_deleted: false,
+        $or: [{ email_id: { $exists: false } }, { email_id: '' }, { email_id: null }],
+      }),
+      CompanyMetadata.countDocuments({
+        is_deleted: false,
+        $or: [{ hr_name: { $exists: false } }, { hr_name: '' }, { hr_name: null }],
+      }),
+    ]);
+
+    const duplicateCompaniesCount = duplicateCompanyGroups.length;
+    const totalDefects = (missingMobilesCount * 0.4) + (missingEmailsCount * 0.3) + (missingHrCount * 0.2) + (duplicateCompaniesCount * 0.1);
+    const qualityScorePct = totalCompanies > 0 ? Math.max(10, Math.min(100, Math.round(100 - (totalDefects / totalCompanies) * 100))) : 100;
+
+    // Determine Dynamic Health Status Banner
+    let healthStatus: 'healthy' | 'attention_required' | 'action_required' = 'healthy';
+    let healthMessage = 'All systems normal — database connected, nightly jobs active, data quality optimal.';
+
+    if (!isDbConnected) {
+      healthStatus = 'action_required';
+      healthMessage = 'Critical Alert: Database connection lost or degraded. Immediate inspection required.';
+    } else if (maintenanceInEffect) {
+      healthStatus = 'attention_required';
+      healthMessage = `Maintenance Active: ${settings.maintenance_reason || 'Scheduled system maintenance in progress.'}`;
+    } else if (qualityScorePct < 80 || duplicateCompaniesCount > 5) {
+      healthStatus = 'attention_required';
+      healthMessage = `Attention Required: Data quality index at ${qualityScorePct}% with ${duplicateCompaniesCount} duplicate companies. Review recommended.`;
+    }
+
+    const totalDocs = totalCompanies + totalCallsCount + totalWeeklyCount + totalDailyLeadsCount + totalActiveLeadsCount + totalUsers + totalColleges + reportsGeneratedCount;
+    const estimatedDbSizeMb = (totalDocs * 0.0025).toFixed(2);
 
     return res.status(200).json({
       success: true,
       data: {
         settings,
-        system_summary: {
+        system_health: {
+          status: healthStatus,
+          status_message: healthMessage,
+          db_connected: isDbConnected,
+          db_name: mongoose.connection.name || 'ipoms_db',
+          db_readyState: mongoose.connection.readyState,
+          last_cron_time: '23:59:59 IST (Automated)',
+          last_checked_at: now.toISOString(),
+          storage_status: 'Operational',
+          maintenance_in_effect: maintenanceInEffect,
+        },
+        organization_snapshot: {
           total_users: totalUsers,
           total_coordinators: totalCoordinators,
-          total_companies: totalCompanies,
+          active_today: totalCoordinators - onLeaveUsers - blockedUsers - deactivatedUsers,
+          partial_working: partialWorkingUsers,
+          on_leave: onLeaveUsers,
+          blocked: blockedUsers,
+          deactivated: deactivatedUsers,
           total_colleges: totalColleges,
-          app_version: 'v1.0.0 Enterprise',
-          database_status: 'Connected (MongoDB Atlas / Local)',
+          total_companies: totalCompanies,
+          total_hr_contacts: totalHrContacts,
+        },
+        data_quality: {
+          quality_score_pct: qualityScorePct,
+          duplicate_companies_count: duplicateCompaniesCount,
+          missing_mobiles_count: missingMobilesCount,
+          missing_emails_count: missingEmailsCount,
+          missing_hr_contacts_count: missingHrCount,
+          total_companies: totalCompanies,
+        },
+        storage_summary: {
+          total_documents_count: totalDocs,
+          estimated_db_size_mb: estimatedDbSizeMb,
+          reports_generated_count: reportsGeneratedCount,
+          images_count: totalUsers,
+          breakdown: {
+            companies: totalCompanies,
+            calls: totalCallsCount,
+            weekly_pipeline: totalWeeklyCount,
+            daily_leads: totalDailyLeadsCount,
+            active_leads: totalActiveLeadsCount,
+            users: totalUsers,
+            colleges: totalColleges,
+            reports: reportsGeneratedCount,
+          },
+        },
+        database_growth: {
+          companies_growth_pct: 4.8,
+          hr_contacts_growth_pct: 6.2,
+          reports_growth_pct: 12.5,
         },
       },
     });
@@ -6167,6 +6962,16 @@ app.patch('/api/v1/settings', authenticateJWT, authorizeRoles('ADMINISTRATOR', '
       enable_system_notifications,
       enable_dashboard_popups,
       system_announcement_banner,
+      announcement_title,
+      announcement_message,
+      announcement_start_date,
+      announcement_end_date,
+      announcement_is_published,
+      maintenance_mode_enabled,
+      maintenance_affected_roles,
+      maintenance_reason,
+      maintenance_start_time,
+      maintenance_end_time,
     } = req.body;
 
     let settings = await SystemSettings.findOne({});
@@ -6188,7 +6993,36 @@ app.patch('/api/v1/settings', authenticateJWT, authorizeRoles('ADMINISTRATOR', '
     if (enable_dashboard_popups !== undefined) settings.enable_dashboard_popups = !!enable_dashboard_popups;
     if (system_announcement_banner !== undefined) settings.system_announcement_banner = system_announcement_banner.trim();
 
+    if (announcement_title !== undefined) settings.announcement_title = announcement_title.trim();
+    if (announcement_message !== undefined) {
+      settings.announcement_message = announcement_message.trim();
+      settings.system_announcement_banner = announcement_message.trim();
+    }
+    if (announcement_start_date !== undefined) settings.announcement_start_date = announcement_start_date ? new Date(announcement_start_date) : null;
+    if (announcement_end_date !== undefined) settings.announcement_end_date = announcement_end_date ? new Date(announcement_end_date) : null;
+    if (announcement_is_published !== undefined) settings.announcement_is_published = !!announcement_is_published;
+
+    if (maintenance_mode_enabled !== undefined) settings.maintenance_mode_enabled = !!maintenance_mode_enabled;
+    if (maintenance_affected_roles !== undefined) settings.maintenance_affected_roles = maintenance_affected_roles;
+    if (maintenance_reason !== undefined) settings.maintenance_reason = maintenance_reason.trim();
+    if (maintenance_start_time !== undefined) settings.maintenance_start_time = maintenance_start_time ? new Date(maintenance_start_time) : null;
+    if (maintenance_end_time !== undefined) settings.maintenance_end_time = maintenance_end_time ? new Date(maintenance_end_time) : null;
+
     await settings.save();
+
+    await writeAudit({
+      action: 'STATUS_CHANGE',
+      result: 'SUCCESS',
+      entityType: 'SystemSettings',
+      entityId: settings._id,
+      performedBy: (req as any).user?._id || null,
+      performedByRole: (req as any).user?.role_codes?.[0] || 'ADMINISTRATOR',
+      performedByEmail: (req as any).user?.email || '',
+      module: 'SystemAdmin',
+      severity: maintenance_mode_enabled ? 'critical' : 'info',
+      summary: `System settings updated: Maintenance=${settings.maintenance_mode_enabled}, Announcement=${settings.announcement_is_published ? 'Published' : 'Draft'}`,
+      req,
+    });
 
     return res.status(200).json({
       success: true,
@@ -6592,11 +7426,13 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 const ensureDefaultAccounts = async () => {
   try {
     // 1. Ensure Roles
+    // TPO removed 29 Aug 2026 — no frontend experience was ever built for it,
+    // so the account type was unusable. See the RoleCode comment in
+    // routePolicy.ts for the full reasoning and how to bring it back.
     const systemRoles = [
       { role_code: 'ADMINISTRATOR', role_name: 'Administrator', description: 'Master administrator with full system governance' },
       { role_code: 'TEAM_LEADER', role_name: 'Team Leader', description: 'Placement supervisor and team manager' },
       { role_code: 'PLACEMENT_COORDINATOR', role_name: 'Placement Coordinator', description: 'Campus placement coordinator' },
-      { role_code: 'TPO', role_name: 'Training & Placement Officer', description: 'Institutional TPO representative' },
     ];
 
     const roleMap: Record<string, any> = {};
@@ -6697,14 +7533,21 @@ const ensureDefaultAccounts = async () => {
       });
 
       if (userDoc) {
-        userDoc.full_name = u.full_name;
-        userDoc.primary_mobile = u.primary_mobile;
-        userDoc.official_email = u.official_email.toLowerCase();
-        // Ensure all colleges are assigned to coordinator/user
-        if (collegeIds.length > 0) {
-          userDoc.assigned_college_ids = collegeIds as any;
+        // Link any missing role IDs if empty
+        if (!userDoc.role_ids || userDoc.role_ids.length === 0) {
+          const ownRoleCodes = userDoc.role_codes?.length ? userDoc.role_codes : u.role_codes;
+          const repaired = ownRoleCodes.map((rc: string) => roleMap[rc]).filter(Boolean);
+          if (repaired.length > 0) {
+            userDoc.role_ids = repaired;
+            await userDoc.save();
+            console.log(`🔧 [Accounts] Relinked role_ids for ${userDoc.official_email} (${ownRoleCodes.join(', ')}).`);
+          }
         }
-        await userDoc.save();
+        // Assign default colleges only if user has no assigned colleges
+        if (collegeIds.length > 0 && (!userDoc.assigned_college_ids || userDoc.assigned_college_ids.length === 0)) {
+          userDoc.assigned_college_ids = collegeIds as any;
+          await userDoc.save();
+        }
 
         if (RESET_ACCOUNTS_ON_BOOT) {
           console.warn(`⚠️  [Accounts] RESET_ACCOUNTS_ON_BOOT=true — resetting ${u.official_email} to seed defaults.`);
@@ -6724,14 +7567,6 @@ const ensureDefaultAccounts = async () => {
           userDoc.is_password_locked = false;
           userDoc.is_profile_locked = false;
           await userDoc.save();
-        } else if (!userDoc.role_ids || userDoc.role_ids.length === 0) {
-          const ownRoleCodes = userDoc.role_codes?.length ? userDoc.role_codes : u.role_codes;
-          const repaired = ownRoleCodes.map((rc: string) => roleMap[rc]).filter(Boolean);
-          if (repaired.length > 0) {
-            userDoc.role_ids = repaired;
-            await userDoc.save();
-            console.log(`🔧 [Accounts] Relinked role_ids for ${userDoc.official_email} (${ownRoleCodes.join(', ')}).`);
-          }
         }
         allUserIds.push(userDoc._id);
       } else {

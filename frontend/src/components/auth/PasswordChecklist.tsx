@@ -13,19 +13,19 @@ export function PasswordChecklist({ password }: { password: string }) {
 
   if (allPassed) {
     return (
-      <p className="mt-1.5 text-micro text-success font-medium" aria-live="polite">
+      <p className="mt-1.5 text-micro text-emerald-600 font-medium" aria-live="polite">
         Password meets all requirements.
       </p>
     );
   }
 
   return (
-    <div className="mt-1.5 text-micro text-fg-subtle leading-relaxed" aria-live="polite">
+    <div className="mt-1.5 text-micro text-slate-500 leading-relaxed" aria-live="polite">
       <p>
         Min 9 characters with uppercase, lowercase, a number, and one special character (@ or .).
       </p>
       {password.length > 0 && failedRules.length > 0 && (
-        <p className="text-destructive mt-0.5 font-medium">
+        <p className="text-rose-600 mt-0.5 font-medium">
           Missing: {failedRules.map((r) => r.label).join(' · ')}
         </p>
       )}

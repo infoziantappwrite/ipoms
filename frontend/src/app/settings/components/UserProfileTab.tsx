@@ -177,8 +177,13 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
   const dobInputRef = useRef<HTMLInputElement>(null);
 
   // Lock status: Corporate identity is always locked.
-  // In Personal details, ONLY LinkedIn, DOB, and Date of Joining are locked once submitted.
-  const isPersonalLocked = Boolean(effectiveUser?.is_profile_locked || isLockedAfterUpdate);
+  // In Personal details, Primary Mobile, Personal Email, LinkedIn, DOB, and Date of Joining are locked once submitted.
+  const isPersonalLocked = Boolean(
+    currentUser?.is_profile_locked ||
+    effectiveUser?.is_profile_locked ||
+    sessionFallback?.is_profile_locked ||
+    isLockedAfterUpdate
+  );
   const isPasswordLocked = Boolean(effectiveUser?.is_password_locked || effectiveUser?.account_status === 'blocked');
   const monthlyPasswordChanges = effectiveUser?.monthly_password_changes_count || 0;
 
@@ -333,8 +338,12 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
 
       const res = await onUpdateProfile(payload);
       if (res.success) {
-        setSuccessMsg(res.message || 'Personal details updated successfully! Locked fields have been recorded.');
+        setSuccessMsg(res.message || 'Personal details updated successfully! Locked fields have been permanently secured.');
         setIsLockedAfterUpdate(true);
+        if (res.data) {
+          setSessionFallback(res.data);
+          updateSessionUser(res.data);
+        }
       } else {
         setErrorMsg(res.error || 'Failed to update profile.');
       }
@@ -385,6 +394,150 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
     'w-full bg-white text-zinc-900 placeholder:text-zinc-400 border border-zinc-300 font-semibold rounded-xl px-3.5 py-2.5 shadow-sm select-none cursor-not-allowed transition-all hover:cursor-not-allowed hover:border-zinc-400';
   const normalInputClass =
     'w-full bg-background border border-border-strong text-fg focus:border-primary focus:outline-none rounded-xl px-3.5 py-2.5 transition-colors';
+
+  const isUserAdmin =
+    currentUser?.role_codes?.some((r: string) => r.toUpperCase().includes('ADMIN')) ||
+    sessionFallback?.role_codes?.some((r: string) => r.toUpperCase().includes('ADMIN')) ||
+    false;
+
+  if (isUserAdmin) {
+    return (
+      <div className="space-y-6 max-w-4xl mx-auto w-full">
+        {/* Administrator Profile & Identity Card */}
+        <div className="glass-panel rounded-2xl border border-border p-6 shadow-4 space-y-6">
+          <div className="flex items-center justify-between border-b border-border pb-4 flex-wrap gap-3">
+            <div className="flex items-center gap-3.5">
+              <span className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 text-primary grid place-items-center shadow-xs">
+                <Shield size={24} />
+              </span>
+              <div>
+                <h2 className="text-base font-bold text-fg">{effectiveName}</h2>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[10px] font-bold font-mono uppercase px-2 py-0.5 rounded bg-primary/15 text-primary border border-primary/25">
+                    System Administrator
+                  </span>
+                  <span className="text-micro text-fg-subtle">
+                    Principal Governance & Authority
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <a
+              href="https://outlook.office.com/mail/"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open Official Outlook Mailbox"
+              className="px-3.5 py-1.5 rounded-xl bg-[#0078d4] hover:bg-[#006cbd] text-white flex items-center gap-2 text-xs font-semibold shadow-xs transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+            >
+              <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24">
+                <path d="M22 6.5l-10 6.5-10-6.5v11a1 1 0 001 1h18a1 1 0 001-1v-11z" />
+                <path d="M12 11.5l10-6.5H2l10 6.5z" opacity="0.85" />
+              </svg>
+              <span>Outlook Webmail</span>
+            </a>
+          </div>
+
+          {/* Account Details Matrix */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs">
+            <div className="p-3.5 bg-surface-sunken rounded-xl border border-border space-y-1">
+              <span className="text-[10px] uppercase font-bold text-fg-subtle block">Administrator Username</span>
+              <span className="text-fg font-mono font-bold block">{effectiveUsername}</span>
+              <span className="text-[10px] text-fg-subtle">System Login Principal</span>
+            </div>
+
+            <div className="p-3.5 bg-surface-sunken rounded-xl border border-border space-y-1">
+              <span className="text-[10px] uppercase font-bold text-fg-subtle block">Official Email Address</span>
+              <span className="text-primary font-mono font-bold block truncate" title={effectiveEmail}>{effectiveEmail}</span>
+              <span className="text-[10px] text-fg-subtle">OTP Recovery Destination</span>
+            </div>
+
+            <div className="p-3.5 bg-surface-sunken rounded-xl border border-border space-y-1">
+              <span className="text-[10px] uppercase font-bold text-fg-subtle block">Organization</span>
+              <span className="text-fg font-semibold block">Infoziant Placement Operations</span>
+              <span className="text-[10px] text-fg-subtle">Central Governance</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Administrator Password & Security Management */}
+        <div className="glass-panel rounded-2xl border border-border p-6 shadow-4 space-y-5">
+          <div className="border-b border-border pb-3 flex items-center justify-between">
+            <div>
+              <h3 className="text-xs font-bold text-fg flex items-center gap-2">
+                <KeyRound size={15} className="text-primary" /> Administrator Password & Security Management
+              </h3>
+              <p className="text-micro text-fg-subtle mt-0.5">
+                Update your administrator credentials whenever required with zero monthly frequency caps
+              </p>
+            </div>
+
+            <span className="text-micro font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full font-semibold">
+              Uncapped Security Access
+            </span>
+          </div>
+
+          {passwordSuccessMsg && (
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/25 rounded-xl text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center gap-2">
+              <CheckCircle2 size={16} /> {passwordSuccessMsg}
+            </div>
+          )}
+
+          {passwordErrorMsg && (
+            <div className="p-3 bg-danger/10 border border-danger/25 rounded-xl text-danger text-xs font-semibold flex items-center gap-2">
+              <AlertCircle size={16} /> {passwordErrorMsg}
+            </div>
+          )}
+
+          <form onSubmit={handlePasswordUpdate} className="space-y-4 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-fg-muted font-semibold mb-1">New Administrator Password *</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Minimum 9 characters…"
+                  className="w-full bg-surface-sunken border border-border rounded-xl px-3.5 py-2 text-fg font-mono text-xs focus:border-primary focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-fg-muted font-semibold mb-1">Confirm New Password *</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repeat new password…"
+                  className="w-full bg-surface-sunken border border-border rounded-xl px-3.5 py-2 text-fg font-mono text-xs focus:border-primary focus:outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-primary/5 rounded-xl border border-primary/20 text-micro text-fg-subtle space-y-1">
+              <div className="font-semibold text-primary flex items-center gap-1.5">
+                <Info size={13} /> Administrator Security & Recovery Note
+              </div>
+              <p>
+                As an Administrator, you can update your password whenever required. If you ever forget your password, you can verify via 6-digit OTP dispatched directly to your official Outlook address (<code className="font-mono text-fg font-bold">{effectiveEmail}</code>).
+              </p>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="submit"
+                disabled={passwordLoading}
+                className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold shadow-3 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <KeyRound size={13} />
+                {passwordLoading ? 'Updating Password…' : 'Update Administrator Password'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -1047,7 +1200,15 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
 
             {/* Inset Light Message Container */}
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70 text-xs text-slate-700 leading-relaxed font-normal shadow-[inset_0_1px_3px_rgba(0,0,0,0.04)]">
-              Are you sure you want to update your profile? Once updated and confirmed, your <strong>Primary Mobile Number, Personal Email Address, LinkedIn Profile Handle, Date of Birth, and Date of Joining Office</strong> will be recorded and permanently locked (only an Administrator can unlock them). Your residential address and alternate mobile number will remain editable anytime.
+              {isPersonalLocked ? (
+                <>
+                  Are you sure you want to update your contact details? Your <strong>Primary Mobile Number, Personal Email Address, LinkedIn Profile Handle, Date of Birth, and Date of Joining Office</strong> remain permanently locked. Your updated residential address, PIN code, and alternate mobile number will be saved.
+                </>
+              ) : (
+                <>
+                  Are you sure you want to update your profile? Once updated and confirmed, your <strong>Primary Mobile Number, Personal Email Address, LinkedIn Profile Handle, Date of Birth, and Date of Joining Office</strong> will be recorded and permanently locked (only an Administrator can unlock them). Your residential address and alternate mobile number will remain editable anytime.
+                </>
+              )}
             </div>
 
             {/* Normal Light Action Buttons */}

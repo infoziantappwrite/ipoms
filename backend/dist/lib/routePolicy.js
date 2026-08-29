@@ -11,9 +11,7 @@ exports.refuseRoleEscalation = refuseRoleEscalation;
 exports.findPolicy = findPolicy;
 const ADMIN = ['ADMINISTRATOR'];
 const TL_ADMIN = ['ADMINISTRATOR', 'TEAM_LEADER'];
-/** Internal operational staff. Deliberately excludes TPO, who is external. */
 const STAFF = ['ADMINISTRATOR', 'TEAM_LEADER', 'PLACEMENT_COORDINATOR'];
-const STAFF_AND_TPO = [...STAFF, 'TPO'];
 /**
  * Legacy/misspelled role codes found in live `users.role_codes`.
  *
@@ -32,7 +30,6 @@ const ROLE_ALIASES = {
     TEAM_LEADER: 'TEAM_LEADER',
     COORDINATOR: 'PLACEMENT_COORDINATOR',
     PLACEMENT_COORDINATOR: 'PLACEMENT_COORDINATOR',
-    TPO: 'TPO',
 };
 function normalizeRole(raw) {
     return ROLE_ALIASES[String(raw || '').trim().toUpperCase()] ?? null;
@@ -51,6 +48,16 @@ const ID = '[a-f0-9]{24}';
 const POLICIES = [
     // ── Master company database ───────────────────────────────────────────────
     { method: 'GET', pattern: new RegExp(`^/companies/search/?$`), roles: STAFF },
+    // Bulk data-repair tooling — until 29 Aug 2026 these four bypassed BOTH
+    // authenticateJWT (a hardcoded exemption in authMiddleware.ts) and this
+    // policy table (via isPublic() below), so anyone with no account at all
+    // could trigger them. import-unique-companies is destructive: it deletes
+    // CompanyMetadata records with serial_number >= 3574. Administrator only,
+    // listed before the general /metadata rules so intent is unambiguous.
+    { method: 'GET', pattern: /^\/metadata\/empty-mobiles\/?$/, roles: ADMIN },
+    { method: '*', pattern: /^\/metadata\/import-unique-companies\/?$/, roles: ADMIN },
+    { method: '*', pattern: /^\/metadata\/export-missing-excel\/?$/, roles: ADMIN },
+    { method: '*', pattern: /^\/metadata\/renumber\/?$/, roles: ADMIN },
     { method: 'DELETE', pattern: new RegExp(`^/metadata/${ID}/purge/?$`), roles: ADMIN },
     { method: 'POST', pattern: new RegExp(`^/metadata/${ID}/restore/?$`), roles: STAFF },
     { method: 'POST', pattern: new RegExp(`^/metadata/bulk-import/?$`), roles: STAFF },
@@ -60,18 +67,20 @@ const POLICIES = [
     { method: 'POST', pattern: /^\/metadata\/?$/, roles: STAFF },
     { method: 'GET', pattern: /^\/metadata\/?$/, roles: STAFF },
     // ── Colleges & staff directory ────────────────────────────────────────────
-    { method: 'GET', pattern: /^\/colleges\/?$/, roles: STAFF_AND_TPO },
+    { method: 'GET', pattern: /^\/colleges\/?$/, roles: STAFF },
     { method: 'GET', pattern: /^\/coordinators\/?$/, roles: TL_ADMIN },
     // ── Daily Tracker (own call log) ──────────────────────────────────────────
     { method: '*', pattern: /^\/daily-tracker(\/.*)?$/, roles: STAFF },
     { method: '*', pattern: /^\/tracker(\/.*)?$/, roles: STAFF },
     // ── Weekly Tracker ────────────────────────────────────────────────────────
-    // TPO is excluded entirely: their access is the finalized Weekly Placement
-    // REPORT, not the live operational board (V1_DECISIONS §8.2).
     // Destructive bulk import/reload: wipes and rebuilds WeeklyTracker from a
     // spreadsheet. Administrator only, and listed before the general
     // /weekly-tracker rule so intent is obvious to the next reader.
     { method: '*', pattern: /^\/weekly-tracker-import(\/.*)?$/, roles: ADMIN },
+    // Data-repair tooling behind ?resync=true. Registered above the global auth
+    // mount in server.ts, so it carries its own authenticateJWT/authorizeRoles;
+    // this entry keeps it visible to the coverage check.
+    { method: 'GET', pattern: /^\/health\/daily-leads-diagnostics\/?$/, roles: ADMIN },
     { method: '*', pattern: /^\/weekly-tracker(\/.*)?$/, roles: STAFF },
     // ── Daily Leads & Active Leads ────────────────────────────────────────────
     { method: '*', pattern: /^\/daily-leads(\/.*)?$/, roles: STAFF },
@@ -119,16 +128,20 @@ const POLICIES = [
 /**
  * Paths served before authentication; never reach this middleware.
  *
- * `/weekly-tracker-import` was removed on 25 Aug 2026: the routes behind it call
- * `WeeklyTracker.deleteMany({})` and re-import from a caller-supplied file path,
- * so anyone who could reach the API could empty the weekly tracker with no
- * token. They are administrator-only now (see the policy table above).
+ * Two entries were removed on 25 Aug 2026:
+ *  - `/weekly-tracker-import` — its routes call `WeeklyTracker.deleteMany({})`
+ *    and re-import from a caller-supplied file path, so anyone who could reach
+ *    the API could empty the weekly tracker with no token.
+ *  - `/colleges` — it populated each college's coordinators with
+ *    `full_name official_email primary_mobile`, publishing the staff directory
+ *    including personal mobile numbers to anonymous callers. Every frontend
+ *    caller already sends a JWT via apiFetch, so nothing needed it public.
  *
  * Keep this list as short as it can possibly be — an entry here bypasses BOTH
  * the authentication gate and the default-deny table in one step.
  */
 function isPublic(path) {
-    return path === '/health' || path.startsWith('/auth') || path === '/colleges';
+    return path === '/health' || path.startsWith('/auth');
 }
 function findPolicy(method, path) {
     return POLICIES.find((p) => (p.method === '*' || p.method === method) && p.pattern.test(path));
@@ -234,9 +247,9 @@ function refuseForeignOwner(req, res, ownerId, message = 'You do not have access
 function assignableRoles(req) {
     const roles = (req.user?.roles || []).map(normalizeRole).filter(Boolean);
     if (roles.includes('ADMINISTRATOR'))
-        return ['ADMINISTRATOR', 'TEAM_LEADER', 'PLACEMENT_COORDINATOR', 'TPO'];
+        return ['ADMINISTRATOR', 'TEAM_LEADER', 'PLACEMENT_COORDINATOR'];
     if (roles.includes('TEAM_LEADER'))
-        return ['PLACEMENT_COORDINATOR', 'TPO'];
+        return ['PLACEMENT_COORDINATOR'];
     return [];
 }
 /**

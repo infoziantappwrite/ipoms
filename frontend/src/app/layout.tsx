@@ -9,10 +9,20 @@ export const metadata: Metadata = {
   description: 'Enterprise Placement Operations, Corporate CRM & Analytics Portal for Infoziant',
 };
 
-// Inline Anti-FOUC Script to apply theme before DOM paint
+// Inline Anti-FOUC Script to apply theme before DOM paint.
+// Splash screen, Login, and Signup pages are ALWAYS guaranteed to be Light Theme by default.
 const themeInitScript = `
   (function() {
     try {
+      var path = window.location.pathname || '';
+      var isAuthPage = path === '/' || path === '/login' || path === '/login/' || path === '/signup' || path === '/signup/';
+      if (isAuthPage) {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+        document.documentElement.style.colorScheme = 'light';
+        return;
+      }
+
       var saved = localStorage.getItem('ipoms_theme');
       var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
       if (saved === 'dark' || (!saved && prefersDark)) {

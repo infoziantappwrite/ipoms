@@ -142,18 +142,13 @@ export function SnoRangeSelector({
             ? 'bg-primary/10 border-primary/40 text-primary ring-1 ring-primary/20 font-bold'
             : 'bg-surface border-border text-fg hover:bg-surface-raised'
         }`}
-        title={isRangeActive ? `Filtered: S.No ${fromSno} to ${toSno}` : 'Filter by S.No Range'}
+        title={isRangeActive ? `Filtered: Range ${fromSno} to ${toSno}` : 'Filter by Range'}
       >
         <div className="flex items-center gap-1.5 truncate">
-          <Hash
-            size={13}
-            strokeWidth={2.25}
-            className={isRangeActive ? 'text-primary' : 'text-fg-subtle'}
-          />
           <span>
             {isRangeActive
-              ? `S.No: ${fromSno ?? 1} – ${toSno ?? maxSno}`
-              : 'S.No Range'}
+              ? `Range: ${fromSno ?? 1} – ${toSno ?? effectiveMax}`
+              : 'Range Picker'}
           </span>
         </div>
 
@@ -161,7 +156,7 @@ export function SnoRangeSelector({
           {isRangeActive && (
             <span
               onClick={handleClear}
-              title="Clear S.No Range"
+              title="Clear Range"
               className="w-4 h-4 rounded-full hover:bg-primary/20 flex items-center justify-center text-primary transition-colors cursor-pointer"
             >
               <X size={11} strokeWidth={2.5} />
@@ -183,8 +178,7 @@ export function SnoRangeSelector({
           {/* Popover Header */}
           <div className="flex items-center justify-between pb-2 border-b border-border/70">
             <div className="flex items-center gap-1.5 text-xs font-bold text-fg">
-              <Hash size={14} className="text-primary" strokeWidth={2.5} />
-              <span>Select S.No Range</span>
+              <span>Range Picker</span>
             </div>
             <span className="text-[10px] font-semibold text-fg-subtle bg-surface-sunken px-2 py-0.5 rounded-md border border-border">
               Total: {effectiveMax.toLocaleString()}

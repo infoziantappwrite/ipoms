@@ -27,6 +27,12 @@ export interface IIncludedSections {
   completed_companies: boolean;
   in_progress: boolean;
   pipeline: boolean;
+  top_companies?: boolean;
+  rejected_companies?: boolean;
+  on_hold_by_college?: boolean;
+  on_hold_by_hr?: boolean;
+  rejected_by_college?: boolean;
+  rejected_by_hr?: boolean;
   pending_tasks?: boolean;
   charts: boolean;
   insights: boolean;
@@ -115,6 +121,8 @@ const ReportLibrarySchema: Schema<IReportLibrary> = new Schema(
       completed_companies: { type: Boolean, default: true },
       in_progress: { type: Boolean, default: true },
       pipeline: { type: Boolean, default: true },
+      top_companies: { type: Boolean, default: true },
+      rejected_by_college: { type: Boolean, default: true },
       charts: { type: Boolean, default: true },
       insights: { type: Boolean, default: true },
       remarks: { type: Boolean, default: true },

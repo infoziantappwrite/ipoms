@@ -11,7 +11,7 @@ import { apiFetch } from '@/lib/api';
 function ReportsPageContent() {
   const searchParams = useSearchParams();
   const templateQuery = searchParams.get('template') || 'weekly_placement';
-  const collegeIdQuery = searchParams.get('collegeId') || 'all';
+  const collegeIdQuery = searchParams.get('collegeId') || '';
   const autoQuery = searchParams.get('auto') === 'true';
 
   const [selectedCollegeId, setSelectedCollegeId] = useState<string>(collegeIdQuery);

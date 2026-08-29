@@ -6,11 +6,22 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.disconnectDatabase = exports.connectDatabase = void 0;
 const mongoose_1 = __importDefault(require("mongoose"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const dns_1 = __importDefault(require("dns"));
 dotenv_1.default.config();
+// Ensure Atlas SRV records resolve reliably on Windows / Node.js
+try {
+    dns_1.default.setServers(['8.8.8.8', '8.8.4.4']);
+}
+catch {
+    // Ignore in environments where setServers might be restricted
+}
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/ipoms_db';
+const sanitizeMongoUri = (uri) => {
+    return uri.replace(/(mongodb(?:\+srv)?:\/\/[^:]+:)([^@]+)(@.+)/i, '$1****$3');
+};
 const connectDatabase = async () => {
     try {
-        console.log(`🔌 [MongoDB] Connecting to ${MONGODB_URI}...`);
+        console.log(`🔌 [MongoDB] Connecting to ${sanitizeMongoUri(MONGODB_URI)}...`);
         const connection = await mongoose_1.default.connect(MONGODB_URI, {
             autoIndex: true, // Build compound indexes automatically in development
             serverSelectionTimeoutMS: 5000,

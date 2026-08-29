@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Settings } from 'lucide-react';
 import { SettingsNav, SettingsSection } from './components/SettingsNav';
 import { UserProfileTab } from './components/UserProfileTab';
@@ -14,10 +15,16 @@ import { apiFetch } from '@/lib/api';
 import { readSessionUser, roleOf, updateSessionUser } from '@/lib/session';
 
 export default function SettingsPage() {
+  const searchParams = useSearchParams();
   const [activeSection, setActiveSection] = useState<SettingsSection>('profile');
   const [users, setUsers] = useState<any[]>([]);
   const [settingsData, setSettingsData] = useState<any | null>(null);
   const [systemSummary, setSystemSummary] = useState<any | null>(null);
+  const [systemHealth, setSystemHealth] = useState<any | null>(null);
+  const [dataQuality, setDataQuality] = useState<any | null>(null);
+  const [organizationSnapshot, setOrganizationSnapshot] = useState<any | null>(null);
+  const [storageSummary, setStorageSummary] = useState<any | null>(null);
+  const [databaseGrowth, setDatabaseGrowth] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [currentUser, setCurrentUser] = useState<any | null>(null);
@@ -35,14 +42,6 @@ export default function SettingsPage() {
         return;
       }
 
-      // `GET /users` is Team-Leader/Admin only (routePolicy.ts) — a coordinator
-      // calling it gets a 403, so only fetch it for roles that can use it.
-      // Own profile always comes from `/profile/:id`, which every role may
-      // read for itself; that used to be looked up by scanning the full user
-      // list instead, which meant a bare, unauthenticated fetch() to an
-      // endpoint coordinators can't even call silently left currentUser stuck
-      // null forever, and every save on this page failed with
-      // "No active profile found."
       const isSupervisor = roleOf(sessionUser) === 'admin' || roleOf(sessionUser) === 'team_leader';
 
       const [profileRes, settingsRes, usersRes] = await Promise.all([
@@ -56,8 +55,14 @@ export default function SettingsPage() {
       }
 
       if (settingsRes.success) {
-        setSettingsData((settingsRes.data as any).settings);
-        setSystemSummary((settingsRes.data as any).system_summary);
+        const d = settingsRes.data as any;
+        setSettingsData(d.settings);
+        setSystemSummary(d.system_summary);
+        setSystemHealth(d.system_health);
+        setDataQuality(d.data_quality);
+        setOrganizationSnapshot(d.organization_snapshot);
+        setStorageSummary(d.storage_summary);
+        setDatabaseGrowth(d.database_growth);
       }
 
       if (usersRes?.success) {
@@ -73,6 +78,13 @@ export default function SettingsPage() {
   useEffect(() => {
     loadSettingsData();
   }, [loadSettingsData]);
+
+  useEffect(() => {
+    const tab = searchParams?.get('tab');
+    if (tab && ['profile', 'users', 'roles', 'config', 'system_info', 'org'].includes(tab)) {
+      setActiveSection(tab as SettingsSection);
+    }
+  }, [searchParams]);
 
   // Update current user profile with monthly photo check
   const handleUpdateProfile = async (updateFields: any): Promise<{ success: boolean; message?: string; error?: string }> => {
@@ -112,15 +124,33 @@ export default function SettingsPage() {
 
   // Deactivate user
   const handleDeactivateUser = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to deactivate and archive user account "${name}"?`)) return;
     try {
       const res = await apiFetch(`/users/${id}`, { method: 'DELETE' });
       if (res.success) {
-        alert(res.message);
+        alert(res.message || `User account "${name}" has been deactivated. You can restore it anytime within 7 days.`);
         loadSettingsData();
+      } else {
+        alert(res.error?.message || 'Failed to deactivate user.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Deactivate user error:', err);
+      alert(err.message || 'Network error deactivating user.');
+    }
+  };
+
+  // Administrator restores deactivated user (within 7 days)
+  const handleRestoreUser = async (id: string, name: string) => {
+    try {
+      const res = await apiFetch(`/users/${id}/restore`, { method: 'PATCH' });
+      if (res.success) {
+        alert(res.message || `User account "${name}" has been restored to Active status!`);
+        loadSettingsData();
+      } else {
+        alert(res.error?.message || 'Failed to restore user.');
+      }
+    } catch (err: any) {
+      console.error('Restore user error:', err);
+      alert(err.message || 'Network error restoring user.');
     }
   };
 
@@ -209,6 +239,7 @@ export default function SettingsPage() {
                     setShowUserModal(true);
                   }}
                   onDeactivateUser={handleDeactivateUser}
+                  onRestoreUser={handleRestoreUser}
                   onUnlockProfile={handleUnlockUserProfile}
                 />
               )}
@@ -223,7 +254,14 @@ export default function SettingsPage() {
               )}
 
               {isAdmin && activeSection === 'system_info' && (
-                <SystemInfoTab summaryData={systemSummary} />
+                <SystemInfoTab
+                  summaryData={systemSummary}
+                  systemHealth={systemHealth}
+                  dataQuality={dataQuality}
+                  organizationSnapshot={organizationSnapshot}
+                  storageSummary={storageSummary}
+                  databaseGrowth={databaseGrowth}
+                />
               )}
             </>
           )}

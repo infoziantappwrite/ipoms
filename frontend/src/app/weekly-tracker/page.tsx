@@ -26,8 +26,11 @@ interface SectionsResponse {
   in_progress: SectionData;
   pipeline: SectionData;
   top_companies: SectionData;
-  rejected_by_hr: SectionData;
-  rejected_by_college: SectionData;
+  rejected_companies?: SectionData;
+  on_hold_by_college?: SectionData;
+  on_hold_by_hr?: SectionData;
+  rejected_by_hr?: SectionData;
+  rejected_by_college?: SectionData;
 }
 
 export default function WeeklyTrackerPage() {
@@ -115,6 +118,7 @@ export default function WeeklyTrackerPage() {
       const params = new URLSearchParams({
         college_id: selectedCollegeId,
         academic_year: academicYear,
+        week_offset: String(weekOffset),
       });
       if (searchQuery.trim()) params.set('search', searchQuery.trim());
       if (companyTypeFilter !== 'all') params.set('company_type', companyTypeFilter);
@@ -129,20 +133,20 @@ export default function WeeklyTrackerPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCollegeId, academicYear, searchQuery, companyTypeFilter]);
+  }, [selectedCollegeId, academicYear, weekOffset, searchQuery, companyTypeFilter]);
 
   // ── Load Live KPI Counts
   const loadKpi = useCallback(async () => {
     if (!selectedCollegeId) return;
     try {
-      const res = await apiFetch(`/weekly-tracker/kpi?college_id=${selectedCollegeId}&academic_year=${academicYear}`);
+      const res = await apiFetch(`/weekly-tracker/kpi?college_id=${selectedCollegeId}&academic_year=${academicYear}&week_offset=${weekOffset}`);
       if (res.success && res.data) {
         setKpi((res.data as any).kpi);
       }
     } catch (err) {
       console.error('Failed to load weekly KPI:', err);
     }
-  }, [selectedCollegeId, academicYear]);
+  }, [selectedCollegeId, academicYear, weekOffset]);
 
   // ── Initial load & filter change effects
   useEffect(() => {
@@ -473,14 +477,14 @@ export default function WeeklyTrackerPage() {
             />
           )}
 
-          {/* Section 6: Rejected by HR */}
-          {shouldRenderSection('rejected_by_hr') && (
+          {/* Section 5: Rejected Companies */}
+          {(shouldRenderSection('rejected_companies') || shouldRenderSection('rejected_by_hr')) && (
             <WeeklySection
-              sectionKey="rejected_by_hr"
-              title={sections?.rejected_by_hr?.title || 'Rejected by HR'}
-              order={sections?.rejected_by_hr?.order ?? 5}
-              summaryMetric={sections?.rejected_by_hr?.summary_metric || ''}
-              rows={sections?.rejected_by_hr?.rows || []}
+              sectionKey="rejected_companies"
+              title={sections?.rejected_companies?.title || sections?.rejected_by_hr?.title || 'Rejected Companies'}
+              order={sections?.rejected_companies?.order ?? 5}
+              summaryMetric={sections?.rejected_companies?.summary_metric || sections?.rejected_by_hr?.summary_metric || ''}
+              rows={sections?.rejected_companies?.rows || sections?.rejected_by_hr?.rows || []}
               isGlobalDeleteMode={isDeleteMode}
               globalSelectedRowIds={selectedRowIds}
               onToggleSelectRow={handleToggleSelectRow}
@@ -492,14 +496,33 @@ export default function WeeklyTrackerPage() {
             />
           )}
 
-          {/* Section 7: Rejected by College */}
-          {shouldRenderSection('rejected_by_college') && (
+          {/* Section 6: Companies On Hold By College */}
+          {(shouldRenderSection('on_hold_by_college') || shouldRenderSection('rejected_by_college')) && (
             <WeeklySection
-              sectionKey="rejected_by_college"
-              title={sections?.rejected_by_college?.title || 'Rejected by College'}
-              order={sections?.rejected_by_college?.order ?? 6}
-              summaryMetric={sections?.rejected_by_college?.summary_metric || ''}
-              rows={sections?.rejected_by_college?.rows || []}
+              sectionKey="on_hold_by_college"
+              title={sections?.on_hold_by_college?.title || sections?.rejected_by_college?.title || 'Companies On Hold By College'}
+              order={sections?.on_hold_by_college?.order ?? 6}
+              summaryMetric={sections?.on_hold_by_college?.summary_metric || sections?.rejected_by_college?.summary_metric || ''}
+              rows={sections?.on_hold_by_college?.rows || sections?.rejected_by_college?.rows || []}
+              isGlobalDeleteMode={isDeleteMode}
+              globalSelectedRowIds={selectedRowIds}
+              onToggleSelectRow={handleToggleSelectRow}
+              onToggleSelectSection={handleToggleSelectSection}
+              onUpdateRow={handleUpdateRow}
+              onMoveSection={handleMoveSection}
+              onTogglePin={handleTogglePin}
+              onDeleteRow={handleDeleteRow}
+            />
+          )}
+
+          {/* Section 7: Companies On Hold By HR */}
+          {shouldRenderSection('on_hold_by_hr') && (
+            <WeeklySection
+              sectionKey="on_hold_by_hr"
+              title={sections?.on_hold_by_hr?.title || 'Companies On Hold By HR'}
+              order={sections?.on_hold_by_hr?.order ?? 7}
+              summaryMetric={sections?.on_hold_by_hr?.summary_metric || ''}
+              rows={sections?.on_hold_by_hr?.rows || []}
               isGlobalDeleteMode={isDeleteMode}
               globalSelectedRowIds={selectedRowIds}
               onToggleSelectRow={handleToggleSelectRow}

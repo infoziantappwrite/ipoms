@@ -5,12 +5,14 @@ import { Pencil, Phone, RotateCcw, Trash2, X } from 'lucide-react';
 
 interface CompanyRecord {
   _id: string;
+  serial_number?: number;
   company_name: string;
   hr_name?: string;
   hr_designation?: string;
   primary_mobile?: string;
   mobile_numbers?: string[];
   primary_email?: string;
+  email_ids?: string[];
   created_at?: string;
   updated_at?: string;
 }
@@ -49,9 +51,9 @@ export function MetadataTable({
             <tr className="bg-surface-sunken text-fg-subtle font-semibold border-b border-border text-micro uppercase tracking-wider">
               <th className="py-3.5 px-4 w-12 text-center">#</th>
               <th className="py-3.5 px-5 min-w-[200px] max-w-[280px] text-left">Company Name</th>
-              <th className="py-3.5 px-4">HR Contact Person</th>
-              <th className="py-3.5 px-4">Mobile Numbers</th>
-              <th className="py-3.5 px-4">Email ID(s)</th>
+              <th className="py-3.5 px-4 min-w-[140px] max-w-[220px]">HR Contact Person</th>
+              <th className="py-3.5 px-4 whitespace-nowrap min-w-[160px]">Mobile Numbers</th>
+              <th className="py-3.5 px-4 min-w-[200px] max-w-[300px]">Email ID(s)</th>
               <th className="py-3.5 px-4 text-center whitespace-nowrap min-w-[110px]">Last Updated</th>
               <th className="py-3.5 px-5 text-center whitespace-nowrap">Actions</th>
             </tr>
@@ -69,37 +71,34 @@ export function MetadataTable({
                 return (
                   <tr key={c._id} className="hover:bg-surface-sunken/60 transition-colors">
                     {/* Serial Number (#) */}
-                    <td className="py-3.5 px-4 text-center font-mono text-[11px] font-semibold">
+                    <td className="py-3.5 px-4 text-center font-mono text-[11px] font-semibold whitespace-nowrap">
                       <span className="inline-block px-2 py-0.5 rounded-md bg-surface-sunken/90 border border-border text-fg font-mono text-xs font-bold shadow-2xs">
                         {serialNo}
                       </span>
                     </td>
 
-                    {/* Company Name */}
-                    <td className="py-3.5 px-5 font-bold text-fg min-w-[200px] max-w-[280px] break-words leading-tight text-xs">
+                    {/* Company Name - Wrap Allowed */}
+                    <td className="py-3.5 px-5 font-bold text-fg min-w-[200px] max-w-[280px] break-words leading-snug text-xs">
                       {c.company_name}
                     </td>
 
-                    {/* HR Contact */}
-                    <td className="py-3.5 px-4 text-fg">
-                      <div className="font-semibold text-fg">{c.hr_name || '—'}</div>
-                      {c.hr_designation && (
-                        <span className="text-micro text-fg-subtle block mt-0.5">{c.hr_designation}</span>
-                      )}
+                    {/* HR Contact - Wrap Allowed */}
+                    <td className="py-3.5 px-4 text-fg min-w-[140px] max-w-[220px]">
+                      <div className="font-semibold text-fg break-words">{c.hr_name || '—'}</div>
                     </td>
 
-                    {/* Mobile Numbers with click-to-copy */}
-                    <td className="py-3.5 px-4">
-                      <div className="flex flex-wrap gap-1.5">
+                    {/* Mobile Numbers - NEVER Wrap Numbers */}
+                    <td className="py-3.5 px-4 whitespace-nowrap min-w-[160px]">
+                      <div className="flex flex-col gap-1.5 items-start">
                         {c.primary_mobile ? (
                           <button
                             type="button"
                             onClick={() => copyToClipboard(c.primary_mobile!)}
-                            className="bg-surface-sunken hover:bg-surface text-fg px-2 py-0.5 rounded-md font-mono text-micro border border-border transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                            className="bg-surface-sunken hover:bg-surface text-fg px-2 py-0.5 rounded-md font-mono text-micro border border-border transition-colors cursor-pointer flex items-center gap-1 shadow-2xs whitespace-nowrap shrink-0"
                             title="Click to copy number"
                           >
                             <Phone size={12} strokeWidth={2} className="text-primary shrink-0" aria-hidden />
-                            <span>{c.primary_mobile}</span>
+                            <span className="whitespace-nowrap tabular-nums">{c.primary_mobile}</span>
                           </button>
                         ) : (
                           <span className="text-fg-subtle">—</span>
@@ -111,21 +110,35 @@ export function MetadataTable({
                               key={i}
                               type="button"
                               onClick={() => copyToClipboard(m)}
-                              className="bg-surface-sunken/50 hover:bg-surface text-fg-subtle hover:text-fg px-1.5 py-0.5 rounded-md font-mono text-micro border border-border/80 transition-colors cursor-pointer"
+                              className="bg-surface-sunken/50 hover:bg-surface text-fg-subtle hover:text-fg px-1.5 py-0.5 rounded-md font-mono text-micro border border-border/80 transition-colors cursor-pointer whitespace-nowrap shrink-0"
                               title="Click to copy alternate number"
                             >
-                              {m}
+                              <span className="whitespace-nowrap tabular-nums">{m}</span>
                             </button>
                           ))}
                       </div>
                     </td>
 
-                    {/* Email ID(s) */}
-                    <td className="py-3.5 px-4 text-fg-muted font-mono text-micro">
-                      {c.primary_email ? (
+                    {/* Email ID(s) - Wraps Multiple Emails Cleanly */}
+                    <td className="py-3.5 px-4 text-fg-muted font-mono text-micro min-w-[200px] max-w-[300px]">
+                      {c.email_ids && c.email_ids.length > 0 ? (
+                        <div className="flex flex-col gap-1">
+                          {c.email_ids.map((email: string, i: number) => (
+                            <a
+                              key={i}
+                              href={`mailto:${email}`}
+                              className="text-primary hover:underline underline-offset-2 font-medium break-all leading-tight"
+                              title={email}
+                            >
+                              {email}
+                            </a>
+                          ))}
+                        </div>
+                      ) : c.primary_email ? (
                         <a
                           href={`mailto:${c.primary_email}`}
-                          className="text-primary hover:underline underline-offset-2 font-medium"
+                          className="text-primary hover:underline underline-offset-2 font-medium break-all leading-tight"
+                          title={c.primary_email}
                         >
                           {c.primary_email}
                         </a>

@@ -27,12 +27,13 @@ const COMPANY_TYPES = [
 ];
 
 const SECTIONS = [
-  { value: 'completed', label: 'Companies Completed' },
-  { value: 'in_progress', label: 'Companies In Progress' },
-  { value: 'pipeline', label: 'Companies in Pipeline' },
-  { value: 'top_companies', label: 'Top Companies' },
-  { value: 'rejected_by_hr', label: 'Companies Rejected by HR' },
-  { value: 'rejected_by_college', label: 'Companies Rejected by TPO' },
+  { value: 'completed', label: '1. Companies Completed' },
+  { value: 'in_progress', label: '2. Companies In Progress' },
+  { value: 'pipeline', label: '3. Companies In Pipeline' },
+  { value: 'top_companies', label: '4. Top Companies' },
+  { value: 'rejected_companies', label: '5. Rejected Companies' },
+  { value: 'on_hold_by_college', label: '6. Companies On Hold By College' },
+  { value: 'on_hold_by_hr', label: '7. Companies On Hold By HR' },
 ];
 
 export function AddCompanyModal({

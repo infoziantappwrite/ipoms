@@ -43,7 +43,7 @@ first.** That is how the password-policy and login-identifier regressions below 
 | Admin account | `placement_management@infoziant.com` |
 | Standard password (all seeded accounts) | `iPOMS@123` — capital **P**, capital **OMS**. Not `Ipoms@123`. |
 | Staff email domain | `@infoziant.com` (login auto-completes a bare username to this) |
-| Role codes | `ADMINISTRATOR`, `TEAM_LEADER`, `PLACEMENT_COORDINATOR`, `TPO` — **UPPERCASE** |
+| Role codes | `ADMINISTRATOR`, `TEAM_LEADER`, `PLACEMENT_COORDINATOR` — **UPPERCASE**. (`TPO` removed 29 Aug 2026 — see §5.) |
 | Timezone for jobs | IST (`Asia/Kolkata`) |
 | Design system | Light-mode neumorphic/clay, IBM Plex Sans, Infoziant navy `#1E3A8A` |
 
@@ -181,6 +181,109 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
    `routePolicy.normalizeRole()` also maps these aliases at request time as a safety net —
    that net is *not* the fix; stored data must still say what it means, or every future
    query and report over `role_codes` inherits the drift. Re-run the script if drift reappears.
+0d. ~~**Four `/metadata/*` data-repair endpoints were reachable with no account at all.**~~
+   **FIXED 29 Aug 2026.** `/metadata/empty-mobiles`, `/metadata/import-unique-companies`,
+   `/metadata/export-missing-excel`, `/metadata/renumber` bypassed auth at **two** layers
+   simultaneously: `authMiddleware.ts`'s `authenticateJWT()` had its own hardcoded exemption
+   list skipping the token check for these four paths (separate from and in addition to
+   `routePolicy.ts`'s `isPublic()`, which also exempted them from the role table). Verified
+   live before the fix: an anonymous `POST /metadata/renumber` with no Authorization header
+   returned 200. Worst of the four: `import-unique-companies` runs
+   `CompanyMetadata.deleteMany({serial_number: {$gte: 3574}})` then re-imports from
+   `C:\Projects\iPOMS\unique_companies_list.xlsx` — a path that only exists on this laptop,
+   so once deployed the delete would succeed and the reimport would silently fail, losing
+   ~233 company records with nothing to replace them. Both exemption lists removed; all four
+   routes are now ADMINISTRATOR-only via the policy table. Verified live in all three states:
+   anonymous → 401, authenticated coordinator → 403, administrator → 200.
+   **`npm run verify:policy` is now 79/79 with one public route.**
+0e. ~~**`GET /daily-leads` rewrote 6 companies' `college_id` on every call.**~~
+   **FIXED 29 Aug 2026.** This is the app's busiest read endpoint, and it unconditionally ran
+   `DailyLead.updateMany({company_name: {$in: [...6 names...]}}, {$set: {college_id: ngceId}})`
+   on every single call — so if a coordinator manually corrected one of those 6 companies to a
+   different college, the next page load anywhere in the app silently reverted it back to NGCE.
+   The repair is gone from the hot path entirely (a GET must never mutate as a side effect);
+   the same fix is still available, opt-in, via `GET /health/daily-leads-diagnostics?resync=true`
+   (administrator only, per trap 0a). Verified live: 3 consecutive calls, no mutation, college
+   count unchanged.
+0f. ~~**Four handlers were missing `scopeToSelf()`.**~~ **FIXED 29 Aug 2026.**
+   `GET /daily-leads`, `GET /assigned-work`, `GET /daily-leads/daily-tracker-positives`, and
+   `GET /notifications` all took `coordinator_id`/`user_id` straight from the query string with
+   no ownership check — any coordinator could read another's leads, assigned work, positive
+   calls, or targeted notifications by passing a different id. All four now call `scopeToSelf()`,
+   matching the pattern already used elsewhere (`routePolicy.ts`). Verified live: a coordinator
+   passing a colleague's id gets only their own data back, with or without the param; an
+   administrator naming a specific coordinator still gets that coordinator's real data (the
+   supervisor override still works).
+0g. ~~**Three screens told the user something untrue.**~~ **FIXED 29 Aug 2026.**
+   (a) *Weekly Tracker week navigation* — the prev/next arrows relabeled the header but never
+   changed the fetched rows; every offset silently showed the same full dataset. The label math
+   was also wrong on its own terms: it computed calendar weeks (1st–7th, 8th–14th...) instead of
+   the Friday–Thursday weeks every row is actually stored against (`week_start_date`/`week_number`
+   from `getFridayWeekBounds()`). Fixed both ends: `GET /weekly-tracker` and
+   `GET /weekly-tracker/kpi` now accept `week_offset` and filter by the real Friday–Thursday
+   range when it's non-zero — offset 0 ("Current") deliberately still shows the full master
+   dataset unfiltered, so existing usage doesn't silently shrink. `formatWeekDisplay()` in
+   `WeeklyHeader.tsx` now computes the same Friday–Thursday boundary as the backend, so the
+   label matches what's actually fetched. Verified live: current week correctly shows
+   "28 Aug – 3 Sept 2026 · Week 35" (today is Sat 29 Aug); non-current offsets return genuinely
+   different (in this case empty) result sets; KPI totals stay consistent with the row count.
+   (b) *Metadata export* — shipped 50 rows under an `iPOMS_Master_Company_Metadata` filename
+   regardless of the real total (3,807+), because `handleExport()` mapped straight from the
+   paginated table state (`limit=50`). Now loops the same endpoint at `limit=500` (the server
+   cap) until every row matching the current filters is fetched, then exports that. Verified
+   live via network trace: 8 sequential requests (pages 1–8 at 500/page) covering all ~3,807
+   records, stopping exactly at completion — no over-fetch, no infinite loop.
+   (c) *Ctrl+S on Metadata* — dispatched the shared "Auto-Saved / All changes permanently
+   synchronized in cloud" banner while only calling `loadMetadata()`, a read; the page has no
+   inline-editable cells; every contact edit already saves immediately through its own modal.
+   Weekly Tracker's identical-looking Ctrl+S banner is legitimate by contrast — its cells commit
+   real edits via `onBlur`, so blurring the active element before refreshing genuinely flushes
+   pending saves. Root cause: `AutoSaveFloatingIndicator` accepted a custom message override in
+   its own signature but silently dropped it, always rendering the hardcoded text. Now the
+   override actually works; Metadata dispatches `{title:'Refreshed', subtitle:'Metadata list
+   re-fetched from the server'}` instead. Verified live: Metadata's Ctrl+S now shows "Refreshed
+   · Metadata list re-fetched from the server"; Weekly Tracker's is unchanged, still "Auto-Saved
+   · All changes permanently synchronized in cloud" — confirmed the fix didn't touch the
+   legitimate case.
+0h. ~~**TPO was a broken, unusable account type.**~~ **REMOVED 29 Aug 2026 (user decision, not a
+   bug fix).** The spec called for an external, read-only TPO role scoped to a college's
+   finalized Weekly Placement Report, but no frontend experience was ever built — `RoleKey` in
+   `frontend/src/lib/session.ts` never included `'tpo'`, so any TPO account fell through to
+   `roleOf()`'s default and got the full internal coordinator dashboard, which the backend then
+   correctly 403'd on every real request. Rather than build the missing frontend, the user chose to remove TPO entirely until it's
+   worth building for real. Confirmed zero live accounts held the role before removing anything.
+   Removed: `TPO` from `RoleCode`, `ROLE_ALIASES`, `assignableRoles()` grants, and the
+   `/colleges` policy (now plain `STAFF` — also fixed a duplicate `/colleges` policy entry found
+   in the process, dead code since `.find()` only ever matched the first); the role-selection
+   dropdown in `UserModal.tsx`, the role filter and styling in `UserManagementTab.tsx`, and the
+   TPO column in `RoleMatrixTab.tsx`; the TPO entry in both role-seeding paths
+   (`server.ts`'s `ensureDefaultAccounts` and the standalone `seedRolesAndAdmin.ts` script); and
+   the now-orphaned TPO document in the `roles` collection itself. Left untouched: every
+   non-role "TPO" reference — `College.tpo_name`/`tpo_contact_mobile` (a college's real
+   placement-office contact, unrelated to iPOMS accounts), and business-vocabulary strings like
+   "Awaiting TPO Approval" and "Rejected by TPO" in status text and report labels. Verified
+   live: assigning `role_codes:["TPO"]` now fails as `Unknown role code` (400) rather than merely
+   insufficient permission; `/roles` returns exactly the 3 remaining codes; the Add User dropdown,
+   User Management role filter, and RBAC matrix all confirmed TPO-free in a live browser session.
+   Full re-add path is documented in the `RoleCode` comment in `routePolicy.ts`.
+0i. ~~**The RBAC matrix on Settings → Role Permissions Matrix was wrong on 5 of 15 rows.**~~
+   **FIXED 29 Aug 2026 — display only, no permission change.** `RoleMatrixTab.tsx` is a
+   hand-maintained table with no live connection to `routePolicy.ts`'s `POLICIES` table, and
+   had drifted: it showed Coordinator as unable to Export Reports, Delete/Archive Company
+   Records, and Restore from Recycle Bin, and Team Leader as unable to do User & Coordinator
+   Management — all four were already true in the real enforced policy (`STAFF`/`TL_ADMIN`
+   roles on the relevant routes), just displayed wrong. It also claimed Administrator has
+   "View Governance & Audit Trail" — no audit-log viewing endpoint exists for any role.
+   Corrected the 4 booleans and replaced the false audit-trail row with a footnote stating
+   the feature isn't built. User explicitly confirmed the direction first ("Coordinators
+   should keep all four — just fix the sign") after I flagged that the two possible fixes
+   (correct the display vs. actually restrict real permissions to match the wrong display)
+   point opposite ways — always ask before touching a permissions display, since the wrong
+   choice either strips access or fakes doc compliance. Verified live in an Administrator
+   session (the tab is Administrator-only — `isAdmin && activeSection === 'roles'` in
+   `settings/page.tsx`, `forCoordinator: false` in `SettingsNav.tsx`): all 5 corrections
+   render as intended. Re-verify against `POLICIES` before trusting this table again next
+   time a permission rule changes — it has no automated link to reality.
 2. **`backend/.env` is tracked in git** — real SMTP and JWT values are in history.
    `git rm --cached backend/.env`, rotate the secrets, and remove the hardcoded JWT fallbacks.
 3. **`frontend/.next/` is tracked in git** (38 files). Git and webpack writing the same
@@ -258,8 +361,13 @@ Data flow: `company_metadata → assigned_work → daily_tracker → weekly_trac
 | 10 | System Admin | — | Director/CEO only. Health, data-quality, announcements. Largely unbuilt. |
 
 ### RBAC essentials
-- **TPO** is external and read-only: only the finalized Weekly Placement Report for their
-  own `college_id`. Enforce at frontend route + API + middleware.
+- **TPO removed 29 Aug 2026** (user decision). The spec called for an external, read-only
+  role scoped to a college's finalized Weekly Placement Report, but no frontend experience was
+  ever built for it — a TPO account fell through to the full internal coordinator dashboard,
+  which the backend then correctly 403'd on every real request. Rather than leave a broken
+  account type reachable, it was pulled entirely: not creatable via Settings, not a valid role
+  code, not seeded. Zero live accounts held it at removal time. Full re-add path documented in
+  the `RoleCode` comment in `backend/src/lib/routePolicy.ts` if a real TPO experience gets built.
 - **Coordinator** sees only their own colleges, work, KPIs, follow-ups. No cross-coordinator visibility.
 - Only Admin hard-purges. Coordinators may restore what they themselves deleted (Ch.6 Recon #3).
 - A coordinator normally handles **3** colleges, max 4.

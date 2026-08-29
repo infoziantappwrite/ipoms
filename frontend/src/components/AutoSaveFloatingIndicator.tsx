@@ -4,12 +4,24 @@ import React, { useState, useEffect, useRef } from 'react';
 import { CheckCircle2, Sparkles, Zap } from 'lucide-react';
 import { triggerHaptic } from '@/lib/haptics';
 
+interface BannerMessage {
+  title?: string;
+  subtitle?: string;
+}
+
 export function AutoSaveFloatingIndicator() {
   const [visible, setVisible] = useState(false);
   const [timestamp, setTimestamp] = useState('');
+  // Was accepted as a param and silently dropped — every caller got the
+  // hardcoded "Auto-Saved / All changes permanently synchronized in cloud"
+  // text regardless of what actually happened, which is honest for pages
+  // with real onBlur-committed edits (Weekly Tracker) but was also firing on
+  // pages that only re-fetch data (Metadata's Ctrl+S does a GET, not a save).
+  // Callers that don't have anything real to report can now say so.
+  const [message, setMessage] = useState<BannerMessage>({});
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const triggerAutoSaveNotice = (customMsg?: string) => {
+  const triggerAutoSaveNotice = (customMsg?: BannerMessage) => {
     // Blur any active element to trigger pending onBlur auto-saves
     if (typeof document !== 'undefined' && document.activeElement && 'blur' in document.activeElement) {
       (document.activeElement as HTMLElement).blur();
@@ -28,6 +40,7 @@ export function AutoSaveFloatingIndicator() {
       hour12: true,
     });
     setTimestamp(timeStr);
+    setMessage(customMsg || {});
     setVisible(true);
     triggerHaptic('success');
 
@@ -46,8 +59,8 @@ export function AutoSaveFloatingIndicator() {
     };
 
     const handleCustomEvent = (e: Event) => {
-      const detail = (e as CustomEvent)?.detail?.message;
-      triggerAutoSaveNotice(detail);
+      const detail = (e as CustomEvent)?.detail as BannerMessage | undefined;
+      triggerAutoSaveNotice(detail?.title || detail?.subtitle ? detail : undefined);
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -77,10 +90,10 @@ export function AutoSaveFloatingIndicator() {
 
         {/* Message */}
         <div className="flex items-center gap-1.5 sm:gap-2 text-xs font-semibold tracking-tight">
-          <span className="text-slate-900 dark:text-white font-bold">Auto-Saved</span>
+          <span className="text-slate-900 dark:text-white font-bold">{message.title || 'Auto-Saved'}</span>
           <span className="text-slate-400 font-normal hidden sm:inline">•</span>
           <span className="text-emerald-700 dark:text-emerald-300 font-medium hidden sm:inline">
-            All changes permanently synchronized in cloud
+            {message.subtitle || 'All changes permanently synchronized in cloud'}
           </span>
           <span className="text-[11px] font-mono text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-white/10 border border-slate-200/80 dark:border-white/10 px-2 py-0.5 rounded-md ml-0.5">
             {timestamp}

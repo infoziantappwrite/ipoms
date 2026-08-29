@@ -8,18 +8,40 @@ const cleanString = (val: any): string => {
   return String(val).trim();
 };
 
+const getRowVal = (row: any, candidates: string[]): any => {
+  const keys = Object.keys(row);
+  for (const candidate of candidates) {
+    if (row[candidate] !== undefined && row[candidate] !== null && String(row[candidate]).trim() !== '') {
+      return row[candidate];
+    }
+  }
+  // Try case-insensitive / stripped match
+  for (const candidate of candidates) {
+    const candNorm = candidate.toLowerCase().replace(/[^a-z0-9]/g, '');
+    for (const k of keys) {
+      const kNorm = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (kNorm === candNorm && row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== '') {
+        return row[k];
+      }
+    }
+  }
+  return '';
+};
+
 const parsePhoneNumbers = (val: any): string[] => {
-  const raw = cleanString(val);
-  if (!raw) return [];
+  if (val === undefined || val === null) return [];
+  const raw = String(val).trim();
+  if (!raw || raw === '-' || raw === '—' || raw === 'N/A' || raw === 'NA') return [];
   return raw
     .split(/[,;\/\n\r|]+/)
-    .map((p) => p.replace(/[^\d+]/g, '').trim())
-    .filter((p) => p.length >= 7);
+    .map((p) => p.trim())
+    .filter((p) => p.replace(/[^\d]/g, '').length >= 7);
 };
 
 const parseEmails = (val: any): string[] => {
-  const raw = cleanString(val);
-  if (!raw) return [];
+  if (val === undefined || val === null) return [];
+  const raw = String(val).trim();
+  if (!raw || raw === '-' || raw === '—' || raw === 'N/A' || raw === 'NA') return [];
   return raw
     .split(/[,;\/\s\n\r|]+/)
     .map((e) => e.trim().toLowerCase())
@@ -75,51 +97,59 @@ export async function importUniqueCompaniesList(): Promise<{
     };
   }
 
-  // 1. Reset all existing metadata created_at dates to 30 days ago so they exit the "Recent Data" window
+  console.log(`📑 [Unique Companies] Found ${rawRows.length} rows in sheet "${sheetName}". Sample keys:`, Object.keys(rawRows[0] || {}));
+
+  // 1. Delete all existing records from S.No 3574 onwards to remove any duplicates or previous imports
+  const deleteResult = await CompanyMetadata.deleteMany({ serial_number: { $gte: 3574 } });
+  console.log(`🗑️ [Unique Companies Clean] Removed ${deleteResult.deletedCount} records with S.No >= 3574.`);
+
+  // 2. Reset all remaining metadata created_at dates to 30 days ago so they exit the "Recent Data" window
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   await CompanyMetadata.updateMany({}, { $set: { created_at: thirtyDaysAgo } });
 
-  // 2. Find maximum existing serial_number
-  const maxRecord = await CompanyMetadata.findOne({}).sort({ serial_number: -1 }).select('serial_number');
-  let currentMaxSno = maxRecord && typeof maxRecord.serial_number === 'number' ? maxRecord.serial_number : 0;
+  // 3. Starting serial number is exactly 3573 (so next starts at 3574)
+  const maxRecord = await CompanyMetadata.findOne({ is_deleted: false }).sort({ serial_number: -1 }).select('serial_number');
+  let currentMaxSno = maxRecord && typeof maxRecord.serial_number === 'number' ? maxRecord.serial_number : 3573;
+  if (currentMaxSno > 3573) currentMaxSno = 3573;
+
   const totalBefore = await CompanyMetadata.countDocuments({});
 
   const now = new Date();
   const docsToInsert: any[] = [];
+  const seenCompanies = new Set<string>();
 
   for (const row of rawRows) {
-    // Look for various possible column name permutations
-    const companyName = cleanString(
-      row['Company Name'] || row['company_name'] || row['Company'] || row['COMPANY NAME'] || row['COMPANY'] || Object.values(row)[0] || ''
-    );
+    const rawComp = getRowVal(row, ['Company Name', 'Company', 'company_name', 'COMPANY NAME', 'Organization', 'Employer']);
+    const companyName = cleanString(rawComp || Object.values(row)[1] || Object.values(row)[0] || '');
 
-    if (!companyName) continue;
+    if (!companyName || companyName === '#VALUE!' || companyName.length < 2) continue;
 
-    const hrName = cleanString(
-      row['HR Contact Person'] || row['HR Name'] || row['hr_name'] || row['HR NAME'] || row['Contact Person'] || row['HR'] || ''
-    );
+    // Deduplicate within the file itself if any duplicate company exists
+    const compKey = companyName.toLowerCase().trim();
+    if (seenCompanies.has(compKey)) {
+      continue;
+    }
+    seenCompanies.add(compKey);
 
-    const designation = cleanString(
-      row['HR Designation'] || row['Designation'] || row['hr_designation'] || row['DESIGNATION'] || ''
-    );
+    const rawHr = getRowVal(row, ['HR Name', 'HR Contact Person', 'hr_name', 'HR NAME', 'Contact Person', 'Name', 'HR']);
+    const hrName = cleanString(rawHr);
 
-    const rawMobile = cleanString(
-      row['Mobile Numbers'] || row['Mobile'] || row['primary_mobile'] || row['MOBILE'] || row['Phone'] || row['Contact Number'] || ''
-    );
+    const rawDesig = getRowVal(row, ['HR Designation', 'Designation', 'hr_designation', 'DESIGNATION', 'Role']);
+    const designation = cleanString(rawDesig);
+
+    const rawMobile = getRowVal(row, ['Mobile Number', 'Mobile Numbers', 'Mobile', 'Phone Number', 'Phone', 'Contact Number', 'primary_mobile', 'MOBILE', 'Contact']);
     const mobileNumbers = parsePhoneNumbers(rawMobile);
-    const primaryMobile = mobileNumbers[0] || (rawMobile.replace(/[^\d+]/g, '').trim() || '');
+    const primaryMobile = mobileNumbers[0] || (cleanString(rawMobile).replace(/[^\d+]/g, '').trim() || '');
 
-    const rawEmail = cleanString(
-      row['Email ID(s)'] || row['Email'] || row['primary_email'] || row['EMAIL'] || row['Email ID'] || ''
-    );
+    const rawEmail = getRowVal(row, ['Email ID', 'Email IDs', 'Email ID(s)', 'Email', 'Email Address', 'Official Email', 'primary_email', 'EMAIL', 'Mail']);
     const emailIds = parseEmails(rawEmail);
-    const primaryEmail = emailIds[0] || (rawEmail.includes('@') ? rawEmail.toLowerCase().trim() : '');
+    const primaryEmail = emailIds[0] || (cleanString(rawEmail).includes('@') ? cleanString(rawEmail).toLowerCase().trim() : '');
 
-    const companyType = cleanString(
-      row['Industry'] || row['company_type'] || row['Type'] || row['INDUSTRY'] || ''
-    ).toLowerCase() || detectCompanyType(companyName);
+    const rawType = getRowVal(row, ['Industry', 'Sector', 'company_type', 'Type', 'INDUSTRY', 'Sector / Industry']);
+    const companyType = cleanString(rawType).toLowerCase() || detectCompanyType(companyName);
 
-    const notes = cleanString(row['Notes'] || row['notes'] || row['Remarks'] || row['REMARKS'] || '');
+    const rawNotes = getRowVal(row, ['Notes', 'notes', 'Remarks', 'REMARKS', 'Comment']);
+    const notes = cleanString(rawNotes);
 
     currentMaxSno += 1;
 
@@ -153,7 +183,7 @@ export async function importUniqueCompaniesList(): Promise<{
     importedCount: insertedCount,
     totalBefore,
     totalAfter,
-    message: `Successfully imported ${insertedCount} contacts from unique_companies_list.xlsx into Master Metadata as Recent Data.`,
-    sampleImported: docsToInsert.slice(0, 5),
+    message: `Successfully purged duplicates >= 3574 and imported ${insertedCount} unique contacts with full mobile numbers from unique_companies_list.xlsx starting at S.No 3574 to ${currentMaxSno}. Total metadata count: ${totalAfter}.`,
+    sampleImported: docsToInsert.slice(0, 8),
   };
 }

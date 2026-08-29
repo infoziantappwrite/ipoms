@@ -141,7 +141,7 @@ export default function DashboardPage() {
           {role === 'team_leader' && (
             <TeamLeaderDashboard data={dashboardData} onRefresh={loadDashboard} />
           )}
-          {role === 'admin' && <AdminDashboard data={dashboardData} />}
+          {role === 'admin' && <AdminDashboard data={dashboardData} onRefresh={loadDashboard} />}
         </>
       )}
     </div>

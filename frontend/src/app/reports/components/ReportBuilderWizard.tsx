@@ -19,6 +19,7 @@ import {
   GraduationCap,
   Loader2,
   Briefcase,
+  XCircle,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { getCachedColleges, fetchAllCollegesCached } from '@/lib/collegeSession';
@@ -30,6 +31,23 @@ interface College {
   college_name: string;
   college_code: string;
 }
+
+const WEEKLY_KPIS = [
+  { key: 'total_calls', label: 'Calls', desc: 'Total Calls Made' },
+  { key: 'positive_responses', label: 'Positives', desc: 'Positive Responses' },
+  { key: 'jds_received', label: 'JDs Received', desc: 'JDs Received' },
+  { key: 'drives_completed', label: 'Completed', desc: 'Drives Completed' },
+  { key: 'drives_in_progress', label: 'In Progress', desc: 'Drives Underway' },
+  { key: 'pipeline_leads', label: 'Pipeline', desc: 'Pipeline Leads' },
+  { key: 'top_companies_count', label: 'Top Companies', desc: 'Target Tier 1' },
+  { key: 'total_offers', label: 'Offers', desc: 'Confirmed Selects' },
+];
+
+const ACTIVE_LEADS_KPIS = [
+  { key: 'total_leads', label: 'Total Leads', desc: 'Active Corporate Leads' },
+  { key: 'graduating_year', label: 'Graduating Batch', desc: 'Target Batch Year' },
+  { key: 'active_companies_count', label: 'Corporate Partners', desc: 'Active Corporate Partners' },
+];
 
 interface Props {
   initialTemplateType: string;
@@ -45,7 +63,9 @@ export function ReportBuilderWizard({
   onReportGenerated,
 }: Props) {
   const [templateType, setTemplateType] = useState(initialTemplateType || 'weekly_placement');
-  const [collegeId, setCollegeId] = useState(initialCollegeId || 'all');
+  const [collegeId, setCollegeId] = useState(
+    initialCollegeId && initialCollegeId !== 'all' ? initialCollegeId : ''
+  );
   const [academicYear, setAcademicYear] = useState('all');
 
   // Dynamic Interactive Date Range Calendar Selection
@@ -67,7 +87,25 @@ export function ReportBuilderWizard({
     in_progress: true,
     pipeline: true,
     top_companies: true,
+    rejected_companies: true,
+    on_hold_by_college: true,
+    on_hold_by_hr: true,
     remarks: true,
+  });
+
+  // Granular KPI card picker toggles
+  const [kpiCards, setKpiCards] = useState<Record<string, boolean>>({
+    total_calls: true,
+    positive_responses: true,
+    jds_received: true,
+    drives_completed: true,
+    drives_in_progress: true,
+    pipeline_leads: true,
+    top_companies_count: true,
+    total_offers: true,
+    total_leads: true,
+    graduating_year: true,
+    active_companies_count: true,
   });
 
   const [colleges, setColleges] = useState<College[]>(() => getCachedColleges());
@@ -80,11 +118,17 @@ export function ReportBuilderWizard({
     in_progress: any[];
     pipeline: any[];
     top_companies: any[];
+    rejected_companies: any[];
+    on_hold_by_college: any[];
+    on_hold_by_hr: any[];
   }>({
     completed: [],
     in_progress: [],
     pipeline: [],
     top_companies: [],
+    rejected_companies: [],
+    on_hold_by_college: [],
+    on_hold_by_hr: [],
   });
   const [loadingWeekly, setLoadingWeekly] = useState(false);
 
@@ -127,10 +171,13 @@ export function ReportBuilderWizard({
         if (isMounted && res.success && res.data) {
           const d = res.data.sections || res.data;
           setWeeklyCompanies({
-            completed: Array.isArray(d.completed) ? d.completed : [],
-            in_progress: Array.isArray(d.in_progress) ? d.in_progress : [],
-            pipeline: Array.isArray(d.pipeline) ? d.pipeline : [],
-            top_companies: Array.isArray(d.top_companies) ? d.top_companies : [],
+            completed: Array.isArray(d.completed?.rows) ? d.completed.rows : (Array.isArray(d.completed) ? d.completed : []),
+            in_progress: Array.isArray(d.in_progress?.rows) ? d.in_progress.rows : (Array.isArray(d.in_progress) ? d.in_progress : []),
+            pipeline: Array.isArray(d.pipeline?.rows) ? d.pipeline.rows : (Array.isArray(d.pipeline) ? d.pipeline : []),
+            top_companies: Array.isArray(d.top_companies?.rows) ? d.top_companies.rows : (Array.isArray(d.top_companies) ? d.top_companies : []),
+            rejected_companies: Array.isArray(d.rejected_companies?.rows) ? d.rejected_companies.rows : (Array.isArray(d.rejected_by_hr?.rows) ? d.rejected_by_hr.rows : []),
+            on_hold_by_college: Array.isArray(d.on_hold_by_college?.rows) ? d.on_hold_by_college.rows : (Array.isArray(d.rejected_by_college?.rows) ? d.rejected_by_college.rows : []),
+            on_hold_by_hr: Array.isArray(d.on_hold_by_hr?.rows) ? d.on_hold_by_hr.rows : [],
           });
         }
       } catch (err) {
@@ -170,6 +217,7 @@ export function ReportBuilderWizard({
         in_progress: true,
         pipeline: true,
         top_companies: true,
+        rejected_by_college: true,
         remarks: true,
       });
       setCustomRemarks('All campus drives are progressing actively as per schedule. Follow-ups with upcoming tech partners remain on track.');
@@ -180,9 +228,11 @@ export function ReportBuilderWizard({
     setValidationErrors([]);
     const errors: string[] = [];
 
-    // 1. Mandatory Target College
-    if (!collegeId || collegeId.trim() === '') {
-      errors.push('Target College must be selected.');
+    // 1. Mandatory Target College (Only for Weekly Placement and Pending Tasks, NOT for Active Leads)
+    if (templateType !== 'active_leads') {
+      if (!collegeId || collegeId.trim() === '' || collegeId === 'all') {
+        errors.push('Target Institution is required. Please pick a college to generate the report.');
+      }
     }
 
     // 2. Mandatory Graduating Academic Year
@@ -221,12 +271,14 @@ export function ReportBuilderWizard({
         method: 'POST',
         body: JSON.stringify({
           template_type: templateType,
-          college_id: collegeId,
+          college_id: templateType === 'active_leads' ? (collegeId || 'all') : collegeId,
           coordinator_id: coordinatorId,
           academic_year: academicYear,
           week_label: weekLabel,
           theme,
           included_sections: sections,
+          included_kpi_cards: kpiCards,
+          kpi_cards: kpiCards,
           custom_remarks: customRemarks,
         }),
       });
@@ -253,19 +305,27 @@ export function ReportBuilderWizard({
     }
     if (templateType === 'active_leads') {
       return [
-        { key: 'kpi_summary', label: 'Active Leads KPI Summary', icon: BarChart3, desc: 'Total leads count, target batch year, and active partner tally' },
-        { key: 'active_leads', label: 'Active Corporate Leads Table', icon: TrendingUp, desc: 'Detailed table with Company, Roles, CTC package, and Fall of Month' },
+        {
+          key: 'kpi_summary',
+          label: 'Active Leads KPI Summary',
+          icon: BarChart3,
+          desc: 'Select which KPI metrics appear in the header summary strip',
+          isKpiSection: true,
+          kpiList: ACTIVE_LEADS_KPIS,
+        },
+        { key: 'active_leads', label: 'Active Corporate Leads Table', icon: Sparkles, desc: 'Detailed table with Company, Roles, CTC package, and Fall of Month' },
         { key: 'remarks', label: 'Coordinator Remarks & Observations', icon: PenLine, desc: 'Corporate relationship overview and strategic notes' },
       ];
     }
 
-    return [
+    const list: any[] = [
       {
         key: 'kpi_summary',
         label: 'Executive Placement KPI Summary',
         icon: BarChart3,
-        desc: '8 metrics: Total Calls, Positives, JDs, Completed, In Progress, Pipeline, Top Companies, Offers',
-        companies: [],
+        desc: 'Select which KPI metrics appear in the header summary strip',
+        isKpiSection: true,
+        kpiList: WEEKLY_KPIS,
       },
       {
         key: 'completed_companies',
@@ -285,11 +345,11 @@ export function ReportBuilderWizard({
       },
       {
         key: 'pipeline',
-        label: '3. Companies in Pipeline',
+        label: '3. Companies In Pipeline',
         icon: Layers,
         desc: 'Upcoming scheduled drives and confirmed tech partnerships',
         companies: weeklyCompanies.pipeline,
-        badgeColor: 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+        badgeColor: 'bg-cyan-50 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800',
       },
       {
         key: 'top_companies',
@@ -299,14 +359,52 @@ export function ReportBuilderWizard({
         companies: weeklyCompanies.top_companies,
         badgeColor: 'bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
       },
-      {
-        key: 'remarks',
-        label: 'Coordinator Remarks & Observations',
-        icon: PenLine,
-        desc: 'Operational observations and placement overview',
-        companies: [],
-      },
     ];
+
+    // 5. Rejected Companies (Show checkbox if data exists)
+    if (Array.isArray(weeklyCompanies.rejected_companies) && weeklyCompanies.rejected_companies.length > 0) {
+      list.push({
+        key: 'rejected_companies',
+        label: '5. Rejected Companies',
+        icon: XCircle,
+        desc: 'Companies with employer declines or ineligible criteria',
+        companies: weeklyCompanies.rejected_companies,
+        badgeColor: 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
+      });
+    }
+
+    // 6. Companies On Hold By College (Show checkbox if data exists)
+    if (Array.isArray(weeklyCompanies.on_hold_by_college) && weeklyCompanies.on_hold_by_college.length > 0) {
+      list.push({
+        key: 'on_hold_by_college',
+        label: '6. Companies On Hold By College',
+        icon: Clock,
+        desc: 'Placement drives placed on hold by college management / TPO',
+        companies: weeklyCompanies.on_hold_by_college,
+        badgeColor: 'bg-orange-50 dark:bg-orange-950/50 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800',
+      });
+    }
+
+    // 7. Companies On Hold By HR (Show checkbox if data exists)
+    if (Array.isArray(weeklyCompanies.on_hold_by_hr) && weeklyCompanies.on_hold_by_hr.length > 0) {
+      list.push({
+        key: 'on_hold_by_hr',
+        label: '7. Companies On Hold By HR',
+        icon: Clock,
+        desc: 'Placement drives placed on hold by corporate HR partners',
+        companies: weeklyCompanies.on_hold_by_hr,
+        badgeColor: 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700',
+      });
+    }
+
+    list.push({
+      key: 'remarks',
+      label: 'Coordinator Remarks & Observations',
+      icon: PenLine,
+      desc: 'Operational observations and placement overview',
+    });
+
+    return list;
   };
 
   return (
@@ -314,44 +412,44 @@ export function ReportBuilderWizard({
 
       {/* ── Navigation Tabs (Weekly Report, Pending Tasks, Active Leads) ────────────────── */}
       <div className="flex justify-center pt-2 pb-2">
-        <div className="w-full max-w-xl bg-surface border border-border p-1.5 rounded-2xl shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+        <div className="w-full max-w-2xl bg-surface border border-border p-1.5 rounded-2xl shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-1.5">
           <button
             type="button"
             onClick={() => handleCategoryChange('weekly_placement')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none ${
+            className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'weekly_placement'
                 ? 'bg-primary text-white shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
             }`}
           >
             <CalendarDays size={15} strokeWidth={2.2} />
-            <span>Weekly Placement Report</span>
+            <span className="whitespace-nowrap">Weekly Placement Report</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleCategoryChange('pending_tasks')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none ${
+            className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'pending_tasks'
                 ? 'bg-primary text-white shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
             }`}
           >
             <ListTodo size={15} strokeWidth={2.2} />
-            <span>Pending Tasks</span>
+            <span className="whitespace-nowrap">Pending Tasks</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleCategoryChange('active_leads')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none ${
+            className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'active_leads'
                 ? 'bg-primary text-white shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
             }`}
           >
-            <TrendingUp size={15} strokeWidth={2.2} />
-            <span>Active Leads</span>
+            <Sparkles size={15} strokeWidth={2.2} />
+            <span className="whitespace-nowrap">Active Leads</span>
           </button>
         </div>
       </div>
@@ -359,46 +457,69 @@ export function ReportBuilderWizard({
       {/* ── Configuration Card: Showing Sections Relevant to Active Report ─────────────── */}
       <div className="rounded-2xl border border-border bg-surface p-6 shadow-xs space-y-6">
 
-        {/* Section A: Scope & Institution Parameters */}
+        {/* Section A: Scope & Parameters */}
         <div className="space-y-4">
           <div className="flex items-center gap-2 border-b border-border/80 pb-2">
-            <Building2 size={16} className="text-primary shrink-0" />
+            {templateType === 'active_leads' ? (
+              <Sparkles size={16} className="text-primary shrink-0" />
+            ) : (
+              <Building2 size={16} className="text-primary shrink-0" />
+            )}
             <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
-              Institutional Scope & Batch
+              {templateType === 'active_leads'
+                ? 'Target Graduating Batch'
+                : 'Institutional Scope & Batch'}
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Target College */}
-            <div>
-              <label className="block text-xs font-semibold text-fg mb-1.5">
-                Target Institution <span className="text-rose-500 font-bold ml-0.5">*</span>
-              </label>
-              <SmoothSelect
-                value={collegeId}
-                onChange={(val) => {
-                  setCollegeId(val);
-                  setValidationErrors([]);
-                }}
-                searchable={true}
-                searchPlaceholder="Search institution name or code…"
-                icon={Building2}
-                title="Institutional Target Scope"
-                options={[
-                  {
-                    value: 'all',
-                    label: 'All Colleges (Consolidated Report)',
-                    badge: 'ALL',
-                  },
-                  ...colleges.map((c: any) => ({
-                    value: c._id,
-                    label: c.college_name,
-                    badge: c.college_code,
-                    sublabel: c.location,
-                  })),
-                ]}
-              />
-            </div>
+          <div className={`grid gap-4 ${templateType === 'active_leads' ? 'grid-cols-1 max-w-md' : 'grid-cols-1 md:grid-cols-2'}`}>
+            {/* Target College (Only for Weekly Placement and Pending Tasks, NOT for Active Leads) */}
+            {templateType !== 'active_leads' && (
+              <div>
+                <label className="block text-xs font-semibold text-fg mb-1.5">
+                  Target Institution <span className="text-rose-500 font-bold ml-0.5">*</span>
+                </label>
+                {(() => {
+                  const isMissingCollege = validationErrors.some(
+                    (e) => e.toLowerCase().includes('institution') || e.toLowerCase().includes('college')
+                  );
+                  return (
+                    <div>
+                      <div className={isMissingCollege ? 'ring-2 ring-rose-500/80 rounded-xl transition-all' : ''}>
+                        <SmoothSelect
+                          value={collegeId}
+                          onChange={(val) => {
+                            setCollegeId(val);
+                            setValidationErrors((prev) =>
+                              prev.filter(
+                                (e) => !e.toLowerCase().includes('institution') && !e.toLowerCase().includes('college')
+                              )
+                            );
+                          }}
+                          placeholder="Select Target Institution *"
+                          searchable={true}
+                          searchPlaceholder="Search institution name or code…"
+                          icon={Building2}
+                          title="Target College / Institution"
+                          options={colleges.map((c: any) => ({
+                            value: c._id,
+                            label: c.college_name,
+                            badge: c.college_code,
+                            sublabel: c.location,
+                          }))}
+                        />
+                      </div>
+                      {isMissingCollege && (
+                        <p className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold mt-1.5 flex items-center gap-1">
+                          <AlertCircle size={12} className="shrink-0" />
+                          Please pick a college before generating the report
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
 
             {/* Graduating Academic Year */}
             <div>
@@ -478,11 +599,17 @@ export function ReportBuilderWizard({
               const Icon = sec.icon;
               const isChecked = !!sections[sec.key];
               const hasCompanies = Array.isArray(sec.companies) && sec.companies.length > 0;
+              const isKpi = !!sec.isKpiSection;
+              const activeKpiCount = isKpi && Array.isArray(sec.kpiList)
+                ? sec.kpiList.filter((k: any) => kpiCards[k.key] !== false).length
+                : 0;
 
               return (
                 <div
                   key={sec.key}
                   className={`flex flex-col p-3.5 rounded-xl border transition-all select-none ${
+                    isKpi ? 'md:col-span-2' : ''
+                  } ${
                     isChecked
                       ? 'bg-primary/5 border-primary/40 dark:border-primary/50 shadow-xs'
                       : 'bg-surface-sunken border-border opacity-70 hover:opacity-100 hover:bg-surface-raised'
@@ -502,7 +629,11 @@ export function ReportBuilderWizard({
                           <span>{sec.label}</span>
                         </span>
 
-                        {Array.isArray(sec.companies) && (
+                        {isKpi && Array.isArray(sec.kpiList) ? (
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border shrink-0 bg-primary/10 border-primary/20 text-primary">
+                            {activeKpiCount}/{sec.kpiList.length} Cards Selected
+                          </span>
+                        ) : Array.isArray(sec.companies) ? (
                           <span
                             className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border shrink-0 ${
                               hasCompanies
@@ -512,40 +643,71 @@ export function ReportBuilderWizard({
                           >
                             {sec.companies.length} {sec.companies.length === 1 ? 'Company' : 'Companies'}
                           </span>
-                        )}
+                        ) : null}
                       </div>
                       <p className="text-micro text-fg-subtle leading-normal">{sec.desc}</p>
                     </div>
                   </label>
 
-                  {/* Live Synced Company Pill List from Weekly Tracker */}
-                  {Array.isArray(sec.companies) && (
-                    <div className="mt-2.5 pt-2 border-t border-border/50">
-                      {hasCompanies ? (
-                        <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto pr-1">
-                          {sec.companies.map((c: any, i: number) => (
-                            <span
-                              key={i}
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium border font-mono ${
-                                sec.badgeColor || 'bg-surface border-border text-fg'
-                              }`}
-                              title={`${c.company_name} — ${c.job_role || 'Role'} ${c.ctc_lpa ? `(${c.ctc_lpa})` : ''}`}
-                            >
-                              <Briefcase size={10} className="shrink-0" />
-                              <span className="font-semibold">{c.company_name}</span>
-                              {c.selected_count ? (
-                                <span className="font-bold ml-0.5 text-emerald-600 dark:text-emerald-400">
-                                  ({c.selected_count} Placed)
-                                </span>
-                              ) : null}
-                            </span>
-                          ))}
+                  {/* KPI Metric Cards Picker (Shown when KPI Section is checked) */}
+                  {isKpi && isChecked && Array.isArray(sec.kpiList) && (
+                    <div className="mt-3 pt-2.5 border-t border-border/60 space-y-2">
+                      <div className="flex items-center justify-between gap-2 text-micro">
+                        <span className="font-semibold text-fg-subtle">Select KPI metric cards to include in report:</span>
+                        <div className="flex items-center gap-2 font-bold">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              const updated = { ...kpiCards };
+                              sec.kpiList.forEach((k: any) => { updated[k.key] = true; });
+                              setKpiCards(updated);
+                            }}
+                            className="text-[10px] text-primary hover:underline cursor-pointer"
+                          >
+                            Select All
+                          </button>
+                          <span className="text-border">|</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              const updated = { ...kpiCards };
+                              sec.kpiList.forEach((k: any) => { updated[k.key] = false; });
+                              setKpiCards(updated);
+                            }}
+                            className="text-[10px] text-fg-subtle hover:text-fg hover:underline cursor-pointer"
+                          >
+                            Clear All
+                          </button>
                         </div>
-                      ) : (
-                        <span className="text-[11px] text-fg-subtle italic">
-                          {loadingWeekly ? 'Checking tracker records…' : 'No companies logged in this section for this college'}
-                        </span>
-                      )}
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {sec.kpiList.map((kpi: any) => {
+                          const isKpiActive = kpiCards[kpi.key] !== false;
+                          return (
+                            <label
+                              key={kpi.key}
+                              className={`flex items-center gap-2 p-2 rounded-lg border text-[11px] font-semibold cursor-pointer transition-all ${
+                                isKpiActive
+                                  ? 'bg-primary/10 border-primary/40 text-primary shadow-2xs font-bold ring-1 ring-primary/20'
+                                  : 'bg-surface border-border text-fg-subtle hover:text-fg'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isKpiActive}
+                                onChange={(e) => setKpiCards({ ...kpiCards, [kpi.key]: e.target.checked })}
+                                className="rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary shrink-0"
+                              />
+                              <div className="flex flex-col min-w-0">
+                                <span className="truncate leading-tight">{kpi.label}</span>
+                                <span className="text-[9px] text-fg-subtle font-normal truncate">{kpi.desc}</span>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -598,9 +760,8 @@ export function ReportBuilderWizard({
             type="button"
             onClick={handleGenerate}
             disabled={loading}
-            className="px-6 py-2.5 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
+            className="px-6 py-2.5 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center cursor-pointer"
           >
-            <Sparkles size={14} strokeWidth={2} aria-hidden />
             <span>{loading ? 'Generating Report…' : 'Generate Report'}</span>
           </button>
         </div>

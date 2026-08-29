@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import {
   LayoutDashboard,
   PhoneCall,
@@ -16,6 +16,10 @@ import {
   PanelLeftOpen,
   Lock,
   X,
+  Users,
+  ShieldCheck,
+  Shield,
+  Sliders,
 } from 'lucide-react';
 
 import { InfoziantMark } from '@/components/InfoziantMark';
@@ -38,7 +42,7 @@ import { updateSessionUser } from '@/lib/session';
 import { triggerHaptic } from '@/lib/haptics';
 
 /** How long the drawer stays open after sign-in before settling to the rail. */
-const INTRO_HOLD_MS = 5000;
+const INTRO_HOLD_MS = 3000;
 
 interface NavItem {
   href: string;
@@ -48,14 +52,24 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { href: '/dashboard',      label: 'Dashboard',      Icon: LayoutDashboard },
-  { href: '/tracker',        label: 'Daily Tracker',  Icon: PhoneCall },
-  { href: '/weekly-tracker', label: 'Weekly Tracker', Icon: CalendarDays },
-  { href: '/daily-leads',    label: 'Daily Leads',    Icon: Target },
-  { href: '/active-leads',   label: 'Active Leads',   Icon: Sparkles },
-  { href: '/pending-tasks',  label: 'Pending Task',   Icon: ListTodo },
-  { href: '/metadata',       label: 'Metadata DB',    Icon: Database },
-  { href: '/reports',        label: 'Report Builder', Icon: TrendingUp },
+  { href: '/dashboard', label: 'Dashboard', Icon: LayoutDashboard },
+
+  // Operational calling tools (Coordinators & Team Leaders)
+  { href: '/tracker', label: 'Daily Tracker', Icon: PhoneCall, roles: ['coordinator', 'team_leader'] },
+  { href: '/weekly-tracker', label: 'Weekly Tracker', Icon: CalendarDays, roles: ['coordinator', 'team_leader'] },
+  { href: '/daily-leads', label: 'Daily Leads', Icon: Target, roles: ['coordinator', 'team_leader'] },
+  { href: '/active-leads', label: 'Active Leads', Icon: Sparkles, roles: ['coordinator', 'team_leader'] },
+  { href: '/pending-tasks', label: 'Pending Task', Icon: ListTodo, roles: ['coordinator', 'team_leader'] },
+
+  // Intelligence & Reporting
+  { href: '/metadata', label: 'Metadata DB', Icon: Database },
+  { href: '/reports', label: 'Report Builder', Icon: TrendingUp },
+
+  // Dedicated Standalone Administrator Governance Modules
+  { href: '/users', label: 'User Management', Icon: Users, roles: ['admin'] },
+  { href: '/roles', label: 'Role Permissions Matrix', Icon: Shield, roles: ['admin'] },
+  { href: '/system-settings', label: 'Season & System Settings', Icon: Sliders, roles: ['admin'] },
+  { href: '/system-health', label: 'System Health & Modules', Icon: ShieldCheck, roles: ['admin'] },
 ];
 
 interface Props {
@@ -66,6 +80,7 @@ interface Props {
 
 export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   const [collapsed, setCollapsed] = useState(false);
@@ -184,7 +199,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
   const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isHoveringRef = useRef(false);
 
-  const startAutoCloseTimer = (delay = 5000) => {
+  const startAutoCloseTimer = (delay = 3000) => {
     if (autoCloseTimerRef.current) clearTimeout(autoCloseTimerRef.current);
     autoCloseTimerRef.current = setTimeout(() => {
       if (!isHoveringRef.current) {
@@ -198,7 +213,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
     if (collapsed) {
       e.preventDefault();
       setCollapsed(false);
-      startAutoCloseTimer(5000);
+      startAutoCloseTimer(3000);
     }
   };
 
@@ -237,26 +252,26 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
           ${collapsed ? 'w-[72px]' : 'w-64'}`}
       >
         {/* ── Brand Header Strip ── */}
-        <div className="h-20 flex items-center px-4 border-b border-border relative shrink-0 justify-between">
+        <div className="h-14 flex items-center px-3 border-b border-border relative shrink-0 justify-between">
           {collapsed ? (
-            <div className="w-full flex items-center justify-center py-2">
+            <div className="w-full flex items-center justify-center py-1">
               <button
                 type="button"
                 onClick={handleLogoClick}
-                className="bg-white rounded-2xl p-1.5 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0 hover:scale-105 active:scale-95 transition-transform duration-300 cursor-pointer"
+                className="bg-white rounded-xl p-1 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0 hover:scale-105 active:scale-95 transition-transform duration-300 cursor-pointer"
                 title="Click to open Navigation Drawer"
               >
-                <InfoziantMark size={34} />
+                <InfoziantMark size={28} />
               </button>
             </div>
           ) : (
-            <div className="flex w-full items-center justify-between py-2">
+            <div className="flex w-full items-center justify-between py-1">
               <Link
                 href="/dashboard"
-                className="flex items-center gap-3 overflow-hidden focus-visible:outline-hidden"
+                className="flex items-center gap-2.5 overflow-hidden focus-visible:outline-hidden"
               >
-                <div className="bg-white rounded-2xl p-1.5 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0">
-                  <InfoziantMark size={34} />
+                <div className="bg-white rounded-xl p-1 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0">
+                  <InfoziantMark size={28} />
                 </div>
                 <div
                   className={`flex flex-col min-w-0
@@ -266,7 +281,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                   <span className="text-body font-bold text-fg tracking-tight truncate leading-tight">
                     iPOMS
                   </span>
-                  <span className="text-micro font-medium text-fg-subtle truncate uppercase tracking-wider">
+                  <span className="text-[10px] font-medium text-fg-subtle truncate uppercase tracking-wider">
                     Placement Suite
                   </span>
                 </div>
@@ -275,11 +290,23 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
           )}
         </div>
 
-        {/* ── Main Nav Items (Zero Scrollbar, Generous Top Breathing Room Below Brand Header) ── */}
-        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 pt-7 pb-4 min-h-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          <ul className="space-y-1.5">
+        {/* ── Main Nav Items (Zero Scrollbar, Fully Fits on Any Screen) ── */}
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-2 min-h-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden flex flex-col justify-start">
+          <ul className="space-y-1 w-full flex flex-col items-center">
             {items.map(({ href, label, Icon }) => {
-              const active = pathname === href || pathname.startsWith(`${href}/`);
+              const currentTab = searchParams?.get('tab');
+              const [hrefPath, hrefQuery] = href.split('?');
+              const hrefTab = hrefQuery ? new URLSearchParams(hrefQuery).get('tab') : null;
+
+              let active = false;
+              if (hrefTab) {
+                active = pathname === hrefPath && currentTab === hrefTab;
+              } else if (href === '/settings') {
+                active = pathname === '/settings' && (!currentTab || currentTab === 'profile');
+              } else {
+                active = pathname === href || (href !== '/' && pathname.startsWith(`${href}/`));
+              }
+
               const isCoordinator = userRole === 'coordinator';
               const isLocked = mounted && href !== '/dashboard' && isCoordinator && !isFocusLocked;
 
@@ -299,15 +326,15 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                 }
                 triggerHaptic('light');
 
-                // If collapsed, expand for 5s and then smoothly auto-close
+                // If collapsed, expand for 3s and then smoothly auto-close
                 if (collapsed) {
                   setCollapsed(false);
                 }
-                startAutoCloseTimer(5000);
+                startAutoCloseTimer(3000);
               };
 
               return (
-                <li key={href}>
+                <li key={href} className="w-full flex justify-center">
                   <Link
                     href={href}
                     onClick={handleNavClick}
@@ -316,8 +343,12 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                     onMouseLeave={() => setHovered(null)}
                     onFocus={(e) => showLabel(e.currentTarget, isLocked ? `${label} (Locked)` : label)}
                     onBlur={() => setHovered(null)}
-                    className={`group flex items-center gap-2.5 rounded-control cursor-pointer active:scale-[0.98] ${
-                      mounted ? 'transition-[background-color,box-shadow,color,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]' : ''
+                    className={`group relative flex items-center rounded-xl cursor-pointer active:scale-[0.98] ${
+                      mounted ? 'transition-[background-color,box-shadow,color,transform,width,padding] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]' : ''
+                    } ${
+                      collapsed
+                        ? 'w-9 h-9 justify-center p-0 mx-auto'
+                        : 'w-full h-9 px-2.5 gap-2.5 justify-start'
                     } ${
                       isLocked
                         ? 'text-fg-subtle/50 hover:bg-surface-sunken/60 hover:text-fg-subtle'
@@ -326,26 +357,28 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                         : 'text-fg-muted hover:bg-surface-sunken hover:text-fg'
                     }`}
                   >
-                    <span className="relative grid h-9 w-9 shrink-0 place-items-center">
-                      <Icon size={18} strokeWidth={2} aria-hidden />
+                    <span className={`relative shrink-0 grid place-items-center ${collapsed ? 'w-full h-full' : 'w-7 h-7'}`}>
+                      <Icon size={17} strokeWidth={2} aria-hidden />
                       {isLocked && (
-                        <span className="absolute bottom-1 right-1 w-3 h-3 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                        <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
                           <Lock size={7} strokeWidth={2.5} />
                         </span>
                       )}
                     </span>
-                    <span className="flex-1 flex items-center justify-between min-w-0 pr-2">
-                      <span
-                        className={`whitespace-nowrap text-xs font-semibold ${
-                          mounted ? 'transition-opacity duration-300 ease-in-out' : ''
-                        } ${collapsed ? 'opacity-100 lg:opacity-0' : 'opacity-100'}`}
-                      >
-                        {label}
+                    {!collapsed && (
+                      <span className="flex-1 flex items-center justify-between min-w-0 pr-1">
+                        <span
+                          className={`whitespace-nowrap text-xs font-semibold ${
+                            mounted ? 'transition-opacity duration-300 ease-in-out' : ''
+                          } opacity-100`}
+                        >
+                          {label}
+                        </span>
+                        {isLocked && (
+                          <Lock size={11} className="text-amber-500/70 ml-2 shrink-0" />
+                        )}
                       </span>
-                      {isLocked && !collapsed && (
-                        <Lock size={12} className="text-amber-500/70 ml-2 shrink-0" />
-                      )}
-                    </span>
+                    )}
                   </Link>
                 </li>
               );
@@ -354,12 +387,12 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
         </nav>
 
         {/* ── Signed-in Profile Identity Avatar & Theme Changer Toggle ───── */}
-        <div className="shrink-0 border-t border-border px-3 py-2.5">
+        <div className="shrink-0 border-t border-border px-2 py-2">
           {collapsed ? (
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-1.5">
               <Link
-                href="/settings?tab=profile"
-                className="group relative flex items-center justify-center p-1 rounded-xl hover:bg-surface-sunken transition-colors"
+                href="/profile"
+                className="group relative flex items-center justify-center p-0.5 rounded-lg hover:bg-surface-sunken transition-colors"
                 title={`${fullName} (${roleLabel})`}
               >
                 {user?.profile_photo_url ? (
@@ -367,45 +400,45 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                   <img
                     src={user.profile_photo_url}
                     alt={fullName}
-                    className="h-9 w-9 rounded-full object-cover shrink-0 ring-1 ring-border shadow-xs group-hover:scale-105 transition-transform"
+                    className="h-8 w-8 rounded-full object-cover shrink-0 ring-1 ring-border shadow-xs group-hover:scale-105 transition-transform"
                   />
                 ) : (
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/10 text-primary text-xs font-bold ring-1 ring-primary/20 shadow-xs group-hover:scale-105 transition-transform">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary text-[11px] font-bold ring-1 ring-primary/20 shadow-xs group-hover:scale-105 transition-transform">
                     {initialsFor(fullName)}
                   </span>
                 )}
               </Link>
-              <ThemeToggle />
+              <ThemeToggle className="w-8 h-8 rounded-lg text-xs" />
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-2 p-1 rounded-xl bg-surface-sunken/60 border border-border/50">
+            <div className="flex items-center justify-between gap-1.5 p-1 rounded-xl bg-surface-sunken/60 border border-border/50">
               <Link
-                href="/settings?tab=profile"
-                className="flex items-center gap-2.5 min-w-0 flex-1 p-1 hover:bg-surface-raised rounded-lg transition-colors overflow-hidden"
+                href="/profile"
+                className="flex items-center gap-2 min-w-0 flex-1 p-1 hover:bg-surface-raised rounded-lg transition-colors overflow-hidden"
               >
                 {user?.profile_photo_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={user.profile_photo_url}
                     alt={fullName}
-                    className="h-8 w-8 rounded-full object-cover shrink-0 ring-1 ring-border shadow-xs"
+                    className="h-7.5 w-7.5 rounded-full object-cover shrink-0 ring-1 ring-border shadow-xs"
                   />
                 ) : (
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary text-xs font-bold ring-1 ring-primary/20 shadow-xs">
+                  <span className="grid h-7.5 w-7.5 shrink-0 place-items-center rounded-full bg-primary/10 text-primary text-[11px] font-bold ring-1 ring-primary/20 shadow-xs">
                     {initialsFor(fullName)}
                   </span>
                 )}
                 <div className="flex flex-col min-w-0">
-                  <span className="text-body font-bold text-fg truncate leading-tight">
+                  <span className="text-xs font-bold text-fg truncate leading-tight">
                     {fullName}
                   </span>
-                  <span className="text-micro font-medium text-fg-subtle truncate">
+                  <span className="text-[10px] font-medium text-fg-subtle truncate">
                     {roleLabel}
                   </span>
                 </div>
               </Link>
               <div className="shrink-0">
-                <ThemeToggle />
+                <ThemeToggle className="w-7.5 h-7.5 rounded-lg text-xs" />
               </div>
             </div>
           )}
@@ -608,7 +641,7 @@ function MobileDrawer({
         {/* Mobile Footer */}
         <div className="p-3 border-t border-border flex items-center justify-between gap-2 safe-bottom">
           <Link
-            href="/settings?tab=profile"
+            href="/profile"
             onClick={() => {
               triggerHaptic('light');
               onClose();

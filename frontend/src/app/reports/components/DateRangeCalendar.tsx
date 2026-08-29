@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import { SmoothCalendar } from '@/components/ui/SmoothCalendar';
-import { CalendarRange, CheckCircle2, ArrowRight } from 'lucide-react';
+import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
+import { CalendarRange } from 'lucide-react';
 
 interface Props {
   startDate: string; // YYYY-MM-DD
@@ -31,8 +31,16 @@ export function formatPeriodFromDates(startStr: string, endStr: string): string 
   }
 }
 
+function toISODate(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function DateRangeCalendar({ startDate, endDate, onChangeRange }: Props) {
-  const handleStartDateDirectChange = (newStart: string) => {
+  const handleStartDateChange = (newStart: string) => {
+    if (!newStart) return;
     if (endDate && newStart > endDate) {
       onChangeRange(newStart, newStart, formatPeriodFromDates(newStart, newStart));
     } else {
@@ -40,7 +48,8 @@ export function DateRangeCalendar({ startDate, endDate, onChangeRange }: Props) 
     }
   };
 
-  const handleEndDateDirectChange = (newEnd: string) => {
+  const handleEndDateChange = (newEnd: string) => {
+    if (!newEnd) return;
     if (startDate && newEnd < startDate) {
       onChangeRange(newEnd, startDate, formatPeriodFromDates(newEnd, startDate));
     } else {
@@ -49,101 +58,118 @@ export function DateRangeCalendar({ startDate, endDate, onChangeRange }: Props) 
   };
 
   const periodLabel = formatPeriodFromDates(startDate, endDate);
-  const isAwaitingSecondClick = Boolean(startDate && !endDate);
+
+  // Calculate day count
+  const dayCount = React.useMemo(() => {
+    if (!startDate || !endDate) return null;
+    const s = new Date(startDate + 'T00:00:00');
+    const e = new Date(endDate + 'T00:00:00');
+    const diff = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    return diff > 0 ? diff : null;
+  }, [startDate, endDate]);
+
+  // Quick preset handlers
+  const handlePresetLast7Days = () => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 6);
+    const sStr = toISODate(start);
+    const eStr = toISODate(end);
+    onChangeRange(sStr, eStr, formatPeriodFromDates(sStr, eStr));
+  };
+
+  const handlePresetPreviousWeek = () => {
+    const end = new Date();
+    end.setDate(end.getDate() - 7);
+    const start = new Date(end);
+    start.setDate(end.getDate() - 6);
+    const sStr = toISODate(start);
+    const eStr = toISODate(end);
+    onChangeRange(sStr, eStr, formatPeriodFromDates(sStr, eStr));
+  };
+
+  const handlePresetLast14Days = () => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 13);
+    const sStr = toISODate(start);
+    const eStr = toISODate(end);
+    onChangeRange(sStr, eStr, formatPeriodFromDates(sStr, eStr));
+  };
 
   return (
-    <div className="bg-surface-sunken border border-border rounded-3xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row gap-5 items-center md:items-start text-fg">
-      {/* ── Visual Smooth Calendar Component ── */}
-      <div className="shrink-0 mx-auto md:mx-0 flex flex-col items-center gap-2">
-        <SmoothCalendar
-          mode="range"
-          startDate={startDate}
-          endDate={endDate}
-          theme="navy"
-          onChangeRange={(s, e) => {
-            onChangeRange(s, e, formatPeriodFromDates(s, e));
-          }}
-          className="shadow-md"
-        />
-        <p className="text-[11px] text-fg-subtle text-center font-medium">
-          {isAwaitingSecondClick ? (
-            <span className="text-amber-600 dark:text-amber-400 font-bold animate-pulse inline-flex items-center gap-1">
-              <ArrowRight size={12} aria-hidden /> Click 2nd date to set End Date
-            </span>
-          ) : (
-            <span>Click any date for <strong>Start Date</strong>, then 2nd date for <strong>End Date</strong></span>
-          )}
-        </p>
-      </div>
-
-      {/* ── Selection Overview & Direct Input Fields ── */}
-      <div className="flex-1 flex flex-col justify-center self-stretch py-1 gap-4">
-        {/* Header Banner */}
-        <div className="flex items-center gap-2.5">
-          <span className="w-8 h-8 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shadow-xs">
-            <CalendarRange size={16} strokeWidth={2.2} />
-          </span>
-          <div>
-            <h3 className="text-xs font-bold text-fg uppercase tracking-wider">
-              Selected Period
-            </h3>
-            <p className="text-sm font-bold text-primary dark:text-sky-300">
-              {periodLabel || 'Click two dates on the calendar or pick below'}
-            </p>
-          </div>
+    <div className="space-y-3">
+      {/* ── Start Date & End Date Solid Smooth Pickers ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Start Date */}
+        <div>
+          <label className="block text-xs font-semibold text-fg mb-1.5">
+            Start Date (From) <span className="text-rose-500 font-bold ml-0.5">*</span>
+          </label>
+          <SmoothDatePicker
+            value={startDate}
+            onChange={handleStartDateChange}
+            placeholder="Select Start Date"
+            variant="input"
+            fullWidth={true}
+            usePortal={true}
+            maxDate={endDate || undefined}
+          />
         </div>
 
-        {/* Start Date & End Date Direct Input Boxes */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* 1. Start Date Field */}
-          <div
-            className={`bg-surface rounded-2xl p-3 border transition-all shadow-2xs ${
-              !startDate
-                ? 'border-primary/50 ring-1 ring-primary/20'
-                : 'border-border'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1">
-                <span className="w-4 h-4 rounded-full bg-primary text-white font-mono text-[9px] flex items-center justify-center font-bold">1</span>
-                Start Date
-              </span>
-              {startDate && <CheckCircle2 size={13} className="text-emerald-500" />}
-            </div>
-            <div className="relative">
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => handleStartDateDirectChange(e.target.value)}
-                className="w-full bg-surface-sunken border border-border text-fg text-xs font-semibold px-3 py-1.5 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 cursor-pointer shadow-2xs font-mono"
-              />
-            </div>
-          </div>
+        {/* End Date */}
+        <div>
+          <label className="block text-xs font-semibold text-fg mb-1.5">
+            End Date (To) <span className="text-rose-500 font-bold ml-0.5">*</span>
+          </label>
+          <SmoothDatePicker
+            value={endDate}
+            onChange={handleEndDateChange}
+            placeholder="Select End Date"
+            variant="input"
+            fullWidth={true}
+            usePortal={true}
+            minDate={startDate || undefined}
+          />
+        </div>
+      </div>
 
-          {/* 2. End Date Field */}
-          <div
-            className={`bg-surface rounded-2xl p-3 border transition-all shadow-2xs ${
-              isAwaitingSecondClick
-                ? 'border-amber-500/60 ring-2 ring-amber-500/20 bg-amber-500/5'
-                : 'border-border'
-            }`}
+      {/* ── Duration & Quick Presets Strip ── */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5 bg-surface-sunken border border-border rounded-xl px-3.5 py-2 text-xs">
+        <div className="flex items-center gap-2">
+          <CalendarRange size={14} className="text-primary shrink-0" />
+          <span className="font-medium text-fg-subtle">Reporting Duration:</span>
+          <strong className="text-primary font-semibold">{periodLabel || 'Select dates above'}</strong>
+          {dayCount !== null && (
+            <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-surface border border-primary/20 text-primary shrink-0">
+              {dayCount} {dayCount === 1 ? 'Day' : 'Days'}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-semibold text-fg-subtle mr-1">Presets:</span>
+          <button
+            type="button"
+            onClick={handlePresetLast7Days}
+            className="text-[11px] font-medium px-2 py-0.5 rounded-lg border border-border bg-surface hover:bg-surface-raised text-fg hover:text-primary transition-all cursor-pointer shadow-2xs"
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1">
-                <span className="w-4 h-4 rounded-full bg-primary text-white font-mono text-[9px] flex items-center justify-center font-bold">2</span>
-                End Date
-              </span>
-              {endDate && <CheckCircle2 size={13} className="text-emerald-500" />}
-            </div>
-            <div className="relative">
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => handleEndDateDirectChange(e.target.value)}
-                className="w-full bg-surface-sunken border border-border text-fg text-xs font-semibold px-3 py-1.5 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 cursor-pointer shadow-2xs font-mono"
-              />
-            </div>
-          </div>
+            Last 7 Days
+          </button>
+          <button
+            type="button"
+            onClick={handlePresetPreviousWeek}
+            className="text-[11px] font-medium px-2 py-0.5 rounded-lg border border-border bg-surface hover:bg-surface-raised text-fg hover:text-primary transition-all cursor-pointer shadow-2xs"
+          >
+            Previous Week
+          </button>
+          <button
+            type="button"
+            onClick={handlePresetLast14Days}
+            className="text-[11px] font-medium px-2 py-0.5 rounded-lg border border-border bg-surface hover:bg-surface-raised text-fg hover:text-primary transition-all cursor-pointer shadow-2xs"
+          >
+            14 Days
+          </button>
         </div>
       </div>
     </div>

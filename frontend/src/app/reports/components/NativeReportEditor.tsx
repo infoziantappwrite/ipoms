@@ -17,6 +17,7 @@ import {
   Building2,
   Clock,
   Eye,
+  XCircle,
 } from 'lucide-react';
 import { A4PdfPreviewModal } from './A4PdfPreviewModal';
 
@@ -155,46 +156,51 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
 
     // KPI Summary (Excluded for Pending Tasks Report)
     if (report.kpi_summary && report.template_type !== 'pending_tasks') {
+      const activeKpis = report.included_kpi_cards || report.included_sections?.kpi_cards || {};
       if (report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined) {
-        html += `
-          <tr><td colspan="8" class="sec-header">ACTIVE LEADS KPI SUMMARY</td></tr>
-          <tr>
-            <th colspan="3">Total Active Leads</th>
-            <th colspan="3">Graduating Batch</th>
-            <th colspan="2">Corporate Partners</th>
-          </tr>
-          <tr>
-            <td colspan="3" style="text-align:center; font-weight:bold; font-size:13pt; color:#1e3a8a;">${report.kpi_summary.total_leads || 0}</td>
-            <td colspan="3" style="text-align:center; font-weight:bold; font-size:13pt; color:#059669;">${report.kpi_summary.graduating_year || '2027'}</td>
-            <td colspan="2" style="text-align:center; font-weight:bold; font-size:13pt; color:#d97706;">${report.kpi_summary.active_companies_count || 0}</td>
-          </tr>
-          <tr><td colspan="8"></td></tr>
-        `;
+        const alCards = [
+          { key: 'total_leads', label: 'Total Active Leads', val: report.kpi_summary.total_leads || 0, color: '#1e3a8a' },
+          { key: 'graduating_year', label: 'Graduating Batch', val: report.kpi_summary.graduating_year || '2027', color: '#059669' },
+          { key: 'active_companies_count', label: 'Corporate Partners', val: report.kpi_summary.active_companies_count || 0, color: '#d97706' },
+        ].filter((c) => activeKpis[c.key] !== false);
+
+        if (alCards.length > 0) {
+          const colSpan = Math.max(1, Math.floor(8 / alCards.length));
+          html += `
+            <tr><td colspan="8" class="sec-header">ACTIVE LEADS KPI SUMMARY</td></tr>
+            <tr>
+              ${alCards.map((c) => `<th colspan="${colSpan}">${c.label}</th>`).join('')}
+            </tr>
+            <tr>
+              ${alCards.map((c) => `<td colspan="${colSpan}" style="text-align:center; font-weight:bold; font-size:13pt; color:${c.color};">${c.val}</td>`).join('')}
+            </tr>
+            <tr><td colspan="8"></td></tr>
+          `;
+        }
       } else {
-        html += `
-          <tr><td colspan="8" class="sec-header">EXECUTIVE PLACEMENT KPI SUMMARY</td></tr>
-          <tr>
-            <th>Calls</th>
-            <th>Positives</th>
-            <th>JDs</th>
-            <th>Completed</th>
-            <th>In Progress</th>
-            <th>Pipeline</th>
-            <th>Top Companies</th>
-            <th>Offers Placed</th>
-          </tr>
-          <tr>
-            <td style="text-align:center;">${report.kpi_summary.total_calls || 0}</td>
-            <td style="text-align:center; color:#059669;">${report.kpi_summary.positive_responses || 0}</td>
-            <td style="text-align:center; color:#0891b2;">${report.kpi_summary.jds_received || 0}</td>
-            <td style="text-align:center; color:#059669;">${report.kpi_summary.drives_completed || 0}</td>
-            <td style="text-align:center; color:#2563eb;">${report.kpi_summary.drives_in_progress || 0}</td>
-            <td style="text-align:center; color:#0891b2;">${report.kpi_summary.pipeline_leads || 0}</td>
-            <td style="text-align:center; color:#d97706;">${report.kpi_summary.top_companies_count || 0}</td>
-            <td style="text-align:center; font-weight:bold; color:#059669;">${report.kpi_summary.total_offers || 0}</td>
-          </tr>
-          <tr><td colspan="8"></td></tr>
-        `;
+        const wpCards = [
+          { key: 'total_calls', label: 'Calls', val: report.kpi_summary.total_calls || 0, color: '#1e3a8a' },
+          { key: 'positive_responses', label: 'Positives', val: report.kpi_summary.positive_responses || 0, color: '#059669' },
+          { key: 'jds_received', label: 'JDs', val: report.kpi_summary.jds_received || 0, color: '#0891b2' },
+          { key: 'drives_completed', label: 'Completed', val: report.kpi_summary.drives_completed || 0, color: '#059669' },
+          { key: 'drives_in_progress', label: 'In Progress', val: report.kpi_summary.drives_in_progress || 0, color: '#2563eb' },
+          { key: 'pipeline_leads', label: 'Pipeline', val: report.kpi_summary.pipeline_leads || 0, color: '#0891b2' },
+          { key: 'top_companies_count', label: 'Top Companies', val: report.kpi_summary.top_companies_count || 0, color: '#d97706' },
+          { key: 'total_offers', label: 'Offers Placed', val: report.kpi_summary.total_offers || 0, color: '#059669' },
+        ].filter((c) => activeKpis[c.key] !== false);
+
+        if (wpCards.length > 0) {
+          html += `
+            <tr><td colspan="8" class="sec-header">EXECUTIVE PLACEMENT KPI SUMMARY</td></tr>
+            <tr>
+              ${wpCards.map((c) => `<th>${c.label}</th>`).join('')}
+            </tr>
+            <tr>
+              ${wpCards.map((c) => `<td style="text-align:center; color:${c.color}; font-weight:bold;">${c.val}</td>`).join('')}
+            </tr>
+            <tr><td colspan="8"></td></tr>
+          `;
+        }
       }
     }
 
@@ -298,6 +304,87 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             <td>${r.job_role || '—'}</td>
             <td style="color:#d97706; font-weight:bold;">${r.ctc_lpa || '—'}</td>
             <td>${r.current_status_text || '—'}</td>
+          </tr>
+        `;
+      });
+      html += `<tr><td colspan="5"></td></tr>`;
+    }
+
+    // Section 5: Rejected Companies
+    const rejRows = report.sections?.rejected_companies || report.sections?.rejected_by_hr;
+    if (rejRows && rejRows.length > 0) {
+      html += `
+        <tr><td colspan="5" class="sec-header" style="background:#fef2f2; color:#991b1b;">5. REJECTED COMPANIES (${rejRows.length} Declined)</td></tr>
+        <tr>
+          <th style="width:50px; text-align:center;">#</th>
+          <th>Company Name</th>
+          <th>Role</th>
+          <th>CTC</th>
+          <th>Status / Reason</th>
+        </tr>
+      `;
+      rejRows.forEach((r: any) => {
+        html += `
+          <tr>
+            <td style="text-align:center;">${r.s_no}</td>
+            <td><b>${r.company_name}</b></td>
+            <td>${r.job_role || '—'}</td>
+            <td style="color:#991b1b;">${r.ctc_lpa || '—'}</td>
+            <td style="color:#991b1b;">${r.current_status_text || 'Rejected Company'}</td>
+          </tr>
+        `;
+      });
+      html += `<tr><td colspan="5"></td></tr>`;
+    }
+
+    // Section 6: Companies On Hold By College
+    const holdColRows = report.sections?.on_hold_by_college || report.sections?.rejected_by_college;
+    if (holdColRows && holdColRows.length > 0) {
+      html += `
+        <tr><td colspan="5" class="sec-header" style="background:#fff7ed; color:#9a3412;">6. COMPANIES ON HOLD BY COLLEGE (${holdColRows.length} Holds)</td></tr>
+        <tr>
+          <th style="width:50px; text-align:center;">#</th>
+          <th>Company Name</th>
+          <th>Role</th>
+          <th>CTC</th>
+          <th>Status / Reason</th>
+        </tr>
+      `;
+      holdColRows.forEach((r: any) => {
+        html += `
+          <tr>
+            <td style="text-align:center;">${r.s_no}</td>
+            <td><b>${r.company_name}</b></td>
+            <td>${r.job_role || '—'}</td>
+            <td style="color:#9a3412;">${r.ctc_lpa || '—'}</td>
+            <td style="color:#9a3412;">${r.current_status_text || 'On Hold By College'}</td>
+          </tr>
+        `;
+      });
+      html += `<tr><td colspan="5"></td></tr>`;
+    }
+
+    // Section 7: Companies On Hold By HR
+    const holdHrRows = report.sections?.on_hold_by_hr;
+    if (holdHrRows && holdHrRows.length > 0) {
+      html += `
+        <tr><td colspan="5" class="sec-header" style="background:#f1f5f9; color:#334155;">7. COMPANIES ON HOLD BY HR (${holdHrRows.length} Holds)</td></tr>
+        <tr>
+          <th style="width:50px; text-align:center;">#</th>
+          <th>Company Name</th>
+          <th>Role</th>
+          <th>CTC</th>
+          <th>Status / Reason</th>
+        </tr>
+      `;
+      holdHrRows.forEach((r: any) => {
+        html += `
+          <tr>
+            <td style="text-align:center;">${r.s_no}</td>
+            <td><b>${r.company_name}</b></td>
+            <td>${r.job_role || '—'}</td>
+            <td style="color:#334155;">${r.ctc_lpa || '—'}</td>
+            <td style="color:#334155;">${r.current_status_text || 'On Hold By HR'}</td>
           </tr>
         `;
       });
@@ -643,61 +730,51 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         </div>
 
         {/* 3. Live KPI Summary Strip (Excluded for Pending Tasks) */}
-        {report.template_type !== 'pending_tasks' && report.included_sections?.kpi_summary && report.kpi_summary && (
-          <>
-            {report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined ? (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-                <div className="bg-surface border border-blue-200 dark:border-blue-900/60 p-2.5 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Total Active Leads</span>
-                  <span className="text-base font-bold font-mono text-primary tabular-nums">{report.kpi_summary.total_leads || 0}</span>
-                </div>
-                <div className="bg-surface border border-emerald-200/80 dark:border-emerald-900/60 p-2.5 rounded-xl text-center shadow-2xs bg-emerald-50/20 dark:bg-emerald-950/20">
-                  <span className="text-micro text-emerald-700 dark:text-emerald-400 font-semibold uppercase block">Graduating Batch</span>
-                  <span className="text-base font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums">{report.kpi_summary.graduating_year || '2027'}</span>
-                </div>
-                <div className="bg-surface border border-amber-200/80 dark:border-amber-900/60 p-2.5 rounded-xl text-center shadow-2xs bg-amber-50/20 dark:bg-amber-950/20">
-                  <span className="text-micro text-amber-700 dark:text-amber-400 font-semibold uppercase block">Corporate Partners</span>
-                  <span className="text-base font-bold font-mono text-amber-700 dark:text-amber-400 tabular-nums">{report.kpi_summary.active_companies_count || 0}</span>
-                </div>
+        {report.template_type !== 'pending_tasks' && report.included_sections?.kpi_summary && report.kpi_summary && (() => {
+          const activeKpis = report.included_kpi_cards || report.included_sections?.kpi_cards || {};
+          if (report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined) {
+            const alCards = [
+              { key: 'total_leads', label: 'Total Active Leads', val: report.kpi_summary.total_leads || 0, border: 'border-blue-200 dark:border-blue-900/60', text: 'text-primary' },
+              { key: 'graduating_year', label: 'Graduating Batch', val: report.kpi_summary.graduating_year || '2027', border: 'border-emerald-200/80 dark:border-emerald-900/60 bg-emerald-50/20 dark:bg-emerald-950/20', text: 'text-emerald-700 dark:text-emerald-400' },
+              { key: 'active_companies_count', label: 'Corporate Partners', val: report.kpi_summary.active_companies_count || 0, border: 'border-amber-200/80 dark:border-amber-900/60 bg-amber-50/20 dark:bg-amber-950/20', text: 'text-amber-700 dark:text-amber-400' },
+            ].filter((c) => activeKpis[c.key] !== false);
+
+            if (alCards.length === 0) return null;
+            return (
+              <div className="flex flex-wrap gap-2.5 pt-1">
+                {alCards.map((card) => (
+                  <div key={card.key} className={`flex-1 min-w-[120px] bg-surface border p-2.5 rounded-xl text-center shadow-2xs ${card.border}`}>
+                    <span className="text-micro text-fg-subtle font-semibold uppercase block">{card.label}</span>
+                    <span className={`text-base font-bold font-mono tabular-nums ${card.text}`}>{card.val}</span>
+                  </div>
+                ))}
               </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 pt-1">
-                <div className="bg-surface border border-blue-200 dark:border-blue-900/60 p-2 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Calls</span>
-                  <span className="text-sm font-bold font-mono text-primary tabular-nums">{report.kpi_summary.total_calls || 0}</span>
-                </div>
-                <div className="bg-surface border border-emerald-200/80 dark:border-emerald-900/60 p-2 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Positives</span>
-                  <span className="text-sm font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums">{report.kpi_summary.positive_responses || 0}</span>
-                </div>
-                <div className="bg-surface border border-cyan-200/80 dark:border-cyan-900/60 p-2 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-fg-subtle font-semibold uppercase block">JDs Received</span>
-                  <span className="text-sm font-bold font-mono text-cyan-700 dark:text-cyan-400 tabular-nums">{report.kpi_summary.jds_received || 0}</span>
-                </div>
-                <div className="bg-surface border border-emerald-200/80 dark:border-emerald-900/60 p-2 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Completed</span>
-                  <span className="text-sm font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums">{report.kpi_summary.drives_completed || 0}</span>
-                </div>
-                <div className="bg-surface border border-blue-200/80 dark:border-blue-900/60 p-2 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-fg-subtle font-semibold uppercase block">In Progress</span>
-                  <span className="text-sm font-bold font-mono text-blue-700 dark:text-blue-400 tabular-nums">{report.kpi_summary.drives_in_progress || 0}</span>
-                </div>
-                <div className="bg-surface border border-cyan-200/80 dark:border-cyan-900/60 p-2 rounded-xl text-center shadow-2xs">
-                  <span className="text-micro text-fg-subtle font-semibold uppercase block">Pipeline</span>
-                  <span className="text-sm font-bold font-mono text-cyan-700 dark:text-cyan-400 tabular-nums">{report.kpi_summary.pipeline_leads || 0}</span>
-                </div>
-                <div className="bg-surface border border-amber-200/80 dark:border-amber-900/60 p-2 rounded-xl text-center shadow-2xs bg-amber-50/20 dark:bg-amber-950/20">
-                  <span className="text-micro text-amber-700 dark:text-amber-400 font-semibold uppercase block">Top Companies</span>
-                  <span className="text-sm font-bold font-mono text-amber-700 dark:text-amber-400 tabular-nums">{report.kpi_summary.top_companies_count || 0}</span>
-                </div>
-                <div className="bg-surface border border-emerald-300 dark:border-emerald-700 p-2 rounded-xl text-center shadow-2xs bg-emerald-50/40 dark:bg-emerald-950/40">
-                  <span className="text-micro text-emerald-800 dark:text-emerald-300 font-bold uppercase block">Offers</span>
-                  <span className="text-sm font-bold font-mono text-emerald-700 dark:text-emerald-400 tabular-nums">{report.kpi_summary.total_offers || 0}</span>
-                </div>
+            );
+          } else {
+            const wpCards = [
+              { key: 'total_calls', label: 'Calls', val: report.kpi_summary.total_calls || 0, border: 'border-blue-200 dark:border-blue-900/60', text: 'text-primary' },
+              { key: 'positive_responses', label: 'Positives', val: report.kpi_summary.positive_responses || 0, border: 'border-emerald-200/80 dark:border-emerald-900/60', text: 'text-emerald-700 dark:text-emerald-400' },
+              { key: 'jds_received', label: 'JDs Received', val: report.kpi_summary.jds_received || 0, border: 'border-cyan-200/80 dark:border-cyan-900/60', text: 'text-cyan-700 dark:text-cyan-400' },
+              { key: 'drives_completed', label: 'Completed', val: report.kpi_summary.drives_completed || 0, border: 'border-emerald-200/80 dark:border-emerald-900/60', text: 'text-emerald-700 dark:text-emerald-400' },
+              { key: 'drives_in_progress', label: 'In Progress', val: report.kpi_summary.drives_in_progress || 0, border: 'border-blue-200/80 dark:border-blue-900/60', text: 'text-blue-700 dark:text-blue-400' },
+              { key: 'pipeline_leads', label: 'Pipeline', val: report.kpi_summary.pipeline_leads || 0, border: 'border-cyan-200/80 dark:border-cyan-900/60', text: 'text-cyan-700 dark:text-cyan-400' },
+              { key: 'top_companies_count', label: 'Top Companies', val: report.kpi_summary.top_companies_count || 0, border: 'border-amber-200/80 dark:border-amber-900/60 bg-amber-50/20 dark:bg-amber-950/20', text: 'text-amber-700 dark:text-amber-400' },
+              { key: 'total_offers', label: 'Offers', val: report.kpi_summary.total_offers || 0, border: 'border-emerald-300 dark:border-emerald-700 bg-emerald-50/40 dark:bg-emerald-950/40', text: 'text-emerald-700 dark:text-emerald-400' },
+            ].filter((c) => activeKpis[c.key] !== false);
+
+            if (wpCards.length === 0) return null;
+            return (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {wpCards.map((card) => (
+                  <div key={card.key} className={`flex-1 min-w-[90px] bg-surface border p-2 rounded-xl text-center shadow-2xs ${card.border}`}>
+                    <span className="text-micro text-fg-subtle font-semibold uppercase block truncate">{card.label}</span>
+                    <span className={`text-sm font-bold font-mono tabular-nums ${card.text}`}>{card.val}</span>
+                  </div>
+                ))}
               </div>
-            )}
-          </>
-        )}
+            );
+          }
+        })()}
 
         {/* 4. Section 1: Companies Completed */}
         {report.included_sections?.completed_companies && report.sections?.completed_companies && (
@@ -942,6 +1019,206 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                 </table>
               </div>
             )}
+          </div>
+        )}
+
+        {/* 7. Section 5: Rejected Companies */}
+        {((report.included_sections?.rejected_companies && report.sections?.rejected_companies && report.sections.rejected_companies.length > 0) ||
+          (report.included_sections?.rejected_by_hr && report.sections?.rejected_by_hr && report.sections.rejected_by_hr.length > 0)) && (
+          <div className="space-y-2 pt-2">
+            <div className="px-3 py-1.5 rounded-xl border border-rose-200 dark:border-rose-800/60 bg-rose-50/70 dark:bg-rose-950/40 font-bold text-xs flex items-center justify-between text-rose-800 dark:text-rose-300">
+              <span className="flex items-center gap-1.5">
+                <XCircle size={14} strokeWidth={2.25} className="text-rose-600 dark:text-rose-400" /> 5. REJECTED COMPANIES
+              </span>
+              <span className="font-mono text-micro bg-surface px-2 py-0.5 rounded-md border border-rose-200 dark:border-rose-800">
+                {(report.sections.rejected_companies || report.sections.rejected_by_hr).length} Declined
+              </span>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <table className="w-full text-xs text-center">
+                <thead>
+                  <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
+                    <th className="py-2 px-2 w-8 text-center">#</th>
+                    <th className="py-2 px-3 text-center">Company Name</th>
+                    <th className="py-2 px-3 text-center">Role</th>
+                    <th className="py-2 px-3 text-center">CTC</th>
+                    <th className="py-2 px-3 text-center">Status / Reason</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
+                  {(report.sections.rejected_companies || report.sections.rejected_by_hr).map((r: any, idx: number) => (
+                    <tr key={idx} className="hover:bg-surface-sunken/60">
+                      <td className="py-2 px-2 text-center text-fg-subtle">{r.s_no}</td>
+                      <td className="py-2 px-3 font-semibold text-fg text-center">
+                        <input
+                          type="text"
+                          value={r.company_name}
+                          onChange={(e) =>
+                            handleUpdateCell(report.sections.rejected_companies ? 'rejected_companies' : 'rejected_by_hr', idx, 'company_name', e.target.value)
+                          }
+                          className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
+                        />
+                      </td>
+                      <td className="py-2 px-3 text-fg-muted text-center">
+                        <input
+                          type="text"
+                          value={r.job_role}
+                          onChange={(e) =>
+                            handleUpdateCell(report.sections.rejected_companies ? 'rejected_companies' : 'rejected_by_hr', idx, 'job_role', e.target.value)
+                          }
+                          className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-muted"
+                        />
+                      </td>
+                      <td className="py-2 px-3 text-rose-600 dark:text-rose-400 font-medium text-center">{r.ctc_lpa || '—'}</td>
+                      <td className="py-2 px-3 text-rose-600 dark:text-rose-400 text-center font-medium">
+                        <input
+                          type="text"
+                          value={r.current_status_text}
+                          onChange={(e) =>
+                            handleUpdateCell(report.sections.rejected_companies ? 'rejected_companies' : 'rejected_by_hr', idx, 'current_status_text', e.target.value)
+                          }
+                          className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-rose-600 dark:text-rose-400 font-medium"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* 8. Section 6: Companies On Hold By College */}
+        {((report.included_sections?.on_hold_by_college && report.sections?.on_hold_by_college && report.sections.on_hold_by_college.length > 0) ||
+          (report.included_sections?.rejected_by_college && report.sections?.rejected_by_college && report.sections.rejected_by_college.length > 0)) && (
+          <div className="space-y-2 pt-2">
+            <div className="px-3 py-1.5 rounded-xl border border-orange-200 dark:border-orange-800/60 bg-orange-50/70 dark:bg-orange-950/40 font-bold text-xs flex items-center justify-between text-orange-800 dark:text-orange-300">
+              <span className="flex items-center gap-1.5">
+                <Clock size={14} strokeWidth={2.25} className="text-orange-600 dark:text-orange-400" /> 6. COMPANIES ON HOLD BY COLLEGE
+              </span>
+              <span className="font-mono text-micro bg-surface px-2 py-0.5 rounded-md border border-orange-200 dark:border-orange-800">
+                {(report.sections.on_hold_by_college || report.sections.rejected_by_college).length} Holds
+              </span>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <table className="w-full text-xs text-center">
+                <thead>
+                  <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
+                    <th className="py-2 px-2 w-8 text-center">#</th>
+                    <th className="py-2 px-3 text-center">Company Name</th>
+                    <th className="py-2 px-3 text-center">Role</th>
+                    <th className="py-2 px-3 text-center">CTC</th>
+                    <th className="py-2 px-3 text-center">Status / Reason</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
+                  {(report.sections.on_hold_by_college || report.sections.rejected_by_college).map((r: any, idx: number) => (
+                    <tr key={idx} className="hover:bg-surface-sunken/60">
+                      <td className="py-2 px-2 text-center text-fg-subtle">{r.s_no}</td>
+                      <td className="py-2 px-3 font-semibold text-fg text-center">
+                        <input
+                          type="text"
+                          value={r.company_name}
+                          onChange={(e) =>
+                            handleUpdateCell(report.sections.on_hold_by_college ? 'on_hold_by_college' : 'rejected_by_college', idx, 'company_name', e.target.value)
+                          }
+                          className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
+                        />
+                      </td>
+                      <td className="py-2 px-3 text-fg-muted text-center">
+                        <input
+                          type="text"
+                          value={r.job_role}
+                          onChange={(e) =>
+                            handleUpdateCell(report.sections.on_hold_by_college ? 'on_hold_by_college' : 'rejected_by_college', idx, 'job_role', e.target.value)
+                          }
+                          className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-muted"
+                        />
+                      </td>
+                      <td className="py-2 px-3 text-orange-600 dark:text-orange-400 font-medium text-center">{r.ctc_lpa || '—'}</td>
+                      <td className="py-2 px-3 text-orange-600 dark:text-orange-400 text-center font-medium">
+                        <input
+                          type="text"
+                          value={r.current_status_text}
+                          onChange={(e) =>
+                            handleUpdateCell(report.sections.on_hold_by_college ? 'on_hold_by_college' : 'rejected_by_college', idx, 'current_status_text', e.target.value)
+                          }
+                          className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-orange-600 dark:text-orange-400 font-medium"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* 9. Section 7: Companies On Hold By HR */}
+        {report.included_sections?.on_hold_by_hr && report.sections?.on_hold_by_hr && report.sections.on_hold_by_hr.length > 0 && (
+          <div className="space-y-2 pt-2">
+            <div className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100/70 dark:bg-slate-900/40 font-bold text-xs flex items-center justify-between text-slate-800 dark:text-slate-300">
+              <span className="flex items-center gap-1.5">
+                <Clock size={14} strokeWidth={2.25} className="text-slate-600 dark:text-slate-400" /> 7. COMPANIES ON HOLD BY HR
+              </span>
+              <span className="font-mono text-micro bg-surface px-2 py-0.5 rounded-md border border-slate-300 dark:border-slate-700">
+                {report.sections.on_hold_by_hr.length} Holds
+              </span>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <table className="w-full text-xs text-center">
+                <thead>
+                  <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
+                    <th className="py-2 px-2 w-8 text-center">#</th>
+                    <th className="py-2 px-3 text-center">Company Name</th>
+                    <th className="py-2 px-3 text-center">Role</th>
+                    <th className="py-2 px-3 text-center">CTC</th>
+                    <th className="py-2 px-3 text-center">Status / Reason</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
+                  {report.sections.on_hold_by_hr.map((r: any, idx: number) => (
+                    <tr key={idx} className="hover:bg-surface-sunken/60">
+                      <td className="py-2 px-2 text-center text-fg-subtle">{r.s_no}</td>
+                      <td className="py-2 px-3 font-semibold text-fg text-center">
+                        <input
+                          type="text"
+                          value={r.company_name}
+                          onChange={(e) =>
+                            handleUpdateCell('on_hold_by_hr', idx, 'company_name', e.target.value)
+                          }
+                          className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg"
+                        />
+                      </td>
+                      <td className="py-2 px-3 text-fg-muted text-center">
+                        <input
+                          type="text"
+                          value={r.job_role}
+                          onChange={(e) =>
+                            handleUpdateCell('on_hold_by_hr', idx, 'job_role', e.target.value)
+                          }
+                          className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-fg-muted"
+                        />
+                      </td>
+                      <td className="py-2 px-3 text-slate-700 dark:text-slate-300 font-medium text-center">{r.ctc_lpa || '—'}</td>
+                      <td className="py-2 px-3 text-slate-700 dark:text-slate-300 text-center font-medium">
+                        <input
+                          type="text"
+                          value={r.current_status_text}
+                          onChange={(e) =>
+                            handleUpdateCell('on_hold_by_hr', idx, 'current_status_text', e.target.value)
+                          }
+                          className="bg-transparent w-full text-center focus:bg-surface focus:border focus:border-primary rounded px-1 outline-none text-slate-700 dark:text-slate-300 font-medium"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 

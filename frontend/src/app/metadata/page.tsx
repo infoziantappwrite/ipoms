@@ -37,6 +37,7 @@ export default function MetadataPage() {
   const [isExactDuplicate, setIsExactDuplicate] = useState<boolean>(false);
 
   const [showBulkPasteModal, setShowBulkPasteModal] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
 
   const loadMetadata = useCallback(async () => {
     setLoading(true);
@@ -67,8 +68,16 @@ export default function MetadataPage() {
     loadMetadata();
   }, [loadMetadata]);
 
-  // ── Global Save & Sync Shortcut (Ctrl+S / Cmd+S) ──
+  // ── Global Refresh Shortcut (Ctrl+S / Cmd+S) ──
+  // This page has no inline-editable cells — every contact edit already
+  // saves immediately through its own modal, so there is nothing pending for
+  // Ctrl+S to flush. It used to dispatch the shared "Auto-Saved / All
+  // changes permanently synchronized in cloud" banner anyway, which told the
+  // user something was persisted when loadMetadata() only re-fetches the
+  // current list. Now it says what actually happened.
   useEffect(() => {
+    const REFRESH_MESSAGE = { title: 'Refreshed', subtitle: 'Metadata list re-fetched from the server' };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
@@ -76,14 +85,14 @@ export default function MetadataPage() {
           document.activeElement.blur();
         }
         loadMetadata();
-        window.dispatchEvent(new CustomEvent('ipoms_trigger_autosave_banner'));
+        window.dispatchEvent(new CustomEvent('ipoms_trigger_autosave_banner', { detail: REFRESH_MESSAGE }));
       }
     };
 
     const handleGlobalTrigger = (e: any) => {
       if (e.detail?.pathname?.includes('/metadata')) {
         loadMetadata();
-        window.dispatchEvent(new CustomEvent('ipoms_trigger_autosave_banner'));
+        window.dispatchEvent(new CustomEvent('ipoms_trigger_autosave_banner', { detail: REFRESH_MESSAGE }));
       }
     };
 
@@ -204,31 +213,72 @@ export default function MetadataPage() {
     }
   };
 
-  // Export to XLSX
-  const handleExport = () => {
-    if (companies.length === 0) {
+  // Export to XLSX — pulls every row matching the current filters, not just
+  // the current 50-row page. Was mapping straight from `companies` (the
+  // paginated table state), so "Export" silently produced a 50-row file
+  // labelled iPOMS_Master_Company_Metadata regardless of how many contacts
+  // actually matched — a coordinator exporting "the master database" got 50
+  // of however many thousand, with no indication anything was truncated.
+  const handleExport = async () => {
+    if (totalCount === 0) {
       alert('No data available to export');
       return;
     }
 
-    const headers = ['Company Name', 'HR Name', 'Designation', 'Primary Mobile', 'All Mobiles', 'Primary Email', 'Industry Type', 'Notes'];
-    const rows = companies.map((c) => [
-      c.company_name || '',
-      c.hr_name || '',
-      c.hr_designation || '',
-      c.primary_mobile || '',
-      (c.mobile_numbers || []).join('; '),
-      c.primary_email || '',
-      c.company_type || '',
-      c.notes || '',
-    ]);
+    setIsExporting(true);
+    try {
+      const EXPORT_PAGE_SIZE = 500; // server-enforced max per request
+      const all: any[] = [];
+      let fetchPage = 1;
+      let expectedTotal = totalCount;
 
-    const rangeSuffix = (fromSno || toSno) ? `_SNo_${fromSno || 1}_to_${toSno || 'End'}` : '';
-    exportToXlsx(`iPOMS_Master_Company_Metadata${rangeSuffix}_${new Date().toISOString().slice(0, 10)}`, {
-      name: 'Master Companies',
-      headers,
-      rows,
-    });
+      while (all.length < expectedTotal) {
+        let endpoint = `/metadata?page=${fetchPage}&limit=${EXPORT_PAGE_SIZE}&is_deleted=${isRecycleBin}`;
+        if (searchQuery.trim()) endpoint += `&q=${encodeURIComponent(searchQuery.trim())}`;
+        if (selectedType !== 'all') endpoint += `&type=${selectedType}`;
+        if (isRecent) endpoint += '&recent=true';
+        if (fromSno !== null && fromSno > 0) endpoint += `&from_sno=${fromSno}`;
+        if (toSno !== null && toSno > 0) endpoint += `&to_sno=${toSno}`;
+
+        const res = await apiFetch<any>(endpoint);
+        if (!res.success || !res.data) break;
+
+        const batch: any[] = res.data.companies || [];
+        if (batch.length === 0) break;
+        all.push(...batch);
+        expectedTotal = res.data.total ?? expectedTotal; // stay accurate if data changed mid-export
+        fetchPage++;
+      }
+
+      if (all.length < expectedTotal) {
+        toast?.(`Export incomplete: got ${all.length} of ${expectedTotal} records. Try again.`, 'error');
+      }
+
+      const headers = ['Company Name', 'HR Name', 'Designation', 'Primary Mobile', 'All Mobiles', 'Primary Email', 'Industry Type', 'Notes'];
+      const rows = all.map((c) => [
+        c.company_name || '',
+        c.hr_name || '',
+        c.hr_designation || '',
+        c.primary_mobile || '',
+        (c.mobile_numbers || []).join('; '),
+        c.primary_email || '',
+        c.company_type || '',
+        c.notes || '',
+      ]);
+
+      const rangeSuffix = (fromSno || toSno) ? `_SNo_${fromSno || 1}_to_${toSno || 'End'}` : '';
+      exportToXlsx(`iPOMS_Master_Company_Metadata${rangeSuffix}_${new Date().toISOString().slice(0, 10)}`, {
+        name: 'Master Companies',
+        headers,
+        rows,
+      });
+      toast?.(`Exported ${all.length} record(s) to Excel.`, 'success');
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert('Export failed. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Trigger direct navigation to Report Builder when clicking PDF or Image from dropdown
@@ -265,6 +315,7 @@ export default function MetadataPage() {
         onOpenAddModal={handleOpenAdd}
         onOpenBulkPasteModal={() => setShowBulkPasteModal(true)}
         onExport={handleExport}
+        isExporting={isExporting}
         onExportPdf={handleOpenPdfModal}
         onExportImage={handleOpenImageModal}
         totalCount={totalCount}
