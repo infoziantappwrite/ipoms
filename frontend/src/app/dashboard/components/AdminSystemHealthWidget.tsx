@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   Clock,
   ShieldCheck,
-  Megaphone,
   Wrench,
   ExternalLink,
   Save,
@@ -33,7 +32,6 @@ interface SystemTelemetry {
   last_sync: string;
   maintenance_mode_enabled: boolean;
   maintenance_reason: string;
-  system_announcement: string;
   academic_year: string;
   season_name: string;
 }
@@ -55,7 +53,6 @@ export function AdminSystemHealthWidget({
 }: Props) {
   const { toast } = useToast();
 
-  const [announcementText, setAnnouncementText] = useState(telemetry?.system_announcement || '');
   const [maintenanceEnabled, setMaintenanceEnabled] = useState(telemetry?.maintenance_mode_enabled || false);
   const [maintenanceReason, setMaintenanceReason] = useState(telemetry?.maintenance_reason || '');
   const [isSaving, setIsSaving] = useState(false);
@@ -68,7 +65,6 @@ export function AdminSystemHealthWidget({
       const res = await apiFetch('/settings', {
         method: 'PATCH',
         body: JSON.stringify({
-          system_announcement_banner: announcementText,
           maintenance_mode_enabled: maintenanceEnabled,
           maintenance_reason: maintenanceReason,
         }),
@@ -96,7 +92,7 @@ export function AdminSystemHealthWidget({
             <Activity size={15} className="text-primary" aria-hidden /> System Telemetry & Module 10 Operations
           </h3>
           <p className="text-micro text-fg-subtle mt-0.5">
-            Operational database health, metadata hygiene index, announcement broadcast, and maintenance switches
+            Operational database health, metadata hygiene index, and the maintenance switch
           </p>
         </div>
 
@@ -175,28 +171,10 @@ export function AdminSystemHealthWidget({
         </div>
       </div>
 
-      {/* Executive Fast Controls: Announcement & Maintenance Switch */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-2 border-t border-border/80">
-        {/* System Announcement Banner Fast Publisher */}
-        <div className="p-4 rounded-xl border border-border bg-surface-sunken/30 space-y-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-fg flex items-center gap-1.5">
-              <Megaphone size={13} className="text-primary" /> Global System Announcement
-            </span>
-            <span className="text-[10px] text-fg-subtle">Broadcasted to all users</span>
-          </div>
-
-          <input
-            type="text"
-            value={announcementText}
-            onChange={(e) => setAnnouncementText(e.target.value)}
-            placeholder="e.g. 'Placement drive for TCS scheduled this Friday at REC campus'"
-            className="w-full text-xs px-3 py-2 rounded-lg bg-surface border border-border focus:border-primary focus:outline-none text-fg"
-          />
-        </div>
-
+      {/* Executive Fast Controls: Maintenance Switch */}
+      <div className="grid grid-cols-1 gap-3.5 pt-2 border-t border-border/80">
         {/* Maintenance Mode Fast Switch */}
-        <div className="p-4 rounded-xl border border-border bg-surface-sunken/30 space-y-2.5">
+        <div className="p-4 rounded-xl border border-border bg-surface-sunken/30 space-y-2.5 max-w-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-fg flex items-center gap-1.5">
               <Wrench size={13} className={maintenanceEnabled ? 'text-danger' : 'text-fg-subtle'} /> Maintenance Mode Switch

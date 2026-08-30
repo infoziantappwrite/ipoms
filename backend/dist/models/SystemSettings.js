@@ -91,11 +91,6 @@ const SystemSettingsSchema = new mongoose_1.Schema({
         type: Boolean,
         default: true,
     },
-    system_announcement_banner: {
-        type: String,
-        default: '',
-        trim: true,
-    },
     // ── Maintenance Mode (Module 10 §8) ──────────────────────────────────
     // Administrator only stayed excluded on purpose: it must always be
     // possible to log in as Administrator and switch this back off, even if

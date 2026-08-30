@@ -180,7 +180,7 @@ export default function LoginPage() {
         return;
       }
 
-      setSuccessMsg(data.message || `Verification code sent to your Outlook inbox (${addr}).`);
+      clearFeedback();
       setSignupOtp('');
       setMode('signup_verify_otp');
     } catch {
@@ -514,7 +514,7 @@ export default function LoginPage() {
                   Forgot password?
                 </button>
               </div>
-              <div className="relative">
+              <div className="relative flex items-center">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
@@ -522,14 +522,15 @@ export default function LoginPage() {
                   placeholder="••••••••"
                   autoComplete="current-password"
                   required
-                  className={`${inputClass} pr-14 transition-none`}
+                  className={`${inputClass} pr-10`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-micro font-semibold text-slate-500 hover:text-slate-800 cursor-pointer transition-none select-none"
+                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded focus:outline-none"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  {showPassword ? 'Hide' : 'Show'}
+                  {showPassword ? <Eye size={16} strokeWidth={2} /> : <EyeOff size={16} strokeWidth={2} />}
                 </button>
               </div>
             </div>
@@ -586,15 +587,34 @@ export default function LoginPage() {
 
             <div>
               <label className="block text-slate-700 font-bold mb-1">Password</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                placeholder="Minimum 9 characters" autoComplete="new-password" required className={inputClass} />
+              <div className="relative flex items-center">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Minimum 9 characters"
+                  autoComplete="new-password"
+                  required
+                  className={`${inputClass} pr-10`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded focus:outline-none"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <Eye size={16} strokeWidth={2} /> : <EyeOff size={16} strokeWidth={2} />}
+                </button>
+              </div>
               <PasswordChecklist password={password} />
             </div>
 
-            <button type="submit" disabled={loading}
-              className="w-full py-3 bg-primary hover:bg-primary/90 disabled:opacity-60 text-white rounded-xl font-bold shadow-md transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-[0.99]">
-              <span>{loading ? 'Sending Outlook Code…' : 'Verify Outlook Email & Continue'}</span>
-              <ArrowRight size={14} />
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-primary hover:bg-primary/90 disabled:opacity-60 text-white rounded-xl font-bold shadow-md transition-all active:scale-[0.99] text-xs cursor-pointer"
+            >
+              {loading ? 'Creating Account…' : 'Create Account'}
             </button>
           </form>
         )}
@@ -610,15 +630,6 @@ export default function LoginPage() {
               <p className="text-micro leading-relaxed text-slate-600">
                 A 6-digit verification code was dispatched to <strong className="text-slate-900 font-mono font-semibold">{email}</strong>. Once verified, your Placement Coordinator account will be activated immediately.
               </p>
-              {/* 1-Click Outlook Launcher */}
-              <a
-                href="https://outlook.office.com/mail/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl text-micro font-bold text-slate-700 shadow-2xs transition-all hover:text-primary cursor-pointer"
-              >
-                <ExternalLink size={12} /> Open Outlook Webmail
-              </a>
             </div>
 
             <div>
@@ -663,7 +674,7 @@ export default function LoginPage() {
                 onClick={() => goTo('signup')}
                 className="text-slate-500 hover:text-slate-900 font-semibold cursor-pointer"
               >
-                ← Edit details
+                Edit details
               </button>
             </div>
           </form>
@@ -776,7 +787,7 @@ export default function LoginPage() {
 
             <div>
               <label className="block text-slate-700 font-bold mb-1">New Password</label>
-              <div className="relative">
+              <div className="relative flex items-center">
                 <input
                   type={showNewPassword ? 'text' : 'password'}
                   value={newPassword}
@@ -784,14 +795,15 @@ export default function LoginPage() {
                   placeholder="Minimum 9 characters"
                   autoComplete="new-password"
                   required
-                  className={`${inputClass} pr-12 transition-none`}
+                  className={`${inputClass} pr-10`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800 cursor-pointer transition-none select-none"
+                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded focus:outline-none"
+                  aria-label={showNewPassword ? 'Hide password' : 'Show password'}
                 >
-                  {showNewPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  {showNewPassword ? <Eye size={16} strokeWidth={2} /> : <EyeOff size={16} strokeWidth={2} />}
                 </button>
               </div>
               <PasswordChecklist password={newPassword} />
@@ -799,7 +811,7 @@ export default function LoginPage() {
 
             <div>
               <label className="block text-slate-700 font-bold mb-1">Re-enter New Password</label>
-              <div className="relative">
+              <div className="relative flex items-center">
                 <input
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
@@ -807,14 +819,15 @@ export default function LoginPage() {
                   placeholder="Repeat new password"
                   autoComplete="new-password"
                   required
-                  className={`${inputClass} pr-12 transition-none`}
+                  className={`${inputClass} pr-10`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800 cursor-pointer transition-none select-none"
+                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded focus:outline-none"
+                  aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                 >
-                  {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  {showConfirmPassword ? <Eye size={16} strokeWidth={2} /> : <EyeOff size={16} strokeWidth={2} />}
                 </button>
               </div>
               {confirmPassword.length > 0 && confirmPassword !== newPassword && (

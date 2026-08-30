@@ -65,10 +65,23 @@ export function UserManagementTab({
     return matchesSearch && matchesRole;
   });
 
-  const roleStyles: any = {
-    ADMINISTRATOR: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-    TEAM_LEADER: 'bg-warning/20 text-warning border-warning/30',
-    COORDINATOR: 'bg-primary/20 text-primary border-primary/30',
+  const formatRoleLabel = (role: string) => {
+    const r = (role || '').toUpperCase();
+    if (r.includes('ADMIN')) return 'Administrator';
+    if (r.includes('LEADER')) return 'Team Leader';
+    if (r.includes('COORDINATOR')) return 'Placement Coordinator';
+    return role.replace(/_/g, ' ');
+  };
+
+  const getRoleBadgeStyle = (role: string) => {
+    const r = (role || '').toUpperCase();
+    if (r.includes('ADMIN')) {
+      return 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30 shadow-2xs';
+    }
+    if (r.includes('LEADER')) {
+      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 shadow-2xs';
+    }
+    return 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30 shadow-2xs';
   };
 
   const handleConfirmDeactivate = async () => {
@@ -147,7 +160,7 @@ export function UserManagementTab({
               <tr className="bg-background/90 text-fg-subtle font-semibold border-b border-border text-micro uppercase tracking-wider">
                 <th className="py-3.5 px-5 min-w-[200px]">User / Full Name</th>
                 <th className="py-3.5 px-4 min-w-[180px]">Contact Info</th>
-                <th className="py-3.5 px-4 text-center min-w-[140px]">Assigned Role</th>
+                <th className="py-3.5 px-4 text-center min-w-[180px]">Assigned Role</th>
                 <th className="py-3.5 px-4 min-w-[240px]">Assigned Institutions</th>
                 <th className="py-3.5 px-4 text-center min-w-[130px]">Status</th>
                 <th className="py-3.5 px-5 text-center min-w-[140px]">Actions</th>
@@ -212,13 +225,13 @@ export function UserManagementTab({
                       </td>
 
                       {/* Role Badge */}
-                      <td className="py-3.5 px-4 text-center">
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         <span
-                          className={`text-micro font-bold px-2 py-0.5 rounded border uppercase ${
-                            roleStyles[primaryRole] || roleStyles.COORDINATOR
-                          }`}
+                          className={`inline-flex items-center justify-center whitespace-nowrap text-[11px] font-semibold px-2.5 py-1 rounded-md border tracking-wide select-none ${getRoleBadgeStyle(
+                            primaryRole
+                          )}`}
                         >
-                          {primaryRole.replace('_', ' ')}
+                          {formatRoleLabel(primaryRole)}
                         </span>
                       </td>
 
@@ -356,71 +369,71 @@ export function UserManagementTab({
         </div>
       </div>
 
-      {/* ── Rich Deactivation Confirmation Modal ── */}
+      {/* ── Deactivation Confirmation Modal ── */}
       {deactivatingUser && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="glass-panel max-w-md w-full rounded-2xl border border-destructive/30 p-6 shadow-5 space-y-5 bg-surface-raised animate-scaleUp">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 max-w-md w-full rounded-xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-xl space-y-4">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-border pb-3">
+            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
               <div className="flex items-center gap-2.5">
-                <span className="w-9 h-9 rounded-xl bg-destructive/15 border border-destructive/30 text-destructive grid place-items-center">
-                  <UserX size={18} />
+                <span className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 grid place-items-center">
+                  <UserX size={16} />
                 </span>
                 <div>
-                  <h3 className="text-sm font-bold text-fg">Deactivate User Account?</h3>
-                  <p className="text-micro text-fg-subtle">1-week restoration window applies</p>
+                  <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Deactivate User Account?</h3>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">1-week restoration window applies</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setDeactivatingUser(null)}
-                className="text-fg-subtle hover:text-fg p-1 rounded-lg hover:bg-surface-sunken"
+                className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 p-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
               >
                 <X size={16} />
               </button>
             </div>
 
             {/* Target Details Card */}
-            <div className="p-3.5 bg-surface-sunken rounded-xl border border-border space-y-1.5 text-xs">
+            <div className="p-3.5 bg-zinc-50 dark:bg-zinc-800/60 rounded-lg border border-zinc-200 dark:border-zinc-700 space-y-1.5 text-xs">
               <div className="flex items-center justify-between">
-                <span className="text-fg-subtle text-micro">Account Target:</span>
-                <span className="font-bold text-fg">{deactivatingUser.full_name}</span>
+                <span className="text-zinc-500 dark:text-zinc-400 text-micro">Account Target:</span>
+                <span className="font-bold text-zinc-900 dark:text-zinc-100">{deactivatingUser.full_name}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-fg-subtle text-micro">Username / Email:</span>
-                <span className="font-mono text-fg text-micro">{deactivatingUser.official_email}</span>
+                <span className="text-zinc-500 dark:text-zinc-400 text-micro">Username / Email:</span>
+                <span className="font-mono text-zinc-900 dark:text-zinc-100 text-micro">{deactivatingUser.official_email}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-fg-subtle text-micro">Current Role:</span>
-                <span className="font-semibold text-primary text-micro uppercase">
-                  {(deactivatingUser.role_codes?.[0] || 'COORDINATOR').replace('_', ' ')}
+                <span className="text-zinc-500 dark:text-zinc-400 text-micro">Current Role:</span>
+                <span className="font-semibold text-blue-600 dark:text-blue-400 text-micro">
+                  {formatRoleLabel(deactivatingUser.role_codes?.[0] || 'COORDINATOR')}
                 </span>
               </div>
             </div>
 
             {/* Policy & Explanation Box */}
-            <div className="p-3.5 bg-amber-500/10 border border-amber-500/25 rounded-xl text-xs space-y-2 text-amber-800 dark:text-amber-300">
-              <div className="font-bold flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
-                <AlertTriangle size={14} className="shrink-0" />
+            <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg text-xs space-y-1.5 text-amber-900 dark:text-amber-200">
+              <div className="font-bold flex items-center gap-1.5 text-amber-700 dark:text-amber-300 text-xs">
+                <AlertTriangle size={13} className="shrink-0" />
                 <span>What happens when deactivated:</span>
               </div>
-              <ul className="list-disc pl-4 space-y-1 text-micro text-fg-muted">
+              <ul className="list-disc pl-4 space-y-1 text-micro text-amber-800 dark:text-amber-300">
                 <li>This user will immediately lose access and be unable to log in.</li>
                 <li>Their assigned colleges and historic logs will be preserved.</li>
                 <li>
-                  <strong className="text-emerald-600 dark:text-emerald-400 font-semibold">1-Week Recovery Window:</strong> The Administrator can restore this account anytime within <strong>7 days</strong>.
+                  <strong className="text-emerald-700 dark:text-emerald-400 font-semibold">1-Week Recovery Window:</strong> The Administrator can restore this account anytime within <strong>7 days</strong>.
                 </li>
                 <li>After 7 days, the account will be permanently archived.</li>
               </ul>
             </div>
 
             {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-2.5 pt-2">
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-zinc-200 dark:border-zinc-800">
               <button
                 type="button"
                 onClick={() => setDeactivatingUser(null)}
                 disabled={isSubmittingDeactivate}
-                className="px-4 py-2 rounded-xl border border-border bg-surface hover:bg-surface-sunken text-fg text-xs font-semibold transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 text-xs font-semibold transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -428,7 +441,7 @@ export function UserManagementTab({
                 type="button"
                 onClick={handleConfirmDeactivate}
                 disabled={isSubmittingDeactivate}
-                className="px-4 py-2 rounded-xl bg-destructive hover:bg-destructive text-white text-xs font-bold shadow-2 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-xs font-semibold shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <Ban size={13} />
                 <span>{isSubmittingDeactivate ? 'Deactivating…' : 'Confirm Deactivation'}</span>

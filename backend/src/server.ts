@@ -26,7 +26,7 @@ import { ActiveLead } from './models/ActiveLead';
 import { SystemSettings } from './models/SystemSettings';
 import { AuditLog } from './models/AuditLog';
 import { writeAudit } from './lib/audit';
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { startFinalizationJob } from './jobs/finalizeDailyTracker';
 import { registerAuthRoutes } from './lib/authRoutes';
 import { registerActiveLeadRoutes, syncLeadFromDailyTracker } from './lib/activeLeadRoutes';
@@ -50,7 +50,6 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
-const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'ipoms_dev_access_secret_super_secure_key_2026';
 
 /**
  * Destructive demo seeding on boot. Off unless explicitly requested — see the
@@ -4451,17 +4450,17 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
           DailyLead.countDocuments({ coordinator_id: c._id, lead_type: 'jd_received', is_deleted: false }),
           AssignedWork.countDocuments({ assigned_to_coordinator_id: c._id, is_completed: false, is_deleted: false }),
           DailyTracker.findOne({ coordinator_id: c._id })
-            .sort({ call_date: -1, created_at: -1 })
+            .sort({ session_date: -1, created_at: -1 })
             .populate('college_id', 'college_name college_code')
-            .select('company_name call_date outcome_status created_at college_id'),
+            .select('company_name session_date outcome_status created_at college_id'),
         ]);
 
         // Determine real-time online status and last activity
         let lastActiveTime: Date | null = null;
         let lastActivitySummary = 'No activity logged today';
 
-        if (latestCall?.call_date) {
-          lastActiveTime = new Date(latestCall.call_date);
+        if (latestCall?.session_date) {
+          lastActiveTime = new Date(latestCall.session_date);
           const company = latestCall.company_name || 'Partner Company';
           const college = (latestCall.college_id as any)?.college_code || (latestCall.college_id as any)?.college_name || '';
           lastActivitySummary = `Logged call for ${company}${college ? ` (${college})` : ''}`;
@@ -4829,7 +4828,6 @@ app.get('/api/v1/dashboard/admin', async (req: Request, res: Response) => {
       last_sync: new Date().toISOString(),
       maintenance_mode_enabled: settingsDoc?.maintenance_mode_enabled || false,
       maintenance_reason: settingsDoc?.maintenance_reason || '',
-      system_announcement: settingsDoc?.system_announcement_banner || '',
       academic_year: settingsDoc?.academic_year || '2026-2027',
       season_name: settingsDoc?.season_name || 'Campus Recruitment Season 2026-27',
     };
@@ -6255,6 +6253,12 @@ app.patch('/api/v1/users/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR', 
       personal_email,
       primary_mobile,
       secondary_mobile,
+      alternate_mobile,
+      employee_id,
+      linkedin_profile,
+      date_of_birth,
+      date_of_joining,
+      is_profile_locked,
       assigned_college_ids,
       role_codes,
       account_status,
@@ -6292,6 +6296,19 @@ app.patch('/api/v1/users/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR', 
     if (personal_email !== undefined) user.personal_email = personal_email.trim().toLowerCase();
     if (primary_mobile !== undefined) user.primary_mobile = primary_mobile.trim();
     if (secondary_mobile !== undefined) user.secondary_mobile = secondary_mobile.trim();
+    if (alternate_mobile !== undefined) user.alternate_mobile = alternate_mobile.trim();
+    if (employee_id !== undefined) user.employee_id = employee_id.trim();
+    if (linkedin_profile !== undefined) user.linkedin_profile = linkedin_profile.trim();
+    if (date_of_birth !== undefined) user.date_of_birth = date_of_birth ? new Date(date_of_birth) : null;
+    if (date_of_joining !== undefined) user.date_of_joining = date_of_joining ? new Date(date_of_joining) : null;
+    if (is_profile_locked !== undefined) {
+      user.is_profile_locked = Boolean(is_profile_locked);
+      if (!is_profile_locked) {
+        user.profile_locked_at = null;
+      } else {
+        user.profile_locked_at = user.profile_locked_at || new Date();
+      }
+    }
     if (account_status !== undefined) user.account_status = account_status;
     if (presence_status !== undefined) user.presence_status = presence_status;
 
@@ -6785,7 +6802,6 @@ app.get('/api/v1/settings', authenticateJWT, async (req: Request, res: Response)
         enable_email_notifications: true,
         enable_system_notifications: true,
         enable_dashboard_popups: true,
-        system_announcement_banner: '',
       });
     }
 
@@ -6961,12 +6977,6 @@ app.patch('/api/v1/settings', authenticateJWT, authorizeRoles('ADMINISTRATOR', '
       enable_email_notifications,
       enable_system_notifications,
       enable_dashboard_popups,
-      system_announcement_banner,
-      announcement_title,
-      announcement_message,
-      announcement_start_date,
-      announcement_end_date,
-      announcement_is_published,
       maintenance_mode_enabled,
       maintenance_affected_roles,
       maintenance_reason,
@@ -6991,16 +7001,6 @@ app.patch('/api/v1/settings', authenticateJWT, authorizeRoles('ADMINISTRATOR', '
     if (enable_email_notifications !== undefined) settings.enable_email_notifications = !!enable_email_notifications;
     if (enable_system_notifications !== undefined) settings.enable_system_notifications = !!enable_system_notifications;
     if (enable_dashboard_popups !== undefined) settings.enable_dashboard_popups = !!enable_dashboard_popups;
-    if (system_announcement_banner !== undefined) settings.system_announcement_banner = system_announcement_banner.trim();
-
-    if (announcement_title !== undefined) settings.announcement_title = announcement_title.trim();
-    if (announcement_message !== undefined) {
-      settings.announcement_message = announcement_message.trim();
-      settings.system_announcement_banner = announcement_message.trim();
-    }
-    if (announcement_start_date !== undefined) settings.announcement_start_date = announcement_start_date ? new Date(announcement_start_date) : null;
-    if (announcement_end_date !== undefined) settings.announcement_end_date = announcement_end_date ? new Date(announcement_end_date) : null;
-    if (announcement_is_published !== undefined) settings.announcement_is_published = !!announcement_is_published;
 
     if (maintenance_mode_enabled !== undefined) settings.maintenance_mode_enabled = !!maintenance_mode_enabled;
     if (maintenance_affected_roles !== undefined) settings.maintenance_affected_roles = maintenance_affected_roles;
@@ -7020,7 +7020,7 @@ app.patch('/api/v1/settings', authenticateJWT, authorizeRoles('ADMINISTRATOR', '
       performedByEmail: (req as any).user?.email || '',
       module: 'SystemAdmin',
       severity: maintenance_mode_enabled ? 'critical' : 'info',
-      summary: `System settings updated: Maintenance=${settings.maintenance_mode_enabled}, Announcement=${settings.announcement_is_published ? 'Published' : 'Draft'}`,
+      summary: `System settings updated: Maintenance=${settings.maintenance_mode_enabled}`,
       req,
     });
 
@@ -7463,11 +7463,13 @@ const ensureDefaultAccounts = async () => {
       'lizenya',
       'megaladevi',
     ];
-    const purgeResult = await User.deleteMany({
-      username: { $nin: allowedUsernames },
-    });
-    if (purgeResult.deletedCount > 0) {
-      console.log(`🧹 [iPOMS] Successfully purged ${purgeResult.deletedCount} unauthorized/legacy user account(s) from database.`);
+    if (RESET_ACCOUNTS_ON_BOOT) {
+      const purgeResult = await User.deleteMany({
+        username: { $nin: allowedUsernames },
+      });
+      if (purgeResult.deletedCount > 0) {
+        console.log(`🧹 [iPOMS] Successfully purged ${purgeResult.deletedCount} unauthorized/legacy user account(s) from database.`);
+      }
     }
 
     // 5. Official Production Roster (1 Admin, 1 Team Leader, 5 Coordinators)

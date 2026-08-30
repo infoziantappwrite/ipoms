@@ -35,17 +35,19 @@ export default function ProfilePage() {
     loadProfile();
   }, [loadProfile]);
 
-  const handleUpdateProfile = async (updateFields: any): Promise<{ success: boolean; message?: string; error?: string }> => {
-    if (!currentUser?._id) return { success: false, error: 'No active profile found.' };
+  const handleUpdateProfile = async (updateFields: any): Promise<{ success: boolean; message?: string; error?: string; data?: any }> => {
+    const sessionUser = readSessionUser();
+    const targetId = currentUser?._id || (currentUser as any)?.id || sessionUser?._id || sessionUser?.id;
+    if (!targetId) return { success: false, error: 'No active profile found.' };
     try {
-      const res = await apiFetch(`/profile/${currentUser._id}`, {
+      const res = await apiFetch(`/profile/${targetId}`, {
         method: 'PATCH',
         body: JSON.stringify(updateFields),
       });
       if (res.success) {
         setCurrentUser(res.data);
         updateSessionUser(res.data);
-        return { success: true, message: res.message || 'Profile updated successfully!' };
+        return { success: true, message: res.message || 'Profile updated successfully!', data: res.data };
       } else {
         return { success: false, error: res.error?.message || 'Failed to update profile.' };
       }

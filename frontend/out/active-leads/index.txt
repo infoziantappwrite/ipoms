@@ -1,13 +1,38 @@
 2:I[6513,[],"ClientPageRoot"]
-3:I[7700,["719","static/chunks/719-0ad1ddf7329ed9fd.js","121","static/chunks/121-5f37dde08c2de2aa.js","943","static/chunks/app/active-leads/page-2cf648a02cda8497.js"],"default"]
+3:I[7700,["3719","static/chunks/3719-69315a433a1bc5b1.js","4121","static/chunks/4121-3ec9ea9e3e0dc7d5.js","3943","static/chunks/app/active-leads/page-3ef1c6d4afaad915.js"],"default"]
 4:I[9275,[],""]
 5:I[1343,[],""]
-6:I[7640,["719","static/chunks/719-0ad1ddf7329ed9fd.js","138","static/chunks/138-07f3a33fef108b4e.js","648","static/chunks/648-485db2b858144739.js","668","static/chunks/668-3267a5af1fdaf519.js","754","static/chunks/754-c35b5410c5379748.js","185","static/chunks/app/layout-0fe36a667a789150.js"],"ToastProvider"]
-7:I[5347,["719","static/chunks/719-0ad1ddf7329ed9fd.js","138","static/chunks/138-07f3a33fef108b4e.js","648","static/chunks/648-485db2b858144739.js","668","static/chunks/668-3267a5af1fdaf519.js","754","static/chunks/754-c35b5410c5379748.js","185","static/chunks/app/layout-0fe36a667a789150.js"],"AppShell"]
-8:I[5451,["138","static/chunks/138-07f3a33fef108b4e.js","601","static/chunks/app/error-f0edc8cdbcc092a3.js"],"default"]
-9:I[8709,["138","static/chunks/138-07f3a33fef108b4e.js","160","static/chunks/app/not-found-5607ac16424c35da.js"],"default"]
-a:I[7602,["719","static/chunks/719-0ad1ddf7329ed9fd.js","138","static/chunks/138-07f3a33fef108b4e.js","648","static/chunks/648-485db2b858144739.js","668","static/chunks/668-3267a5af1fdaf519.js","754","static/chunks/754-c35b5410c5379748.js","185","static/chunks/app/layout-0fe36a667a789150.js"],"AutoSaveFloatingIndicator"]
-b:I[5412,["555","static/chunks/app/loading-11e55b2d8f64fe09.js"],"PageSkeleton"]
-0:["eL7iiPpWUV3BQxz-eRgGA",[[["",{"children":["active-leads",{"children":["__PAGE__",{}]}]},"$undefined","$undefined",true],["",{"children":["active-leads",{"children":["__PAGE__",{},[["$L1",["$","$L2",null,{"props":{"params":{},"searchParams":{}},"Component":"$3"}]],null],null]},["$","$L4",null,{"parallelRouterKey":"children","segmentPath":["children","active-leads","children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","styles":null}],null]},[["$","html",null,{"lang":"en","suppressHydrationWarning":true,"children":[["$","head",null,{"children":["$","script",null,{"dangerouslySetInnerHTML":{"__html":"\n  (function() {\n    try {\n      var saved = localStorage.getItem('ipoms_theme');\n      var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;\n      if (saved === 'dark' || (!saved && prefersDark)) {\n        document.documentElement.classList.add('dark');\n        document.documentElement.classList.remove('light');\n        document.documentElement.style.colorScheme = 'dark';\n      } else {\n        document.documentElement.classList.remove('dark');\n        document.documentElement.classList.add('light');\n        document.documentElement.style.colorScheme = 'light';\n      }\n    } catch (e) {}\n  })();\n"}}]}],["$","body",null,{"className":"min-h-screen bg-background text-fg antialiased selection:bg-primary selection:text-primary-foreground flex flex-col transition-colors duration-200","children":[["$","a",null,{"href":"#main","className":"sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-toast focus:rounded-control focus:bg-primary focus:px-3 focus:py-2 focus:text-body focus:font-semibold focus:text-primary-foreground","children":"Skip to main content"}],["$","$L6",null,{"children":[["$","$L7",null,{"children":["$","$L4",null,{"parallelRouterKey":"children","segmentPath":["children"],"error":"$8","errorStyles":[],"errorScripts":[],"template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":["$","$L9",null,{}],"notFoundStyles":[],"styles":null}]}],["$","$La",null,{}]]}]]}]]}],null],[["$","$Lb",null,{}],[],[]]],[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/css/f2c8d3cdf6e314ae.css","precedence":"next","crossOrigin":"$undefined"}]],[null,"$Lc"]]]]]
-c:[["$","meta","0",{"name":"viewport","content":"width=device-width, initial-scale=1"}],["$","meta","1",{"charSet":"utf-8"}],["$","title","2",{"children":"Infoziant iPOMS — Placement Operations & Management System"}],["$","meta","3",{"name":"description","content":"Enterprise Placement Operations, Corporate CRM & Analytics Portal for Infoziant"}]]
+7:I[7640,["3719","static/chunks/3719-69315a433a1bc5b1.js","7138","static/chunks/7138-49b09bbf9a428cf1.js","6648","static/chunks/6648-5c51a20511c84bb9.js","668","static/chunks/668-078d42a05fd5351b.js","9754","static/chunks/9754-0320949c2d337b11.js","3185","static/chunks/app/layout-e5083ef03c7ae11f.js"],"ToastProvider"]
+8:I[5347,["3719","static/chunks/3719-69315a433a1bc5b1.js","7138","static/chunks/7138-49b09bbf9a428cf1.js","6648","static/chunks/6648-5c51a20511c84bb9.js","668","static/chunks/668-078d42a05fd5351b.js","9754","static/chunks/9754-0320949c2d337b11.js","3185","static/chunks/app/layout-e5083ef03c7ae11f.js"],"AppShell"]
+9:I[5451,["7138","static/chunks/7138-49b09bbf9a428cf1.js","7601","static/chunks/app/error-904f1743a785f59b.js"],"default"]
+a:I[8709,["7138","static/chunks/7138-49b09bbf9a428cf1.js","9160","static/chunks/app/not-found-e3190a3ec603e06c.js"],"default"]
+b:I[7602,["3719","static/chunks/3719-69315a433a1bc5b1.js","7138","static/chunks/7138-49b09bbf9a428cf1.js","6648","static/chunks/6648-5c51a20511c84bb9.js","668","static/chunks/668-078d42a05fd5351b.js","9754","static/chunks/9754-0320949c2d337b11.js","3185","static/chunks/app/layout-e5083ef03c7ae11f.js"],"AutoSaveFloatingIndicator"]
+c:I[5412,["8555","static/chunks/app/loading-7ec1d0610258e44f.js"],"PageSkeleton"]
+6:T419,
+  (function() {
+    try {
+      var path = window.location.pathname || '';
+      var isAuthPage = path === '/' || path === '/login' || path === '/login/' || path === '/signup' || path === '/signup/';
+      if (isAuthPage) {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+        document.documentElement.style.colorScheme = 'light';
+        return;
+      }
+
+      var saved = localStorage.getItem('ipoms_theme');
+      var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (saved === 'dark' || (!saved && prefersDark)) {
+        document.documentElement.classList.add('dark');
+        document.documentElement.classList.remove('light');
+        document.documentElement.style.colorScheme = 'dark';
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+        document.documentElement.style.colorScheme = 'light';
+      }
+    } catch (e) {}
+  })();
+0:["249h6LjT7avcTlodkNNwH",[[["",{"children":["active-leads",{"children":["__PAGE__",{}]}]},"$undefined","$undefined",true],["",{"children":["active-leads",{"children":["__PAGE__",{},[["$L1",["$","$L2",null,{"props":{"params":{},"searchParams":{}},"Component":"$3"}]],null],null]},["$","$L4",null,{"parallelRouterKey":"children","segmentPath":["children","active-leads","children"],"error":"$undefined","errorStyles":"$undefined","errorScripts":"$undefined","template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":"$undefined","notFoundStyles":"$undefined","styles":null}],null]},[["$","html",null,{"lang":"en","suppressHydrationWarning":true,"children":[["$","head",null,{"children":["$","script",null,{"dangerouslySetInnerHTML":{"__html":"$6"}}]}],["$","body",null,{"className":"min-h-screen bg-background text-fg antialiased selection:bg-primary selection:text-primary-foreground flex flex-col transition-colors duration-200","children":[["$","a",null,{"href":"#main","className":"sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-toast focus:rounded-control focus:bg-primary focus:px-3 focus:py-2 focus:text-body focus:font-semibold focus:text-primary-foreground","children":"Skip to main content"}],["$","$L7",null,{"children":[["$","$L8",null,{"children":["$","$L4",null,{"parallelRouterKey":"children","segmentPath":["children"],"error":"$9","errorStyles":[],"errorScripts":[],"template":["$","$L5",null,{}],"templateStyles":"$undefined","templateScripts":"$undefined","notFound":["$","$La",null,{}],"notFoundStyles":[],"styles":null}]}],["$","$Lb",null,{}]]}]]}]]}],null],[["$","$Lc",null,{}],[],[]]],[[["$","link","0",{"rel":"stylesheet","href":"/_next/static/css/1e5c3c38914d1b17.css","precedence":"next","crossOrigin":"$undefined"}]],[null,"$Ld"]]]]]
+d:[["$","meta","0",{"name":"viewport","content":"width=device-width, initial-scale=1"}],["$","meta","1",{"charSet":"utf-8"}],["$","title","2",{"children":"Infoziant iPOMS — Placement Operations & Management System"}],["$","meta","3",{"name":"description","content":"Enterprise Placement Operations, Corporate CRM & Analytics Portal for Infoziant"}]]
 1:null

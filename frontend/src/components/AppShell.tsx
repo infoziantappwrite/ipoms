@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, Suspense } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Menu } from 'lucide-react';
@@ -81,7 +81,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <AppSidebar mobileOpen={mobileOpen} onMobileClose={closeMobile} />
+      <Suspense fallback={null}>
+        <AppSidebar mobileOpen={mobileOpen} onMobileClose={closeMobile} />
+      </Suspense>
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Drawer trigger — only where the drawer is off-canvas. */}

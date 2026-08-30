@@ -5,7 +5,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const http_1 = __importDefault(require("http"));
-const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'ipoms_dev_access_secret_super_secure_key_2026';
+// No fallback — this script signs tokens the real server must accept, so it
+// has to use the same secret the server is actually running with.
+if (!process.env.JWT_ACCESS_SECRET) {
+    throw new Error('JWT_ACCESS_SECRET environment variable is required — set it in backend/.env');
+}
+const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;
 function generateTestToken(payload, expiresIn = '1h') {
     return jsonwebtoken_1.default.sign(payload, JWT_ACCESS_SECRET, { expiresIn: expiresIn });
 }

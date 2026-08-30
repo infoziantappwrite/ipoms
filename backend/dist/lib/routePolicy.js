@@ -108,6 +108,7 @@ const POLICIES = [
     { method: 'POST', pattern: /^\/notifications\/?$/, roles: TL_ADMIN },
     { method: '*', pattern: /^\/notifications(\/.*)?$/, roles: STAFF },
     // ── Users, profiles, roles ────────────────────────────────────────────────
+    { method: 'PATCH', pattern: new RegExp(`^/users/${ID}/restore/?$`), roles: ADMIN },
     { method: 'PATCH', pattern: new RegExp(`^/users/${ID}/unlock-profile/?$`), roles: TL_ADMIN },
     { method: 'DELETE', pattern: new RegExp(`^/users/${ID}/?$`), roles: ADMIN },
     { method: 'PATCH', pattern: new RegExp(`^/users/${ID}/?$`), roles: TL_ADMIN },

@@ -12,7 +12,7 @@ import { PhotoCropModal } from './PhotoCropModal';
 
 interface Props {
   currentUser: any;
-  onUpdateProfile: (data: any) => Promise<{ success: boolean; message?: string; error?: string; is_locked?: boolean }>;
+  onUpdateProfile: (data: any) => Promise<{ success: boolean; message?: string; error?: string; is_locked?: boolean; data?: any }>;
 }
 
 function getCleanUsername(user: any): string {
@@ -182,7 +182,9 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
     currentUser?.is_profile_locked ||
     effectiveUser?.is_profile_locked ||
     sessionFallback?.is_profile_locked ||
-    isLockedAfterUpdate
+    isLockedAfterUpdate ||
+    (effectiveUser?.date_of_birth && effectiveUser?.date_of_joining) ||
+    Boolean(effectiveUser?.personal_email && effectiveUser?.primary_mobile)
   );
   const isPasswordLocked = Boolean(effectiveUser?.is_password_locked || effectiveUser?.account_status === 'blocked');
   const monthlyPasswordChanges = effectiveUser?.monthly_password_changes_count || 0;
@@ -336,16 +338,30 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
       // Always send profile_photo_url so backend saves it to database
       payload.profile_photo_url = profilePhotoUrl;
 
-      const res = await onUpdateProfile(payload);
-      if (res.success) {
+      let res = await onUpdateProfile(payload);
+      if (!res?.success) {
+        const uid = effectiveUser?._id || (effectiveUser as any)?.id || readSessionUser()?._id || (readSessionUser() as any)?.id;
+        if (uid) {
+          try {
+            const directRes = await apiFetch(`/profile/${uid}`, {
+              method: 'PATCH',
+              body: JSON.stringify(payload),
+            });
+            if (directRes.success) {
+              res = { success: true, message: directRes.message, data: directRes.data };
+            }
+          } catch {}
+        }
+      }
+
+      if (res?.success) {
         setSuccessMsg(res.message || 'Personal details updated successfully! Locked fields have been permanently secured.');
         setIsLockedAfterUpdate(true);
-        if (res.data) {
-          setSessionFallback(res.data);
-          updateSessionUser(res.data);
-        }
+        const updatedData = res.data || { ...effectiveUser, ...payload, is_profile_locked: true };
+        setSessionFallback(updatedData);
+        updateSessionUser(updatedData);
       } else {
-        setErrorMsg(res.error || 'Failed to update profile.');
+        setErrorMsg(res?.error || 'Failed to update profile.');
       }
     } catch {
       setErrorMsg('Error connecting to the server. Please try again.');
@@ -374,13 +390,13 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
 
     try {
       const res = await onUpdateProfile({ password: newPassword });
-      if (res.success) {
+      if (res?.success) {
         setPasswordSuccessMsg(res.message || 'Password updated successfully!');
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
       } else {
-        setPasswordErrorMsg(res.error || 'Failed to update password.');
+        setPasswordErrorMsg(res?.error || 'Failed to update password.');
       }
     } catch {
       setPasswordErrorMsg('Error connecting to the server. Please try again.');
@@ -389,9 +405,9 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
     }
   };
 
-  // Reusable styling for disabled fields: crisp white background with 🚫 hover cursor
+  // Reusable styling for disabled fields: clear lock indicators with 🚫 hover cursor
   const whiteDisabledInputClass =
-    'w-full bg-white text-zinc-900 placeholder:text-zinc-400 border border-zinc-300 font-semibold rounded-xl px-3.5 py-2.5 shadow-sm select-none cursor-not-allowed transition-all hover:cursor-not-allowed hover:border-zinc-400';
+    'w-full bg-slate-100/90 dark:bg-zinc-800/80 text-slate-800 dark:text-zinc-200 placeholder:text-slate-400 border border-slate-300 dark:border-zinc-700 font-semibold rounded-xl px-3.5 py-2.5 shadow-2xs select-none cursor-not-allowed transition-all hover:cursor-not-allowed';
   const normalInputClass =
     'w-full bg-background border border-border-strong text-fg focus:border-primary focus:outline-none rounded-xl px-3.5 py-2.5 transition-colors';
 

@@ -4,7 +4,14 @@ import jwt from 'jsonwebtoken';
 // Exported so routes that can't carry an Authorization header (e.g. SSE via
 // the browser's native EventSource, which cannot set custom headers) can
 // verify a token passed another way — see chatRoutes.ts's /chat/stream.
-export const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'ipoms_dev_access_secret_super_secure_key_2026';
+//
+// No fallback secret: a hardcoded default here would let anyone who has read
+// this source forge a valid Administrator JWT the moment the env var is
+// unset in any environment. Fail fast at boot instead.
+if (!process.env.JWT_ACCESS_SECRET) {
+  throw new Error('JWT_ACCESS_SECRET environment variable is required — set it in backend/.env');
+}
+export const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;
 
 export interface AuthUserPayload {
   userId: string;

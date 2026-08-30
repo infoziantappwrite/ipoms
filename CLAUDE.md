@@ -127,7 +127,7 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
 | 11 | Endpoints `kebab-case` plural (Ch.7 §7.1.6) | Mixed: `/daily-leads` ✓ but `/metadata`, `/assigned-work/:id/complete` | Cosmetic; don't churn URLs without a reason |
 | 12 | Files `kebab-case.tsx`, backend `camelCaseController.ts` (Ch.7 §7.1.2) | Frontend uses `PascalCase.tsx` throughout | Codebase-wide; follow the **existing** convention, not the spec |
 | 13 | ≥80% unit coverage, Supertest RBAC suites, 7 E2E journeys (Ch.7 §7.4) | Zero tests | Blocks the Phase-8/9 gate outright |
-| 14 | No secrets in source (Ch.7 §7.1.1 #9) | `JWT_ACCESS_SECRET` has a hardcoded fallback in `authRoutes.ts:34` and `authMiddleware.ts:4`; **`backend/.env` is committed to git** | Real security issue — see §5 |
+| 14 | No secrets in source (Ch.7 §7.1.1 #9) | ~~`JWT_ACCESS_SECRET` had a hardcoded fallback~~ **FIXED 30 Aug 2026** — see §5 item 2. `backend/.env` was already untracked in an earlier commit (`c549425`), not currently committed. |  |
 
 ---
 
@@ -284,8 +284,21 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
    `settings/page.tsx`, `forCoordinator: false` in `SettingsNav.tsx`): all 5 corrections
    render as intended. Re-verify against `POLICIES` before trusting this table again next
    time a permission rule changes — it has no automated link to reality.
-2. **`backend/.env` is tracked in git** — real SMTP and JWT values are in history.
-   `git rm --cached backend/.env`, rotate the secrets, and remove the hardcoded JWT fallbacks.
+2. ~~**Hardcoded JWT secret fallback in 4 files.**~~ **FIXED 30 Aug 2026.** `server.ts`,
+   `authMiddleware.ts`, `authRoutes.ts`, and `scripts/verifyAuthMiddleware.ts` all fell back
+   to the identical literal `'ipoms_dev_access_secret_super_secure_key_2026'` (access) /
+   `'ipoms_dev_refresh_secret_super_secure_key_2026'` (refresh) whenever `JWT_ACCESS_SECRET`/
+   `JWT_REFRESH_SECRET` was unset — anyone who had read this source could forge a valid
+   Administrator JWT the moment either var went missing in any environment. All four now
+   throw at module load if the corresponding env var isn't set (fail fast, no silent
+   fallback); `authRoutes.ts` also no longer keeps its own copy of `JWT_ACCESS_SECRET` — it
+   imports the one exported from `authMiddleware.ts`, and `server.ts`'s copy was dead code
+   (never read anywhere) so it was deleted outright rather than fixed. Verified: `tsc --noEmit`
+   clean, server boots against the real `.env`, and a live login → authenticated `/settings`
+   request round-tripped a real token through the new import path successfully.
+   **`backend/.env` itself was already untracked** in an earlier commit (`c549425`) — not
+   currently a live gap, though anything in it before that commit is still in git history and
+   should be treated as compromised if it hasn't been rotated.
 3. **`frontend/.next/` is tracked in git** (38 files). Git and webpack writing the same
    directory is the likely cause of the recurring Windows `.next` corruption
    (`UNKNOWN: unknown error, errno -4094`). `git rm --cached -r frontend/.next`.
@@ -341,6 +354,29 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     leaving the process alive with no listener. Verified by snapshotting all collection counts
     and the admin password hash across a restart — identical. **Never re-enable either flag
     against a database with real data, and never add a new destructive routine to boot.**
+11. **Organization Announcement Broadcaster removed entirely (user decision, 30 Aug 2026) —
+    not a bug fix.** The feature (Settings → System Config's "Organization Announcement
+    Broadcaster" form, plus a duplicate mini-editor in `AdminSystemHealthWidget.tsx` on the
+    admin dashboard) let an Administrator write/save an announcement, but **nothing ever
+    displayed it** — no coordinator or Team Leader screen read `announcement_message`/
+    `announcement_is_published`; the "Publish to All Portals" toggle did nothing downstream.
+    Rather than build the missing display, the user chose to remove the concept entirely.
+    Removed: the `announcement_title`/`announcement_message`/`announcement_start_date`/
+    `announcement_end_date`/`announcement_is_published`/`system_announcement_banner` fields
+    from `SystemSettings.ts` (schema + interface); all reads/writes of them in `GET`/
+    `PATCH /api/v1/settings` and `GET /api/v1/dashboard/admin` in `server.ts`; the announcement
+    section of `SystemConfigTab.tsx`; the announcement mini-editor in
+    `AdminSystemHealthWidget.tsx`; and the stale values from the live `system_settings`
+    document itself (one-time `$unset`). Verified: both `tsc --noEmit` clean, server boots
+    against the real `.env`, and a live `GET /settings` response contains no `announcement*`
+    key. **A separate, unrelated "Broadcast Announcement" feature still exists** at
+    `frontend/src/app/notifications/components/BroadcastModal.tsx` — it is NOT what was
+    removed here, and it has its own bug: it POSTs to `/notifications/broadcast`, which has no
+    backend route (the real, working, TL/Admin-gated endpoint is `POST /api/v1/notifications`,
+    `server.ts` line ~5242) — so clicking it 404s. Not touched; flagged for a future fix. If
+    that gets fixed, `RoleMatrixTab.tsx`'s "Dispatch Broadcast Announcements" row (currently
+    `tl: true, admin: true`) should be re-verified against it working end-to-end, not just the
+    backend route existing.
 
 ---
 
@@ -358,7 +394,7 @@ Data flow: `company_metadata → assigned_work → daily_tracker → weekly_trac
 | 06 | Reports & Analytics | `/reports` | 4 templates (Weekly, Monthly, College, Coordinator). Report edits are **presentation-only and never mutate operational records**. Reports are never stored — exported to the user's machine. Every generation writes an audit log. |
 | 07 | Dashboards | `/dashboard` | Landing page. **Inform and route — never a data-entry screen.** Order: Greeting → Notifications → Assigned Work → Priority College → Today's Tasks (max 3) → KPIs. Live, non-editable, minimal. **Quick Nav shortcut cards removed 22 Aug 2026** (user decision) — the left sidebar already covers module navigation; the coordinator dashboard no longer duplicates it. **Observations/Insights section also removed 22 Aug 2026** (user decision). |
 | 09 | Settings | `/settings` | **Customises appearance, never business logic.** |
-| 10 | System Admin | — | Director/CEO only. Health, data-quality, announcements. Largely unbuilt. |
+| 10 | System Admin | — | Director/CEO only. **Verified 30 Aug 2026 — mostly built, not "largely unbuilt"**: admin dashboard KPIs/leaderboard/account-resolution, maintenance mode (incl. real enforcement middleware), and the Data Quality Monitor are all genuinely wired to live data. Real gap: no real audit-log viewing screen (only an unfiltered last-8 feed). The "Organization Announcement Broadcaster" (write-only, never displayed to staff) was removed entirely 30 Aug 2026 — see §5 item 11 — rather than building the missing display. |
 
 ### RBAC essentials
 - **TPO removed 29 Aug 2026** (user decision). The spec called for an external, read-only
@@ -413,7 +449,8 @@ cd backend && npx tsc --noEmit -p tsconfig.json && cd ../frontend && npx tsc --n
 
 Ordered by severity, not by phase number.
 
-1. **Security:** untrack + rotate `backend/.env`; remove hardcoded JWT secret fallbacks.
+1. **Security:** rotate the secrets that were in `backend/.env` before it was untracked
+   (still live in git history). ~~Remove hardcoded JWT secret fallbacks~~ done 30 Aug 2026.
    *(RBAC and role-code drift — done 21 Aug 2026, see §3 and §5.)*
 2. **Data safety:** build `recycle_bin` (+90-day TTL) and `import_processing_history`.
 3. **Jobs:** add the 3 missing crons.

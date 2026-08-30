@@ -102,18 +102,12 @@ export default function UsersPage() {
           </p>
         </div>
 
-        {/* Action Controls & Sign Out */}
+        {/* User Presence Badge & Sign Out Button (Top-Right Corner) */}
         <div className="shrink-0 flex items-center gap-3">
-          <button
-            onClick={() => {
-              setEditingUser(null);
-              setShowUserModal(true);
-            }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-semibold shadow-2 transition-all hover:scale-105 active:scale-95 cursor-pointer"
-          >
-            <Plus size={14} />
-            <span>Add User</span>
-          </button>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface border border-border text-xs font-mono text-fg-muted shadow-sm select-none">
+            <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+            <span>Presence: Active</span>
+          </span>
           <UserSignOutButton />
         </div>
       </div>

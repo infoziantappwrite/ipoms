@@ -44,6 +44,7 @@ const User_1 = require("../models/User");
 const audit_1 = require("./audit");
 const mailer_1 = require("./mailer");
 const passwordPolicy_1 = require("./passwordPolicy");
+const authMiddleware_1 = require("./authMiddleware");
 /**
  * Authentication routes: sign-in, lockout, OTP reset.
  *
@@ -66,8 +67,13 @@ const passwordPolicy_1 = require("./passwordPolicy");
  *    attempt cap, so neither a database read nor repeated guessing yields a
  *    usable code.
  */
-const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'ipoms_dev_access_secret_super_secure_key_2026';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'ipoms_dev_refresh_secret_super_secure_key_2026';
+// No fallback secret — see authMiddleware.ts for why. JWT_ACCESS_SECRET is
+// imported from there so both files share one source of truth and one
+// fail-fast check instead of two independently-drifting copies.
+if (!process.env.JWT_REFRESH_SECRET) {
+    throw new Error('JWT_REFRESH_SECRET environment variable is required — set it in backend/.env');
+}
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 /** Consecutive failures allowed. The next failure locks the account. */
 const MAX_FAILED_ATTEMPTS = 3;
 const OTP_TTL_MINUTES = 10;
@@ -125,7 +131,7 @@ function generateOtp() {
     return String(crypto_1.default.randomInt(0, 1_000_000)).padStart(6, '0');
 }
 function signToken(user) {
-    return jsonwebtoken_1.default.sign({ userId: user._id, email: user.official_email, roles: user.role_codes, fullName: user.full_name }, JWT_ACCESS_SECRET, { expiresIn: '8h' });
+    return jsonwebtoken_1.default.sign({ userId: user._id, email: user.official_email, roles: user.role_codes, fullName: user.full_name }, authMiddleware_1.JWT_ACCESS_SECRET, { expiresIn: '8h' });
 }
 function publicUser(user) {
     return {
@@ -155,19 +161,12 @@ function publicUser(user) {
         state: user.state || '',
     };
 }
+const pendingSignups = new Map();
 function registerAuthRoutes(app) {
-    /* ── Staff Self-Registration / Sign Up ────────────────────────────────── */
-    app.post('/api/v1/auth/signup', async (req, res) => {
+    /* ── Staff Self-Registration Step 1: Request Outlook Email OTP ────────── */
+    app.post('/api/v1/auth/signup/request-otp', async (req, res) => {
         try {
-            const { full_name = '', username = '', official_email = '', primary_mobile = '', password = '',
-            // `role_codes` is deliberately NOT read from req.body. This endpoint is
-            // public and unauthenticated by design (it IS the account-creation
-            // flow), so trusting a client-supplied role here let anyone on the
-            // network POST {"role_codes":["ADMINISTRATOR"]} and receive full
-            // admin access with no verification whatsoever. Self-registration
-            // always creates exactly one role, unconditionally.
-             } = req.body;
-            const role_codes = [SELF_SIGNUP_ROLE];
+            const { full_name = '', username = '', official_email = '', primary_mobile = '', password = '', } = req.body;
             const email = String(official_email).trim().toLowerCase();
             const uname = String(username).trim().toLowerCase();
             const name = String(full_name).trim();
@@ -190,43 +189,184 @@ function registerAuthRoutes(app) {
             if (existingUser) {
                 const isSameEmail = existingUser.official_email.toLowerCase() === email;
                 return fail(res, 409, 'ACCOUNT_ALREADY_EXISTS', isSameEmail
-                    ? `An account with ${email} already exists. You cannot create a new account with an existing email ID. Please sign in or reset your password.`
+                    ? `An account with ${email} already exists. Please sign in or reset your password.`
                     : `The username "${uname}" is already taken. Please choose a different username.`);
             }
-            const { Role } = await Promise.resolve().then(() => __importStar(require('../models/Role')));
-            const roles = await Role.find({ role_code: { $in: role_codes } });
-            const roleIds = roles.map((r) => r._id);
             const salt = await bcryptjs_1.default.genSalt(12);
             const password_hash = await bcryptjs_1.default.hash(password, salt);
-            const user = await User_1.User.create({
+            const code = generateOtp();
+            const otp_hash = await bcryptjs_1.default.hash(code, 10);
+            const expires_at = new Date(Date.now() + OTP_TTL_MINUTES * 60_000);
+            pendingSignups.set(email, {
                 full_name: name,
                 username: uname,
                 official_email: email,
-                password_hash,
-                role_codes,
-                role_ids: roleIds,
                 primary_mobile: String(primary_mobile).trim(),
+                password_hash,
+                otp_hash,
+                expires_at,
+                attempts: 0,
+            });
+            const delivery = await (0, mailer_1.sendOtpEmail)(email, name, code, OTP_TTL_MINUTES);
+            await (0, audit_1.writeAudit)({
+                action: 'OTP_ISSUED',
+                result: delivery.delivered ? 'SUCCESS' : 'FAILED',
+                entityType: 'users',
+                entityId: null,
+                performedBy: null,
+                performedByRole: 'COORDINATOR',
+                performedByEmail: email,
+                module: 'Security & Audit',
+                severity: 'info',
+                summary: delivery.delivered
+                    ? `Signup verification code emailed to Outlook inbox ${email}`
+                    : `Signup verification code delivery failed for ${email} (${delivery.reason})`,
+                req,
+            });
+            if (!delivery.delivered && delivery.reason === 'SMTP is not configured on the server') {
+                return res.status(200).json({
+                    success: true,
+                    message: `Verification code generated: ${code}`,
+                    data: { expiresInMinutes: OTP_TTL_MINUTES, devMode: true, devCode: code },
+                });
+            }
+            return res.status(200).json({
+                success: true,
+                message: `A 6-digit verification code has been sent to your official Outlook inbox (${email}). Enter the code to activate your Coordinator account.`,
+                data: { expiresInMinutes: OTP_TTL_MINUTES },
+            });
+        }
+        catch (error) {
+            return fail(res, 500, 'INTERNAL_SERVER_ERROR', error?.message || 'Unexpected error');
+        }
+    });
+    /* ── Staff Self-Registration Step 2: Verify OTP & Create Account ──────── */
+    app.post('/api/v1/auth/signup/verify-otp', async (req, res) => {
+        try {
+            const email = String(req.body?.official_email || req.body?.email || '').trim().toLowerCase();
+            const otp = String(req.body?.otp ?? '').trim();
+            if (!email || !otp) {
+                return fail(res, 400, 'FIELDS_REQUIRED', 'Email and verification code are required.');
+            }
+            const pending = pendingSignups.get(email);
+            if (!pending) {
+                return fail(res, 400, 'NO_SIGNUP_PENDING', 'No pending registration found for this email. Please submit the sign-up form again.');
+            }
+            if (pending.expires_at.getTime() < Date.now()) {
+                pendingSignups.delete(email);
+                return fail(res, 400, 'OTP_EXPIRED', 'Verification code has expired. Please request a new code.');
+            }
+            pending.attempts += 1;
+            if (pending.attempts > OTP_MAX_ATTEMPTS) {
+                pendingSignups.delete(email);
+                return fail(res, 400, 'OTP_MAX_ATTEMPTS', 'Too many invalid attempts. Please sign up again.');
+            }
+            const match = await bcryptjs_1.default.compare(otp, pending.otp_hash);
+            if (!match) {
+                const remaining = Math.max(0, OTP_MAX_ATTEMPTS - pending.attempts);
+                return fail(res, 400, 'INVALID_OTP', `Invalid verification code. ${remaining} attempt(s) remaining.`);
+            }
+            // Check once more if user already exists
+            const existingUser = await User_1.User.findOne({
+                $or: [{ official_email: email }, { username: pending.username }],
+            });
+            if (existingUser) {
+                pendingSignups.delete(email);
+                return fail(res, 409, 'ACCOUNT_ALREADY_EXISTS', 'Account already exists. Please sign in.');
+            }
+            const { Role } = await Promise.resolve().then(() => __importStar(require('../models/Role')));
+            const roles = await Role.find({ role_code: { $in: [SELF_SIGNUP_ROLE] } });
+            const roleIds = roles.map((r) => r._id);
+            const user = await User_1.User.create({
+                full_name: pending.full_name,
+                username: pending.username,
+                official_email: pending.official_email,
+                password_hash: pending.password_hash,
+                role_codes: [SELF_SIGNUP_ROLE],
+                role_ids: roleIds,
+                primary_mobile: pending.primary_mobile,
                 account_status: 'active',
                 presence_status: 'available',
                 is_deleted: false,
             });
+            pendingSignups.delete(email);
+            setRefreshCookie(res, user);
             await (0, audit_1.writeAudit)({
                 action: 'CREATE',
                 result: 'SUCCESS',
                 entityType: 'users',
                 entityId: user._id,
                 performedBy: user._id,
-                performedByRole: role_codes[0] || 'COORDINATOR',
+                performedByRole: SELF_SIGNUP_ROLE,
                 performedByEmail: email,
                 module: 'Security & Audit',
                 severity: 'info',
-                summary: `Self-registered new account for ${name} (${email})`,
+                summary: `Self-registered Placement Coordinator account for ${user.full_name} (${email}) verified via Outlook OTP`,
                 req,
             });
             return res.status(201).json({
                 success: true,
-                message: `Account created successfully for ${name}. You can sign in now.`,
-                data: { user: publicUser(user) },
+                message: `Welcome to Infoziant iPOMS, ${user.full_name}! Your Placement Coordinator account is now active.`,
+                data: {
+                    token: signToken(user),
+                    user: publicUser(user),
+                },
+            });
+        }
+        catch (error) {
+            return fail(res, 500, 'INTERNAL_SERVER_ERROR', error?.message || 'Unexpected error');
+        }
+    });
+    /* ── Legacy / Combined Sign Up endpoint (routes to request-otp or verify-otp) ── */
+    app.post('/api/v1/auth/signup', async (req, res) => {
+        if (req.body?.otp) {
+            return app._router.handle({ ...req, url: '/api/v1/auth/signup/verify-otp' }, res);
+        }
+        // Otherwise route to request-otp
+        try {
+            const { full_name = '', username = '', official_email = '', primary_mobile = '', password = '', } = req.body;
+            const email = String(official_email).trim().toLowerCase();
+            const uname = String(username).trim().toLowerCase();
+            const name = String(full_name).trim();
+            if (!name || !uname || !email || !password) {
+                return fail(res, 400, 'FIELDS_REQUIRED', 'Please complete all required fields.');
+            }
+            if (!email.endsWith(`@${STAFF_DOMAIN}`)) {
+                return fail(res, 400, 'INVALID_DOMAIN', `Only @${STAFF_DOMAIN} email addresses are permitted.`);
+            }
+            if (!(0, passwordPolicy_1.isPasswordValid)(password)) {
+                return fail(res, 400, 'PASSWORD_POLICY', (0, passwordPolicy_1.firstPasswordError)(password) || 'Password does not meet the policy.');
+            }
+            const existingUser = await User_1.User.findOne({
+                $or: [{ official_email: email }, { username: uname }],
+            });
+            if (existingUser) {
+                const isSameEmail = existingUser.official_email.toLowerCase() === email;
+                return fail(res, 409, 'ACCOUNT_ALREADY_EXISTS', isSameEmail
+                    ? `An account with ${email} already exists. Please sign in or reset your password.`
+                    : `The username "${uname}" is already taken. Please choose a different username.`);
+            }
+            const salt = await bcryptjs_1.default.genSalt(12);
+            const password_hash = await bcryptjs_1.default.hash(password, salt);
+            const code = generateOtp();
+            const otp_hash = await bcryptjs_1.default.hash(code, 10);
+            const expires_at = new Date(Date.now() + OTP_TTL_MINUTES * 60_000);
+            pendingSignups.set(email, {
+                full_name: name,
+                username: uname,
+                official_email: email,
+                primary_mobile: String(primary_mobile).trim(),
+                password_hash,
+                otp_hash,
+                expires_at,
+                attempts: 0,
+            });
+            const delivery = await (0, mailer_1.sendOtpEmail)(email, name, code, OTP_TTL_MINUTES);
+            return res.status(200).json({
+                success: true,
+                requiresOtp: true,
+                message: `A 6-digit verification code has been sent to your Outlook inbox (${email}). Please verify to complete account creation.`,
+                data: { expiresInMinutes: OTP_TTL_MINUTES },
             });
         }
         catch (error) {
@@ -262,9 +402,7 @@ function registerAuthRoutes(app) {
             }
             // Already locked — send them straight to recovery.
             if (user.account_status === 'blocked') {
-                return fail(res, 423, 'ACCOUNT_LOCKED', isAdmin(user.role_codes)
-                    ? 'This administrator account is locked. It must be unlocked on the server.'
-                    : 'Your account is locked after repeated failed attempts. Verify by email to set a new password.', { requiresReset: !isAdmin(user.role_codes), adminLocked: isAdmin(user.role_codes) });
+                return fail(res, 423, 'ACCOUNT_LOCKED', 'Your account is locked after repeated failed attempts. Verify by email to set a new password.', { requiresReset: true });
             }
             if (user.account_status !== 'active') {
                 return fail(res, 403, 'ACCOUNT_INACTIVE', 'This account is not active. Contact your administrator.');
@@ -284,9 +422,7 @@ function registerAuthRoutes(app) {
                         performedByEmail: user.official_email, module: 'Security & Audit', severity: 'critical',
                         summary: `Account locked after ${MAX_FAILED_ATTEMPTS} consecutive failed sign-in attempts`, req,
                     });
-                    return fail(res, 423, 'ACCOUNT_LOCKED', isAdmin(user.role_codes)
-                        ? 'This administrator account is now locked. It must be unlocked on the server.'
-                        : 'Account locked after 3 failed attempts. Verify by email to set a new password.', { requiresReset: !isAdmin(user.role_codes), adminLocked: isAdmin(user.role_codes) });
+                    return fail(res, 423, 'ACCOUNT_LOCKED', 'Account locked after 3 failed attempts. Verify by email to set a new password.', { requiresReset: true });
                 }
                 await user.save();
                 await (0, audit_1.writeAudit)({
@@ -376,9 +512,6 @@ function registerAuthRoutes(app) {
             const user = await User_1.User.findOne({ official_email: email, is_deleted: false });
             if (!user)
                 return fail(res, 404, 'ACCOUNT_NOT_FOUND', 'No iPOMS account exists for this email address.');
-            if (isAdmin(user.role_codes)) {
-                return fail(res, 403, 'ADMIN_NO_OTP', 'Administrator accounts cannot be reset by email. Unlock it on the server instead.');
-            }
             const code = generateOtp();
             user.reset_otp_hash = await bcryptjs_1.default.hash(code, 10);
             user.reset_otp_expires_at = new Date(Date.now() + OTP_TTL_MINUTES * 60_000);

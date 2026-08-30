@@ -7,7 +7,6 @@ import {
   Settings,
   Monitor,
   Sun,
-  Megaphone,
   Wrench,
   ShieldCheck,
   Clock,
@@ -33,17 +32,6 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
   const [emailNotifs, setEmailNotifs] = useState(settingsData?.enable_email_notifications ?? true);
   const [systemNotifs, setSystemNotifs] = useState(settingsData?.enable_system_notifications ?? true);
   const [dashboardPopups, setDashboardPopups] = useState(settingsData?.enable_dashboard_popups ?? true);
-
-  // Structured Announcement State (Item #7)
-  const [announcementTitle, setAnnouncementTitle] = useState(settingsData?.announcement_title || '');
-  const [announcementMsg, setAnnouncementMsg] = useState(settingsData?.announcement_message || settingsData?.system_announcement_banner || '');
-  const [announcementStartDate, setAnnouncementStartDate] = useState(
-    settingsData?.announcement_start_date ? new Date(settingsData.announcement_start_date).toISOString().slice(0, 10) : ''
-  );
-  const [announcementEndDate, setAnnouncementEndDate] = useState(
-    settingsData?.announcement_end_date ? new Date(settingsData.announcement_end_date).toISOString().slice(0, 10) : ''
-  );
-  const [announcementPublished, setAnnouncementPublished] = useState(settingsData?.announcement_is_published ?? false);
 
   // Maintenance Mode State (Item #6)
   const [maintenanceEnabled, setMaintenanceEnabled] = useState(settingsData?.maintenance_mode_enabled ?? false);
@@ -71,16 +59,6 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
       setEmailNotifs(settingsData.enable_email_notifications ?? true);
       setSystemNotifs(settingsData.enable_system_notifications ?? true);
       setDashboardPopups(settingsData.enable_dashboard_popups ?? true);
-
-      setAnnouncementTitle(settingsData.announcement_title || '');
-      setAnnouncementMsg(settingsData.announcement_message || settingsData.system_announcement_banner || '');
-      setAnnouncementStartDate(
-        settingsData.announcement_start_date ? new Date(settingsData.announcement_start_date).toISOString().slice(0, 10) : ''
-      );
-      setAnnouncementEndDate(
-        settingsData.announcement_end_date ? new Date(settingsData.announcement_end_date).toISOString().slice(0, 10) : ''
-      );
-      setAnnouncementPublished(settingsData.announcement_is_published ?? false);
 
       setMaintenanceEnabled(settingsData.maintenance_mode_enabled ?? false);
       setMaintenanceReason(settingsData.maintenance_reason || '');
@@ -116,12 +94,6 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
       enable_email_notifications: emailNotifs,
       enable_system_notifications: systemNotifs,
       enable_dashboard_popups: dashboardPopups,
-      system_announcement_banner: announcementMsg.trim(),
-      announcement_title: announcementTitle.trim(),
-      announcement_message: announcementMsg.trim(),
-      announcement_start_date: announcementStartDate || null,
-      announcement_end_date: announcementEndDate || null,
-      announcement_is_published: announcementPublished,
       maintenance_mode_enabled: maintenanceEnabled,
       maintenance_affected_roles: affectedRoles,
       maintenance_reason: maintenanceReason.trim(),
@@ -132,90 +104,7 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 text-xs max-w-4xl mx-auto w-full">
-      {/* ── 1. Structured Organization Announcement Management (Module 10 §7) ── */}
-      <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-4">
-        <div className="border-b border-border pb-3 flex items-center justify-between flex-wrap gap-2">
-          <div>
-            <h3 className="text-xs font-bold text-fg flex items-center gap-2">
-              <Megaphone size={15} className="text-primary" /> Organization Announcement Broadcaster
-            </h3>
-            <p className="text-micro text-fg-subtle mt-0.5">
-              Publish timed global announcement banners to coordinators and team leaders
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                announcementPublished
-                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
-                  : 'bg-surface-sunken text-fg-subtle border-border'
-              }`}
-            >
-              {announcementPublished ? 'Live on Dashboards' : 'Draft / Inactive'}
-            </span>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <div>
-            <label className="block text-fg-muted font-semibold mb-1">Announcement Title</label>
-            <input
-              type="text"
-              placeholder="e.g. End-of-Week Placement Drive Notice"
-              value={announcementTitle}
-              onChange={(e) => setAnnouncementTitle(e.target.value)}
-              className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-fg text-xs focus:border-primary focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-fg-muted font-semibold mb-1">Announcement Message Body</label>
-            <textarea
-              rows={2}
-              placeholder="Enter message to broadcast across all coordinator and team leader screens…"
-              value={announcementMsg}
-              onChange={(e) => setAnnouncementMsg(e.target.value)}
-              className="w-full bg-surface-sunken border border-border rounded-lg p-3 text-fg text-xs focus:border-primary focus:outline-none"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center pt-1">
-            <div>
-              <label className="block text-fg-muted font-semibold mb-1">Start Date</label>
-              <input
-                type="date"
-                value={announcementStartDate}
-                onChange={(e) => setAnnouncementStartDate(e.target.value)}
-                className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-1.5 text-fg text-xs font-mono"
-              />
-            </div>
-
-            <div>
-              <label className="block text-fg-muted font-semibold mb-1">End Date</label>
-              <input
-                type="date"
-                value={announcementEndDate}
-                onChange={(e) => setAnnouncementEndDate(e.target.value)}
-                className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-1.5 text-fg text-xs font-mono"
-              />
-            </div>
-
-            <div className="pt-4">
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={announcementPublished}
-                  onChange={(e) => setAnnouncementPublished(e.target.checked)}
-                  className="rounded bg-surface border-border-strong text-primary "
-                />
-                <span className="text-fg font-bold">Publish to All Portals</span>
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── 2. Maintenance Mode Controller (Module 10 §6) ── */}
+      {/* ── 1. Maintenance Mode Controller (Module 10 §6) ── */}
       <div className={`glass-panel rounded-2xl border p-6 space-y-4 shadow-4 transition-colors ${maintenanceEnabled ? 'border-amber-500/40 bg-amber-500/5' : 'border-border'}`}>
         <div className="border-b border-border pb-3 flex items-center justify-between flex-wrap gap-2">
           <div>

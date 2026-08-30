@@ -7,6 +7,7 @@ import { User } from '../models/User';
 import { writeAudit } from './audit';
 import { sendOtpEmail } from './mailer';
 import { isPasswordValid, firstPasswordError } from './passwordPolicy';
+import { JWT_ACCESS_SECRET } from './authMiddleware';
 
 /**
  * Authentication routes: sign-in, lockout, OTP reset.
@@ -31,8 +32,13 @@ import { isPasswordValid, firstPasswordError } from './passwordPolicy';
  *    usable code.
  */
 
-const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'ipoms_dev_access_secret_super_secure_key_2026';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'ipoms_dev_refresh_secret_super_secure_key_2026';
+// No fallback secret — see authMiddleware.ts for why. JWT_ACCESS_SECRET is
+// imported from there so both files share one source of truth and one
+// fail-fast check instead of two independently-drifting copies.
+if (!process.env.JWT_REFRESH_SECRET) {
+  throw new Error('JWT_REFRESH_SECRET environment variable is required — set it in backend/.env');
+}
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 
 /** Consecutive failures allowed. The next failure locks the account. */
 const MAX_FAILED_ATTEMPTS = 3;

@@ -13,12 +13,6 @@ export interface ISystemSettings extends Document {
   enable_email_notifications: boolean;
   enable_system_notifications: boolean;
   enable_dashboard_popups: boolean;
-  system_announcement_banner?: string;
-  announcement_title?: string;
-  announcement_message?: string;
-  announcement_start_date?: Date | null;
-  announcement_end_date?: Date | null;
-  announcement_is_published?: boolean;
   maintenance_mode_enabled: boolean;
   maintenance_affected_roles: string[];
   maintenance_reason: string;
@@ -84,33 +78,6 @@ const SystemSettingsSchema: Schema<ISystemSettings> = new Schema(
     enable_dashboard_popups: {
       type: Boolean,
       default: true,
-    },
-    system_announcement_banner: {
-      type: String,
-      default: '',
-      trim: true,
-    },
-    announcement_title: {
-      type: String,
-      default: '',
-      trim: true,
-    },
-    announcement_message: {
-      type: String,
-      default: '',
-      trim: true,
-    },
-    announcement_start_date: {
-      type: Date,
-      default: null,
-    },
-    announcement_end_date: {
-      type: Date,
-      default: null,
-    },
-    announcement_is_published: {
-      type: Boolean,
-      default: false,
     },
     // ── Maintenance Mode (Module 10 §8) ──────────────────────────────────
     // Administrator only stayed excluded on purpose: it must always be
