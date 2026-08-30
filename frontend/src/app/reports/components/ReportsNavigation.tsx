@@ -16,9 +16,6 @@ export function ReportsNavigation() {
             <h1 className="text-lg font-bold text-fg tracking-tight">
               Report Builder
             </h1>
-            <p className="text-xs text-fg-subtle mt-0.5 font-medium">
-              Configure parameters, select templates, and generate interactive document reports
-            </p>
           </div>
         </div>
 

@@ -118,15 +118,15 @@ export function MetadataHeader({
       {/* ── Bottom Controls Row: Search, Type Filter, S.No Range, Actions ─────────── */}
       <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t border-border/40">
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Starts-With Live Search */}
-          <div className="relative">
-            <Search size={14} strokeWidth={2} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
+          {/* Starts-With Live Search (High Visibility with Crisp Outline & Light Placeholder) */}
+          <div className="relative w-52 sm:w-60 shrink-0">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-300 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Type company (e.g. ACC) or phone…"
-              className="bg-surface-sunken border border-border rounded-xl pl-8 pr-3 py-1.5 text-xs text-fg placeholder:text-fg-disabled outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 w-52 sm:w-60 transition-colors"
+              className="w-full h-8 pl-8 pr-3 bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-300 dark:border-zinc-700/90 hover:border-zinc-400 dark:hover:border-zinc-500 text-zinc-900 dark:text-zinc-100 text-xs rounded-xl shadow-xs placeholder:text-zinc-500 dark:placeholder:text-zinc-300/80 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium"
             />
           </div>
 

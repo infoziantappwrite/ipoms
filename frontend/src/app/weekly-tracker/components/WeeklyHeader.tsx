@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, Plus, RefreshCw, FileSpreadsheet, Trash2 } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Plus, RefreshCw, FileSpreadsheet, Trash2, Search } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { CollegeSelector, College } from '@/components/CollegeSelector';
 import { SmoothExportDropdown } from '@/components/ui/SmoothExportDropdown';
@@ -29,47 +29,73 @@ interface Props {
   isDeleting?: boolean;
 }
 
-// Friday-to-Thursday week display, mirroring the backend's own week boundary
-// (getFridayWeekBounds() in server.ts) so the label always matches what
-// /weekly-tracker actually filters by for this offset. The previous version
-// computed calendar weeks (1st-7th, 8th-14th, ...) — a different boundary
-// than the Friday-Thursday weeks every row is actually stored against, so
-// the label never matched the real data even after the data itself is
-// correctly filtered.
+/**
+ * Month-based Weekly Period System:
+ * - Every month is divided into 4 sequential operational weeks:
+ *   • Week 1: 1st to 7th (7 days)
+ *   • Week 2: 8th to 14th (7 days)
+ *   • Week 3: 15th to 21st (7 days)
+ *   • Week 4: 22nd to the last day of that month (28th, 29th, 30th, or 31st)
+ * - Week periods NEVER cross month boundaries.
+ * - The new month (e.g. September) always starts fresh with Week 1 (1 Sept – 7 Sept).
+ */
 function formatWeekDisplay(offset: number) {
-  const targetDate = new Date();
-  targetDate.setDate(targetDate.getDate() + offset * 7);
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-11
+  const currentDate = now.getDate();
 
-  const day = targetDate.getDay(); // 0=Sun ... 5=Fri, 6=Sat
-  const diffToFriday = day >= 5 ? day - 5 : day + 2;
-  const startFriday = new Date(targetDate);
-  startFriday.setDate(targetDate.getDate() - diffToFriday);
+  // Determine current week in month (1-4)
+  const currentWeekInMonth =
+    currentDate <= 7 ? 1 : currentDate <= 14 ? 2 : currentDate <= 21 ? 3 : 4;
 
-  const endThursday = new Date(startFriday);
-  endThursday.setDate(startFriday.getDate() + 6);
+  // Absolute 0-indexed week across all time: (year * 12 + month) * 4 + (week - 1)
+  const currentAbsoluteWeek =
+    (currentYear * 12 + currentMonth) * 4 + (currentWeekInMonth - 1);
+  const targetAbsoluteWeek = currentAbsoluteWeek + offset;
 
-  const startOfYear = new Date(startFriday.getFullYear(), 0, 1);
-  const pastDaysOfYear = (startFriday.getTime() - startOfYear.getTime()) / 86400000;
-  const weekNumber = Math.ceil((pastDaysOfYear + startOfYear.getDay() + 1) / 7);
+  const targetMonthTotal = Math.floor(targetAbsoluteWeek / 4);
+  const targetWeekNumber = ((targetAbsoluteWeek % 4) + 4) % 4 + 1; // 1, 2, 3, 4
+  const targetYear = Math.floor(targetMonthTotal / 12);
+  const targetMonth = ((targetMonthTotal % 12) + 12) % 12;
 
-  const startDay = startFriday.getDate();
-  const endDay = endThursday.getDate();
-  const monthName = startFriday.toLocaleDateString('en-IN', { month: 'long' });
-  const startMonthShort = startFriday.toLocaleDateString('en-IN', { month: 'short' });
-  const endMonthShort = endThursday.toLocaleDateString('en-IN', { month: 'short' });
-  const year = startFriday.getFullYear();
+  // Calculate days for the target week
+  const lastDayOfMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
 
-  const rangeStr =
-    startFriday.getMonth() === endThursday.getMonth()
-      ? `${startDay} – ${endDay} ${endMonthShort} ${year}`
-      : `${startDay} ${startMonthShort} – ${endDay} ${endMonthShort} ${year}`;
+  let startDay = 1;
+  let endDay = 7;
+  if (targetWeekNumber === 1) {
+    startDay = 1;
+    endDay = 7;
+  } else if (targetWeekNumber === 2) {
+    startDay = 8;
+    endDay = 14;
+  } else if (targetWeekNumber === 3) {
+    startDay = 15;
+    endDay = 21;
+  } else {
+    // Week 4 runs from 22nd to the last day of the month (28th, 29th, 30th, or 31st)
+    startDay = 22;
+    endDay = lastDayOfMonth;
+  }
+
+  const startDateObj = new Date(targetYear, targetMonth, startDay);
+  const endDateObj = new Date(targetYear, targetMonth, endDay);
+
+  const monthName = startDateObj.toLocaleDateString('en-IN', { month: 'long' });
+  const monthShort = startDateObj.toLocaleDateString('en-IN', { month: 'short' });
+  const year = targetYear;
+
+  const rangeStr = `${startDay} ${monthShort} – ${endDay} ${monthShort} ${year}`;
 
   return {
-    monthlyWeekNumber: weekNumber,
+    monthlyWeekNumber: targetWeekNumber,
     monthName,
     year,
     rangeStr,
     isCurrent: offset === 0,
+    startDate: startDateObj,
+    endDate: endDateObj,
   };
 }
 
@@ -220,31 +246,34 @@ export function WeeklyHeader({
         {/* ── Search Bar & Icon Action Buttons (Search Left, Icons Right) ── */}
         {selectedCollegeId && (
           <div className="flex items-center gap-2 shrink-0 flex-wrap">
-            {/* Search Input on the Left */}
+            {/* Search Input on the Left (High Visibility with Crisp Outline & Light Placeholder) */}
             {onSearchChange && (
-              <div className="w-44 sm:w-52">
+              <div className="relative w-48 sm:w-56 shrink-0">
+                <Search
+                  size={13}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-300 pointer-events-none"
+                />
                 <input
                   type="text"
                   placeholder="Search company, role…"
                   value={searchQuery || ''}
                   onChange={(e) => onSearchChange(e.target.value)}
-                  className="w-full h-8 bg-surface-sunken border border-border text-fg text-xs px-3 rounded-xl shadow-2xs placeholder:text-fg-disabled outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+                  className="w-full h-8 pl-8 pr-3 bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-300 dark:border-zinc-700/90 hover:border-zinc-400 dark:hover:border-zinc-500 text-zinc-900 dark:text-zinc-100 text-xs rounded-xl shadow-xs placeholder:text-zinc-500 dark:placeholder:text-zinc-300/80 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium"
                 />
               </div>
             )}
 
-            {/* Action Buttons on the Right */}
+            {/* Action Buttons on the Right (Only Icons for Add, Sync, Export, Delete) */}
             <div className="flex items-center gap-1.5 shrink-0">
               {onOpenAddModal && (
                 <button
                   type="button"
                   onClick={onOpenAddModal}
-                  className="h-8 px-2.5 bg-[#1e3a8a] hover:bg-[#172554] text-white rounded-lg flex items-center gap-1.5 text-[11px] font-bold shadow-xs transition-colors cursor-pointer shrink-0"
-                  title="Add Company"
+                  className="w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center justify-center shadow-xs transition-all cursor-pointer shrink-0 active:scale-95"
+                  title="Add Company / Entry"
                   aria-label="Add Company"
                 >
-                  <Plus size={13} strokeWidth={2.5} />
-                  <span>Add</span>
+                  <Plus size={16} strokeWidth={2.5} />
                 </button>
               )}
 
@@ -252,12 +281,11 @@ export function WeeklyHeader({
                 <button
                   type="button"
                   onClick={onSyncDailyPositives}
-                  className="h-8 px-2.5 bg-[#4f46e5] hover:bg-[#4338ca] text-white rounded-lg flex items-center gap-1.5 text-[11px] font-bold shadow-xs transition-colors cursor-pointer shrink-0"
+                  className="w-8 h-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl flex items-center justify-center shadow-xs transition-all cursor-pointer shrink-0 active:scale-95"
                   title="Sync Daily Tracker Positives"
                   aria-label="Sync"
                 >
-                  <RefreshCw size={13} strokeWidth={2.5} />
-                  <span>Sync</span>
+                  <RefreshCw size={15} strokeWidth={2.2} />
                 </button>
               )}
 
@@ -267,6 +295,8 @@ export function WeeklyHeader({
                   onExportPdf={onExportPdf}
                   onExportImage={onExportImage}
                   isExporting={isExporting}
+                  iconOnly={true}
+                  className="!w-8 !h-8 !rounded-xl !bg-emerald-600 hover:!bg-emerald-700 !shadow-xs"
                 />
               )}
 
@@ -276,12 +306,11 @@ export function WeeklyHeader({
                   <button
                     type="button"
                     onClick={onToggleDeleteMode}
-                    className="h-8 px-2.5 bg-[#be123c] hover:bg-[#9f1239] text-white rounded-lg flex items-center gap-1.5 text-[11px] font-bold shadow-xs transition-colors cursor-pointer shrink-0"
+                    className="w-8 h-8 bg-rose-600 hover:bg-rose-700 text-white rounded-xl flex items-center justify-center shadow-xs transition-all cursor-pointer shrink-0 active:scale-95"
                     title="Delete Rows"
                     aria-label="Delete Rows"
                   >
-                    <Trash2 size={13} strokeWidth={2.5} />
-                    <span>Delete</span>
+                    <Trash2 size={15} strokeWidth={2.2} />
                   </button>
                 ) : (
                   <div className="flex items-center gap-1.5 shrink-0">
@@ -289,19 +318,19 @@ export function WeeklyHeader({
                       type="button"
                       disabled={(selectedCount || 0) === 0 || isDeleting}
                       onClick={onExecuteBulkDelete}
-                      className="h-8 px-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-lg flex items-center gap-1.5 text-[11px] font-bold shadow-xs transition-all cursor-pointer shrink-0 animate-pulse"
+                      className="h-8 px-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-xl flex items-center gap-1.5 text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0 animate-pulse"
                       title="Confirm Delete Selected Rows"
                     >
                       <Trash2 size={13} strokeWidth={2.5} />
-                      <span>{isDeleting ? 'Deleting…' : `Delete Selected (${selectedCount || 0})`}</span>
+                      <span>Delete ({selectedCount || 0})</span>
                     </button>
                     <button
                       type="button"
                       onClick={onToggleDeleteMode}
-                      className="h-8 px-2.5 bg-surface-sunken hover:bg-surface-raised border border-border text-fg rounded-lg flex items-center gap-1 text-[11px] font-semibold transition-colors cursor-pointer shrink-0"
+                      className="h-8 px-2.5 bg-surface-sunken hover:bg-surface-raised border border-border text-fg rounded-xl flex items-center text-xs font-semibold transition-colors cursor-pointer shrink-0"
                       title="Cancel Delete Mode"
                     >
-                      <span>Cancel</span>
+                      Cancel
                     </button>
                   </div>
                 )

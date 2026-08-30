@@ -219,9 +219,9 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                 </p>
               </div>
 
-              {/* Right: Target College Logo */}
-              <div className="flex items-center shrink-0 justify-end">
-                {!isConsolidated && !logoFailed ? (
+              {/* Right: Target College Logo (Hidden for Active Leads) */}
+              <div className="flex items-center shrink-0 justify-end min-w-[100px]">
+                {report.template_type === 'active_leads' ? null : !isConsolidated && !logoFailed ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     key={collegeLogoUrl}
@@ -241,7 +241,7 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
 
             {/* 2. Report Metadata Ribbon */}
             <div className="flex items-center justify-center flex-wrap gap-4 sm:gap-8 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 font-medium text-center">
-              {report.template_type !== 'pending_tasks' && (
+              {report.template_type === 'weekly_placement' && (
                 <>
                   <div className="flex items-center gap-1.5">
                     <Calendar size={13} className="text-blue-700 shrink-0" />
@@ -263,7 +263,6 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                 const alCards = [
                   { key: 'total_leads', label: 'Total Active Leads', val: report.kpi_summary.total_leads || 0, bg: 'bg-slate-50 border-blue-200', text: 'text-blue-900', labelText: 'text-slate-500' },
                   { key: 'graduating_year', label: 'Graduating Batch', val: report.kpi_summary.graduating_year || '2027', bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700', labelText: 'text-emerald-800' },
-                  { key: 'active_companies_count', label: 'Corporate Partners', val: report.kpi_summary.active_companies_count || 0, bg: 'bg-amber-50 border-amber-200', text: 'text-amber-700', labelText: 'text-amber-800' },
                 ].filter((c) => activeKpis[c.key] !== false);
 
                 if (alCards.length === 0) return null;
@@ -583,58 +582,64 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
             )}
 
             {/* Section: Placement Pending Tasks */}
-            {report.included_sections?.pending_tasks && report.sections?.pending_tasks && (
-              <div className="space-y-1.5">
-                <div className="px-3 py-1 rounded-md bg-indigo-50 border border-indigo-200 font-bold text-[11px] flex items-center justify-between text-indigo-900">
-                  <span className="flex items-center gap-1.5">
-                    <ListTodo size={13} className="text-indigo-700" /> PLACEMENT PENDING TASKS
-                  </span>
-                  <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded border border-indigo-200 text-indigo-700 font-bold">
-                    {report.sections.pending_tasks.length} Tasks
-                  </span>
-                </div>
+            {report.included_sections?.pending_tasks && report.sections?.pending_tasks && (() => {
+              const hasDriveDate = report.sections.pending_tasks.some(
+                (r: any) => r.drive_date && String(r.drive_date).trim() !== '' && String(r.drive_date).trim() !== '—' && String(r.drive_date).trim() !== '-'
+              );
 
-                {report.sections.pending_tasks.length === 0 ? (
-                  <p className="text-[11px] text-slate-400 italic py-1 pl-2">No pending tasks recorded for this period.</p>
-                ) : (
-                  <table className="w-full text-[10px] text-center border-collapse border border-slate-200">
-                    <thead>
-                      <tr className="bg-slate-100 text-slate-700 font-semibold text-[9px] uppercase border-b border-slate-200">
-                        <th className="py-1.5 px-1.5 w-6 text-center border-r border-slate-200">#</th>
-                        <th className="py-1.5 px-2 text-center border-r border-slate-200">Company Name</th>
-                        <th className="py-1.5 px-2 text-center border-r border-slate-200">JD Date</th>
-                        <th className="py-1.5 px-2 text-center border-r border-slate-200">DB Date</th>
-                        <th className="py-1.5 px-2 text-center border-r border-slate-200">Current Status</th>
-                        <th className="py-1.5 px-2 text-center border-r border-slate-200">Remarks / Next Action</th>
-                        <th className="py-1.5 px-2 text-center border-r border-slate-200">Drive Date</th>
-                        <th className="py-1.5 px-2 text-center">Remarks</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 text-center">
-                      {report.sections.pending_tasks.map((r: any, idx: number) => (
-                        <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
-                          <td className="py-1.5 px-1.5 text-center text-slate-500 font-mono border-r border-slate-200">{r.s_no}</td>
-                          <td className="py-1.5 px-2 text-center font-bold text-slate-900 border-r border-slate-200">{r.company_name}</td>
-                          <td className="py-1.5 px-2 text-center text-slate-600 border-r border-slate-200">{r.jd_received_date || '—'}</td>
-                          <td className="py-1.5 px-2 text-center text-slate-600 border-r border-slate-200">{r.db_shared_date || '—'}</td>
-                          <td className="py-1.5 px-2 text-center text-slate-700 border-r border-slate-200">{r.current_status || '—'}</td>
-                          <td className="py-1.5 px-2 text-center text-slate-900 font-medium border-r border-slate-200">{r.action_to_be_taken || '—'}</td>
-                          <td className="py-1.5 px-2 text-center text-indigo-700 font-semibold border-r border-slate-200">{r.drive_date || '—'}</td>
-                          <td className="py-1.5 px-2 text-center text-slate-500">{r.remarks || '—'}</td>
+              return (
+                <div className="space-y-1.5">
+                  <div className="px-3 py-1 rounded-md bg-indigo-50 border border-indigo-200 font-bold text-[11px] flex items-center justify-between text-indigo-900">
+                    <span className="flex items-center gap-1.5">
+                      <ListTodo size={13} className="text-indigo-700" /> PLACEMENT PENDING TASKS
+                    </span>
+                    <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded border border-indigo-200 text-indigo-700 font-bold">
+                      {report.sections.pending_tasks.length} Tasks
+                    </span>
+                  </div>
+
+                  {report.sections.pending_tasks.length === 0 ? (
+                    <p className="text-[11px] text-slate-400 italic py-1 pl-2">No pending tasks recorded for this period.</p>
+                  ) : (
+                    <table className="w-full text-[10px] text-center border-collapse border border-slate-200">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-700 font-semibold text-[9px] uppercase border-b border-slate-200">
+                          <th className="py-1.5 px-1.5 w-6 text-center border-r border-slate-200">#</th>
+                          <th className="py-1.5 px-2 text-center border-r border-slate-200">Company Name</th>
+                          <th className="py-1.5 px-2 text-center border-r border-slate-200">JD Date</th>
+                          <th className="py-1.5 px-2 text-center border-r border-slate-200">DB Date</th>
+                          <th className="py-1.5 px-2 text-center border-r border-slate-200">Current Status</th>
+                          <th className="py-1.5 px-2 text-center border-r border-slate-200">Remarks / Next Action</th>
+                          {hasDriveDate && <th className="py-1.5 px-2 text-center">Drive Date</th>}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 text-center">
+                        {report.sections.pending_tasks.map((r: any, idx: number) => (
+                          <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                            <td className="py-1.5 px-1.5 text-center text-slate-500 font-mono border-r border-slate-200">{r.s_no}</td>
+                            <td className="py-1.5 px-2 text-center font-bold text-slate-900 border-r border-slate-200">{r.company_name}</td>
+                            <td className="py-1.5 px-2 text-center text-slate-600 border-r border-slate-200">{r.jd_received_date || '—'}</td>
+                            <td className="py-1.5 px-2 text-center text-slate-600 border-r border-slate-200">{r.db_shared_date || '—'}</td>
+                            <td className="py-1.5 px-2 text-center text-slate-700 border-r border-slate-200">{r.current_status || '—'}</td>
+                            <td className="py-1.5 px-2 text-center text-slate-900 font-medium border-r border-slate-200">{r.action_to_be_taken || '—'}</td>
+                            {hasDriveDate && (
+                              <td className="py-1.5 px-2 text-center text-indigo-700 font-semibold">{r.drive_date || '—'}</td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Section: Active Corporate Leads */}
             {report.included_sections?.active_leads && report.sections?.active_leads && (
               <div className="space-y-1.5">
                 <div className="px-3 py-1 rounded-md bg-emerald-50 border border-emerald-200 font-bold text-[11px] flex items-center justify-between text-emerald-900">
                   <span className="flex items-center gap-1.5">
-                    <TrendingUp size={13} className="text-emerald-700" /> ACTIVE CORPORATE LEADS
+                    <TrendingUp size={13} className="text-emerald-700" /> ACTIVE CORPORATE LEADS — {String(report.kpi_summary?.graduating_year || report.academic_year || '2027').toUpperCase()}
                   </span>
                   <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded border border-emerald-200 text-emerald-700 font-bold">
                     {report.sections.active_leads.length} Leads
@@ -642,28 +647,24 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                 </div>
 
                 {report.sections.active_leads.length === 0 ? (
-                  <p className="text-[11px] text-slate-400 italic py-1 pl-2">No active leads recorded.</p>
+                  <p className="text-[11px] text-slate-400 italic py-1 pl-2">No active leads recorded for this graduating batch.</p>
                 ) : (
                   <table className="w-full text-[11px] text-center border-collapse border border-slate-200">
-                    <thead>
+                    <thead className="print:table-header-group">
                       <tr className="bg-slate-100 text-slate-700 font-semibold text-[10px] uppercase border-b border-slate-200">
                         <th className="py-1.5 px-2 w-8 text-center border-r border-slate-200">#</th>
-                        <th className="py-1.5 px-2.5 text-center border-r border-slate-200">Company Name</th>
-                        <th className="py-1.5 px-2.5 text-center border-r border-slate-200">Role(s)</th>
-                        <th className="py-1.5 px-2 text-center border-r border-slate-200">CTC</th>
-                        <th className="py-1.5 px-2 text-center border-r border-slate-200">Fall of Month</th>
-                        <th className="py-1.5 px-2 text-center">Graduating Batch</th>
+                        <th className="py-1.5 px-3 text-center border-r border-slate-200">Company Name</th>
+                        <th className="py-1.5 px-3 text-center border-r border-slate-200">Role</th>
+                        <th className="py-1.5 px-3 text-center">CTC</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 text-center">
                       {report.sections.active_leads.map((r: any, idx: number) => (
-                        <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                        <tr key={idx} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} avoid-break`}>
                           <td className="py-1.5 px-2 text-center text-slate-500 font-mono border-r border-slate-200">{r.s_no}</td>
-                          <td className="py-1.5 px-2.5 text-center font-bold text-slate-900 border-r border-slate-200">{r.company_name}</td>
-                          <td className="py-1.5 px-2.5 text-center text-slate-700 border-r border-slate-200">{r.role || '—'}</td>
-                          <td className="py-1.5 px-2 text-center text-emerald-700 font-semibold border-r border-slate-200">{r.ctc || '—'}</td>
-                          <td className="py-1.5 px-2 text-center text-slate-600 border-r border-slate-200">{r.followup_month || '—'}</td>
-                          <td className="py-1.5 px-2 text-center text-slate-600">{r.academic_year || '2027'}</td>
+                          <td className="py-1.5 px-3 text-center font-bold text-slate-900 border-r border-slate-200">{r.company_name}</td>
+                          <td className="py-1.5 px-3 text-center text-slate-700 border-r border-slate-200">{r.role || '—'}</td>
+                          <td className="py-1.5 px-3 text-center text-emerald-700 font-semibold">{r.ctc || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -676,7 +677,8 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
             {report.included_sections?.remarks && report.remarks && (
               <div className="space-y-1 pt-1">
                 <div className="font-bold text-[11px] text-slate-800 flex items-center gap-1.5">
-                  <PenLine size={13} className="text-slate-600" /> Coordinator Remarks & Observations
+                  <PenLine size={13} className="text-slate-600" />
+                  <span>{report.template_type === 'active_leads' ? 'Notes' : 'Coordinator Remarks & Observations'}</span>
                 </div>
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-800 leading-relaxed">
                   {report.remarks}

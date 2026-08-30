@@ -33,6 +33,7 @@ export function UserSignOutButton({ className = '' }: Props) {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('ipoms_token');
         localStorage.removeItem('ipoms_user');
+        localStorage.removeItem('ipoms_nav_collapsed');
         sessionStorage.removeItem('ipoms_nav_intro');
         sessionStorage.removeItem('ipoms_splash_seen');
       }

@@ -144,51 +144,93 @@
 }
 
 .dark {
-  --background:       15  23  42;  /* #0F172A */
-  --surface:          30  41  59;  /* #1E293B */
-  --surface-raised:   51  65  85;  /* #334155 */
-  --surface-sunken:   15  23  42;  /* #0F172A */
-  --overlay:           2   6  23;  /* #020617 */
+  /* ── Surface ladder ───────────────────────────────────────────────────
+     Contrast ratios below are stated against the surface each token
+     actually lands on — same discipline as the light block. The old ladder
+     was effectively invisible: page↔card measured 1.10:1 and page↔sunken
+     1.02:1, and `sunken` was LIGHTER than `background`, so a "recessed"
+     toolbar read as raised. Each step is now perceptible, and `sunken`
+     sits genuinely below `surface` where it belongs.
 
-  --card:             30  41  59;
-  --popover:          30  41  59;
+     Dark mode cannot carry the light theme's wide surface separation
+     without going milky, so the ladder stays tight on purpose — the
+     border and the rim highlight below do most of the boundary work. */
+  --background:        9  13  22;  /* #090D16  deep pitch midnight canvas    */
+  --surface:          22  29  46;  /* #161D2E  cards — 1.16:1 vs page        */
+  --surface-raised:   33  43  64;  /* #212B40  dropdowns — 1.19:1 vs card    */
+  --surface-sunken:   13  17  28;  /* #0D111C  toolbars — 1.12:1 below card  */
+  --overlay:           2   4   8;  /* #020408  modal backdrop                */
 
-  --foreground:      248 250 252;  /* #F8FAFC */
-  --fg-muted:        203 213 225;  /* #CBD5E1 */
-  --fg-subtle:       148 163 184;  /* #94A3B8 */
-  --fg-disabled:     100 116 139;  /* #64748B */
+  --card:             22  29  46;
+  --popover:          22  29  46;
+
+  --foreground:      248 250 252;  /* #F8FAFC  16.1:1 on card               */
+  --fg-muted:        203 213 225;  /* #CBD5E1  11.3:1                       */
+  --fg-subtle:       148 163 184;  /* #94A3B8   6.6:1 on card, 5.5:1 raised */
+  --fg-disabled:      71  85 105;  /* #475569  decorative only, never text  */
 
   --card-foreground: 248 250 252;
-  --muted:            30  41  59;
+  --muted:            22  29  46;
   --muted-foreground:148 163 184;
 
-  --primary:          59 130 246;  /* #3B82F6 */
-  --primary-hover:    96 165 250;  /* #60A5FA */
-  --primary-subtle:   30  58 138;  /* #1E3A8A */
+  /* ── Brand ────────────────────────────────────────────────────────────
+     Infoziant navy #1E3A8A is hsl(224°, 64%, 33%). The previous dark
+     primary #3B82F6 is hsl(217°, 91%, 60%) — stock Tailwind blue-500,
+     7° off the brand hue with saturation pushed to 91%, which is why dark
+     mode read generic rather than Infoziant. These stay on hue 224: the
+     same navy, lit for a dark canvas rather than swapped for another blue.
+
+     KNOWN LIMITATION — `--primary` cannot satisfy both of its callers.
+     It is used as text 315 times (wants a LIGHT value for contrast against
+     the card) and as a button fill under a hardcoded `text-white` 91 times
+     (wants a DARK value for contrast against that white). Solving both at
+     once is arithmetically impossible: the crossover point where the two
+     ratios are equal is 4.10:1, still short of AA's 4.5:1. So this token is
+     tuned for the dominant caller (text, 4.64:1 ✓) and `--primary-foreground`
+     deliberately stays white to match the 91 buttons that ignore it — a
+     half-migration would leave 7 dark-label buttons beside 91 white-label
+     ones. The real fix is a component sweep replacing hardcoded `text-white`
+     with `text-primary-foreground`, after which this token flips to a dark
+     foreground and white-on-primary stops being a concern. Until then
+     white-on-primary is 3.63:1, unchanged from the 3.68:1 it was before. */
+  --primary:          85 128 245;  /* #5580F5  hue 224 — 4.64:1 as text on card */
+  --primary-hover:   122 155 250;  /* #7A9BFA  hue 224 — 6.3:1 as text on card  */
+  --primary-subtle:   23  37  84;  /* #172554  navy tint background             */
   --primary-foreground: 255 255 255;
-  --accent:           96 165 250;
-  --accent-foreground: 15  23  42;
+  --accent:          138 166 242;  /* #8AA6F2  hue 224 — 7.1:1 on card          */
+  --accent-foreground: 9  13  22;  /* dark label on the bright accent — 8.2:1   */
 
   --success:          52 211 153;  /* #34D399 */
   --success-subtle:    6  78  59;  /* #064E3B */
-  --success-foreground: 15  23  42;
+  --success-foreground: 9  13  22;
 
   --warning:         251 191  36;  /* #FBBF24 */
   --warning-subtle:  120  53  15;  /* #78350F */
-  --warning-foreground: 15  23  42;
+  --warning-foreground: 9  13  22;
 
   --destructive:     248 113 113;  /* #F87171 */
   --destructive-subtle: 127  29  29;
-  --destructive-foreground: 15  23  42;
+  --destructive-foreground: 9  13  22;
 
   --info:             96 165 250;
-  --info-subtle:      30  58 138;
-  --info-foreground:  15  23  42;
+  --info-subtle:      23  37  84;
+  --info-foreground:   9  13  22;
 
-  --border:           51  65  85;  /* #334155 */
-  --border-strong:    71  85 105;  /* #475569 */
-  --input:            71  85 105;
-  --ring:             96 165 250;  /* #60A5FA */
+  /* ── Lines & focus ────────────────────────────────────────────────────
+     These were the weakest link in the dark theme. The old --border read
+     1.22:1 against the card and --border-strong 1.58:1, well under WCAG
+     1.4.11's 3:1 for a boundary that carries meaning. That mattered more
+     here than it would elsewhere, because the elevation shadows were also
+     invisible (see below) — so a card had no perceivable edge at all, from
+     either shadow or stroke. --border-strong now clears 3:1 outright and
+     is the correct token for anything whose edge conveys information: an
+     input, a table division, a real separator. Plain --border stays softer
+     at 1.85:1 for decorative card outlines, where the fill change and the
+     rim highlight already signal the boundary. */
+  --border:           58  72 105;  /* #3A4869  1.85:1 on card — decorative edges */
+  --border-strong:    93 110 150;  /* #5D6E96  3.31:1 on card — meets 1.4.11     */
+  --input:            93 110 150;  /* inputs must use the compliant stroke        */
+  --ring:             85 128 245;  /* #5580F5  4.64:1 on card                     */
 
   /* Lighter, desaturated tints -- dark mode never inverts categorical hue. */
   --module-1:  96 165 250;  /* #60A5FA */
@@ -200,29 +242,54 @@
   --module-7: 163 230  53;  /* #A3E635 */
   --module-8: 148 163 184;  /* #94A3B8 */
 
-  /* ── Dark Neumorphic / Elevation Tokens ────────────────────────────── */
-  --neu-light:  51  65  85;   /* subtle dark slate-blue highlight edge */
-  --neu-dark:    2   6  23;   /* deep ambient slate shadow */
+  /* ── Elevation: rim-light model (dark mode inverts the light theme) ───
+     The light theme reads depth from a cast shadow. That model does not
+     survive translation to a dark canvas, and the previous tokens were a
+     direct port of it: --neu-dark was #020617 cast onto a #090D16 page —
+     a shadow darker than its own background by an imperceptible amount.
+     Measured on the running app, the result was that depth simply did not
+     exist: 21 of 1,442 elements on the dashboard carried any shadow, and
+     0 of 138 on Weekly Tracker. The system's defining clay/neumorphic
+     character was absent from every dark screen.
+
+     So the roles swap. On a dark surface the HIGHLIGHT carries elevation
+     and the shadow only anchors it — a 1px inset rim along the top edge
+     catching the implied light, with a soft ambient beneath for weight.
+     This is the standard dark-mode elevation model, and unlike a cast
+     shadow it stays legible no matter how dark the canvas gets.
+
+     The rim strengthens as an element rises (0.045 → 0.09), which is what
+     makes the four steps distinguishable from one another. Keep the thin
+     --border alongside it, exactly as the light theme does: the highlight
+     gives depth, the border still does the boundary work. */
+  --neu-light: 255 255 255;   /* rim highlight — the light source itself   */
+  --neu-dark:    0   0   0;   /* ambient anchor, not the depth cue         */
 
   --elevation-1:
-    -1px -1px 3px  rgb(var(--neu-light) / 0.40),
-     2px  2px 6px  rgb(var(--neu-dark)  / 0.60);
+    inset 0 1px 0 0 rgb(var(--neu-light) / 0.045),
+    0 1px 2px 0 rgb(var(--neu-dark) / 0.50);
   --elevation-2:
-    -2px -2px 6px  rgb(var(--neu-light) / 0.35),
-     4px  4px 12px rgb(var(--neu-dark)  / 0.70);
+    inset 0 1px 0 0 rgb(var(--neu-light) / 0.055),
+    0 2px 6px -1px rgb(var(--neu-dark) / 0.55),
+    0 6px 16px -4px rgb(var(--neu-dark) / 0.40);
   --elevation-3:
-    -3px -3px 10px rgb(var(--neu-light) / 0.30),
-     6px  6px 18px rgb(var(--neu-dark)  / 0.80);
+    inset 0 1px 0 0 rgb(var(--neu-light) / 0.07),
+    0 4px 12px -2px rgb(var(--neu-dark) / 0.60),
+    0 12px 28px -8px rgb(var(--neu-dark) / 0.50);
   --elevation-4:
-    -4px -4px 14px rgb(var(--neu-light) / 0.25),
-     8px  8px 24px rgb(var(--neu-dark)  / 0.85);
+    inset 0 1px 0 0 rgb(var(--neu-light) / 0.09),
+    0 8px 20px -4px rgb(var(--neu-dark) / 0.65),
+    0 20px 48px -12px rgb(var(--neu-dark) / 0.55);
 
+  /* Debossed / pressed. The rim moves to the BOTTOM edge — light catching
+     the lower lip of a carved recess is the inverse of it catching the top
+     lip of a raised one, which is what sells the direction change. */
   --elevation-inset-1:
-    inset -1px -1px 3px rgb(var(--neu-light) / 0.35),
-    inset  2px  2px 5px rgb(var(--neu-dark)  / 0.70);
+    inset 0 1px 2px 0 rgb(var(--neu-dark) / 0.50),
+    inset 0 -1px 0 0 rgb(var(--neu-light) / 0.03);
   --elevation-inset-2:
-    inset -2px -2px 5px rgb(var(--neu-light) / 0.30),
-    inset  3px  3px 8px rgb(var(--neu-dark)  / 0.80);
+    inset 0 2px 5px 0 rgb(var(--neu-dark) / 0.60),
+    inset 0 -1px 0 0 rgb(var(--neu-light) / 0.04);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -419,12 +486,12 @@ textarea:focus-visible,
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   PRINT STYLES — A4 ORIENTATION FOR NATIVE REPORT CANVAS
+   PRINT STYLES — A4 ORIENTATION FOR NATIVE REPORT CANVAS & MULTI-PAGE REPORTS
    ═══════════════════════════════════════════════════════════════════════════ */
 @media print {
   @page {
     size: A4 portrait;
-    margin: 8mm 10mm;
+    margin: 8mm 10mm 10mm 10mm;
   }
 
   /* Hide entire application chrome, sidebars, headers, floating toolbars, and buttons */
@@ -461,6 +528,24 @@ textarea:focus-visible,
     display: block !important;
   }
 
+  /* Master Print Layout Table for Repeating Header and Footer on Every Single Printed Page */
+  .print-layout-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+
+  .print-page-header {
+    display: table-header-group !important;
+  }
+
+  .print-page-footer {
+    display: table-footer-group !important;
+  }
+
   /* Report Canvas takes exact 100% A4 printable area */
   .printable-report-canvas {
     width: 100% !important;
@@ -470,6 +555,11 @@ textarea:focus-visible,
     border: none !important;
     box-shadow: none !important;
     background: #ffffff !important;
+  }
+
+  /* Repeat table headers at top of each page if table breaks across pages */
+  table thead {
+    display: table-header-group !important;
   }
 
   /* Editable input fields render as clean plain text during print */

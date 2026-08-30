@@ -23,6 +23,7 @@ interface Props {
   className?: string;
   icon?: React.ElementType;
   title?: string;
+  error?: boolean;
 }
 
 export function SmoothSelect({
@@ -36,6 +37,7 @@ export function SmoothSelect({
   className = '',
   icon: TriggerIcon,
   title,
+  error = false,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -156,29 +158,52 @@ export function SmoothSelect({
         type="button"
         disabled={disabled}
         onClick={handleToggle}
-        className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-colors cursor-pointer select-none ${
-          isOpen
+        className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-all cursor-pointer select-none ${
+          error
+            ? isOpen
+              ? 'bg-white dark:bg-slate-950 border-rose-500 ring-2 ring-rose-500/80 text-slate-900 dark:text-slate-100 shadow-xs'
+              : 'bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50/70 dark:hover:bg-rose-950/40 border-rose-500 ring-1 ring-rose-500/60 text-slate-900 dark:text-slate-100'
+            : isOpen
             ? 'bg-white dark:bg-slate-950 border-blue-600 ring-1 ring-blue-600 text-slate-900 dark:text-slate-100'
             : 'bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100'
         } disabled:opacity-50 disabled:cursor-not-allowed`}
       >
         <div className="flex items-center gap-2 truncate">
-          {TriggerIcon && <TriggerIcon size={14} className="text-blue-600 dark:text-blue-400 shrink-0" />}
+          {TriggerIcon && (
+            <TriggerIcon
+              size={14}
+              className={
+                error
+                  ? 'text-rose-500 dark:text-rose-400 shrink-0'
+                  : 'text-blue-600 dark:text-blue-400 shrink-0'
+              }
+            />
+          )}
           {selectedOption ? (
             <span className="truncate text-slate-900 dark:text-slate-100 font-medium flex items-center gap-1.5">
               {selectedOption.badge && (
-                <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold">[{selectedOption.badge}]</span>
+                <span className={`font-mono font-semibold ${error ? 'text-rose-500' : 'text-blue-600 dark:text-blue-400'}`}>
+                  [{selectedOption.badge}]
+                </span>
               )}
               <span className="truncate">{selectedOption.label}</span>
             </span>
           ) : (
-            <span className="text-slate-400 dark:text-slate-500 font-normal">{placeholder}</span>
+            <span className={error ? 'text-rose-600 dark:text-rose-300 font-normal' : 'text-slate-400 dark:text-slate-500 font-normal'}>
+              {placeholder}
+            </span>
           )}
         </div>
         <ChevronDown
           size={14}
-          className={`shrink-0 text-slate-400 dark:text-slate-500 transition-transform duration-150 ${
-            isOpen ? 'rotate-180 text-blue-600' : ''
+          className={`shrink-0 transition-transform duration-150 ${
+            error
+              ? isOpen
+                ? 'rotate-180 text-rose-500'
+                : 'text-rose-500 dark:text-rose-400'
+              : isOpen
+              ? 'rotate-180 text-blue-600'
+              : 'text-slate-400 dark:text-slate-500'
           }`}
         />
       </button>

@@ -46,7 +46,6 @@ const WEEKLY_KPIS = [
 const ACTIVE_LEADS_KPIS = [
   { key: 'total_leads', label: 'Total Leads', desc: 'Active Corporate Leads' },
   { key: 'graduating_year', label: 'Graduating Batch', desc: 'Target Batch Year' },
-  { key: 'active_companies_count', label: 'Corporate Partners', desc: 'Active Corporate Partners' },
 ];
 
 interface Props {
@@ -66,7 +65,9 @@ export function ReportBuilderWizard({
   const [collegeId, setCollegeId] = useState(
     initialCollegeId && initialCollegeId !== 'all' ? initialCollegeId : ''
   );
-  const [academicYear, setAcademicYear] = useState('all');
+  const [academicYear, setAcademicYear] = useState(
+    initialTemplateType === 'active_leads' ? '' : 'all'
+  );
 
   // Dynamic Interactive Date Range Calendar Selection
   const [startDate, setStartDate] = useState('2026-08-21');
@@ -76,21 +77,38 @@ export function ReportBuilderWizard({
   );
 
   const [theme, setTheme] = useState('blue');
-  const [customRemarks, setCustomRemarks] = useState(
-    'All campus drives are progressing actively as per schedule. Follow-ups with upcoming tech partners remain on track.'
-  );
+  const [customRemarks, setCustomRemarks] = useState(() => {
+    if (initialTemplateType === 'pending_tasks') {
+      return 'All pending action items are actively tracked with institutions and corporate HRs for prompt closure.';
+    }
+    if (initialTemplateType === 'active_leads') {
+      return 'Comprehensive active corporate roster curated for campus recruitment engagements.';
+    }
+    return 'All campus drives are progressing actively as per schedule. Follow-ups with upcoming tech partners remain on track.';
+  });
 
-  // Section inclusion toggles
-  const [sections, setSections] = useState<Record<string, boolean>>({
-    kpi_summary: true,
-    completed_companies: true,
-    in_progress: true,
-    pipeline: true,
-    top_companies: true,
-    rejected_companies: true,
-    on_hold_by_college: true,
-    on_hold_by_hr: true,
-    remarks: true,
+  // Section inclusion toggles initialized from template
+  const [sections, setSections] = useState<Record<string, boolean>>(() => {
+    const s: Record<string, boolean> = {};
+    if (initialTemplateType === 'pending_tasks') {
+      s.pending_tasks = true;
+      s.remarks = true;
+    } else if (initialTemplateType === 'active_leads') {
+      s.kpi_summary = true;
+      s.active_leads = true;
+      s.remarks = true;
+    } else {
+      s.kpi_summary = true;
+      s.completed_companies = true;
+      s.in_progress = true;
+      s.pipeline = true;
+      s.top_companies = true;
+      s.rejected_companies = true;
+      s.on_hold_by_college = true;
+      s.on_hold_by_hr = true;
+      s.remarks = true;
+    }
+    return s;
   });
 
   // Granular KPI card picker toggles
@@ -194,6 +212,43 @@ export function ReportBuilderWizard({
     };
   }, [collegeId, academicYear, templateType]);
 
+  // Sync state when returning from editor via initialTemplateType / initialCollegeId props
+  useEffect(() => {
+    if (initialTemplateType && initialTemplateType !== templateType) {
+      setTemplateType(initialTemplateType);
+      if (initialTemplateType === 'pending_tasks') {
+        setSections({
+          pending_tasks: true,
+          remarks: true,
+        });
+        setCustomRemarks('All pending action items are actively tracked with institutions and corporate HRs for prompt closure.');
+      } else if (initialTemplateType === 'active_leads') {
+        setSections({
+          kpi_summary: true,
+          active_leads: true,
+          remarks: true,
+        });
+        setCustomRemarks('Comprehensive active corporate roster curated for campus recruitment engagements.');
+      } else {
+        setSections({
+          kpi_summary: true,
+          completed_companies: true,
+          in_progress: true,
+          pipeline: true,
+          top_companies: true,
+          rejected_companies: true,
+          on_hold_by_college: true,
+          on_hold_by_hr: true,
+          remarks: true,
+        });
+        setCustomRemarks('All campus drives are progressing actively as per schedule. Follow-ups with upcoming tech partners remain on track.');
+      }
+    }
+    if (initialCollegeId && initialCollegeId !== 'all') {
+      setCollegeId(initialCollegeId);
+    }
+  }, [initialTemplateType, initialCollegeId]);
+
   const handleCategoryChange = (newType: string) => {
     setTemplateType(newType);
     setValidationErrors([]);
@@ -204,6 +259,9 @@ export function ReportBuilderWizard({
       });
       setCustomRemarks('All pending action items are actively tracked with institutions and corporate HRs for prompt closure.');
     } else if (newType === 'active_leads') {
+      if (academicYear === 'all') {
+        setAcademicYear('');
+      }
       setSections({
         kpi_summary: true,
         active_leads: true,
@@ -235,9 +293,15 @@ export function ReportBuilderWizard({
       }
     }
 
-    // 2. Mandatory Graduating Academic Year
-    if (!academicYear || academicYear.trim() === '') {
-      errors.push('Graduating Academic Year must be selected.');
+    // 2. Mandatory Graduating Academic Year (Strictly enforced for Active Leads: 2027, 2028, 2029...)
+    if (templateType === 'active_leads') {
+      if (!academicYear || academicYear === 'all' || academicYear.trim() === '') {
+        errors.push('Graduating Academic Batch Year (e.g., 2027, 2028, 2029) is mandatory for Active Leads.');
+      }
+    } else {
+      if (!academicYear || academicYear.trim() === '') {
+        errors.push('Graduating Academic Year must be selected.');
+      }
     }
 
     // 3. Mandatory Date Range with minimum 5 days verification for weekly placement
@@ -276,7 +340,11 @@ export function ReportBuilderWizard({
           academic_year: academicYear,
           week_label: weekLabel,
           theme,
-          included_sections: sections,
+          included_sections: {
+            ...sections,
+            ...(templateType === 'active_leads' ? { active_leads: true } : {}),
+            ...(templateType === 'pending_tasks' ? { pending_tasks: true } : {}),
+          },
           included_kpi_cards: kpiCards,
           kpi_cards: kpiCards,
           custom_remarks: customRemarks,
@@ -313,8 +381,7 @@ export function ReportBuilderWizard({
           isKpiSection: true,
           kpiList: ACTIVE_LEADS_KPIS,
         },
-        { key: 'active_leads', label: 'Active Corporate Leads Table', icon: Sparkles, desc: 'Detailed table with Company, Roles, CTC package, and Fall of Month' },
-        { key: 'remarks', label: 'Coordinator Remarks & Observations', icon: PenLine, desc: 'Corporate relationship overview and strategic notes' },
+        { key: 'remarks', label: 'Notes', icon: PenLine, desc: 'Corporate relationship overview and strategic notes' },
       ];
     }
 
@@ -485,30 +552,29 @@ export function ReportBuilderWizard({
                   );
                   return (
                     <div>
-                      <div className={isMissingCollege ? 'ring-2 ring-rose-500/80 rounded-xl transition-all' : ''}>
-                        <SmoothSelect
-                          value={collegeId}
-                          onChange={(val) => {
-                            setCollegeId(val);
-                            setValidationErrors((prev) =>
-                              prev.filter(
-                                (e) => !e.toLowerCase().includes('institution') && !e.toLowerCase().includes('college')
-                              )
-                            );
-                          }}
-                          placeholder="Select Target Institution *"
-                          searchable={true}
-                          searchPlaceholder="Search institution name or code…"
-                          icon={Building2}
-                          title="Target College / Institution"
-                          options={colleges.map((c: any) => ({
-                            value: c._id,
-                            label: c.college_name,
-                            badge: c.college_code,
-                            sublabel: c.location,
-                          }))}
-                        />
-                      </div>
+                      <SmoothSelect
+                        value={collegeId}
+                        error={isMissingCollege}
+                        onChange={(val) => {
+                          setCollegeId(val);
+                          setValidationErrors((prev) =>
+                            prev.filter(
+                              (e) => !e.toLowerCase().includes('institution') && !e.toLowerCase().includes('college')
+                            )
+                          );
+                        }}
+                        placeholder="Select Target Institution *"
+                        searchable={true}
+                        searchPlaceholder="Search institution name or code…"
+                        icon={Building2}
+                        title="Target College / Institution"
+                        options={colleges.map((c: any) => ({
+                          value: c._id,
+                          label: c.college_name,
+                          badge: c.college_code,
+                          sublabel: c.location,
+                        }))}
+                      />
                       {isMissingCollege && (
                         <p className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold mt-1.5 flex items-center gap-1">
                           <AlertCircle size={12} className="shrink-0" />
@@ -521,21 +587,19 @@ export function ReportBuilderWizard({
               </div>
             )}
 
-            {/* Graduating Academic Year */}
+            {/* Graduating Academic Year / Batch */}
             <div>
               <label className="block text-xs font-semibold text-fg mb-1.5">
                 Graduating Academic Batch <span className="text-rose-500 font-bold ml-0.5">*</span>
               </label>
-              <SmoothSelect
-                value={academicYear}
-                onChange={(val) => {
-                  setAcademicYear(val);
-                  setValidationErrors([]);
-                }}
-                icon={GraduationCap}
-                title="Graduating Academic Batch"
-                options={[
-                  { value: 'all', label: 'All Batches' },
+              {(() => {
+                const isMissingBatch =
+                  validationErrors.length > 0 &&
+                  ((templateType === 'active_leads' && (!academicYear || academicYear === 'all')) || !academicYear);
+
+                const batchOptions = [
+                  ...(templateType !== 'active_leads' ? [{ value: 'all', label: 'All Batches' }] : []),
+                  { value: '2026', label: '2026' },
                   { value: '2027', label: '2027' },
                   { value: '2028', label: '2028' },
                   { value: '2029', label: '2029' },
@@ -545,8 +609,30 @@ export function ReportBuilderWizard({
                   { value: '2033', label: '2033' },
                   { value: '2034', label: '2034' },
                   { value: '2035', label: '2035' },
-                ]}
-              />
+                ];
+
+                return (
+                  <div>
+                    <SmoothSelect
+                      value={academicYear === 'all' && templateType === 'active_leads' ? '' : academicYear}
+                      onChange={(val) => {
+                        setAcademicYear(val);
+                        setValidationErrors([]);
+                      }}
+                      placeholder="Select Year"
+                      icon={GraduationCap}
+                      title="Graduating Academic Batch"
+                      options={batchOptions}
+                      error={isMissingBatch}
+                    />
+                    {isMissingBatch && (
+                      <p className="text-[11px] text-rose-500 font-medium mt-1 animate-fadeIn">
+                        Please select a graduating batch year.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -583,9 +669,14 @@ export function ReportBuilderWizard({
               </h2>
             </div>
             <div className="flex items-center gap-2">
-              {loadingWeekly && (
+              {templateType === 'weekly_placement' && loadingWeekly && (
                 <span className="flex items-center gap-1 text-[11px] text-primary font-bold animate-pulse">
                   <Loader2 size={12} className="animate-spin" /> Syncing with Weekly Tracker…
+                </span>
+              )}
+              {templateType === 'active_leads' && (
+                <span className="flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-400 font-bold">
+                  <Sparkles size={12} /> Synced with Active Leads Management
                 </span>
               )}
               <span className="text-micro font-semibold text-fg-subtle">
@@ -594,12 +685,33 @@ export function ReportBuilderWizard({
             </div>
           </div>
 
+          {/* Mandatory Active Leads Table Core Notice */}
+          {templateType === 'active_leads' && (
+            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-300 shadow-2xs">
+              <span className="w-8 h-8 rounded-lg bg-emerald-600/15 dark:bg-emerald-400/15 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shrink-0">
+                <Sparkles size={16} />
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-bold flex items-center gap-2">
+                  <span>Active Corporate Leads Table</span>
+                  <span className="text-[10px] font-mono uppercase bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-md font-bold border border-emerald-300/60 dark:border-emerald-700/60">
+                    Always Included
+                  </span>
+                </div>
+                <p className="text-micro text-emerald-700/80 dark:text-emerald-400/80 font-normal mt-0.5">
+                  Directly synced from the <strong className="font-semibold">Active Leads Management</strong> module ({academicYear || 'Selected Year'} batch) with strictly 4 columns: <strong className="font-semibold">#</strong>, <strong className="font-semibold">Company Name</strong>, <strong className="font-semibold">Role</strong>, <strong className="font-semibold">CTC</strong>.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
             {getSectionsConfig().map((sec: any) => {
               const Icon = sec.icon;
               const isChecked = !!sections[sec.key];
               const hasCompanies = Array.isArray(sec.companies) && sec.companies.length > 0;
               const isKpi = !!sec.isKpiSection;
+              const isFullWidth = isKpi || sec.key === 'remarks' || getSectionsConfig().length <= 2;
               const activeKpiCount = isKpi && Array.isArray(sec.kpiList)
                 ? sec.kpiList.filter((k: any) => kpiCards[k.key] !== false).length
                 : 0;
@@ -608,7 +720,7 @@ export function ReportBuilderWizard({
                 <div
                   key={sec.key}
                   className={`flex flex-col p-3.5 rounded-xl border transition-all select-none ${
-                    isKpi ? 'md:col-span-2' : ''
+                    isFullWidth ? 'col-span-1 md:col-span-2' : ''
                   } ${
                     isChecked
                       ? 'bg-primary/5 border-primary/40 dark:border-primary/50 shadow-xs'
@@ -682,13 +794,13 @@ export function ReportBuilderWizard({
                           </button>
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <div className={sec.kpiList.length <= 2 ? 'grid grid-cols-1 sm:grid-cols-2 gap-2.5' : 'grid grid-cols-2 sm:grid-cols-4 gap-2'}>
                         {sec.kpiList.map((kpi: any) => {
                           const isKpiActive = kpiCards[kpi.key] !== false;
                           return (
                             <label
                               key={kpi.key}
-                              className={`flex items-center gap-2 p-2 rounded-lg border text-[11px] font-semibold cursor-pointer transition-all ${
+                              className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
                                 isKpiActive
                                   ? 'bg-primary/10 border-primary/40 text-primary shadow-2xs font-bold ring-1 ring-primary/20'
                                   : 'bg-surface border-border text-fg-subtle hover:text-fg'
@@ -702,7 +814,7 @@ export function ReportBuilderWizard({
                               />
                               <div className="flex flex-col min-w-0">
                                 <span className="truncate leading-tight">{kpi.label}</span>
-                                <span className="text-[9px] text-fg-subtle font-normal truncate">{kpi.desc}</span>
+                                <span className="text-[10px] text-fg-subtle font-normal truncate mt-0.5">{kpi.desc}</span>
                               </div>
                             </label>
                           );
@@ -716,12 +828,12 @@ export function ReportBuilderWizard({
           </div>
         </div>
 
-        {/* Section D: Coordinator Observations & Remarks */}
+        {/* Section D: Observations & Remarks */}
         <div className="space-y-3 pt-2">
           <div className="flex items-center gap-2 border-b border-border/80 pb-2">
             <PenLine size={16} className="text-primary shrink-0" />
             <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
-              Coordinator Remarks & Notes
+              {templateType === 'active_leads' ? 'Notes' : 'Coordinator Remarks & Notes'}
             </h2>
           </div>
           <textarea
@@ -729,7 +841,7 @@ export function ReportBuilderWizard({
             value={customRemarks}
             onChange={(e) => setCustomRemarks(e.target.value)}
             className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl p-3 text-xs text-fg outline-none shadow-xs font-medium"
-            placeholder="Add operational notes, remarks, or instructions for leadership..."
+            placeholder={templateType === 'active_leads' ? 'Add notes or highlights for the batch roster...' : 'Add operational notes, remarks, or instructions for leadership...'}
           />
         </div>
 

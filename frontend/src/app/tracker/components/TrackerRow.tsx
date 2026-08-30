@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useCallback, useEffect } from 'react';
-import { Phone, Trash2 } from 'lucide-react';
+import { Phone, Trash2, Pencil } from 'lucide-react';
 import type { TrackerRow as TrackerRowType, CallOutcome } from '../page';
 import { triggerHaptic } from '@/lib/haptics';
 import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
@@ -52,6 +52,7 @@ interface Props {
   index?: number;
   isReadOnly: boolean;
   onUpdate: (patch: Partial<TrackerRowType>) => void;
+  onEdit?: (row: TrackerRowType) => void;
   onDelete: () => void;
   onCall?: (row: TrackerRowType) => void;
 }
@@ -132,7 +133,7 @@ function smartParseTime(input: string): { iso: string; formatted: string } | nul
   };
 }
 
-export function TrackerRow({ row, index, isReadOnly, onUpdate, onDelete, onCall }: Props) {
+export function TrackerRow({ row, index, isReadOnly, onUpdate, onEdit, onDelete, onCall }: Props) {
   const startTimeRef = useRef<HTMLInputElement>(null);
   const commentsRef = useRef<HTMLTextAreaElement | HTMLInputElement>(null);
 
@@ -390,18 +391,32 @@ export function TrackerRow({ row, index, isReadOnly, onUpdate, onDelete, onCall 
       </div>
 
       {/* Actions */}
-      <div className="px-2 py-2 flex items-center justify-center">
+      <div className="px-2 py-2 flex items-center justify-center gap-1">
         {!isReadOnly && (
-          <button
-            onClick={() => {
-              triggerHaptic('medium');
-              onDelete();
-            }}
-            title="Delete this contact row from today's tracker"
-            className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 transition-all active:scale-90 p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
-          >
-            <Trash2 size={14} />
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                onEdit?.(row);
+              }}
+              title="Edit this calling row"
+              className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-600 transition-all active:scale-90 p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/40 cursor-pointer"
+            >
+              <Pencil size={14} strokeWidth={2} />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('medium');
+                onDelete();
+              }}
+              title="Delete this contact row from today's tracker"
+              className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 transition-all active:scale-90 p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+            >
+              <Trash2 size={14} strokeWidth={2} />
+            </button>
+          </>
         )}
       </div>
     </div>

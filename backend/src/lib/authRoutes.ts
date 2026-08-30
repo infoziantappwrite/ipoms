@@ -587,6 +587,15 @@ export function registerAuthRoutes(app: Express) {
 
       if (!user) return fail(res, 404, 'ACCOUNT_NOT_FOUND', 'No iPOMS account exists for this email address.');
 
+      // Administrator is deliberately excluded from email-OTP recovery — see
+      // the module header comment. Compromising the admin's mailbox must not
+      // be enough to take over the Administrator account; only server access
+      // (`npm run unlock`) can recover it.
+      if (isAdmin(user.role_codes)) {
+        return fail(res, 403, 'ADMIN_OTP_DISABLED',
+          'Administrator accounts cannot be recovered by email. Contact your system operator to run the server-side unlock script.');
+      }
+
       const code = generateOtp();
       user.reset_otp_hash = await bcrypt.hash(code, 10);
       user.reset_otp_expires_at = new Date(Date.now() + OTP_TTL_MINUTES * 60_000);
@@ -641,6 +650,11 @@ export function registerAuthRoutes(app: Express) {
       const user = await User.findOne({ official_email: email, is_deleted: false }).select('+reset_otp_hash');
       if (!user) return fail(res, 404, 'ACCOUNT_NOT_FOUND', 'No iPOMS account exists for this email address.');
 
+      if (isAdmin(user.role_codes)) {
+        return fail(res, 403, 'ADMIN_OTP_DISABLED',
+          'Administrator accounts cannot be recovered by email. Contact your system operator to run the server-side unlock script.');
+      }
+
       if (!user.reset_otp_hash || !user.reset_otp_expires_at) {
         return fail(res, 400, 'NO_OTP_PENDING', 'No verification code has been requested for this account.');
       }
@@ -685,6 +699,11 @@ export function registerAuthRoutes(app: Express) {
 
       const user = await User.findOne({ official_email: email, is_deleted: false }).select('+reset_otp_hash');
       if (!user) return fail(res, 404, 'ACCOUNT_NOT_FOUND', 'No iPOMS account exists for this email address.');
+
+      if (isAdmin(user.role_codes)) {
+        return fail(res, 403, 'ADMIN_OTP_DISABLED',
+          'Administrator accounts cannot be recovered by email. Contact your system operator to run the server-side unlock script.');
+      }
 
       if (!user.reset_otp_hash || !user.reset_otp_expires_at) {
         return fail(res, 400, 'NO_OTP_PENDING', 'No verification code has been requested for this account.');

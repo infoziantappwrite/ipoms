@@ -8,6 +8,7 @@ interface Props {
   rows: TrackerRowType[];
   isReadOnly: boolean;
   onRowUpdate: (rowId: string, patch: Partial<TrackerRowType>) => Promise<void>;
+  onEdit?: (row: TrackerRowType) => void;
   onDelete: (rowId: string) => Promise<void>;
   onCall?: (row: TrackerRowType) => void;
 }
@@ -27,7 +28,7 @@ const COLUMN_HEADERS = [
   { label: 'Actions', width: 'w-14 text-center shrink-0' },
 ];
 
-export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onDelete, onCall }: Props) {
+export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, onCall }: Props) {
   if (rows.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16 text-center">
@@ -76,6 +77,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onDelete, onCall }:
               index={index + 1}
               isReadOnly={isReadOnly}
               onUpdate={(patch) => onRowUpdate(row._id, patch)}
+              onEdit={onEdit}
               onDelete={() => onDelete(row._id)}
               onCall={onCall}
             />

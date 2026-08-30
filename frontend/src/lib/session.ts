@@ -62,7 +62,8 @@ export const ROLE_LABEL: Record<RoleKey, string> = {
 /** Marks the drawer intro as due — called once, on successful sign-in. */
 export function armNavIntro() {
   try {
-    window.sessionStorage.setItem(NAV_INTRO_KEY, 'pending');
+    window.sessionStorage.setItem(NAV_INTRO_KEY, 'play');
+    window.localStorage.removeItem(NAV_COLLAPSED_KEY);
   } catch { /* storage disabled */ }
 }
 

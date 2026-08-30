@@ -9,10 +9,11 @@ import { CalendarPicker } from './components/CalendarPicker';
 import { SoftphonePanel, SoftphoneCallResult } from './components/SoftphonePanel';
 import { SmoothOutcomeDropdown } from '@/components/ui/SmoothOutcomeDropdown';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
-import { AlertTriangle, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Cloud, Download, Loader2, PhoneCall, Plus, Save } from 'lucide-react';
+import { AlertTriangle, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Cloud, Download, Loader2, PhoneCall, Plus, Save, Search } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
 import { ManualAddRowModal } from './components/ManualAddRowModal';
+import { EditTrackerRowModal } from './components/EditTrackerRowModal';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -88,6 +89,7 @@ export default function DailyTrackerPage() {
   const [activeCallRow, setActiveCallRow] = useState<TrackerRow | null>(null);
   const [sessionDate, setSessionDate] = useState<string>('');
   const [isManualAddOpen, setIsManualAddOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState<TrackerRow | null>(null);
 
   // Real signed-in identity. The backend still enforces ownership itself
   // (scopeToSelf pins a coordinator to their own id regardless of what's
@@ -555,13 +557,17 @@ export default function DailyTrackerPage() {
                 />
 
                 {/* Search */}
-                <div className="w-48 sm:w-56 shrink-0">
+                <div className="relative w-48 sm:w-56 shrink-0">
+                  <Search
+                    size={13}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-300 pointer-events-none"
+                  />
                   <input
                     type="text"
                     placeholder="Search company, HR, mobile…"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 text-fg text-xs px-3.5 py-1.5 rounded-xl outline-none placeholder:text-fg-disabled shadow-xs transition-colors"
+                    className="w-full h-8 pl-8 pr-3 bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-300 dark:border-zinc-700/90 hover:border-zinc-400 dark:hover:border-zinc-500 text-zinc-900 dark:text-zinc-100 text-xs rounded-xl shadow-xs placeholder:text-zinc-500 dark:placeholder:text-zinc-300/80 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium"
                   />
                 </div>
               </>
@@ -638,6 +644,7 @@ export default function DailyTrackerPage() {
             rows={displayRows}
             isReadOnly={isHistoryMode}
             onRowUpdate={handleRowUpdate}
+            onEdit={(row) => setEditingRow(row)}
             onDelete={handleDeleteRow}
             onCall={(row) => setActiveCallRow(row)}
           />
@@ -703,6 +710,20 @@ export default function DailyTrackerPage() {
           sessionDate={sessionDate}
           onClose={() => setIsManualAddOpen(false)}
           onRowAdded={handleManualRowAdded}
+        />
+      )}
+
+      {/* ── Edit Tracker Row Modal ────────────────────────────────────────── */}
+      {editingRow && (
+        <EditTrackerRowModal
+          row={editingRow}
+          onClose={() => setEditingRow(null)}
+          onSave={async (id, patch) => {
+            await handleRowUpdate(id, patch);
+          }}
+          onDelete={async (id) => {
+            await handleDeleteRow(id);
+          }}
         />
       )}
 

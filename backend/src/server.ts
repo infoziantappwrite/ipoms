@@ -838,7 +838,17 @@ app.post('/api/v1/daily-tracker/manual-row', async (req: Request, res: Response)
 app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { call_start_time, outcome_status, comments, follow_up_date, follow_up_month } = req.body;
+    const {
+      call_start_time,
+      outcome_status,
+      comments,
+      follow_up_date,
+      follow_up_month,
+      company_name,
+      hr_name,
+      mobile_number,
+      email_id,
+    } = req.body;
 
     const row = await DailyTracker.findById(id);
     if (!row) {
@@ -858,6 +868,19 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
         success: false,
         error: { code: 'FINALIZED', message: "This day's tracker has been finalized and is read-only" },
       });
+    }
+
+    if (company_name !== undefined && typeof company_name === 'string') {
+      row.company_name = company_name.trim();
+    }
+    if (hr_name !== undefined && typeof hr_name === 'string') {
+      row.hr_name = hr_name.trim();
+    }
+    if (mobile_number !== undefined && typeof mobile_number === 'string') {
+      row.mobile_number = mobile_number.trim();
+    }
+    if (email_id !== undefined && typeof email_id === 'string') {
+      row.email_id = email_id.trim();
     }
 
     if (outcome_status && !call_start_time && !row.call_start_time) {
@@ -1406,6 +1429,49 @@ app.get('/api/v1/daily-tracker/pending-followups', async (req: Request, res: Res
 // Spec: Module_04_Weekly_Tracker_Specification_v1.0.md
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Helper: Calculate Month-bound 4-week periods (never crossing month boundaries)
+function getMonthWeekBounds(offset: number = 0) {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const currentDate = now.getDate();
+
+  const currentWeekInMonth =
+    currentDate <= 7 ? 1 : currentDate <= 14 ? 2 : currentDate <= 21 ? 3 : 4;
+
+  const currentAbsoluteWeek =
+    (currentYear * 12 + currentMonth) * 4 + (currentWeekInMonth - 1);
+  const targetAbsoluteWeek = currentAbsoluteWeek + offset;
+
+  const targetMonthTotal = Math.floor(targetAbsoluteWeek / 4);
+  const targetWeekNumber = ((targetAbsoluteWeek % 4) + 4) % 4 + 1;
+  const targetYear = Math.floor(targetMonthTotal / 12);
+  const targetMonth = ((targetMonthTotal % 12) + 12) % 12;
+
+  const lastDayOfMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+
+  let startDay = 1;
+  let endDay = 7;
+  if (targetWeekNumber === 1) {
+    startDay = 1;
+    endDay = 7;
+  } else if (targetWeekNumber === 2) {
+    startDay = 8;
+    endDay = 14;
+  } else if (targetWeekNumber === 3) {
+    startDay = 15;
+    endDay = 21;
+  } else {
+    startDay = 22;
+    endDay = lastDayOfMonth;
+  }
+
+  const startDate = new Date(targetYear, targetMonth, startDay, 0, 0, 0, 0);
+  const endDate = new Date(targetYear, targetMonth, endDay, 23, 59, 59, 999);
+
+  return { startDate, endDate, weekNumber: targetWeekNumber, month: targetMonth, year: targetYear };
+}
+
 // Helper: Calculate Friday-to-Friday week bounds for a given date
 function getFridayWeekBounds(targetDate: Date = new Date()) {
   const d = new Date(targetDate);
@@ -1478,18 +1544,15 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
       filter.company_type = company_type;
     }
 
-    // Week navigation, previously a UI-only label that never changed the
-    // fetched data — every offset showed the same full dataset. Only filter
-    // when the caller navigates away from "Current" (offset 0), so the
-    // default view stays the full master dataset exactly as before; this is
-    // additive for anyone who actually uses the prev/next arrows, not a
-    // scope change for existing usage.
+    // Month-based week filtering when user navigates prev/next week
     const offsetNum = week_offset !== undefined ? Number(week_offset) : 0;
     if (offsetNum !== 0 && !Number.isNaN(offsetNum)) {
-      const targetDate = new Date();
-      targetDate.setDate(targetDate.getDate() + offsetNum * 7);
-      const { startFriday } = getFridayWeekBounds(targetDate);
-      filter.week_start_date = startFriday;
+      const { startDate, endDate } = getMonthWeekBounds(offsetNum);
+      filter.$or = [
+        { follow_up_date: { $gte: startDate, $lte: endDate } },
+        { drive_date: { $gte: startDate, $lte: endDate } },
+        { week_start_date: { $gte: startDate, $lte: endDate } },
+      ];
     }
 
     if (search) {
@@ -3521,11 +3584,12 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
 
     // ── CASE 2: ACTIVE LEADS REPORT ────────────────────────────────────────────
     if (template_type === 'active_leads') {
-      const alFilter: any = { is_deleted: { $ne: true } };
-      if (academic_year && academic_year !== 'all') {
-        const yearQueries: any[] = [academic_year, Number(academic_year), String(academic_year)].filter(Boolean);
-        alFilter.academic_year = { $in: yearQueries };
-      }
+      const selectedBatch = (academic_year && academic_year !== 'all') ? String(academic_year).trim() : '2027';
+      const alFilter: any = {
+        is_deleted: { $ne: true },
+        academic_year: { $in: [selectedBatch, Number(selectedBatch)] },
+      };
+
       if (college_id && college_id !== 'all') {
         const cId = Types.ObjectId.isValid(String(college_id)) ? new Types.ObjectId(String(college_id)) : college_id;
         alFilter.college_id = { $in: [cId, String(college_id)] };
@@ -3535,19 +3599,25 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         alFilter.coordinator_id = uId;
       }
 
-      let activeLeads = await ActiveLead.find(alFilter).sort({ created_at: -1 });
+      let activeLeads = await ActiveLead.find(alFilter).sort({ company_name: 1 });
 
-      // Fallback: If 0 found and academic year was specified, query all active leads
-      if (activeLeads.length === 0 && alFilter.academic_year) {
-        const fbFilter = { ...alFilter };
-        delete fbFilter.academic_year;
-        activeLeads = await ActiveLead.find(fbFilter).sort({ created_at: -1 });
+      // Fallback: If 0 found with college filter, fetch all matching batch across all institutions
+      if (activeLeads.length === 0) {
+        activeLeads = await ActiveLead.find({
+          is_deleted: { $ne: true },
+          academic_year: { $in: [selectedBatch, Number(selectedBatch)] },
+        }).sort({ company_name: 1 });
+      }
+
+      // If still 0 found, fall back to all active leads
+      if (activeLeads.length === 0) {
+        activeLeads = await ActiveLead.find({ is_deleted: { $ne: true } }).sort({ company_name: 1 });
       }
 
       const reportDocument = {
         template_type: 'active_leads',
-        report_title: `Active Leads Management Report — ${academic_year === 'all' ? 'All Batches' : academic_year + ' Graduating'}`,
-        report_period: week_label,
+        report_title: `Active Leads Pipeline Report — ${selectedBatch}`,
+        report_period: week_label || selectedBatch,
         generated_by: coordinator?.full_name || 'A. Mohanaradha (Lead Placement Coordinator)',
         generated_date: new Date().toLocaleDateString('en-IN', {
           day: 'numeric',
@@ -3565,8 +3635,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         },
         kpi_summary: {
           total_leads: activeLeads.length,
-          graduating_year: academic_year === 'all' ? '2027 / All' : academic_year,
-          active_companies_count: activeLeads.length,
+          graduating_year: selectedBatch,
         },
         sections: {
           active_leads: activeLeads.map((l, idx) => ({
@@ -3574,11 +3643,9 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
             company_name: l.company_name,
             role: l.role || '—',
             ctc: l.ctc || 'Competitive',
-            followup_month: l.followup_month || '—',
-            academic_year: l.academic_year || '2027',
           })),
         },
-        remarks: custom_remarks || 'Comprehensive active corporate roster curated for campus recruitment engagements.',
+        remarks: custom_remarks || `Comprehensive active corporate roster curated for ${selectedBatch} graduating campus recruitment engagements.`,
         included_sections: included_sections || {
           kpi_summary: true,
           active_leads: true,
@@ -4445,7 +4512,7 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
           }),
           DailyTracker.countDocuments({
             coordinator_id: c._id,
-            outcome_status: { $in: POSITIVE_OUTCOMES },
+            outcome_status: 'invite_mail',
           }),
           DailyLead.countDocuments({ coordinator_id: c._id, lead_type: 'jd_received', is_deleted: false }),
           AssignedWork.countDocuments({ assigned_to_coordinator_id: c._id, is_completed: false, is_deleted: false }),

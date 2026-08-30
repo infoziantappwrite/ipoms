@@ -45,7 +45,7 @@ first.** That is how the password-policy and login-identifier regressions below 
 | Staff email domain | `@infoziant.com` (login auto-completes a bare username to this) |
 | Role codes | `ADMINISTRATOR`, `TEAM_LEADER`, `PLACEMENT_COORDINATOR` — **UPPERCASE**. (`TPO` removed 29 Aug 2026 — see §5.) |
 | Timezone for jobs | IST (`Asia/Kolkata`) |
-| Design system | Light-mode neumorphic/clay, IBM Plex Sans, Infoziant navy `#1E3A8A` |
+| Design system | Neumorphic/clay, IBM Plex Sans, Infoziant navy `#1E3A8A`. Light and dark both ship; dark uses a **rim-light** elevation model, not the light theme's cast shadow — see §5 item 13 |
 
 ### Password policy (user-mandated, supersedes Module 08)
 Minimum **9** characters; at least one lowercase, one uppercase, one digit, and at least
@@ -377,8 +377,51 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     that gets fixed, `RoleMatrixTab.tsx`'s "Dispatch Broadcast Announcements" row (currently
     `tl: true, admin: true`) should be re-verified against it working end-to-end, not just the
     backend route existing.
-
----
+12. ~~**Administrator could self-recover by email OTP, contradicting the documented CLI-only
+    policy.**~~ **FIXED 30 Aug 2026.** §2's "Lockout & recovery" rule says a blocked
+    Administrator has no email-OTP path specifically so a compromised admin mailbox can't be
+    used to take over the account. `authRoutes.ts` already defined an `isAdmin()` helper
+    (line 98) but never called it — `POST /auth/request-otp`, `/auth/verify-otp`, and
+    `/auth/reset-password` had zero role check, so any account including Administrator could
+    request and use an email OTP. Verified live before the fix:
+    `POST /auth/request-otp {"email":"placement_management@infoziant.com"}` returned
+    `success:true` and actually emailed a code. Now all three handlers call `isAdmin()` and
+    refuse with `403 ADMIN_OTP_DISABLED` pointing to `npm run unlock` instead; coordinator/Team
+    Leader accounts are unaffected (re-verified live — Sujitha's OTP request still succeeds).
+13. **Dark theme rebuilt at the token layer, 30 Aug 2026 — `globals.css` `.dark` block only,
+    zero component files touched, light mode byte-for-byte unchanged** (re-verified live:
+    primary still `#1E3A8A`, white-on-primary still 10.36:1, original cast-shadow elevation
+    intact). Three things were wrong and are now fixed:
+    (a) *Elevation didn't exist.* `--neu-dark` was `#020617` cast onto a `#090D16` page — a
+    shadow darker than its own background by an imperceptible amount. Measured live: **21 of
+    1,442** elements on the dashboard carried any shadow, **0 of 138** on Weekly Tracker. Dark
+    mode now uses a **rim-light** model — a 1px inset highlight on the top edge carries the
+    depth, the shadow only anchors it, and the rim strengthens 0.045→0.09 across the four
+    steps. **This inverts the light theme deliberately; do not "restore symmetry" by porting
+    the light cast-shadow back.** Debossed variants move the rim to the bottom edge.
+    (b) *Surfaces and borders were invisible.* page↔card was 1.10:1, page↔sunken 1.02:1, and
+    `sunken` was **lighter** than `background` (so a recessed toolbar read as raised). Borders
+    were 1.22:1 / 1.58:1, far under WCAG 1.4.11's 3:1 — combined with (a), cards had no
+    perceivable edge from either shadow or stroke. Now: card 1.16:1 vs page, sunken correctly
+    below card, `--border` 1.85:1 (decorative), **`--border-strong` 3.31:1 — use this one for
+    any edge that carries meaning** (inputs, real dividers); `--input` points at it.
+    (c) *Primary had drifted off-brand.* Dark primary was `#3B82F6` = hsl(**217°**, 91%, 60%) —
+    stock Tailwind blue-500, 7° off Infoziant navy's hsl(**224°**, 64%, 33%). Now `#5580F5`,
+    hue 224 — the same navy, lit for a dark canvas. `--accent`/`--primary-hover` likewise.
+    **Known unresolved conflict, deliberately left:** `--primary` is used as text 315× (wants a
+    light value) and as a button fill under a *hardcoded* `text-white` 91× (wants a dark one).
+    Both cannot pass AA from one token — the crossover where the ratios meet is 4.10:1, short
+    of 4.5. It is tuned for the dominant caller (text, 4.64:1 ✓); `--primary-foreground` stays
+    white on purpose so the 91 buttons don't end up beside 7 dark-label ones. **The real fix is
+    a component sweep replacing hardcoded `text-white` with `text-primary-foreground`, after
+    which this token flips to a dark foreground.** Until then white-on-primary is 3.63:1
+    (was 3.68:1 — unchanged, not a regression).
+    Still open from the same audit, untouched: ~1,464 unpaired raw-palette classes in live
+    components (20 files use `text-slate-800/900` with no dark variant — near-black text that
+    vanishes on a dark page); hardcoded light-mode button shadows at the bottom of
+    `globals.css`; `.apple-glass` using `backdrop-filter` in direct contradiction of the
+    "no glassmorphism anywhere" rule stated in the same file; scrollbars globally killed with
+    `!important`, which makes the styled scrollbar block above it dead code.
 
 ## 6. Module map
 

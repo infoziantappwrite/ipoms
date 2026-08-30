@@ -1,6 +1,6 @@
 'use client';
 
-import { FileSpreadsheet, Plus, Target, Trash2, RefreshCw, Copy } from 'lucide-react';
+import { FileSpreadsheet, Plus, Target, Trash2, RefreshCw, Copy, Search } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { SmoothExportDropdown } from '@/components/ui/SmoothExportDropdown';
@@ -76,14 +76,18 @@ export function LeadsHeader({
             theme="navy"
           />
 
-          {/* Search Box */}
-          <div className="w-56 sm:w-64">
+          {/* Search Box (High Visibility with Crisp Outline & Light Placeholder) */}
+          <div className="relative w-56 sm:w-64 shrink-0">
+            <Search
+              size={13}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-300 pointer-events-none"
+            />
             <input
               type="text"
               placeholder="Search company, role…"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 text-fg text-xs px-3.5 py-1.5 rounded-xl placeholder:text-fg-disabled outline-none shadow-xs transition-colors"
+              className="w-full h-8 pl-8 pr-3 bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-300 dark:border-zinc-700/90 hover:border-zinc-400 dark:hover:border-zinc-500 text-zinc-900 dark:text-zinc-100 text-xs rounded-xl shadow-xs placeholder:text-zinc-500 dark:placeholder:text-zinc-300/80 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium"
             />
           </div>
         </div>

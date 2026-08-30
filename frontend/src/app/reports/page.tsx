@@ -56,6 +56,12 @@ function ReportsPageContent() {
   }, [templateQuery, collegeIdQuery, autoQuery]);
 
   const handleReportGenerated = (reportData: any) => {
+    if (reportData?.template_type) {
+      setSelectedTemplateType(reportData.template_type);
+    }
+    if (reportData?.branding?.college_id) {
+      setSelectedCollegeId(reportData.branding.college_id);
+    }
     setGeneratedReport(reportData);
     setIsEditingReport(true);
   };
