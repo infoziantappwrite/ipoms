@@ -17,7 +17,8 @@ const SECTIONS = [
   { key: 'pipeline', label: 'Companies in Pipeline' },
   { key: 'top_companies', label: 'Top Companies' },
   { key: 'rejected_by_hr', label: 'Rejected by HR' },
-  { key: 'rejected_by_college', label: 'Rejected by College' },
+  { key: 'on_hold_by_college', label: 'On Hold by College (TPO)' },
+  { key: 'on_hold_by_hr', label: 'On Hold by HR' },
 ];
 
 export function RowActionMenu({

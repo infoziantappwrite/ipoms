@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { FolderOpen, Pencil } from 'lucide-react';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
+import { MoveSectionDropdown } from './MoveSectionDropdown';
 
 export interface WeeklyRow {
   _id: string;
@@ -99,7 +100,7 @@ export function WeeklyTable({
             {isCompletedSection && (
               <th className="py-2.5 px-3 min-w-[120px] text-center">Offers Received</th>
             )}
-            <th className="py-2.5 px-2 w-12 text-center">Edit</th>
+            <th className="py-2.5 px-3 min-w-[110px] text-center">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border/60 font-normal bg-surface">
@@ -369,16 +370,23 @@ function TableRow({
         </td>
       )}
 
-      {/* 7. Action: Edit Pen Icon */}
+      {/* 7. Actions: Move Dropdown & Edit Pen Icon */}
       <td className="py-2.5 px-2 text-center" onClick={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          onClick={() => onEditRow?.(row)}
-          title={`Edit ${row.company_name} (Role, CTC, Company spelling, Status)`}
-          className="p-1.5 rounded-lg text-fg-subtle hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-all cursor-pointer inline-flex items-center justify-center"
-        >
-          <Pencil size={13} strokeWidth={2.25} />
-        </button>
+        <div className="inline-flex items-center justify-center gap-1.5">
+          <MoveSectionDropdown
+            currentSection={row.pipeline_section}
+            companyName={row.company_name}
+            onMoveSection={(targetSection) => onMoveSection(row._id, targetSection)}
+          />
+          <button
+            type="button"
+            onClick={() => onEditRow?.(row)}
+            title={`Edit ${row.company_name} (Role, CTC, Company spelling, Status)`}
+            className="p-1.5 rounded-lg text-fg-subtle hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-all cursor-pointer inline-flex items-center justify-center"
+          >
+            <Pencil size={13} strokeWidth={2.25} />
+          </button>
+        </div>
       </td>
     </tr>
   );

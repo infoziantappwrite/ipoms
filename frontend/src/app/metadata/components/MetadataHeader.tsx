@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Database, ClipboardList, FileSpreadsheet, Plus, Search, Trash2, Clock, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { SmoothIndustryDropdown } from '@/components/ui/SmoothIndustryDropdown';
@@ -109,8 +109,8 @@ export function MetadataHeader({
           </p>
         </div>
 
-        {/* Pin Sign Out to Absolute Top Right */}
-        <div className="shrink-0">
+        {/* Top-Right Sign Out */}
+        <div className="flex items-center gap-2 shrink-0">
           <UserSignOutButton />
         </div>
       </div>

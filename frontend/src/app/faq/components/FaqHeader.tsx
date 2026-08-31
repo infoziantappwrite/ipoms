@@ -1,0 +1,30 @@
+'use client';
+
+import React from 'react';
+import { HelpCircle } from 'lucide-react';
+import { UserSignOutButton } from '@/components/UserSignOutButton';
+
+export function FaqHeader() {
+  return (
+    <header className="sticky top-0 z-40 bg-surface/95 backdrop-blur-md border-b border-border px-6 py-4 shadow-xs print:hidden text-fg">
+      {/* ── Top Row: Title & Top-Right User Sign Out ────────────────────────── */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-xs">
+            <HelpCircle size={22} strokeWidth={2.2} />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-fg tracking-tight">
+              Frequently Asked Questions
+            </h1>
+          </div>
+        </div>
+
+        {/* Pin Sign Out to Absolute Top Right */}
+        <div className="shrink-0">
+          <UserSignOutButton />
+        </div>
+      </div>
+    </header>
+  );
+}

@@ -127,16 +127,16 @@ export function SmoothOutcomeDropdown({
         />
       </button>
 
-      {/* ── Origin-Anchored Dropdown Popover ───────────────────────────── */}
+      {/* ── Solid Minimal SaaS Dropdown Popover ───────────────────────── */}
       {isOpen && (
         <div
           role="listbox"
           className={`absolute top-full ${
             align === 'right' ? 'right-0 origin-top-right' : 'left-0 origin-top-left'
-          } mt-1.5 w-64 bg-surface/98 backdrop-blur-md border border-border rounded-2xl shadow-3 z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] text-fg select-none`}
+          } mt-1.5 w-64 bg-surface border border-border rounded-xl shadow-xl z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] text-fg select-none`}
         >
           {/* Header ribbon */}
-          <div className="px-3.5 py-2.5 border-b border-border bg-surface-sunken/80 flex items-center justify-between text-micro font-bold text-fg-subtle uppercase tracking-wider">
+          <div className="px-3.5 py-2 border-b border-border bg-surface-sunken flex items-center justify-between text-micro font-bold text-fg-subtle uppercase tracking-wider">
             <span className="flex items-center gap-1.5">
               <Filter size={12} className="text-primary" /> Filter By Call Status
             </span>
@@ -144,7 +144,7 @@ export function SmoothOutcomeDropdown({
           </div>
 
           {/* Status List */}
-          <div className="max-h-72 overflow-y-auto p-1.5 space-y-0.5 custom-scrollbar bg-surface divide-y divide-border/30">
+          <div className="max-h-72 overflow-y-auto p-1.5 space-y-0.5 custom-scrollbar bg-surface divide-y divide-border/40">
             {CALL_OUTCOME_OPTIONS.map((opt) => {
               const isSelected = opt.value === value;
               return (
@@ -152,10 +152,10 @@ export function SmoothOutcomeDropdown({
                   key={opt.value}
                   type="button"
                   onClick={() => handleSelect(opt.value)}
-                  className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between gap-2.5 transition-all active:scale-[0.98] cursor-pointer ${
+                  className={`w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between gap-2.5 transition-colors cursor-pointer ${
                     isSelected
-                      ? 'bg-primary/15 text-primary font-bold shadow-2xs'
-                      : 'hover:bg-surface-raised text-fg'
+                      ? 'bg-primary/10 text-primary font-bold shadow-2xs'
+                      : 'hover:bg-surface-sunken text-fg'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">

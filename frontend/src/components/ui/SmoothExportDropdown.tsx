@@ -117,7 +117,7 @@ export function SmoothExportDropdown({
         onClick={handleToggle}
         className={
           iconOnly
-            ? `w-9 h-9 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-full flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-95 shrink-0 relative ${className}`
+            ? `w-9 h-9 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-95 shrink-0 relative ${className}`
             : `px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 whitespace-nowrap shrink-0 ${className}`
         }
         title={title}

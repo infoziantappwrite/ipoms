@@ -2223,6 +2223,7 @@ app.patch('/api/v1/weekly-tracker/:id/section', async (req: Request, res: Respon
     }
 
     row.pipeline_section = pipeline_section;
+    row.is_pinned_top = pipeline_section === 'top_companies';
     if (current_status_text) {
       row.current_status_text = current_status_text;
     }

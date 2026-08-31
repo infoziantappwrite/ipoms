@@ -201,7 +201,7 @@ export function DashboardHeader() {
           </div>
 
           {/* Top-Right Sign Out */}
-          <div>
+          <div className="flex items-center gap-2.5">
             <UserSignOutButton
               className={
                 isNight

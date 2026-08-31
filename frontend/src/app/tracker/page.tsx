@@ -467,7 +467,7 @@ export default function DailyTrackerPage() {
               </div>
             )}
 
-            <div className="shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               <UserSignOutButton />
             </div>
           </div>

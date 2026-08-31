@@ -92,21 +92,21 @@ export function LeadsHeader({
           </div>
         </div>
 
-        {/* Right Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Right Action Buttons (Icon-Only Minimal SaaS) */}
+        <div className="flex items-center gap-2 shrink-0">
           {onToggleDeleteMode && (
             <button
               type="button"
               onClick={onToggleDeleteMode}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 ${
+              className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 shrink-0 ${
                 isDeleteMode
                   ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-200 dark:shadow-none'
                   : 'bg-surface border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:border-rose-300'
               }`}
               title={isDeleteMode ? 'Exit Delete Mode' : 'Select and delete leads'}
+              aria-label={isDeleteMode ? 'Exit Delete Mode' : 'Delete Leads'}
             >
-              <Trash2 size={14} strokeWidth={2} />
-              <span>{isDeleteMode ? 'Exit Delete' : 'Delete'}</span>
+              <Trash2 size={16} strokeWidth={2.2} />
             </button>
           )}
 
@@ -115,11 +115,11 @@ export function LeadsHeader({
             <button
               type="button"
               onClick={onOpenCopyToJdModal}
-              className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 hover:shadow-amber-500/20"
+              className="w-9 h-9 flex items-center justify-center bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 hover:shadow-amber-500/20 shrink-0"
               title="Copy positive leads to JD Received section for selected colleges"
+              aria-label="Copy to JD"
             >
-              <Copy size={13} strokeWidth={2.5} />
-              <span>Copy to JD</span>
+              <Copy size={16} strokeWidth={2.2} />
             </button>
           )}
 
@@ -128,20 +128,11 @@ export function LeadsHeader({
               type="button"
               disabled={isSyncing}
               onClick={onSyncPositives}
-              className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 hover:shadow-indigo-500/20"
+              className="w-9 h-9 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 hover:shadow-indigo-500/20 shrink-0"
               title="Sync positive calls and scheduled pipeline leads for this date"
+              aria-label="Sync Positives"
             >
-              {isSyncing ? (
-                <>
-                  <RefreshCw size={13} strokeWidth={2.5} className="animate-spin" />
-                  <span>Syncing…</span>
-                </>
-              ) : (
-                <>
-                  <RefreshCw size={13} strokeWidth={2.5} />
-                  <span>Sync</span>
-                </>
-              )}
+              <RefreshCw size={16} strokeWidth={2.2} className={isSyncing ? 'animate-spin' : ''} />
             </button>
           )}
 
@@ -151,14 +142,17 @@ export function LeadsHeader({
             onExportPdf={onExportPdf}
             onExportImage={onExportImage}
             isExporting={isExporting}
+            iconOnly={true}
           />
 
           <button
             type="button"
             onClick={onOpenAddModal}
-            className="flex items-center gap-1.5 bg-primary hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer active:scale-95"
+            className="w-9 h-9 flex items-center justify-center bg-primary hover:bg-blue-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer active:scale-95 shrink-0"
+            title="Add Daily Opportunity Entry"
+            aria-label="Add Lead"
           >
-            <Plus size={14} strokeWidth={2} /> Add
+            <Plus size={18} strokeWidth={2.5} />
           </button>
         </div>
       </div>
