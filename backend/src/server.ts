@@ -71,6 +71,7 @@ const allowedOrigins = [
   'http://localhost',
   'capacitor://localhost',
   'https://localhost',
+  'https://ipoms.vercel.app',
 ];
 
 // Middleware stack
@@ -78,11 +79,11 @@ app.use(helmet());
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, or server-to-server)
-      if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://192.168.') || origin.startsWith('http://10.0.2.2')) {
+      // Allow requests with no origin, Vercel deployments, mobile apps, or local networks
+      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app') || origin.startsWith('http://192.168.') || origin.startsWith('http://10.0.2.2')) {
         return callback(null, true);
       }
-      return callback(null, true); // Permissive in dev to avoid mobile emulator blocks
+      return callback(null, true);
     },
     credentials: true,
   })

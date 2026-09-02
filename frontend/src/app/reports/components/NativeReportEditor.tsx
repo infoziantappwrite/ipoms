@@ -2930,10 +2930,10 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                   <colgroup>
                     <col style={{ width: '38px' }} />
                     <col style={{ width: '25%' }} />
-                    <col style={{ width: '25%' }} />
+                    <col style={{ width: '24%' }} />
                     <col style={{ width: '11%' }} />
-                    <col style={{ width: '28%' }} />
-                    <col style={{ width: '8%' }} />
+                    <col style={{ width: '26%' }} />
+                    <col style={{ width: '11%' }} />
                   </colgroup>
                   <thead className="print:table-header-group">
                     <tr className="hidden print:table-row bg-emerald-50 border-b border-emerald-200 text-emerald-900">
@@ -2946,10 +2946,13 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
                       <th className="py-2 px-1 w-10 text-center font-mono" style={{ width: '38px' }}>#</th>
                       <th className="py-2 px-2.5 w-[25%] text-center whitespace-normal font-semibold">Company Name</th>
-                      <th className="py-2 px-2 w-[25%] text-center whitespace-normal">Role</th>
+                      <th className="py-2 px-2 w-[24%] text-center whitespace-normal">Role</th>
                       <th className="py-2 px-1 w-[11%] text-center whitespace-nowrap">CTC</th>
-                      <th className="py-2 px-2 w-[28%] text-center whitespace-normal">Status</th>
-                      <th className="py-1 px-1 w-[8%] text-center whitespace-normal leading-tight">Offers<br />Received</th>
+                      <th className="py-2 px-2 w-[26%] text-center whitespace-normal">Status</th>
+                      <th className="py-1 px-1 w-[11%] text-center leading-tight">
+                        <span className="block whitespace-nowrap">Offers</span>
+                        <span className="block whitespace-nowrap">Received</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
@@ -2965,7 +2968,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                             className="font-semibold text-fg text-center"
                           />
                         </td>
-                        <td className="py-2 px-2 w-[25%] text-fg-muted text-center whitespace-normal">
+                        <td className="py-2 px-2 w-[24%] text-fg-muted text-center whitespace-normal">
                           <EditableReportCell
                             value={r.role || r.job_role || ''}
                             onChange={(val) =>
@@ -2984,7 +2987,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                             className="text-fg-muted text-center whitespace-nowrap"
                           />
                         </td>
-                        <td className="py-2 px-2 w-[28%] text-emerald-600 dark:text-emerald-400 font-medium text-center whitespace-normal leading-snug">
+                        <td className="py-2 px-2 w-[26%] text-emerald-600 dark:text-emerald-400 font-medium text-center whitespace-normal leading-snug">
                           <EditableReportCell
                             value={r.status || r.current_status_text || 'Drive Completed'}
                             onChange={(val) =>
@@ -2993,7 +2996,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                             className="text-emerald-600 dark:text-emerald-400 font-medium text-center"
                           />
                         </td>
-                        <td className="py-2 px-1 w-[8%] text-emerald-600 dark:text-emerald-400 font-bold text-center whitespace-nowrap">
+                        <td className="py-2 px-1 w-[11%] text-emerald-600 dark:text-emerald-400 font-bold text-center whitespace-nowrap">
                           <EditableReportCell
                             value={String(r.offers_received ?? r.selected_count ?? 0)}
                             onChange={(val) =>

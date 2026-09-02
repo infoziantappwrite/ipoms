@@ -386,10 +386,10 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                     <colgroup>
                       <col style={{ width: '38px' }} />
                       <col style={{ width: '25%' }} />
-                      <col style={{ width: '25%' }} />
+                      <col style={{ width: '24%' }} />
                       <col style={{ width: '11%' }} />
-                      <col style={{ width: '28%' }} />
-                      <col style={{ width: '8%' }} />
+                      <col style={{ width: '26%' }} />
+                      <col style={{ width: '11%' }} />
                     </colgroup>
                     <thead className="print:table-header-group">
                       <tr className="bg-emerald-50 border-b border-emerald-200 text-emerald-900">
@@ -402,10 +402,13 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                       <tr className="bg-slate-100 text-slate-700 font-semibold text-[10px] uppercase border-b border-slate-200">
                         <th className="py-1.5 px-1 w-10 text-center border-r border-slate-200 font-mono" style={{ width: '38px' }}>#</th>
                         <th className="py-1.5 px-2 w-[25%] text-center border-r border-slate-200 whitespace-normal">Company Name</th>
-                        <th className="py-1.5 px-2 w-[25%] text-center border-r border-slate-200 whitespace-normal">Role</th>
+                        <th className="py-1.5 px-2 w-[24%] text-center border-r border-slate-200 whitespace-normal">Role</th>
                         <th className="py-1.5 px-1 w-[11%] text-center border-r border-slate-200 whitespace-nowrap">CTC</th>
-                        <th className="py-1.5 px-2 w-[28%] text-center border-r border-slate-200 whitespace-normal">Status</th>
-                        <th className="py-1 px-1 w-[8%] text-center whitespace-normal leading-tight">Offers<br />Received</th>
+                        <th className="py-1.5 px-2 w-[26%] text-center border-r border-slate-200 whitespace-normal">Status</th>
+                        <th className="py-1 px-1 w-[11%] text-center leading-tight">
+                          <span className="block whitespace-nowrap">Offers</span>
+                          <span className="block whitespace-nowrap">Received</span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 text-center">
@@ -413,10 +416,10 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                         <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
                           <td className="py-1.5 px-1 w-10 text-center text-slate-500 font-mono border-r border-slate-200" style={{ width: '38px' }}>{r.s_no}</td>
                           <td className="py-1.5 px-2 w-[25%] text-center font-bold text-slate-900 border-r border-slate-200 whitespace-normal leading-snug">{r.company_name}</td>
-                          <td className="py-1.5 px-2 w-[25%] text-center text-slate-700 border-r border-slate-200 whitespace-normal leading-snug">{r.job_role}</td>
+                          <td className="py-1.5 px-2 w-[24%] text-center text-slate-700 border-r border-slate-200 whitespace-normal leading-snug">{r.job_role}</td>
                           <td className="py-1.5 px-1 w-[11%] text-center text-emerald-700 font-semibold border-r border-slate-200 whitespace-nowrap">{r.ctc_lpa}</td>
-                          <td className="py-1.5 px-2 w-[28%] text-center text-slate-600 border-r border-slate-200 whitespace-normal leading-snug">{r.current_status_text}</td>
-                          <td className="py-1.5 px-1 w-[8%] text-center font-bold text-emerald-700 whitespace-nowrap">{r.selected_count || 0}</td>
+                          <td className="py-1.5 px-2 w-[26%] text-center text-slate-600 border-r border-slate-200 whitespace-normal leading-snug">{r.current_status_text}</td>
+                          <td className="py-1.5 px-1 w-[11%] text-center font-bold text-emerald-700 whitespace-nowrap">{r.selected_count || 0}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -848,10 +851,10 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                     <colgroup>
                       <col style={{ width: '38px' }} />
                       <col style={{ width: '25%' }} />
-                      <col style={{ width: '25%' }} />
+                      <col style={{ width: '24%' }} />
                       <col style={{ width: '11%' }} />
-                      <col style={{ width: '28%' }} />
-                      <col style={{ width: '8%' }} />
+                      <col style={{ width: '26%' }} />
+                      <col style={{ width: '11%' }} />
                     </colgroup>
                     <thead className="print:table-header-group">
                       <tr className="bg-emerald-50 border-b border-emerald-200 text-emerald-900">
@@ -864,10 +867,13 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                       <tr className="bg-slate-100 text-slate-700 font-semibold text-[10px] uppercase border-b border-slate-200">
                         <th className="py-1.5 px-1 w-10 text-center border-r border-slate-200 font-mono" style={{ width: '38px' }}>#</th>
                         <th className="py-1.5 px-2.5 w-[25%] text-center border-r border-slate-200 whitespace-normal">Company Name</th>
-                        <th className="py-1.5 px-2 w-[25%] text-center border-r border-slate-200 whitespace-normal">Role</th>
+                        <th className="py-1.5 px-2 w-[24%] text-center border-r border-slate-200 whitespace-normal">Role</th>
                         <th className="py-1.5 px-1 w-[11%] text-center border-r border-slate-200 whitespace-nowrap">CTC</th>
-                        <th className="py-1.5 px-2 w-[28%] text-center border-r border-slate-200 whitespace-normal">Status</th>
-                        <th className="py-1 px-1 w-[8%] text-center whitespace-normal leading-tight">Offers<br />Received</th>
+                        <th className="py-1.5 px-2 w-[26%] text-center border-r border-slate-200 whitespace-normal">Status</th>
+                        <th className="py-1 px-1 w-[11%] text-center leading-tight">
+                          <span className="block whitespace-nowrap">Offers</span>
+                          <span className="block whitespace-nowrap">Received</span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 text-center">
@@ -875,10 +881,10 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                         <tr key={idx} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} avoid-break`}>
                           <td className="py-1.5 px-1 w-10 text-center text-slate-500 font-mono border-r border-slate-200" style={{ width: '38px' }}>{r.s_no}</td>
                           <td className="py-1.5 px-2.5 w-[25%] text-center font-bold text-slate-900 border-r border-slate-200 whitespace-normal leading-snug">{r.company_name}</td>
-                          <td className="py-1.5 px-2 w-[25%] text-center text-slate-700 border-r border-slate-200 whitespace-normal leading-snug">{r.role || r.job_role || '—'}</td>
+                          <td className="py-1.5 px-2 w-[24%] text-center text-slate-700 border-r border-slate-200 whitespace-normal leading-snug">{r.role || r.job_role || '—'}</td>
                           <td className="py-1.5 px-1 w-[11%] text-center text-slate-700 border-r border-slate-200 whitespace-nowrap">{r.ctc || r.ctc_lpa || '—'}</td>
-                          <td className="py-1.5 px-2 w-[28%] text-center font-medium text-emerald-700 border-r border-slate-200 whitespace-normal leading-snug">{r.status || r.current_status_text || 'Drive Completed'}</td>
-                          <td className="py-1.5 px-1 w-[8%] text-center font-bold text-emerald-700 whitespace-nowrap">{r.offers_received ?? r.selected_count ?? 0}</td>
+                          <td className="py-1.5 px-2 w-[26%] text-center font-medium text-emerald-700 border-r border-slate-200 whitespace-normal leading-snug">{r.status || r.current_status_text || 'Drive Completed'}</td>
+                          <td className="py-1.5 px-1 w-[11%] text-center font-bold text-emerald-700 whitespace-nowrap">{r.offers_received ?? r.selected_count ?? 0}</td>
                         </tr>
                       ))}
                     </tbody>
