@@ -22,6 +22,12 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
     description: 'Browse all frequently asked questions across the iPOMS platform.',
   },
   {
+    id: 'active_college_focus',
+    label: 'Active College Focus & Locking',
+    iconName: 'ShieldCheck',
+    description: 'Weekly college focus locking, coordinator quotas (Min 1, Max 4), and unlocking dashboard modules.',
+  },
+  {
     id: 'report_builder',
     label: 'Report Builder & Exports',
     iconName: 'FileText',
@@ -66,6 +72,29 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
 ];
 
 export const FAQ_ITEMS: FaqItem[] = [
+  // ── 0. Active College Focus & Module Unlocking ──
+  {
+    id: 'faq-0',
+    category: 'active_college_focus',
+    categoryLabel: 'Active College Focus & Locking',
+    question: 'How to unlock the dashboard modules when they are locked, and how many colleges need to be selected in the Active College Focus section?',
+    answer: 'To unlock your dashboard and access all operational modules (Daily Tracker, Weekly Tracker, Leads, Reports, and Pending Tasks), you must select your assigned partner institutions in the **Active College Focus** section on your Coordinator Dashboard and click **Save & Lock Focus**.\n\nHere are the complete guidelines, quotas, and unlocking conditions:\n\n* **1. College Selection Quota (Minimum 1, Maximum 4)**:\n  - **Minimum**: Every coordinator **must select at least 1 partner college** to unlock their dashboard and modules.\n  - **Maximum**: A coordinator can select and manage a **maximum of 4 partner colleges** during any active cycle.\n\n* **2. Strict Mutual Exclusion (Zero Duplication Across Coordinators)**:\n  - The **exact same college cannot be selected by multiple coordinators**.\n  - Once an institution is locked by one coordinator, it is marked with a **`🔒 Handled by [Coordinator Name]`** badge in the matrix and becomes disabled/non-selectable for all other coordinators.\n  - This guarantees all 6 placement coordinators operate on distinct, non-overlapping institutions without duplicate calling or double-handling.\n\n* **3. Weekly Monday Cycle**:\n  - Active college focus is configured on a **weekly basis** starting every **Monday**.\n  - Coordinators update or verify their assigned institutions at the start of each work week.\n\n* **4. How to Lock & Unlock the Modules**:\n  - **To Unlock Dashboard Modules**: Select your 1 to 4 available colleges from the grid and click the **"Save & Lock Focus"** button. The dashboard KPIs, Daily Tracker, Weekly Tracker, Leads, Reports, and sidebar navigation will immediately unlock for full access.\n  - **To Modify Selections Later**: If you ever need to change your focus institutions during the week, click **"Unlock & Edit Focus"**, adjust your selected colleges, and click **"Save & Lock Focus"** again to re-lock.',
+    tags: [
+      'active college focus',
+      'unlock modules',
+      'how to unlock',
+      'minimum colleges',
+      'maximum colleges',
+      'weekly monday',
+      'mutual exclusion',
+      'no duplicate colleges',
+      'save and lock',
+      'unlock and edit',
+      'dashboard locked',
+      'college selection',
+    ],
+  },
+
   // ── 1. Report Builder & Document Generation ──
   {
     id: 'faq-1',

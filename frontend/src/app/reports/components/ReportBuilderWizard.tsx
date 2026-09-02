@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Globe,
   Sparkles,
@@ -20,9 +20,12 @@ import {
   Loader2,
   Briefcase,
   XCircle,
+  Award,
+  Trophy,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { getCachedColleges, fetchAllCollegesCached } from '@/lib/collegeSession';
+import { readSessionUser } from '@/lib/session';
+import { getCachedColleges, fetchAllCollegesCached, sortCollegesWithPriority, getCoordinatorSelectedColleges } from '@/lib/collegeSession';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
 import { DateRangeCalendar, formatPeriodFromDates } from './DateRangeCalendar';
 
@@ -48,6 +51,32 @@ const ACTIVE_LEADS_KPIS = [
   { key: 'graduating_year', label: 'Graduating Batch', desc: 'Target Batch Year' },
 ];
 
+const MONTH_OPTIONS = [
+  { value: '2026-01', label: 'January 2026', badge: '31 Days', sublabel: '01 Jan 2026 – 31 Jan 2026 • Ends on 31st', start: '2026-01-01', end: '2026-01-31' },
+  { value: '2026-02', label: 'February 2026', badge: '28 Days', sublabel: '01 Feb 2026 – 28 Feb 2026 • Ends on 28th', start: '2026-02-01', end: '2026-02-28' },
+  { value: '2026-03', label: 'March 2026', badge: '31 Days', sublabel: '01 Mar 2026 – 31 Mar 2026 • Ends on 31st', start: '2026-03-01', end: '2026-03-31' },
+  { value: '2026-04', label: 'April 2026', badge: '30 Days', sublabel: '01 Apr 2026 – 30 Apr 2026 • Ends on 30th', start: '2026-04-01', end: '2026-04-30' },
+  { value: '2026-05', label: 'May 2026', badge: '31 Days', sublabel: '01 May 2026 – 31 May 2026 • Ends on 31st', start: '2026-05-01', end: '2026-05-31' },
+  { value: '2026-06', label: 'June 2026', badge: '30 Days', sublabel: '01 Jun 2026 – 30 Jun 2026 • Ends on 30th', start: '2026-06-01', end: '2026-06-30' },
+  { value: '2026-07', label: 'July 2026', badge: '31 Days', sublabel: '01 Jul 2026 – 31 Jul 2026 • Ends on 31st', start: '2026-07-01', end: '2026-07-31' },
+  { value: '2026-08', label: 'August 2026', badge: '31 Days', sublabel: '01 Aug 2026 – 31 Aug 2026 • Ends on 31st', start: '2026-08-01', end: '2026-08-31' },
+  { value: '2026-09', label: 'September 2026', badge: '30 Days', sublabel: '01 Sep 2026 – 30 Sep 2026 • Ends on 30th', start: '2026-09-01', end: '2026-09-30' },
+  { value: '2026-10', label: 'October 2026', badge: '31 Days', sublabel: '01 Oct 2026 – 31 Oct 2026 • Ends on 31st', start: '2026-10-01', end: '2026-10-31' },
+  { value: '2026-11', label: 'November 2026', badge: '30 Days', sublabel: '01 Nov 2026 – 30 Nov 2026 • Ends on 30th', start: '2026-11-01', end: '2026-11-30' },
+  { value: '2026-12', label: 'December 2026', badge: '31 Days', sublabel: '01 Dec 2026 – 31 Dec 2026 • Ends on 31st', start: '2026-12-01', end: '2026-12-31' },
+  { value: '2027-01', label: 'January 2027', badge: '31 Days', sublabel: '01 Jan 2027 – 31 Jan 2027 • Ends on 31st', start: '2027-01-01', end: '2027-01-31' },
+  { value: '2027-02', label: 'February 2027', badge: '28 Days', sublabel: '01 Feb 2027 – 28 Feb 2027 • Ends on 28th', start: '2027-02-01', end: '2027-02-28' },
+  { value: '2027-03', label: 'March 2027', badge: '31 Days', sublabel: '01 Mar 2027 – 31 Mar 2027 • Ends on 31st', start: '2027-03-01', end: '2027-03-31' },
+  { value: '2027-04', label: 'April 2027', badge: '30 Days', sublabel: '01 Apr 2027 – 30 Apr 2027 • Ends on 30th', start: '2027-04-01', end: '2027-04-30' },
+  { value: '2027-05', label: 'May 2027', badge: '31 Days', sublabel: '01 May 2027 – 31 May 2027 • Ends on 31st', start: '2027-05-01', end: '2027-05-31' },
+];
+
+const MONTH_END_KPIS = [
+  { key: 'total_conversion_count', label: 'Total Conversions', desc: 'Total Conversion Count' },
+  { key: 'total_companies_scheduled', label: 'Companies Scheduled', desc: 'Total Companies Scheduled' },
+  { key: 'total_offers_moved', label: 'Offers Received', desc: 'Total Offers Received' },
+];
+
 interface Props {
   initialTemplateType: string;
   initialCollegeId: string;
@@ -69,13 +98,15 @@ export function ReportBuilderWizard({
     initialTemplateType === 'active_leads' ? '' : 'all'
   );
 
+  // Selected Month for Month-End reports
+  const [selectedMonth, setSelectedMonth] = useState('2026-08');
+
   // Dynamic Interactive Date Range Calendar Selection
   const [startDate, setStartDate] = useState('2026-08-21');
   const [endDate, setEndDate] = useState('2026-08-27');
   const [weekLabel, setWeekLabel] = useState(
     () => formatPeriodFromDates('2026-08-21', '2026-08-27') || '21 Aug – 27 Aug 2026'
   );
-
   const [theme, setTheme] = useState('blue');
   const [customRemarks, setCustomRemarks] = useState(() => {
     if (initialTemplateType === 'pending_tasks') {
@@ -83,6 +114,9 @@ export function ReportBuilderWizard({
     }
     if (initialTemplateType === 'active_leads') {
       return 'Comprehensive active corporate roster curated for campus recruitment engagements.';
+    }
+    if (initialTemplateType === 'month_end') {
+      return 'Comprehensive monthly recruitment progress review covering conversions, scheduled drives, and placement selections.';
     }
     return 'All campus drives are progressing actively as per schedule. Follow-ups with upcoming tech partners remain on track.';
   });
@@ -97,6 +131,15 @@ export function ReportBuilderWizard({
       s.kpi_summary = true;
       s.active_leads = true;
       s.remarks = true;
+    } else if (initialTemplateType === 'month_end') {
+      s.kpi_summary = true;
+      s.completed_companies = true;
+      s.company_conversions = true;
+      s.companies_in_drive = true;
+      s.company_drives_scheduled = true;
+      s.on_hold_by_college = true;
+      s.on_hold_by_hr = true;
+      s.remarks = false;
     } else {
       s.kpi_summary = true;
       s.completed_companies = true;
@@ -124,6 +167,10 @@ export function ReportBuilderWizard({
     total_leads: true,
     graduating_year: true,
     active_companies_count: true,
+    colleges_handled: true,
+    total_conversion_count: true,
+    total_companies_scheduled: true,
+    total_offers_moved: true,
   });
 
   const [colleges, setColleges] = useState<College[]>(() => getCachedColleges());
@@ -133,6 +180,7 @@ export function ReportBuilderWizard({
   // Live Weekly Tracker Companies State (Synced directly with Weekly Tracker DB)
   const [weeklyCompanies, setWeeklyCompanies] = useState<{
     completed: any[];
+    in_drive: any[];
     in_progress: any[];
     pipeline: any[];
     top_companies: any[];
@@ -141,6 +189,7 @@ export function ReportBuilderWizard({
     on_hold_by_hr: any[];
   }>({
     completed: [],
+    in_drive: [],
     in_progress: [],
     pipeline: [],
     top_companies: [],
@@ -150,52 +199,77 @@ export function ReportBuilderWizard({
   });
   const [loadingWeekly, setLoadingWeekly] = useState(false);
 
+  // Sync colleges on mount
   useEffect(() => {
-    if (initialTemplateType) setTemplateType(initialTemplateType);
-  }, [initialTemplateType]);
-
-  useEffect(() => {
-    if (initialCollegeId) setCollegeId(initialCollegeId);
-  }, [initialCollegeId]);
-
-  useEffect(() => {
-    fetchAllCollegesCached()
-      .then((list) => {
-        if (Array.isArray(list) && list.length > 0) {
-          setColleges(list);
+    let isMounted = true;
+    const loadColleges = async () => {
+      try {
+        const fetched = await fetchAllCollegesCached();
+        if (isMounted && fetched && fetched.length > 0) {
+          setColleges(fetched);
         }
-      })
-      .catch(console.error);
+      } catch (err) {
+        console.error('Failed to load colleges in ReportBuilderWizard:', err);
+      }
+    };
+    loadColleges();
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Fetch Live Weekly Tracker Companies whenever target college, batch or template changes
+  // Prioritize active focus colleges first, followed by all remaining colleges in alphabetical order
+  const prioritizedColleges = useMemo(() => {
+    const coordinatorSelectedIds = getCoordinatorSelectedColleges();
+    const focusedIdsFromColleges = (colleges as any[]).filter((c) => c.is_selected_by_me).map((c) => c._id);
+    const activeFocusIds = Array.from(new Set([...coordinatorSelectedIds, ...focusedIdsFromColleges]));
+    return sortCollegesWithPriority(colleges as any[], activeFocusIds);
+  }, [colleges]);
+
+  // Fetch live Weekly Tracker companies for the selected college and batch
   useEffect(() => {
-    if (templateType !== 'weekly_placement') return;
+    if (!collegeId || collegeId === 'all' || templateType === 'active_leads') {
+      setWeeklyCompanies({
+        completed: [],
+        in_drive: [],
+        in_progress: [],
+        pipeline: [],
+        top_companies: [],
+        rejected_companies: [],
+        on_hold_by_college: [],
+        on_hold_by_hr: [],
+      });
+      return;
+    }
 
     let isMounted = true;
-    setLoadingWeekly(true);
-
     const fetchWeeklyData = async () => {
+      setLoadingWeekly(true);
       try {
-        const queryParams = new URLSearchParams();
-        if (collegeId && collegeId !== 'all') {
-          queryParams.append('college_id', collegeId);
-        }
+        const params = new URLSearchParams();
+        params.set('college_id', collegeId);
         if (academicYear && academicYear !== 'all') {
-          queryParams.append('academic_year', academicYear);
+          params.set('academic_year', academicYear);
         }
 
-        const res = await apiFetch<any>(`/weekly-tracker?${queryParams.toString()}`);
-        if (isMounted && res.success && res.data) {
-          const d = res.data.sections || res.data;
+        const res = await apiFetch(`/weekly-tracker?${params.toString()}`);
+        if (isMounted && res.success && Array.isArray(res.data)) {
+          const rows = res.data;
           setWeeklyCompanies({
-            completed: Array.isArray(d.completed?.rows) ? d.completed.rows : (Array.isArray(d.completed) ? d.completed : []),
-            in_progress: Array.isArray(d.in_progress?.rows) ? d.in_progress.rows : (Array.isArray(d.in_progress) ? d.in_progress : []),
-            pipeline: Array.isArray(d.pipeline?.rows) ? d.pipeline.rows : (Array.isArray(d.pipeline) ? d.pipeline : []),
-            top_companies: Array.isArray(d.top_companies?.rows) ? d.top_companies.rows : (Array.isArray(d.top_companies) ? d.top_companies : []),
-            rejected_companies: Array.isArray(d.rejected_companies?.rows) ? d.rejected_companies.rows : (Array.isArray(d.rejected_by_hr?.rows) ? d.rejected_by_hr.rows : []),
-            on_hold_by_college: Array.isArray(d.on_hold_by_college?.rows) ? d.on_hold_by_college.rows : (Array.isArray(d.rejected_by_college?.rows) ? d.rejected_by_college.rows : []),
-            on_hold_by_hr: Array.isArray(d.on_hold_by_hr?.rows) ? d.on_hold_by_hr.rows : [],
+            completed: rows.filter((r: any) => r.pipeline_section === 'completed'),
+            in_drive: rows.filter((r: any) => r.pipeline_section === 'in_drive' || r.pipeline_section === 'companies_in_drive'),
+            in_progress: rows.filter((r: any) => r.pipeline_section === 'in_progress'),
+            pipeline: rows.filter((r: any) => r.pipeline_section === 'pipeline'),
+            top_companies: rows.filter(
+              (r: any) => r.pipeline_section === 'top_companies' || r.is_pinned_top
+            ),
+            rejected_companies: rows.filter(
+              (r: any) => r.pipeline_section === 'rejected_companies' || r.pipeline_section === 'rejected_by_hr'
+            ),
+            on_hold_by_college: rows.filter(
+              (r: any) => r.pipeline_section === 'on_hold_by_college' || r.pipeline_section === 'rejected_by_college'
+            ),
+            on_hold_by_hr: rows.filter((r: any) => r.pipeline_section === 'on_hold_by_hr'),
           });
         }
       } catch (err) {
@@ -204,9 +278,7 @@ export function ReportBuilderWizard({
         if (isMounted) setLoadingWeekly(false);
       }
     };
-
     fetchWeeklyData();
-
     return () => {
       isMounted = false;
     };
@@ -229,6 +301,18 @@ export function ReportBuilderWizard({
           remarks: true,
         });
         setCustomRemarks('Comprehensive active corporate roster curated for campus recruitment engagements.');
+      } else if (initialTemplateType === 'month_end') {
+        setSections({
+          kpi_summary: true,
+          completed_companies: true,
+          company_conversions: true,
+          companies_in_drive: true,
+          company_drives_scheduled: true,
+          on_hold_by_college: true,
+          on_hold_by_hr: true,
+          remarks: false,
+        });
+        setCustomRemarks('Comprehensive monthly recruitment progress review covering conversions, scheduled drives, and placement selections.');
       } else {
         setSections({
           kpi_summary: true,
@@ -268,6 +352,21 @@ export function ReportBuilderWizard({
         remarks: true,
       });
       setCustomRemarks('Comprehensive active corporate roster curated for campus recruitment engagements.');
+    } else if (newType === 'month_end') {
+      setSections({
+        kpi_summary: true,
+        completed_companies: true,
+        company_conversions: true,
+        companies_in_drive: true,
+        company_drives_scheduled: true,
+        on_hold_by_college: true,
+        on_hold_by_hr: true,
+        remarks: false,
+      });
+      setStartDate('2026-08-01');
+      setEndDate('2026-08-31');
+      setWeekLabel('August 2026');
+      setCustomRemarks('Comprehensive monthly recruitment progress review covering conversions, scheduled drives, and placement selections.');
     } else {
       setSections({
         kpi_summary: true,
@@ -286,19 +385,19 @@ export function ReportBuilderWizard({
     setValidationErrors([]);
     const errors: string[] = [];
 
-    // 1. Mandatory Target College (Only for Weekly Placement and Pending Tasks, NOT for Active Leads)
-    if (templateType !== 'active_leads') {
+    // 1. Mandatory Target College (For Weekly Placement, Month-End, and Pending Tasks)
+    if (templateType === 'weekly_placement' || templateType === 'pending_tasks' || templateType === 'month_end') {
       if (!collegeId || collegeId.trim() === '' || collegeId === 'all') {
         errors.push('Target Institution is required. Please pick a college to generate the report.');
       }
     }
 
-    // 2. Mandatory Graduating Academic Year (Strictly enforced for Active Leads: 2027, 2028, 2029...)
+    // 2. Graduating Academic Year (Mandatory for Active Leads & Weekly Reports, Optional for Month-End)
     if (templateType === 'active_leads') {
       if (!academicYear || academicYear === 'all' || academicYear.trim() === '') {
         errors.push('Graduating Academic Batch Year (e.g., 2027, 2028, 2029) is mandatory for Active Leads.');
       }
-    } else {
+    } else if (templateType !== 'month_end') {
       if (!academicYear || academicYear.trim() === '') {
         errors.push('Graduating Academic Year must be selected.');
       }
@@ -336,7 +435,7 @@ export function ReportBuilderWizard({
         body: JSON.stringify({
           template_type: templateType,
           college_id: templateType === 'active_leads' ? (collegeId || 'all') : collegeId,
-          coordinator_id: coordinatorId,
+          coordinator_id: coordinatorId || readSessionUser()?._id || readSessionUser()?.id || '',
           academic_year: academicYear,
           week_label: weekLabel,
           theme,
@@ -382,6 +481,64 @@ export function ReportBuilderWizard({
           kpiList: ACTIVE_LEADS_KPIS,
         },
         { key: 'remarks', label: 'Notes', icon: PenLine, desc: 'Corporate relationship overview and strategic notes' },
+      ];
+    }
+    if (templateType === 'month_end') {
+      return [
+        {
+          key: 'kpi_summary',
+          label: 'Month-End Executive KPI Cards',
+          icon: BarChart3,
+          desc: '3 colored cards: Total conversions, Companies scheduled, Offers received',
+          isKpiSection: true,
+          kpiList: MONTH_END_KPIS,
+        },
+        {
+          key: 'completed_companies',
+          label: 'Companies Completed',
+          icon: Trophy,
+          desc: 'Company Name, Role, CTC, Status, Offers Received',
+          companies: weeklyCompanies.completed,
+          badgeColor: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+        },
+        {
+          key: 'company_conversions',
+          label: 'JD Received Companies',
+          icon: Briefcase,
+          desc: 'Company Name, Role, CTC, JD Received Date',
+          companies: weeklyCompanies.in_progress,
+          badgeColor: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+        },
+        {
+          key: 'companies_in_drive',
+          label: 'Companies in Drive',
+          icon: Calendar,
+          desc: 'Company Name, Role, CTC, Status',
+          companies: weeklyCompanies.in_drive,
+          badgeColor: 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
+        },
+        {
+          key: 'on_hold_by_college',
+          label: 'Companies on Hold by TPO',
+          icon: Clock,
+          desc: 'Placement drives placed on hold by college management / TPO',
+          companies: weeklyCompanies.on_hold_by_college,
+          badgeColor: 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+        },
+        {
+          key: 'on_hold_by_hr',
+          label: 'Companies on Hold by HR',
+          icon: AlertCircle,
+          desc: 'Drives on hold from corporate employer / HR side',
+          companies: weeklyCompanies.on_hold_by_hr,
+          badgeColor: 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
+        },
+        {
+          key: 'remarks',
+          label: 'Coordinator Monthly Observations',
+          icon: PenLine,
+          desc: 'Operational summary and placement review notes',
+        },
       ];
     }
 
@@ -477,26 +634,39 @@ export function ReportBuilderWizard({
   return (
     <div className="space-y-6 text-fg">
 
-      {/* ── Navigation Tabs (Weekly Report, Pending Tasks, Active Leads) ────────────────── */}
+      {/* ── Navigation Tabs (Weekly Report, Month-End Report, Pending Tasks, Active Leads) ────────────────── */}
       <div className="flex justify-center pt-2 pb-2">
-        <div className="w-full max-w-2xl bg-surface border border-border p-1.5 rounded-2xl shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+        <div className="w-full max-w-4xl bg-surface border border-border p-1.5 rounded-2xl shadow-xs grid grid-cols-2 md:grid-cols-4 gap-1.5">
           <button
             type="button"
             onClick={() => handleCategoryChange('weekly_placement')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
+            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'weekly_placement'
                 ? 'bg-primary text-white shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
             }`}
           >
             <CalendarDays size={15} strokeWidth={2.2} />
-            <span className="whitespace-nowrap">Weekly Placement Report</span>
+            <span className="whitespace-nowrap">Weekly Report</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleCategoryChange('month_end')}
+            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
+              templateType === 'month_end'
+                ? 'bg-primary text-white shadow-xs'
+                : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
+            }`}
+          >
+            <Award size={15} strokeWidth={2.2} />
+            <span className="whitespace-nowrap">Month-End Report</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleCategoryChange('pending_tasks')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
+            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'pending_tasks'
                 ? 'bg-primary text-white shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
@@ -509,7 +679,7 @@ export function ReportBuilderWizard({
           <button
             type="button"
             onClick={() => handleCategoryChange('active_leads')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
+            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'active_leads'
                 ? 'bg-primary text-white shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
@@ -529,18 +699,22 @@ export function ReportBuilderWizard({
           <div className="flex items-center gap-2 border-b border-border/80 pb-2">
             {templateType === 'active_leads' ? (
               <Sparkles size={16} className="text-primary shrink-0" />
+            ) : templateType === 'month_end' ? (
+              <Award size={16} className="text-indigo-600 shrink-0" />
             ) : (
               <Building2 size={16} className="text-primary shrink-0" />
             )}
             <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
               {templateType === 'active_leads'
                 ? 'Target Graduating Batch'
+                : templateType === 'month_end'
+                ? 'Institutional Scope & Batch'
                 : 'Institutional Scope & Batch'}
             </h2>
           </div>
 
           <div className={`grid gap-4 ${templateType === 'active_leads' ? 'grid-cols-1 max-w-md' : 'grid-cols-1 md:grid-cols-2'}`}>
-            {/* Target College (Only for Weekly Placement and Pending Tasks, NOT for Active Leads) */}
+            {/* Target College (For Weekly Placement, Month-End, Pending Tasks) */}
             {templateType !== 'active_leads' && (
               <div>
                 <label className="block text-xs font-semibold text-fg mb-1.5">
@@ -568,11 +742,12 @@ export function ReportBuilderWizard({
                         searchPlaceholder="Search institution name or code…"
                         icon={Building2}
                         title="Target College / Institution"
-                        options={colleges.map((c: any) => ({
+                        options={prioritizedColleges.map((c: any) => ({
                           value: c._id,
                           label: c.college_name,
                           badge: c.college_code,
                           sublabel: c.location,
+                          isPinned: Boolean(c.isPinned || c.is_selected_by_me),
                         }))}
                       />
                       {isMissingCollege && (
@@ -590,11 +765,12 @@ export function ReportBuilderWizard({
             {/* Graduating Academic Year / Batch */}
             <div>
               <label className="block text-xs font-semibold text-fg mb-1.5">
-                Graduating Academic Batch <span className="text-rose-500 font-bold ml-0.5">*</span>
+                Graduating Academic Batch {templateType === 'month_end' ? <span className="text-fg-subtle text-[11px] font-normal">(Optional)</span> : <span className="text-rose-500 font-bold ml-0.5">*</span>}
               </label>
               {(() => {
                 const isMissingBatch =
                   validationErrors.length > 0 &&
+                  templateType !== 'month_end' &&
                   ((templateType === 'active_leads' && (!academicYear || academicYear === 'all')) || !academicYear);
 
                 const batchOptions = [
@@ -637,7 +813,7 @@ export function ReportBuilderWizard({
           </div>
         </div>
 
-        {/* Section B: Reporting Period (Only for Weekly Report) */}
+        {/* Section B: Reporting Period (For Weekly Report & Month-End Report) */}
         {templateType === 'weekly_placement' && (
           <div className="space-y-4 pt-2">
             <div className="flex items-center gap-2 border-b border-border/80 pb-2">
@@ -659,13 +835,74 @@ export function ReportBuilderWizard({
           </div>
         )}
 
+        {templateType === 'month_end' && (
+          <div className="space-y-4 pt-2">
+            <div className="flex items-center gap-2 border-b border-border/80 pb-2">
+              <Calendar size={16} className="text-primary shrink-0" />
+              <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
+                Month-End Reporting Period
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+              <div>
+                <label className="block text-xs font-semibold text-fg mb-1.5">
+                  Select Reporting Month <span className="text-rose-500 font-bold ml-0.5">*</span>
+                </label>
+                <SmoothSelect
+                  value={selectedMonth}
+                  onChange={(val) => {
+                    setSelectedMonth(val);
+                    const found = MONTH_OPTIONS.find((m) => m.value === val);
+                    if (found) {
+                      setStartDate(found.start);
+                      setEndDate(found.end);
+                      setWeekLabel(`${found.label} (${found.start} – ${found.end})`);
+                      setValidationErrors([]);
+                    }
+                  }}
+                  placeholder="Select Month"
+                  icon={CalendarDays}
+                  title="Month-End Reporting Cycle"
+                  options={MONTH_OPTIONS.map((m) => ({
+                    value: m.value,
+                    label: m.label,
+                    badge: m.badge,
+                    sublabel: m.sublabel,
+                  }))}
+                />
+              </div>
+
+              {(() => {
+                const activeMonth = MONTH_OPTIONS.find((m) => m.value === selectedMonth) || MONTH_OPTIONS[7];
+                return (
+                  <div className="mt-0 md:mt-6 p-3.5 rounded-xl border border-primary/20 bg-primary/5 dark:bg-primary/10 flex flex-col justify-center space-y-1 text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 font-bold text-fg">
+                        <CheckCircle2 size={15} className="text-primary shrink-0" />
+                        <span>{activeMonth.label}</span>
+                      </div>
+                      <span className="bg-primary text-white font-mono text-[10px] font-bold px-2 py-0.5 rounded-md shadow-2xs">
+                        {activeMonth.badge}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-fg-muted pl-6">
+                      Submission Cycle: <strong className="text-fg font-semibold">{activeMonth.start}</strong> to <strong className="text-fg font-semibold">{activeMonth.end}</strong>
+                    </p>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
         {/* Section C: Included Report Sections (Live Synced with Weekly Tracker) */}
         <div className="space-y-4 pt-2">
           <div className="flex items-center justify-between border-b border-border/80 pb-2 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <Layers size={16} className="text-primary shrink-0" />
               <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
-                Sections & Companies to Include in Report
+                Sections & Metrics to Include in Report
               </h2>
             </div>
             <div className="flex items-center gap-2">
@@ -677,6 +914,11 @@ export function ReportBuilderWizard({
               {templateType === 'active_leads' && (
                 <span className="flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-400 font-bold">
                   <Sparkles size={12} /> Synced with Active Leads Management
+                </span>
+              )}
+              {templateType === 'month_end' && (
+                <span className="flex items-center gap-1.5 text-[11px] text-indigo-600 dark:text-indigo-400 font-bold">
+                  <Award size={12} /> Individual Coordinator Month-End Summary
                 </span>
               )}
               <span className="text-micro font-semibold text-fg-subtle">

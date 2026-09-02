@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { SplashScreen } from '@/components/SplashScreen';
 import { readSessionUser } from '@/lib/session';
 
-/** 5-second splash duration before proceeding to authentication or dashboard */
-const SPLASH_MS = 5000;
+/** 1.2-second smooth splash duration before proceeding to authentication or dashboard */
+const SPLASH_MS = 1200;
 
 export default function EntryPage() {
   const router = useRouter();

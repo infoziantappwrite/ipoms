@@ -78,7 +78,11 @@ const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 const MAX_FAILED_ATTEMPTS = 3;
 const OTP_TTL_MINUTES = 10;
 const OTP_MAX_ATTEMPTS = 5;
-const STAFF_DOMAIN = 'infoziant.com';
+const STAFF_DOMAINS = ['infoziant.com', 'icl.today'];
+function isStaffDomain(email) {
+    const lower = email.toLowerCase().trim();
+    return STAFF_DOMAINS.some((domain) => lower.endsWith(`@${domain}`));
+}
 /**
  * "Remember this device" support. The access token stays a short-lived
  * (8h) bearer token used on every request; a long-lived refresh token
@@ -173,8 +177,8 @@ function registerAuthRoutes(app) {
             if (!name || !uname || !email || !password) {
                 return fail(res, 400, 'FIELDS_REQUIRED', 'Please complete all required fields.');
             }
-            if (!email.endsWith(`@${STAFF_DOMAIN}`)) {
-                return fail(res, 400, 'INVALID_DOMAIN', `Only @${STAFF_DOMAIN} email addresses are permitted.`);
+            if (!isStaffDomain(email)) {
+                return fail(res, 400, 'INVALID_DOMAIN', `Only @${STAFF_DOMAINS.join(' or @')} email addresses are permitted.`);
             }
             if (!(0, passwordPolicy_1.isPasswordValid)(password)) {
                 return fail(res, 400, 'PASSWORD_POLICY', (0, passwordPolicy_1.firstPasswordError)(password) || 'Password does not meet the policy.');
@@ -331,8 +335,8 @@ function registerAuthRoutes(app) {
             if (!name || !uname || !email || !password) {
                 return fail(res, 400, 'FIELDS_REQUIRED', 'Please complete all required fields.');
             }
-            if (!email.endsWith(`@${STAFF_DOMAIN}`)) {
-                return fail(res, 400, 'INVALID_DOMAIN', `Only @${STAFF_DOMAIN} email addresses are permitted.`);
+            if (!isStaffDomain(email)) {
+                return fail(res, 400, 'INVALID_DOMAIN', `Only @${STAFF_DOMAINS.join(' or @')} email addresses are permitted.`);
             }
             if (!(0, passwordPolicy_1.isPasswordValid)(password)) {
                 return fail(res, 400, 'PASSWORD_POLICY', (0, passwordPolicy_1.firstPasswordError)(password) || 'Password does not meet the policy.');
@@ -386,10 +390,10 @@ function registerAuthRoutes(app) {
             // Distinguish the three ways an email can be wrong, so the form can point
             // at the actual problem instead of saying "invalid" to all of them.
             if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) {
-                return fail(res, 400, 'EMAIL_MALFORMED', 'That is not a valid email address. Example: name@infoziant.com');
+                return fail(res, 400, 'EMAIL_MALFORMED', 'That is not a valid email address. Example: name@infoziant.com or name@icl.today');
             }
-            if (!rawEmail.endsWith(`@${STAFF_DOMAIN}`)) {
-                return fail(res, 400, 'EMAIL_WRONG_DOMAIN', `Use your Infoziant address — it must end in @${STAFF_DOMAIN}.`);
+            if (!isStaffDomain(rawEmail)) {
+                return fail(res, 400, 'EMAIL_WRONG_DOMAIN', `Use your official organization address — it must end in @${STAFF_DOMAINS.join(' or @')}.`);
             }
             const user = await User_1.User.findOne({ official_email: rawEmail, is_deleted: false });
             if (!user) {

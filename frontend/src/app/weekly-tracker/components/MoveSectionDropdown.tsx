@@ -12,6 +12,7 @@ import {
   Clock,
   Check,
   ChevronDown,
+  Calendar,
 } from 'lucide-react';
 import { triggerHaptic } from '@/lib/haptics';
 
@@ -30,6 +31,13 @@ export const WEEKLY_PIPELINE_SECTIONS: MoveSectionOption[] = [
     Icon: Trophy,
     colorClass: 'text-emerald-600 dark:text-emerald-400',
     activeBgClass: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-bold',
+  },
+  {
+    key: 'in_drive',
+    label: 'Companies in Drive',
+    Icon: Calendar,
+    colorClass: 'text-indigo-600 dark:text-indigo-400',
+    activeBgClass: 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-bold',
   },
   {
     key: 'in_progress',

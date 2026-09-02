@@ -52,7 +52,7 @@ export function WeeklyTable({
   onEditRow,
 }: Props) {
   const isCompletedSection = sectionKey === 'completed';
-  const hasFollowUpColumn = ['in_progress', 'pipeline', 'follow_ups_due_today'].includes(sectionKey);
+  const hasFollowUpColumn = ['in_drive', 'companies_in_drive', 'in_progress', 'pipeline', 'follow_ups_due_today'].includes(sectionKey);
 
   if (rows.length === 0) {
     return (

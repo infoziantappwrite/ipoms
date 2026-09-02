@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { X, CheckCircle2, Pencil, Trash2, Building2, Sparkles, ClipboardList, GraduationCap } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
+import { sortCollegesWithPriority, getCoordinatorSelectedColleges } from '@/lib/collegeSession';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
 import { SmoothYearDropdown } from '@/components/ui/SmoothYearDropdown';
@@ -51,6 +52,13 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
   const [ctcUnit, setCtcUnit] = useState<'LPA' | '/ Month'>(() => {
     return lead.ctc?.includes('/ Month') ? '/ Month' : 'LPA';
   });
+
+  const prioritizedColleges = useMemo(() => {
+    const coordinatorSelectedIds = getCoordinatorSelectedColleges();
+    const focusedIdsFromColleges = (colleges as any[]).filter((c) => c.is_selected_by_me).map((c) => c._id);
+    const activeFocusIds = Array.from(new Set([...coordinatorSelectedIds, ...focusedIdsFromColleges]));
+    return sortCollegesWithPriority(colleges as any[], activeFocusIds);
+  }, [colleges]);
 
   // Close on Escape key
   useEffect(() => {
@@ -207,10 +215,12 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
                 title="Select Associated Institution"
                 options={[
                   { value: '', label: '— No Specific College —' },
-                  ...colleges.map((c) => ({
+                  ...prioritizedColleges.map((c: any) => ({
                     value: c._id,
                     label: c.college_name,
                     badge: c.college_code,
+                    sublabel: c.location,
+                    isPinned: Boolean(c.isPinned || c.is_selected_by_me),
                   })),
                 ]}
               />

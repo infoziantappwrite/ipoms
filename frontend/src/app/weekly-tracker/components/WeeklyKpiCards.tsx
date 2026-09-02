@@ -1,9 +1,10 @@
 'use client';
 
-import { Clock, Trophy, Rocket, Inbox, Star, XCircle } from 'lucide-react';
+import { Clock, Trophy, Rocket, Inbox, Star, XCircle, Calendar } from 'lucide-react';
 
 export interface WeeklyKpiData {
   pipeline: number;
+  in_drive?: number;
   in_progress: number;
   completed: number;
   total_offers: number;
@@ -29,6 +30,16 @@ export function WeeklyKpiCards({ kpi, activeSectionFilter, onFilterSection }: Pr
       borderCol: 'border-emerald-200/80 dark:border-emerald-900/50 hover:border-emerald-300',
       activeBorder: 'border-emerald-500 bg-emerald-50/80 dark:bg-emerald-950/80 ring-2 ring-emerald-400/30',
       Icon: Trophy,
+    },
+    {
+      key: 'in_drive',
+      label: 'In Drive',
+      value: kpi.in_drive ?? 0,
+      textColor: 'text-indigo-700 dark:text-indigo-400',
+      bgLight: 'bg-indigo-50 dark:bg-indigo-950/60',
+      borderCol: 'border-indigo-200/80 dark:border-indigo-900/50 hover:border-indigo-300',
+      activeBorder: 'border-indigo-500 bg-indigo-50/80 dark:bg-indigo-950/80 ring-2 ring-indigo-400/30',
+      Icon: Calendar,
     },
     {
       key: 'in_progress',
@@ -73,7 +84,7 @@ export function WeeklyKpiCards({ kpi, activeSectionFilter, onFilterSection }: Pr
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 w-full">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 w-full">
       {cards.map((c) => {
         const isActive = activeSectionFilter === c.key;
         const IconComponent = c.Icon;

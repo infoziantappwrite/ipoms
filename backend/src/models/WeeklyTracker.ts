@@ -4,6 +4,8 @@ import mongoose, { Document, Schema, Model, Types } from 'mongoose';
 // Spec: Module_04_Weekly_Tracker_Specification_v1.0.md — Section 7 & 8
 export type PipelineSection =
   | 'completed'
+  | 'in_drive'
+  | 'companies_in_drive'
   | 'in_progress'
   | 'pipeline'
   | 'top_companies'
@@ -15,6 +17,8 @@ export type PipelineSection =
 
 export const PIPELINE_SECTIONS: PipelineSection[] = [
   'completed',
+  'in_drive',
+  'companies_in_drive',
   'in_progress',
   'pipeline',
   'top_companies',

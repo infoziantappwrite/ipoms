@@ -42,7 +42,7 @@ const PERIOD_ICON: Record<GreetingPeriod, LucideIcon> = {
   afternoon: Sun,
   early_evening: Sunset,
   dusk: Sunset,
-  evening: Moon,
+  evening: Sunset,
   night: Moon,
 };
 

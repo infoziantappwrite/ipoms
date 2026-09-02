@@ -2,13 +2,14 @@
 
 import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Check, Search, X } from 'lucide-react';
+import { ChevronDown, Check, Search, X, Sparkles } from 'lucide-react';
 
 export interface SelectOption {
   value: string;
   label: string;
   sublabel?: string;
   badge?: string;
+  isPinned?: boolean;
   icon?: React.ElementType;
 }
 
@@ -282,22 +283,29 @@ export function SmoothSelect({
                       className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer text-left select-none ${
                         isSelected
                           ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-semibold'
+                          : opt.isPinned
+                          ? 'bg-blue-50/40 dark:bg-blue-950/20 text-slate-800 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-900/30'
                           : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                       }`}
                     >
-                      <div className="flex items-center gap-2 truncate">
+                      <div className="flex items-center gap-2 truncate flex-1 min-w-0">
                         {OptionIcon && (
                           <OptionIcon
                             size={14}
                             className={isSelected ? 'text-blue-600' : 'text-slate-400'}
                           />
                         )}
-                        <div className="truncate">
-                          <div className="flex items-center gap-1.5 truncate">
+                        <div className="truncate flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 truncate flex-wrap">
                             {opt.badge && (
                               <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold">[{opt.badge}]</span>
                             )}
                             <span className="truncate">{opt.label}</span>
+                            {opt.isPinned && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold text-[9px] tracking-tight shrink-0 border border-blue-500/20">
+                                <Sparkles size={8} className="text-amber-500 shrink-0" /> Focus
+                              </span>
+                            )}
                           </div>
                           {opt.sublabel && (
                             <p className="text-[10px] text-slate-400 dark:text-slate-500 font-normal truncate mt-0.5">

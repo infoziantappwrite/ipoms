@@ -198,12 +198,16 @@ export function PendingTaskTable({
 
                     {/* JD Received Date */}
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5 text-fg-muted font-medium">
-                        <Calendar size={13} className="text-fg-subtle shrink-0" />
-                        <span className="font-mono text-[11px] text-fg-muted">
-                          {formatDate(task.jd_received_date)}
-                        </span>
-                      </div>
+                      {task.jd_received_date ? (
+                        <div className="flex items-center gap-1.5 text-fg-muted font-medium">
+                          <Calendar size={13} className="text-fg-subtle shrink-0" />
+                          <span className="font-mono text-[11px] text-fg-muted">
+                            {formatDate(task.jd_received_date)}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-fg-disabled text-xs font-mono">—</span>
+                      )}
                     </td>
 
                     {/* DB Shared Date */}

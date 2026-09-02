@@ -102,11 +102,11 @@ export function MetadataHeader({
               </>
             )}
           </div>
-          <p className="text-xs text-fg-subtle mt-0.5">
-            {isRecycleBin
-              ? 'View, restore, or permanently purge recently deleted company and HR contact records'
-              : 'Centralized Corporate Directory, HR Contacts & Intelligence Repository'}
-          </p>
+          {isRecycleBin && (
+            <p className="text-xs text-fg-subtle mt-0.5">
+              View, restore, or permanently purge recently deleted company and HR contact records
+            </p>
+          )}
         </div>
 
         {/* Top-Right Sign Out */}

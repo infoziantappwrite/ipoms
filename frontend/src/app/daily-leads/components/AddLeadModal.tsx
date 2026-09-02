@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { ClipboardList, Plus, Sparkles, Zap, X, CheckCircle2, Building2, GraduationCap } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
+import { sortCollegesWithPriority, getCoordinatorSelectedColleges } from '@/lib/collegeSession';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
 import { SmoothYearDropdown } from '@/components/ui/SmoothYearDropdown';
@@ -66,6 +67,13 @@ export function AddLeadModal({
       })
       .catch(console.error);
   }, []);
+
+  const prioritizedColleges = useMemo(() => {
+    const coordinatorSelectedIds = getCoordinatorSelectedColleges();
+    const focusedIdsFromColleges = (colleges as any[]).filter((c) => c.is_selected_by_me).map((c) => c._id);
+    const activeFocusIds = Array.from(new Set([...coordinatorSelectedIds, ...focusedIdsFromColleges]));
+    return sortCollegesWithPriority(colleges as any[], activeFocusIds);
+  }, [colleges]);
 
   // Fetch Daily Tracker positives for Copy Shortcut
   const handleOpenDtDrawer = () => {
@@ -296,10 +304,12 @@ export function AddLeadModal({
                 title="Select Associated Institution"
                 options={[
                   { value: '', label: '— Select College (Required) —' },
-                  ...colleges.map((c) => ({
+                  ...prioritizedColleges.map((c: any) => ({
                     value: c._id,
                     label: c.college_name,
                     badge: c.college_code,
+                    sublabel: c.location,
+                    isPinned: Boolean(c.isPinned || c.is_selected_by_me),
                   })),
                 ]}
               />

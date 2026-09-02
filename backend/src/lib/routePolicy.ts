@@ -104,7 +104,7 @@ const POLICIES: Policy[] = [
   { method: 'GET',    pattern: /^\/metadata\/?$/,                        roles: STAFF },
 
   // ── Colleges & staff directory ────────────────────────────────────────────
-  { method: 'GET',    pattern: /^\/colleges\/?$/,                        roles: STAFF },
+  { method: '*',      pattern: /^\/colleges(\/.*)?$/,                    roles: STAFF },
   { method: 'GET',    pattern: /^\/coordinators\/?$/,                    roles: TL_ADMIN },
 
   // ── Daily Tracker (own call log) ──────────────────────────────────────────
