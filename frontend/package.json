@@ -2,12 +2,13 @@
   "name": "ipoms-frontend",
   "version": "1.0.0",
   "private": true,
-  "scripts": {
-    "dev": "next dev -p 3000",
-    "build": "next build",
-    "start": "next start -p 3000",
-    "lint": "next lint"
-  },
+"scripts": {
+  "dev": "next dev -p 3000",
+  "build": "next build",
+  "build:mobile": "node -e \"require('fs').copyFileSync('next.config.mobile.js','next.config.js')\" && next build",
+  "start": "next start -p 3000",
+  "lint": "next lint"
+},
   "dependencies": {
     "@capacitor/android": "^8.5.0",
     "@capacitor/cli": "^8.5.0",
@@ -19,7 +20,8 @@
     "ogl": "^1.0.11",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "tailwind-merge": "^2.4.0"
+    "tailwind-merge": "^2.4.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

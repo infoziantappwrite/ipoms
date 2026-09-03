@@ -78,9 +78,9 @@ const allowedOrigins = [
 app.use(helmet());
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin, Vercel deployments, mobile apps, or local networks
-      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app') || origin.startsWith('http://192.168.') || origin.startsWith('http://10.0.2.2')) {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      // Allow requests with no origin (like mobile apps, curl, or server-to-server)
+      if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://192.168.') || origin.startsWith('http://10.0.2.2')) {
         return callback(null, true);
       }
       return callback(null, true);

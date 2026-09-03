@@ -111,7 +111,7 @@ export function authorizeRoles(...allowedRoles: string[]) {
 
     const userRoles = req.user.roles || [];
     const normalizedAllowed = allowedRoles.map((r) => r.toUpperCase());
-    const hasRole = userRoles.some((role) => {
+    const hasRole = userRoles.some((role: string) => {
       const uRole = role.toUpperCase();
       if (normalizedAllowed.includes(uRole)) return true;
       if (uRole === 'ADMIN' && normalizedAllowed.includes('ADMINISTRATOR')) return true;
