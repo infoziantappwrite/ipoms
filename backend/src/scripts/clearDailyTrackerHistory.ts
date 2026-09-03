@@ -1,14 +1,17 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import path from 'path';
+import dns from 'dns';
 import { DailyTracker } from '../models/DailyTracker';
 
-dotenv.config();
+dns.setServers(['8.8.8.8', '1.1.1.1']);
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/ipoms_db';
 
 async function clearDailyTracker() {
   try {
-    console.log(`🔌 Connecting to MongoDB: ${MONGODB_URI}`);
+    console.log(`🔌 Connecting to MongoDB Atlas...`);
     await mongoose.connect(MONGODB_URI);
     
     const countBefore = await DailyTracker.countDocuments({});

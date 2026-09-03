@@ -67,6 +67,8 @@ const POLICIES = [
     { method: 'POST', pattern: /^\/metadata\/?$/, roles: STAFF },
     { method: 'GET', pattern: /^\/metadata\/?$/, roles: STAFF },
     // ── Colleges & staff directory ────────────────────────────────────────────
+    { method: 'PATCH', pattern: new RegExp(`^/colleges/${ID}/status/?$`), roles: TL_ADMIN },
+    { method: 'POST', pattern: /^\/colleges\/sync-roster\/?$/, roles: TL_ADMIN },
     { method: '*', pattern: /^\/colleges(\/.*)?$/, roles: STAFF },
     { method: 'GET', pattern: /^\/coordinators\/?$/, roles: TL_ADMIN },
     // ── Daily Tracker (own call log) ──────────────────────────────────────────

@@ -141,7 +141,8 @@ export function MetadataHeader({
             <SnoRangeSelector
               fromSno={fromSno}
               toSno={toSno}
-              maxSno={totalCount}
+              minSno={isRecent ? 3548 : 1}
+              maxSno={isRecent ? 4050 : Math.max(totalCount, 4050)}
               onApplyRange={onApplyRange}
               onClearRange={onClearRange}
             />

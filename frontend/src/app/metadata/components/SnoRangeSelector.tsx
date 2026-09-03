@@ -6,6 +6,7 @@ import { Hash, ChevronDown, Check, X, AlertTriangle, ArrowRight } from 'lucide-r
 interface Props {
   fromSno: number | null;
   toSno: number | null;
+  minSno?: number;
   maxSno?: number;
   onApplyRange: (from: number | null, to: number | null) => void;
   onClearRange: () => void;
@@ -14,7 +15,8 @@ interface Props {
 export function SnoRangeSelector({
   fromSno,
   toSno,
-  maxSno = 3823,
+  minSno = 1,
+  maxSno = 4050,
   onApplyRange,
   onClearRange,
 }: Props) {
@@ -23,7 +25,7 @@ export function SnoRangeSelector({
   const [localTo, setLocalTo] = useState<string>(toSno ? String(toSno) : '');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const maxSnoRef = useRef<number>(Math.max(3823, maxSno || 3823));
+  const maxSnoRef = useRef<number>(Math.max(4050, maxSno || 4050));
 
   useEffect(() => {
     if (maxSno && maxSno > 500 && maxSno > maxSnoRef.current) {
@@ -31,7 +33,8 @@ export function SnoRangeSelector({
     }
   }, [maxSno]);
 
-  const effectiveMax = Math.max(maxSnoRef.current, maxSno > 500 ? maxSno : maxSnoRef.current);
+  const effectiveMin = Math.max(1, minSno || 1);
+  const effectiveMax = Math.max(effectiveMin, maxSnoRef.current, maxSno || 4050);
 
   // Sync with prop changes
   useEffect(() => {
@@ -79,8 +82,8 @@ export function SnoRangeSelector({
     const fromVal = fromStr.trim() ? parseInt(fromStr.trim(), 10) : null;
     const toVal = toStr.trim() ? parseInt(toStr.trim(), 10) : null;
 
-    if (fromVal !== null && fromVal < 1) {
-      setErrorMessage('Start number must be greater than or equal to 1');
+    if (fromVal !== null && fromVal < effectiveMin) {
+      setErrorMessage(`Start number must be greater than or equal to ${effectiveMin.toLocaleString()}`);
       return false;
     }
 
@@ -113,7 +116,7 @@ export function SnoRangeSelector({
     }
 
     // If only one is filled, auto-fill default bounds
-    const finalFrom = fromVal ?? 1;
+    const finalFrom = fromVal ?? effectiveMin;
     const finalTo = toVal ?? effectiveMax;
 
     onApplyRange(finalFrom, finalTo);
@@ -147,7 +150,7 @@ export function SnoRangeSelector({
         <div className="flex items-center gap-1.5 truncate">
           <span>
             {isRangeActive
-              ? `Range: ${fromSno ?? 1} – ${toSno ?? effectiveMax}`
+              ? `Range: ${fromSno ?? effectiveMin} – ${toSno ?? effectiveMax}`
               : 'Range Picker'}
           </span>
         </div>
@@ -181,7 +184,7 @@ export function SnoRangeSelector({
               <span>Range Picker</span>
             </div>
             <span className="text-[10px] font-semibold text-fg-subtle bg-surface-sunken px-2 py-0.5 rounded-md border border-border">
-              Total: {effectiveMax.toLocaleString()}
+              {effectiveMin > 1 ? `S.No: ${effectiveMin} – ${effectiveMax.toLocaleString()}` : `Total: ${effectiveMax.toLocaleString()}`}
             </span>
           </div>
 
@@ -189,13 +192,13 @@ export function SnoRangeSelector({
           <div className="grid grid-cols-2 gap-2.5">
             <div>
               <label className="block text-[11px] font-semibold text-fg-muted mb-1">
-                Start (≥ 1)
+                Start (≥ {effectiveMin.toLocaleString()})
               </label>
               <input
                 type="number"
-                min="1"
+                min={effectiveMin}
                 max={effectiveMax}
-                placeholder="1"
+                placeholder={String(effectiveMin)}
                 value={localFrom}
                 onChange={(e) => handleFromChange(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleApply()}
@@ -210,7 +213,7 @@ export function SnoRangeSelector({
               </label>
               <input
                 type="number"
-                min="1"
+                min={effectiveMin}
                 max={effectiveMax}
                 placeholder={String(effectiveMax)}
                 value={localTo}

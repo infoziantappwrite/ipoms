@@ -1349,32 +1349,69 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       // 7. Active Corporate Leads (Strictly 4 columns: #, Company Name, Role, CTC)
       if (report.included_sections?.active_leads && report.sections?.active_leads) {
         const alRows = report.sections.active_leads;
-        const headers = ['#', 'Company Name', 'Role', 'CTC'];
-        const colWidths = [50, 420, 420, 230];
-        const rawRows = alRows.map((r: any) => [
-          String(r.s_no || ''),
-          String(r.company_name || '—'),
-          String(r.role || '—'),
-          String(r.ctc || 'Competitive'),
-        ]);
+        const isCanvasJdOnly = Boolean(
+          (report.kpi_summary?.selected_streams?.jd_received && !report.kpi_summary?.selected_streams?.positives && !report.kpi_summary?.selected_streams?.weekly_tracker) ||
+          report.kpi_summary?.tier_focus?.includes('Hot Leads (JD Received)') ||
+          report.report_title?.includes('Hot Leads') ||
+          alRows.some((r: any) => r.colleges && r.colleges !== '—' && r.source === 'jd_received')
+        );
+
+        const activeCols = report.active_leads_columns || {};
+        const showCanvasColleges = activeCols.colleges !== undefined ? activeCols.colleges : isCanvasJdOnly;
+        const showCanvasRole = activeCols.role !== false;
+        const showCanvasCtc = activeCols.ctc !== false;
+
+        const headers: string[] = ['#', 'Company Name'];
+        if (showCanvasColleges) headers.push('Colleges');
+        if (showCanvasRole) headers.push('Role');
+        if (showCanvasCtc) headers.push('CTC');
+
+        // Total available width after # (50px) is 1070px
+        let colWidths: number[];
+        if (showCanvasColleges && showCanvasRole && showCanvasCtc) {
+          colWidths = [50, 310, 250, 310, 200];
+        } else if (showCanvasColleges && showCanvasRole && !showCanvasCtc) {
+          colWidths = [50, 390, 310, 370];
+        } else if (showCanvasColleges && !showCanvasRole && showCanvasCtc) {
+          colWidths = [50, 450, 370, 250];
+        } else if (showCanvasColleges && !showCanvasRole && !showCanvasCtc) {
+          colWidths = [50, 600, 470];
+        } else if (!showCanvasColleges && showCanvasRole && showCanvasCtc) {
+          colWidths = [50, 420, 420, 230];
+        } else if (!showCanvasColleges && showCanvasRole && !showCanvasCtc) {
+          colWidths = [50, 540, 530];
+        } else if (!showCanvasColleges && !showCanvasRole && showCanvasCtc) {
+          colWidths = [50, 720, 350];
+        } else {
+          colWidths = [50, 1070];
+        }
+
+        const rawRows = alRows.map((r: any) => {
+          const row: string[] = [String(r.s_no || ''), String(r.company_name || '—')];
+          if (showCanvasColleges) row.push(String(r.colleges || '—'));
+          if (showCanvasRole) row.push(String(r.role || '—'));
+          if (showCanvasCtc) row.push(String(r.ctc || 'Competitive'));
+          return row;
+        });
 
         const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
           let maxLines = 1;
           const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
             const colW = colWidths[cIdx];
             const maxCellW = colW - 16;
+            const isLastCtc = showCanvasCtc && cIdx === headers.length - 1;
             const font = cIdx === 1
               ? 'bold 11px system-ui, -apple-system, sans-serif'
               : cIdx === 0
               ? '500 11px monospace'
-              : (cIdx === 3)
+              : isLastCtc
               ? 'bold 11px system-ui, -apple-system, sans-serif'
               : '500 11px system-ui, -apple-system, sans-serif';
             const fillStyle = cIdx === 1
               ? '#0f172a'
               : cIdx === 0
               ? '#64748b'
-              : (cIdx === 3)
+              : isLastCtc
               ? '#059669'
               : '#334155';
 
@@ -1387,8 +1424,9 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
 
         const batchLabel = report.kpi_summary?.graduating_year || (report.academic_year ? `${report.academic_year} Graduating Batch` : '2027 Graduating Batch');
+        const canvasTitle = isCanvasJdOnly ? 'HOT LEADS (JD RECEIVED)' : `ACTIVE CORPORATE LEADS — ${batchLabel.toUpperCase()}`;
         sectionsToDraw.push({
-          title: `ACTIVE CORPORATE LEADS — ${batchLabel.toUpperCase()}`,
+          title: canvasTitle,
           badge: `${alRows.length} Leads`,
           accentBg: '#ecfdf5',
           accentBorder: '#a7f3d0',
@@ -1670,9 +1708,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           : 'Weekly Placement Report');
       ctx.fillText(mainTitle, W / 2, currentY + 28);
 
-      ctx.fillStyle = '#475569';
-      ctx.font = 'bold 14px system-ui, -apple-system, sans-serif';
-      ctx.fillText(collegeName, W / 2, currentY + 52);
+      if (collegeName && collegeName !== 'Consolidated Partner Institutions' && report.template_type !== 'active_leads') {
+        ctx.fillStyle = '#475569';
+        ctx.font = 'bold 14px system-ui, -apple-system, sans-serif';
+        ctx.fillText(collegeName, W / 2, currentY + 52);
+      }
 
       // College Logo / Code Badge (Right) — Hidden for Active Leads
       if (report.template_type !== 'active_leads') {
@@ -1709,12 +1749,10 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       ctx.textAlign = 'center';
 
       let metaText = '';
-      if (report.template_type === 'month_end') {
-        metaText = `Prepared by: ${report.generated_by || report.branding?.prepared_by || 'Placement Coordinator'}        •        Generated Date: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
-      } else if (report.template_type === 'weekly_placement') {
-        metaText = `Period: ${getCleanPeriod(report.report_period)}    •    Prepared by: ${report.generated_by || report.branding?.prepared_by || 'Placement Coordinator'}    •    Generated Date: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
+      if (report.template_type === 'weekly_placement') {
+        metaText = `Period: ${getCleanPeriod(report.report_period)}    •    Generated Date: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
       } else {
-        metaText = `Prepared by: ${report.generated_by || report.branding?.prepared_by || 'Placement Coordinator'}    •    Generated Date: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
+        metaText = `Generated Date: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
       }
       ctx.fillText(metaText, W / 2, currentY + 24);
 
@@ -1856,10 +1894,17 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       ctx.stroke();
 
       currentY += 24;
-      ctx.textAlign = 'center';
       ctx.fillStyle = '#64748b';
       ctx.font = '500 11px system-ui, -apple-system, sans-serif';
-      ctx.fillText('© 2026 Infoziant. All rights reserved.', W / 2, currentY);
+      ctx.textAlign = 'left';
+      ctx.fillText('© 2026 Infoziant. All rights reserved.', PADDING, currentY);
+
+      if (report.include_prepared_by !== false && Boolean(report.generated_by || report.branding?.prepared_by)) {
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+        ctx.fillText(`Prepared by: ${report.generated_by || report.branding?.prepared_by}`, W - PADDING, currentY);
+      }
 
       // ── 8. Export High-Res PNG (3000px Ultra-HD for WhatsApp) ──
       canvas.toBlob(
@@ -1887,6 +1932,44 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
   const collegeCode = (report.branding?.college_code || 'iPOMS').toUpperCase();
   const isConsolidated = !collegeCode || collegeCode === 'IPOMS';
   const collegeLogoUrl = COLLEGE_LOGO_MAP[collegeCode] || `/college-logos/${collegeCode.toLowerCase()}.png`;
+
+  const activeCols = report.active_leads_columns || {};
+  const showCollegesCol = Boolean(
+    report.template_type === 'active_leads' &&
+    (activeCols.colleges !== undefined
+      ? activeCols.colleges
+      : ((report.kpi_summary?.selected_streams?.jd_received && !report.kpi_summary?.selected_streams?.positives && !report.kpi_summary?.selected_streams?.weekly_tracker) ||
+         report.kpi_summary?.tier_focus?.includes('Hot Leads (JD Received)') ||
+         report.report_title?.includes('Hot Leads') ||
+         (report.sections?.active_leads && report.sections.active_leads.some((r: any) => r.colleges && r.colleges !== '—' && r.source === 'jd_received'))))
+  );
+  const showRoleCol = activeCols.role !== false;
+  const showCtcCol = activeCols.ctc !== false;
+
+  const activeLeadsColWidths = (() => {
+    if (showCollegesCol && showRoleCol && showCtcCol) {
+      return { comp: '28%', colleges: '22%', role: '28%', ctc: '22%' };
+    }
+    if (showCollegesCol && showRoleCol && !showCtcCol) {
+      return { comp: '36%', colleges: '30%', role: '34%', ctc: '0%' };
+    }
+    if (showCollegesCol && !showRoleCol && showCtcCol) {
+      return { comp: '42%', colleges: '34%', role: '0%', ctc: '24%' };
+    }
+    if (showCollegesCol && !showRoleCol && !showCtcCol) {
+      return { comp: '55%', colleges: '45%', role: '0%', ctc: '0%' };
+    }
+    if (!showCollegesCol && showRoleCol && showCtcCol) {
+      return { comp: '34%', colleges: '0%', role: '38%', ctc: '28%' };
+    }
+    if (!showCollegesCol && showRoleCol && !showCtcCol) {
+      return { comp: '50%', colleges: '0%', role: '50%', ctc: '0%' };
+    }
+    if (!showCollegesCol && !showRoleCol && showCtcCol) {
+      return { comp: '65%', colleges: '0%', role: '0%', ctc: '35%' };
+    }
+    return { comp: '100%', colleges: '0%', role: '0%', ctc: '0%' };
+  })();
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-4 print:p-0 print:m-0 print:max-w-full text-fg">
@@ -1930,9 +2013,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               onChange={(e) => setReport({ ...report, report_title: e.target.value })}
               className="text-base sm:text-lg font-bold text-fg print:text-slate-900 bg-transparent border-b border-transparent hover:border-border focus:border-primary focus:bg-surface-sunken px-2 rounded transition-colors outline-none tracking-tight font-sans text-center w-full max-w-lg"
             />
-            <p className="text-xs font-semibold text-fg-muted print:text-slate-700 mt-0.5 px-1 text-center">
-              {collegeName}
-            </p>
+            {collegeName && collegeName !== 'Consolidated Partner Institutions' && report.template_type !== 'active_leads' && (
+              <p className="text-xs font-semibold text-fg-muted print:text-slate-700 mt-0.5 px-1 text-center">
+                {collegeName}
+              </p>
+            )}
           </div>
 
           {/* Right: Target College Logo (Hidden for Active Leads) */}
@@ -1957,26 +2042,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
 
         {/* 2. Report Metadata Sub-bar */}
         <div className="flex items-center justify-between flex-wrap gap-4 text-xs text-fg-muted bg-surface-sunken border border-border rounded-xl px-5 py-2.5 font-medium print:bg-slate-50 print:text-slate-600 print:border-slate-200 mb-4">
-          {report.template_type === 'month_end' ? (
-            <>
-              <div className="flex items-center gap-1.5">
-                <User size={13} className="text-primary shrink-0" />
-                <span>Prepared by: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_by || report.branding?.prepared_by || 'Placement Coordinator'}</strong></span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Calendar size={13} className="text-fg-subtle print:text-slate-500 shrink-0" />
-                <span>Generated Date: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_date}</strong></span>
-              </div>
-            </>
-          ) : report.template_type === 'weekly_placement' ? (
+          {report.template_type === 'weekly_placement' ? (
             <>
               <div className="flex items-center gap-1.5">
                 <Calendar size={13} className="text-primary shrink-0" />
                 <span>Period: <strong className="text-fg print:text-slate-900 font-semibold">{getCleanPeriod(report.report_period)}</strong></span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <User size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <span>Prepared by: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_by || report.branding?.prepared_by || 'Placement Coordinator'}</strong></span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Calendar size={13} className="text-fg-subtle print:text-slate-400 shrink-0" />
@@ -1984,16 +2054,12 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               </div>
             </>
           ) : (
-            <>
+            <div>
               <div className="flex items-center gap-1.5">
-                <User size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <span>Prepared by: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_by || report.branding?.prepared_by || 'Placement Coordinator'}</strong></span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Calendar size={13} className="text-fg-subtle print:text-slate-400 shrink-0" />
+                <Calendar size={13} className="text-fg-subtle print:text-slate-500 shrink-0" />
                 <span>Generated Date: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_date}</strong></span>
               </div>
-            </>
+            </div>
           )}
         </div>
 
@@ -2053,14 +2119,38 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                 valText: 'text-blue-700 dark:text-blue-400 font-extrabold text-xl',
               },
               {
-                key: 'graduating_year',
-                label: 'Graduating Batch',
-                val: report.kpi_summary.graduating_year || '2027',
+                key: 'hot_leads_count',
+                label: 'Hot (JD Received)',
+                val: report.kpi_summary.hot_leads_count || 0,
+                bgClass: 'bg-amber-50 dark:bg-amber-950/60 border-amber-300 dark:border-amber-700/80',
+                labelText: 'text-amber-800 dark:text-amber-300 font-bold',
+                valText: 'text-amber-700 dark:text-amber-400 font-extrabold text-xl',
+              },
+              {
+                key: 'warm_leads_count',
+                label: 'Warm (Positives)',
+                val: report.kpi_summary.warm_leads_count || 0,
                 bgClass: 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700/80',
                 labelText: 'text-emerald-800 dark:text-emerald-300 font-bold',
                 valText: 'text-emerald-700 dark:text-emerald-400 font-extrabold text-xl',
               },
-            ].filter((c) => activeKpis[c.key] !== false);
+              {
+                key: 'pipeline_leads_count',
+                label: 'Weekly Pipeline',
+                val: report.kpi_summary.pipeline_leads_count || 0,
+                bgClass: 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-700/80',
+                labelText: 'text-indigo-800 dark:text-indigo-300 font-bold',
+                valText: 'text-indigo-700 dark:text-indigo-400 font-extrabold text-xl',
+              },
+              {
+                key: 'graduating_year',
+                label: 'Graduating Batch',
+                val: report.kpi_summary.graduating_year || 'All Batches',
+                bgClass: 'bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700',
+                labelText: 'text-slate-800 dark:text-slate-300 font-bold',
+                valText: 'text-slate-700 dark:text-slate-400 font-extrabold text-xl',
+              },
+            ].filter((c) => activeKpis[c.key] !== false && (c.val !== 0 || c.key === 'total_leads' || c.key === 'graduating_year'));
 
             if (alCards.length === 0) return null;
             return (
@@ -2842,8 +2932,24 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         {report.included_sections?.active_leads && report.sections?.active_leads && (
           <div className="space-y-2 pt-2">
             <div className="px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/70 dark:bg-emerald-950/40 font-bold text-xs flex items-center text-emerald-900 dark:text-emerald-300 print:hidden">
-              <span className="flex items-center gap-1.5">
-                <TrendingUp size={14} strokeWidth={2.25} className="text-emerald-700 dark:text-emerald-400" /> ACTIVE CORPORATE LEADS — {String(report.kpi_summary?.graduating_year || report.academic_year || '2027').toUpperCase()}
+              <span className="flex items-center gap-1.5 uppercase">
+                <TrendingUp size={14} strokeWidth={2.25} className="text-emerald-700 dark:text-emerald-400" />
+                {(() => {
+                  const tier = report.kpi_summary?.tier_focus || '';
+                  const batchSuffix = report.kpi_summary?.graduating_year && report.kpi_summary.graduating_year !== 'All Batches'
+                    ? ` — ${report.kpi_summary.graduating_year}`
+                    : '';
+                  if (tier.includes('Hot Leads') || report.report_title?.includes('Hot Leads')) {
+                    return `HOT LEADS (JD RECEIVED)${batchSuffix}`;
+                  }
+                  if (tier.includes('Positive') || report.report_title?.includes('Positive')) {
+                    return `POSITIVE LEADS${batchSuffix}`;
+                  }
+                  if (tier.includes('Weekly Tracker') || report.report_title?.includes('Weekly Tracker')) {
+                    return `WEEKLY TRACKER PIPELINE${batchSuffix}`;
+                  }
+                  return `ACTIVE CORPORATE LEADS${batchSuffix}`;
+                })()}
               </span>
             </div>
 
@@ -2854,30 +2960,31 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                 <table className="w-full text-xs text-center border-collapse table-fixed">
                   <colgroup>
                     <col style={{ width: '38px' }} />
-                    <col style={{ width: '39%' }} />
-                    <col style={{ width: '39%' }} />
-                    <col style={{ width: '18%' }} />
+                    <col style={{ width: activeLeadsColWidths.comp }} />
+                    {showCollegesCol && <col style={{ width: activeLeadsColWidths.colleges }} />}
+                    {showRoleCol && <col style={{ width: activeLeadsColWidths.role }} />}
+                    {showCtcCol && <col style={{ width: activeLeadsColWidths.ctc }} />}
                   </colgroup>
                   <thead className="print:table-header-group">
-                    <tr className="hidden print:table-row bg-emerald-50 border-b border-emerald-200 text-emerald-900">
-                      <th colSpan={4} className="py-1.5 px-3 text-left font-bold text-[11px] bg-emerald-50 text-emerald-900">
-                        <span className="flex items-center gap-1.5">
-                          <TrendingUp size={13} className="text-emerald-700 shrink-0" /> ACTIVE CORPORATE LEADS — {String(report.kpi_summary?.graduating_year || report.academic_year || '2027').toUpperCase()}
-                        </span>
-                      </th>
-                    </tr>
                     <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
-                      <th className="py-2 px-1 w-10 text-center font-mono" style={{ width: '38px' }}>#</th>
-                      <th className="py-2 px-4 w-[39%] text-center whitespace-normal font-semibold">Company Name</th>
-                      <th className="py-2 px-4 w-[39%] text-center whitespace-normal">Role</th>
-                      <th className="py-2 px-3 w-[18%] text-center whitespace-nowrap">CTC</th>
+                      <th className="py-2 px-1 text-center font-mono" style={{ width: '38px' }}>#</th>
+                      <th className="py-2 px-3 text-center whitespace-normal font-semibold">Company Name</th>
+                      {showCollegesCol && (
+                        <th className="py-2 px-2 text-center whitespace-normal font-bold text-primary">Colleges</th>
+                      )}
+                      {showRoleCol && (
+                        <th className="py-2 px-3 text-center whitespace-normal">Role</th>
+                      )}
+                      {showCtcCol && (
+                        <th className="py-2 px-2.5 text-center whitespace-normal font-semibold">CTC</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
                     {report.sections.active_leads.map((r: any, idx: number) => (
                       <tr key={idx} className="hover:bg-surface-sunken/60 avoid-break">
-                        <td className="py-2 px-1 w-10 text-center text-fg-subtle font-mono" style={{ width: '38px' }}>{r.s_no}</td>
-                        <td className="py-2 px-4 w-[39%] font-semibold text-fg text-center whitespace-normal">
+                        <td className="py-2 px-1 text-center text-fg-subtle font-mono" style={{ width: '38px' }}>{r.s_no}</td>
+                        <td className="py-2 px-3 font-semibold text-fg text-center whitespace-normal">
                           <EditableReportCell
                             value={r.company_name}
                             onChange={(val) =>
@@ -2886,24 +2993,40 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                             className="font-semibold text-fg text-center"
                           />
                         </td>
-                        <td className="py-2 px-4 w-[39%] text-fg-muted text-center whitespace-normal">
-                          <EditableReportCell
-                            value={r.role}
-                            onChange={(val) =>
-                              handleUpdateCell('active_leads', idx, 'role', val)
-                            }
-                            className="text-fg-muted text-center"
-                          />
-                        </td>
-                        <td className="py-2 px-3 w-[18%] text-emerald-600 dark:text-emerald-400 font-semibold text-center whitespace-nowrap">
-                          <EditableReportCell
-                            value={r.ctc}
-                            onChange={(val) =>
-                              handleUpdateCell('active_leads', idx, 'ctc', val)
-                            }
-                            className="text-emerald-600 dark:text-emerald-400 font-semibold text-center"
-                          />
-                        </td>
+                        {showCollegesCol && (
+                          <td className="py-2 px-2 text-center whitespace-normal">
+                            <EditableReportCell
+                              value={r.colleges || '—'}
+                              onChange={(val) =>
+                                handleUpdateCell('active_leads', idx, 'colleges', val)
+                              }
+                              className="text-primary font-semibold text-center text-xs"
+                            />
+                          </td>
+                        )}
+                        {showRoleCol && (
+                          <td className="py-2 px-3 text-fg-muted text-center whitespace-normal">
+                            <EditableReportCell
+                              value={r.role}
+                              onChange={(val) =>
+                                handleUpdateCell('active_leads', idx, 'role', val)
+                              }
+                              className="text-fg-muted text-center"
+                            />
+                          </td>
+                        )}
+                        {showCtcCol && (
+                          <td className="py-2 px-2.5 text-emerald-600 dark:text-emerald-400 font-semibold text-center whitespace-normal break-words">
+                            <EditableReportCell
+                              value={r.ctc}
+                              onChange={(val) =>
+                                handleUpdateCell('active_leads', idx, 'ctc', val)
+                              }
+                              nowrap={false}
+                              className="text-emerald-600 dark:text-emerald-400 font-semibold text-center whitespace-normal break-words leading-tight"
+                            />
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -3390,9 +3513,13 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           <div>
             <p className="text-[11px] text-fg-subtle print:text-slate-500 font-medium">© 2026 Infoziant. All rights reserved.</p>
           </div>
-          <div className="font-mono text-[11px] text-fg-subtle print:text-slate-500 font-medium">
-            Placement Operations Report • iPOMS
-          </div>
+          {/* Prepared By in Footer Area */}
+          {report.include_prepared_by !== false && Boolean(report.generated_by || report.branding?.prepared_by) && (
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-fg print:text-slate-800">
+              <User size={13} className="text-primary shrink-0" />
+              <span>Prepared by: <strong className="font-bold">{report.generated_by || report.branding?.prepared_by}</strong></span>
+            </div>
+          )}
         </div>
       </div>
 

@@ -425,16 +425,8 @@ export default function DailyTrackerPage() {
             </p>
           </div>
 
-          {/* Right: Back to Today (in history) + Selected College Logo Badge + Sign Out */}
+          {/* Right: Selected College Logo Badge + Sign Out */}
           <div className="flex items-center gap-3">
-            {isHistoryMode && (
-              <button
-                onClick={() => setIsHistoryMode(false)}
-                className="px-3.5 py-1.5 bg-primary hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
-              >
-                Back to Today
-              </button>
-            )}
 
             {/* Selected College Logo Badge + Location */}
             {selectedCollegeObj && (

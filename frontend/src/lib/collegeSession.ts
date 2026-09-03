@@ -15,6 +15,8 @@ export const ALL_COLLEGES_CACHE_KEY = 'ipoms_cached_all_colleges';
 
 export interface CollegeOccupancy extends College {
   is_occupied?: boolean;
+  is_shared_slot?: boolean;
+  other_handlers_count?: number;
   occupied_by?: { user_id: string; name: string; email: string } | null;
   is_selected_by_me?: boolean;
 }

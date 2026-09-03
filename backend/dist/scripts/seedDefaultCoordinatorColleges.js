@@ -10,6 +10,11 @@ const User_1 = require("../models/User");
  */
 exports.DEFAULT_COORDINATOR_COLLEGE_ROSTER = [
     {
+        name: 'Sujitha S (Sujitha)',
+        email: 'sujitha_s@infoziant.com',
+        collegeCodes: ['NEHRU', 'KPR', 'SONA', 'MAREPHRA'],
+    },
+    {
         name: 'A.Mohanaradha (Mohana)',
         email: 'mohanaradha_a@infoziant.com',
         collegeCodes: ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],

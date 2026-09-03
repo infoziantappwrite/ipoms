@@ -116,6 +116,68 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
   const handleZoomOut = () => setZoomLevel((z) => Math.max(z - 15, 60));
   const handleResetZoom = () => setZoomLevel(100);
 
+  const isActiveLeadsReport = report.template_type === 'active_leads';
+  const allActiveLeads: any[] = report.sections?.active_leads || [];
+
+  const hasPreparedBy = report.include_prepared_by !== false && Boolean(report.generated_by || report.branding?.prepared_by);
+  const preparedByName = report.generated_by || report.branding?.prepared_by || 'Placement Coordinator';
+
+  const activeCols = report.active_leads_columns || {};
+  const showCollegesCol = Boolean(
+    isActiveLeadsReport &&
+    (activeCols.colleges !== undefined
+      ? activeCols.colleges
+      : ((report.kpi_summary?.selected_streams?.jd_received && !report.kpi_summary?.selected_streams?.positives && !report.kpi_summary?.selected_streams?.weekly_tracker) ||
+         report.kpi_summary?.tier_focus?.includes('Hot Leads (JD Received)') ||
+         report.report_title?.includes('Hot Leads') ||
+         (report.sections?.active_leads && report.sections.active_leads.some((r: any) => r.colleges && r.colleges !== '—' && r.source === 'jd_received'))))
+  );
+  const showRoleCol = activeCols.role !== false;
+  const showCtcCol = activeCols.ctc !== false;
+
+  const activeLeadsColWidths = (() => {
+    if (showCollegesCol && showRoleCol && showCtcCol) {
+      return { num: '36px', comp: '28%', colleges: '22%', role: '28%', ctc: '22%' };
+    }
+    if (showCollegesCol && showRoleCol && !showCtcCol) {
+      return { num: '36px', comp: '36%', colleges: '30%', role: '34%', ctc: '0%' };
+    }
+    if (showCollegesCol && !showRoleCol && showCtcCol) {
+      return { num: '36px', comp: '42%', colleges: '34%', role: '0%', ctc: '24%' };
+    }
+    if (showCollegesCol && !showRoleCol && !showCtcCol) {
+      return { num: '38px', comp: '55%', colleges: '45%', role: '0%', ctc: '0%' };
+    }
+    if (!showCollegesCol && showRoleCol && showCtcCol) {
+      return { num: '38px', comp: '34%', colleges: '0%', role: '38%', ctc: '28%' };
+    }
+    if (!showCollegesCol && showRoleCol && !showCtcCol) {
+      return { num: '38px', comp: '50%', colleges: '0%', role: '50%', ctc: '0%' };
+    }
+    if (!showCollegesCol && !showRoleCol && showCtcCol) {
+      return { num: '38px', comp: '65%', colleges: '0%', role: '0%', ctc: '35%' };
+    }
+    return { num: '38px', comp: '100%', colleges: '0%', role: '0%', ctc: '0%' };
+  })();
+
+  // Pagination for Active Leads Directory
+  // Page 1: Branding header + Ribbon + KPI summary cards + Section title banner + Column headers (fits 22 rows)
+  // Page 2+: Slim continuation header + Repeated column headers (fits 28 rows per page)
+  const PAGE_1_ROWS = 22;
+  const SUBSEQUENT_PAGE_ROWS = 28;
+
+  const activeLeadsPages: any[][] = [];
+  if (isActiveLeadsReport) {
+    if (allActiveLeads.length === 0) {
+      activeLeadsPages.push([]);
+    } else {
+      activeLeadsPages.push(allActiveLeads.slice(0, PAGE_1_ROWS));
+      for (let i = PAGE_1_ROWS; i < allActiveLeads.length; i += SUBSEQUENT_PAGE_ROWS) {
+        activeLeadsPages.push(allActiveLeads.slice(i, i + SUBSEQUENT_PAGE_ROWS));
+      }
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
       {/* ── Top Floating Action Bar ────────────────────────────────────────── */}
@@ -130,6 +192,11 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
               <span className="text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full font-mono">
                 210mm × 297mm Sheet
               </span>
+              {isActiveLeadsReport && activeLeadsPages.length > 1 && (
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-mono">
+                  {activeLeadsPages.length} Pages
+                </span>
+              )}
             </h2>
             <p className="text-[11px] text-slate-400">
               Standard light-themed institutional layout as printed on paper
@@ -193,18 +260,278 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
       </div>
 
       {/* ── Scrollable Preview Viewport (Emulating Standard Paper Desk) ─────── */}
-      <div className="flex-1 overflow-auto p-4 sm:p-8 flex justify-center items-start bg-slate-900/60 no-scrollbar">
-        {/* ── Simulated A4 White Paper Container ────────────────────────────── */}
-        <div
-          ref={paperRef}
-          style={{
-            transform: `scale(${zoomLevel / 100})`,
-            transformOrigin: 'top center',
-            width: '794px', // 210mm at 96 DPI
-            minHeight: `${Math.max(1, paperPages) * 1123}px`, // Exact multiple of A4 page height (1123px, 2246px, etc.)
-          }}
-          className="bg-white text-slate-900 rounded-none sm:rounded-sm shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-slate-300 p-8 sm:p-12 transition-transform duration-200 select-text flex flex-col justify-between relative"
-        >
+      <div className="flex-1 overflow-auto p-4 sm:p-8 flex flex-col items-center bg-slate-900/60 no-scrollbar gap-8">
+        {isActiveLeadsReport ? (
+          /* Multi-Page Render for Active Leads Pipeline Report */
+          activeLeadsPages.map((pageRows, pageIdx) => {
+            const isFirstPage = pageIdx === 0;
+            const pageNum = pageIdx + 1;
+            const totalPages = activeLeadsPages.length;
+
+            return (
+              <div
+                key={pageIdx}
+                style={{
+                  transform: `scale(${zoomLevel / 100})`,
+                  transformOrigin: 'top center',
+                  width: '794px',
+                  minHeight: '1123px',
+                }}
+                className="bg-white text-slate-900 rounded-none sm:rounded-sm shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-slate-300 p-8 sm:p-12 transition-transform duration-200 select-text flex flex-col justify-between relative print:break-after-page print:min-h-screen"
+              >
+                <div className="space-y-4 flex-1 flex flex-col">
+                  {isFirstPage ? (
+                    <>
+                      {/* 1. Header Branding Strip with Infoziant Logo (Left), Centered Title & Subtitle */}
+                      <div className="flex items-center justify-between border-b-2 border-slate-300 pb-4 gap-4 mb-2">
+                        <div className="flex items-center shrink-0">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src="/infoziant-head.png"
+                            alt="Infoziant"
+                            className="h-14 w-auto object-contain shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/college-logos/Infozianthead.png';
+                            }}
+                          />
+                        </div>
+
+                        <div className="flex-1 text-center min-w-0 px-2 flex flex-col items-center justify-center">
+                          <h1 className="text-lg font-bold text-blue-900 tracking-tight font-sans text-center">
+                            {report.report_title || 'Active Leads Pipeline Report'}
+                          </h1>
+                          {collegeName && collegeName !== 'Consolidated Partner Institutions' && report.template_type !== 'active_leads' && (
+                            <p className="text-xs font-semibold text-slate-700 mt-0.5 text-center">
+                              {collegeName}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center shrink-0 justify-end min-w-[100px]" />
+                      </div>
+
+                      {/* 2. Report Metadata Ribbon */}
+                      <div className="flex items-center justify-between flex-wrap gap-4 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-5 py-2.5 font-medium mb-3">
+                        <div className="flex items-center gap-1.5">
+                          <Calendar size={13} className="text-slate-500 shrink-0" />
+                          <span>Generated Date: <strong className="text-slate-900 font-semibold">{report.generated_date}</strong></span>
+                        </div>
+                      </div>
+
+                      {/* 3. KPI Summary Strip */}
+                      {report.included_sections?.kpi_summary && report.kpi_summary && (
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          <div className="flex-1 min-w-[90px] border p-2 rounded-xl text-center shadow-xs bg-blue-50 border-blue-300">
+                            <span className="text-[9.5px] font-bold uppercase block tracking-wider text-blue-800">Total Active Leads</span>
+                            <span className="text-base font-extrabold font-mono text-blue-700">{report.kpi_summary.total_leads || allActiveLeads.length}</span>
+                          </div>
+                          {report.kpi_summary.hot_leads_count !== undefined && report.kpi_summary.hot_leads_count > 0 && (
+                            <div className="flex-1 min-w-[90px] border p-2 rounded-xl text-center shadow-xs bg-amber-50 border-amber-300">
+                              <span className="text-[9.5px] font-bold uppercase block tracking-wider text-amber-800">Hot (JD Received)</span>
+                              <span className="text-base font-extrabold font-mono text-amber-700">{report.kpi_summary.hot_leads_count}</span>
+                            </div>
+                          )}
+                          {report.kpi_summary.warm_leads_count !== undefined && report.kpi_summary.warm_leads_count > 0 && (
+                            <div className="flex-1 min-w-[90px] border p-2 rounded-xl text-center shadow-xs bg-emerald-50 border-emerald-300">
+                              <span className="text-[9.5px] font-bold uppercase block tracking-wider text-emerald-800">Warm (Positives)</span>
+                              <span className="text-base font-extrabold font-mono text-emerald-700">{report.kpi_summary.warm_leads_count}</span>
+                            </div>
+                          )}
+                          {report.kpi_summary.pipeline_leads_count !== undefined && report.kpi_summary.pipeline_leads_count > 0 && (
+                            <div className="flex-1 min-w-[90px] border p-2 rounded-xl text-center shadow-xs bg-indigo-50 border-indigo-300">
+                              <span className="text-[9.5px] font-bold uppercase block tracking-wider text-indigo-800">Weekly Pipeline</span>
+                              <span className="text-base font-extrabold font-mono text-indigo-700">{report.kpi_summary.pipeline_leads_count}</span>
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-[90px] border p-2 rounded-xl text-center shadow-xs bg-slate-50 border-slate-300">
+                            <span className="text-[9.5px] font-bold uppercase block tracking-wider text-slate-700">Batch</span>
+                            <span className="text-base font-extrabold font-mono text-slate-800">{report.kpi_summary.graduating_year || report.academic_year || 'All Batches'}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 4. Active Corporate Leads Section Banner */}
+                      <div className="px-3 py-1.5 rounded-md bg-emerald-50 border border-emerald-200 font-bold text-[11px] flex items-center justify-between text-emerald-900 mb-1">
+                        <span className="flex items-center gap-1.5 uppercase">
+                          <TrendingUp size={13} className="text-emerald-700 shrink-0" />
+                          {(() => {
+                            const tier = report.kpi_summary?.tier_focus || '';
+                            const batchSuffix = report.kpi_summary?.graduating_year && report.kpi_summary.graduating_year !== 'All Batches'
+                              ? ` — ${report.kpi_summary.graduating_year}`
+                              : '';
+                            if (tier.includes('Hot Leads') || report.report_title?.includes('Hot Leads')) {
+                              return `HOT LEADS (JD RECEIVED)${batchSuffix}`;
+                            }
+                            if (tier.includes('Positive') || report.report_title?.includes('Positive')) {
+                              return `POSITIVE LEADS${batchSuffix}`;
+                            }
+                            if (tier.includes('Weekly Tracker') || report.report_title?.includes('Weekly Tracker')) {
+                              return `WEEKLY TRACKER PIPELINE${batchSuffix}`;
+                            }
+                            return `ACTIVE CORPORATE LEADS${batchSuffix}`;
+                          })()}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    /* Page 2+: Slim Continuation Header Strip */
+                    <div className="flex items-center justify-between border-b-2 border-slate-300 pb-2.5 mb-2">
+                      <div className="flex items-center gap-2.5">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src="/infoziant-head.png"
+                          alt="Infoziant"
+                          className="h-8 w-auto object-contain shrink-0"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/college-logos/Infozianthead.png';
+                          }}
+                        />
+                        <div>
+                          <h2 className="text-xs font-bold text-blue-900 tracking-tight leading-tight uppercase">
+                            {(() => {
+                              const tier = report.kpi_summary?.tier_focus || '';
+                              const batchSuffix = report.kpi_summary?.graduating_year && report.kpi_summary.graduating_year !== 'All Batches'
+                                ? ` — ${report.kpi_summary.graduating_year}`
+                                : '';
+                              if (tier.includes('Hot Leads') || report.report_title?.includes('Hot Leads')) {
+                                return `HOT LEADS (JD RECEIVED)${batchSuffix}`;
+                              }
+                              if (tier.includes('Positive') || report.report_title?.includes('Positive')) {
+                                return `POSITIVE LEADS${batchSuffix}`;
+                              }
+                              if (tier.includes('Weekly Tracker') || report.report_title?.includes('Weekly Tracker')) {
+                                return `WEEKLY TRACKER PIPELINE${batchSuffix}`;
+                              }
+                              return `ACTIVE CORPORATE LEADS${batchSuffix}`;
+                            })()}
+                          </h2>
+                          <p className="text-[9.5px] text-slate-500 font-semibold">
+                            {collegeName && collegeName !== 'Consolidated Partner Institutions' && report.template_type !== 'active_leads' ? `${collegeName} • ` : ''}Directory (Continued)
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-[10.5px] font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded">
+                        Page {pageNum} of {totalPages}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Table with Column Headers Repeated on Every Page */}
+                  {pageRows.length === 0 ? (
+                    <p className="text-[11px] text-slate-400 italic py-2 pl-2">No active leads recorded for this graduating batch.</p>
+                  ) : (
+                    <table className="w-full text-[11px] text-center border-collapse border border-slate-200 table-fixed">
+                      <colgroup>
+                        <col style={{ width: activeLeadsColWidths.num }} />
+                        <col style={{ width: activeLeadsColWidths.comp }} />
+                        {showCollegesCol && <col style={{ width: activeLeadsColWidths.colleges }} />}
+                        {showRoleCol && <col style={{ width: activeLeadsColWidths.role }} />}
+                        {showCtcCol && <col style={{ width: activeLeadsColWidths.ctc }} />}
+                      </colgroup>
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-700 font-semibold text-[10px] uppercase border-b border-slate-200">
+                          <th className="py-1.5 px-1 text-center border-r border-slate-200 font-mono" style={{ width: activeLeadsColWidths.num }}>#</th>
+                          <th className="py-1.5 px-2.5 text-center border-r border-slate-200 whitespace-normal">Company Name</th>
+                          {showCollegesCol && (
+                            <th className="py-1.5 px-2 text-center border-r border-slate-200 whitespace-normal text-blue-900 font-bold">Colleges</th>
+                          )}
+                          {showRoleCol && (
+                            <th className="py-1.5 px-2.5 text-center border-r border-slate-200 whitespace-normal">Role</th>
+                          )}
+                          {showCtcCol && (
+                            <th className="py-1.5 px-2 text-center whitespace-normal font-semibold">CTC</th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 text-center">
+                        {pageRows.map((r: any, rIdx: number) => (
+                          <tr key={rIdx} className={rIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                            <td className="py-1.5 px-1 text-center text-slate-500 font-mono border-r border-slate-200" style={{ width: activeLeadsColWidths.num }}>{r.s_no}</td>
+                            <td className="py-1.5 px-2.5 text-center font-bold text-slate-900 border-r border-slate-200 whitespace-normal leading-snug">{r.company_name}</td>
+                            {showCollegesCol && (
+                              <td className="py-1.5 px-2 text-center border-r border-slate-200 whitespace-normal leading-tight text-slate-700">
+                                {r.colleges && r.colleges !== '—' ? (
+                                  <span className="inline-block px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200 text-[10px] font-semibold">
+                                    {r.colleges}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 italic text-xs">—</span>
+                                )}
+                              </td>
+                            )}
+                            {showRoleCol && (
+                              <td className="py-1.5 px-2.5 text-center text-slate-700 border-r border-slate-200 whitespace-normal leading-snug">{r.role || '—'}</td>
+                            )}
+                            {showCtcCol && (
+                              <td className="py-1.5 px-2 text-center text-emerald-700 font-semibold whitespace-normal break-words leading-tight">
+                                {r.ctc ? (
+                                  r.ctc.includes(',') ? (
+                                    <div className="flex flex-col items-center justify-center gap-0.5 leading-tight py-0.5">
+                                      {r.ctc.split(',').map((part: string, pIdx: number) => (
+                                        <span key={pIdx} className="block whitespace-normal break-words text-[10.5px]">
+                                          {part.trim()}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="block whitespace-normal break-words leading-tight text-[10.5px]">{r.ctc}</span>
+                                  )
+                                ) : (
+                                  <span className="text-slate-400 italic font-normal text-xs">—</span>
+                                )}
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+
+                  {/* If Final Page and Notes/Remarks Exist */}
+                  {pageIdx === totalPages - 1 && report.included_sections?.remarks && report.remarks && (
+                    <div className="space-y-1 pt-2">
+                      <div className="font-bold text-[11px] text-slate-800 flex items-center gap-1.5">
+                        <PenLine size={13} className="text-slate-600" />
+                        <span>Notes</span>
+                      </div>
+                      <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[10.5px] text-slate-800 leading-relaxed">
+                        {report.remarks}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Master Institutional Footer on Every Page */}
+                <div className="border-t border-slate-300 pt-2.5 pb-0.5 mt-auto flex items-center justify-between text-[10px] text-slate-500 shrink-0">
+                  <div>
+                    <p className="mt-0.5">© 2026 Infoziant. All rights reserved.</p>
+                  </div>
+                  {/* Prepared by in Footer */}
+                  {hasPreparedBy && (
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                      <User size={12} className="text-blue-900 shrink-0" />
+                      <span>Prepared by: <strong className="font-bold">{preparedByName}</strong></span>
+                    </div>
+                  )}
+                  <div className="font-semibold text-slate-600">
+                    Page {pageNum} of {totalPages}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          /* Standard Single/Multi-Section Paper Container for Other Report Types */
+          <div
+            ref={paperRef}
+            style={{
+              transform: `scale(${zoomLevel / 100})`,
+              transformOrigin: 'top center',
+              width: '794px', // 210mm at 96 DPI
+              minHeight: `${Math.max(1, paperPages) * 1123}px`, // Exact multiple of A4 page height (1123px, 2246px, etc.)
+            }}
+            className="bg-white text-slate-900 rounded-none sm:rounded-sm shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] border border-slate-300 p-8 sm:p-12 transition-transform duration-200 select-text flex flex-col justify-between relative"
+          >
           {/* 1. Header Branding Strip with Infoziant Logo (Left), Centered Title & Subtitle, & Target College Logo (Right) */}
           <div className="flex items-center justify-between border-b-2 border-slate-300 pb-4 gap-4 mb-2">
             {/* Left: Infoziant Corporate Header */}
@@ -259,26 +586,11 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
 
           {/* 2. Report Metadata Ribbon */}
           <div className="flex items-center justify-between flex-wrap gap-4 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-5 py-2.5 font-medium mb-4">
-            {report.template_type === 'month_end' ? (
-              <>
-                <div className="flex items-center gap-1.5">
-                  <User size={13} className="text-blue-900 shrink-0" />
-                  <span>Prepared by: <strong className="text-slate-900 font-semibold">{report.generated_by || report.branding?.prepared_by || 'Placement Coordinator'}</strong></span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Calendar size={13} className="text-slate-500 shrink-0" />
-                  <span>Generated Date: <strong className="text-slate-900 font-semibold">{report.generated_date}</strong></span>
-                </div>
-              </>
-            ) : report.template_type === 'weekly_placement' ? (
+            {report.template_type === 'weekly_placement' ? (
               <>
                 <div className="flex items-center gap-1.5">
                   <Calendar size={13} className="text-blue-700 shrink-0" />
                   <span>Period: <strong className="text-slate-900 font-semibold">{getCleanPeriod(report.report_period)}</strong></span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <User size={13} className="text-emerald-700 shrink-0" />
-                  <span>Prepared by: <strong className="text-slate-900 font-semibold">{report.generated_by || report.branding?.prepared_by || 'Placement Coordinator'}</strong></span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Calendar size={13} className="text-slate-400 shrink-0" />
@@ -286,16 +598,12 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                 </div>
               </>
             ) : (
-              <>
+              <div>
                 <div className="flex items-center gap-1.5">
-                  <User size={13} className="text-emerald-700 shrink-0" />
-                  <span>Prepared by: <strong className="text-slate-900 font-semibold">{report.generated_by || report.branding?.prepared_by || 'Placement Coordinator'}</strong></span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Calendar size={13} className="text-slate-400 shrink-0" />
+                  <Calendar size={13} className="text-slate-500 shrink-0" />
                   <span>Generated Date: <strong className="text-slate-900 font-semibold">{report.generated_date}</strong></span>
                 </div>
-              </>
+              </div>
             )}
           </div>
 
@@ -800,9 +1108,9 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                   <table className="w-full text-[11px] text-center border-collapse border border-slate-200 table-fixed">
                     <colgroup>
                       <col style={{ width: '38px' }} />
-                      <col style={{ width: '39%' }} />
-                      <col style={{ width: '39%' }} />
-                      <col style={{ width: '18%' }} />
+                      <col style={{ width: '34%' }} />
+                      <col style={{ width: '38%' }} />
+                      <col style={{ width: '28%' }} />
                     </colgroup>
                     <thead className="print:table-header-group">
                       <tr className="bg-emerald-50 border-b border-emerald-200 text-emerald-900">
@@ -814,18 +1122,34 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                       </tr>
                       <tr className="bg-slate-100 text-slate-700 font-semibold text-[10px] uppercase border-b border-slate-200">
                         <th className="py-1.5 px-1 w-10 text-center border-r border-slate-200 font-mono" style={{ width: '38px' }}>#</th>
-                        <th className="py-1.5 px-3 w-[39%] text-center border-r border-slate-200 whitespace-normal">Company Name</th>
-                        <th className="py-1.5 px-3 w-[39%] text-center border-r border-slate-200 whitespace-normal">Role</th>
-                        <th className="py-1.5 px-2 w-[18%] text-center whitespace-nowrap">CTC</th>
+                        <th className="py-1.5 px-3 w-[34%] text-center border-r border-slate-200 whitespace-normal">Company Name</th>
+                        <th className="py-1.5 px-3 w-[38%] text-center border-r border-slate-200 whitespace-normal">Role</th>
+                        <th className="py-1.5 px-2.5 w-[28%] text-center whitespace-normal font-semibold">CTC</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 text-center">
                       {report.sections.active_leads.map((r: any, idx: number) => (
                         <tr key={idx} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'} avoid-break`}>
                           <td className="py-1.5 px-1 w-10 text-center text-slate-500 font-mono border-r border-slate-200" style={{ width: '38px' }}>{r.s_no}</td>
-                          <td className="py-1.5 px-3 w-[39%] text-center font-bold text-slate-900 border-r border-slate-200 whitespace-normal leading-snug">{r.company_name}</td>
-                          <td className="py-1.5 px-3 w-[39%] text-center text-slate-700 border-r border-slate-200 whitespace-normal leading-snug">{r.role || '—'}</td>
-                          <td className="py-1.5 px-2 w-[18%] text-center text-emerald-700 font-semibold whitespace-nowrap">{r.ctc || '—'}</td>
+                          <td className="py-1.5 px-3 w-[34%] text-center font-bold text-slate-900 border-r border-slate-200 whitespace-normal leading-snug">{r.company_name}</td>
+                          <td className="py-1.5 px-3 w-[38%] text-center text-slate-700 border-r border-slate-200 whitespace-normal leading-snug">{r.role || '—'}</td>
+                          <td className="py-1.5 px-2.5 w-[28%] text-center text-emerald-700 font-semibold whitespace-normal break-words leading-tight">
+                            {r.ctc ? (
+                              r.ctc.includes(',') ? (
+                                <div className="flex flex-col items-center justify-center gap-0.5 leading-tight py-0.5">
+                                  {r.ctc.split(',').map((part: string, pIdx: number) => (
+                                    <span key={pIdx} className="block whitespace-normal break-words text-[10.5px]">
+                                      {part.trim()}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="block whitespace-normal break-words leading-tight text-[10.5px]">{r.ctc}</span>
+                              )
+                            ) : (
+                              <span className="text-slate-400 italic font-normal text-xs">—</span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1125,11 +1449,16 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
             <div>
               <p className="mt-0.5">© 2026 Infoziant. All rights reserved.</p>
             </div>
-            <div className="font-mono text-slate-400 font-medium">
-              Placement Operations Report • iPOMS
-            </div>
+            {/* Prepared by in Footer */}
+            {hasPreparedBy && (
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                <User size={12} className="text-blue-900 shrink-0" />
+                <span>Prepared by: <strong className="font-bold">{preparedByName}</strong></span>
+              </div>
+            )}
           </div>
         </div>
+        )}
       </div>
     </div>
   );

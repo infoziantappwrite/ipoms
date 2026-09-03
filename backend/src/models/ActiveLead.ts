@@ -70,11 +70,13 @@ const ActiveLeadSchema: Schema<IActiveLead> = new Schema(
     },
     role: {
       type: String,
+      required: [true, 'Role is required'],
       trim: true,
       default: 'Graduate Trainee',
     },
     ctc: {
       type: String,
+      required: [true, 'CTC is required'],
       trim: true,
       default: '',
     },
@@ -91,7 +93,7 @@ const ActiveLeadSchema: Schema<IActiveLead> = new Schema(
     },
     academic_year: {
       type: String,
-      required: true,
+      required: false,
       default: '2027',
       index: true,
     },

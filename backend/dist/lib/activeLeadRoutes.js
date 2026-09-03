@@ -282,7 +282,13 @@ function registerActiveLeadRoutes(app) {
         try {
             const { company_name, role = 'Graduate Trainee', ctc = '', status = 'Hiring', followup_month = '', academic_year = '2026', college_id, } = req.body;
             if (!company_name || !company_name.trim()) {
-                return res.status(400).json({ success: false, error: { message: 'Company name is required' } });
+                return res.status(400).json({ success: false, error: { message: 'Company Name is required' } });
+            }
+            if (!role || !role.trim()) {
+                return res.status(400).json({ success: false, error: { message: 'Role is required' } });
+            }
+            if (!ctc || !ctc.trim()) {
+                return res.status(400).json({ success: false, error: { message: 'CTC is required' } });
             }
             if (!ActiveLead_1.ACTIVE_LEAD_STATUSES.includes(status)) {
                 return res.status(400).json({ success: false, error: { message: 'Invalid status' } });

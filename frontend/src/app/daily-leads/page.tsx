@@ -413,7 +413,7 @@ export default function DailyLeadsPage() {
 
   return (
     <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
-      {/* ── Top Header ────────────────────────────────────────────────────── */}
+      {/* ── Top Header with Tab Bar (Just Above Section Before the Calendar) ─ */}
       <LeadsHeader
         selectedDate={selectedDate}
         onDateChange={setSelectedDate}
@@ -432,18 +432,12 @@ export default function DailyLeadsPage() {
         onSyncPositives={handleSyncPositives}
         isSyncing={isSyncing}
         activeTab={activeTab}
-        onOpenCopyToJdModal={() => setIsCopyToJdModalOpen(true)}
-      />
-
-      {/* ── Tab Bar (Positives vs JD Received) ────────────────────────────── */}
-      <LeadsTabBar
-        activeTab={activeTab}
         onTabChange={handleTabChange}
         positivesCount={summary.positives_count}
         jdCount={summary.jd_received_count}
-        isDeleteMode={isDeleteMode}
         selectedCount={selectedIds.length}
         onBulkDelete={handleBulkDelete}
+        onOpenCopyToJdModal={() => setIsCopyToJdModalOpen(true)}
       />
 
       {/* ── Table Workspace ───────────────────────────────────────────────── */}
