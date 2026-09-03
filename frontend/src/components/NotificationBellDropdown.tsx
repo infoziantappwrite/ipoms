@@ -5,7 +5,9 @@ import { AlertTriangle, Bell, CalendarDays, Check, Megaphone, X } from 'lucide-r
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { getApiBase } from '@/lib/api';
+
+const API = getApiBase();
 
 interface Props {
   userId?: string;

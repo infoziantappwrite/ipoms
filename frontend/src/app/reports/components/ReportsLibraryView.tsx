@@ -12,7 +12,9 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { getApiBase } from '@/lib/api';
+
+const API = getApiBase();
 
 interface Props {
   onSelectTemplate: (templateId: string) => void;

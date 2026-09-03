@@ -75,22 +75,26 @@ function signRefreshToken(user: any) {
   return jwt.sign({ userId: user._id }, JWT_REFRESH_SECRET, { expiresIn: `${REFRESH_TOKEN_TTL_DAYS}d` });
 }
 
-function refreshCookieOptions() {
+function refreshCookieOptions(req?: Request) {
+  const isHttps =
+    process.env.NODE_ENV === 'production' ||
+    Boolean(req && (req.secure || req.headers['x-forwarded-proto'] === 'https' || req.headers['x-forwarded-ssl'] === 'on'));
+
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax' as const,
+    secure: isHttps,
+    sameSite: isHttps ? ('none' as const) : ('lax' as const),
     path: REFRESH_COOKIE_PATH,
     maxAge: REFRESH_TOKEN_MAX_AGE_MS,
   };
 }
 
-function setRefreshCookie(res: Response, user: any) {
-  res.cookie(REFRESH_TOKEN_COOKIE, signRefreshToken(user), refreshCookieOptions());
+function setRefreshCookie(res: Response, user: any, req?: Request) {
+  res.cookie(REFRESH_TOKEN_COOKIE, signRefreshToken(user), refreshCookieOptions(req));
 }
 
-function clearRefreshCookie(res: Response) {
-  res.clearCookie(REFRESH_TOKEN_COOKIE, { path: REFRESH_COOKIE_PATH });
+function clearRefreshCookie(res: Response, req?: Request) {
+  res.clearCookie(REFRESH_TOKEN_COOKIE, refreshCookieOptions(req));
 }
 
 /**
@@ -522,11 +526,11 @@ export function registerAuthRoutes(app: Express) {
       });
 
       if (rememberMe) {
-        setRefreshCookie(res, user);
+        setRefreshCookie(res, user, req);
       } else {
         // Guards against a stale 30-day cookie surviving a login where the
         // user deliberately unchecked "remember me" this time.
-        clearRefreshCookie(res);
+        clearRefreshCookie(res, req);
       }
 
       return res.status(200).json({
@@ -553,19 +557,19 @@ export function registerAuthRoutes(app: Express) {
       try {
         decoded = jwt.verify(rawToken, JWT_REFRESH_SECRET) as { userId: string };
       } catch {
-        clearRefreshCookie(res);
+        clearRefreshCookie(res, req);
         return fail(res, 401, 'REFRESH_INVALID', 'Your remembered session has expired. Please sign in again.');
       }
 
       const user = await User.findOne({ _id: decoded.userId, is_deleted: false });
       if (!user || user.account_status !== 'active') {
-        clearRefreshCookie(res);
+        clearRefreshCookie(res, req);
         return fail(res, 401, 'REFRESH_INVALID', 'Your remembered session is no longer valid. Please sign in again.');
       }
 
       // Sliding window: a device that's actually in use stays remembered
       // for a full 30 days from its last activity, not just from login.
-      setRefreshCookie(res, user);
+      setRefreshCookie(res, user, req);
 
       return res.status(200).json({
         success: true,
@@ -580,7 +584,7 @@ export function registerAuthRoutes(app: Express) {
      revocation itself is out of scope (stateless 8h tokens, same as the
      rest of the app) — this only stops this device from silently refreshing. */
   app.post('/api/v1/auth/logout', async (req: Request, res: Response) => {
-    clearRefreshCookie(res);
+    clearRefreshCookie(res, req);
     return res.status(200).json({ success: true, message: 'Signed out.' });
   });
 

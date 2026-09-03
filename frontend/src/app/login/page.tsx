@@ -15,7 +15,9 @@ import { armNavIntro } from '@/lib/session';
 import { clearDailyFocusOnLogin } from '@/lib/collegeSession';
 import { isPasswordValid } from '@/lib/passwordPolicy';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { getApiBase } from '@/lib/api';
+
+const API = getApiBase();
 const STAFF_DOMAIN = 'infoziant.com';
 
 type Mode = 'login' | 'signup' | 'signup_verify_otp' | 'forgot' | 'verify_otp' | 'set_new_password';
@@ -132,6 +134,7 @@ export default function LoginPage() {
         try {
           localStorage.setItem('ipoms_token', token);
           sessionStorage.setItem('ipoms_token', token);
+          sessionStorage.setItem('ipoms_login_time', String(Date.now()));
         } catch {}
       }
       if (user) {
@@ -228,6 +231,7 @@ export default function LoginPage() {
         try {
           localStorage.setItem('ipoms_token', token);
           sessionStorage.setItem('ipoms_token', token);
+          sessionStorage.setItem('ipoms_login_time', String(Date.now()));
         } catch {}
       }
       if (user) {
