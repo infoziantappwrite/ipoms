@@ -127,6 +127,13 @@ export default function LoginPage() {
 
       // Persist session
       const user = data.data?.user;
+      const token = data.data?.token;
+      if (token) {
+        try {
+          localStorage.setItem('ipoms_token', token);
+          sessionStorage.setItem('ipoms_token', token);
+        } catch {}
+      }
       if (user) {
         try {
           const raw = JSON.stringify(user);
@@ -216,6 +223,13 @@ export default function LoginPage() {
       }
 
       const user = data.data?.user;
+      const token = data.data?.token;
+      if (token) {
+        try {
+          localStorage.setItem('ipoms_token', token);
+          sessionStorage.setItem('ipoms_token', token);
+        } catch {}
+      }
       if (user) {
         try {
           const raw = JSON.stringify(user);

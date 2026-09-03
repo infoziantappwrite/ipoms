@@ -29,7 +29,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
-  const [masterTotal, setMasterTotal] = useState(3823);
+  const [masterTotal, setMasterTotal] = useState(4050);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [inputPage, setInputPage] = useState<string>('1');
@@ -196,6 +196,8 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
               onClick={() => {
                 const next = !isRecent;
                 setIsRecent(next);
+                setFromSno(null);
+                setToSno(null);
                 setPage(1);
               }}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer active:scale-95 ${
@@ -243,24 +245,23 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
               />
             </div>
 
-            {/* S.No Range Dropdown Selector */}
-            {!isRecent && (
-              <SnoRangeSelector
-                fromSno={fromSno}
-                toSno={toSno}
-                maxSno={masterTotal}
-                onApplyRange={(f, t) => {
-                  setFromSno(f);
-                  setToSno(t);
-                  setPage(1);
-                }}
-                onClearRange={() => {
-                  setFromSno(null);
-                  setToSno(null);
-                  setPage(1);
-                }}
-              />
-            )}
+            {/* S.No Range Dropdown Selector (Works for both Metadata & Recent Data!) */}
+            <SnoRangeSelector
+              fromSno={fromSno}
+              toSno={toSno}
+              minSno={isRecent ? 3548 : 1}
+              maxSno={masterTotal}
+              onApplyRange={(f, t) => {
+                setFromSno(f);
+                setToSno(t);
+                setPage(1);
+              }}
+              onClearRange={() => {
+                setFromSno(null);
+                setToSno(null);
+                setPage(1);
+              }}
+            />
           </div>
 
           {/* Quick Selection Actions & Top Pagination with Jump Input */}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Database, ClipboardList, FileSpreadsheet, Plus, Search, Trash2, Clock, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { SmoothIndustryDropdown } from '@/components/ui/SmoothIndustryDropdown';
@@ -102,15 +102,15 @@ export function MetadataHeader({
               </>
             )}
           </div>
-          <p className="text-xs text-fg-subtle mt-0.5">
-            {isRecycleBin
-              ? 'View, restore, or permanently purge recently deleted company and HR contact records'
-              : 'Centralized Corporate Directory, HR Contacts & Intelligence Repository'}
-          </p>
+          {isRecycleBin && (
+            <p className="text-xs text-fg-subtle mt-0.5">
+              View, restore, or permanently purge recently deleted company and HR contact records
+            </p>
+          )}
         </div>
 
-        {/* Pin Sign Out to Absolute Top Right */}
-        <div className="shrink-0">
+        {/* Top-Right Sign Out */}
+        <div className="flex items-center gap-2 shrink-0">
           <UserSignOutButton />
         </div>
       </div>
@@ -141,7 +141,8 @@ export function MetadataHeader({
             <SnoRangeSelector
               fromSno={fromSno}
               toSno={toSno}
-              maxSno={totalCount}
+              minSno={isRecent ? 3548 : 1}
+              maxSno={isRecent ? 4050 : Math.max(totalCount, 4050)}
               onApplyRange={onApplyRange}
               onClearRange={onClearRange}
             />

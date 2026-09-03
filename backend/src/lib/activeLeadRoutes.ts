@@ -325,7 +325,13 @@ export function registerActiveLeadRoutes(app: Express) {
       } = req.body;
 
       if (!company_name || !company_name.trim()) {
-        return res.status(400).json({ success: false, error: { message: 'Company name is required' } });
+        return res.status(400).json({ success: false, error: { message: 'Company Name is required' } });
+      }
+      if (!role || !role.trim()) {
+        return res.status(400).json({ success: false, error: { message: 'Role is required' } });
+      }
+      if (!ctc || !ctc.trim()) {
+        return res.status(400).json({ success: false, error: { message: 'CTC is required' } });
       }
 
       if (!ACTIVE_LEAD_STATUSES.includes(status)) {

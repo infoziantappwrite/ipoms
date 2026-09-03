@@ -37,6 +37,8 @@ exports.WeeklyTracker = exports.PIPELINE_SECTIONS = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 exports.PIPELINE_SECTIONS = [
     'completed',
+    'in_drive',
+    'companies_in_drive',
     'in_progress',
     'pipeline',
     'top_companies',

@@ -6,6 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const database_1 = require("../config/database");
 const User_1 = require("../models/User");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
+const dns_1 = __importDefault(require("dns"));
+dns_1.default.setServers(['8.8.8.8', '1.1.1.1']);
 async function listUsers() {
     await (0, database_1.connectDatabase)();
     const users = await User_1.User.find({ is_deleted: false }).select('full_name username official_email role_codes account_status password_hash');

@@ -13,7 +13,7 @@ const COLLEGE_LOGOS = [
   'hits.png', 'kamaraj.png', 'karpagam.png', 'karunya.png', 'kgisl.png',
   'kit.png', 'klu.png', 'kpr.png', 'kumaraguru.png', 'mkce.png',
   'narayanaguru.png', 'ngp.png', 'npr.png', 'psg.png', 'psna.png',
-  'smvec.png', 'sona.png', 'vit.png',
+  'smvec.png', 'sona.png', 'vit.png', 'MCET.png', 'MEC.png',
 ];
 
 export function LoginCollegeLogoStrip() {

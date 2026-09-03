@@ -23,6 +23,8 @@ interface SectionData {
 interface SectionsResponse {
   follow_ups_due_today: SectionData;
   completed: SectionData;
+  in_drive?: SectionData;
+  companies_in_drive?: SectionData;
   in_progress: SectionData;
   pipeline: SectionData;
   top_companies: SectionData;
@@ -401,7 +403,7 @@ export default function WeeklyTrackerPage() {
       {/* ── Operational Sections ────────────────────────────────────────── */}
       {selectedCollegeId && sections && (
         <div className="flex-1 px-6 pb-8 space-y-4">
-          {/* Section: Companies Completed */}
+          {/* Section 1: Companies Completed */}
           {shouldRenderSection('completed') && (
             <WeeklySection
               sectionKey="completed"
@@ -420,12 +422,31 @@ export default function WeeklyTrackerPage() {
             />
           )}
 
+          {/* Section 2: Companies in Drive */}
+          {(shouldRenderSection('in_drive') || shouldRenderSection('companies_in_drive')) && (
+            <WeeklySection
+              sectionKey="in_drive"
+              title={sections?.in_drive?.title || sections?.companies_in_drive?.title || 'Companies in Drive'}
+              order={sections?.in_drive?.order ?? 2}
+              summaryMetric={sections?.in_drive?.summary_metric || sections?.companies_in_drive?.summary_metric || ''}
+              rows={sections?.in_drive?.rows || sections?.companies_in_drive?.rows || []}
+              isGlobalDeleteMode={isDeleteMode}
+              globalSelectedRowIds={selectedRowIds}
+              onToggleSelectRow={handleToggleSelectRow}
+              onToggleSelectSection={handleToggleSelectSection}
+              onUpdateRow={handleUpdateRow}
+              onMoveSection={handleMoveSection}
+              onTogglePin={handleTogglePin}
+              onDeleteRow={handleDeleteRow}
+            />
+          )}
+
           {/* Section 3: Companies In Progress */}
           {shouldRenderSection('in_progress') && (
             <WeeklySection
               sectionKey="in_progress"
               title={sections?.in_progress?.title || 'Companies In Progress'}
-              order={sections?.in_progress?.order ?? 2}
+              order={sections?.in_progress?.order ?? 3}
               summaryMetric={sections?.in_progress?.summary_metric || ''}
               rows={sections?.in_progress?.rows || []}
               isGlobalDeleteMode={isDeleteMode}

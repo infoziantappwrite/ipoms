@@ -42,7 +42,7 @@ const PERIOD_ICON: Record<GreetingPeriod, LucideIcon> = {
   afternoon: Sun,
   early_evening: Sunset,
   dusk: Sunset,
-  evening: Moon,
+  evening: Sunset,
   night: Moon,
 };
 
@@ -201,7 +201,7 @@ export function DashboardHeader() {
           </div>
 
           {/* Top-Right Sign Out */}
-          <div>
+          <div className="flex items-center gap-2.5">
             <UserSignOutButton
               className={
                 isNight

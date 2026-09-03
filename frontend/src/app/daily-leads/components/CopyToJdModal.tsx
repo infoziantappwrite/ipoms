@@ -214,32 +214,37 @@ export function CopyToJdModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-xl bg-surface border border-border rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-        {/* ── Modal Header (Compact & Smooth) ───────────────────────── */}
-        <div className="px-6 py-3.5 border-b border-border bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-surface flex items-center justify-between gap-3 shrink-0">
+      <div className="relative w-full max-w-2xl bg-surface border border-border rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 min-h-[500px] max-h-[92vh]">
+        {/* ── Modal Header (Comfortable & Clean) ───────────────────────── */}
+        <div className="px-6 py-4 border-b border-border bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-surface flex items-center justify-between gap-3 shrink-0 rounded-t-3xl">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25 flex items-center justify-center shadow-xs shrink-0">
-              <Copy size={16} />
+            <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25 flex items-center justify-center shadow-xs shrink-0">
+              <Copy size={17} />
             </div>
-            <h3 className="text-sm sm:text-base font-bold text-fg tracking-tight">
-              Copy to JD Received
-            </h3>
+            <div>
+              <h3 className="text-base font-bold text-fg tracking-tight">
+                Copy to JD Received
+              </h3>
+              <p className="text-[11px] text-fg-subtle">
+                Transfer positive placement opportunities to focused campus JD records
+              </p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-7 h-7 rounded-lg bg-surface hover:bg-surface-raised border border-border/80 hover:border-border text-fg-subtle hover:text-fg flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
+            className="w-8 h-8 rounded-lg bg-surface hover:bg-surface-raised border border-border/80 hover:border-border text-fg-subtle hover:text-fg flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
             title="Close"
           >
-            <X size={14} />
+            <X size={15} />
           </button>
         </div>
 
-        {/* ── Modal Body (Compact, Proportional Spacing) ─────────────── */}
+        {/* ── Modal Body (Comfortably Contained Inside Window) ────────── */}
         <form
           id="copy-to-jd-form"
           onSubmit={handleSubmit}
-          className="px-6 pt-5 pb-5 space-y-4 text-xs [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          className="flex-1 overflow-y-auto px-7 py-5 space-y-5 text-xs custom-scrollbar"
         >
           {/* Step 1: Company Selection with Smooth Floating Dropdown */}
           <div className="space-y-1.5">
@@ -308,9 +313,9 @@ export function CopyToJdModal({
                   </div>
                 </button>
 
-                {/* Floating Smooth Popover */}
+                {/* Floating Smooth Popover Contained Inside Modal */}
                 {isCompanyDropdownOpen && (
-                  <div className="absolute left-0 right-0 top-full mt-1.5 bg-surface border border-border rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col">
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-surface border border-border rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col">
                     {/* Search inside Popover if multiple companies */}
                     {uniqueCompanies.length > 2 && (
                       <div className="p-2 border-b border-border bg-surface-sunken/60">
@@ -328,8 +333,8 @@ export function CopyToJdModal({
                       </div>
                     )}
 
-                    {/* Options List */}
-                    <div className="max-h-52 overflow-y-auto divide-y divide-border/40 p-1 space-y-0.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                    {/* Options List with comfortable height (3-4 companies, no overflow outside) */}
+                    <div className="max-h-56 overflow-y-auto divide-y divide-border/40 p-1.5 space-y-1 custom-scrollbar">
                       {filteredUniqueCompanies.length === 0 ? (
                         <div className="p-3 text-center text-fg-disabled text-xs">
                           No matching positive companies

@@ -13,6 +13,7 @@ import {
   ChevronUp,
   Trash2,
   X,
+  Calendar,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { WeeklyTable, WeeklyRow } from './WeeklyTable';
@@ -46,6 +47,18 @@ const SECTION_CONFIGS: Record<string, { Icon: any; headerBg: string; badgeClass:
     headerBg: 'bg-emerald-50/80 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900/40 text-emerald-900 dark:text-emerald-300',
     badgeClass: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700/60',
     iconClass: 'text-emerald-600 dark:text-emerald-400',
+  },
+  in_drive: {
+    Icon: Calendar,
+    headerBg: 'bg-indigo-50/80 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900/40 text-indigo-900 dark:text-indigo-300',
+    badgeClass: 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700/60',
+    iconClass: 'text-indigo-600 dark:text-indigo-400',
+  },
+  companies_in_drive: {
+    Icon: Calendar,
+    headerBg: 'bg-indigo-50/80 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900/40 text-indigo-900 dark:text-indigo-300',
+    badgeClass: 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700/60',
+    iconClass: 'text-indigo-600 dark:text-indigo-400',
   },
   in_progress: {
     Icon: Rocket,

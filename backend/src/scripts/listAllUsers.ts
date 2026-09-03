@@ -1,6 +1,9 @@
 import { connectDatabase, disconnectDatabase } from '../config/database';
 import { User } from '../models/User';
 import bcrypt from 'bcryptjs';
+import dns from 'dns';
+
+dns.setServers(['8.8.8.8', '1.1.1.1']);
 
 async function listUsers() {
   await connectDatabase();

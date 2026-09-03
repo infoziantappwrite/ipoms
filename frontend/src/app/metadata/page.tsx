@@ -306,6 +306,8 @@ export default function MetadataPage() {
         isRecent={isRecent}
         onToggleRecent={() => {
           setIsRecent(!isRecent);
+          setFromSno(null);
+          setToSno(null);
           setPage(1);
         }}
         fromSno={fromSno}

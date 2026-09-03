@@ -80,11 +80,11 @@ export function RowMonthDropdown({ value, onChange, disabled = false }: Props) {
         />
       </button>
 
-      {/* ── Smooth Dropdown Popover ───────────────────────────────────── */}
+      {/* ── Solid Minimal SaaS Dropdown Popover ───────────────────────── */}
       {isOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="absolute left-0 top-full mt-1 w-44 bg-surface/98 backdrop-blur-md border border-border rounded-2xl shadow-3 z-50 p-1.5 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] text-fg select-none origin-top-left max-h-56 overflow-y-auto custom-scrollbar"
+          className="absolute left-0 top-full mt-1 w-44 bg-surface border border-border rounded-xl shadow-xl z-50 p-1.5 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] text-fg select-none origin-top-left max-h-56 overflow-y-auto custom-scrollbar"
         >
           <div className="text-[10px] font-bold text-fg-subtle uppercase px-2 py-1 tracking-wider border-b border-border/40 mb-0.5">
             Follow Up Month
@@ -96,10 +96,10 @@ export function RowMonthDropdown({ value, onChange, disabled = false }: Props) {
                 key={m}
                 type="button"
                 onClick={() => handleSelect(m)}
-                className={`w-full text-left px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-between gap-1.5 transition-all active:scale-[0.98] cursor-pointer ${
+                className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between gap-1.5 transition-colors cursor-pointer ${
                   isSelected
                     ? 'bg-warning/15 text-warning-strong font-bold shadow-2xs'
-                    : 'hover:bg-surface-raised text-fg'
+                    : 'hover:bg-surface-sunken text-fg'
                 }`}
               >
                 <span>{m}</span>

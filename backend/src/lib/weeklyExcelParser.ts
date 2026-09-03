@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as xlsx from 'xlsx';
 import { Types } from 'mongoose';
 import { College } from '../models/College';
@@ -185,7 +186,13 @@ export async function importWeeklySheetForCollege(sheetName: string): Promise<{
   sectionsBreakdown: Record<string, number>;
   entries: ParsedWeeklyEntry[];
 }> {
-  const filePath = 'C:\\Users\\admin\\Downloads\\Weekly Report.xlsx';
+  const candidatePaths = [
+    'C:\\Users\\admin\\Downloads\\Weekly .xlsx',
+    'C:\\Users\\admin\\Downloads\\Weekly Report 2027 BATCH (1).xlsx',
+    'C:\\Users\\admin\\Downloads\\Weekly Report 2027 BATCH.xlsx',
+    'C:\\Users\\admin\\Downloads\\Weekly Report.xlsx',
+  ];
+  const filePath = candidatePaths.find((p) => fs.existsSync(p)) || candidatePaths[0];
   const workbook = xlsx.readFile(filePath);
 
   const matchedSheetKey = workbook.SheetNames.find(

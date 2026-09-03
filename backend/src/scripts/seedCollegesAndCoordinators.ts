@@ -51,9 +51,13 @@ const LOCATION_MAP: Record<string, string> = {
   MAR: 'Kanyakumari, Tamil Nadu',
   NGCE: 'Kanyakumari, Tamil Nadu',
   ACEW: 'Kanyakumari, Tamil Nadu',
+  MCET: 'Pollachi, Tamil Nadu',
+  MEC: 'Singlandhapuram, Tamil Nadu',
 };
 
 const LOGO_MAP: Record<string, string> = {
+  MEC: '/college-logos/MEC.png',
+  MCET: '/college-logos/MCET.png',
   ACET: '/college-logos/acet.png',
   KIOT: '/college-logos/kiot.jfif',
   KLU: '/college-logos/klu.png',

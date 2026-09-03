@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.parseSheetData = parseSheetData;
 exports.importWeeklySheetForCollege = importWeeklySheetForCollege;
+const fs = __importStar(require("fs"));
 const xlsx = __importStar(require("xlsx"));
 const College_1 = require("../models/College");
 const CompanyMetadata_1 = require("../models/CompanyMetadata");
@@ -188,7 +189,13 @@ function parseSheetData(sheet) {
     return entries;
 }
 async function importWeeklySheetForCollege(sheetName) {
-    const filePath = 'C:\\Users\\admin\\Downloads\\Weekly Report.xlsx';
+    const candidatePaths = [
+        'C:\\Users\\admin\\Downloads\\Weekly .xlsx',
+        'C:\\Users\\admin\\Downloads\\Weekly Report 2027 BATCH (1).xlsx',
+        'C:\\Users\\admin\\Downloads\\Weekly Report 2027 BATCH.xlsx',
+        'C:\\Users\\admin\\Downloads\\Weekly Report.xlsx',
+    ];
+    const filePath = candidatePaths.find((p) => fs.existsSync(p)) || candidatePaths[0];
     const workbook = xlsx.readFile(filePath);
     const matchedSheetKey = workbook.SheetNames.find((s) => s.trim().toLowerCase() === sheetName.trim().toLowerCase());
     if (!matchedSheetKey) {

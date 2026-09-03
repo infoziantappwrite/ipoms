@@ -135,7 +135,7 @@ export function ActiveLeadHeader({
             </div>
           )}
 
-          <div className="ml-2 shrink-0">
+          <div className="ml-2 flex items-center gap-2 shrink-0">
             <UserSignOutButton />
           </div>
         </div>

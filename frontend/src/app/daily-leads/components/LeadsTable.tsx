@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowRightCircle, Pencil, Sparkles, Trash2, Calendar, FileText, CheckCircle2, ChevronDown } from 'lucide-react';
+import { ArrowRightCircle, Sparkles, Trash2, Calendar, FileText, CheckCircle2, ChevronDown } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { InlineCollegeSelector } from './InlineCollegeSelector';
 import { EditLeadModal } from './EditLeadModal';
@@ -112,8 +112,10 @@ export function LeadsTable({
               <th className="py-3 px-3 min-w-[220px] text-center border-r border-border/80">Company Name</th>
               <th className="py-3 px-3 min-w-[170px] text-center border-r border-border/80">Role</th>
               <th className="py-3 px-3 min-w-[110px] text-center border-r border-border/80">CTC</th>
-              <th className="py-3 px-3 min-w-[110px] text-center border-r border-border/80">Eligible Batch</th>
-              <th className="py-3 px-2 w-12 text-center">Action</th>
+              <th className={`py-3 px-3 min-w-[110px] text-center ${activeTab === 'positive' ? 'border-r border-border/80' : ''}`}>Eligible Batch</th>
+              {activeTab === 'positive' && (
+                <th className="py-3 px-2 w-28 text-center">Action</th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60 font-normal bg-surface">
@@ -410,7 +412,7 @@ function TableRow({
       </td>
 
       {/* Eligible Batch (Multi-select from 2025 onwards) */}
-      <td className="py-2.5 px-3 text-fg-muted whitespace-nowrap min-w-[110px] text-center border-r border-border/60">
+      <td className={`py-2.5 px-3 text-fg-muted whitespace-nowrap min-w-[110px] text-center ${activeTab === 'positive' ? 'border-r border-border/60' : ''}`}>
         <SmoothYearDropdown
           value={row.eligible_batch}
           onChange={(newYear) => onUpdateRow(row._id, { eligible_batch: newYear })}
@@ -418,36 +420,22 @@ function TableRow({
         />
       </td>
 
-      {/* Action Column (Move to JD for Positives tab; Pen Edit icon for JD Received tab) */}
-      <td className="py-2.5 px-2 text-center whitespace-nowrap w-12">
-        {activeTab === 'positive' ? (
+      {/* Action Column (Only needed for Positives tab to Move to JD; removed for JD Received since all cells are inline editable) */}
+      {activeTab === 'positive' && (
+        <td className="py-2.5 px-2 text-center whitespace-nowrap w-28">
           <button
             type="button"
             onClick={handleMoveAction}
             disabled={isDeleteMode || isMoving}
-            className="inline-flex items-center justify-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 shadow-2xs hover:shadow-xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer mx-auto text-[11px] font-bold"
+            className="inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 shadow-2xs hover:shadow-xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer mx-auto text-[11px] font-bold"
             title="Move this lead to JD Received tab"
             aria-label="Move to JD Received"
           >
             <ArrowRightCircle size={13} strokeWidth={2.4} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
-            <span className="whitespace-nowrap hidden xl:inline">Move to JD</span>
+            <span className="whitespace-nowrap">Move to JD</span>
           </button>
-        ) : (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit();
-            }}
-            disabled={isDeleteMode}
-            className="p-1.5 rounded-lg bg-surface-sunken hover:bg-primary/10 text-fg-subtle hover:text-primary border border-border/60 hover:border-primary/30 cursor-pointer shadow-2xs active:scale-95 disabled:opacity-0 mx-auto transition-colors"
-            title="Edit JD details"
-            aria-label="Edit JD details"
-          >
-            <Pencil size={13} strokeWidth={2.2} />
-          </button>
-        )}
-      </td>
+        </td>
+      )}
     </tr>
   );
 }

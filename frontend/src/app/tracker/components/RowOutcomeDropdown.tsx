@@ -109,15 +109,15 @@ export function RowOutcomeDropdown({ value, onChange, disabled = false, placemen
         />
       </button>
 
-      {/* ── Smooth Dropdown Popover ───────────────────────────────────── */}
+      {/* ── Solid Minimal SaaS Dropdown Popover ───────────────────────── */}
       {isOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
           className={`absolute ${
             placement === 'top'
-              ? 'left-0 bottom-full mb-1 origin-bottom-left'
-              : 'left-0 top-full mt-1 origin-top-left'
-          } w-52 bg-surface/98 backdrop-blur-md border border-border rounded-2xl shadow-2xl z-[100] p-1.5 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] text-fg select-none max-h-64 overflow-y-auto custom-scrollbar`}
+              ? 'left-0 bottom-full mb-1.5 origin-bottom-left'
+              : 'left-0 top-full mt-1.5 origin-top-left'
+          } w-52 bg-surface border border-border rounded-xl shadow-xl z-[100] p-1.5 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] text-fg select-none max-h-64 overflow-y-auto custom-scrollbar`}
         >
           {ROW_OUTCOMES.map((opt) => {
             const isSelected = opt.value === value;
@@ -126,10 +126,10 @@ export function RowOutcomeDropdown({ value, onChange, disabled = false, placemen
                 key={opt.value}
                 type="button"
                 onClick={() => handleSelect(opt.value)}
-                className={`w-full text-left px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-between gap-2 transition-all active:scale-[0.98] cursor-pointer ${
+                className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer ${
                   isSelected
-                    ? 'bg-primary/15 font-bold shadow-2xs'
-                    : 'hover:bg-surface-raised text-fg'
+                    ? 'bg-primary/10 text-primary font-bold shadow-2xs'
+                    : 'hover:bg-surface-sunken text-fg'
                 }`}
               >
                 <div className="flex items-center gap-2 min-w-0">

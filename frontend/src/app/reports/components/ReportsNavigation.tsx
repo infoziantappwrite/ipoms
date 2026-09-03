@@ -6,7 +6,7 @@ import { UserSignOutButton } from '@/components/UserSignOutButton';
 export function ReportsNavigation() {
   return (
     <header className="sticky top-0 z-40 bg-surface/95 backdrop-blur-md border-b border-border px-6 py-4 space-y-3 shadow-xs print:hidden text-fg">
-      {/* ── Top Row: Title & Top-Right Sign Out ────────────────────────── */}
+      {/* ── Top Row: Title & Top-Right Actions (Sign Out) ────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-xs">
@@ -19,8 +19,8 @@ export function ReportsNavigation() {
           </div>
         </div>
 
-        {/* Pin Sign Out to Absolute Top Right */}
-        <div className="shrink-0">
+        {/* Top-Right Sign Out */}
+        <div className="flex items-center gap-2.5 shrink-0">
           <UserSignOutButton />
         </div>
       </div>

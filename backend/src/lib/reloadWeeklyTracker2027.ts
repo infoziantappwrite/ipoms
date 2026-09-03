@@ -182,6 +182,7 @@ export async function reloadWeeklyTrackerFrom2027Workbook(customPath?: string): 
 }> {
   const possiblePaths = [
     customPath,
+    'C:\\Users\\admin\\Downloads\\Weekly .xlsx',
     'C:\\Users\\admin\\Downloads\\Weekly Report 2027 BATCH (1).xlsx',
     'C:\\Users\\admin\\Downloads\\Weekly Report 2027 BATCH.xlsx',
     'C:\\Users\\admin\\Downloads\\Weekly Report.xlsx',

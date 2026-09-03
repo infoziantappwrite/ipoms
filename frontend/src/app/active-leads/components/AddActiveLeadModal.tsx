@@ -52,7 +52,15 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!companyName.trim()) {
-      setError('Company Name is required');
+      setError('Company Name is mandatory');
+      return;
+    }
+    if (!role.trim()) {
+      setError('Role is mandatory');
+      return;
+    }
+    if (!ctcValue.trim()) {
+      setError('CTC is mandatory');
       return;
     }
 
@@ -141,7 +149,9 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {/* Role */}
             <div>
-              <label className="block text-xs font-bold text-fg mb-1.5">Role</label>
+              <label className="block text-xs font-bold text-fg mb-1.5">
+                Role <span className="text-rose-500 font-bold">*</span>
+              </label>
               <div className="relative">
                 <Briefcase size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
                 <input
@@ -157,7 +167,9 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
             {/* CTC with LPA & / Month (Internship) Toggle */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold text-fg">CTC (₹)</label>
+                <label className="block text-xs font-bold text-fg">
+                  CTC (₹) <span className="text-rose-500 font-bold">*</span>
+                </label>
                 
                 {/* Unit Switch: LPA vs / Month (Internship) vs Both */}
                 <div className="inline-flex items-center bg-surface-sunken border border-border p-0.5 rounded-lg text-[10px] font-bold shadow-2xs">
@@ -253,7 +265,9 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
 
             {/* Academic Year Dropdown */}
             <div>
-              <label className="block text-xs font-bold text-fg mb-1.5">Hiring Year</label>
+              <label className="block text-xs font-bold text-fg mb-1.5">
+                Hiring Year <span className="text-fg-subtle text-[11px] font-normal">(Optional)</span>
+              </label>
               <SmoothYearDropdown value={academicYear} onChange={setAcademicYear} className="w-full" />
             </div>
           </div>

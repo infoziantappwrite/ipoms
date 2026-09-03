@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   Shield,
   Sliders,
+  HelpCircle,
 } from 'lucide-react';
 
 import { InfoziantMark } from '@/components/InfoziantMark';
@@ -64,11 +65,12 @@ const NAV: NavItem[] = [
   // Intelligence & Reporting
   { href: '/metadata', label: 'Metadata DB', Icon: Database },
   { href: '/reports', label: 'Report Builder', Icon: TrendingUp },
+  { href: '/faq', label: 'Help & FAQs', Icon: HelpCircle },
 
   // Dedicated Standalone Administrator Governance Modules
   { href: '/users', label: 'User Management', Icon: Users, roles: ['admin'] },
   { href: '/roles', label: 'Role Permissions Matrix', Icon: Shield, roles: ['admin'] },
-  { href: '/system-settings', label: 'Season & System Settings', Icon: Sliders, roles: ['admin'] },
+  { href: '/system-settings', label: 'Season & System Settings', Icon: Sliders, roles: ['admin', 'team_leader'] },
   { href: '/system-health', label: 'System Health & Modules', Icon: ShieldCheck, roles: ['admin'] },
 ];
 
@@ -251,9 +253,9 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
           )}
         </div>
 
-        {/* ── Main Nav Items (Spacious, Elegant Module Layout) ── */}
-        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3.5 min-h-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden flex flex-col justify-start">
-          <ul className="space-y-2 w-full flex flex-col items-center">
+        {/* ── Main Nav Items (Medium 17px Icons, Locked Zero-Scroll) ── */}
+        <nav className="flex-1 overflow-hidden px-2.5 py-3 min-h-0 flex flex-col justify-start">
+          <ul className="space-y-1.5 w-full flex flex-col items-center">
             {items.map(({ href, label, Icon }) => {
               const currentTab = searchParams?.get('tab');
               const [hrefPath, hrefQuery] = href.split('?');
@@ -302,8 +304,8 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                       mounted ? 'transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]' : ''
                     } ${
                       collapsed
-                        ? 'w-10 h-10 justify-center p-0 mx-auto'
-                        : 'w-full h-10.5 px-3 gap-3 justify-start'
+                        ? 'w-9 h-9 justify-center p-0 mx-auto'
+                        : 'w-full h-9 px-3 gap-3 justify-start'
                     } ${
                       isLocked
                         ? 'text-zinc-400 dark:text-zinc-600 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60'
@@ -312,18 +314,18 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                         : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 font-medium'
                     }`}
                   >
-                    <span className={`relative shrink-0 grid place-items-center ${collapsed ? 'w-full h-full' : 'w-6 h-6'}`}>
-                      <Icon size={18} strokeWidth={active ? 2.2 : 1.8} aria-hidden />
+                    <span className={`relative shrink-0 grid place-items-center ${collapsed ? 'w-full h-full' : 'w-5.5 h-5.5'}`}>
+                      <Icon size={17} strokeWidth={active ? 2.2 : 1.85} aria-hidden />
                       {isLocked && (
                         <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                          <Lock size={7} strokeWidth={2.5} />
+                          <Lock size={6.5} strokeWidth={2.5} />
                         </span>
                       )}
                     </span>
                     {!collapsed && (
                       <span className="flex-1 flex items-center justify-between min-w-0 pr-1">
                         <span
-                          className={`whitespace-nowrap text-[13px] ${
+                          className={`whitespace-nowrap text-[12.5px] ${
                             active ? 'font-semibold text-white' : 'font-medium text-zinc-800 dark:text-zinc-200'
                           } ${
                             mounted ? 'transition-opacity duration-300 ease-in-out' : ''
@@ -332,7 +334,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                           {label}
                         </span>
                         {isLocked && (
-                          <Lock size={12} className="text-amber-500/70 ml-2 shrink-0" />
+                          <Lock size={11} className="text-amber-500/70 ml-2 shrink-0" />
                         )}
                       </span>
                     )}
@@ -357,31 +359,31 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                   <img
                     src={user.profile_photo_url}
                     alt={fullName}
-                    className="h-9 w-9 rounded-full object-cover shrink-0 ring-2 ring-zinc-200 dark:ring-zinc-700 shadow-sm group-hover:scale-105 transition-transform"
+                    className="w-9 h-9 rounded-full object-cover shrink-0 ring-2 ring-zinc-200 dark:ring-zinc-700 shadow-sm group-hover:scale-105 transition-transform"
                   />
                 ) : (
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-xs font-bold tracking-wider shadow-sm ring-2 ring-white dark:ring-zinc-900 group-hover:scale-105 transition-transform">
+                  <span className="grid w-9 h-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-[11px] font-bold tracking-normal leading-none shadow-xs ring-2 ring-white dark:ring-zinc-900 group-hover:scale-105 transition-transform">
                     {initialsFor(fullName)}
                   </span>
                 )}
               </Link>
-              <ThemeToggle className="w-8 h-8 rounded-lg text-xs" />
+              <ThemeToggle className="w-9 h-9 rounded-xl text-xs" />
             </div>
           ) : (
             <div className="flex items-center justify-between gap-1.5 p-1.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 shadow-xs">
               <Link
                 href="/profile"
-                className="flex items-center gap-2.5 min-w-0 flex-1 p-1 hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-colors overflow-hidden"
+                className="flex items-center gap-2.5 min-w-0 flex-1 p-0.5 hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-colors overflow-hidden"
               >
                 {user?.profile_photo_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={user.profile_photo_url}
                     alt={fullName}
-                    className="h-9 w-9 rounded-full object-cover shrink-0 ring-2 ring-zinc-200 dark:ring-zinc-700 shadow-sm"
+                    className="w-9 h-9 rounded-full object-cover shrink-0 ring-2 ring-zinc-200 dark:ring-zinc-700 shadow-sm"
                   />
                 ) : (
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-xs font-bold tracking-wider shadow-sm ring-2 ring-white dark:ring-zinc-900">
+                  <span className="grid w-9 h-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-[11px] font-bold tracking-normal leading-none shadow-xs ring-2 ring-white dark:ring-zinc-900">
                     {initialsFor(fullName)}
                   </span>
                 )}
@@ -395,7 +397,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                 </div>
               </Link>
               <div className="shrink-0">
-                <ThemeToggle className="w-8 h-8 rounded-lg text-xs" />
+                <ThemeToggle className="w-9 h-9 rounded-xl text-xs" />
               </div>
             </div>
           )}
@@ -543,8 +545,8 @@ function MobileDrawer({
         </div>
 
         {/* Mobile Nav Links */}
-        <nav className="flex-1 overflow-y-auto px-4 py-4">
-          <ul className="space-y-2">
+        <nav className="flex-1 overflow-y-auto px-3 py-2.5">
+          <ul className="space-y-1">
             {items.map(({ href, label, Icon }) => {
               const active = pathname === href || pathname.startsWith(`${href}/`);
               const isCoordinator = roleOf(user) === 'coordinator';
@@ -573,7 +575,7 @@ function MobileDrawer({
                   <Link
                     href={href}
                     onClick={handleClick}
-                    className={`group flex items-center justify-between px-3.5 py-3 rounded-xl text-[13px] transition-all active:scale-[0.98] ${
+                    className={`group flex items-center justify-between px-3 py-2 rounded-xl text-[12.5px] transition-all active:scale-[0.98] ${
                       isLocked
                         ? 'text-zinc-400 dark:text-zinc-600 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60'
                         : active
@@ -581,12 +583,12 @@ function MobileDrawer({
                         : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 font-medium'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <Icon size={19} strokeWidth={active ? 2.2 : 1.8} />
+                    <div className="flex items-center gap-2.5">
+                      <Icon size={16} strokeWidth={active ? 2.2 : 1.8} />
                       <span>{label}</span>
                     </div>
                     {isLocked && (
-                      <Lock size={13} className="text-amber-500/80 shrink-0" />
+                      <Lock size={11} className="text-amber-500/80 shrink-0" />
                     )}
                   </Link>
                 </li>
@@ -610,10 +612,10 @@ function MobileDrawer({
               <img
                 src={user.profile_photo_url}
                 alt={fullName}
-                className="h-9 w-9 rounded-full object-cover shrink-0 ring-2 ring-zinc-200 dark:ring-zinc-700 shadow-sm"
+                className="w-9 h-9 rounded-full object-cover shrink-0 ring-2 ring-zinc-200 dark:ring-zinc-700 shadow-sm"
               />
             ) : (
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-xs font-bold tracking-wider shadow-sm ring-2 ring-white dark:ring-zinc-900">
+              <span className="grid w-9 h-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-[11px] font-bold tracking-normal leading-none shadow-xs ring-2 ring-white dark:ring-zinc-900">
                 {initialsFor(fullName)}
               </span>
             )}

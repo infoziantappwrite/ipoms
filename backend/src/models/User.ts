@@ -33,6 +33,9 @@ export interface IUser extends Document {
   role_ids: Types.ObjectId[];
   role_codes: string[];
   assigned_college_ids: Types.ObjectId[];
+  weekly_focus_locked?: boolean;
+  weekly_focus_week_key?: string;
+  weekly_focus_locked_at?: Date | null;
   is_email_verified: boolean;
   must_change_password: boolean;
   last_login_at?: Date | null;
@@ -213,6 +216,21 @@ const UserSchema: Schema<IUser> = new Schema(
         index: true,
       },
     ],
+    weekly_focus_locked: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    weekly_focus_week_key: {
+      type: String,
+      default: '',
+      trim: true,
+      index: true,
+    },
+    weekly_focus_locked_at: {
+      type: Date,
+      default: null,
+    },
     is_email_verified: {
       type: Boolean,
       default: true,

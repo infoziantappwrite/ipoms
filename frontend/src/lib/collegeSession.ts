@@ -13,7 +13,15 @@ export const COORDINATOR_FOCUS_WEEK_KEY = 'ipoms_coordinator_focus_week';
 export const COORDINATOR_FOCUS_LOCKED_KEY = 'ipoms_coordinator_focus_locked';
 export const ALL_COLLEGES_CACHE_KEY = 'ipoms_cached_all_colleges';
 
-let memoryCachedColleges: College[] = [];
+export interface CollegeOccupancy extends College {
+  is_occupied?: boolean;
+  is_shared_slot?: boolean;
+  other_handlers_count?: number;
+  occupied_by?: { user_id: string; name: string; email: string } | null;
+  is_selected_by_me?: boolean;
+}
+
+let memoryCachedColleges: CollegeOccupancy[] = [];
 
 /** Returns YYYY-MM-DD for today */
 function getTodayKey(): string {
@@ -39,7 +47,7 @@ export function getCurrentWeekMondayKey(d: Date = new Date()): string {
   return `${year}-${month}-${dayStr}`;
 }
 
-export function getCachedColleges(): College[] {
+export function getCachedColleges(): CollegeOccupancy[] {
   if (memoryCachedColleges && memoryCachedColleges.length > 0) {
     return memoryCachedColleges;
   }
@@ -57,7 +65,7 @@ export function getCachedColleges(): College[] {
   return [];
 }
 
-export function setCachedColleges(list: College[]): void {
+export function setCachedColleges(list: CollegeOccupancy[]): void {
   if (!Array.isArray(list) || list.length === 0) return;
   memoryCachedColleges = list;
   if (typeof window === 'undefined') return;
@@ -67,19 +75,168 @@ export function setCachedColleges(list: College[]): void {
   } catch {}
 }
 
-export async function fetchAllCollegesCached(): Promise<College[]> {
+export async function fetchAllCollegesCached(): Promise<CollegeOccupancy[]> {
   const cached = getCachedColleges();
   try {
-    const res = await apiFetch('/colleges');
+    const res = await apiFetch('/colleges/focus-matrix');
     if (res.success && Array.isArray((res.data as any)?.colleges) && (res.data as any).colleges.length > 0) {
-      const liveList: College[] = (res.data as any).colleges;
+      const liveList: CollegeOccupancy[] = (res.data as any).colleges;
       setCachedColleges(liveList);
+
+      const focusData = (res.data as any)?.current_user_focus;
+      if (focusData && typeof window !== 'undefined') {
+        if (focusData.is_locked) {
+          localStorage.setItem(COORDINATOR_FOCUS_LOCKED_KEY, 'true');
+          localStorage.setItem(COORDINATOR_FOCUS_WEEK_KEY, focusData.week_key || getCurrentWeekMondayKey());
+          if (Array.isArray(focusData.selected_college_ids) && focusData.selected_college_ids.length > 0) {
+            localStorage.setItem(COORDINATOR_SELECTED_COLLEGES_KEY, JSON.stringify(focusData.selected_college_ids));
+          }
+        }
+      }
+
       return liveList;
     }
   } catch (err) {
-    console.warn('[Colleges] Background fetch failed, using cached list', err);
+    console.warn('[Colleges] Background focus-matrix fetch failed, using cached list', err);
   }
   return cached;
+}
+
+/**
+ * Real-time fetch of college occupancy focus matrix from backend
+ */
+export async function fetchCollegeFocusMatrix(): Promise<{
+  colleges: CollegeOccupancy[];
+  isLocked: boolean;
+  selectedIds: string[];
+  weekKey: string;
+}> {
+  try {
+    const res = await apiFetch('/colleges/focus-matrix');
+    if (res.success && res.data) {
+      const liveList: CollegeOccupancy[] = (res.data as any).colleges || [];
+      const focusData = (res.data as any).current_user_focus || {};
+      const weekKey = (res.data as any).week_key || getCurrentWeekMondayKey();
+      const isLocked = Boolean(focusData.is_locked);
+      const selectedIds = Array.isArray(focusData.selected_college_ids) ? focusData.selected_college_ids : [];
+
+      if (liveList.length > 0) {
+        setCachedColleges(liveList);
+      }
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(COORDINATOR_FOCUS_WEEK_KEY, weekKey);
+        localStorage.setItem(COORDINATOR_FOCUS_LOCKED_KEY, isLocked ? 'true' : 'false');
+        if (selectedIds.length > 0) {
+          localStorage.setItem(COORDINATOR_SELECTED_COLLEGES_KEY, JSON.stringify(selectedIds));
+        }
+      }
+
+      return {
+        colleges: liveList,
+        isLocked,
+        selectedIds,
+        weekKey,
+      };
+    }
+  } catch (err) {
+    console.error('Failed to fetch college focus matrix:', err);
+  }
+
+  return {
+    colleges: getCachedColleges(),
+    isLocked: isFocusLockedToday(),
+    selectedIds: getCoordinatorSelectedColleges(),
+    weekKey: getCurrentWeekMondayKey(),
+  };
+}
+
+/**
+ * Locks focus on the backend and synchronizes local storage & events
+ */
+export async function lockDailyFocusApi(ids: string[]): Promise<{ success: boolean; message?: string }> {
+  const sanitized = Array.from(new Set(ids.filter(Boolean))).slice(0, 4);
+  if (sanitized.length === 0 || sanitized.length > 4) {
+    return { success: false, message: 'Please select between 1 and 4 partner colleges.' };
+  }
+
+  try {
+    const res = await apiFetch('/colleges/lock-focus', {
+      method: 'POST',
+      body: JSON.stringify({ college_ids: sanitized }),
+    });
+
+    if (!res.success) {
+      const errMsg = (res as any)?.error?.message || (res as any)?.message || 'Failed to lock college focus.';
+      return { success: false, message: errMsg };
+    }
+
+    const weekKey = (res.data as any)?.week_key || getCurrentWeekMondayKey();
+    const today = getTodayKey();
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(COORDINATOR_SELECTED_COLLEGES_KEY, JSON.stringify(sanitized));
+      localStorage.setItem(COORDINATOR_FOCUS_DATE_KEY, today);
+      localStorage.setItem(COORDINATOR_FOCUS_WEEK_KEY, weekKey);
+      localStorage.setItem(COORDINATOR_FOCUS_LOCKED_KEY, 'true');
+
+      // Auto-set first selected college as active session
+      const all = getCachedColleges();
+      const firstCol = all.find((c) => c._id === sanitized[0]);
+      if (firstCol) {
+        setActiveCollege(firstCol._id, firstCol.college_name, firstCol);
+      }
+
+      window.dispatchEvent(
+        new CustomEvent('ipoms_focus_updated', {
+          detail: { selectedIds: sanitized, isLocked: true, date: today, weekKey },
+        })
+      );
+      window.dispatchEvent(
+        new CustomEvent('ipoms_coordinator_colleges_changed', {
+          detail: { selectedIds: sanitized },
+        })
+      );
+    }
+
+    return {
+      success: true,
+      message: (res as any)?.message || 'Active college focus locked successfully!',
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || 'Network error while locking focus.',
+    };
+  }
+}
+
+/**
+ * Unlocks focus on the backend so coordinator can adjust selection
+ */
+export async function unlockDailyFocusApi(): Promise<{ success: boolean; message?: string }> {
+  try {
+    const res = await apiFetch('/colleges/unlock-focus', {
+      method: 'POST',
+    });
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(COORDINATOR_FOCUS_LOCKED_KEY, 'false');
+      window.dispatchEvent(
+        new CustomEvent('ipoms_focus_updated', {
+          detail: { selectedIds: getCoordinatorSelectedColleges(), isLocked: false },
+        })
+      );
+    }
+
+    return {
+      success: true,
+      message: (res as any)?.message || 'Focus unlocked. You can now adjust your partner institutions.',
+    };
+  } catch (err: any) {
+    unlockDailyFocus(); // Fallback to local unlock
+    return { success: true, message: 'Focus unlocked locally.' };
+  }
 }
 
 /**
@@ -237,10 +394,15 @@ export function sortCollegesWithPriority(
   const pinned: (College & { isPinned?: boolean })[] = [];
   const unpinned: (College & { isPinned?: boolean })[] = [];
 
-  const selectedSet = new Set(selectedIds);
+  const selectedSet = new Set(selectedIds.map(s => String(s).toLowerCase().trim()));
 
   for (const col of allColleges) {
-    if (selectedSet.has(col._id)) {
+    const isExplicitlyPinned =
+      selectedSet.has(String(col._id).toLowerCase()) ||
+      selectedSet.has(String(col.college_code).toLowerCase()) ||
+      Boolean((col as any).is_selected_by_me);
+
+    if (isExplicitlyPinned) {
       pinned.push({ ...col, isPinned: true });
     } else {
       unpinned.push({ ...col, isPinned: false });

@@ -198,6 +198,21 @@ const UserSchema = new mongoose_1.Schema({
             index: true,
         },
     ],
+    weekly_focus_locked: {
+        type: Boolean,
+        default: false,
+        index: true,
+    },
+    weekly_focus_week_key: {
+        type: String,
+        default: '',
+        trim: true,
+        index: true,
+    },
+    weekly_focus_locked_at: {
+        type: Date,
+        default: null,
+    },
     is_email_verified: {
         type: Boolean,
         default: true,

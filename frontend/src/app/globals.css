@@ -528,25 +528,7 @@ textarea:focus-visible,
     display: block !important;
   }
 
-  /* Master Print Layout Table for Repeating Header and Footer on Every Single Printed Page */
-  .print-layout-table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-    border: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: transparent !important;
-  }
-
-  .print-page-header {
-    display: table-header-group !important;
-  }
-
-  .print-page-footer {
-    display: table-footer-group !important;
-  }
-
-  /* Report Canvas takes exact 100% A4 printable area */
+  /* Report Canvas takes exact 100% A4 printable area and pins footer to end of report */
   .printable-report-canvas {
     width: 100% !important;
     max-width: 100% !important;
@@ -555,6 +537,10 @@ textarea:focus-visible,
     border: none !important;
     box-shadow: none !important;
     background: #ffffff !important;
+    min-height: calc(297mm - 20mm) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
   }
 
   /* Repeat table headers at top of each page if table breaks across pages */
@@ -582,6 +568,58 @@ textarea:focus-visible,
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
+
+  /* Universal word-wrapping on print with balanced table-layout */
+  .printable-report-canvas table {
+    table-layout: fixed !important;
+    width: 100% !important;
+  }
+
+  .printable-report-canvas th,
+  .printable-report-canvas td,
+  .printable-report-canvas div,
+  .printable-report-canvas span,
+  .printable-report-canvas p {
+    white-space: normal !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   REPORT WORD-WRAPPING & TABLE LAYOUT (Screen Preview & Editing)
+   ═══════════════════════════════════════════════════════════════════════════ */
+.printable-report-canvas table,
+.a4-print-canvas table {
+  table-layout: fixed !important;
+  width: 100% !important;
+  border-collapse: collapse !important;
+}
+
+.printable-report-canvas th,
+.printable-report-canvas td,
+.a4-print-canvas th,
+.a4-print-canvas td {
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  word-wrap: break-word !important;
+  line-height: 1.35 !important;
+  vertical-align: middle !important;
+}
+
+.printable-report-canvas [contenteditable],
+.printable-report-canvas div,
+.printable-report-canvas p,
+.printable-report-canvas span,
+.a4-print-canvas div,
+.a4-print-canvas p,
+.a4-print-canvas span {
+  white-space: normal !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  word-wrap: break-word !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
