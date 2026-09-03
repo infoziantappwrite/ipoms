@@ -18,14 +18,14 @@ import { isPasswordValid } from '@/lib/passwordPolicy';
 import { getApiBase } from '@/lib/api';
 
 const API = getApiBase();
-const STAFF_DOMAIN = 'infoziant.com';
+const STAFF_DOMAINS = ['infoziant.com', 'icl.today'] as const;
 
 type Mode = 'login' | 'signup' | 'signup_verify_otp' | 'forgot' | 'verify_otp' | 'set_new_password';
 
 function completeEmail(raw: string): string {
   const v = raw.trim();
   if (!v || v.includes('@')) return v;
-  return `${v}@${STAFF_DOMAIN}`;
+  return `${v}@infoziant.com`;
 }
 
 export default function LoginPage() {
@@ -240,6 +240,15 @@ export default function LoginPage() {
           localStorage.setItem('ipoms_user', raw);
           sessionStorage.setItem('ipoms_user', raw);
         } catch {}
+      }
+
+      // No token means the account was created but is pending Team
+      // Leader/Administrator approval, not signed in yet — stay on the
+      // login screen with the server's own explanation rather than
+      // claiming "Welcome" and bouncing off a dashboard with no session.
+      if (!token) {
+        setSuccessMsg(data.message || `Your email is verified, ${user?.full_name || ''}. Your account is pending approval.`);
+        return;
       }
 
       setSuccessMsg(`Account verified successfully! Welcome, ${user?.full_name || 'Coordinator'}.`);
@@ -511,13 +520,13 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onBlur={(e) => setEmail(completeEmail(e.target.value))}
-                placeholder={`name@${STAFF_DOMAIN}`}
+                placeholder="name@infoziant.com or name@icl.today"
                 autoComplete="username"
                 required
                 className={`${inputClass} font-mono`}
               />
               <p className="mt-1 text-micro text-slate-500">
-                Type your name and press Tab — @{STAFF_DOMAIN} is added for you.
+                Supports @infoziant.com and @icl.today domains.
               </p>
             </div>
 
@@ -594,7 +603,7 @@ export default function LoginPage() {
                 <input type="text"
                 inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)}
                   onBlur={(e) => setEmail(completeEmail(e.target.value))}
-                  placeholder={`priya.k@${STAFF_DOMAIN}`} required className={`${inputClass} font-mono`} />
+                  placeholder="name@infoziant.com or name@icl.today" required className={`${inputClass} font-mono`} />
               </div>
               <div>
                 <label className="block text-slate-700 font-bold mb-1">Primary Mobile</label>
@@ -710,7 +719,7 @@ export default function LoginPage() {
               <input type="text"
                 inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)}
                 onBlur={(e) => setEmail(completeEmail(e.target.value))}
-                placeholder={`name@${STAFF_DOMAIN}`} required className={`${inputClass} font-mono`} />
+                placeholder="name@infoziant.com or name@icl.today" required className={`${inputClass} font-mono`} />
             </div>
 
             <button type="submit" disabled={loading}

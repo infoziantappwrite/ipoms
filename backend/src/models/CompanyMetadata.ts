@@ -17,6 +17,7 @@ export interface ICompanyMetadata extends Document {
   notes?: string;
   is_deleted: boolean;
   deleted_at?: Date | null;
+  deleted_by?: mongoose.Types.ObjectId | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -121,6 +122,13 @@ const CompanyMetadataSchema: Schema<ICompanyMetadata> = new Schema(
     },
     deleted_at: {
       type: Date,
+      default: null,
+    },
+    // Who deleted this record — restore is scoped to this so a coordinator
+    // can only recover their own deletions; Admin/Team Leader may override.
+    deleted_by: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
       default: null,
     },
   },

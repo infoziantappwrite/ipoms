@@ -229,6 +229,7 @@ export default function WeeklyTrackerPage() {
         body: JSON.stringify({
           college_id: selectedCollegeId,
           coordinator_id: coordinatorId,
+          academic_year: academicYear,
         }),
       });
       if (res.success) {

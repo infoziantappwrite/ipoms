@@ -181,7 +181,7 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
                   type="email"
                   value={officialEmail}
                   onChange={(e) => setOfficialEmail(e.target.value)}
-                  placeholder="name@infoziant.com"
+                  placeholder="name@infoziant.com or name@icl.today"
                   disabled={isEditing}
                   className={`${inputClass} font-mono`}
                   required
@@ -228,6 +228,7 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
                   icon={Activity}
                   title="Account Status"
                   options={[
+                    { value: 'pending', label: 'Pending Approval (Self-Registered)' },
                     { value: 'active', label: 'Active (Full Working)' },
                     { value: 'partial_working', label: 'Partial Working (Reduced Load / Shift)' },
                     { value: 'on_leave', label: 'On Leave (Approved Leave)' },

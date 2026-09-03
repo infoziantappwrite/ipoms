@@ -1599,6 +1599,59 @@ app.delete('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
   }
 });
 
+// ── DT-4C: DELETE /api/v1/daily-tracker/bulk
+// Bulk delete daily tracker rows (today's sheet, all dates for a college, or entire tracker reset)
+app.delete('/api/v1/daily-tracker/bulk', async (req: Request, res: Response) => {
+  try {
+    const { college_id, scope, session_date } = req.body || {};
+    const coordinator_id = scopeToSelf(req, req.body?.coordinator_id);
+
+    const filter: any = {};
+
+    // Filter by college if not explicitly 'all'
+    if (college_id && college_id !== 'all') {
+      filter.college_id = new Types.ObjectId(college_id);
+    }
+
+    // Determine scope
+    if (scope === 'today') {
+      const targetDate = session_date ? buildSessionDate(session_date) : buildSessionDate();
+      filter.session_date = targetDate;
+      if (coordinator_id) {
+        filter.coordinator_id = new Types.ObjectId(coordinator_id);
+      }
+    } else if (scope === 'college_all') {
+      // All dates for this college
+      if (coordinator_id) {
+        filter.coordinator_id = new Types.ObjectId(coordinator_id);
+      }
+    } else if (scope === 'entire_database') {
+      // Entire daily tracker database cleared
+      // Leave filter empty to delete all DailyTracker documents
+    } else {
+      // Default: today's rows for current college and coordinator
+      const targetDate = session_date ? buildSessionDate(session_date) : buildSessionDate();
+      filter.session_date = targetDate;
+      if (coordinator_id) {
+        filter.coordinator_id = new Types.ObjectId(coordinator_id);
+      }
+    }
+
+    const result = await DailyTracker.deleteMany(filter);
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully deleted ${result.deletedCount} daily tracker record${result.deletedCount === 1 ? '' : 's'}.`,
+      deleted_count: result.deletedCount,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to bulk delete tracker records' },
+    });
+  }
+});
+
 // ── DT-5: POST /api/v1/daily-tracker/save-progress
 // Manual Save Progress
 app.post('/api/v1/daily-tracker/save-progress', async (req: Request, res: Response) => {
@@ -1794,7 +1847,8 @@ app.get('/api/v1/daily-tracker/kpi', async (req: Request, res: Response) => {
       DailyTracker.countDocuments({ ...baseFilter, outcome_status: { $ne: null }, is_skipped: false }),
       DailyTracker.countDocuments({ ...baseFilter, outcome_status: 'no_response', is_skipped: false }),
       DailyTracker.countDocuments({ ...baseFilter, outcome_status: 'follow_up', is_skipped: false }),
-      DailyTracker.countDocuments({ ...baseFilter, outcome_status: { $in: POSITIVE_OUTCOMES }, is_skipped: false }),
+      // Positive KPI Card: specifically counts only invite_mail calls
+      DailyTracker.countDocuments({ ...baseFilter, outcome_status: 'invite_mail', is_skipped: false }),
     ]);
 
     return res.status(200).json({
@@ -2085,7 +2139,10 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
     }
 
     if (search) {
-      const q = String(search).trim();
+      // Was unescaped raw user input straight into $regex — a bare "("
+      // (common in real company names like "ABC (India) Pvt Ltd") threw an
+      // uncaught 500 on this and the export-xlsx endpoint below.
+      const q = escapeRegex(String(search).trim());
       filter.$or = [
         { company_name: { $regex: q, $options: 'i' } },
         { job_role: { $regex: q, $options: 'i' } },
@@ -2171,6 +2228,13 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
           pipeline.push(r);
           break;
       }
+    });
+
+    // Ensure "Companies in Pipeline" preserves chronological order so newly synced leads are appended from the last
+    pipeline.sort((a, b) => {
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return timeA - timeB;
     });
 
     return res.status(200).json({
@@ -2392,7 +2456,10 @@ app.get('/api/v1/weekly-tracker/export-xlsx', async (req: Request, res: Response
     }
 
     if (search) {
-      const q = String(search).trim();
+      // Was unescaped raw user input straight into $regex — a bare "("
+      // (common in real company names like "ABC (India) Pvt Ltd") threw an
+      // uncaught 500 on this and the export-xlsx endpoint below.
+      const q = escapeRegex(String(search).trim());
       filter.$or = [
         { company_name: { $regex: q, $options: 'i' } },
         { job_role: { $regex: q, $options: 'i' } },
@@ -2955,56 +3022,96 @@ app.get('/api/v1/weekly-tracker/kpi', async (req: Request, res: Response) => {
 });
 
 // ── WT-8: POST /api/v1/weekly-tracker/sync-daily-positives
-// Ingest un-promoted positive outcome rows from Daily Tracker into Weekly Tracker Pipeline
+// Ingest un-promoted positive outcome rows from Daily Tracker into Weekly Tracker Pipeline (Companies in Pipeline)
 app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res: Response) => {
   try {
-    const { college_id, coordinator_id } = req.body;
+    const { college_id, coordinator_id, academic_year } = req.body;
 
-    if (!college_id || !coordinator_id) {
+    if (!college_id) {
       return res.status(400).json({
         success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'college_id and coordinator_id are required' },
+        error: { code: 'VALIDATION_ERROR', message: 'college_id is required' },
       });
     }
 
+    const targetYear = Number(academic_year) || 2027;
     const { startFriday, endThursday, weekNumber } = getFridayWeekBounds();
 
-    // Find positive calls from daily tracker that are not yet created in weekly tracker
-    const positiveDailyRows = await DailyTracker.find({
-      college_id: new Types.ObjectId(String(college_id)),
-      coordinator_id: new Types.ObjectId(String(coordinator_id)),
+    // Resolve all matching college IDs (aliases/codes) so college references are consistent
+    const queryCollegeIds: any[] = [];
+    if (Types.ObjectId.isValid(String(college_id))) {
+      queryCollegeIds.push(new Types.ObjectId(String(college_id)));
+      const targetCol = await College.findById(college_id);
+      if (targetCol) {
+        const sameCodeCols = await College.find({
+          $or: [
+            { college_code: targetCol.college_code },
+            { college_name: targetCol.college_name },
+          ],
+        });
+        sameCodeCols.forEach((sc) => {
+          if (!queryCollegeIds.some((id) => String(id) === String(sc._id))) {
+            queryCollegeIds.push(sc._id);
+          }
+        });
+      }
+    } else {
+      const foundCols = await College.find({
+        $or: [
+          { college_code: String(college_id).toUpperCase() },
+          { college_name: new RegExp(String(college_id), 'i') },
+        ],
+      });
+      foundCols.forEach((fc) => queryCollegeIds.push(fc._id));
+    }
+
+    // Daily Tracker filter: look for positive outcomes (invite_mail, hiring, jd_received, drive_completed)
+    const dailyFilter: any = {
+      college_id: { $in: queryCollegeIds },
       outcome_status: { $in: POSITIVE_OUTCOMES },
-    });
+    };
+
+    if (coordinator_id && Types.ObjectId.isValid(String(coordinator_id))) {
+      dailyFilter.coordinator_id = new Types.ObjectId(String(coordinator_id));
+    }
+
+    const positiveDailyRows = await DailyTracker.find(dailyFilter).sort({ session_date: 1, created_at: 1 });
 
     let syncedCount = 0;
 
     for (const dRow of positiveDailyRows) {
-      // Check if already present in weekly_tracker
+      // Check if already present in weekly_tracker for this academic year
       const existing = await WeeklyTracker.findOne({
-        college_id: dRow.college_id,
+        college_id: { $in: queryCollegeIds },
+        academic_year: targetYear,
         company_name: { $regex: `^${dRow.company_name.trim()}$`, $options: 'i' },
         is_deleted: false,
       });
 
       if (!existing) {
         await WeeklyTracker.create({
-          academic_year: 2026,
+          academic_year: targetYear,
           college_id: dRow.college_id,
-          coordinator_id: dRow.coordinator_id,
-          company_id: dRow.company_id,
+          coordinator_id: dRow.coordinator_id || (coordinator_id ? new Types.ObjectId(String(coordinator_id)) : new Types.ObjectId()),
+          company_id: dRow.company_id || new Types.ObjectId(),
           daily_tracker_id: dRow._id,
-          company_name: dRow.company_name,
+          company_name: dRow.company_name.trim(),
           job_role: 'Graduate Trainee',
-          cdc_reference: '',
+          cdc_reference: dRow.hr_name ? `${dRow.hr_name}${dRow.mobile_number ? ` (${dRow.mobile_number})` : ''}` : '',
           company_type: 'Software / IT',
-          ctc_lpa: '',
-          eligible_batch: '2026 Batch',
+          ctc_lpa: 'To be disclosed',
+          eligible_batch: `${targetYear} Batch`,
           pipeline_section: 'pipeline',
-          current_status_text: `Invite email sent (${(dRow.outcome_status || 'positive').replace(/_/g, ' ')})`,
+          current_status_text: dRow.outcome_status === 'invite_mail'
+            ? 'Invite email sent'
+            : (dRow.outcome_status || 'positive').replace(/_/g, ' '),
           follow_up_date: dRow.follow_up_date || null,
           week_number: weekNumber,
           week_start_date: startFriday,
           week_end_date: endThursday,
+          created_at: new Date(),
+          updated_at: new Date(),
+          last_status_updated_at: new Date(),
         });
         syncedCount++;
       }
@@ -3018,7 +3125,9 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
 
     return res.status(200).json({
       success: true,
-      message: `${syncedCount} positive lead(s) synced into Weekly Tracker pipeline`,
+      message: syncedCount > 0
+        ? `${syncedCount} positive company lead(s) synced into Companies in Pipeline.`
+        : 'All positive daily tracker leads are already synchronized into Weekly Tracker.',
       data: { synced: syncedCount },
     });
   } catch (error: any) {
@@ -3100,7 +3209,9 @@ app.get('/api/v1/daily-leads', async (req: Request, res: Response) => {
     }
 
     if (search) {
-      const q = String(search).trim();
+      // Same unescaped-regex bug as Weekly Tracker — a bare "(" in a
+      // company name threw an uncaught 500 here too.
+      const q = escapeRegex(String(search).trim());
       filter.$or = [
         { company_name: { $regex: q, $options: 'i' } },
         { job_role: { $regex: q, $options: 'i' } },
@@ -3183,10 +3294,15 @@ app.post('/api/v1/daily-leads', async (req: Request, res: Response) => {
       });
     }
 
-    let resolvedCoordinatorId = coordinator_id || (req as any).user?._id || (req as any).user?.id;
+    // This route is Coordinator-only (see routePolicy.ts) precisely so this
+    // can be unconditional: the caller's own id, never a client-supplied
+    // coordinator_id — otherwise any coordinator could log a lead under a
+    // colleague's name. body.coordinator_id is destructured above but
+    // deliberately unused for attribution.
+    let resolvedCoordinatorId: string | undefined = (req as any).user?.userId;
     if (!resolvedCoordinatorId || !Types.ObjectId.isValid(String(resolvedCoordinatorId))) {
       const fallbackUser = await User.findOne({ is_active: { $ne: false } });
-      resolvedCoordinatorId = fallbackUser?._id;
+      resolvedCoordinatorId = fallbackUser?._id ? String(fallbackUser._id) : undefined;
     }
 
     if (!resolvedCoordinatorId) {
@@ -3254,6 +3370,8 @@ app.patch('/api/v1/daily-leads/:id', async (req: Request, res: Response) => {
       });
     }
 
+    if (refuseForeignOwner(req, res, String(lead.coordinator_id), 'You can only edit your own leads.')) return;
+
     const allowedFields = [
       'company_name',
       'job_role',
@@ -3311,6 +3429,8 @@ app.post('/api/v1/daily-leads/:id/move-to-jd', async (req: Request, res: Respons
       });
     }
 
+    if (refuseForeignOwner(req, res, String(lead.coordinator_id), 'You can only move your own leads to JD Received.')) return;
+
     lead.lead_type = 'jd_received';
     lead.is_moved_to_jd = true;
     lead.event_time = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -3346,6 +3466,8 @@ app.delete('/api/v1/daily-leads/:id', async (req: Request, res: Response) => {
         error: { code: 'NOT_FOUND', message: 'Daily lead not found' },
       });
     }
+
+    if (refuseForeignOwner(req, res, String(lead.coordinator_id), 'You can only delete your own leads.')) return;
 
     lead.is_deleted = true;
     lead.deleted_at = new Date();
@@ -6974,6 +7096,7 @@ app.delete('/api/v1/metadata/:id', authenticateJWT, authorizeRoles('ADMINISTRATO
 
     record.is_deleted = true;
     record.deleted_at = new Date();
+    record.deleted_by = (req as any).user?.userId ? new Types.ObjectId((req as any).user.userId) : null;
     await record.save();
 
     return res.status(200).json({
@@ -7002,8 +7125,17 @@ app.post('/api/v1/metadata/:id/restore', authenticateJWT, authorizeRoles('ADMINI
       });
     }
 
+    // A coordinator may only restore what they themselves deleted; Admin and
+    // Team Leader (isSupervisor) may restore anything. Records deleted before
+    // this field existed have deleted_by=null, which reads as "unowned" and
+    // is refused for a non-supervisor — the same fail-closed default as
+    // refuseForeignOwner uses everywhere else.
+    if (refuseForeignOwner(req, res, record.deleted_by ? String(record.deleted_by) : undefined,
+      'You can only restore records you deleted yourself.')) return;
+
     record.is_deleted = false;
     record.deleted_at = null;
+    record.deleted_by = null;
     await record.save();
 
     return res.status(200).json({
@@ -7316,6 +7448,15 @@ app.post('/api/v1/users', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMI
       return res.status(400).json({
         success: false,
         error: { code: 'VALIDATION_ERROR', message: 'full_name, username, and official_email are mandatory' },
+      });
+    }
+
+    const emailLower = official_email.trim().toLowerCase();
+    const isStaffEmail = emailLower.endsWith('@infoziant.com') || emailLower.endsWith('@icl.today');
+    if (!isStaffEmail) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_DOMAIN', message: 'Official email must end with @infoziant.com or @icl.today' },
       });
     }
 

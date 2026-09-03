@@ -319,13 +319,18 @@ export function registerAuthRoutes(app: Express) {
         role_codes: [SELF_SIGNUP_ROLE],
         role_ids: roleIds,
         primary_mobile: pending.primary_mobile,
-        account_status: 'active',
+        // Self-registration verifies the account belongs to a real
+        // @infoziant.com/@icl.today inbox, but that is identity, not
+        // authorization — 'pending' until a Team Leader or Administrator
+        // reviews and activates it (Settings → User Management), so a
+        // verified email can no longer walk straight into a working
+        // Coordinator account with zero human review.
+        account_status: 'pending',
         presence_status: 'available',
         is_deleted: false,
       });
 
       pendingSignups.delete(email);
-      setRefreshCookie(res, user);
 
       await writeAudit({
         action: 'CREATE',
@@ -337,15 +342,14 @@ export function registerAuthRoutes(app: Express) {
         performedByEmail: email,
         module: 'Security & Audit',
         severity: 'info',
-        summary: `Self-registered Placement Coordinator account for ${user.full_name} (${email}) verified via Outlook OTP`,
+        summary: `Self-registered Placement Coordinator account for ${user.full_name} (${email}) verified via Outlook OTP — awaiting Team Leader/Administrator approval`,
         req,
       });
 
       return res.status(201).json({
         success: true,
-        message: `Welcome to Infoziant iPOMS, ${user.full_name}! Your Placement Coordinator account is now active.`,
+        message: `Your email is verified, ${user.full_name}. Your account is now pending review — a Team Leader or Administrator will activate it shortly, and you'll be able to sign in once approved.`,
         data: {
-          token: signToken(user),
           user: publicUser(user),
         },
       });
@@ -467,6 +471,11 @@ export function registerAuthRoutes(app: Express) {
         return fail(res, 423, 'ACCOUNT_LOCKED',
           'Your account is locked after repeated failed attempts. Verify by email to set a new password.',
           { requiresReset: true });
+      }
+
+      if (user.account_status === 'pending') {
+        return fail(res, 403, 'ACCOUNT_PENDING_APPROVAL',
+          'Your account is pending review. A Team Leader or Administrator needs to approve it before you can sign in.');
       }
 
       if (user.account_status !== 'active') {

@@ -422,6 +422,43 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     `globals.css`; `.apple-glass` using `backdrop-filter` in direct contradiction of the
     "no glassmorphism anywhere" rule stated in the same file; scrollbars globally killed with
     `!important`, which makes the styled scrollbar block above it dead code.
+14. ~~**Metadata restore had no ownership check.**~~ **FIXED 3 Sep 2026.** Any coordinator could
+    restore any deleted company record, not just their own — the documented rule
+    ("Coordinators may restore what they themselves deleted") was never enforced, and the
+    schema didn't even track who deleted a record. Added `deleted_by` to `CompanyMetadata`
+    (set on delete, cleared on restore); the restore handler now calls
+    `refuseForeignOwner(req, res, record.deleted_by)` — Admin/Team Leader (`isSupervisor`)
+    may still restore anything, a Coordinator only their own. Verified live: Mohanaradha
+    deleted a record, Lizenya's restore attempt got `403 FORBIDDEN_NOT_OWNER`, Mohanaradha's
+    own restore succeeded, and Admin's supervisor-override restore succeeded too.
+15. ~~**Daily Leads write access was not Coordinator-only, and had no ownership scoping.**~~
+    **FIXED 3 Sep 2026.** Contradicted Module 05 ("Coordinator-only write; everyone else
+    read-only") on two counts: `routePolicy.ts` gated `/daily-leads*` to `STAFF` (all three
+    roles, every method), and the handlers took `coordinator_id` straight from the request
+    body with no check, so a Team Leader could create or delete a lead attributed to any
+    coordinator. Split the policy: POST/PATCH/DELETE now require `PLACEMENT_COORDINATOR`
+    specifically (GET stays `STAFF`); the create handler ignores any client-supplied
+    `coordinator_id` and always attributes to the caller; the edit, move-to-JD, and delete
+    handlers each added `refuseForeignOwner()` against the lead's real `coordinator_id`.
+    Verified live: Team Leader's POST now gets `403`; a coordinator's spoofed
+    `coordinator_id` in the request body is silently ignored and the record is correctly
+    attributed to the real caller instead.
+16. ~~**Self-signup produced a fully-working Coordinator account with zero human review.**~~
+    **FIXED 3 Sep 2026.** A verified `@infoziant.com`/`@icl.today` inbox was the *only* gate —
+    OTP success immediately created an `active` account and auto-logged the user in. Added a
+    `pending` `account_status`: the account is created as `pending` (not auto-logged-in) after
+    OTP verification, and login refuses `pending` with `403 ACCOUNT_PENDING_APPROVAL` pointing
+    at Team Leader/Administrator review. **No new approval UI was needed** — `PATCH /users/:id`
+    (already TL/Admin-accessible) accepts `account_status`, and `UserModal.tsx`'s status dropdown
+    now includes "Pending Approval (Self-Registered)" so an existing Team Leader/Admin can spot
+    and activate one through the User Management screen they already have. Frontend signup flow
+    updated to show the pending message instead of "Welcome" + dashboard redirect when no token
+    comes back. Verified live end-to-end: a `pending` account's login attempt is refused; Team
+    Leader's `PATCH .../users/:id {"account_status":"active"}` flips it; the same account then
+    logs in successfully.
+    **Undocumented finding from the same testing pass:** signup's domain check accepts
+    `@icl.today` in addition to `@infoziant.com` — surfaced in the error copy itself, not
+    documented anywhere. Not touched; confirm with the user whether this is intentional.
 
 ## 6. Module map
 
