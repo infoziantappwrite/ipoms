@@ -51,6 +51,9 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
 
+// Enable trust proxy so Express correctly detects HTTPS when running behind reverse proxies (Nginx, Cloudflare, Traefik, AWS ALB)
+app.set('trust proxy', 1);
+
 /**
  * Destructive demo seeding on boot. Off unless explicitly requested — see the
  * comment block in startServer() for what each seed empties.
@@ -68,24 +71,48 @@ const RESET_ACCOUNTS_ON_BOOT = process.env.RESET_ACCOUNTS_ON_BOOT === 'true';
 const allowedOrigins = [
   CORS_ORIGIN,
   'http://localhost:3000',
+  'https://localhost:3000',
+  'http://localhost:5000',
+  'https://localhost:5000',
+  'http://127.0.0.1:3000',
+  'https://127.0.0.1:3000',
   'http://localhost',
-  'capacitor://localhost',
   'https://localhost',
+  'capacitor://localhost',
   'https://ipoms.vercel.app',
 ];
 
-// Middleware stack
-app.use(helmet());
+// Middleware stack - Configure Helmet to allow cross-origin API access across HTTP and HTTPS
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+  })
+);
+
 app.use(
   cors({
-    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-      // Allow requests with no origin (like mobile apps, curl, or server-to-server)
-      if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://192.168.') || origin.startsWith('http://10.0.2.2')) {
+    origin: (origin, callback) => {
+      // Allow requests with no origin (native apps, curl, server-to-server)
+      if (!origin) return callback(null, true);
+      // Allow localhost on any port (HTTP or HTTPS)
+      if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return callback(null, true);
+      }
+      // Allow local networks
+      if (/^https?:\/\/(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/.test(origin)) {
+        return callback(null, true);
+      }
+      // Allow Vercel deployments and custom allowed origins
+      if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
         return callback(null, true);
       }
       return callback(null, true);
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin', 'Cookie'],
+    exposedHeaders: ['Authorization', 'Set-Cookie'],
   })
 );
 app.use(express.json({ limit: '25mb' }));

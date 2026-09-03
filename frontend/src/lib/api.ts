@@ -4,7 +4,33 @@
  * Automatically injects JWT Bearer token from localStorage into all outbound requests.
  */
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+/**
+ * Dynamically resolves the appropriate API base URL, ensuring that if the
+ * frontend is accessed over HTTPS, the API base uses HTTPS to prevent
+ * browser Mixed Content blocks and Authorization header-stripping redirects.
+ */
+export function getApiBase(): string {
+  let base = process.env.NEXT_PUBLIC_API_URL;
+  if (base) {
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && base.startsWith('http://')) {
+      base = base.replace(/^http:\/\//, 'https://');
+    }
+    return base;
+  }
+
+  if (typeof window !== 'undefined') {
+    const isHttps = window.location.protocol === 'https:';
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return `${isHttps ? 'https' : 'http'}://${host}:5000/api/v1`;
+    }
+    return `${window.location.origin}/api/v1`;
+  }
+
+  return 'http://localhost:5000/api/v1';
+}
+
+export const API_BASE = getApiBase();
 
 /**
  * Returns standard authentication headers with Bearer token if present.
@@ -15,7 +41,7 @@ export function getAuthHeaders(customHeaders: HeadersInit = {}): HeadersInit {
   };
 
   if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('ipoms_token');
+    const token = localStorage.getItem('ipoms_token') || sessionStorage.getItem('ipoms_token');
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
@@ -38,14 +64,20 @@ function refreshAccessToken(): Promise<boolean> {
   if (!refreshInFlight) {
     refreshInFlight = (async () => {
       try {
-        const res = await fetch(`${API_BASE}/auth/refresh`, {
+        const base = getApiBase();
+        const res = await fetch(`${base}/auth/refresh`, {
           method: 'POST',
           credentials: 'include',
         });
         const data = await res.json().catch(() => ({}));
         if (data?.success && data?.data?.token) {
           localStorage.setItem('ipoms_token', data.data.token);
-          if (data.data.user) localStorage.setItem('ipoms_user', JSON.stringify(data.data.user));
+          sessionStorage.setItem('ipoms_token', data.data.token);
+          if (data.data.user) {
+            const raw = JSON.stringify(data.data.user);
+            localStorage.setItem('ipoms_user', raw);
+            sessionStorage.setItem('ipoms_user', raw);
+          }
           return true;
         }
         return false;
@@ -67,7 +99,8 @@ export async function apiFetch<T = any>(
   options: RequestInit = {},
   _isRetry = false
 ): Promise<{ success: boolean; data?: T; message?: string; error?: { code: string; message: string } }> {
-  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+  const base = getApiBase();
+  const url = endpoint.startsWith('http') ? endpoint : `${base}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
   const isAuthEndpoint = /\/auth\/(login|refresh|logout)$/.test(url);
 
   const headers = getAuthHeaders(options.headers || {});
@@ -82,8 +115,17 @@ export async function apiFetch<T = any>(
     const data = await response.json().catch(() => ({}));
 
     if (response.status === 401 && typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+      // Check if user just logged in within the last 20 seconds (post-login grace window)
+      // to prevent premature logouts from transient network or protocol handshakes.
+      let isRecentLogin = false;
+      try {
+        const loginTime = sessionStorage.getItem('ipoms_login_time');
+        if (loginTime && Date.now() - parseInt(loginTime, 10) < 20000) {
+          isRecentLogin = true;
+        }
+      } catch {}
+
       // A remembered device gets one silent retry via the refresh cookie
-      // before we treat this as a real session expiry.
       if (!isAuthEndpoint && !_isRetry) {
         const refreshed = await refreshAccessToken();
         if (refreshed) {
@@ -91,10 +133,14 @@ export async function apiFetch<T = any>(
         }
       }
 
-      console.warn('[apiClient] 401 Unauthorized — Session expired or token invalid.');
-      localStorage.removeItem('ipoms_token');
-      localStorage.removeItem('ipoms_user');
-      window.location.href = '/login?expired=1';
+      if (!isRecentLogin) {
+        console.warn('[apiClient] 401 Unauthorized — Session expired or token invalid.');
+        localStorage.removeItem('ipoms_token');
+        localStorage.removeItem('ipoms_user');
+        window.location.href = '/login?expired=1';
+      } else {
+        console.warn('[apiClient] 401 received during initial post-login window on', url, 'Retaining session.');
+      }
     }
 
     if (!response.ok && !data.error) {

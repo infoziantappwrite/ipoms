@@ -4,7 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { Building2, Globe, Landmark, RefreshCw, TrendingUp, User, PhoneCall, Sparkles, FileText, CheckCircle2, Trophy } from 'lucide-react';
 import { CollegeSelector } from '@/components/CollegeSelector';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+import { getApiBase } from '@/lib/api';
+
+const API = getApiBase();
 
 interface Props {
   selectedCollegeId: string;

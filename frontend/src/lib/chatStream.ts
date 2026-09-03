@@ -1,5 +1,7 @@
 'use client';
 
+import { getApiBase } from '@/lib/api';
+
 /**
  * Single shared SSE connection to /chat/stream, used by every chat surface
  * (full page, sidebar unread badge, floating dock) instead of each one
@@ -48,7 +50,7 @@ function ensureConnection() {
   const token = localStorage.getItem('ipoms_token');
   if (!token) return;
 
-  const base = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+  const base = getApiBase();
   const instance = new EventSource(`${base}/chat/stream?token=${encodeURIComponent(token)}`);
   es = instance;
 
