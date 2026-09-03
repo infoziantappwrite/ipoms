@@ -169,6 +169,12 @@ export default function LoginPage() {
       return;
     }
 
+    const mobileDigits = mobile.trim().replace(/[\s\-()]/g, '').replace(/^\+/, '');
+    if (mobile.trim() && !/^\d{10,13}$/.test(mobileDigits)) {
+      setErrorMsg('Enter a valid 10-digit mobile number.');
+      return;
+    }
+
     setLoading(true);
 
     try {

@@ -5,8 +5,6 @@ import {
   Building2,
   CalendarDays,
   Settings,
-  Monitor,
-  Sun,
   Wrench,
   ShieldCheck,
   Clock,
@@ -27,11 +25,6 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
   const [orgName, setOrgName] = useState(settingsData?.org_name || 'Infoziant Placement Operations');
   const [supportEmail, setSupportEmail] = useState(settingsData?.org_support_email || 'support@infoziant.com');
   const [supportPhone, setSupportPhone] = useState(settingsData?.org_support_phone || '+91 98401 23456');
-  const [themeDefault, setThemeDefault] = useState(settingsData?.theme_default || 'light');
-  const [landingPage, setLandingPage] = useState(settingsData?.default_landing_page || '/dashboard');
-  const [emailNotifs, setEmailNotifs] = useState(settingsData?.enable_email_notifications ?? true);
-  const [systemNotifs, setSystemNotifs] = useState(settingsData?.enable_system_notifications ?? true);
-  const [dashboardPopups, setDashboardPopups] = useState(settingsData?.enable_dashboard_popups ?? true);
 
   // Maintenance Mode State (Item #6)
   const [maintenanceEnabled, setMaintenanceEnabled] = useState(settingsData?.maintenance_mode_enabled ?? false);
@@ -54,11 +47,6 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
       setOrgName(settingsData.org_name || 'Infoziant Placement Operations');
       setSupportEmail(settingsData.org_support_email || 'support@infoziant.com');
       setSupportPhone(settingsData.org_support_phone || '+91 98401 23456');
-      setThemeDefault(settingsData.theme_default || 'light');
-      setLandingPage(settingsData.default_landing_page || '/dashboard');
-      setEmailNotifs(settingsData.enable_email_notifications ?? true);
-      setSystemNotifs(settingsData.enable_system_notifications ?? true);
-      setDashboardPopups(settingsData.enable_dashboard_popups ?? true);
 
       setMaintenanceEnabled(settingsData.maintenance_mode_enabled ?? false);
       setMaintenanceReason(settingsData.maintenance_reason || '');
@@ -89,11 +77,6 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
       org_name: orgName.trim(),
       org_support_email: supportEmail.trim(),
       org_support_phone: supportPhone.trim(),
-      theme_default: themeDefault,
-      default_landing_page: landingPage,
-      enable_email_notifications: emailNotifs,
-      enable_system_notifications: systemNotifs,
-      enable_dashboard_popups: dashboardPopups,
       maintenance_mode_enabled: maintenanceEnabled,
       maintenance_affected_roles: affectedRoles,
       maintenance_reason: maintenanceReason.trim(),
@@ -284,86 +267,6 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
               className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-fg font-mono text-xs"
             />
           </div>
-        </div>
-      </div>
-
-      {/* ── 5. Preferences & Notification Channels ── */}
-      <div className="glass-panel rounded-2xl border border-border p-6 space-y-4 shadow-4">
-        <div className="border-b border-border pb-3">
-          <h3 className="text-xs font-bold text-fg flex items-center gap-2">
-            <Settings size={14} strokeWidth={2} aria-hidden /> Application Delivery & Preferences
-          </h3>
-          <p className="text-micro text-fg-subtle mt-0.5">
-            Default landing page, UI theme, and notification delivery channels
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-fg-muted font-semibold mb-1">Default Landing Screen</label>
-            <SmoothSelect
-              value={landingPage}
-              onChange={setLandingPage}
-              icon={Monitor}
-              title="Default Landing Screen"
-              options={[
-                { value: '/dashboard', label: 'Role-Based Dashboard (/dashboard)' },
-                { value: '/tracker', label: 'Daily Call Tracker (/tracker)' },
-                { value: '/weekly-tracker', label: 'Weekly Tracker Board (/weekly-tracker)' },
-                { value: '/daily-leads', label: 'Daily Leads Register (/daily-leads)' },
-                { value: '/pending-tasks', label: 'Pending Task Register (/pending-tasks)' },
-                { value: '/reports', label: 'Reports & Analytics (/reports)' },
-              ]}
-            />
-          </div>
-
-          <div>
-            <label className="block text-fg-muted font-semibold mb-1">Default Theme Style</label>
-            <SmoothSelect
-              value={themeDefault}
-              onChange={setThemeDefault}
-              icon={Sun}
-              title="Default UI Theme"
-              options={[
-                { value: 'light', label: 'Light Theme (Clean Crisp Minimal)' },
-                { value: 'dark', label: 'Dark Theme' },
-                { value: 'system', label: 'System Default' },
-              ]}
-            />
-          </div>
-        </div>
-
-        {/* Notification Switches */}
-        <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-border">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={emailNotifs}
-              onChange={(e) => setEmailNotifs(e.target.checked)}
-              className="rounded bg-surface border-border-strong text-primary"
-            />
-            <span className="text-fg-muted font-semibold">Email Alerts Active</span>
-          </label>
-
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={systemNotifs}
-              onChange={(e) => setSystemNotifs(e.target.checked)}
-              className="rounded bg-surface border-border-strong text-primary"
-            />
-            <span className="text-fg-muted font-semibold">In-App Notifications</span>
-          </label>
-
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={dashboardPopups}
-              onChange={(e) => setDashboardPopups(e.target.checked)}
-              className="rounded bg-surface border-border-strong text-primary"
-            />
-            <span className="text-fg-muted font-semibold">Dashboard Popups</span>
-          </label>
         </div>
       </div>
 

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Pencil, Plus, X, UserPlus, Shield, Activity, Lock, Unlock, Calendar, Mail, Phone, Linkedin, Hash } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
+import { isPasswordValid, firstPasswordError } from '@/lib/passwordPolicy';
 
 interface Props {
   initialData?: any | null;
@@ -38,6 +39,13 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
   );
   const [accountStatus, setAccountStatus] = useState(initialData?.account_status || 'active');
   const [password, setPassword] = useState('Password@123');
+  // Backend's PATCH /users/:id already accepted a password — the edit modal
+  // just never exposed a field for it, so an admin resetting a locked-out
+  // user's password had no UI path and had to fall back to the OTP flow.
+  // Defaults off so editing unrelated fields never silently touches the
+  // password.
+  const [resetPassword, setResetPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -68,6 +76,11 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
       return;
     }
 
+    if (isEditing && resetPassword && !isPasswordValid(newPassword)) {
+      alert(firstPasswordError(newPassword) || 'New password does not meet the policy.');
+      return;
+    }
+
     setLoading(true);
     try {
       const payload: any = {
@@ -90,6 +103,8 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
 
       if (!isEditing) {
         payload.password = password;
+      } else if (resetPassword) {
+        payload.password = newPassword;
       }
 
       const url = isEditing ? `/users/${initialData._id}` : '/users';
@@ -381,6 +396,32 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
                 onChange={(e) => setPassword(e.target.value)}
                 className={`${inputClass} font-mono`}
               />
+            </div>
+          )}
+
+          {isEditing && (
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer select-none text-zinc-700 dark:text-zinc-300 font-semibold mb-1">
+                <input
+                  type="checkbox"
+                  checked={resetPassword}
+                  onChange={(e) => {
+                    setResetPassword(e.target.checked);
+                    if (!e.target.checked) setNewPassword('');
+                  }}
+                  className="rounded"
+                />
+                Reset this user's password
+              </label>
+              {resetPassword && (
+                <input
+                  type="text"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Minimum 9 characters — uppercase, lowercase, a digit, and @ or ."
+                  className={`${inputClass} font-mono mt-1`}
+                />
+              )}
             </div>
           )}
 

@@ -369,14 +369,11 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     `AdminSystemHealthWidget.tsx`; and the stale values from the live `system_settings`
     document itself (one-time `$unset`). Verified: both `tsc --noEmit` clean, server boots
     against the real `.env`, and a live `GET /settings` response contains no `announcement*`
-    key. **A separate, unrelated "Broadcast Announcement" feature still exists** at
-    `frontend/src/app/notifications/components/BroadcastModal.tsx` — it is NOT what was
-    removed here, and it has its own bug: it POSTs to `/notifications/broadcast`, which has no
-    backend route (the real, working, TL/Admin-gated endpoint is `POST /api/v1/notifications`,
-    `server.ts` line ~5242) — so clicking it 404s. Not touched; flagged for a future fix. If
-    that gets fixed, `RoleMatrixTab.tsx`'s "Dispatch Broadcast Announcements" row (currently
-    `tl: true, admin: true`) should be re-verified against it working end-to-end, not just the
-    backend route existing.
+    key. ~~A separate, unrelated "Broadcast Announcement" feature existed at
+    `BroadcastModal.tsx`~~ — **removed 3 Sep 2026, see §5 item 27.** Correction to what this
+    entry said at the time: it was never actually a live, clickable, 404-ing button — the
+    whole `/notifications` page was already `redirect('/dashboard')`, so the component holding
+    it was unreachable dead code, not a reachable bug. Deleted rather than fixed.
 12. ~~**Administrator could self-recover by email OTP, contradicting the documented CLI-only
     policy.**~~ **FIXED 30 Aug 2026.** §2's "Lockout & recovery" rule says a blocked
     Administrator has no email-OTP path specifically so a compromised admin mailbox can't be
@@ -458,7 +455,111 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     logs in successfully.
     **Undocumented finding from the same testing pass:** signup's domain check accepts
     `@icl.today` in addition to `@infoziant.com` — surfaced in the error copy itself, not
-    documented anywhere. Not touched; confirm with the user whether this is intentional.
+    documented anywhere. **Confirmed genuinely in use** (not a stray config entry): the live
+    `users` collection already has a real seeded account on `@icl.today` (Seshmitha Tamilselvi
+    R). Still not documented anywhere outside the code itself — worth a proper mention here
+    once confirmed with the user, but functionally safe as-is.
+17. ~~**Weekly Tracker and Daily Leads search crashed (500) on regex special characters.**~~
+    **FIXED 3 Sep 2026.** Both endpoints passed the raw `search` query straight into
+    `$regex` with no escaping — a bare `(`, ordinary in real company names ("ABC (India) Pvt
+    Ltd"), threw an uncaught `"Regular expression is invalid: missing closing parenthesis"`.
+    `Metadata` and `Active Leads` search already escaped correctly (via the existing
+    `escapeRegex()` helper) and were the reference for the fix — applied the same helper at
+    all three unescaped call sites (`GET /weekly-tracker`, `GET /weekly-tracker/export-xlsx`,
+    `GET /daily-leads`). Verified live: `?search=(` now returns `200` on all three instead
+    of `500`.
+18. ~~**Signup's Primary Mobile field accepted non-numeric input with zero validation.**~~
+    **FIXED 3 Sep 2026.** `abc123xyz` passed straight through, client and server, and would
+    have been stored as a coordinator's "phone number." Added `isValidMobile()`
+    (10-13 digits after stripping spaces/hyphens/a leading `+`) to both backend signup
+    handlers and a matching frontend check — but only when a mobile *is* supplied, since the
+    field has no `required` attribute in the UI and was already legitimately optional; the
+    fix targets the garbage-data bug, not scope-creeps the field into mandatory. Verified
+    live: `abc123xyz` → `400 INVALID_MOBILE`; a real 10-digit number → proceeds normally.
+19. ~~**Daily Leads summary badge counted every coordinator, not just the caller.**~~
+    **FIXED 3 Sep 2026.** `GET /daily-leads/summary` never called `scopeToSelf()` — a
+    coordinator's Positives/JD badge silently showed the org-wide total while the row list
+    right below it (which already scoped correctly) showed only her own. Added the same
+    `scopeToSelf()` call the list endpoint already uses. Verified live: a coordinator's own
+    summary (305 positives) is now genuinely lower than the true org-wide total requested
+    explicitly by Admin with `coordinator_id=all` (315) — confirming real scoping, not a
+    coincidental match.
+20. ~~**Team Leader's User Management permission had no UI to reach it.**~~ **FIXED 3 Sep
+    2026.** Backend already allowed `TL_ADMIN` on `POST`/`PATCH /users`; every path to it was
+    hard-gated to Administrator only. Two independent surfaces both needed opening: the
+    standalone `/users` page (`AppSidebar.tsx`'s nav entry, `roles: ['admin']` →
+    `['admin', 'team_leader']`, matching the pattern already used for `/system-settings`) and
+    the `/settings?tab=users` path (`settings/page.tsx`'s `isAdmin` gates on the sidebar, the
+    users section, and the modal all switched to a new `canManageUsers = isAdmin ||
+    isTeamLeader`; `SettingsNav.tsx` reworked from a single `forCoordinator` flag to a
+    3-tier `visible: 'all' | 'staff' | 'admin'` per section so Team Leader sees Profile +
+    User Management only — Role Matrix/System Config/Organization/System Info stay
+    Administrator-only on both nav surfaces). Verified live as Sujitha (Team Leader): the
+    Settings sidebar now shows both sections (previously showed nothing but Profile), and
+    User Management renders the real 8-account list.
+21. **Real PDF/PNG export, a real recycle-bin screen, and wiring up the built-but-orphaned
+    chat module are each their own project, not a bug fix** — deliberately not started
+    without a scoping conversation first. See release gate items 2 and 5, and the "chat
+    module" finding in the QA report.
+22. ~~**Signup OTP's "0 attempt(s) remaining" was off by one — a 6th guess still got
+    evaluated.**~~ **FIXED 3 Sep 2026.** The signup verify-OTP handler incremented the
+    attempt counter *then* checked the cap (`attempts > 5`), so the 5th wrong guess showed
+    "0 remaining" while the block only actually fired on a 6th call. The forgot-password OTP
+    flow already did this correctly (check `>=` cap *before* incrementing) and never had the
+    bug — signup's handler was rewritten to match that same order. Verified live: 5 wrong
+    attempts show 4→3→2→1→0 remaining exactly as before, but the 6th call is now a flat
+    `400 OTP_MAX_ATTEMPTS` with no code evaluated, instead of silently taking one more guess.
+23. **`@icl.today` alongside `@infoziant.com` in signup's allowed domains is real and in
+    active use** — not a stray config entry. Confirmed live: an existing seeded account
+    (Seshmitha Tamilselvi R) already has an `@icl.today` address. Still worth a one-line
+    mention in whatever onboarding doc explains the staff email domain, since nothing outside
+    the code currently says two domains are valid.
+24. ~~**System Info's growth percentages were hardcoded constants, never computed.**~~
+    **FIXED 3 Sep 2026.** `4.8` / `6.2` / `12.5` were literal numbers returned on every load
+    regardless of real data. There's no historical-snapshot table to diff a real trend
+    against, so rather than invent a different kind of fake number, replaced them with a real
+    7-day window computed straight from `created_at` timestamps (recently-added ÷ everything
+    before that window) on `CompanyMetadata` and `ReportLibrary` — genuinely small honest
+    numbers instead of confident fake ones. Verified live: a quiet week now correctly shows
+    `0` across all three instead of the old constants.
+25. ~~**Five System Config preferences (default landing page, default theme, 3 notification
+    toggles) saved but nothing ever read them back.**~~ **REMOVED 3 Sep 2026 (not wired up)** —
+    same call as the Organization Announcement Broadcaster removal: each was a single
+    org-wide value with no role-aware consumer (a global "default landing page" doesn't suit
+    every role equally; the app already has a proper per-viewer dark/light toggle, making a
+    server-side "default theme" low-value and awkward to apply before first paint; the 3
+    notification toggles had no single gated send-path to wire against, tied to the same
+    incompleteness as the orphaned chat module). Removed the "Application Delivery &
+    Preferences" section from `SystemConfigTab.tsx`, the 5 fields from `SystemSettings.ts`
+    and both `server.ts` handlers, and the stale values from the live document (`$unset`).
+26. ~~**No password-reset control for an existing user in the Admin UI.**~~ **FIXED
+    3 Sep 2026.** `PATCH /users/:id` already accepted a `password` field; the edit modal only
+    ever showed a password input when *creating* a user. Added a "Reset this user's password"
+    checkbox to `UserModal.tsx` (off by default, so editing unrelated fields never risks
+    silently touching the password) that reveals a field validated against the shared
+    `passwordPolicy` module client-side; backend handler now also enforces `isPasswordValid()`
+    server-side on this path (previously accepted anything). Verified live: a weak password
+    on this endpoint now returns `400 PASSWORD_POLICY` with the specific missing requirement.
+27. ~~**"Broadcast Announcement" button 404s.**~~ **REMOVED 3 Sep 2026 (user decision — "we
+    don't want broadcast announce button"), not fixed.** Turned out to be moot either way:
+    `/notifications/page.tsx` is currently just `redirect('/dashboard')` — the whole page
+    that held this button (`NotificationsHeader.tsx`, `BroadcastModal.tsx`) was **already
+    unreachable dead code**, imported by nothing. Deleted both files outright and removed the
+    "Dispatch Broadcast Announcements" row from the Role Permissions Matrix rather than
+    fixing its target endpoint. **Correction to this file's own earlier entry** (§5 item 11's
+    closing note, and the original QA report): both described this as a live, clickable,
+    404-ing button — it was real orphaned source code, but not something any user could
+    actually have reached. Worth remembering: a component existing in `src/` is not the same
+    claim as a component being on a rendered page — check the route, not just the file, next
+    time.
+28. **Housekeeping, 3 Sep 2026:** removed the last 3 stray `.tsx.bak` files, the
+    `.playwright-cli` console-log dumps, and stale `playwright-report`/`test-results`
+    directories (all gitignored, zero version-control impact). Removed 3 confirmed-dead
+    dependencies — backend `winston` and `zod`, frontend `axios` — after re-verifying zero
+    references in either `src/` tree; `package-lock.json` resynced with a real `npm install`
+    on both sides. **`ogl` was on the original suspect list but is no longer dead** — a
+    `GradientWaves` WebGL component now imports it, added by someone else's concurrent commit
+    mid-session; re-checked before touching anything and left it alone.
 
 ## 6. Module map
 

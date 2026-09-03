@@ -3490,7 +3490,12 @@ app.delete('/api/v1/daily-leads/:id', async (req: Request, res: Response) => {
 // Summary Strip counts: Positives count, JDs count, Active colleges count (Spec Section 7.3)
 app.get('/api/v1/daily-leads/summary', async (req: Request, res: Response) => {
   try {
-    const { date, college_id, coordinator_id } = req.query;
+    const { date, college_id } = req.query;
+    // Was unscoped: the frontend never sends coordinator_id at all, so this
+    // silently counted every coordinator's leads while the row list below it
+    // (GET /daily-leads, which does call scopeToSelf) correctly showed only
+    // the caller's own — a badge that quietly disagreed with its own table.
+    const coordinator_id = scopeToSelf(req, req.query.coordinator_id as string | undefined);
 
     const baseFilter: any = {
       is_deleted: false,
@@ -7603,8 +7608,15 @@ app.patch('/api/v1/users/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR', 
     }
 
     if (password && password.trim()) {
+      const trimmedPassword = password.trim();
+      if (!isPasswordValid(trimmedPassword)) {
+        return res.status(400).json({
+          success: false,
+          error: { code: 'PASSWORD_POLICY', message: firstPasswordError(trimmedPassword) || 'Password does not meet the policy.' },
+        });
+      }
       const salt = await bcrypt.genSalt(10);
-      user.password_hash = await bcrypt.hash(password.trim(), salt);
+      user.password_hash = await bcrypt.hash(trimmedPassword, salt);
       user.last_password_changed_at = new Date();
     }
 
@@ -8077,11 +8089,6 @@ app.get('/api/v1/settings', authenticateJWT, async (req: Request, res: Response)
         org_name: 'Infoziant Placement Operations',
         org_support_email: 'support@infoziant.com',
         org_support_phone: '+91 98401 23456',
-        theme_default: 'dark',
-        default_landing_page: '/dashboard',
-        enable_email_notifications: true,
-        enable_system_notifications: true,
-        enable_dashboard_popups: true,
       });
     }
 
@@ -8174,6 +8181,27 @@ app.get('/api/v1/settings', authenticateJWT, async (req: Request, res: Response)
     const totalDocs = totalCompanies + totalCallsCount + totalWeeklyCount + totalDailyLeadsCount + totalActiveLeadsCount + totalUsers + totalColleges + reportsGeneratedCount;
     const estimatedDbSizeMb = (totalDocs * 0.0025).toFixed(2);
 
+    // Real 7-day growth, not the hardcoded 4.8/6.2/12.5 this used to return
+    // regardless of actual data (verified live before this fix: identical
+    // numbers on every load). "Recent added / everything before that window"
+    // — there's no historical snapshot table to diff against, so this is the
+    // honest signal actually available from created_at timestamps, not a
+    // fabricated trend line.
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const growthPct = (recent: number, total: number) => {
+      const prior = total - recent;
+      return prior > 0 ? Math.round((recent / prior) * 1000) / 10 : 0;
+    };
+    const [recentCompanies, recentHrContacts, recentReports] = await Promise.all([
+      CompanyMetadata.countDocuments({ is_deleted: false, created_at: { $gte: sevenDaysAgo } }),
+      CompanyMetadata.countDocuments({
+        is_deleted: false,
+        created_at: { $gte: sevenDaysAgo },
+        hr_name: { $exists: true, $ne: '' },
+      }),
+      ReportLibrary.countDocuments({ is_deleted: false, created_at: { $gte: sevenDaysAgo } }),
+    ]);
+
     return res.status(200).json({
       success: true,
       data: {
@@ -8226,9 +8254,9 @@ app.get('/api/v1/settings', authenticateJWT, async (req: Request, res: Response)
           },
         },
         database_growth: {
-          companies_growth_pct: 4.8,
-          hr_contacts_growth_pct: 6.2,
-          reports_growth_pct: 12.5,
+          companies_growth_pct: growthPct(recentCompanies, totalCompanies),
+          hr_contacts_growth_pct: growthPct(recentHrContacts, totalHrContacts),
+          reports_growth_pct: growthPct(recentReports, reportsGeneratedCount),
         },
       },
     });
@@ -8252,11 +8280,6 @@ app.patch('/api/v1/settings', authenticateJWT, authorizeRoles('ADMINISTRATOR', '
       org_name,
       org_support_email,
       org_support_phone,
-      theme_default,
-      default_landing_page,
-      enable_email_notifications,
-      enable_system_notifications,
-      enable_dashboard_popups,
       maintenance_mode_enabled,
       maintenance_affected_roles,
       maintenance_reason,
@@ -8276,11 +8299,6 @@ app.patch('/api/v1/settings', authenticateJWT, authorizeRoles('ADMINISTRATOR', '
     if (org_name !== undefined) settings.org_name = org_name.trim();
     if (org_support_email !== undefined) settings.org_support_email = org_support_email.trim().toLowerCase();
     if (org_support_phone !== undefined) settings.org_support_phone = org_support_phone.trim();
-    if (theme_default !== undefined) settings.theme_default = theme_default;
-    if (default_landing_page !== undefined) settings.default_landing_page = default_landing_page;
-    if (enable_email_notifications !== undefined) settings.enable_email_notifications = !!enable_email_notifications;
-    if (enable_system_notifications !== undefined) settings.enable_system_notifications = !!enable_system_notifications;
-    if (enable_dashboard_popups !== undefined) settings.enable_dashboard_popups = !!enable_dashboard_popups;
 
     if (maintenance_mode_enabled !== undefined) settings.maintenance_mode_enabled = !!maintenance_mode_enabled;
     if (maintenance_affected_roles !== undefined) settings.maintenance_affected_roles = maintenance_affected_roles;

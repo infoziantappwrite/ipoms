@@ -106,6 +106,18 @@ const SELF_SIGNUP_ROLE = 'PLACEMENT_COORDINATOR';
 
 const isAdmin = (roles: string[] = []) => roles.includes('ADMINISTRATOR') || roles.includes('ADMIN');
 
+/**
+ * 10-13 digits after stripping spaces/hyphens/parens and an optional leading
+ * "+" (covers a bare 10-digit Indian mobile and a +91-prefixed one). Signup
+ * previously accepted anything at all here — a mobile field with letters in
+ * it ("abc123xyz") passed straight through with no validation, client or
+ * server side.
+ */
+function isValidMobile(mobile: string): boolean {
+  const digits = String(mobile).replace(/[\s\-()]/g, '').replace(/^\+/, '');
+  return /^\d{10,13}$/.test(digits);
+}
+
 function fail(res: Response, status: number, code: string, message: string, extra: Record<string, unknown> = {}) {
   return res.status(status).json({ success: false, error: { code, message, ...extra } });
 }
@@ -186,6 +198,10 @@ export function registerAuthRoutes(app: Express) {
 
       if (!isStaffDomain(email)) {
         return fail(res, 400, 'INVALID_DOMAIN', `Only @${STAFF_DOMAINS.join(' or @')} email addresses are permitted.`);
+      }
+
+      if (String(primary_mobile).trim() && !isValidMobile(primary_mobile)) {
+        return fail(res, 400, 'INVALID_MOBILE', 'Enter a valid 10-digit mobile number.');
       }
 
       if (!isPasswordValid(password)) {
@@ -286,14 +302,18 @@ export function registerAuthRoutes(app: Express) {
         return fail(res, 400, 'OTP_EXPIRED', 'Verification code has expired. Please request a new code.');
       }
 
-      pending.attempts += 1;
-      if (pending.attempts > OTP_MAX_ATTEMPTS) {
+      // Was increment-then-check (>), which let a 6th guess through evaluation
+      // right after the "0 attempt(s) remaining" message on the 5th wrong
+      // one — check-then-increment (matching the forgot-password OTP flow
+      // below, which never had this bug) so "0 remaining" is actually true.
+      if (pending.attempts >= OTP_MAX_ATTEMPTS) {
         pendingSignups.delete(email);
         return fail(res, 400, 'OTP_MAX_ATTEMPTS', 'Too many invalid attempts. Please sign up again.');
       }
 
       const match = await bcrypt.compare(otp, pending.otp_hash);
       if (!match) {
+        pending.attempts += 1;
         const remaining = Math.max(0, OTP_MAX_ATTEMPTS - pending.attempts);
         return fail(res, 400, 'INVALID_OTP', `Invalid verification code. ${remaining} attempt(s) remaining.`);
       }
@@ -383,6 +403,10 @@ export function registerAuthRoutes(app: Express) {
 
       if (!isStaffDomain(email)) {
         return fail(res, 400, 'INVALID_DOMAIN', `Only @${STAFF_DOMAINS.join(' or @')} email addresses are permitted.`);
+      }
+
+      if (String(primary_mobile).trim() && !isValidMobile(primary_mobile)) {
+        return fail(res, 400, 'INVALID_MOBILE', 'Enter a valid 10-digit mobile number.');
       }
 
       if (!isPasswordValid(password)) {

@@ -18,24 +18,33 @@ interface Props {
 }
 
 export function SettingsNav({ activeSection, onSectionChange, userCount, userRole = 'COORDINATOR' }: Props) {
-  const isCoordinator = userRole.toUpperCase().includes('COORDINATOR');
+  const role = userRole.toUpperCase();
+  const isCoordinator = role.includes('COORDINATOR');
+  // Team Leader has real backend permission for User Management
+  // (POST/PATCH /users is TL_ADMIN in routePolicy.ts) but not for Role
+  // Matrix, System Config, or System Info — those stay Administrator-only.
+  const isTeamLeader = role.includes('TEAM_LEAD');
 
   const allSections = [
-    { id: 'profile' as SettingsSection, label: 'My Profile & Security', Icon: User, badge: 'Personal', forCoordinator: true },
+    { id: 'profile' as SettingsSection, label: 'My Profile & Security', Icon: User, badge: 'Personal', visible: 'all' as const },
     {
       id: 'users' as SettingsSection,
       label: 'User Management',
       Icon: Users,
       badge: userCount ? `${userCount} Users` : 'Admin',
-      forCoordinator: false,
+      visible: 'staff' as const,
     },
-    { id: 'roles' as SettingsSection, label: 'Role Permissions Matrix', Icon: ShieldCheck, badge: 'RBAC', forCoordinator: false },
-    { id: 'config' as SettingsSection, label: 'Season & System Settings', Icon: Sliders, badge: 'Global', forCoordinator: false },
-    { id: 'org' as SettingsSection, label: 'Organization Branding', Icon: Building2, badge: 'Director', forCoordinator: false },
-    { id: 'system_info' as SettingsSection, label: 'System Health & Modules', Icon: Activity, badge: 'Status', forCoordinator: true },
+    { id: 'roles' as SettingsSection, label: 'Role Permissions Matrix', Icon: ShieldCheck, badge: 'RBAC', visible: 'admin' as const },
+    { id: 'config' as SettingsSection, label: 'Season & System Settings', Icon: Sliders, badge: 'Global', visible: 'admin' as const },
+    { id: 'org' as SettingsSection, label: 'Organization Branding', Icon: Building2, badge: 'Director', visible: 'admin' as const },
+    { id: 'system_info' as SettingsSection, label: 'System Health & Modules', Icon: Activity, badge: 'Status', visible: 'admin' as const },
   ];
 
-  const sections = isCoordinator ? allSections.filter((s) => s.forCoordinator) : allSections;
+  const sections = allSections.filter((s) => {
+    if (s.visible === 'all') return true;
+    if (s.visible === 'staff') return !isCoordinator; // Team Leader or Administrator
+    return !isCoordinator && !isTeamLeader; // 'admin' — Administrator only
+  });
 
   return (
     <div className="w-full md:w-64 bg-surface rounded-2xl border border-border p-3 flex md:flex-col gap-1.5 overflow-x-auto shrink-0 shadow-xs">

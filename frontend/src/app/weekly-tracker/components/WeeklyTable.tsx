@@ -92,7 +92,9 @@ export function WeeklyTable({
               CTC <span className="text-rose-500 font-bold">*</span>
             </th>
             <th className="py-2.5 px-3 min-w-[240px]">
-              Status <span className="text-rose-500 font-bold">*</span>
+              <span title="Free-text notes only — to move a company between Pipeline / In Progress / Completed etc., use Edit instead.">
+                Status <span className="text-rose-500 font-bold">*</span>
+              </span>
             </th>
             {hasFollowUpColumn && (
               <th className="py-2.5 px-3 min-w-[140px] text-center">Follow Up</th>

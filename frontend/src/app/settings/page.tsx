@@ -173,6 +173,14 @@ function SettingsPageContent() {
   };
 
   const isAdmin = currentUser?.role_codes?.some((r: string) => r.toUpperCase().includes('ADMIN'));
+  // Team Leader has real backend permission to create/edit users
+  // (POST/PATCH /users is TL_ADMIN in routePolicy.ts) but the sidebar and
+  // every section below were hard-gated to Administrator only, so that
+  // permission had no way to be reached. Only the User Management section
+  // opens up here — Role Matrix, System Config, and System Info stay
+  // Administrator-only because Team Leader has no backend access to those.
+  const isTeamLeader = currentUser?.role_codes?.some((r: string) => r.toUpperCase().includes('TEAM_LEAD'));
+  const canManageUsers = isAdmin || isTeamLeader;
 
   return (
     <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
@@ -182,11 +190,13 @@ function SettingsPageContent() {
         <div>
           <h1 className="text-xl font-bold text-fg tracking-tight flex items-center gap-2">
             <Settings size={18} strokeWidth={2} className="text-primary" aria-hidden />
-            <span>{isAdmin ? 'Settings & System Administration' : 'Profile'}</span>
+            <span>{canManageUsers ? 'Settings' : 'Profile'}</span>
           </h1>
           <p className="text-xs text-fg-subtle mt-0.5">
             {isAdmin
               ? 'Personal Profile, User Accounts, Role Permissions (RBAC) & Global Season Configuration'
+              : isTeamLeader
+              ? 'Personal Profile & User Accounts'
               : 'Manage your profile picture, personal contact details, residential address, and security'}
           </p>
         </div>
@@ -204,8 +214,8 @@ function SettingsPageContent() {
       {/* ── Main Layout: Profile or Admin Settings Panel ───────────────────── */}
       <div className="p-6 max-w-7xl mx-auto w-full flex flex-col md:flex-row gap-6 flex-1">
 
-        {/* Admin-only Sidebar Nav */}
-        {isAdmin && (
+        {/* Sidebar Nav — Administrator sees everything, Team Leader sees Profile + User Management */}
+        {canManageUsers && (
           <SettingsNav
             activeSection={activeSection}
             onSectionChange={setActiveSection}
@@ -229,7 +239,7 @@ function SettingsPageContent() {
                 />
               )}
 
-              {isAdmin && activeSection === 'users' && (
+              {canManageUsers && activeSection === 'users' && (
                 <UserManagementTab
                   users={users}
                   onOpenAddUser={() => {
@@ -272,7 +282,7 @@ function SettingsPageContent() {
       </div>
 
       {/* User Create / Edit Modal */}
-      {isAdmin && showUserModal && (
+      {canManageUsers && showUserModal && (
         <UserModal
           initialData={editingUser}
           onClose={() => setShowUserModal(false)}
