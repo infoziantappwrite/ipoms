@@ -9,7 +9,7 @@ import { CalendarPicker } from './components/CalendarPicker';
 import { SoftphonePanel, SoftphoneCallResult } from './components/SoftphonePanel';
 import { SmoothOutcomeDropdown } from '@/components/ui/SmoothOutcomeDropdown';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
-import { AlertTriangle, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Cloud, Download, Loader2, PhoneCall, Plus, Save, Search, Trash2 } from 'lucide-react';
+import { AlertTriangle, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Cloud, Loader2, PhoneCall, Plus, Save, Search, Trash2, Upload } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
 import { ManualAddRowModal } from './components/ManualAddRowModal';
@@ -559,10 +559,10 @@ export default function DailyTrackerPage() {
                     }
                     window.open('/tracker/load-contacts', '_blank');
                   }}
-                  className="flex items-center gap-1.5 bg-primary hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
+                  className="flex items-center gap-1.5 bg-primary hover:bg-blue-700 text-primary-foreground px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
                   title="Click me to load contacts from metadata base"
                 >
-                  <Download size={14} strokeWidth={2.5} aria-hidden /> Load
+                  <Upload size={14} strokeWidth={2.5} aria-hidden /> Load
                 </button>
 
                 {/* Save Button (Icon-Only) */}
@@ -577,15 +577,16 @@ export default function DailyTrackerPage() {
                   <Save size={15} strokeWidth={2.5} aria-hidden />
                 </button>
 
-                {/* Delete Button (Bulk Deletion) */}
+                {/* Delete Button (Icon-Only Dustbin) */}
                 <button
                   type="button"
                   onClick={() => setIsBulkDeleteOpen(true)}
                   disabled={!selectedCollegeId}
-                  className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0 active:scale-95"
+                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95 shrink-0"
                   title="Bulk Delete Daily Tracker Data"
+                  aria-label="Bulk Delete Daily Tracker Data"
                 >
-                  <Trash2 size={14} strokeWidth={2.2} aria-hidden /> Delete
+                  <Trash2 size={15} strokeWidth={2.2} aria-hidden />
                 </button>
 
                 {/* History / Calendar */}
@@ -602,7 +603,7 @@ export default function DailyTrackerPage() {
                   type="button"
                   onClick={() => setIsManualAddOpen(true)}
                   title="Add Custom Entry (Row-wise)"
-                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary hover:bg-blue-700 text-white shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95 shrink-0"
+                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary hover:bg-blue-700 text-primary-foreground shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95 shrink-0"
                 >
                   <Plus size={16} strokeWidth={2.5} aria-hidden />
                 </button>
@@ -637,7 +638,7 @@ export default function DailyTrackerPage() {
                 <button
                   type="button"
                   onClick={() => setIsHistoryMode(false)}
-                  className="flex items-center gap-1.5 bg-primary hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
+                  className="flex items-center gap-1.5 bg-primary hover:bg-blue-700 text-primary-foreground px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
                 >
                   Back to Today
                 </button>

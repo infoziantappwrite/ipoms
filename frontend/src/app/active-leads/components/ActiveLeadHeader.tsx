@@ -268,7 +268,7 @@ export function ActiveLeadHeader({
           <button
             type="button"
             onClick={onOpenAddModal}
-            className="px-4 py-1.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 whitespace-nowrap shrink-0"
+            className="px-4 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 whitespace-nowrap shrink-0"
           >
             <Plus size={13} strokeWidth={2.5} className="shrink-0" />
             <span>Add</span>

@@ -47,6 +47,7 @@ import { updateHitsWeeklyTracker } from './scripts/updateHitsWeeklyTracker';
 import { authenticateJWT, authorizeRoles, AuthUserPayload } from './lib/authMiddleware';
 import { authorizeRoute, scopeToSelf, isSupervisor, refuseForeignOwner, refuseRoleEscalation, assignableRoles, normalizeRole } from './lib/routePolicy';
 import { isPasswordValid, firstPasswordError } from './lib/passwordPolicy';
+import { sendForeignCollegeEditEmail } from './lib/mailer';
 
 dotenv.config();
 
@@ -2775,6 +2776,60 @@ app.get('/api/v1/weekly-tracker/export-xlsx', async (req: Request, res: Response
   }
 });
 
+/**
+ * Weekly Tracker deliberately allows any coordinator to create/edit/delete on
+ * any college - there is no access lock. This only reports it afterwards: if
+ * the acting coordinator isn't one of the college's real assigned owners
+ * (users.assigned_college_ids), every active, non-deleted owner gets an email.
+ * A college with nobody assigned yet notifies no one (nothing to protect).
+ * Fire-and-forget - a notification failure must never affect the coordinator's
+ * own save/delete, which has already succeeded by the time this runs.
+ */
+async function notifyForeignCollegeOwners(
+  actorUserId: string | undefined,
+  collegeId: any,
+  companyName: string,
+  action: 'created' | 'updated' | 'deleted'
+): Promise<void> {
+  try {
+    if (!actorUserId || !collegeId) return;
+
+    const owners: any[] = await User.find({
+      assigned_college_ids: collegeId,
+      is_deleted: false,
+      account_status: 'active',
+      // Administrator holds every college for oversight dashboards (all 27, by
+      // design) - that is not "the person who really handles it." Excluding
+      // the role, not naming an account, so it still works if the admin ever
+      // changes.
+      role_codes: { $ne: 'ADMINISTRATOR' },
+    }).select('_id full_name official_email');
+
+    if (owners.length === 0) return;
+    if (owners.some((o) => String(o._id) === String(actorUserId))) return;
+
+    const [actor, college] = await Promise.all([
+      User.findById(actorUserId).select('full_name'),
+      College.findById(collegeId).select('college_name'),
+    ]);
+    if (!actor || !college) return;
+
+    const timestamp = new Date();
+    for (const owner of owners) {
+      sendForeignCollegeEditEmail(owner.official_email, {
+        ownerName: owner.full_name,
+        actorName: (actor as any).full_name,
+        collegeName: (college as any).college_name,
+        companyName,
+        action,
+        timestamp,
+      }).catch((e: any) => console.error('[weekly-tracker] notify owner failed:', e?.message || e));
+    }
+  } catch (e: any) {
+    console.error('[weekly-tracker] notifyForeignCollegeOwners error:', e?.message || e);
+  }
+}
+
 // ── WT-2: POST /api/v1/weekly-tracker
 // Add a recruitment drive record manually
 app.post('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
@@ -2883,6 +2938,13 @@ app.post('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
       is_pinned_top: pipeline_section === 'top_companies',
     });
 
+    notifyForeignCollegeOwners(
+      (req as any).user?.userId,
+      newDrive.college_id,
+      newDrive.company_name,
+      'created'
+    );
+
     return res.status(201).json({
       success: true,
       message: 'Recruitment drive record created successfully',
@@ -2971,6 +3033,8 @@ app.patch('/api/v1/weekly-tracker/:id', async (req: Request, res: Response) => {
     row.last_status_updated_at = new Date();
     await row.save();
 
+    notifyForeignCollegeOwners((req as any).user?.userId, row.college_id, row.company_name, 'updated');
+
     return res.status(200).json({
       success: true,
       message: 'Weekly tracker record updated successfully',
@@ -3013,6 +3077,8 @@ app.patch('/api/v1/weekly-tracker/:id/section', async (req: Request, res: Respon
     }
     row.last_status_updated_at = new Date();
     await row.save();
+
+    notifyForeignCollegeOwners((req as any).user?.userId, row.college_id, row.company_name, 'updated');
 
     return res.status(200).json({
       success: true,
@@ -3074,6 +3140,8 @@ app.delete('/api/v1/weekly-tracker/:id', async (req: Request, res: Response) => 
     row.is_deleted = true;
     row.deleted_at = new Date();
     await row.save();
+
+    notifyForeignCollegeOwners((req as any).user?.userId, row.college_id, row.company_name, 'deleted');
 
     return res.status(200).json({
       success: true,
@@ -4324,6 +4392,154 @@ function matchesMinCtcHelper(
   return Math.max(...numbers) >= minCtc;
 }
 
+const SERVER_COLLEGE_LOGO_MAP: Record<string, string> = {
+  // Nehru Group of Institutions / NCET
+  NEHRU: '/college-logos/nehru.png',
+  NCET: '/college-logos/nehru.png',
+  'NEHRU GROUP': '/college-logos/nehru.png',
+  'NEHRU GROUP OF INSTITUTIONS': '/college-logos/nehru.png',
+
+  // Narayana Guru College of Engineering
+  NGCE: '/college-logos/narayanaguru.png',
+  NGC: '/college-logos/narayanaguru.png',
+  NARAYANAGURU: '/college-logos/narayanaguru.png',
+  'NARAYANA GURU': '/college-logos/narayanaguru.png',
+  ACET: '/college-logos/acet.png',
+  ACEW: '/college-logos/ACEW.jfif',
+  AIHT: '/college-logos/aiht.png',
+  AAA: '/college-logos/aaa.png',
+  AMCET: '/college-logos/AMCET.png',
+  'ANNAI MIRA': '/college-logos/annai mira.png',
+  AUDISANKAR: '/college-logos/audisankar.png',
+  AUDISANKARA: '/college-logos/audisankar.png',
+  AVS: '/college-logos/avs.png',
+  BHARATHIYAR: '/college-logos/bharathiyar institue.png',
+  CHRIST: '/college-logos/christ.png',
+  DSU: '/college-logos/dsu.png',
+  EGS: '/college-logos/egs.png',
+  GANESH: '/college-logos/ganesg.png',
+  GANESG: '/college-logos/ganesg.png',
+  GCT: '/college-logos/gnyanamani.png',
+  GNYANAMANI: '/college-logos/gnyanamani.png',
+  GNANAMANI: '/college-logos/gnyanamani.png',
+  HITS: '/college-logos/hits.png',
+  HINDUSTAN: '/college-logos/hits.png',
+  IFET: '/college-logos/ifet.png',
+  KAMARAJ: '/college-logos/kamaraj.png',
+  KARPAGAM: '/college-logos/karpagam.png',
+  KARUNYA: '/college-logos/karunya.png',
+  KCT: '/college-logos/kumaraguru.png',
+  KGISL: '/college-logos/kgisl.png',
+  KIOT: '/college-logos/kiot.jfif',
+  KIT: '/college-logos/kit.png',
+  KLU: '/college-logos/klu.png',
+  KALASALINGAM: '/college-logos/klu.png',
+  KPR: '/college-logos/kpr.png',
+  KUMARAGURU: '/college-logos/kumaraguru.png',
+  LICET: '/college-logos/layola.png',
+  LAYOLA: '/college-logos/layola.png',
+  LOYOLA: '/college-logos/layola.png',
+  MAR: '/college-logos/mar ephream.png',
+  'MAR EPHRAEM': '/college-logos/mar ephream.png',
+  'MAR EPHREAM': '/college-logos/mar ephream.png',
+  MCET: '/college-logos/MCET.png',
+  MAHALINGAM: '/college-logos/MCET.png',
+  MEC: '/college-logos/MEC.png',
+  MUTHAYAMMAL: '/college-logos/MEC.png',
+  MKCE: '/college-logos/mkce.png',
+  'M.KUMARASAMY': '/college-logos/mkce.png',
+  NGP: '/college-logos/ngp.png',
+  'DR. N.G.P.': '/college-logos/ngp.png',
+  'DR. NGP': '/college-logos/ngp.png',
+  NPR: '/college-logos/npr.png',
+  PANIMALAR: '/college-logos/panimalar.png',
+  PEC: '/college-logos/panimalar.png',
+  PSG: '/college-logos/psg.png',
+  PSNA: '/college-logos/psna.png',
+  RATHINAM: '/college-logos/Rathinam - RTC.png',
+  RTC: '/college-logos/Rathinam - RTC.png',
+  SECE: '/college-logos/srieshwar.png',
+  SETHU: '/college-logos/sethu institue.png',
+  SIT: '/college-logos/sethu institue.png',
+  SMVEC: '/college-logos/smvec.png',
+  SONA: '/college-logos/sona.png',
+  SRI_SHANMUGA: '/college-logos/sri shanmuga.png',
+  'SRI SHANMUGA': '/college-logos/sri shanmuga.png',
+  'SRI SHANMUGHA': '/college-logos/sri shanmuga.png',
+  SRIESHWAR: '/college-logos/srieshwar.png',
+  'SRI ESHWAR': '/college-logos/srieshwar.png',
+  SRM: '/college-logos/srm.png',
+  SSEI: '/college-logos/sri shanmuga.png',
+  VAIGAI: '/college-logos/vaigai.png',
+  VCE: '/college-logos/vaigai.png',
+  VIT: '/college-logos/vit.png',
+};
+
+function resolveCollegeLogoUrl(targetCollege: any): string | null {
+  if (!targetCollege) return null;
+  const rawLogo = targetCollege.logo_url;
+  if (
+    rawLogo &&
+    typeof rawLogo === 'string' &&
+    rawLogo.trim() !== '' &&
+    !rawLogo.includes('Infozianthead.png') &&
+    !rawLogo.includes('clearbit')
+  ) {
+    return rawLogo.trim();
+  }
+  const code = (targetCollege.college_code || '').toUpperCase().trim();
+  if (code && SERVER_COLLEGE_LOGO_MAP[code]) {
+    return SERVER_COLLEGE_LOGO_MAP[code];
+  }
+  const name = (targetCollege.college_name || '').toLowerCase().trim();
+  if (name.includes('nehru')) return '/college-logos/nehru.png';
+  if (name.includes('narayana guru') || name.includes('narayanaguru')) return '/college-logos/narayanaguru.png';
+  if (name.includes('hindustan') || name.includes('hits')) return '/college-logos/hits.png';
+  if (name.includes('kalasalingam') || name.includes('klu')) return '/college-logos/klu.png';
+  if (name.includes('karpagam')) return '/college-logos/karpagam.png';
+  if (name.includes('karunya')) return '/college-logos/karunya.png';
+  if (name.includes('kumaraguru') || name.includes('kct')) return '/college-logos/kumaraguru.png';
+  if (name.includes('rathinam')) return '/college-logos/Rathinam - RTC.png';
+  if (name.includes('ngp') || name.includes('n.g.p')) return '/college-logos/ngp.png';
+  if (name.includes('kumarasamy') || name.includes('mkce')) return '/college-logos/mkce.png';
+  if (name.includes('sethu')) return '/college-logos/sethu institue.png';
+  if (name.includes('shanmuga') || name.includes('shanmugha') || name.includes('ssei')) return '/college-logos/sri shanmuga.png';
+  if (name.includes('eshwar') || name.includes('srieshwar') || name.includes('sece')) return '/college-logos/srieshwar.png';
+  if (name.includes('panimalar')) return '/college-logos/panimalar.png';
+  if (name.includes('kamaraj')) return '/college-logos/kamaraj.png';
+  if (name.includes('psna')) return '/college-logos/psna.png';
+  if (name.includes('psg')) return '/college-logos/psg.png';
+  if (name.includes('smvec') || name.includes('manakula')) return '/college-logos/smvec.png';
+  if (name.includes('dsu') || name.includes('dhanalakshmi')) return '/college-logos/dsu.png';
+  if (name.includes('kiot') || name.includes('knowledge')) return '/college-logos/kiot.jfif';
+  if (name.includes('sona')) return '/college-logos/sona.png';
+  if (name.includes('avs')) return '/college-logos/avs.png';
+  if (name.includes('aaa')) return '/college-logos/aaa.png';
+  if (name.includes('kgisl')) return '/college-logos/kgisl.png';
+  if (name.includes('mar ephraem') || name.includes('mar ephream')) return '/college-logos/mar ephream.png';
+  if (name.includes('akshaya') || name.includes('acet')) return '/college-logos/acet.png';
+  if (name.includes('anand') || name.includes('aiht')) return '/college-logos/aiht.png';
+  if (name.includes('npr')) return '/college-logos/npr.png';
+  if (name.includes('vaigai')) return '/college-logos/vaigai.png';
+  if (name.includes('ifet')) return '/college-logos/ifet.png';
+  if (name.includes('egs') || name.includes('pillay')) return '/college-logos/egs.png';
+  if (name.includes('gnyanamani') || name.includes('gnanamani')) return '/college-logos/gnyanamani.png';
+  if (name.includes('christ')) return '/college-logos/christ.png';
+  if (name.includes('srm')) return '/college-logos/srm.png';
+  if (name.includes('vit') || name.includes('vellore')) return '/college-logos/vit.png';
+  if (name.includes('mcet') || name.includes('mahalingam')) return '/college-logos/MCET.png';
+  if (name.includes('mec') || name.includes('muthayammal')) return '/college-logos/MEC.png';
+  if (name.includes('amcet') || name.includes('annai mira')) return '/college-logos/AMCET.png';
+  if (name.includes('audisankar')) return '/college-logos/audisankar.png';
+  if (name.includes('bharathiyar')) return '/college-logos/bharathiyar institue.png';
+  if (name.includes('loyola') || name.includes('layola') || name.includes('licet')) return '/college-logos/layola.png';
+
+  if (code && code !== 'IPOMS' && code !== 'COLLEGE' && code !== 'MULTI') {
+    return `/college-logos/${code.toLowerCase()}.png`;
+  }
+  return null;
+}
+
 // ── RA-5: POST /api/v1/reports/generate
 // Dynamic Report Generator reading live from M03, M04, and M05 (Spec Section 9.7 & 10.3)
 app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
@@ -4335,7 +4551,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       academic_year = 'all',
       date_from,
       date_to,
-      week_label = 'Week 3: 21 Aug - 27 Aug 2026',
+      week_label = '',
       theme = 'blue',
       included_sections,
       included_kpi_cards,
@@ -4494,7 +4710,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
           company_logo: '/infoziant-head.png',
           college_name: targetCollege?.college_name || (college_id === 'all' ? 'All Partner Institutions' : 'Target Institution'),
           college_code: targetCollege?.college_code || (college_id === 'all' ? 'IPOMS' : 'COLLEGE'),
-          college_logo: targetCollege?.logo_url || null,
+          college_logo: resolveCollegeLogoUrl(targetCollege),
           confidential_notice: 'Prepared by Infoziant',
         },
         sections: {
@@ -4782,10 +4998,10 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         theme: theme || 'blue',
         branding: {
           company_name: 'Infoziant IT Solutions Inc.',
-          company_logo: '/infoziant-logo.png',
+          company_logo: '/infoziant-head.png',
           college_name: targetCollege?.college_name || '',
           college_code: targetCollege?.college_code || 'iPOMS',
-          college_logo: targetCollege?.college_website ? `https://logo.clearbit.com/${targetCollege.college_website.replace(/https?:\/\//, '')}` : null,
+          college_logo: (isConsolidated || !targetCollege) ? null : resolveCollegeLogoUrl(targetCollege),
           confidential_notice: 'Prepared by Infoziant',
         },
         kpi_summary: {
@@ -5046,7 +5262,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
           company_logo: '/infoziant-head.png',
           college_name: targetCollege?.college_name || (college_id === 'all' ? 'All Handled Institutions' : 'Target Institution'),
           college_code: targetCollege?.college_code || (college_id === 'all' ? 'IPOMS' : 'COLLEGE'),
-          college_logo: targetCollege?.logo_url || null,
+          college_logo: resolveCollegeLogoUrl(targetCollege),
           confidential_notice: `Prepared by Infoziant • ${coordinator?.full_name || 'Placement Coordinator'}`,
           prepared_by: coordinator?.full_name || 'Placement Coordinator',
           coordinator_name: coordinator?.full_name || 'Placement Coordinator',
@@ -5205,7 +5421,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         is_multi_college: true,
         colleges_data,
         report_title: 'Consolidated Weekly Placement Report',
-        report_period: week_label || 'All Dates (Cumulative)',
+        report_period: (week_label && !String(week_label).toLowerCase().includes('cumulative')) ? String(week_label).trim() : '',
         include_prepared_by: include_prepared_by !== false,
         generated_by: (include_prepared_by === false) ? '' : (prepared_by || coordinator?.full_name || 'Placement Coordinator'),
         generated_date: new Date().toLocaleDateString('en-IN', {
@@ -5415,7 +5631,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
           : template_type === 'monthly_placement'
           ? `Monthly Placement Review — ${academic_year} Season`
           : 'Placement Operations Report',
-      report_period: week_label || 'All Dates (Cumulative)',
+      report_period: (week_label && !String(week_label).toLowerCase().includes('cumulative')) ? String(week_label).trim() : '',
       include_prepared_by: include_prepared_by !== false,
       generated_by: (include_prepared_by === false) ? '' : (prepared_by || coordinator?.full_name || 'Placement Coordinator'),
       active_leads_columns: active_leads_columns || { colleges: true, role: true, ctc: true },
@@ -5427,10 +5643,10 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       theme: theme || 'blue',
       branding: {
         company_name: 'Infoziant IT Solutions Inc.',
-        company_logo: '/infoziant-logo.png',
+        company_logo: '/infoziant-head.png',
         college_name: targetCollege?.college_name || 'Consolidated Partner Institutions',
         college_code: targetCollege?.college_code || 'iPOMS',
-        college_logo: targetCollege?.college_website ? `https://logo.clearbit.com/${targetCollege.college_website.replace(/https?:\/\//, '')}` : null,
+        college_logo: resolveCollegeLogoUrl(targetCollege),
         confidential_notice: 'Prepared by Infoziant',
       },
       kpi_summary: {

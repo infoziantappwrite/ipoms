@@ -16,6 +16,9 @@ interface Props {
   coordinatorId: string;
   onClose: () => void;
   onAdded: () => void;
+  /** True when collegeId isn't one of the acting coordinator's assigned colleges. */
+  isForeignCollege?: boolean;
+  collegeName?: string;
 }
 
 const SECTIONS = [
@@ -34,6 +37,8 @@ export function AddCompanyModal({
   coordinatorId,
   onClose,
   onAdded,
+  isForeignCollege,
+  collegeName,
 }: Props) {
   const { toast } = useToast();
   const [companyName, setCompanyName] = useState('');
@@ -88,6 +93,14 @@ export function AddCompanyModal({
     if (!currentStatusText.trim()) {
       toast('Current Status Remarks is mandatory.', 'warning');
       return;
+    }
+
+    if (isForeignCollege) {
+      const proceed = window.confirm(
+        `${collegeName || 'This college'} is not one of your assigned colleges. `
+        + `Continue adding this company anyway? The coordinator who handles it will be notified.`
+      );
+      if (!proceed) return;
     }
 
     let finalOffersCount = 0;
@@ -250,7 +263,7 @@ export function AddCompanyModal({
                   onClick={() => setCtcUnit('LPA')}
                   className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
                     ctcUnit === 'LPA'
-                      ? 'bg-primary text-white shadow-xs'
+                      ? 'bg-primary text-primary-foreground shadow-xs'
                       : 'text-fg-muted hover:text-fg hover:bg-surface-raised'
                   }`}
                 >
@@ -261,7 +274,7 @@ export function AddCompanyModal({
                   onClick={() => setCtcUnit('/ Month')}
                   className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
                     ctcUnit === '/ Month'
-                      ? 'bg-primary text-white shadow-xs'
+                      ? 'bg-primary text-primary-foreground shadow-xs'
                       : 'text-fg-muted hover:text-fg hover:bg-surface-raised'
                   }`}
                 >
@@ -321,7 +334,7 @@ export function AddCompanyModal({
                     <Trophy size={13} className="text-emerald-600 dark:text-emerald-400" />
                     Offers Received <span className="text-rose-500">*</span>
                   </span>
-                  <span className="text-[11px] font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-300 dark:border-emerald-800 font-bold shadow-2xs">
+                  <span className="text-micro font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-300 dark:border-emerald-800 font-bold shadow-2xs">
                     0 – 50 only
                   </span>
                 </label>
@@ -425,7 +438,7 @@ export function AddCompanyModal({
             type="submit"
             form="add-company-form"
             disabled={loading}
-            className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 hover:shadow-md hover:shadow-primary/25"
+            className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 hover:shadow-md hover:shadow-primary/25"
           >
             <Plus size={15} strokeWidth={2.5} />
             <span>{loading ? 'Adding…' : 'Add'}</span>

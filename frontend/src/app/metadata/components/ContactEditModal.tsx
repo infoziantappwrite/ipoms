@@ -236,7 +236,7 @@ export function ContactEditModal({
             <button
               type="submit"
               disabled={loading}
-              className="w-full sm:w-auto px-6 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="w-full sm:w-auto px-6 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs font-semibold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               {loading ? 'Saving…' : isEditing ? 'Save Changes' : 'Create Contact'}
             </button>

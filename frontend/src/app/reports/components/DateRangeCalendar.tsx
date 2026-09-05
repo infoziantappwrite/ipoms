@@ -163,7 +163,7 @@ export function DateRangeCalendar({ startDate, endDate, onChangeRange, isOptiona
           <CalendarRange size={14} className="text-primary shrink-0" />
           <span className="font-medium text-fg-subtle">Reporting Duration:</span>
           <strong className="text-primary font-semibold">
-            {periodLabel || (isOptional ? 'All Dates (Cumulative)' : 'Select dates above')}
+            {periodLabel || (isOptional ? 'All Records (No Date Filter)' : 'Select dates above')}
           </strong>
           {dayCount !== null ? (
             <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-surface border border-primary/20 text-primary shrink-0">
@@ -171,7 +171,7 @@ export function DateRangeCalendar({ startDate, endDate, onChangeRange, isOptiona
             </span>
           ) : isOptional && !startDate && !endDate ? (
             <span className="font-mono text-[10px] font-semibold px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 shrink-0">
-              Full History (All Dates)
+              All Records
             </span>
           ) : null}
         </div>

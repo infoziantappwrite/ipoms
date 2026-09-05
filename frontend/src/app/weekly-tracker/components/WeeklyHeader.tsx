@@ -211,16 +211,16 @@ export function WeeklyHeader({
               <span className="text-xs font-bold text-fg whitespace-nowrap">
                 {weekInfo.monthName} {weekInfo.year}
               </span>
-              <span className="text-[11px] font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded-full whitespace-nowrap leading-none">
+              <span className="text-micro font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded-full whitespace-nowrap leading-none">
                 Week {weekInfo.monthlyWeekNumber}
               </span>
               {weekInfo.isCurrent && (
-                <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 px-1.5 py-0.5 rounded-md font-semibold whitespace-nowrap leading-none">
+                <span className="text-micro bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 px-1.5 py-0.5 rounded-md font-semibold whitespace-nowrap leading-none">
                   Current
                 </span>
               )}
             </div>
-            <div className="text-[10px] text-fg-subtle font-mono mt-0.5 whitespace-nowrap leading-none">
+            <div className="text-micro text-fg-subtle font-mono mt-0.5 whitespace-nowrap leading-none">
               {weekInfo.rangeStr}
             </div>
           </div>

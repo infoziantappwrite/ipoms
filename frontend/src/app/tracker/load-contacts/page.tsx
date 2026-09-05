@@ -229,7 +229,7 @@ export default function LoadContactsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-fg flex flex-col font-sans selection:bg-primary selection:text-white">
+    <div className="min-h-screen bg-background text-fg flex flex-col font-sans selection:bg-primary selection:text-primary-foreground">
       
       {/* ── Sticky Top Pinned Section (Header + Search Controls) ──────────── */}
       <div className="sticky top-0 z-30 bg-surface border-b border-border shadow-xs">
@@ -263,7 +263,7 @@ export default function LoadContactsPage() {
                 }}
                 className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer active:scale-95 ${
                   isRecent
-                    ? 'bg-primary text-white border border-primary shadow-xs ring-1 ring-primary/30'
+                    ? 'bg-primary text-primary-foreground border border-primary shadow-xs ring-1 ring-primary/30'
                     : 'bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 hover:border-primary/40'
                 }`}
                 title={isRecent ? 'Switch back to all metadata from Serial Number 1' : 'Filter & sort contacts added in the past 1 to 2 weeks'}
@@ -532,7 +532,7 @@ export default function LoadContactsPage() {
             <button
               onClick={handleImportToTracker}
               disabled={selected.size === 0 || importedSuccess}
-              className="px-6 py-2.5 bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-[2px_2px_8px_rgba(30,58,138,0.25)] flex items-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+              className="px-6 py-2.5 bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-primary-foreground text-xs font-bold rounded-xl shadow-[2px_2px_8px_rgba(30,58,138,0.25)] flex items-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
             >
               {importedSuccess ? (
                 <>

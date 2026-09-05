@@ -621,6 +621,48 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     early). Verified live: an unknown company → `400`, no row written; a real metadata
     company → `201` as before. `tsc --noEmit` clean both sides.
 
+32. **Weekly Tracker cross-college soft-warning + owner notification, 5 Sep 2026 (new
+    feature, user-requested).** Access remains fully open by design - any coordinator can
+    still create/edit/delete on any college, exactly as before. What changed: if the acting
+    coordinator isn't a real assigned owner of the college they're touching, the browser
+    shows a plain confirm (`window.confirm`) before the save fires - "This isn't one of your
+    assigned colleges, continue anyway?" - and if they proceed, every active/non-deleted real
+    owner of that college gets an email from iPOMS naming who changed what and when. Cancel
+    aborts before any request is sent (verified live: no PATCH left the browser). An
+    unassigned college notifies nobody (nothing to protect yet); an oversight account
+    (Administrator, who holds all 27 colleges by design for dashboards) is explicitly excluded
+    from being counted as a "real owner" so it never gets CC'd on every edit in the system.
+    Scoped to create, edit (both the inline PATCH and the drag/drop section-move), and delete;
+    deliberately *not* the pin-toggle (cosmetic, no notification value). Weekly Tracker only -
+    Daily Tracker was explicitly deferred.
+    Prerequisite fixed first: `users.assigned_college_ids` was still the broken "everyone holds
+    nearly all 25 colleges" state from the old boot bug (§5 item 0h) - corrected via
+    `scripts/fixCollegeAssignments.ts` (dry-run by default) against a human-confirmed roster:
+    Mohanaradha→Karpagam/AIHT/Achariya/KPR, Thirisha→PSNA/DSU/SMVEC, Malavika→KLU/NGCE,
+    Lizenya→NPR/KIOT/ACEW, Megala→NGP/Kamaraj, Seshmitha→MCET/MEC, and Sujitha (a Team Leader,
+    deliberately treated as a focus owner for these 5 despite TL status)→Nehru/Mar Ephraem/
+    KPR/HITS/SONA. KPR is genuinely shared (Mohanaradha handles calls, Sujitha handles email) -
+    both get notified on a foreign edit there. 7 colleges (Karunya, AVS, AAA, Sri Shanmugha,
+    EGS, MKCE, KGISL) are deliberately left unassigned until real owners are named - no warning
+    fires for them yet. Backed up both `users` and `weekly_tracker` before the assignment fix.
+    New: `lib/mailer.ts`'s `sendForeignCollegeEditEmail()` (reuses the existing SMTP transporter
+    - no new integration, no cost); the `notifyForeignCollegeOwners()` helper in `server.ts`,
+    called (fire-and-forget, never blocking the coordinator's own save) from `POST
+    /weekly-tracker`, `PATCH /weekly-tracker/:id`, `PATCH /weekly-tracker/:id/section`, and
+    `DELETE /weekly-tracker/:id`; the `myCollegeIds`/`isForeignCollege` check and confirm
+    dialogs in `weekly-tracker/page.tsx` and `AddCompanyModal.tsx`.
+    Verified live end-to-end: Mohanaradha editing Nehru (Sujitha's college) → confirm dialog →
+    Cancel → zero network requests sent, nothing saved; Accept path proven via 5 direct API
+    tests (create/edit/move/delete all correctly notify Sujitha and correctly exclude the
+    Administrator after that exclusion was added mid-build - the first pass wrongly CC'd
+    Administrator on every foreign edit, since it holds all 27 colleges for oversight).
+    Mohanaradha editing her own college (Achariya) → zero friction, real `PATCH → 200`, no
+    dialog at all. Unassigned-college edit (Karunya) → no notification sent, confirmed against
+    the mailer log. WhatsApp was explicitly ruled out by the user (cost/setup) in favor of
+    email; can be added later as a second channel on the same `notifyForeignCollegeOwners()`
+    call without touching the warning-dialog side.
+
+## 6. Module map
 ## 6. Module map
 ## 6. Module map
 

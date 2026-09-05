@@ -543,7 +543,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
               <button
                 type="submit"
                 disabled={passwordLoading}
-                className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold shadow-3 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="px-6 py-2.5 bg-primary hover:bg-primary-hover text-primary-foreground rounded-xl text-xs font-bold shadow-3 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <KeyRound size={13} />
                 {passwordLoading ? 'Updating Password…' : 'Update Administrator Password'}
@@ -1068,7 +1068,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="px-6 py-3 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-bold shadow-3 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                    className="px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-xs font-bold shadow-3 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                   >
                     <Save size={14} />
                     {loading ? <span>Saving Profile...</span> : <span>Update Profile</span>}
@@ -1182,7 +1182,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
                   <button
                     type="submit"
                     disabled={passwordLoading || isPasswordLocked || !newPassword}
-                    className="px-6 py-2.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-bold shadow-2 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+                    className="px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-xs font-bold shadow-2 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-2 cursor-pointer"
                   >
                     <KeyRound size={14} />
                     {passwordLoading ? <span>Updating Password...</span> : <span>Update Password</span>}
@@ -1239,7 +1239,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
               <button
                 type="button"
                 onClick={handleConfirmedUpdate}
-                className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-bold shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+                className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold shadow-sm transition-all active:scale-[0.98] cursor-pointer"
               >
                 OK
               </button>

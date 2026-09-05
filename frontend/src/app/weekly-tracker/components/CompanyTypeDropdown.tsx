@@ -119,7 +119,7 @@ export function CompanyTypeDropdown({
             : 'bg-surface-sunken/80 border-border/80 text-fg hover:border-primary/60 hover:bg-surface'
         } ${isOpen ? 'ring-1 ring-primary border-primary bg-surface' : ''}`}
       >
-        <span className="truncate leading-tight text-[11.5px] block font-medium">
+        <span className="truncate leading-tight text-micro block font-medium">
           {displayValue}
         </span>
         <ChevronDown
@@ -149,11 +149,11 @@ export function CompanyTypeDropdown({
         >
           {/* Header ribbon with Search bar */}
           <div className="px-2 pt-1 pb-1.5 border-b border-border bg-surface-sunken rounded-xl flex flex-col gap-1">
-            <div className="flex items-center justify-between text-[10px] font-bold text-fg-subtle uppercase tracking-wider px-1">
+            <div className="flex items-center justify-between text-micro font-bold text-fg-subtle uppercase tracking-wider px-1">
               <span className="flex items-center gap-1.5 text-primary">
                 <Building2 size={12} className="shrink-0" /> Company Type
               </span>
-              <span className="font-mono text-fg-disabled text-[9.5px]">
+              <span className="font-mono text-fg-disabled text-micro">
                 {filteredOptions.length} of {COMPANY_TYPES.length}
               </span>
             </div>
@@ -187,7 +187,7 @@ export function CompanyTypeDropdown({
                     key={opt}
                     type="button"
                     onClick={(e) => handleSelect(opt, e)}
-                    className={`w-full text-left px-2.5 py-2 rounded-xl text-[11.5px] leading-snug flex items-center justify-between gap-2 transition-colors cursor-pointer ${
+                    className={`w-full text-left px-2.5 py-2 rounded-xl text-micro leading-snug flex items-center justify-between gap-2 transition-colors cursor-pointer ${
                       isSelected
                         ? 'bg-primary/10 text-primary font-bold border border-primary/20'
                         : 'text-fg hover:bg-surface-sunken hover:text-primary'

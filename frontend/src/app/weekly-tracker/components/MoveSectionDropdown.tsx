@@ -217,11 +217,11 @@ export function MoveSectionDropdown({
           className="bg-surface border border-border rounded-2xl shadow-2xl p-1.5 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150 text-fg select-none overflow-hidden"
         >
           {/* Header ribbon */}
-          <div className="px-3 py-1.5 border-b border-border bg-surface-sunken rounded-xl flex items-center justify-between text-[10.5px] font-bold text-fg-subtle uppercase tracking-wider mb-1">
+          <div className="px-3 py-1.5 border-b border-border bg-surface-sunken rounded-xl flex items-center justify-between text-micro font-bold text-fg-subtle uppercase tracking-wider mb-1">
             <span className="flex items-center gap-1.5">
               <ArrowRightLeft size={12} className="text-primary" /> Move Company To
             </span>
-            <span className="text-[10px] font-mono text-fg-disabled">7 Sections</span>
+            <span className="text-micro font-mono text-fg-disabled">7 Sections</span>
           </div>
 
           {/* Section options */}
@@ -247,7 +247,7 @@ export function MoveSectionDropdown({
                     <span className="truncate">{sec.label}</span>
                   </div>
                   {isCurrent ? (
-                    <span className="text-[10px] uppercase font-bold text-primary px-1.5 py-0.2 rounded bg-primary/10 border border-primary/20 shrink-0">
+                    <span className="text-micro uppercase font-bold text-primary px-1.5 py-0.2 rounded bg-primary/10 border border-primary/20 shrink-0">
                       Current
                     </span>
                   ) : (

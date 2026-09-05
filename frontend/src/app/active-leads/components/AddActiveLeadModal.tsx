@@ -181,7 +181,7 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
                     }}
                     className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
                       ctcUnit === 'LPA'
-                        ? 'bg-primary text-white shadow-xs'
+                        ? 'bg-primary text-primary-foreground shadow-xs'
                         : 'text-fg-subtle hover:text-fg'
                     }`}
                   >
@@ -195,7 +195,7 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
                     }}
                     className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
                       ctcUnit === 'Month'
-                        ? 'bg-primary text-white shadow-xs'
+                        ? 'bg-primary text-primary-foreground shadow-xs'
                         : 'text-fg-subtle hover:text-fg'
                     }`}
                     title="Per month stipend for internships"
@@ -210,7 +210,7 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
                     }}
                     className={`px-2 py-0.5 rounded-md transition-all cursor-pointer ${
                       ctcUnit === 'Both'
-                        ? 'bg-primary text-white shadow-xs'
+                        ? 'bg-primary text-primary-foreground shadow-xs'
                         : 'text-fg-subtle hover:text-fg'
                     }`}
                     title="Both Internship Stipend & Full-time LPA"
@@ -277,7 +277,7 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full sm:w-auto px-6 py-2 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              className="w-full sm:w-auto px-6 py-2 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
             >
               <Plus size={14} strokeWidth={2.5} />
               <span>{submitting ? 'Saving…' : 'Add'}</span>

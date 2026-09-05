@@ -102,7 +102,7 @@ export function DuplicateWarningModal({
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+              className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
             >
               OK, Dismiss
             </button>

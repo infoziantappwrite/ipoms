@@ -13,7 +13,8 @@
     "verify:policy": "ts-node src/scripts/verifyRoutePolicy.ts",
     "fix:roles": "ts-node src/scripts/fixRoleCodes.ts",
     "seed:nehru": "ts-node src/scripts/runWeeklySnapshot.ts nehru",
-    "seed:hits": "ts-node src/scripts/runWeeklySnapshot.ts hits"
+    "seed:hits": "ts-node src/scripts/runWeeklySnapshot.ts hits",
+    "fix:college-assignments": "ts-node src/scripts/fixCollegeAssignments.ts"
   },
   "keywords": [
     "ipoms",

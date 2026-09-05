@@ -313,7 +313,7 @@ export default function MetadataPage() {
   const isRangeActive = fromSno !== null || toSno !== null;
 
   return (
-    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
+    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-primary-foreground">
 
       {/* ── Top Header Bar ────────────────────────────────────────────────── */}
       <MetadataHeader

@@ -415,7 +415,7 @@ export default function DailyLeadsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
+    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-primary-foreground">
       {/* ── Top Header with Tab Bar (Just Above Section Before the Calendar) ─ */}
       <LeadsHeader
         selectedDate={selectedDate}

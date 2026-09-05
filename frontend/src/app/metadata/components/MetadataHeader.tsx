@@ -156,7 +156,7 @@ export function MetadataHeader({
             onClick={onToggleRecent}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs ${
               isRecent
-                ? 'bg-primary text-white border-primary shadow-xs ring-1 ring-primary/30'
+                ? 'bg-primary text-primary-foreground border-primary shadow-xs ring-1 ring-primary/30'
                 : 'bg-primary/10 hover:bg-primary/20 text-primary border-primary/25 hover:border-primary/40'
             }`}
             title={isRecent ? 'Switch back to all metadata from Serial Number 1' : 'View contacts added in the past 1 to 2 weeks'}
@@ -273,7 +273,7 @@ export function MetadataHeader({
               {/* Add Contact Icon Button (Solid Navy Blue with Tooltip) */}
               <button
                 onClick={onOpenAddModal}
-                className="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 text-white flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-95"
+                className="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-95"
                 title="Add Single Contact"
                 aria-label="Add Contact"
               >

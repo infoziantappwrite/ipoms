@@ -2,7 +2,7 @@
 
 import { TrackerRow } from './TrackerRow';
 import type { TrackerRow as TrackerRowType, CallOutcome } from '../page';
-import { ClipboardList, Download } from 'lucide-react';
+import { ClipboardList } from 'lucide-react';
 
 interface Props {
   rows: TrackerRowType[];

@@ -95,7 +95,7 @@ export function MaintenanceScreen({ reason, startTime, endTime, onRetry }: Props
             type="button"
             onClick={handleCheck}
             disabled={checking}
-            className="w-full py-2.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            className="w-full py-2.5 bg-primary hover:bg-primary-hover text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
             <RefreshCw size={14} className={checking ? 'animate-spin' : ''} />
             {checking ? 'Checking System...' : 'Check System Status'}

@@ -236,7 +236,7 @@ export function LeadsHeader({
             <button
               type="button"
               onClick={onOpenAddModal}
-              className="w-9 h-9 flex items-center justify-center bg-primary hover:bg-blue-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer active:scale-95 shrink-0"
+              className="w-9 h-9 flex items-center justify-center bg-primary hover:bg-blue-700 text-primary-foreground rounded-xl shadow-xs transition-colors cursor-pointer active:scale-95 shrink-0"
               title="Add Daily Opportunity Entry"
               aria-label="Add Lead"
             >

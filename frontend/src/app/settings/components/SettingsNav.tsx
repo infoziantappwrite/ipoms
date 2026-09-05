@@ -61,7 +61,7 @@ export function SettingsNav({ activeSection, onSectionChange, userCount, userRol
             className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all text-left whitespace-nowrap md:whitespace-normal w-full cursor-pointer
               ${
                 isActive
-                  ? 'bg-primary text-white shadow-xs'
+                  ? 'bg-primary text-primary-foreground shadow-xs'
                   : 'text-fg-subtle hover:text-fg hover:bg-slate-50'
               }`}
           >

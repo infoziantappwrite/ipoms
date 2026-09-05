@@ -24,61 +24,36 @@ import {
   Briefcase,
   Flame,
 } from 'lucide-react';
+import { COLLEGE_LOGO_MAP, getCollegeLogoUrl } from '@/lib/collegeLogo';
 
-const COLLEGE_LOGO_MAP: Record<string, string> = {
-  ACET: '/college-logos/acet.png',
-  KIOT: '/college-logos/kiot.jfif',
-  KLU: '/college-logos/klu.png',
-  KPR: '/college-logos/kpr.png',
-  KARPAGAM: '/college-logos/karpagam.png',
-  AIHT: '/college-logos/aiht.png',
-  PSNA: '/college-logos/psna.png',
-  SMVEC: '/college-logos/smvec.png',
-  DSU: '/college-logos/dsu.png',
-  MKCE: '/college-logos/mkce.png',
-  SONA: '/college-logos/sona.png',
-  KARUNYA: '/college-logos/karunya.png',
-  KAMARAJ: '/college-logos/kamaraj.png',
-  NPR: '/college-logos/npr.png',
-  AVS: '/college-logos/avs.png',
-  AAA: '/college-logos/aaa.png',
-  KGISL: '/college-logos/kgisl.png',
-  SSEI: '/college-logos/sri shanmuga.png',
-  NGP: '/college-logos/ngp.png',
-  HITS: '/college-logos/hits.png',
-  MAR: '/college-logos/mar ephream.png',
-  NGCE: '/college-logos/narayanaguru.png',
-  ACEW: '/college-logos/ACEW.jfif',
-  KCT: '/college-logos/kumaraguru.png',
-  PSG: '/college-logos/psg.png',
-  LICET: '/college-logos/layola.png',
-  PEC: '/college-logos/panimalar.png',
-  RTC: '/college-logos/Rathinam - RTC.png',
-  SIT: '/college-logos/sethu institue.png',
-  SECE: '/college-logos/srieshwar.png',
-  SRM: '/college-logos/srm .png',
-  VIT: '/college-logos/vit.png',
-  KIT: '/college-logos/kit.png',
-  EGS: '/college-logos/egs.png',
-  GCT: '/college-logos/gnyanamani.png',
-  IFET: '/college-logos/ifet.png',
-  CHRIST: '/college-logos/christ.png',
-  VCE: '/college-logos/vaigai.png',
-  MCET: '/college-logos/MCET.png',
-  MEC: '/college-logos/MEC.png',
-};
 
 function getCleanPeriod(period?: string): string {
   if (!period) return '';
-  if (period.includes(': ')) {
-    const parts = period.split(': ');
-    return parts[parts.length - 1].trim();
+  const trimmed = String(period).trim();
+  if (
+    !trimmed ||
+    trimmed.toLowerCase() === 'cumulative' ||
+    trimmed.toLowerCase() === 'all dates (cumulative)' ||
+    trimmed.toLowerCase() === 'all dates' ||
+    trimmed.toLowerCase().includes('cumulative')
+  ) {
+    return '';
   }
-  if (period.includes('(') && period.includes(')')) {
-    const match = period.match(/\((.*?)\)/);
-    if (match && match[1]) return match[1].trim();
+  if (trimmed.includes(': ')) {
+    const parts = trimmed.split(': ');
+    const last = parts[parts.length - 1].trim();
+    if (last.toLowerCase() === 'cumulative' || last.toLowerCase().includes('cumulative')) return '';
+    return last;
   }
-  return period.trim();
+  if (trimmed.includes('(') && trimmed.includes(')')) {
+    const match = trimmed.match(/\((.*?)\)/);
+    if (match && match[1]) {
+      const inside = match[1].trim();
+      if (inside.toLowerCase() === 'cumulative' || inside.toLowerCase().includes('cumulative')) return '';
+      return inside;
+    }
+  }
+  return trimmed;
 }
 
 interface Props {
@@ -111,7 +86,7 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
   const collegeName = report.branding?.college_name || 'Consolidated Partner Institutions';
   const collegeCode = (report.branding?.college_code || 'iPOMS').toUpperCase();
   const isConsolidated = !collegeCode || collegeCode === 'IPOMS';
-  const collegeLogoUrl = COLLEGE_LOGO_MAP[collegeCode] || `/college-logos/${collegeCode.toLowerCase()}.png`;
+  const collegeLogoUrl = getCollegeLogoUrl(collegeCode, collegeName, report.branding?.college_logo);
 
   const handleZoomIn = () => setZoomLevel((z) => Math.min(z + 15, 140));
   const handleZoomOut = () => setZoomLevel((z) => Math.max(z - 15, 60));
@@ -243,7 +218,7 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                 onPrint();
               }, 100);
             }}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-primary hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-1.5 bg-primary hover:bg-blue-700 text-primary-foreground rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer"
           >
             <Printer size={14} />
             <span>Save PDF / Print</span>
@@ -567,9 +542,9 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
               </p>
             </div>
 
-            {/* Right: Target College Logo (Hidden for Active Leads & Multi-College Weekly Reports) */}
+            {/* Right: Target College Logo (Hidden for Multi-College Weekly Reports and Consolidated reports) */}
             <div className="flex items-center shrink-0 justify-end min-w-[100px]">
-              {report.template_type === 'active_leads' || report.is_multi_college ? null : !isConsolidated && !logoFailed ? (
+              {report.is_multi_college || isConsolidated ? null : !logoFailed ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   key={collegeLogoUrl}
@@ -581,7 +556,7 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
               ) : (
                 <div className="h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700">
                   <Building2 size={15} className="text-blue-900 shrink-0" />
-                  <span>{isConsolidated ? 'iPOMS' : collegeCode}</span>
+                  <span>{collegeCode}</span>
                 </div>
               )}
             </div>
@@ -589,7 +564,7 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
 
           {/* 2. Report Metadata Ribbon */}
           <div className="flex items-center justify-between flex-wrap gap-4 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-5 py-2.5 font-medium mb-4">
-            {report.template_type === 'weekly_placement' ? (
+            {report.template_type === 'weekly_placement' && getCleanPeriod(report.report_period) ? (
               <>
                 <div className="flex items-center gap-1.5">
                   <Calendar size={13} className="text-blue-700 shrink-0" />
@@ -601,7 +576,7 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                 </div>
               </>
             ) : (
-              <div>
+              <div className="w-full flex items-center justify-end">
                 <div className="flex items-center gap-1.5">
                   <Calendar size={13} className="text-slate-500 shrink-0" />
                   <span>Generated Date: <strong className="text-slate-900 font-semibold">{report.generated_date}</strong></span>

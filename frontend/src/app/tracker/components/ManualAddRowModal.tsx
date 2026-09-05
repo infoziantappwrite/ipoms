@@ -722,7 +722,7 @@ export function ManualAddRowModal({
             <button
               type="submit"
               disabled={submitting}
-              className="flex items-center justify-center gap-2 px-7 py-2 rounded-xl bg-primary hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold shadow-sm transition-all cursor-pointer hover:scale-[1.02] active:scale-98"
+              className="flex items-center justify-center gap-2 px-7 py-2 rounded-xl bg-primary hover:bg-blue-700 disabled:opacity-50 text-primary-foreground text-xs font-bold shadow-sm transition-all cursor-pointer hover:scale-[1.02] active:scale-98"
             >
               {submitting ? (
                 <>

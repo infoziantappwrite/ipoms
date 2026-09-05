@@ -25,61 +25,36 @@ import {
   Flame,
 } from 'lucide-react';
 import { A4PdfPreviewModal } from './A4PdfPreviewModal';
+import { COLLEGE_LOGO_MAP, getCollegeLogoUrl } from '@/lib/collegeLogo';
 
-const COLLEGE_LOGO_MAP: Record<string, string> = {
-  ACET: '/college-logos/acet.png',
-  KIOT: '/college-logos/kiot.jfif',
-  KLU: '/college-logos/klu.png',
-  KPR: '/college-logos/kpr.png',
-  KARPAGAM: '/college-logos/karpagam.png',
-  AIHT: '/college-logos/aiht.png',
-  PSNA: '/college-logos/psna.png',
-  SMVEC: '/college-logos/smvec.png',
-  DSU: '/college-logos/dsu.png',
-  MKCE: '/college-logos/mkce.png',
-  SONA: '/college-logos/sona.png',
-  KARUNYA: '/college-logos/karunya.png',
-  KAMARAJ: '/college-logos/kamaraj.png',
-  NPR: '/college-logos/npr.png',
-  AVS: '/college-logos/avs.png',
-  AAA: '/college-logos/aaa.png',
-  KGISL: '/college-logos/kgisl.png',
-  SSEI: '/college-logos/sri shanmuga.png',
-  NGP: '/college-logos/ngp.png',
-  HITS: '/college-logos/hits.png',
-  MAR: '/college-logos/mar ephream.png',
-  NGCE: '/college-logos/narayanaguru.png',
-  ACEW: '/college-logos/ACEW.jfif',
-  KCT: '/college-logos/kumaraguru.png',
-  PSG: '/college-logos/psg.png',
-  LICET: '/college-logos/layola.png',
-  PEC: '/college-logos/panimalar.png',
-  RTC: '/college-logos/Rathinam - RTC.png',
-  SIT: '/college-logos/sethu institue.png',
-  SECE: '/college-logos/srieshwar.png',
-  SRM: '/college-logos/srm .png',
-  VIT: '/college-logos/vit.png',
-  KIT: '/college-logos/kit.png',
-  EGS: '/college-logos/egs.png',
-  GCT: '/college-logos/gnyanamani.png',
-  IFET: '/college-logos/ifet.png',
-  CHRIST: '/college-logos/christ.png',
-  VCE: '/college-logos/vaigai.png',
-  MCET: '/college-logos/MCET.png',
-  MEC: '/college-logos/MEC.png',
-};
 
 export function getCleanPeriod(period?: string): string {
   if (!period) return '';
-  if (period.includes(': ')) {
-    const parts = period.split(': ');
-    return parts[parts.length - 1].trim();
+  const trimmed = String(period).trim();
+  if (
+    !trimmed ||
+    trimmed.toLowerCase() === 'cumulative' ||
+    trimmed.toLowerCase() === 'all dates (cumulative)' ||
+    trimmed.toLowerCase() === 'all dates' ||
+    trimmed.toLowerCase().includes('cumulative')
+  ) {
+    return '';
   }
-  if (period.includes('(') && period.includes(')')) {
-    const match = period.match(/\((.*?)\)/);
-    if (match && match[1]) return match[1].trim();
+  if (trimmed.includes(': ')) {
+    const parts = trimmed.split(': ');
+    const last = parts[parts.length - 1].trim();
+    if (last.toLowerCase() === 'cumulative' || last.toLowerCase().includes('cumulative')) return '';
+    return last;
   }
-  return period.trim();
+  if (trimmed.includes('(') && trimmed.includes(')')) {
+    const match = trimmed.match(/\((.*?)\)/);
+    if (match && match[1]) {
+      const inside = match[1].trim();
+      if (inside.toLowerCase() === 'cumulative' || inside.toLowerCase().includes('cumulative')) return '';
+      return inside;
+    }
+  }
+  return trimmed;
 }
 
 export function getReportExportBaseFileName(report: any): string {
@@ -250,7 +225,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         <p className="text-sm">No report loaded in editor.</p>
         <button
           onClick={onBackToBuilder}
-          className="mt-3 px-4 py-2 bg-primary text-white rounded-xl text-xs font-semibold cursor-pointer"
+          className="mt-3 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-xs font-semibold cursor-pointer"
         >
           Open Builder Wizard
         </button>
@@ -2121,20 +2096,19 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       let currentY = PADDING;
 
       // ── 2. Header: Logos & Centered Title ──
-      // Infoziant Logo (Left) — Enlarged for clear-cut branding definition
+      // Infoziant Logo (Left) — Clean logo without any surrounding border box
       const logoBoxW = 154;
       const logoBoxH = 66;
-      drawRoundRect(PADDING, currentY, logoBoxW, logoBoxH, 8, '#ffffff', '#e2e8f0', 1);
       if (infoziantImg) {
         const aspect = infoziantImg.width / infoziantImg.height;
-        const imgH = 54;
-        const imgW = Math.min(142, imgH * aspect);
-        ctx.drawImage(infoziantImg, PADDING + (logoBoxW - imgW) / 2, currentY + (logoBoxH - imgH) / 2, imgW, imgH);
+        const imgH = 56;
+        const imgW = Math.min(150, imgH * aspect);
+        ctx.drawImage(infoziantImg, PADDING, currentY + (logoBoxH - imgH) / 2, imgW, imgH);
       } else {
         ctx.fillStyle = '#0f172a';
         ctx.font = 'bold 16px system-ui, -apple-system, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('Infoziant', PADDING + logoBoxW / 2, currentY + 39);
+        ctx.textAlign = 'left';
+        ctx.fillText('Infoziant', PADDING, currentY + 39);
       }
 
       // Title & Subtitle (Center)
@@ -2163,20 +2137,18 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         ctx.fillText(collegeName, W / 2, currentY + 55);
       }
 
-      // College Logo / Code Badge (Right) — Hidden for Active Leads & Multi-College Weekly Reports
-      if (report.template_type !== 'active_leads' && !report.is_multi_college) {
-        const rightLogoX = W - PADDING - logoBoxW;
-        drawRoundRect(rightLogoX, currentY, logoBoxW, logoBoxH, 8, '#ffffff', '#e2e8f0', 1);
-        if (!isConsolidated && collegeImg) {
+      // College Logo / Code Badge (Right) — Clean logo without any surrounding border box
+      if (!report.is_multi_college && !isConsolidated) {
+        if (collegeImg) {
           const aspect = collegeImg.width / collegeImg.height;
-          const imgH = 54;
-          const imgW = Math.min(142, imgH * aspect);
-          ctx.drawImage(collegeImg, rightLogoX + (logoBoxW - imgW) / 2, currentY + (logoBoxH - imgH) / 2, imgW, imgH);
+          const imgH = 56;
+          const imgW = Math.min(150, imgH * aspect);
+          ctx.drawImage(collegeImg, W - PADDING - imgW, currentY + (logoBoxH - imgH) / 2, imgW, imgH);
         } else {
           ctx.fillStyle = '#0284c7';
           ctx.font = 'bold 16px system-ui, -apple-system, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText(isConsolidated ? 'iPOMS' : collegeCode, rightLogoX + logoBoxW / 2, currentY + 39);
+          ctx.textAlign = 'right';
+          ctx.fillText(collegeCode, W - PADDING, currentY + 39);
         }
       }
 
@@ -2198,8 +2170,9 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       ctx.textAlign = 'center';
 
       let metaText = '';
-      if (report.template_type === 'weekly_placement') {
-        metaText = `Period: ${getCleanPeriod(report.report_period)}    •    Generated Date: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
+      const cleanPeriod = getCleanPeriod(report.report_period);
+      if (report.template_type === 'weekly_placement' && cleanPeriod) {
+        metaText = `Period: ${cleanPeriod}    •    Generated Date: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
       } else {
         metaText = `Generated Date: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
       }
@@ -2443,7 +2416,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
   const collegeName = report.branding?.college_name || 'Consolidated Partner Institutions';
   const collegeCode = (report.branding?.college_code || 'iPOMS').toUpperCase();
   const isConsolidated = !collegeCode || collegeCode === 'IPOMS';
-  const collegeLogoUrl = COLLEGE_LOGO_MAP[collegeCode] || `/college-logos/${collegeCode.toLowerCase()}.png`;
+  const collegeLogoUrl = getCollegeLogoUrl(collegeCode, collegeName, report.branding?.college_logo);
 
   const activeCols = report.active_leads_columns || {};
   const showCollegesCol = Boolean(
@@ -2495,17 +2468,15 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         <div className="flex items-center justify-between border-b-2 border-border print:border-slate-300 pb-4 gap-4 mb-2">
           {/* Left: Infoziant Logo */}
           <div className="flex items-center shrink-0">
-            <div className="bg-white rounded-xl p-2 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/infoziant-head.png"
-                alt="Infoziant"
-                className="h-14 w-auto object-contain shrink-0"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = '/college-logos/Infozianthead.png';
-                }}
-              />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/infoziant-head.png"
+              alt="Infoziant"
+              className="h-14 w-auto object-contain shrink-0"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/college-logos/Infozianthead.png';
+              }}
+            />
           </div>
 
           {/* Center: Main Title and Subtitle (Center-Aligned) */}
@@ -2532,9 +2503,9 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             )}
           </div>
 
-          {/* Right: Target College Logo (Hidden for Active Leads & Multi-College Weekly Reports) */}
+          {/* Right: Target College Logo (Hidden for Multi-College Weekly Reports and Consolidated reports) */}
           <div className="flex items-center shrink-0 justify-end min-w-[100px]">
-            {report.template_type === 'active_leads' || report.is_multi_college ? null : !isConsolidated && !logoFailed ? (
+            {report.is_multi_college || isConsolidated ? null : !logoFailed ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 key={collegeLogoUrl}
@@ -2546,7 +2517,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             ) : (
               <div className="h-10 px-3.5 bg-surface-sunken border border-border rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-fg shadow-2xs">
                 <Building2 size={15} className="text-primary shrink-0" />
-                <span>{isConsolidated ? 'iPOMS' : collegeCode}</span>
+                <span>{collegeCode}</span>
               </div>
             )}
           </div>
@@ -2554,7 +2525,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
 
         {/* 2. Report Metadata Sub-bar */}
         <div className="flex items-center justify-between flex-wrap gap-4 text-xs text-fg-muted bg-surface-sunken border border-border rounded-xl px-5 py-2.5 font-medium print:bg-slate-50 print:text-slate-600 print:border-slate-200 mb-4">
-          {report.template_type === 'weekly_placement' ? (
+          {report.template_type === 'weekly_placement' && getCleanPeriod(report.report_period) ? (
             <>
               <div className="flex items-center gap-1.5">
                 <Calendar size={13} className="text-primary shrink-0" />
@@ -2566,7 +2537,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               </div>
             </>
           ) : (
-            <div>
+            <div className="w-full flex items-center justify-end">
               <div className="flex items-center gap-1.5">
                 <Calendar size={13} className="text-fg-subtle print:text-slate-500 shrink-0" />
                 <span>Generated Date: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_date}</strong></span>
@@ -2727,7 +2698,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                   className="space-y-3 print:break-inside-avoid break-inside-avoid border border-border rounded-2xl p-4 bg-surface-sunken/30 shadow-xs"
                 >
                   {/* Institution Banner */}
-                  <div className="flex items-center justify-between flex-wrap gap-2 px-3.5 py-2 bg-primary text-white rounded-xl shadow-xs">
+                  <div className="flex items-center justify-between flex-wrap gap-2 px-3.5 py-2 bg-primary text-primary-foreground rounded-xl shadow-xs">
                     <div className="flex items-center gap-2">
                       <span className="w-5 h-5 rounded-full bg-white/20 text-white flex items-center justify-center text-[10px] font-mono font-bold shrink-0">
                         {cIdx + 1}
@@ -4418,7 +4389,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         <button
           type="button"
           onClick={handlePrintPdf}
-          className="flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.98]"
+          className="flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary-hover text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.98]"
         >
           <Download size={14} strokeWidth={2} aria-hidden /> Save PDF
         </button>
@@ -4450,7 +4421,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             onClick={handleScrollToBottom}
             title="Jump to End of Report"
             aria-label="Jump to End of Report"
-            className="w-11 h-11 rounded-full bg-primary hover:bg-primary-hover text-white border border-primary/40 shadow-2xl backdrop-blur-md flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer ring-2 ring-primary/30 group"
+            className="w-11 h-11 rounded-full bg-primary hover:bg-primary-hover text-primary-foreground border border-primary/40 shadow-2xl backdrop-blur-md flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer ring-2 ring-primary/30 group"
           >
             <ArrowDown size={19} strokeWidth={2.5} className="group-hover:translate-y-0.5 transition-transform" />
           </button>

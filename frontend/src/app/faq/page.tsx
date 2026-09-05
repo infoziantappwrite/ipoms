@@ -119,7 +119,7 @@ function FaqContent() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
+    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-primary-foreground">
       {/* ── Clean Standalone Header (No Subtitle, No Search Box, No Badge) ──────────── */}
       <FaqHeader />
 
@@ -141,7 +141,7 @@ function FaqContent() {
                   onClick={() => setSelectedCategory(cat.id)}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer shrink-0 border ${
                     isSelected
-                      ? 'bg-primary text-white border-primary shadow-xs'
+                      ? 'bg-primary text-primary-foreground border-primary shadow-xs'
                       : 'bg-surface-sunken hover:bg-surface-raised text-fg-subtle hover:text-fg border-border/80'
                   }`}
                 >
@@ -324,7 +324,7 @@ function FaqContent() {
             onClick={handleScrollToBottom}
             title="Jump to Bottom of FAQs"
             aria-label="Jump to Bottom of FAQs"
-            className="w-11 h-11 rounded-full bg-primary hover:bg-primary-hover text-white border border-primary/40 shadow-2xl backdrop-blur-md flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer ring-2 ring-primary/30 group"
+            className="w-11 h-11 rounded-full bg-primary hover:bg-primary-hover text-primary-foreground border border-primary/40 shadow-2xl backdrop-blur-md flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer ring-2 ring-primary/30 group"
           >
             <ArrowDown size={19} strokeWidth={2.5} className="group-hover:translate-y-0.5 transition-transform" />
           </button>

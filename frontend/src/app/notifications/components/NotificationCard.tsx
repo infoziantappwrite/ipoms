@@ -155,7 +155,7 @@ export function NotificationCard({
               onClick={() => onAcknowledge(n._id, 'acknowledged')}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1 cursor-pointer ${
                 n.user_response === 'acknowledged'
-                  ? 'bg-primary text-white border-primary shadow-xs'
+                  ? 'bg-primary text-primary-foreground border-primary shadow-xs'
                   : 'bg-primary-subtle text-primary border-primary/30 hover:bg-primary/20'
               }`}
             >

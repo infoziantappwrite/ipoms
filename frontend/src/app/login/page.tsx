@@ -560,7 +560,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded focus:outline-none"
+                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <Eye size={16} strokeWidth={2} /> : <EyeOff size={16} strokeWidth={2} />}
@@ -581,7 +581,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-primary hover:bg-primary/90 disabled:opacity-60 text-white rounded-xl font-bold shadow-md transition-all active:scale-[0.99] text-xs cursor-pointer"
+              className="w-full py-3 bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground rounded-xl font-bold shadow-md transition-all active:scale-[0.99] text-xs cursor-pointer"
             >
               {loading ? 'Authenticating…' : 'Sign-In'}
             </button>
@@ -633,7 +633,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded focus:outline-none"
+                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <Eye size={16} strokeWidth={2} /> : <EyeOff size={16} strokeWidth={2} />}
@@ -645,7 +645,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-primary hover:bg-primary/90 disabled:opacity-60 text-white rounded-xl font-bold shadow-md transition-all active:scale-[0.99] text-xs cursor-pointer"
+              className="w-full py-3 bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground rounded-xl font-bold shadow-md transition-all active:scale-[0.99] text-xs cursor-pointer"
             >
               {loading ? 'Creating Account…' : 'Create Account'}
             </button>
@@ -687,7 +687,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading || signupOtp.length !== 6}
-              className="w-full py-3.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-xl font-bold shadow-md transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-[0.99]"
+              className="w-full py-3.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground rounded-xl font-bold shadow-md transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-[0.99]"
             >
               <CheckCircle2 size={16} strokeWidth={2} />
               <span>{loading ? 'Verifying & Activating…' : 'Verify OTP & Activate Account'}</span>
@@ -729,7 +729,7 @@ export default function LoginPage() {
             </div>
 
             <button type="submit" disabled={loading}
-              className="w-full py-3 bg-primary hover:bg-primary/90 disabled:opacity-60 text-white rounded-xl font-bold shadow-md transition-colors text-xs cursor-pointer">
+              className="w-full py-3 bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground rounded-xl font-bold shadow-md transition-colors text-xs cursor-pointer">
               {loading ? 'Sending…' : 'Send Verification Code'}
             </button>
 
@@ -776,7 +776,7 @@ export default function LoginPage() {
               className={`w-full py-3.5 rounded-xl font-bold text-xs transition-all shadow-md flex items-center justify-center gap-2 select-none cursor-pointer ${
                 isUnlocked
                   ? 'bg-emerald-600 text-white scale-[1.02] shadow-emerald-500/25 ring-2 ring-emerald-400'
-                  : 'bg-primary hover:bg-primary/90 disabled:opacity-50 text-white active:scale-[0.99]'
+                  : 'bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground active:scale-[0.99]'
               }`}
             >
               {isUnlocked ? (
@@ -833,7 +833,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded focus:outline-none"
+                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded"
                   aria-label={showNewPassword ? 'Hide password' : 'Show password'}
                 >
                   {showNewPassword ? <Eye size={16} strokeWidth={2} /> : <EyeOff size={16} strokeWidth={2} />}
@@ -857,7 +857,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded focus:outline-none"
+                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded"
                   aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                 >
                   {showConfirmPassword ? <Eye size={16} strokeWidth={2} /> : <EyeOff size={16} strokeWidth={2} />}
@@ -873,7 +873,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading || !newPassword || newPassword !== confirmPassword || !isPasswordValid(newPassword)}
-              className="w-full py-3.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-xl font-bold shadow-md transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-[0.99]"
+              className="w-full py-3.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground rounded-xl font-bold shadow-md transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-[0.99]"
             >
               <KeyRound size={16} strokeWidth={2} />
               <span>{loading ? 'Saving & Authenticating…' : 'Save & Sign In'}</span>

@@ -87,12 +87,6 @@ interface College {
   college_code: string;
 }
 
-const WEEKLY_KPIS = [
-  { key: 'total_calls', label: 'Total Calls Made', desc: 'Total Calls Made' },
-  { key: 'positive_responses', label: 'Positives', desc: 'Positive Responses' },
-  { key: 'not_hiring', label: 'Not Hiring', desc: 'Not Hiring Responses' },
-  { key: 'jds_received', label: 'JD Received', desc: 'JD Received' },
-];
 
 const ACTIVE_17_COLLEGE_CODES = [
   'KLU', 'PSNA', 'KIOT', 'DSU', 'SMVEC', 'AIHT', 'ACET', 'NEHRU',
@@ -242,7 +236,7 @@ export function ReportBuilderWizard({
       s.on_hold_by_hr = true;
       s.remarks = false;
     } else {
-      s.kpi_summary = true;
+      s.kpi_summary = false;
       s.completed_companies = true;
       s.companies_in_drive = true;
       s.in_progress = true;
@@ -713,7 +707,7 @@ export function ReportBuilderWizard({
         setCustomRemarks('Comprehensive monthly recruitment progress review covering conversions, scheduled drives, and placement selections.');
       } else {
         setSections({
-          kpi_summary: true,
+          kpi_summary: false,
           completed_companies: true,
           in_progress: true,
           pipeline: true,
@@ -844,7 +838,7 @@ export function ReportBuilderWizard({
       setCustomRemarks('Comprehensive monthly recruitment progress review covering conversions, scheduled drives, and placement selections.');
     } else {
       setSections({
-        kpi_summary: true,
+        kpi_summary: false,
         completed_companies: true,
         companies_in_drive: true,
         in_progress: true,
@@ -914,8 +908,8 @@ export function ReportBuilderWizard({
     try {
       const isMultiWeekly = templateType === 'weekly_placement' && weeklyTargetMode === 'group';
       const effectiveWeekLabel = (!startDate || !endDate)
-        ? (weekLabel && !weekLabel.toLowerCase().includes('select') ? weekLabel : 'All Dates (Cumulative)')
-        : (weekLabel || 'All Dates (Cumulative)');
+        ? (weekLabel && !weekLabel.toLowerCase().includes('select') && !weekLabel.toLowerCase().includes('cumulative') ? weekLabel : '')
+        : (weekLabel && !weekLabel.toLowerCase().includes('cumulative') ? weekLabel : '');
       // Build custom weekly companies filtered payload if weekly_placement template
       let customWeeklyCompaniesPayload: any = undefined;
       if (templateType === 'weekly_placement') {
@@ -1077,14 +1071,6 @@ export function ReportBuilderWizard({
 
     const list: any[] = [
       {
-        key: 'kpi_summary',
-        label: 'Executive Placement KPI Summary',
-        icon: BarChart3,
-        desc: 'Select which KPI metrics appear in the header summary strip',
-        isKpiSection: true,
-        kpiList: WEEKLY_KPIS,
-      },
-      {
         key: 'completed_companies',
         label: '1. Companies Completed',
         icon: CheckCircle2,
@@ -1171,7 +1157,7 @@ export function ReportBuilderWizard({
             onClick={() => handleCategoryChange('weekly_placement')}
             className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'weekly_placement'
-                ? 'bg-primary text-white shadow-xs'
+                ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
             }`}
           >
@@ -1184,7 +1170,7 @@ export function ReportBuilderWizard({
             onClick={() => handleCategoryChange('month_end')}
             className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'month_end'
-                ? 'bg-primary text-white shadow-xs'
+                ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
             }`}
           >
@@ -1197,7 +1183,7 @@ export function ReportBuilderWizard({
             onClick={() => handleCategoryChange('pending_tasks')}
             className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'pending_tasks'
-                ? 'bg-primary text-white shadow-xs'
+                ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
             }`}
           >
@@ -1210,7 +1196,7 @@ export function ReportBuilderWizard({
             onClick={() => handleCategoryChange('active_leads')}
             className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'active_leads'
-                ? 'bg-primary text-white shadow-xs'
+                ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
             }`}
           >
@@ -1262,7 +1248,7 @@ export function ReportBuilderWizard({
                         }}
                         className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
                           weeklyTargetMode === 'single'
-                            ? 'bg-primary text-white shadow-2xs font-semibold'
+                            ? 'bg-primary text-primary-foreground shadow-2xs font-semibold'
                             : 'text-fg-muted hover:text-fg'
                         }`}
                       >
@@ -1282,7 +1268,7 @@ export function ReportBuilderWizard({
                         }}
                         className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
                           weeklyTargetMode === 'group'
-                            ? 'bg-primary text-white shadow-2xs font-semibold'
+                            ? 'bg-primary text-primary-foreground shadow-2xs font-semibold'
                             : 'text-fg-muted hover:text-fg'
                         }`}
                       >
@@ -1961,7 +1947,7 @@ export function ReportBuilderWizard({
                 </span>
               </div>
               <span className="text-[11px] text-fg-subtle">
-                Leave empty for Full History (Cumulative), or choose dates to filter
+                Leave empty for all records, or choose dates to filter
               </span>
             </div>
             <DateRangeCalendar
@@ -1971,7 +1957,7 @@ export function ReportBuilderWizard({
               onChangeRange={(s, e, calculatedLabel) => {
                 setStartDate(s);
                 setEndDate(e);
-                setWeekLabel(calculatedLabel || 'All Dates (Cumulative)');
+                setWeekLabel((calculatedLabel && !calculatedLabel.toLowerCase().includes('cumulative')) ? calculatedLabel : '');
                 setValidationErrors([]);
               }}
             />
@@ -2025,7 +2011,7 @@ export function ReportBuilderWizard({
                         <CheckCircle2 size={15} className="text-primary shrink-0" />
                         <span>{activeMonth.label}</span>
                       </div>
-                      <span className="bg-primary text-white font-mono text-[10px] font-bold px-2 py-0.5 rounded-md shadow-2xs">
+                      <span className="bg-primary text-primary-foreground font-mono text-[10px] font-bold px-2 py-0.5 rounded-md shadow-2xs">
                         {activeMonth.badge}
                       </span>
                     </div>
@@ -2225,19 +2211,19 @@ export function ReportBuilderWizard({
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-sm font-bold text-fg">
-                      Live Pipeline Snapshot & Company Filters
+                      Company CTC & Selective Sharing Filters
                     </h2>
                     <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/15 text-primary border border-primary/30">
                       Showing {totalWeeklyFilteredCount} of {totalWeeklyRawCount}
                     </span>
                   </div>
                   <p className="text-[11px] text-fg-subtle">
-                    Live stage overview and dynamic CTC filters for the selected institution. Check/uncheck companies to customize the generated weekly report.
+                    Filter placement drives by minimum CTC threshold and selectively include/exclude company rows for the weekly report.
                   </p>
                 </div>
               </div>
 
-              {(weeklyMinCtc !== null || weeklyCompanySearch || weeklyCompanyType !== 'all' || weeklyStatusFilter !== 'all' || weeklyExcludedIds.size > 0 || weeklyIncludeCompetitive) && (
+              {(weeklyMinCtc !== null || weeklyCompanySearch || weeklyCompanyType !== 'all' || weeklyStatusFilter !== 'all' || weeklyExcludedIds.size > 0 || weeklyIncludeCompetitive || weeklyActivePreviewTab !== 'all') && (
                 <button
                   type="button"
                   onClick={handleResetWeeklyFilters}
@@ -2249,178 +2235,7 @@ export function ReportBuilderWizard({
               )}
             </div>
 
-            {/* Live Pipeline Snapshot Ribbon */}
-            <div className="bg-surface border border-border/80 rounded-xl p-3 sm:p-3.5 space-y-2.5 shadow-2xs">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs font-bold text-fg flex items-center gap-1.5">
-                    <Building2 size={13} className="text-primary" />
-                    {selectedCollegeObj ? (
-                      <span>
-                        {selectedCollegeObj.college_name}{' '}
-                        <span className="text-fg-subtle font-normal">
-                          ({selectedCollegeObj.college_code || 'COLLEGE'})
-                        </span>
-                      </span>
-                    ) : (
-                      <span>Select an Institution to View Live Drive Statistics</span>
-                    )}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-fg-subtle">
-                  {loadingWeekly ? (
-                    <span className="flex items-center gap-1 text-primary font-semibold">
-                      <Loader2 size={12} className="animate-spin" />
-                      Syncing live data...
-                    </span>
-                  ) : (
-                    <span className="font-semibold text-fg">
-                      {totalWeeklyRawCount} total placement drives found
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* 6 Quick Stage Metric Cards (Clicking switches tab immediately!) */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                {/* 1. In Progress */}
-                <button
-                  type="button"
-                  onClick={() => setWeeklyActivePreviewTab('in_progress')}
-                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                    weeklyActivePreviewTab === 'in_progress'
-                      ? 'bg-blue-500/15 border-blue-500/50 shadow-xs ring-2 ring-blue-500/20'
-                      : 'bg-surface-raised/60 hover:bg-surface-raised border-border/80'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                      <Clock size={12} />
-                      In Progress
-                    </span>
-                    <span className="text-base font-black text-blue-700 dark:text-blue-300">
-                      {weeklyCompanies.in_progress?.length || 0}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-fg-subtle truncate mt-1">Ongoing active drives</span>
-                </button>
-
-                {/* 2. In Pipeline */}
-                <button
-                  type="button"
-                  onClick={() => setWeeklyActivePreviewTab('pipeline')}
-                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                    weeklyActivePreviewTab === 'pipeline'
-                      ? 'bg-amber-500/15 border-amber-500/50 shadow-xs ring-2 ring-amber-500/20'
-                      : 'bg-surface-raised/60 hover:bg-surface-raised border-border/80'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                      <Layers size={12} />
-                      In Pipeline
-                    </span>
-                    <span className="text-base font-black text-amber-700 dark:text-amber-300">
-                      {weeklyCompanies.pipeline?.length || 0}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-fg-subtle truncate mt-1">Upcoming pipeline</span>
-                </button>
-
-                {/* 3. In Drive */}
-                <button
-                  type="button"
-                  onClick={() => setWeeklyActivePreviewTab('in_drive')}
-                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                    weeklyActivePreviewTab === 'in_drive'
-                      ? 'bg-purple-500/15 border-purple-500/50 shadow-xs ring-2 ring-purple-500/20'
-                      : 'bg-surface-raised/60 hover:bg-surface-raised border-border/80'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1">
-                      <Zap size={12} />
-                      In Drive
-                    </span>
-                    <span className="text-base font-black text-purple-700 dark:text-purple-300">
-                      {weeklyCompanies.in_drive?.length || 0}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-fg-subtle truncate mt-1">Scheduled / live drives</span>
-                </button>
-
-                {/* 4. Completed */}
-                <button
-                  type="button"
-                  onClick={() => setWeeklyActivePreviewTab('completed')}
-                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                    weeklyActivePreviewTab === 'completed'
-                      ? 'bg-emerald-500/15 border-emerald-500/50 shadow-xs ring-2 ring-emerald-500/20'
-                      : 'bg-surface-raised/60 hover:bg-surface-raised border-border/80'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                      <CheckCircle2 size={12} />
-                      Completed
-                    </span>
-                    <span className="text-base font-black text-emerald-700 dark:text-emerald-300">
-                      {weeklyCompanies.completed?.length || 0}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-fg-subtle truncate mt-1">Concluded drives</span>
-                </button>
-
-                {/* 5. Top Companies */}
-                <button
-                  type="button"
-                  onClick={() => setWeeklyActivePreviewTab('top_companies')}
-                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                    weeklyActivePreviewTab === 'top_companies'
-                      ? 'bg-rose-500/15 border-rose-500/50 shadow-xs ring-2 ring-rose-500/20'
-                      : 'bg-surface-raised/60 hover:bg-surface-raised border-border/80'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1">
-                      <Star size={12} />
-                      Top Companies
-                    </span>
-                    <span className="text-base font-black text-rose-700 dark:text-rose-300">
-                      {weeklyCompanies.top_companies?.length || 0}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-fg-subtle truncate mt-1">Tier-1 & pinned</span>
-                </button>
-
-                {/* 6. On Hold & Declined */}
-                <button
-                  type="button"
-                  onClick={() => setWeeklyActivePreviewTab('on_hold')}
-                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
-                    weeklyActivePreviewTab === 'on_hold' || weeklyActivePreviewTab === 'rejected'
-                      ? 'bg-slate-500/15 border-slate-500/50 shadow-xs ring-2 ring-slate-500/20'
-                      : 'bg-surface-raised/60 hover:bg-surface-raised border-border/80'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1">
-                      <AlertCircle size={12} />
-                      On Hold / Decl.
-                    </span>
-                    <span className="text-base font-black text-slate-700 dark:text-slate-300">
-                      {(weeklyCompanies.on_hold_by_college?.length || 0) +
-                        (weeklyCompanies.on_hold_by_hr?.length || 0) +
-                        (weeklyCompanies.rejected_companies?.length || 0)}
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-fg-subtle truncate mt-1">Deferred & on hold</span>
-                </button>
-              </div>
-            </div>
-
-            {/* CTC Range Filter Controls (Dropdown List + Quick Presets) */}
+            {/* CTC Range Filter Controls (Dropdown List + Custom LPA + Include Competitive) */}
             <div className="space-y-2.5 bg-surface border border-border/80 rounded-xl p-3 sm:p-3.5 shadow-2xs">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <span className="text-xs font-bold text-fg flex items-center gap-1.5">
@@ -2444,10 +2259,10 @@ export function ReportBuilderWizard({
                 </label>
               </div>
 
-              {/* Main Selection Area: Dropdown + Quick Pills + Custom LPA */}
-              <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
+              {/* Main Selection Area: Dropdown + Custom LPA */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                 {/* 1. Primary Dropdown Selector (Lists every available CTC cutoff onwards) */}
-                <div className="w-full lg:w-72 shrink-0">
+                <div className="w-full sm:w-80 shrink-0">
                   <SmoothSelect
                     value={weeklyMinCtc === null ? 'all' : String(weeklyMinCtc)}
                     onChange={(val) => {
@@ -2469,57 +2284,10 @@ export function ReportBuilderWizard({
                   />
                 </div>
 
-                {/* 2. Popular Milestone Quick Pills */}
-                <div className="flex flex-wrap items-center gap-1.5 flex-1">
-                  {[
-                    { label: 'All CTCs', value: null },
-                    { label: '≥ 3 LPA', value: 3 },
-                    { label: '≥ 4 LPA', value: 4 },
-                    { label: '≥ 6 LPA', value: 6 },
-                    { label: '≥ 8 LPA', value: 8 },
-                    { label: '≥ 10 LPA', value: 10 },
-                  ].map((preset) => {
-                    const isActive = weeklyMinCtc === preset.value;
-                    const matchingCount =
-                      preset.value === null
-                        ? totalWeeklyRawCount
-                        : availableCtcBrackets.find((b) => b.value === preset.value)?.count;
-
-                    return (
-                      <button
-                        key={preset.label}
-                        type="button"
-                        onClick={() => {
-                          setWeeklyMinCtc(preset.value);
-                          setWeeklyCustomCtcInput('');
-                        }}
-                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                          isActive
-                            ? 'bg-primary text-white border-primary shadow-xs font-bold ring-2 ring-primary/25'
-                            : 'bg-surface-raised/70 border-border text-fg-subtle hover:text-fg hover:border-border-hover hover:bg-surface-raised'
-                        }`}
-                      >
-                        <span>{preset.label}</span>
-                        {matchingCount !== undefined && matchingCount > 0 && (
-                          <span
-                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                              isActive
-                                ? 'bg-white/25 text-white'
-                                : 'bg-primary/10 text-primary border border-primary/20'
-                            }`}
-                          >
-                            {matchingCount}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* 3. Custom numeric LPA input */}
-                <div className="flex items-center gap-1.5 pl-0 lg:pl-2.5 lg:border-l border-border/70 shrink-0">
-                  <span className="text-[11px] font-semibold text-fg-subtle whitespace-nowrap">Custom:</span>
-                  <div className="relative w-20">
+                {/* 2. Custom numeric LPA input */}
+                <div className="flex items-center gap-2 sm:pl-3 sm:border-l border-border/70">
+                  <span className="text-[11px] font-semibold text-fg-subtle whitespace-nowrap">Or Custom CTC:</span>
+                  <div className="relative w-24">
                     <input
                       type="number"
                       step="0.5"
@@ -2540,14 +2308,26 @@ export function ReportBuilderWizard({
                       className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-lg px-2.5 py-1.5 text-xs text-fg outline-none font-medium font-mono"
                     />
                   </div>
-                  <span className="text-[11px] font-medium text-fg-subtle">LPA</span>
+                  <span className="text-xs font-medium text-fg-subtle">LPA</span>
+                  {weeklyMinCtc !== null && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWeeklyMinCtc(null);
+                        setWeeklyCustomCtcInput('');
+                      }}
+                      className="text-[11px] font-semibold text-fg-subtle hover:text-red-500 underline ml-1 cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
 
             {/* Column-level filter controls */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-              {/* Company Name search */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+              {/* 1. Company Name search */}
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1">
                   <Search size={11} />
@@ -2574,7 +2354,28 @@ export function ReportBuilderWizard({
                 </div>
               </div>
 
-              {/* Company Type filter */}
+              {/* 2. Pipeline Section selector */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1">
+                  <Layers size={11} />
+                  Pipeline Section
+                </label>
+                <select
+                  value={weeklyActivePreviewTab}
+                  onChange={(e) => setWeeklyActivePreviewTab(e.target.value as any)}
+                  className="w-full bg-surface border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-lg px-2.5 py-1.5 text-xs text-fg outline-none shadow-2xs font-medium cursor-pointer"
+                >
+                  <option value="all">All Placement Drives ({tabCounts.all})</option>
+                  <option value="in_progress">In Progress ({tabCounts.in_progress})</option>
+                  <option value="pipeline">In Pipeline ({tabCounts.pipeline})</option>
+                  <option value="in_drive">In Drive ({tabCounts.in_drive})</option>
+                  <option value="completed">Completed ({tabCounts.completed})</option>
+                  <option value="top_companies">Top Companies ({tabCounts.top_companies})</option>
+                  <option value="on_hold">On Hold / Decl. ({tabCounts.on_hold + tabCounts.rejected})</option>
+                </select>
+              </div>
+
+              {/* 3. Company Type filter */}
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1">
                   <Briefcase size={11} />
@@ -2594,7 +2395,7 @@ export function ReportBuilderWizard({
                 </select>
               </div>
 
-              {/* Status / Remarks filter */}
+              {/* 4. Status / Remarks filter */}
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1">
                   <Clock size={11} />
@@ -2622,44 +2423,24 @@ export function ReportBuilderWizard({
               </div>
             </div>
 
-            {/* Preview Section Tabs & Row Selection Actions */}
-            <div className="space-y-2.5 pt-2 border-t border-border/80">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                {/* Pipeline Tabs */}
-                <div className="flex flex-wrap items-center gap-1 overflow-x-auto pb-1 max-w-full">
-                  {[
-                    { key: 'all', label: 'All Matching', count: tabCounts.all },
-                    { key: 'in_progress', label: 'In Progress', count: tabCounts.in_progress },
-                    { key: 'pipeline', label: 'In Pipeline', count: tabCounts.pipeline },
-                    { key: 'in_drive', label: 'In Drive', count: tabCounts.in_drive },
-                    { key: 'completed', label: 'Completed', count: tabCounts.completed },
-                    { key: 'top_companies', label: 'Top Companies', count: tabCounts.top_companies },
-                    { key: 'on_hold', label: 'On Hold', count: tabCounts.on_hold },
-                    { key: 'rejected', label: 'Rejected', count: tabCounts.rejected },
-                  ].map((tab) => {
-                    const isTabActive = weeklyActivePreviewTab === tab.key;
-                    return (
-                      <button
-                        key={tab.key}
-                        type="button"
-                        onClick={() => setWeeklyActivePreviewTab(tab.key)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                          isTabActive
-                            ? 'bg-primary text-white shadow-xs font-bold ring-2 ring-primary/20'
-                            : 'bg-surface border border-border text-fg-subtle hover:text-fg hover:bg-surface-raised'
-                        }`}
-                      >
-                        <span>{tab.label}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-                          isTabActive
-                            ? 'bg-white/20 text-white'
-                            : 'bg-surface-sunken text-fg-subtle border border-border/40'
-                        }`}>
-                          {tab.count}
-                        </span>
-                      </button>
-                    );
-                  })}
+            {/* Preview Section Table Header & Row Selection Actions */}
+            <div className="space-y-2 pt-2 border-t border-border/80">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-surface border border-border/70 rounded-xl px-3.5 py-2 shadow-2xs">
+                {/* Active Section Badge */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-fg-subtle">
+                    Previewing:
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-primary/10 text-primary border border-primary/20">
+                    {weeklyActivePreviewTab === 'all' && `All Matching Drives (${previewRows.length})`}
+                    {weeklyActivePreviewTab === 'in_progress' && `In Progress Drives (${previewRows.length})`}
+                    {weeklyActivePreviewTab === 'pipeline' && `Upcoming Pipeline Drives (${previewRows.length})`}
+                    {weeklyActivePreviewTab === 'in_drive' && `In Drive / Scheduled Drives (${previewRows.length})`}
+                    {weeklyActivePreviewTab === 'completed' && `Completed Drives (${previewRows.length})`}
+                    {weeklyActivePreviewTab === 'top_companies' && `Top Tier Companies (${previewRows.length})`}
+                    {weeklyActivePreviewTab === 'on_hold' && `On Hold & Declined (${previewRows.length})`}
+                    {weeklyActivePreviewTab === 'rejected' && `Rejected (${previewRows.length})`}
+                  </span>
                 </div>
 
                 {/* Bulk Select/Deselect in current tab */}
@@ -2667,7 +2448,7 @@ export function ReportBuilderWizard({
                   <button
                     type="button"
                     onClick={handleSelectAllPreview}
-                    className="text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+                    className="text-xs font-semibold text-primary hover:underline cursor-pointer"
                   >
                     Select All
                   </button>
@@ -2675,7 +2456,7 @@ export function ReportBuilderWizard({
                   <button
                     type="button"
                     onClick={handleDeselectAllPreview}
-                    className="text-[11px] font-semibold text-fg-subtle hover:text-fg hover:underline cursor-pointer"
+                    className="text-xs font-semibold text-fg-subtle hover:text-fg hover:underline cursor-pointer"
                   >
                     Deselect All
                   </button>
@@ -2868,7 +2649,7 @@ export function ReportBuilderWizard({
             type="button"
             onClick={handleGenerate}
             disabled={loading}
-            className="px-6 py-2.5 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center cursor-pointer"
+            className="px-6 py-2.5 bg-primary hover:bg-primary-hover disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center cursor-pointer"
           >
             <span>{loading ? 'Generating Report…' : 'Generate Report'}</span>
           </button>

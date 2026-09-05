@@ -226,7 +226,7 @@ export function EditCompanyModal({
                   onClick={() => setCtcUnit('LPA')}
                   className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
                     ctcUnit === 'LPA'
-                      ? 'bg-primary text-white shadow-xs'
+                      ? 'bg-primary text-primary-foreground shadow-xs'
                       : 'text-fg-muted hover:text-fg hover:bg-surface-raised'
                   }`}
                 >
@@ -237,7 +237,7 @@ export function EditCompanyModal({
                   onClick={() => setCtcUnit('/ Month')}
                   className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
                     ctcUnit === '/ Month'
-                      ? 'bg-primary text-white shadow-xs'
+                      ? 'bg-primary text-primary-foreground shadow-xs'
                       : 'text-fg-muted hover:text-fg hover:bg-surface-raised'
                   }`}
                 >
@@ -314,7 +314,7 @@ export function EditCompanyModal({
           {/* Student Candidate Counts (if in progress or completed) */}
           <div className="grid grid-cols-3 gap-3 bg-surface-sunken/60 p-3 rounded-xl border border-border/80">
             <div>
-              <label className="block text-[11px] font-semibold text-fg-subtle mb-1">Registered</label>
+              <label className="block text-micro font-semibold text-fg-subtle mb-1">Registered</label>
               <input
                 type="number"
                 min="0"
@@ -324,7 +324,7 @@ export function EditCompanyModal({
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-fg-subtle mb-1">Shortlisted</label>
+              <label className="block text-micro font-semibold text-fg-subtle mb-1">Shortlisted</label>
               <input
                 type="number"
                 min="0"
@@ -334,7 +334,7 @@ export function EditCompanyModal({
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mb-1">Offers Received (0–50)</label>
+              <label className="block text-micro font-semibold text-emerald-600 dark:text-emerald-400 mb-1">Offers Received (0–50)</label>
               <input
                 type="number"
                 min="0"
@@ -409,7 +409,7 @@ export function EditCompanyModal({
               type="submit"
               form="edit-company-form"
               disabled={loading}
-              className="px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 hover:shadow-md hover:shadow-primary/25"
+              className="px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 hover:shadow-md hover:shadow-primary/25"
             >
               <CheckCircle2 size={15} />
               <span>{loading ? 'Saving Changes…' : 'Save Changes'}</span>

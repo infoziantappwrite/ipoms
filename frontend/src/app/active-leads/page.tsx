@@ -327,7 +327,7 @@ export default function ActiveLeadsPage() {
   const paginatedLeads = leads.slice((page - 1) * limit, page * limit);
 
   return (
-    <div className="min-h-screen bg-background text-fg selection:bg-primary selection:text-white flex flex-col">
+    <div className="min-h-screen bg-background text-fg selection:bg-primary selection:text-primary-foreground flex flex-col">
       {/* Header (Sticky / Frozen at Top) */}
       <ActiveLeadHeader
         searchQuery={searchQuery}

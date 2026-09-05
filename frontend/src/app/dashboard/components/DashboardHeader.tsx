@@ -284,7 +284,7 @@ export function DashboardHeader() {
 
               <Link
                 href="/tracker"
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold shadow-sm shadow-primary/20 transition-all hover:scale-105 active:scale-95 cursor-pointer ring-1 ring-primary/20"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-sm shadow-primary/20 transition-all hover:scale-105 active:scale-95 cursor-pointer ring-1 ring-primary/20"
               >
                 <PhoneCall size={14} />
                 <span>Launch Daily Tracker</span>
