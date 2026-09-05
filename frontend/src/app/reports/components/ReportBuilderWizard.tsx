@@ -516,6 +516,15 @@ export function ReportBuilderWizard({
     };
   }, [weeklyCompanies]);
 
+  // Dropdown options formatted for SmoothSelect
+  const ctcSelectOptions = useMemo(() => {
+    return availableCtcBrackets.map((b) => ({
+      value: b.value === null ? 'all' : String(b.value),
+      label: b.value === null ? 'All CTC Packages (Any Range)' : `≥ ${b.value} LPA onwards`,
+      badge: `${b.count} ${b.count === 1 ? 'drive' : 'drives'}`,
+    }));
+  }, [availableCtcBrackets]);
+
   // Memoized Filtered Weekly Tracker companies based on CTC and column filters
   const filteredWeeklyCompanies = useMemo(() => {
     const filterRow = (r: any) => {
@@ -2411,12 +2420,12 @@ export function ReportBuilderWizard({
               </div>
             </div>
 
-            {/* Dynamic CTC Thresholds Filter Row */}
-            <div className="space-y-2">
+            {/* CTC Range Filter Controls (Dropdown List + Quick Presets) */}
+            <div className="space-y-2.5 bg-surface border border-border/80 rounded-xl p-3 sm:p-3.5 shadow-2xs">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <span className="text-xs font-bold text-fg flex items-center gap-1.5">
                   <TrendingUp size={14} className="text-emerald-600 dark:text-emerald-400" />
-                  Available CTC Thresholds:
+                  Select Minimum CTC Threshold (Starting Package Onwards):
                   {weeklyMinCtc !== null && (
                     <span className="text-primary font-extrabold ml-1">≥ {weeklyMinCtc} LPA</span>
                   )}
@@ -2435,41 +2444,81 @@ export function ReportBuilderWizard({
                 </label>
               </div>
 
-              {/* Dynamic Quick Select CTC Threshold Badges */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                {availableCtcBrackets.map((item) => {
-                  const isActive = weeklyMinCtc === item.value;
-                  return (
-                    <button
-                      key={item.label}
-                      type="button"
-                      onClick={() => {
-                        setWeeklyMinCtc(item.value);
+              {/* Main Selection Area: Dropdown + Quick Pills + Custom LPA */}
+              <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
+                {/* 1. Primary Dropdown Selector (Lists every available CTC cutoff onwards) */}
+                <div className="w-full lg:w-72 shrink-0">
+                  <SmoothSelect
+                    value={weeklyMinCtc === null ? 'all' : String(weeklyMinCtc)}
+                    onChange={(val) => {
+                      if (val === 'all') {
+                        setWeeklyMinCtc(null);
                         setWeeklyCustomCtcInput('');
-                      }}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                        isActive
-                          ? 'bg-primary text-white border-primary shadow-xs font-bold ring-2 ring-primary/25'
-                          : 'bg-surface border-border text-fg hover:text-fg hover:border-border-hover hover:bg-surface-raised'
-                      }`}
-                    >
-                      <span>{item.label}</span>
-                      <span
-                        className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                      } else {
+                        const num = parseFloat(val);
+                        setWeeklyMinCtc(isNaN(num) ? null : num);
+                        setWeeklyCustomCtcInput('');
+                      }
+                    }}
+                    icon={TrendingUp}
+                    title="Select Starting CTC (Onwards)"
+                    placeholder="Select CTC threshold..."
+                    searchable={true}
+                    searchPlaceholder="Search CTC package (e.g. 4, 6.5, 10)..."
+                    options={ctcSelectOptions}
+                  />
+                </div>
+
+                {/* 2. Popular Milestone Quick Pills */}
+                <div className="flex flex-wrap items-center gap-1.5 flex-1">
+                  {[
+                    { label: 'All CTCs', value: null },
+                    { label: '≥ 3 LPA', value: 3 },
+                    { label: '≥ 4 LPA', value: 4 },
+                    { label: '≥ 6 LPA', value: 6 },
+                    { label: '≥ 8 LPA', value: 8 },
+                    { label: '≥ 10 LPA', value: 10 },
+                  ].map((preset) => {
+                    const isActive = weeklyMinCtc === preset.value;
+                    const matchingCount =
+                      preset.value === null
+                        ? totalWeeklyRawCount
+                        : availableCtcBrackets.find((b) => b.value === preset.value)?.count;
+
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => {
+                          setWeeklyMinCtc(preset.value);
+                          setWeeklyCustomCtcInput('');
+                        }}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                           isActive
-                            ? 'bg-white/25 text-white'
-                            : 'bg-primary/10 text-primary border border-primary/20'
+                            ? 'bg-primary text-white border-primary shadow-xs font-bold ring-2 ring-primary/25'
+                            : 'bg-surface-raised/70 border-border text-fg-subtle hover:text-fg hover:border-border-hover hover:bg-surface-raised'
                         }`}
                       >
-                        {item.count}
-                      </span>
-                    </button>
-                  );
-                })}
+                        <span>{preset.label}</span>
+                        {matchingCount !== undefined && matchingCount > 0 && (
+                          <span
+                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                              isActive
+                                ? 'bg-white/25 text-white'
+                                : 'bg-primary/10 text-primary border border-primary/20'
+                            }`}
+                          >
+                            {matchingCount}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
 
-                {/* Custom numeric LPA input */}
-                <div className="flex items-center gap-1.5 pl-2 border-l border-border/70">
-                  <span className="text-[11px] font-semibold text-fg-subtle">Custom:</span>
+                {/* 3. Custom numeric LPA input */}
+                <div className="flex items-center gap-1.5 pl-0 lg:pl-2.5 lg:border-l border-border/70 shrink-0">
+                  <span className="text-[11px] font-semibold text-fg-subtle whitespace-nowrap">Custom:</span>
                   <div className="relative w-20">
                     <input
                       type="number"
@@ -2488,7 +2537,7 @@ export function ReportBuilderWizard({
                           setWeeklyMinCtc(null);
                         }
                       }}
-                      className="w-full bg-surface border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-lg px-2 py-1 text-xs text-fg outline-none font-medium"
+                      className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-lg px-2.5 py-1.5 text-xs text-fg outline-none font-medium font-mono"
                     />
                   </div>
                   <span className="text-[11px] font-medium text-fg-subtle">LPA</span>
@@ -2648,20 +2697,20 @@ export function ReportBuilderWizard({
                     </p>
                   </div>
                 ) : (
-                  <div className="max-h-72 overflow-y-auto divide-y divide-border/60">
+                  <div className="max-h-72 overflow-y-auto overflow-x-auto relative bg-surface">
                     <table className="w-full text-left text-xs border-collapse">
-                      <thead className="bg-surface-sunken/80 sticky top-0 text-[11px] font-bold text-fg-subtle uppercase tracking-wider border-b border-border/80">
-                        <tr>
-                          <th className="py-2 px-3 w-8 text-center">Inc</th>
-                          <th className="py-2 px-2 w-8 text-center">#</th>
-                          <th className="py-2 px-3">Company & Role</th>
-                          <th className="py-2 px-3">Type</th>
-                          <th className="py-2 px-3">CTC</th>
-                          <th className="py-2 px-3">Status / Remarks</th>
-                          <th className="py-2 px-3">Section</th>
+                      <thead className="sticky top-0 z-20 bg-surface-sunken border-b border-border text-[10.5px] font-bold text-fg-muted uppercase tracking-wider select-none shadow-2xs">
+                        <tr className="bg-surface-sunken">
+                          <th className="bg-surface-sunken py-2.5 px-3 w-10 text-center">Inc</th>
+                          <th className="bg-surface-sunken py-2.5 px-2 w-10 text-center font-mono">#</th>
+                          <th className="bg-surface-sunken py-2.5 px-3 min-w-[200px]">Company & Role</th>
+                          <th className="bg-surface-sunken py-2.5 px-3 min-w-[130px]">Type</th>
+                          <th className="bg-surface-sunken py-2.5 px-3 min-w-[100px]">CTC</th>
+                          <th className="bg-surface-sunken py-2.5 px-3 min-w-[200px]">Status / Remarks</th>
+                          <th className="bg-surface-sunken py-2.5 px-3 min-w-[120px]">Section</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-border/50 font-medium">
+                      <tbody className="divide-y divide-border/60 font-medium bg-surface">
                         {previewRows.map((row: any, idx: number) => {
                           const rowId = String(row._id || row.company_id || row.company_name);
                           const isIncluded = !weeklyExcludedIds.has(rowId);
@@ -2672,11 +2721,11 @@ export function ReportBuilderWizard({
                               onClick={() => handleToggleExcludeCompany(rowId)}
                               className={`cursor-pointer transition-colors ${
                                 isIncluded
-                                  ? 'hover:bg-primary/5 bg-surface'
+                                  ? 'hover:bg-primary/5 bg-surface text-fg'
                                   : 'opacity-40 bg-surface-sunken/40 line-through text-fg-subtle'
                               }`}
                             >
-                              <td className="py-2 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                              <td className="py-2.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
                                 <input
                                   type="checkbox"
                                   checked={isIncluded}
@@ -2684,10 +2733,10 @@ export function ReportBuilderWizard({
                                   className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
                                 />
                               </td>
-                              <td className="py-2 px-2 text-center text-fg-subtle text-[11px]">
+                              <td className="py-2.5 px-2 text-center text-fg-subtle text-[11px] font-mono">
                                 {idx + 1}
                               </td>
-                              <td className="py-2 px-3">
+                              <td className="py-2.5 px-3">
                                 <div className="font-bold text-fg leading-snug">
                                   {row.company_name}
                                 </div>
@@ -2695,18 +2744,18 @@ export function ReportBuilderWizard({
                                   {row.job_role || row.role || 'Campus Hire'}
                                 </div>
                               </td>
-                              <td className="py-2 px-3 text-fg-subtle text-[11px] whitespace-nowrap">
+                              <td className="py-2.5 px-3 text-fg-subtle text-[11px] whitespace-nowrap">
                                 {row.company_type || 'IT / Tech'}
                               </td>
-                              <td className="py-2 px-3 whitespace-nowrap">
+                              <td className="py-2.5 px-3 whitespace-nowrap">
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border ${getCtcBadgeColor(ctc)}`}>
                                   {ctc}
                                 </span>
                               </td>
-                              <td className="py-2 px-3 text-fg-subtle text-[11px] max-w-xs truncate">
+                              <td className="py-2.5 px-3 text-fg-subtle text-[11px] max-w-xs truncate">
                                 {row.current_status_text || row.status || row.remarks || '—'}
                               </td>
-                              <td className="py-2 px-3 whitespace-nowrap">
+                              <td className="py-2.5 px-3 whitespace-nowrap">
                                 <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-surface-sunken border border-border text-fg-subtle">
                                   {row._sectionLabel}
                                 </span>
@@ -2718,7 +2767,7 @@ export function ReportBuilderWizard({
                     </table>
                   </div>
                 )}
-                <div className="px-3 py-2 bg-surface-sunken/60 border-t border-border/80 flex items-center justify-between text-[11px] text-fg-subtle">
+                <div className="px-3 py-2 bg-surface-sunken border-t border-border flex items-center justify-between text-[11px] text-fg-subtle">
                   <span>
                     Tip: Click any row or checkbox to include or exclude individual companies from the generated report.
                   </span>

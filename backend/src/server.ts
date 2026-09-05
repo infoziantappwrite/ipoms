@@ -2852,6 +2852,15 @@ app.post('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
     const effectiveFollowUp = pipeline_section === 'follow_ups_due_today' && !follow_up_date ? new Date() : (follow_up_date ? new Date(follow_up_date) : null);
     const { startFriday, endThursday, weekNumber } = getFridayWeekBounds();
 
+    const rawOffers = req.body.offers_received !== undefined ? req.body.offers_received : req.body.selected_count;
+    let finalSelectedCount = 0;
+    if (rawOffers !== undefined && rawOffers !== null && rawOffers !== '') {
+      const parsed = parseInt(String(rawOffers), 10);
+      if (!isNaN(parsed)) {
+        finalSelectedCount = Math.min(50, Math.max(0, parsed));
+      }
+    }
+
     const newDrive = await WeeklyTracker.create({
       academic_year: 2026,
       college_id: new Types.ObjectId(String(college_id)),
@@ -2867,7 +2876,7 @@ app.post('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
       current_status_text: current_status_text.trim(),
       follow_up_date: effectiveFollowUp,
       drive_date: drive_date ? new Date(drive_date) : null,
-      selected_count: Number(selected_count) || 0,
+      selected_count: finalSelectedCount,
       week_number: weekNumber,
       week_start_date: startFriday,
       week_end_date: endThursday,
@@ -2945,11 +2954,19 @@ app.patch('/api/v1/weekly-tracker/:id', async (req: Request, res: Response) => {
       if (patchData[field] !== undefined) {
         if (['follow_up_date', 'drive_date'].includes(field)) {
           (row as any)[field] = patchData[field] ? new Date(patchData[field]) : null;
+        } else if (field === 'selected_count') {
+          const num = parseInt(String(patchData[field]), 10);
+          (row as any)[field] = isNaN(num) ? 0 : Math.min(50, Math.max(0, num));
         } else {
           (row as any)[field] = typeof patchData[field] === 'string' ? patchData[field].trim() : patchData[field];
         }
       }
     });
+
+    if (patchData.offers_received !== undefined && patchData.selected_count === undefined) {
+      const num = parseInt(String(patchData.offers_received), 10);
+      row.selected_count = isNaN(num) ? 0 : Math.min(50, Math.max(0, num));
+    }
 
     row.last_status_updated_at = new Date();
     await row.save();

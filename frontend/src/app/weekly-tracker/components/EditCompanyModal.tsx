@@ -334,12 +334,29 @@ export function EditCompanyModal({
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mb-1">Offers / Selected</label>
+              <label className="block text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mb-1">Offers Received (0–50)</label>
               <input
                 type="number"
                 min="0"
+                max="50"
+                step="1"
                 value={selectedCount}
-                onChange={(e) => setSelectedCount(Number(e.target.value))}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === '') {
+                    setSelectedCount(0);
+                    return;
+                  }
+                  const num = parseInt(raw.replace(/[^0-9]/g, ''), 10);
+                  if (isNaN(num) || num < 0) setSelectedCount(0);
+                  else if (num > 50) setSelectedCount(50);
+                  else setSelectedCount(num);
+                }}
+                onKeyDown={(e) => {
+                  if (['-', '+', '.', 'e', 'E'].includes(e.key)) {
+                    e.preventDefault();
+                  }
+                }}
                 className="w-full bg-surface border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 rounded-lg px-2 py-1.5 text-xs text-center outline-none font-mono font-bold"
               />
             </div>

@@ -366,12 +366,30 @@ function TableRow({
             <input
               type="number"
               min="0"
+              max="50"
+              step="1"
               value={tempValue}
-              onChange={(e) => setTempValue(Number(e.target.value))}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === '') {
+                  setTempValue(0);
+                  return;
+                }
+                const num = parseInt(raw.replace(/[^0-9]/g, ''), 10);
+                if (isNaN(num) || num < 0) setTempValue(0);
+                else if (num > 50) setTempValue(50);
+                else setTempValue(num);
+              }}
+              onKeyDown={(e) => {
+                if (['-', '+', '.', 'e', 'E'].includes(e.key)) {
+                  e.preventDefault();
+                } else {
+                  handleKeyDown(e, 'selected_count');
+                }
+              }}
               onBlur={() => commitEdit('selected_count')}
-              onKeyDown={(e) => handleKeyDown(e, 'selected_count')}
               autoFocus
-              className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg text-center w-16 outline-none shadow-xs"
+              className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg text-center w-16 outline-none shadow-xs font-mono font-bold"
             />
           ) : (
             <span

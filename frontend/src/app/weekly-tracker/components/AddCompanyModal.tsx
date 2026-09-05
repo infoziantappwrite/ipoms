@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, X, Building2, Briefcase, Layers, GraduationCap } from 'lucide-react';
+import { Plus, X, Building2, Briefcase, Layers, GraduationCap, Trophy } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
@@ -43,6 +43,7 @@ export function AddCompanyModal({
   const [ctcUnit, setCtcUnit] = useState<'LPA' | '/ Month'>('LPA');
   const [eligibleBatch, setEligibleBatch] = useState('2026');
   const [pipelineSection, setPipelineSection] = useState('completed');
+  const [offersReceived, setOffersReceived] = useState<string>('0');
   const [followUpDate, setFollowUpDate] = useState('');
   const [currentStatusText, setCurrentStatusText] = useState('Drive confirmed and scheduled');
   const [loading, setLoading] = useState(false);
@@ -89,6 +90,20 @@ export function AddCompanyModal({
       return;
     }
 
+    let finalOffersCount = 0;
+    if (pipelineSection === 'completed') {
+      if (offersReceived === '' || offersReceived === undefined || offersReceived === null) {
+        toast('Offers Received is mandatory for Completed companies.', 'warning');
+        return;
+      }
+      const num = parseInt(offersReceived, 10);
+      if (isNaN(num) || num < 0 || num > 50 || String(offersReceived).includes('.')) {
+        toast('Offers Received must be a whole number between 0 and 50.', 'warning');
+        return;
+      }
+      finalOffersCount = num;
+    }
+
     const formattedCtc = ctcValue.includes('LPA') || ctcValue.toLowerCase().includes('month')
       ? ctcValue.trim()
       : `${ctcValue.trim()} ${ctcUnit}`;
@@ -109,6 +124,8 @@ export function AddCompanyModal({
           pipeline_section: pipelineSection,
           current_status_text: currentStatusText.trim(),
           follow_up_date: followUpDate || undefined,
+          selected_count: finalOffersCount,
+          offers_received: finalOffersCount,
         }),
       });
 
@@ -280,7 +297,7 @@ export function AddCompanyModal({
             </div>
           </div>
 
-          <div className={`grid gap-3.5 ${pipelineSection === 'in_progress' || pipelineSection === 'pipeline' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+          <div className={`grid gap-3.5 ${pipelineSection === 'completed' || pipelineSection === 'in_progress' || pipelineSection === 'pipeline' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
             {/* Eligible Batch (Year Dropdown) */}
             <div>
               <label className="block text-fg font-semibold mb-1.5">Eligible Batch (Year)</label>
@@ -295,6 +312,71 @@ export function AddCompanyModal({
                 }))}
               />
             </div>
+
+            {/* Offers Received (Visible only when Target Section is Companies Completed) */}
+            {pipelineSection === 'completed' && (
+              <div className="animate-fadeIn">
+                <label className="block text-fg font-semibold mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Trophy size={13} className="text-emerald-600 dark:text-emerald-400" />
+                    Offers Received <span className="text-rose-500">*</span>
+                  </span>
+                  <span className="text-[11px] font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-300 dark:border-emerald-800 font-bold shadow-2xs">
+                    0 – 50 only
+                  </span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max="50"
+                    step="1"
+                    required
+                    value={offersReceived}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === '') {
+                        setOffersReceived('');
+                        return;
+                      }
+                      // Allow only non-negative digits
+                      const clean = raw.replace(/[^0-9]/g, '');
+                      if (clean === '') {
+                        setOffersReceived('');
+                        return;
+                      }
+                      const num = parseInt(clean, 10);
+                      if (isNaN(num)) return;
+                      if (num < 0) {
+                        setOffersReceived('0');
+                      } else if (num > 50) {
+                        setOffersReceived('50');
+                        toast('Offers received cannot exceed 50.', 'warning');
+                      } else {
+                        setOffersReceived(String(num));
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      // Block negative, decimal, plus, e/E
+                      if (['-', '+', '.', 'e', 'E'].includes(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
+                    onBlur={() => {
+                      if (offersReceived === '' || isNaN(parseInt(offersReceived, 10))) {
+                        setOffersReceived('0');
+                      } else {
+                        const num = parseInt(offersReceived, 10);
+                        if (num < 0) setOffersReceived('0');
+                        else if (num > 50) setOffersReceived('50');
+                      }
+                    }}
+                    placeholder="e.g. 12 (Max 50)"
+                    className="w-full bg-surface-sunken border border-border focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl px-3.5 py-2.5 text-fg font-bold text-xs transition-all outline-none font-mono"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Follow-up Date */}
             {(pipelineSection === 'in_progress' || pipelineSection === 'pipeline') && (
