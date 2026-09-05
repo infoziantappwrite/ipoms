@@ -10,16 +10,7 @@ import { WeeklyRow } from './WeeklyTable';
 
 const BATCH_YEARS = ['2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
 
-const COMPANY_TYPES = [
-  'Software / IT',
-  'Software / Product',
-  'Core / Engineering',
-  'Banking / Finance',
-  'Healthcare / Pharma',
-  'EdTech / Education',
-  'Consulting',
-  'BPO / KPO',
-];
+import { COMPANY_TYPES } from '../constants/companyTypes';
 
 const SECTIONS = [
   { value: 'completed', label: '1. Companies Completed' },
@@ -47,7 +38,7 @@ export function EditCompanyModal({
 }: Props) {
   const [companyName, setCompanyName] = useState(row.company_name || '');
   const [jobRole, setJobRole] = useState(row.job_role || '');
-  const [companyType, setCompanyType] = useState(row.company_type || 'Software / IT');
+  const [companyType, setCompanyType] = useState(row.company_type || 'IT / Software & Technology');
   const [ctcValue, setCtcValue] = useState(() => {
     if (!row.ctc_lpa) return '';
     return row.ctc_lpa.replace(/LPA|\/ Month/gi, '').trim();

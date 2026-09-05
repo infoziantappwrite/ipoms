@@ -70,27 +70,6 @@ const SystemSettingsSchema = new mongoose_1.Schema({
         default: '+91 98401 23456',
         trim: true,
     },
-    theme_default: {
-        type: String,
-        enum: ['dark', 'light', 'system'],
-        default: 'dark',
-    },
-    default_landing_page: {
-        type: String,
-        default: '/dashboard',
-    },
-    enable_email_notifications: {
-        type: Boolean,
-        default: true,
-    },
-    enable_system_notifications: {
-        type: Boolean,
-        default: true,
-    },
-    enable_dashboard_popups: {
-        type: Boolean,
-        default: true,
-    },
     // ── Maintenance Mode (Module 10 §8) ──────────────────────────────────
     // Administrator only stayed excluded on purpose: it must always be
     // possible to log in as Administrator and switch this back off, even if

@@ -44,7 +44,11 @@ export default function WeeklyTrackerPage() {
   const [selectedCollegeName, setSelectedCollegeName] = useState<string>(() => {
     return getActiveCollege().name || '';
   });
-  const [academicYear, setAcademicYear] = useState<string>('2027');
+  // 'all' - there is no working year selector in the UI (onAcademicYearChange is
+  // never actually wired to a control), so a hardcoded year here silently filters
+  // out real data forever whenever the current season's number doesn't match it.
+  // 'all' means "don't filter", matching what the backend now does honestly.
+  const [academicYear, setAcademicYear] = useState<string>('all');
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [sections, setSections] = useState<SectionsResponse | null>(null);
   const [kpi, setKpi] = useState<WeeklyKpiData | null>(null);

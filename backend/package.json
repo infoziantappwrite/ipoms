@@ -11,7 +11,9 @@
     "seed:admin": "ts-node src/scripts/seedRolesAndAdmin.ts",
     "unlock": "ts-node src/scripts/unlockUser.ts",
     "verify:policy": "ts-node src/scripts/verifyRoutePolicy.ts",
-    "fix:roles": "ts-node src/scripts/fixRoleCodes.ts"
+    "fix:roles": "ts-node src/scripts/fixRoleCodes.ts",
+    "seed:nehru": "ts-node src/scripts/runWeeklySnapshot.ts nehru",
+    "seed:hits": "ts-node src/scripts/runWeeklySnapshot.ts hits"
   },
   "keywords": [
     "ipoms",
@@ -31,6 +33,7 @@
     "dotenv": "^16.4.5",
     "exceljs": "^4.4.0",
     "express": "^4.19.2",
+    "express-rate-limit": "^8.7.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.5.2",

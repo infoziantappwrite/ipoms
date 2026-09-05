@@ -245,7 +245,7 @@ export default function LoadContactsPage() {
                   <span>Load Today's Contacts</span>
                 </h1>
                 <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full font-bold">
-                  {isRecent ? 'Recent Data (S.No 3548+)' : 'Master Database Picker'}
+                  {isRecent ? 'Recent Data (Last 100)' : 'Master Database Picker'}
                 </span>
               </div>
             </div>
@@ -306,7 +306,7 @@ export default function LoadContactsPage() {
               <SnoRangeSelector
                 fromSno={fromSno}
                 toSno={toSno}
-                minSno={isRecent ? 3548 : 1}
+                minSno={isRecent ? Math.max(1, masterTotal - 99) : 1}
                 maxSno={masterTotal}
                 onApplyRange={(f, t) => {
                   setFromSno(f);

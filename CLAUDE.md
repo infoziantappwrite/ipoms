@@ -561,6 +561,67 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     `GradientWaves` WebGL component now imports it, added by someone else's concurrent commit
     mid-session; re-checked before touching anything and left it alone.
 
+29. ~~**Every server restart (and every backend file save) wiped the Nehru and HITS weekly
+    tracker rows.**~~ **FIXED 4 Sep 2026 — a regression of trap 10, reintroduced by new code.**
+    `startServer()` called `updateNehruWeeklyTracker()` and `updateHitsWeeklyTracker()`
+    unconditionally, positioned immediately *below* the `SEED_ON_BOOT` block — visually next to
+    the guard but outside it. Despite their names both are wipe-and-rebuild: each runs
+    `WeeklyTracker.deleteMany({college_id: ...})` for its college, then re-inserts a hardcoded
+    snapshot transcribed from screenshots (65 rows HITS, 54 Nehru). Because the snapshot is
+    deterministic the screen always looked correct afterwards — what vanished was the *drift*:
+    every status, follow-up date and note entered since the snapshot was written. Verified live:
+    a restart removed 50 Nehru + 61 HITS rows and wrote back 54 + 65, so live data had genuinely
+    diverged and that divergence was lost (no backup existed; unrecoverable). Amplified by
+    `"dev": "ts-node-dev --respawn"` — this fired on *every backend file save*, not just restarts.
+    Fix: both calls moved inside `if (SEED_ON_BOOT)`, and a deliberate runner added —
+    `npm run seed:nehru` / `npm run seed:hits` (`scripts/runWeeklySnapshot.ts`), **dry-run by
+    default**, reporting how many rows would be deleted and requiring `--apply` to act, matching
+    the `fix:roles` convention. Verified: `tsc --noEmit` clean; dry run reports 61 at-risk rows
+    and changes nothing; a full boot leaves counts identical (61/50/869 before and after) and logs
+    only "Boot seeding skipped". **The lesson trap 10 already recorded still stands and was
+    re-learned the hard way: application startup must never mutate business data. Boot runs on
+    every crash-restart, deploy, autoscale event and file save. One-off data loaders belong in
+    `package.json` as explicit commands, never in `startServer()`.**
+
+30. ~~**Weekly Tracker's `academic_year` filter could never actually filter — and the
+    response mislabeled unfiltered data as whatever year was requested.**~~ **FIXED
+    4 Sep 2026.** Two independent bugs compounded: (a) the frontend's `academicYear`
+    state was frozen at `'2027'` — `onAcademicYearChange` was accepted as a prop by
+    `WeeklyHeader.tsx` but never actually wired to any control, so every request from
+    every user, forever, sent `academic_year=2027`; (b) `GET /weekly-tracker`,
+    `/weekly-tracker/kpi`, and `/weekly-tracker/export-xlsx` each silently discarded
+    the filter whenever it matched zero rows (`if (rows.length === 0 && filter.academic_year)`
+    → re-query without it) and then **echoed the requested year back anyway** — so a
+    live session requesting `academic_year=2027` was served all 968 rows, every one of
+    them genuinely `academic_year: 2026`, with the response itself claiming `"academic_year":
+    2027`. Caught live: a real frontend session was doing exactly this mid-audit. Fixed by
+    removing all three silent fallbacks (an empty result is now a real empty result) and
+    replacing two hardcoded `|| 2027` echoes with `'all'`/`'All Years'` — the response never
+    invents a year again. `sync-daily-positives`'s creation-time default also moved from
+    `2027` to `2026` so newly-synced rows stay consistent with the other 969. Frontend default
+    changed to `'all'` rather than hardcoding `'2026'` — since there is still no working year
+    picker, a hardcoded year would just recreate this bug the next season. Verified live via
+    both curl and a real browser session: unfiltered → `academic_year: "all"`, 968 rows;
+    `academic_year=2026` → same 968, honestly filtered; `academic_year=2027` → genuinely `0`,
+    not a silent full dataset; browser header updated from the old frozen "2027 Season" to
+    the correct **"2026 Season"**. `tsc --noEmit` clean both sides.
+31. ~~**Manually adding a company to Weekly Tracker that wasn't in Metadata created a
+    dangling `company_id` pointing at nothing.**~~ **FIXED 4 Sep 2026 (user decision:
+    Option A — refuse rather than save with a broken link).** `POST /weekly-tracker`'s
+    metadata-resolution step correctly never auto-created a metadata record (per the
+    "only Daily Tracker / Metadata module may add contacts" rule), but its fallback when
+    no match was found was `resolvedCompanyId = new Types.ObjectId()` — a freshly minted,
+    random ID saved onto the new WeeklyTracker row with **no document behind it at all**,
+    in either collection. Unlike the 192 tagged placeholders created by the 2027 batch
+    import (`METADATA_TAG`), this orphan had nothing to find it by. Now refuses with
+    `400 COMPANY_NOT_IN_METADATA` before creating anything, same shape as the existing
+    mandatory-field check in the same handler. Removed the now-dead `is_in_metadata: false`
+    success branch in both the backend response and `AddCompanyModal.tsx` (a success
+    response can no longer carry `is_in_metadata: false` — the only false path returns
+    early). Verified live: an unknown company → `400`, no row written; a real metadata
+    company → `201` as before. `tsc --noEmit` clean both sides.
+
+## 6. Module map
 ## 6. Module map
 
 Data flow: `company_metadata → assigned_work → daily_tracker → weekly_tracker → daily_leads → reports/dashboards`

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { FolderOpen, Pencil } from 'lucide-react';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { MoveSectionDropdown } from './MoveSectionDropdown';
+import { CompanyTypeDropdown } from './CompanyTypeDropdown';
 
 export interface WeeklyRow {
   _id: string;
@@ -95,6 +96,9 @@ export function WeeklyTable({
               <span title="Free-text notes only — to move a company between Pipeline / In Progress / Completed etc., use Edit instead.">
                 Status <span className="text-rose-500 font-bold">*</span>
               </span>
+            </th>
+            <th className="py-2.5 px-3 min-w-[190px]">
+              Company Type
             </th>
             {hasFollowUpColumn && (
               <th className="py-2.5 px-3 min-w-[140px] text-center">Follow Up</th>
@@ -308,6 +312,14 @@ function TableRow({
             {row.current_status_text || <span className="text-fg-disabled italic">—</span>}
           </span>
         )}
+      </td>
+
+      {/* 5b. Company Type */}
+      <td className="py-2.5 px-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+        <CompanyTypeDropdown
+          value={row.company_type}
+          onChange={(newType) => onUpdateRow(row._id, { company_type: newType })}
+        />
       </td>
 
       {/* Follow Up Date Picker (Smooth application-themed calendar across all sections) */}

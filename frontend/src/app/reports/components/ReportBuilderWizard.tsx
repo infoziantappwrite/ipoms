@@ -23,16 +23,63 @@ import {
   Award,
   Trophy,
   Flame,
+  Rocket,
   Zap,
   Check,
   Columns3,
   UserCheck,
+  Highlighter,
+  Palette,
+  Search,
+  Filter,
+  SlidersHorizontal,
+  X,
+  ArrowUpDown,
+  RotateCcw,
+  Star,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
 import { getCachedColleges, fetchAllCollegesCached, sortCollegesWithPriority, getCoordinatorSelectedColleges } from '@/lib/collegeSession';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
 import { DateRangeCalendar, formatPeriodFromDates } from './DateRangeCalendar';
+
+export function extractCtcNumbers(ctcStr: string | undefined | null): number[] {
+  if (!ctcStr) return [];
+  const clean = String(ctcStr).replace(/,/g, '');
+  const matches = clean.match(/\d+(?:\.\d+)?/g);
+  if (!matches) return [];
+  return matches.map(Number).filter((n) => !isNaN(n) && n > 0 && n < 250);
+}
+
+export function matchesMinCtc(
+  ctcStr: string | undefined | null,
+  minCtc: number | null | undefined,
+  includeCompetitive: boolean = false
+): boolean {
+  if (minCtc === null || minCtc === undefined || minCtc <= 0) return true;
+  const numbers = extractCtcNumbers(ctcStr);
+  if (numbers.length === 0) return includeCompetitive;
+  return Math.max(...numbers) >= minCtc;
+}
+
+export function getCtcBadgeColor(ctcStr: string | undefined | null): string {
+  const numbers = extractCtcNumbers(ctcStr);
+  if (numbers.length === 0) {
+    return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700';
+  }
+  const maxVal = Math.max(...numbers);
+  if (maxVal >= 10) {
+    return 'bg-purple-100 dark:bg-purple-950/70 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-800';
+  }
+  if (maxVal >= 6) {
+    return 'bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800';
+  }
+  if (maxVal >= 4) {
+    return 'bg-blue-100 dark:bg-blue-950/70 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-800';
+  }
+  return 'bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800';
+}
 
 interface College {
   _id: string;
@@ -41,14 +88,15 @@ interface College {
 }
 
 const WEEKLY_KPIS = [
-  { key: 'total_calls', label: 'Calls', desc: 'Total Calls Made' },
+  { key: 'total_calls', label: 'Total Calls Made', desc: 'Total Calls Made' },
   { key: 'positive_responses', label: 'Positives', desc: 'Positive Responses' },
-  { key: 'jds_received', label: 'JDs Received', desc: 'JDs Received' },
-  { key: 'drives_completed', label: 'Completed', desc: 'Drives Completed' },
-  { key: 'drives_in_progress', label: 'In Progress', desc: 'Drives Underway' },
-  { key: 'pipeline_leads', label: 'Pipeline', desc: 'Pipeline Leads' },
-  { key: 'top_companies_count', label: 'Top Companies', desc: 'Target Tier 1' },
-  { key: 'total_offers', label: 'Offers', desc: 'Confirmed Selects' },
+  { key: 'not_hiring', label: 'Not Hiring', desc: 'Not Hiring Responses' },
+  { key: 'jds_received', label: 'JD Received', desc: 'JD Received' },
+];
+
+const ACTIVE_17_COLLEGE_CODES = [
+  'KLU', 'PSNA', 'KIOT', 'DSU', 'SMVEC', 'AIHT', 'ACET', 'NEHRU',
+  'HITS', 'MAR', 'ACEW', 'NGC', 'NGCE', 'NGP', 'KAMARAJ', 'NPR', 'MCET', 'MEC'
 ];
 
 const ACTIVE_LEADS_KPIS = [
@@ -85,6 +133,15 @@ const MONTH_END_KPIS = [
   { key: 'total_offers_moved', label: 'Offers Received', desc: 'Total Offers Received' },
 ];
 
+const HIGHLIGHT_PALETTES = [
+  { label: 'Fluorescent Yellow', color: '#fef08a', border: '#fde047', badge: 'Yellow' },
+  { label: 'Warm Amber', color: '#fed7aa', border: '#fdba74', badge: 'Amber' },
+  { label: 'Soft Coral', color: '#fecdd3', border: '#fda4af', badge: 'Rose' },
+  { label: 'Ice Sky', color: '#bae6fd', border: '#7dd3fc', badge: 'Sky' },
+  { label: 'Mint Green', color: '#bbf7d0', border: '#86efac', badge: 'Green' },
+  { label: 'Lavender', color: '#e9d5ff', border: '#d8b4fe', badge: 'Purple' },
+];
+
 interface Props {
   initialTemplateType: string;
   initialCollegeId: string;
@@ -103,6 +160,9 @@ export function ReportBuilderWizard({
     initialCollegeId && initialCollegeId !== 'all' ? initialCollegeId : ''
   );
   const [academicYear, setAcademicYear] = useState('all');
+  const [weeklyTargetMode, setWeeklyTargetMode] = useState<'single' | 'group'>('single');
+  const [selectedGroupCollegeIds, setSelectedGroupCollegeIds] = useState<string[]>([]);
+  const [groupSearchQuery, setGroupSearchQuery] = useState<string>('');
 
   // Active Leads Stream Filter Selection (JD Received, Positives, Weekly Tracker)
   const [activeLeadStreams, setActiveLeadStreams] = useState<{
@@ -131,6 +191,13 @@ export function ReportBuilderWizard({
   const [preparedByName, setPreparedByName] = useState<string>(() => {
     return readSessionUser()?.full_name || 'Placement Coordinator';
   });
+
+  // Pending Tasks State for row highlighting during report creation
+  const [pendingTasksList, setPendingTasksList] = useState<any[]>([]);
+  const [loadingPendingTasks, setLoadingPendingTasks] = useState<boolean>(false);
+  const [highlightedTaskIds, setHighlightedTaskIds] = useState<Set<string>>(new Set());
+  const [highlightColor, setHighlightColor] = useState<string>('#fef08a'); // Fluorescent Yellow
+  const [highlightColorMap, setHighlightColorMap] = useState<Record<string, string>>({});
 
   // Selected Month for Month-End reports
   const [selectedMonth, setSelectedMonth] = useState('2026-08');
@@ -177,6 +244,7 @@ export function ReportBuilderWizard({
     } else {
       s.kpi_summary = true;
       s.completed_companies = true;
+      s.companies_in_drive = true;
       s.in_progress = true;
       s.pipeline = true;
       s.top_companies = true;
@@ -192,12 +260,8 @@ export function ReportBuilderWizard({
   const [kpiCards, setKpiCards] = useState<Record<string, boolean>>({
     total_calls: true,
     positive_responses: true,
+    not_hiring: true,
     jds_received: true,
-    drives_completed: true,
-    drives_in_progress: true,
-    pipeline_leads: true,
-    top_companies_count: true,
-    total_offers: true,
     total_leads: true,
     graduating_year: true,
     active_companies_count: true,
@@ -233,6 +297,16 @@ export function ReportBuilderWizard({
   });
   const [loadingWeekly, setLoadingWeekly] = useState(false);
 
+  // ── Weekly Tracker Filters & Preview State ──
+  const [weeklyMinCtc, setWeeklyMinCtc] = useState<number | null>(null);
+  const [weeklyCustomCtcInput, setWeeklyCustomCtcInput] = useState<string>('');
+  const [weeklyIncludeCompetitive, setWeeklyIncludeCompetitive] = useState<boolean>(false);
+  const [weeklyCompanySearch, setWeeklyCompanySearch] = useState<string>('');
+  const [weeklyCompanyType, setWeeklyCompanyType] = useState<string>('all');
+  const [weeklyStatusFilter, setWeeklyStatusFilter] = useState<string>('all');
+  const [weeklyActivePreviewTab, setWeeklyActivePreviewTab] = useState<string>('all');
+  const [weeklyExcludedIds, setWeeklyExcludedIds] = useState<Set<string>>(new Set());
+
   // Sync colleges on mount
   useEffect(() => {
     let isMounted = true;
@@ -260,9 +334,26 @@ export function ReportBuilderWizard({
     return sortCollegesWithPriority(colleges as any[], activeFocusIds);
   }, [colleges]);
 
+  const filteredGroupColleges = useMemo(() => {
+    if (!groupSearchQuery.trim()) return prioritizedColleges;
+    const q = groupSearchQuery.toLowerCase().trim();
+    return prioritizedColleges.filter((c: any) =>
+      (c.college_name || '').toLowerCase().includes(q) ||
+      (c.college_code || '').toLowerCase().includes(q) ||
+      (c.location || '').toLowerCase().includes(q)
+    );
+  }, [prioritizedColleges, groupSearchQuery]);
+
   // Fetch live Weekly Tracker companies for the selected college and batch
   useEffect(() => {
-    if (!collegeId || collegeId === 'all' || templateType === 'active_leads') {
+    const targetIds =
+      weeklyTargetMode === 'group'
+        ? selectedGroupCollegeIds.filter(Boolean)
+        : collegeId && collegeId !== 'all'
+        ? [collegeId]
+        : [];
+
+    if (targetIds.length === 0 || templateType === 'active_leads') {
       setWeeklyCompanies({
         completed: [],
         in_drive: [],
@@ -281,29 +372,69 @@ export function ReportBuilderWizard({
       setLoadingWeekly(true);
       try {
         const params = new URLSearchParams();
-        params.set('college_id', collegeId);
+        params.set('college_id', targetIds.join(','));
         if (academicYear && academicYear !== 'all') {
           params.set('academic_year', academicYear);
         }
 
-        const res = await apiFetch(`/weekly-tracker?${params.toString()}`);
-        if (isMounted && res.success && Array.isArray(res.data)) {
-          const rows = res.data;
+        let res = await apiFetch(`/weekly-tracker?${params.toString()}`);
+
+        // Fallback: If 0 records returned for a specific academic year filter, fallback to all batches for this college
+        if (
+          isMounted &&
+          res.success &&
+          res.data &&
+          ((res.data.sections && Object.values(res.data.sections).every((s: any) => !s?.rows?.length)) ||
+            (Array.isArray(res.data) && res.data.length === 0)) &&
+          academicYear &&
+          academicYear !== 'all'
+        ) {
+          const fallbackParams = new URLSearchParams();
+          fallbackParams.set('college_id', targetIds.join(','));
+          res = await apiFetch(`/weekly-tracker?${fallbackParams.toString()}`);
+        }
+
+        if (isMounted && res.success && res.data) {
+          let completed: any[] = [];
+          let in_drive: any[] = [];
+          let in_progress: any[] = [];
+          let pipeline: any[] = [];
+          let top_companies: any[] = [];
+          let rejected_companies: any[] = [];
+          let on_hold_by_college: any[] = [];
+          let on_hold_by_hr: any[] = [];
+
+          if (res.data.sections) {
+            const sec = res.data.sections;
+            completed = sec.completed?.rows || [];
+            in_drive = sec.in_drive?.rows || sec.companies_in_drive?.rows || [];
+            in_progress = sec.in_progress?.rows || [];
+            pipeline = sec.pipeline?.rows || [];
+            top_companies = sec.top_companies?.rows || [];
+            rejected_companies = sec.rejected_companies?.rows || sec.rejected_by_hr?.rows || [];
+            on_hold_by_college = sec.on_hold_by_college?.rows || sec.rejected_by_college?.rows || [];
+            on_hold_by_hr = sec.on_hold_by_hr?.rows || [];
+          } else if (Array.isArray(res.data)) {
+            const rows = res.data;
+            completed = rows.filter((r: any) => r.pipeline_section === 'completed');
+            in_drive = rows.filter((r: any) => r.pipeline_section === 'in_drive' || r.pipeline_section === 'companies_in_drive');
+            in_progress = rows.filter((r: any) => r.pipeline_section === 'in_progress');
+            pipeline = rows.filter((r: any) => r.pipeline_section === 'pipeline');
+            top_companies = rows.filter((r: any) => r.pipeline_section === 'top_companies' || r.is_pinned_top);
+            rejected_companies = rows.filter((r: any) => r.pipeline_section === 'rejected_companies' || r.pipeline_section === 'rejected_by_hr');
+            on_hold_by_college = rows.filter((r: any) => r.pipeline_section === 'on_hold_by_college' || r.pipeline_section === 'rejected_by_college');
+            on_hold_by_hr = rows.filter((r: any) => r.pipeline_section === 'on_hold_by_hr');
+          }
+
           setWeeklyCompanies({
-            completed: rows.filter((r: any) => r.pipeline_section === 'completed'),
-            in_drive: rows.filter((r: any) => r.pipeline_section === 'in_drive' || r.pipeline_section === 'companies_in_drive'),
-            in_progress: rows.filter((r: any) => r.pipeline_section === 'in_progress'),
-            pipeline: rows.filter((r: any) => r.pipeline_section === 'pipeline'),
-            top_companies: rows.filter(
-              (r: any) => r.pipeline_section === 'top_companies' || r.is_pinned_top
-            ),
-            rejected_companies: rows.filter(
-              (r: any) => r.pipeline_section === 'rejected_companies' || r.pipeline_section === 'rejected_by_hr'
-            ),
-            on_hold_by_college: rows.filter(
-              (r: any) => r.pipeline_section === 'on_hold_by_college' || r.pipeline_section === 'rejected_by_college'
-            ),
-            on_hold_by_hr: rows.filter((r: any) => r.pipeline_section === 'on_hold_by_hr'),
+            completed,
+            in_drive,
+            in_progress,
+            pipeline,
+            top_companies,
+            rejected_companies,
+            on_hold_by_college,
+            on_hold_by_hr,
           });
         }
       } catch (err) {
@@ -316,7 +447,231 @@ export function ReportBuilderWizard({
     return () => {
       isMounted = false;
     };
-  }, [collegeId, academicYear, templateType]);
+  }, [collegeId, weeklyTargetMode, selectedGroupCollegeIds, academicYear, templateType]);
+
+  const selectedCollegeObj = useMemo(() => {
+    if (weeklyTargetMode === 'group') {
+      return {
+        college_name: `${selectedGroupCollegeIds.length} Selected Institutions`,
+        college_code: 'MULTI',
+      };
+    }
+    return (colleges as any[]).find((c) => String(c._id) === String(collegeId));
+  }, [colleges, collegeId, weeklyTargetMode, selectedGroupCollegeIds]);
+
+  // Dynamic CTC ranges calculation based on actual companies present in the selected college
+  const { availableCtcBrackets, unspecifiedCtcCount } = useMemo(() => {
+    const allRows = [
+      ...(weeklyCompanies.in_progress || []),
+      ...(weeklyCompanies.pipeline || []),
+      ...(weeklyCompanies.in_drive || []),
+      ...(weeklyCompanies.completed || []),
+      ...(weeklyCompanies.top_companies || []),
+      ...(weeklyCompanies.on_hold_by_college || []),
+      ...(weeklyCompanies.on_hold_by_hr || []),
+      ...(weeklyCompanies.rejected_companies || []),
+    ];
+
+    if (allRows.length === 0) {
+      return {
+        availableCtcBrackets: [{ label: 'All CTCs', value: null, count: 0 }],
+        unspecifiedCtcCount: 0,
+      };
+    }
+
+    let unspecCount = 0;
+    const distinctNumbers = new Set<number>();
+    allRows.forEach((r) => {
+      const nums = extractCtcNumbers(r.ctc_lpa || r.ctc);
+      if (nums.length === 0) {
+        unspecCount++;
+      } else {
+        nums.forEach((n) => {
+          if (n >= 1 && n <= 100) {
+            distinctNumbers.add(Math.round(n * 10) / 10);
+          }
+        });
+      }
+    });
+
+    const baselineThresholds = [3, 4, 5, 6, 8, 10, 12, 15];
+    const allThresholdCandidates = Array.from(
+      new Set([...baselineThresholds, ...Array.from(distinctNumbers)])
+    ).sort((a, b) => a - b);
+
+    const brackets = allThresholdCandidates
+      .map((thresh) => ({
+        value: thresh,
+        label: `≥ ${thresh} LPA`,
+        count: allRows.filter((r) => matchesMinCtc(r.ctc_lpa || r.ctc, thresh, false)).length,
+      }))
+      .filter((b) => b.count > 0);
+
+    return {
+      availableCtcBrackets: [
+        { label: 'All CTCs', value: null, count: allRows.length },
+        ...brackets,
+      ],
+      unspecifiedCtcCount: unspecCount,
+    };
+  }, [weeklyCompanies]);
+
+  // Memoized Filtered Weekly Tracker companies based on CTC and column filters
+  const filteredWeeklyCompanies = useMemo(() => {
+    const filterRow = (r: any) => {
+      // 1. Min CTC
+      if (!matchesMinCtc(r.ctc_lpa || r.ctc, weeklyMinCtc, weeklyIncludeCompetitive)) return false;
+      // 2. Company Name
+      if (weeklyCompanySearch.trim()) {
+        const q = weeklyCompanySearch.toLowerCase().trim();
+        if (!(r.company_name || '').toLowerCase().includes(q)) return false;
+      }
+      // 3. Company Type
+      if (weeklyCompanyType && weeklyCompanyType !== 'all') {
+        const t = (r.company_type || '').toLowerCase();
+        if (weeklyCompanyType === 'software' && !t.includes('soft') && !t.includes('it')) return false;
+        if (weeklyCompanyType === 'core' && !t.includes('core') && !t.includes('mech') && !t.includes('elec') && !t.includes('civil')) return false;
+        if (weeklyCompanyType === 'product' && !t.includes('prod')) return false;
+        if (weeklyCompanyType === 'banking' && !t.includes('bank') && !t.includes('fin')) return false;
+        if (weeklyCompanyType === 'consulting' && !t.includes('consult')) return false;
+      }
+      // 4. Status
+      if (weeklyStatusFilter && weeklyStatusFilter !== 'all') {
+        const s = weeklyStatusFilter.toLowerCase().trim();
+        const text = ((r.current_status_text || r.status || '') + ' ' + (r.remarks || '')).toLowerCase();
+        if (!text.includes(s)) return false;
+      }
+      return true;
+    };
+
+    return {
+      completed: (weeklyCompanies.completed || []).filter(filterRow),
+      in_drive: (weeklyCompanies.in_drive || []).filter(filterRow),
+      in_progress: (weeklyCompanies.in_progress || []).filter(filterRow),
+      pipeline: (weeklyCompanies.pipeline || []).filter(filterRow),
+      top_companies: (weeklyCompanies.top_companies || []).filter(filterRow),
+      rejected_companies: (weeklyCompanies.rejected_companies || []).filter(filterRow),
+      on_hold_by_college: (weeklyCompanies.on_hold_by_college || []).filter(filterRow),
+      on_hold_by_hr: (weeklyCompanies.on_hold_by_hr || []).filter(filterRow),
+    };
+  }, [
+    weeklyCompanies,
+    weeklyMinCtc,
+    weeklyIncludeCompetitive,
+    weeklyCompanySearch,
+    weeklyCompanyType,
+    weeklyStatusFilter,
+  ]);
+
+  const totalWeeklyRawCount = useMemo(() => {
+    return Object.values(weeklyCompanies).reduce(
+      (sum: number, arr: any) => sum + (Array.isArray(arr) ? arr.length : 0),
+      0
+    );
+  }, [weeklyCompanies]);
+
+  const totalWeeklyFilteredCount = useMemo(() => {
+    return Object.values(filteredWeeklyCompanies).reduce((sum: number, arr: any) => {
+      const activeRows = Array.isArray(arr)
+        ? arr.filter(
+            (r: any) =>
+              !weeklyExcludedIds.has(String(r._id || r.company_id || r.company_name))
+          )
+        : [];
+      return sum + activeRows.length;
+    }, 0);
+  }, [filteredWeeklyCompanies, weeklyExcludedIds]);
+
+  const previewRows = useMemo(() => {
+    if (weeklyActivePreviewTab === 'in_progress')
+      return filteredWeeklyCompanies.in_progress.map((r) => ({ ...r, _sectionKey: 'in_progress', _sectionLabel: 'In Progress' }));
+    if (weeklyActivePreviewTab === 'pipeline')
+      return filteredWeeklyCompanies.pipeline.map((r) => ({ ...r, _sectionKey: 'pipeline', _sectionLabel: 'In Pipeline' }));
+    if (weeklyActivePreviewTab === 'in_drive')
+      return filteredWeeklyCompanies.in_drive.map((r) => ({ ...r, _sectionKey: 'in_drive', _sectionLabel: 'In Drive' }));
+    if (weeklyActivePreviewTab === 'completed')
+      return filteredWeeklyCompanies.completed.map((r) => ({ ...r, _sectionKey: 'completed', _sectionLabel: 'Completed' }));
+    if (weeklyActivePreviewTab === 'top_companies')
+      return filteredWeeklyCompanies.top_companies.map((r) => ({ ...r, _sectionKey: 'top_companies', _sectionLabel: 'Top Company' }));
+    if (weeklyActivePreviewTab === 'on_hold') {
+      return [
+        ...filteredWeeklyCompanies.on_hold_by_college.map((r) => ({ ...r, _sectionKey: 'on_hold_by_college', _sectionLabel: 'On Hold (College)' })),
+        ...filteredWeeklyCompanies.on_hold_by_hr.map((r) => ({ ...r, _sectionKey: 'on_hold_by_hr', _sectionLabel: 'On Hold (HR)' })),
+      ];
+    }
+    if (weeklyActivePreviewTab === 'rejected') {
+      return filteredWeeklyCompanies.rejected_companies.map((r) => ({ ...r, _sectionKey: 'rejected_companies', _sectionLabel: 'Rejected' }));
+    }
+    // 'all'
+    return [
+      ...filteredWeeklyCompanies.in_progress.map((r) => ({ ...r, _sectionKey: 'in_progress', _sectionLabel: 'In Progress' })),
+      ...filteredWeeklyCompanies.pipeline.map((r) => ({ ...r, _sectionKey: 'pipeline', _sectionLabel: 'In Pipeline' })),
+      ...filteredWeeklyCompanies.in_drive.map((r) => ({ ...r, _sectionKey: 'in_drive', _sectionLabel: 'In Drive' })),
+      ...filteredWeeklyCompanies.completed.map((r) => ({ ...r, _sectionKey: 'completed', _sectionLabel: 'Completed' })),
+      ...filteredWeeklyCompanies.top_companies.map((r) => ({ ...r, _sectionKey: 'top_companies', _sectionLabel: 'Top Company' })),
+      ...filteredWeeklyCompanies.on_hold_by_college.map((r) => ({ ...r, _sectionKey: 'on_hold_by_college', _sectionLabel: 'On Hold (College)' })),
+      ...filteredWeeklyCompanies.on_hold_by_hr.map((r) => ({ ...r, _sectionKey: 'on_hold_by_hr', _sectionLabel: 'On Hold (HR)' })),
+      ...filteredWeeklyCompanies.rejected_companies.map((r) => ({ ...r, _sectionKey: 'rejected_companies', _sectionLabel: 'Rejected' })),
+    ];
+  }, [weeklyActivePreviewTab, filteredWeeklyCompanies]);
+
+  const tabCounts = useMemo(() => {
+    const countActive = (arr: any[]) =>
+      (arr || []).filter(
+        (r: any) => !weeklyExcludedIds.has(String(r._id || r.company_id || r.company_name))
+      ).length;
+    return {
+      all: totalWeeklyFilteredCount,
+      in_progress: countActive(filteredWeeklyCompanies.in_progress),
+      pipeline: countActive(filteredWeeklyCompanies.pipeline),
+      in_drive: countActive(filteredWeeklyCompanies.in_drive),
+      completed: countActive(filteredWeeklyCompanies.completed),
+      top_companies: countActive(filteredWeeklyCompanies.top_companies),
+      on_hold:
+        countActive(filteredWeeklyCompanies.on_hold_by_college) +
+        countActive(filteredWeeklyCompanies.on_hold_by_hr),
+      rejected: countActive(filteredWeeklyCompanies.rejected_companies),
+    };
+  }, [filteredWeeklyCompanies, weeklyExcludedIds, totalWeeklyFilteredCount]);
+
+  const handleToggleExcludeCompany = (id: string) => {
+    setWeeklyExcludedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAllPreview = () => {
+    setWeeklyExcludedIds((prev) => {
+      const next = new Set(prev);
+      previewRows.forEach((r: any) => {
+        next.delete(String(r._id || r.company_id || r.company_name));
+      });
+      return next;
+    });
+  };
+
+  const handleDeselectAllPreview = () => {
+    setWeeklyExcludedIds((prev) => {
+      const next = new Set(prev);
+      previewRows.forEach((r: any) => {
+        next.add(String(r._id || r.company_id || r.company_name));
+      });
+      return next;
+    });
+  };
+
+  const handleResetWeeklyFilters = () => {
+    setWeeklyMinCtc(null);
+    setWeeklyCustomCtcInput('');
+    setWeeklyIncludeCompetitive(false);
+    setWeeklyCompanySearch('');
+    setWeeklyCompanyType('all');
+    setWeeklyStatusFilter('all');
+    setWeeklyExcludedIds(new Set());
+  };
 
   // Sync state when returning from editor via initialTemplateType / initialCollegeId props
   useEffect(() => {
@@ -367,6 +722,86 @@ export function ReportBuilderWizard({
     }
   }, [initialTemplateType, initialCollegeId]);
 
+  // ── Auto-load Pending Tasks when template is pending_tasks and college is selected ──
+  useEffect(() => {
+    if (templateType !== 'pending_tasks') return;
+    if (!collegeId || collegeId === 'all') {
+      setPendingTasksList([]);
+      return;
+    }
+    let isSubscribed = true;
+    setLoadingPendingTasks(true);
+    apiFetch(`/pending-tasks?college_id=${collegeId}`)
+      .then((res) => {
+        if (!isSubscribed) return;
+        if (res.success && res.data) {
+          const list = (res.data as any).tasks || [];
+          setPendingTasksList(list);
+        }
+      })
+      .catch((err) => console.error('[ReportBuilder] Failed to load pending tasks:', err))
+      .finally(() => {
+        if (isSubscribed) setLoadingPendingTasks(false);
+      });
+    return () => {
+      isSubscribed = false;
+    };
+  }, [templateType, collegeId]);
+
+  const handleToggleRowHighlight = (taskId: string) => {
+    const nextSet = new Set(highlightedTaskIds);
+    const nextMap = { ...highlightColorMap };
+    if (nextSet.has(taskId)) {
+      nextSet.delete(taskId);
+      delete nextMap[taskId];
+    } else {
+      nextSet.add(taskId);
+      nextMap[taskId] = highlightColor;
+    }
+    setHighlightedTaskIds(nextSet);
+    setHighlightColorMap(nextMap);
+  };
+
+  const handleAutoHighlightCollegePending = () => {
+    const nextSet = new Set(highlightedTaskIds);
+    const nextMap = { ...highlightColorMap };
+    pendingTasksList.forEach((t) => {
+      const status = (t.current_status || '').toLowerCase();
+      const action = (t.action_to_be_taken || '').toLowerCase();
+      const remarks = (t.remarks || '').toLowerCase();
+      const isPending =
+        status.includes('pending') ||
+        status.includes('db pending') ||
+        status.includes('database pending') ||
+        action.includes('yet to be share') ||
+        action.includes('db yet') ||
+        action.includes('pending') ||
+        remarks.includes('pending');
+      if (isPending) {
+        nextSet.add(t._id);
+        nextMap[t._id] = highlightColor;
+      }
+    });
+    setHighlightedTaskIds(nextSet);
+    setHighlightColorMap(nextMap);
+  };
+
+  const handleClearAllHighlights = () => {
+    setHighlightedTaskIds(new Set());
+    setHighlightColorMap({});
+  };
+
+  const handleHighlightAllTasks = () => {
+    const nextSet = new Set<string>();
+    const nextMap: Record<string, string> = {};
+    pendingTasksList.forEach((t) => {
+      nextSet.add(t._id);
+      nextMap[t._id] = highlightColor;
+    });
+    setHighlightedTaskIds(nextSet);
+    setHighlightColorMap(nextMap);
+  };
+
   const handleCategoryChange = (newType: string) => {
     setTemplateType(newType);
     setValidationErrors([]);
@@ -402,10 +837,13 @@ export function ReportBuilderWizard({
       setSections({
         kpi_summary: true,
         completed_companies: true,
+        companies_in_drive: true,
         in_progress: true,
         pipeline: true,
         top_companies: true,
-        rejected_by_college: true,
+        rejected_companies: true,
+        on_hold_by_college: true,
+        on_hold_by_hr: true,
         remarks: true,
       });
       setCustomRemarks('All campus drives are progressing actively as per schedule. Follow-ups with upcoming tech partners remain on track.');
@@ -417,7 +855,17 @@ export function ReportBuilderWizard({
     const errors: string[] = [];
 
     // 1. Mandatory Target College (For Weekly Placement, Month-End, and Pending Tasks)
-    if (templateType === 'weekly_placement' || templateType === 'pending_tasks' || templateType === 'month_end') {
+    if (templateType === 'weekly_placement') {
+      if (weeklyTargetMode === 'group') {
+        if (selectedGroupCollegeIds.length === 0) {
+          errors.push('Please select at least one college for the multi-college weekly report.');
+        }
+      } else {
+        if (!collegeId || collegeId.trim() === '' || collegeId === 'all') {
+          errors.push('Target Institution is required. Please pick a college to generate the report.');
+        }
+      }
+    } else if (templateType === 'pending_tasks' || templateType === 'month_end') {
       if (!collegeId || collegeId.trim() === '' || collegeId === 'all') {
         errors.push('Target Institution is required. Please pick a college to generate the report.');
       }
@@ -437,22 +885,13 @@ export function ReportBuilderWizard({
       }
     }
 
-    // 3. Mandatory Date Range with minimum 5 days verification for weekly placement
+    // 3. Date Range verification for weekly placement (Optional for both single and multi-college)
     if (templateType === 'weekly_placement') {
-      if (!startDate || !endDate) {
-        errors.push('Both "From" and "To" dates are required for the Report Period.');
-      } else {
+      if (startDate && endDate) {
         const s = new Date(startDate + 'T00:00:00');
         const e = new Date(endDate + 'T00:00:00');
         if (s > e) {
           errors.push('The "From" start date cannot be after the "To" end date.');
-        } else {
-          const diffDays = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-          if (diffDays < 5) {
-            errors.push(
-              `Weekly Report date range must span a minimum of 5 days (currently ${diffDays} day${diffDays === 1 ? '' : 's'}).`
-            );
-          }
         }
       }
     }
@@ -464,19 +903,50 @@ export function ReportBuilderWizard({
 
     setLoading(true);
     try {
+      const isMultiWeekly = templateType === 'weekly_placement' && weeklyTargetMode === 'group';
+      const effectiveWeekLabel = (!startDate || !endDate)
+        ? (weekLabel && !weekLabel.toLowerCase().includes('select') ? weekLabel : 'All Dates (Cumulative)')
+        : (weekLabel || 'All Dates (Cumulative)');
+      // Build custom weekly companies filtered payload if weekly_placement template
+      let customWeeklyCompaniesPayload: any = undefined;
+      if (templateType === 'weekly_placement') {
+        const filterExcluded = (arr: any[]) =>
+          (arr || []).filter(
+            (r: any) => !weeklyExcludedIds.has(String(r._id || r.company_id || r.company_name))
+          );
+        customWeeklyCompaniesPayload = {
+          completed: filterExcluded(filteredWeeklyCompanies.completed),
+          in_drive: filterExcluded(filteredWeeklyCompanies.in_drive),
+          in_progress: filterExcluded(filteredWeeklyCompanies.in_progress),
+          pipeline: filterExcluded(filteredWeeklyCompanies.pipeline),
+          top_companies: filterExcluded(filteredWeeklyCompanies.top_companies),
+          rejected_companies: filterExcluded(filteredWeeklyCompanies.rejected_companies),
+          on_hold_by_college: filterExcluded(filteredWeeklyCompanies.on_hold_by_college),
+          on_hold_by_hr: filterExcluded(filteredWeeklyCompanies.on_hold_by_hr),
+        };
+      }
+
       const res = await apiFetch('/reports/generate', {
         method: 'POST',
         body: JSON.stringify({
           template_type: templateType,
-          college_id: templateType === 'active_leads' ? (collegeId || 'all') : collegeId,
+          is_multi_college: isMultiWeekly,
+          college_ids: isMultiWeekly ? selectedGroupCollegeIds : undefined,
+          college_id: isMultiWeekly ? 'multi' : (templateType === 'active_leads' ? (collegeId || 'all') : collegeId),
           coordinator_id: coordinatorId || readSessionUser()?._id || readSessionUser()?.id || '',
           academic_year: academicYear,
-          week_label: weekLabel,
+          week_label: effectiveWeekLabel,
           theme,
           lead_sources: templateType === 'active_leads' ? activeLeadStreams : undefined,
           active_leads_columns: templateType === 'active_leads' ? activeLeadsColumns : undefined,
           include_prepared_by: includePreparedBy,
           prepared_by: includePreparedBy ? preparedByName.trim() : '',
+          min_ctc: weeklyMinCtc,
+          include_competitive_ctc: weeklyIncludeCompetitive,
+          company_name_filter: weeklyCompanySearch.trim() || undefined,
+          company_type_filter: weeklyCompanyType !== 'all' ? weeklyCompanyType : undefined,
+          status_filter: weeklyStatusFilter.trim() || undefined,
+          custom_weekly_companies: customWeeklyCompaniesPayload,
           included_sections: {
             ...sections,
             ...(templateType === 'active_leads' ? { active_leads: true } : {}),
@@ -485,6 +955,22 @@ export function ReportBuilderWizard({
           included_kpi_cards: kpiCards,
           kpi_cards: kpiCards,
           custom_remarks: customRemarks,
+          highlighted_task_ids: Array.from(highlightedTaskIds),
+          highlight_color_map: highlightColorMap,
+          default_highlight_color: highlightColor,
+          custom_pending_tasks: templateType === 'pending_tasks' && pendingTasksList.length > 0 ? pendingTasksList.map((t, idx) => ({
+            _id: t._id,
+            s_no: t.serial_no || idx + 1,
+            company_name: t.company_name,
+            jd_received_date: t.jd_received_date ? new Date(t.jd_received_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
+            db_shared_date: t.db_shared_date ? new Date(t.db_shared_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
+            current_status: t.current_status || 'Database Pending',
+            action_to_be_taken: t.action_to_be_taken || '',
+            drive_date: t.drive_date ? new Date(t.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
+            remarks: t.remarks || '',
+            is_highlighted: highlightedTaskIds.has(t._id),
+            highlight_color: highlightColorMap[t._id] || highlightColor,
+          })) : undefined,
         }),
       });
       if (res.success && res.data) {
@@ -594,70 +1080,66 @@ export function ReportBuilderWizard({
         label: '1. Companies Completed',
         icon: CheckCircle2,
         desc: 'Finished drives with confirmed placed student counts',
-        companies: weeklyCompanies.completed,
+        companies: filteredWeeklyCompanies.completed,
         badgeColor: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
       },
       {
+        key: 'companies_in_drive',
+        label: '2. Companies in Drive',
+        icon: Rocket,
+        desc: 'Scheduled campus placement drives actively underway or confirmed',
+        companies: filteredWeeklyCompanies.in_drive,
+        badgeColor: 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+      },
+      {
         key: 'in_progress',
-        label: '2. Companies In Progress',
+        label: '3. Companies In Progress',
         icon: Clock,
         desc: 'Active ongoing interview evaluation rounds',
-        companies: weeklyCompanies.in_progress,
+        companies: filteredWeeklyCompanies.in_progress,
         badgeColor: 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
       },
       {
         key: 'pipeline',
-        label: '3. Companies In Pipeline',
+        label: '4. Companies In Pipeline',
         icon: Layers,
         desc: 'Upcoming scheduled drives and confirmed tech partnerships',
-        companies: weeklyCompanies.pipeline,
+        companies: filteredWeeklyCompanies.pipeline,
         badgeColor: 'bg-cyan-50 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800',
       },
       {
         key: 'top_companies',
-        label: '4. Top Companies',
+        label: '5. Top Companies',
         icon: Sparkles,
         desc: 'Premier high-CTC partner organizations',
-        companies: weeklyCompanies.top_companies,
+        companies: filteredWeeklyCompanies.top_companies || [],
         badgeColor: 'bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
       },
-    ];
-
-    // 5. Rejected Companies (Show checkbox if data exists)
-    if (Array.isArray(weeklyCompanies.rejected_companies) && weeklyCompanies.rejected_companies.length > 0) {
-      list.push({
+      {
         key: 'rejected_companies',
-        label: '5. Rejected Companies',
+        label: '6. Rejected Companies',
         icon: XCircle,
         desc: 'Companies with employer declines or ineligible criteria',
-        companies: weeklyCompanies.rejected_companies,
+        companies: filteredWeeklyCompanies.rejected_companies || [],
         badgeColor: 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
-      });
-    }
-
-    // 6. Companies On Hold By College (Show checkbox if data exists)
-    if (Array.isArray(weeklyCompanies.on_hold_by_college) && weeklyCompanies.on_hold_by_college.length > 0) {
-      list.push({
+      },
+      {
         key: 'on_hold_by_college',
-        label: '6. Companies On Hold By College',
+        label: '7. Companies On Hold By College',
         icon: Clock,
         desc: 'Placement drives placed on hold by college management / TPO',
-        companies: weeklyCompanies.on_hold_by_college,
+        companies: filteredWeeklyCompanies.on_hold_by_college || [],
         badgeColor: 'bg-orange-50 dark:bg-orange-950/50 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800',
-      });
-    }
-
-    // 7. Companies On Hold By HR (Show checkbox if data exists)
-    if (Array.isArray(weeklyCompanies.on_hold_by_hr) && weeklyCompanies.on_hold_by_hr.length > 0) {
-      list.push({
+      },
+      {
         key: 'on_hold_by_hr',
-        label: '7. Companies On Hold By HR',
+        label: '8. Companies On Hold By HR',
         icon: Clock,
         desc: 'Placement drives placed on hold by corporate HR partners',
-        companies: weeklyCompanies.on_hold_by_hr,
+        companies: filteredWeeklyCompanies.on_hold_by_hr || [],
         badgeColor: 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700',
-      });
-    }
+      },
+    ];
 
     list.push({
       key: 'remarks',
@@ -754,49 +1236,205 @@ export function ReportBuilderWizard({
           <div className={`grid gap-4 ${templateType === 'active_leads' ? 'grid-cols-1 max-w-md' : 'grid-cols-1 md:grid-cols-2'}`}>
             {/* Target College (For Weekly Placement, Month-End, Pending Tasks) */}
             {templateType !== 'active_leads' && (
-              <div>
-                <label className="block text-xs font-semibold text-fg mb-1.5">
-                  Target Institution <span className="text-rose-500 font-bold ml-0.5">*</span>
-                </label>
-                {(() => {
-                  const isMissingCollege = validationErrors.some(
-                    (e) => e.toLowerCase().includes('institution') || e.toLowerCase().includes('college')
-                  );
-                  return (
-                    <div>
-                      <SmoothSelect
-                        value={collegeId}
-                        error={isMissingCollege}
-                        onChange={(val) => {
-                          setCollegeId(val);
-                          setValidationErrors((prev) =>
-                            prev.filter(
-                              (e) => !e.toLowerCase().includes('institution') && !e.toLowerCase().includes('college')
-                            )
-                          );
+              <div className={templateType === 'weekly_placement' && weeklyTargetMode === 'group' ? 'md:col-span-2' : ''}>
+                <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                  <label className="block text-xs font-semibold text-fg">
+                    Target Institution <span className="text-rose-500 font-bold ml-0.5">*</span>
+                  </label>
+
+                  {/* Mode Toggle for Weekly Report */}
+                  {templateType === 'weekly_placement' && (
+                    <div className="flex items-center gap-1 p-0.5 bg-surface-sunken border border-border rounded-lg text-micro font-medium">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWeeklyTargetMode('single');
+                          setValidationErrors([]);
                         }}
-                        placeholder="Select Target Institution *"
-                        searchable={true}
-                        searchPlaceholder="Search institution name or code…"
-                        icon={Building2}
-                        title="Target College / Institution"
-                        options={prioritizedColleges.map((c: any) => ({
-                          value: c._id,
-                          label: c.college_name,
-                          badge: c.college_code,
-                          sublabel: c.location,
-                          isPinned: Boolean(c.isPinned || c.is_selected_by_me),
-                        }))}
+                        className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                          weeklyTargetMode === 'single'
+                            ? 'bg-primary text-white shadow-2xs font-semibold'
+                            : 'text-fg-muted hover:text-fg'
+                        }`}
+                      >
+                        Single College
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setWeeklyTargetMode('group');
+                          setValidationErrors([]);
+                          if (selectedGroupCollegeIds.length === 0) {
+                            const activeColleges = colleges.filter((c: any) =>
+                              ACTIVE_17_COLLEGE_CODES.includes((c.college_code || '').toUpperCase())
+                            );
+                            setSelectedGroupCollegeIds(activeColleges.map((c: any) => c._id));
+                          }
+                        }}
+                        className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                          weeklyTargetMode === 'group'
+                            ? 'bg-primary text-white shadow-2xs font-semibold'
+                            : 'text-fg-muted hover:text-fg'
+                        }`}
+                      >
+                        Multiple Colleges / Group
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Single College Selector */}
+                {(templateType !== 'weekly_placement' || weeklyTargetMode === 'single') && (
+                  <div>
+                    {(() => {
+                      const isMissingCollege = validationErrors.some(
+                        (e) => e.toLowerCase().includes('institution') || e.toLowerCase().includes('college')
+                      );
+                      return (
+                        <div>
+                          <SmoothSelect
+                            value={collegeId}
+                            error={isMissingCollege}
+                            onChange={(val) => {
+                              setCollegeId(val);
+                              setValidationErrors((prev) =>
+                                prev.filter(
+                                  (e) => !e.toLowerCase().includes('institution') && !e.toLowerCase().includes('college')
+                                )
+                              );
+                            }}
+                            placeholder="Select Target Institution *"
+                            searchable={true}
+                            searchPlaceholder="Search institution name or code…"
+                            icon={Building2}
+                            title="Target College / Institution"
+                            options={prioritizedColleges.map((c: any) => ({
+                              value: c._id,
+                              label: c.college_name,
+                              badge: c.college_code,
+                              sublabel: c.location,
+                              isPinned: Boolean(c.isPinned || c.is_selected_by_me),
+                            }))}
+                          />
+                          {isMissingCollege && (
+                            <p className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold mt-1.5 flex items-center gap-1">
+                              <AlertCircle size={12} className="shrink-0" />
+                              Please pick a college before generating the report
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* Multiple Colleges / Group Multi-Select */}
+                {templateType === 'weekly_placement' && weeklyTargetMode === 'group' && (
+                  <div className="border border-border rounded-xl p-3 bg-surface-sunken/40 flex flex-col gap-2.5">
+                    {/* Quick Presets Ribbon */}
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const activeColleges = colleges.filter((c: any) =>
+                              ACTIVE_17_COLLEGE_CODES.includes((c.college_code || '').toUpperCase())
+                            );
+                            setSelectedGroupCollegeIds(activeColleges.map((c: any) => c._id));
+                            setValidationErrors([]);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 text-xs font-semibold hover:bg-emerald-500/20 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                        >
+                          🟢 17 Active Colleges
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedGroupCollegeIds(colleges.map((c: any) => c._id));
+                            setValidationErrors([]);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-surface border border-border text-xs font-medium text-fg hover:border-primary transition-colors cursor-pointer shadow-2xs"
+                        >
+                          Select All ({colleges.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedGroupCollegeIds([])}
+                          className="px-2.5 py-1 rounded-lg bg-surface border border-border text-xs font-medium text-fg-muted hover:text-rose-600 transition-colors cursor-pointer shadow-2xs"
+                        >
+                          Clear
+                        </button>
+                      </div>
+
+                      <span className="text-xs font-bold text-primary font-mono">
+                        {selectedGroupCollegeIds.length} of {colleges.length} Selected
+                      </span>
+                    </div>
+
+                    {/* Search filter inside group selector */}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={groupSearchQuery}
+                        onChange={(e) => setGroupSearchQuery(e.target.value)}
+                        placeholder="Search colleges by name, code or city…"
+                        className="w-full pl-7 pr-3 py-1.5 bg-surface border border-border rounded-lg text-xs text-fg outline-none focus:border-primary placeholder:text-fg-disabled"
                       />
-                      {isMissingCollege && (
-                        <p className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold mt-1.5 flex items-center gap-1">
-                          <AlertCircle size={12} className="shrink-0" />
-                          Please pick a college before generating the report
-                        </p>
+                      <Search size={13} className="absolute left-2.5 top-2.5 text-fg-disabled pointer-events-none" />
+                    </div>
+
+                    {/* Scrollable Checkbox List */}
+                    <div className="max-h-52 overflow-y-auto pr-1 space-y-1 divide-y divide-border/40 border border-border rounded-lg bg-surface p-1.5 [scrollbar-width:thin]">
+                      {filteredGroupColleges.length === 0 ? (
+                        <p className="text-center py-4 text-xs text-fg-disabled italic">No institutions match search</p>
+                      ) : (
+                        filteredGroupColleges.map((c: any) => {
+                          const isSelected = selectedGroupCollegeIds.includes(c._id);
+                          const isActiveCode = ACTIVE_17_COLLEGE_CODES.includes((c.college_code || '').toUpperCase());
+
+                          return (
+                            <label
+                              key={c._id}
+                              className={`flex items-center justify-between gap-2 p-1.5 rounded-md hover:bg-surface-sunken cursor-pointer transition-colors ${
+                                isSelected ? 'bg-primary/5 font-medium' : ''
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => {
+                                    setValidationErrors([]);
+                                    setSelectedGroupCollegeIds((prev) =>
+                                      isSelected ? prev.filter((id) => id !== c._id) : [...prev, c._id]
+                                    );
+                                  }}
+                                  className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary accent-primary cursor-pointer shrink-0"
+                                />
+                                <span className="text-xs text-fg truncate font-medium">{c.college_name}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {isActiveCode && (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" title="Active College" />
+                                )}
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-surface-sunken border border-border text-fg-subtle font-semibold">
+                                  {c.college_code}
+                                </span>
+                              </div>
+                            </label>
+                          );
+                        })
                       )}
                     </div>
-                  );
-                })()}
+
+                    {validationErrors.some((e) => e.toLowerCase().includes('multi-college') || e.toLowerCase().includes('at least one college')) && (
+                      <p className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold mt-0.5 flex items-center gap-1">
+                        <AlertCircle size={12} className="shrink-0" />
+                        Please select at least one college for the report.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1087,22 +1725,244 @@ export function ReportBuilderWizard({
           </div>
         )}
 
+        {/* Section: Placement Pending Tasks & Interactive Row Highlighting */}
+        {templateType === 'pending_tasks' && (
+          <div className="space-y-4 pt-2">
+            <div className="flex items-center justify-between border-b border-border/80 pb-2 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <Highlighter size={16} className="text-amber-500 shrink-0" />
+                <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
+                  Placement Pending Tasks & Row Highlighting
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                {loadingPendingTasks && (
+                  <span className="flex items-center gap-1 text-[11px] text-primary font-bold animate-pulse">
+                    <Loader2 size={12} className="animate-spin" /> Loading tasks…
+                  </span>
+                )}
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full border bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-200">
+                  {highlightedTaskIds.size} of {pendingTasksList.length} Tasks Highlighted
+                </span>
+              </div>
+            </div>
+
+            {/* Explanatory Info Card */}
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-3 shadow-2xs">
+              <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0 mt-0.5">
+                <Highlighter size={15} />
+              </span>
+              <div className="flex-1 min-w-0 space-y-1">
+                <p className="font-bold leading-tight">
+                  Selective Row Highlighter for College-Side Pending Items
+                </p>
+                <p className="text-[11px] text-amber-800/90 dark:text-amber-300/90 leading-relaxed font-normal">
+                  If there are totally 5 tasks but only 3 are pending cases from the college side (e.g. <strong className="font-semibold underline">Database Pending</strong>), you can highlight those rows here in your chosen shade. The highlight is preserved across <strong className="font-semibold">Live Preview</strong>, <strong className="font-semibold">Excel</strong>, <strong className="font-semibold">Image</strong>, and <strong className="font-semibold">PDF</strong> exports.
+                </p>
+              </div>
+            </div>
+
+            {/* Highlighting Toolbar: Palette Swatches & Quick Actions */}
+            <div className="p-3.5 rounded-xl bg-surface-sunken/80 border border-border flex items-center justify-between flex-wrap gap-3">
+              {/* Color Swatches */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-fg-muted flex items-center gap-1.5">
+                  <Palette size={13} className="text-primary" /> Highlighter Shade:
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {HIGHLIGHT_PALETTES.map((pal) => {
+                    const isSelected = highlightColor === pal.color;
+                    return (
+                      <button
+                        key={pal.color}
+                        type="button"
+                        onClick={() => {
+                          setHighlightColor(pal.color);
+                          if (highlightedTaskIds.size > 0) {
+                            const updatedMap: Record<string, string> = {};
+                            highlightedTaskIds.forEach((id) => {
+                              updatedMap[id] = pal.color;
+                            });
+                            setHighlightColorMap(updatedMap);
+                          }
+                        }}
+                        title={`${pal.label} (${pal.badge})`}
+                        style={{ backgroundColor: pal.color, borderColor: pal.border }}
+                        className={`w-6 h-6 rounded-full border-2 transition-all cursor-pointer flex items-center justify-center shadow-2xs ${
+                          isSelected ? 'scale-110 ring-2 ring-primary ring-offset-1 ring-offset-surface' : 'hover:scale-105 opacity-80 hover:opacity-100'
+                        }`}
+                      >
+                        {isSelected && <Check size={11} className="text-slate-900 font-bold" strokeWidth={3.5} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleAutoHighlightCollegePending}
+                  title="Auto-highlight pending tasks from college side (DB Pending, Database Pending, etc.)"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 dark:text-amber-200 border border-amber-500/40 transition-all cursor-pointer shadow-2xs active:scale-95"
+                >
+                  <Sparkles size={13} className="text-amber-600" />
+                  <span>Auto-Highlight DB Pending</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleHighlightAllTasks}
+                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-fg-subtle hover:text-fg hover:bg-surface border border-border transition-all cursor-pointer"
+                >
+                  Highlight All
+                </button>
+
+                {highlightedTaskIds.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearAllHighlights}
+                    className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-rose-600 hover:bg-rose-500/10 border border-rose-500/30 transition-all cursor-pointer"
+                  >
+                    Clear Highlights
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Interactive Preview Table in Wizard */}
+            <div className="border border-border rounded-xl bg-surface overflow-hidden shadow-2xs">
+              {loadingPendingTasks ? (
+                <div className="p-8 text-center text-fg-subtle flex items-center justify-center gap-2">
+                  <Loader2 size={16} className="animate-spin text-primary" />
+                  <span className="text-xs font-medium">Fetching pending tasks for selected institution...</span>
+                </div>
+              ) : !collegeId || collegeId === 'all' ? (
+                <div className="p-8 text-center text-fg-subtle">
+                  <Building2 size={24} className="mx-auto mb-2 opacity-50 text-primary" />
+                  <p className="text-xs font-semibold">Please pick a Target Institution above to load and highlight its pending tasks.</p>
+                </div>
+              ) : pendingTasksList.length === 0 ? (
+                <div className="p-8 text-center text-fg-subtle">
+                  <ListTodo size={24} className="mx-auto mb-2 opacity-50 text-fg-subtle" />
+                  <p className="text-xs font-semibold">No active pending tasks recorded for this college.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto max-h-[380px] overflow-y-auto">
+                  <table className="w-full text-xs text-center border-collapse">
+                    <thead className="sticky top-0 z-10 bg-surface-sunken border-b border-border text-[10.5px] font-bold text-fg-muted uppercase tracking-wider select-none">
+                      <tr>
+                        <th className="py-2.5 px-2 w-10 text-center font-mono">#</th>
+                        <th className="py-2.5 px-3 text-center min-w-[160px]">Company Name</th>
+                        <th className="py-2.5 px-2 min-w-[100px] text-center whitespace-nowrap">JD Received Date</th>
+                        <th className="py-2.5 px-2 min-w-[100px] text-center whitespace-nowrap">DB Shared Date</th>
+                        <th className="py-2.5 px-2 min-w-[130px] text-center">Current Status</th>
+                        <th className="py-2.5 px-3 min-w-[200px] text-center">Remarks / Next Action</th>
+                        <th className="py-2.5 px-2 min-w-[100px] text-center whitespace-nowrap">Drive Date</th>
+                        <th className="py-2.5 px-3 w-28 text-center">Highlight</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {pendingTasksList.map((t: any, idx: number) => {
+                        const isHl = highlightedTaskIds.has(t._id);
+                        const rowHlColor = highlightColorMap[t._id] || highlightColor;
+                        return (
+                          <tr
+                            key={t._id || idx}
+                            style={isHl ? { backgroundColor: rowHlColor } : undefined}
+                            className={`transition-colors cursor-pointer ${
+                              isHl
+                                ? 'font-semibold text-slate-950 shadow-2xs'
+                                : idx % 2 === 0
+                                ? 'bg-surface hover:bg-surface-sunken/60'
+                                : 'bg-surface-sunken/30 hover:bg-surface-sunken/60'
+                            }`}
+                            onClick={() => handleToggleRowHighlight(t._id)}
+                          >
+                            <td className="py-2 px-2 text-center font-mono font-bold" style={{ backgroundColor: isHl ? rowHlColor : undefined }}>
+                              {t.serial_no || idx + 1}
+                            </td>
+                            <td className="py-2 px-3 text-center font-bold" style={{ backgroundColor: isHl ? rowHlColor : undefined }}>
+                              {t.company_name}
+                            </td>
+                            <td className="py-2 px-2 text-center whitespace-nowrap font-mono text-[11px]" style={{ backgroundColor: isHl ? rowHlColor : undefined }}>
+                              {t.jd_received_date ? new Date(t.jd_received_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                            </td>
+                            <td className="py-2 px-2 text-center whitespace-nowrap font-mono text-[11px]" style={{ backgroundColor: isHl ? rowHlColor : undefined }}>
+                              {t.db_shared_date ? new Date(t.db_shared_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                            </td>
+                            <td className="py-2 px-2 text-center" style={{ backgroundColor: isHl ? rowHlColor : undefined }}>
+                              <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                isHl
+                                  ? 'bg-black/10 border-black/20 text-slate-900'
+                                  : t.current_status?.toLowerCase().includes('pending')
+                                  ? 'bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300'
+                                  : 'bg-surface border-border text-fg'
+                              }`}>
+                                {t.current_status || 'Database Pending'}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-center leading-snug" style={{ backgroundColor: isHl ? rowHlColor : undefined }}>
+                              <span className="font-semibold block">{t.action_to_be_taken || '—'}</span>
+                              {t.remarks && <span className="text-[10px] opacity-75 italic block mt-0.5">Note: {t.remarks}</span>}
+                            </td>
+                            <td className="py-2 px-2 text-center whitespace-nowrap font-mono text-[11px]" style={{ backgroundColor: isHl ? rowHlColor : undefined }}>
+                              {t.drive_date ? new Date(t.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                            </td>
+                            <td className="py-2 px-3 text-center" style={{ backgroundColor: isHl ? rowHlColor : undefined }}>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleRowHighlight(t._id);
+                                }}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all shadow-2xs ${
+                                  isHl
+                                    ? 'bg-slate-900 text-white hover:bg-slate-800'
+                                    : 'bg-surface hover:bg-amber-100 hover:text-amber-800 border border-border text-fg-subtle'
+                                }`}
+                              >
+                                <Highlighter size={12} className={isHl ? 'fill-amber-400 text-amber-400' : ''} />
+                                <span>{isHl ? 'Highlighted' : 'Highlight'}</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Section B: Reporting Period (For Weekly Report & Month-End Report) */}
         {templateType === 'weekly_placement' && (
           <div className="space-y-4 pt-2">
-            <div className="flex items-center gap-2 border-b border-border/80 pb-2">
-              <Calendar size={16} className="text-primary shrink-0" />
-              <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
-                Reporting Period & Date Range
-              </h2>
+            <div className="flex items-center justify-between border-b border-border/80 pb-2 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <Calendar size={16} className="text-primary shrink-0" />
+                <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
+                  Reporting Period & Date Range
+                </h2>
+                <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                  Optional
+                </span>
+              </div>
+              <span className="text-[11px] text-fg-subtle">
+                Leave empty for Full History (Cumulative), or choose dates to filter
+              </span>
             </div>
             <DateRangeCalendar
               startDate={startDate}
               endDate={endDate}
+              isOptional={true}
               onChangeRange={(s, e, calculatedLabel) => {
                 setStartDate(s);
                 setEndDate(e);
-                setWeekLabel(calculatedLabel);
+                setWeekLabel(calculatedLabel || 'All Dates (Cumulative)');
                 setValidationErrors([]);
               }}
             />
@@ -1343,6 +2203,533 @@ export function ReportBuilderWizard({
             })}
           </div>
         </div>
+
+        {/* Section C.1: Weekly Placement CTC & Column Filters + Live Pipeline Preview */}
+        {templateType === 'weekly_placement' && (
+          <div className="space-y-4 pt-2 border border-primary/25 bg-surface-raised/40 dark:bg-primary/5 rounded-2xl p-4 sm:p-5 shadow-xs">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/80 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                  <SlidersHorizontal size={18} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-bold text-fg">
+                      Live Pipeline Snapshot & Company Filters
+                    </h2>
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/15 text-primary border border-primary/30">
+                      Showing {totalWeeklyFilteredCount} of {totalWeeklyRawCount}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-fg-subtle">
+                    Live stage overview and dynamic CTC filters for the selected institution. Check/uncheck companies to customize the generated weekly report.
+                  </p>
+                </div>
+              </div>
+
+              {(weeklyMinCtc !== null || weeklyCompanySearch || weeklyCompanyType !== 'all' || weeklyStatusFilter !== 'all' || weeklyExcludedIds.size > 0 || weeklyIncludeCompetitive) && (
+                <button
+                  type="button"
+                  onClick={handleResetWeeklyFilters}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-fg-subtle hover:text-fg hover:bg-surface transition-all self-start sm:self-auto cursor-pointer"
+                >
+                  <RotateCcw size={13} />
+                  <span>Reset Filters</span>
+                </button>
+              )}
+            </div>
+
+            {/* Live Pipeline Snapshot Ribbon */}
+            <div className="bg-surface border border-border/80 rounded-xl p-3 sm:p-3.5 space-y-2.5 shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-xs font-bold text-fg flex items-center gap-1.5">
+                    <Building2 size={13} className="text-primary" />
+                    {selectedCollegeObj ? (
+                      <span>
+                        {selectedCollegeObj.college_name}{' '}
+                        <span className="text-fg-subtle font-normal">
+                          ({selectedCollegeObj.college_code || 'COLLEGE'})
+                        </span>
+                      </span>
+                    ) : (
+                      <span>Select an Institution to View Live Drive Statistics</span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-fg-subtle">
+                  {loadingWeekly ? (
+                    <span className="flex items-center gap-1 text-primary font-semibold">
+                      <Loader2 size={12} className="animate-spin" />
+                      Syncing live data...
+                    </span>
+                  ) : (
+                    <span className="font-semibold text-fg">
+                      {totalWeeklyRawCount} total placement drives found
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* 6 Quick Stage Metric Cards (Clicking switches tab immediately!) */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                {/* 1. In Progress */}
+                <button
+                  type="button"
+                  onClick={() => setWeeklyActivePreviewTab('in_progress')}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    weeklyActivePreviewTab === 'in_progress'
+                      ? 'bg-blue-500/15 border-blue-500/50 shadow-xs ring-2 ring-blue-500/20'
+                      : 'bg-surface-raised/60 hover:bg-surface-raised border-border/80'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                      <Clock size={12} />
+                      In Progress
+                    </span>
+                    <span className="text-base font-black text-blue-700 dark:text-blue-300">
+                      {weeklyCompanies.in_progress?.length || 0}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-fg-subtle truncate mt-1">Ongoing active drives</span>
+                </button>
+
+                {/* 2. In Pipeline */}
+                <button
+                  type="button"
+                  onClick={() => setWeeklyActivePreviewTab('pipeline')}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    weeklyActivePreviewTab === 'pipeline'
+                      ? 'bg-amber-500/15 border-amber-500/50 shadow-xs ring-2 ring-amber-500/20'
+                      : 'bg-surface-raised/60 hover:bg-surface-raised border-border/80'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      <Layers size={12} />
+                      In Pipeline
+                    </span>
+                    <span className="text-base font-black text-amber-700 dark:text-amber-300">
+                      {weeklyCompanies.pipeline?.length || 0}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-fg-subtle truncate mt-1">Upcoming pipeline</span>
+                </button>
+
+                {/* 3. In Drive */}
+                <button
+                  type="button"
+                  onClick={() => setWeeklyActivePreviewTab('in_drive')}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    weeklyActivePreviewTab === 'in_drive'
+                      ? 'bg-purple-500/15 border-purple-500/50 shadow-xs ring-2 ring-purple-500/20'
+                      : 'bg-surface-raised/60 hover:bg-surface-raised border-border/80'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-purple-600 dark:text-purple-400 flex items-center gap-1">
+                      <Zap size={12} />
+                      In Drive
+                    </span>
+                    <span className="text-base font-black text-purple-700 dark:text-purple-300">
+                      {weeklyCompanies.in_drive?.length || 0}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-fg-subtle truncate mt-1">Scheduled / live drives</span>
+                </button>
+
+                {/* 4. Completed */}
+                <button
+                  type="button"
+                  onClick={() => setWeeklyActivePreviewTab('completed')}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    weeklyActivePreviewTab === 'completed'
+                      ? 'bg-emerald-500/15 border-emerald-500/50 shadow-xs ring-2 ring-emerald-500/20'
+                      : 'bg-surface-raised/60 hover:bg-surface-raised border-border/80'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                      <CheckCircle2 size={12} />
+                      Completed
+                    </span>
+                    <span className="text-base font-black text-emerald-700 dark:text-emerald-300">
+                      {weeklyCompanies.completed?.length || 0}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-fg-subtle truncate mt-1">Concluded drives</span>
+                </button>
+
+                {/* 5. Top Companies */}
+                <button
+                  type="button"
+                  onClick={() => setWeeklyActivePreviewTab('top_companies')}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    weeklyActivePreviewTab === 'top_companies'
+                      ? 'bg-rose-500/15 border-rose-500/50 shadow-xs ring-2 ring-rose-500/20'
+                      : 'bg-surface-raised/60 hover:bg-surface-raised border-border/80'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                      <Star size={12} />
+                      Top Companies
+                    </span>
+                    <span className="text-base font-black text-rose-700 dark:text-rose-300">
+                      {weeklyCompanies.top_companies?.length || 0}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-fg-subtle truncate mt-1">Tier-1 & pinned</span>
+                </button>
+
+                {/* 6. On Hold & Declined */}
+                <button
+                  type="button"
+                  onClick={() => setWeeklyActivePreviewTab('on_hold')}
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                    weeklyActivePreviewTab === 'on_hold' || weeklyActivePreviewTab === 'rejected'
+                      ? 'bg-slate-500/15 border-slate-500/50 shadow-xs ring-2 ring-slate-500/20'
+                      : 'bg-surface-raised/60 hover:bg-surface-raised border-border/80'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                      <AlertCircle size={12} />
+                      On Hold / Decl.
+                    </span>
+                    <span className="text-base font-black text-slate-700 dark:text-slate-300">
+                      {(weeklyCompanies.on_hold_by_college?.length || 0) +
+                        (weeklyCompanies.on_hold_by_hr?.length || 0) +
+                        (weeklyCompanies.rejected_companies?.length || 0)}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-fg-subtle truncate mt-1">Deferred & on hold</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Dynamic CTC Thresholds Filter Row */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="text-xs font-bold text-fg flex items-center gap-1.5">
+                  <TrendingUp size={14} className="text-emerald-600 dark:text-emerald-400" />
+                  Available CTC Thresholds:
+                  {weeklyMinCtc !== null && (
+                    <span className="text-primary font-extrabold ml-1">≥ {weeklyMinCtc} LPA</span>
+                  )}
+                </span>
+                <label className="flex items-center gap-1.5 text-[11px] text-fg-subtle cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={weeklyIncludeCompetitive}
+                    onChange={(e) => setWeeklyIncludeCompetitive(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
+                  />
+                  <span>
+                    Include Competitive / Unspecified CTC
+                    {unspecifiedCtcCount > 0 && ` (${unspecifiedCtcCount})`}
+                  </span>
+                </label>
+              </div>
+
+              {/* Dynamic Quick Select CTC Threshold Badges */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {availableCtcBrackets.map((item) => {
+                  const isActive = weeklyMinCtc === item.value;
+                  return (
+                    <button
+                      key={item.label}
+                      type="button"
+                      onClick={() => {
+                        setWeeklyMinCtc(item.value);
+                        setWeeklyCustomCtcInput('');
+                      }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-primary text-white border-primary shadow-xs font-bold ring-2 ring-primary/25'
+                          : 'bg-surface border-border text-fg hover:text-fg hover:border-border-hover hover:bg-surface-raised'
+                      }`}
+                    >
+                      <span>{item.label}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                          isActive
+                            ? 'bg-white/25 text-white'
+                            : 'bg-primary/10 text-primary border border-primary/20'
+                        }`}
+                      >
+                        {item.count}
+                      </span>
+                    </button>
+                  );
+                })}
+
+                {/* Custom numeric LPA input */}
+                <div className="flex items-center gap-1.5 pl-2 border-l border-border/70">
+                  <span className="text-[11px] font-semibold text-fg-subtle">Custom:</span>
+                  <div className="relative w-20">
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      max="100"
+                      value={weeklyCustomCtcInput}
+                      placeholder="e.g. 7"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setWeeklyCustomCtcInput(val);
+                        const num = parseFloat(val);
+                        if (!isNaN(num) && num >= 0) {
+                          setWeeklyMinCtc(num);
+                        } else if (val === '') {
+                          setWeeklyMinCtc(null);
+                        }
+                      }}
+                      className="w-full bg-surface border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-lg px-2 py-1 text-xs text-fg outline-none font-medium"
+                    />
+                  </div>
+                  <span className="text-[11px] font-medium text-fg-subtle">LPA</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Column-level filter controls */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+              {/* Company Name search */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1">
+                  <Search size={11} />
+                  Company Name
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={weeklyCompanySearch}
+                    onChange={(e) => setWeeklyCompanySearch(e.target.value)}
+                    placeholder="Search by company name..."
+                    className="w-full bg-surface border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-lg pl-7 pr-7 py-1.5 text-xs text-fg outline-none shadow-2xs font-medium"
+                  />
+                  <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
+                  {weeklyCompanySearch && (
+                    <button
+                      type="button"
+                      onClick={() => setWeeklyCompanySearch('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg cursor-pointer p-0.5"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Company Type filter */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1">
+                  <Briefcase size={11} />
+                  Company Type
+                </label>
+                <select
+                  value={weeklyCompanyType}
+                  onChange={(e) => setWeeklyCompanyType(e.target.value)}
+                  className="w-full bg-surface border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-lg px-2.5 py-1.5 text-xs text-fg outline-none shadow-2xs font-medium cursor-pointer"
+                >
+                  <option value="all">All Company Types</option>
+                  <option value="software">Software / IT</option>
+                  <option value="core">Core Engineering</option>
+                  <option value="product">Product Development</option>
+                  <option value="banking">Banking / FinTech</option>
+                  <option value="consulting">Consulting / Analytics</option>
+                </select>
+              </div>
+
+              {/* Status / Remarks filter */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1">
+                  <Clock size={11} />
+                  Status / Remarks
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={weeklyStatusFilter}
+                    onChange={(e) => setWeeklyStatusFilter(e.target.value)}
+                    placeholder="Filter status or remarks..."
+                    className="w-full bg-surface border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-lg pl-7 pr-7 py-1.5 text-xs text-fg outline-none shadow-2xs font-medium"
+                  />
+                  <Filter size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
+                  {weeklyStatusFilter && (
+                    <button
+                      type="button"
+                      onClick={() => setWeeklyStatusFilter('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg cursor-pointer p-0.5"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Preview Section Tabs & Row Selection Actions */}
+            <div className="space-y-2.5 pt-2 border-t border-border/80">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                {/* Pipeline Tabs */}
+                <div className="flex flex-wrap items-center gap-1 overflow-x-auto pb-1 max-w-full">
+                  {[
+                    { key: 'all', label: 'All Matching', count: tabCounts.all },
+                    { key: 'in_progress', label: 'In Progress', count: tabCounts.in_progress },
+                    { key: 'pipeline', label: 'In Pipeline', count: tabCounts.pipeline },
+                    { key: 'in_drive', label: 'In Drive', count: tabCounts.in_drive },
+                    { key: 'completed', label: 'Completed', count: tabCounts.completed },
+                    { key: 'top_companies', label: 'Top Companies', count: tabCounts.top_companies },
+                    { key: 'on_hold', label: 'On Hold', count: tabCounts.on_hold },
+                    { key: 'rejected', label: 'Rejected', count: tabCounts.rejected },
+                  ].map((tab) => {
+                    const isTabActive = weeklyActivePreviewTab === tab.key;
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => setWeeklyActivePreviewTab(tab.key)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                          isTabActive
+                            ? 'bg-primary text-white shadow-xs font-bold ring-2 ring-primary/20'
+                            : 'bg-surface border border-border text-fg-subtle hover:text-fg hover:bg-surface-raised'
+                        }`}
+                      >
+                        <span>{tab.label}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                          isTabActive
+                            ? 'bg-white/20 text-white'
+                            : 'bg-surface-sunken text-fg-subtle border border-border/40'
+                        }`}>
+                          {tab.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Bulk Select/Deselect in current tab */}
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={handleSelectAllPreview}
+                    className="text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+                  >
+                    Select All
+                  </button>
+                  <span className="text-border">|</span>
+                  <button
+                    type="button"
+                    onClick={handleDeselectAllPreview}
+                    className="text-[11px] font-semibold text-fg-subtle hover:text-fg hover:underline cursor-pointer"
+                  >
+                    Deselect All
+                  </button>
+                </div>
+              </div>
+
+              {/* Table of Preview Rows */}
+              <div className="border border-border/80 rounded-xl overflow-hidden bg-surface">
+                {previewRows.length === 0 ? (
+                  <div className="p-8 text-center space-y-2">
+                    <div className="w-10 h-10 mx-auto rounded-full bg-surface-sunken flex items-center justify-center text-fg-subtle">
+                      <Filter size={20} />
+                    </div>
+                    <p className="text-xs font-semibold text-fg">
+                      No companies match the filter criteria
+                    </p>
+                    <p className="text-[11px] text-fg-subtle">
+                      Try adjusting the CTC threshold or clearing the search terms.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="max-h-72 overflow-y-auto divide-y divide-border/60">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-surface-sunken/80 sticky top-0 text-[11px] font-bold text-fg-subtle uppercase tracking-wider border-b border-border/80">
+                        <tr>
+                          <th className="py-2 px-3 w-8 text-center">Inc</th>
+                          <th className="py-2 px-2 w-8 text-center">#</th>
+                          <th className="py-2 px-3">Company & Role</th>
+                          <th className="py-2 px-3">Type</th>
+                          <th className="py-2 px-3">CTC</th>
+                          <th className="py-2 px-3">Status / Remarks</th>
+                          <th className="py-2 px-3">Section</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/50 font-medium">
+                        {previewRows.map((row: any, idx: number) => {
+                          const rowId = String(row._id || row.company_id || row.company_name);
+                          const isIncluded = !weeklyExcludedIds.has(rowId);
+                          const ctc = row.ctc_lpa || row.ctc || 'Competitive';
+                          return (
+                            <tr
+                              key={`${rowId}-${idx}`}
+                              onClick={() => handleToggleExcludeCompany(rowId)}
+                              className={`cursor-pointer transition-colors ${
+                                isIncluded
+                                  ? 'hover:bg-primary/5 bg-surface'
+                                  : 'opacity-40 bg-surface-sunken/40 line-through text-fg-subtle'
+                              }`}
+                            >
+                              <td className="py-2 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  type="checkbox"
+                                  checked={isIncluded}
+                                  onChange={() => handleToggleExcludeCompany(rowId)}
+                                  className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
+                                />
+                              </td>
+                              <td className="py-2 px-2 text-center text-fg-subtle text-[11px]">
+                                {idx + 1}
+                              </td>
+                              <td className="py-2 px-3">
+                                <div className="font-bold text-fg leading-snug">
+                                  {row.company_name}
+                                </div>
+                                <div className="text-[10px] text-fg-subtle">
+                                  {row.job_role || row.role || 'Campus Hire'}
+                                </div>
+                              </td>
+                              <td className="py-2 px-3 text-fg-subtle text-[11px] whitespace-nowrap">
+                                {row.company_type || 'IT / Tech'}
+                              </td>
+                              <td className="py-2 px-3 whitespace-nowrap">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border ${getCtcBadgeColor(ctc)}`}>
+                                  {ctc}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 text-fg-subtle text-[11px] max-w-xs truncate">
+                                {row.current_status_text || row.status || row.remarks || '—'}
+                              </td>
+                              <td className="py-2 px-3 whitespace-nowrap">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-surface-sunken border border-border text-fg-subtle">
+                                  {row._sectionLabel}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <div className="px-3 py-2 bg-surface-sunken/60 border-t border-border/80 flex items-center justify-between text-[11px] text-fg-subtle">
+                  <span>
+                    Tip: Click any row or checkbox to include or exclude individual companies from the generated report.
+                  </span>
+                  <span className="font-semibold text-fg">
+                    {previewRows.filter((r: any) => !weeklyExcludedIds.has(String(r._id || r.company_id || r.company_name))).length} selected in this tab
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Section D: Observations & Remarks */}
         <div className="space-y-3 pt-2">

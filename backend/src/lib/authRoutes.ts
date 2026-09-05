@@ -487,7 +487,9 @@ export function registerAuthRoutes(app: Express) {
           performedByEmail: rawEmail, module: 'Security & Audit', severity: 'warning',
           summary: `Sign-in attempted for unknown address ${rawEmail}`, req,
         });
-        return fail(res, 404, 'ACCOUNT_NOT_FOUND', 'No iPOMS account exists for this email address.');
+        // Dummy hash compare to normalize response timing and prevent timing attacks
+        await bcrypt.compare(password, '$2a$12$e8m.4U4pX4Z0U8NfQ12VKeVzQz/t9F2L1vK6H0j9x7L1s0r1w2e3u');
+        return fail(res, 401, 'INVALID_CREDENTIALS', 'Invalid email or password.');
       }
 
       // Already locked — send them straight to recovery.
@@ -539,10 +541,10 @@ export function registerAuthRoutes(app: Express) {
           summary: `Incorrect password (attempt ${user.failed_login_attempts} of ${MAX_FAILED_ATTEMPTS})`, req,
         });
 
-        return fail(res, 401, 'WRONG_PASSWORD',
+        return fail(res, 401, 'INVALID_CREDENTIALS',
           remaining > 0
-            ? `Incorrect password. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining before your account is locked.`
-            : 'Incorrect password. One more failed attempt will lock your account.',
+            ? `Invalid email or password. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining before your account is locked.`
+            : 'Invalid email or password. One more failed attempt will lock your account.',
           { attemptsRemaining: Math.max(remaining, 0) });
       }
 

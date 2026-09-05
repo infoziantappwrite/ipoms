@@ -136,6 +136,13 @@ const CompanyMetadataSchema = new mongoose_1.Schema({
         type: Date,
         default: null,
     },
+    // Who deleted this record — restore is scoped to this so a coordinator
+    // can only recover their own deletions; Admin/Team Leader may override.
+    deleted_by: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null,
+    },
 }, {
     collection: 'company_metadata',
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },

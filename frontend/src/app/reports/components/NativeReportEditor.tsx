@@ -21,6 +21,8 @@ import {
   AlertCircle,
   ArrowDown,
   ArrowUp,
+  Highlighter,
+  Flame,
 } from 'lucide-react';
 import { A4PdfPreviewModal } from './A4PdfPreviewModal';
 
@@ -302,7 +304,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         <table>
           <tr><td colspan="8" class="header-title">${report.branding?.company_name || 'Infoziant'}</td></tr>
           <tr><td colspan="8" class="header-sub">${report.branding?.college_name || 'Partner Institutions'} — ${report.report_title}</td></tr>
-          <tr><td colspan="8" style="color:#64748b;">${report.template_type === 'weekly_placement' ? `Period: ${getCleanPeriod(report.report_period)} | ` : (report.template_type === 'month_end' ? `Month: ${report.report_period || 'August 2026'} | ` : '')}Prepared by: ${report.generated_by || report.branding?.prepared_by || 'Placement Coordinator'} | Generated: ${report.generated_date || ''}</td></tr>
+          <tr><td colspan="8" style="color:#64748b;">${report.template_type === 'weekly_placement' ? `Period: ${getCleanPeriod(report.report_period)} | ` : (report.template_type === 'month_end' ? `Month: ${report.report_period || 'August 2026'} | ` : '')}${report.include_prepared_by !== false && (report.generated_by || report.branding?.prepared_by) ? `Prepared by: ${report.generated_by || report.branding?.prepared_by} | ` : ''}Generated: ${report.generated_date || ''}</td></tr>
           <tr><td colspan="8"></td></tr>
     `;
 
@@ -349,16 +351,32 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             <tr><td colspan="8"></td></tr>
           `;
         }
+      } else if (report.is_multi_college) {
+        const multiCards = [
+          { key: 'total_colleges', label: 'Colleges Included', val: report.kpi_summary.total_colleges || report.colleges_data?.length || 0, color: '#1e3a8a' },
+          { key: 'drives_completed', label: 'Drives Completed', val: report.kpi_summary.drives_completed || 0, color: '#059669' },
+          { key: 'drives_in_progress', label: 'In Progress', val: report.kpi_summary.drives_in_progress || 0, color: '#2563eb' },
+          { key: 'total_offers', label: 'Offers Placed', val: report.kpi_summary.total_offers || 0, color: '#7c3aed' },
+        ].filter((c) => activeKpis[c.key] !== false);
+
+        if (multiCards.length > 0) {
+          html += `
+            <tr><td colspan="8" class="sec-header">CONSOLIDATED KPI SUMMARY</td></tr>
+            <tr>
+              ${multiCards.map((c) => `<th>${c.label}</th>`).join('')}
+            </tr>
+            <tr>
+              ${multiCards.map((c) => `<td style="text-align:center; color:${c.color}; font-weight:bold;">${c.val}</td>`).join('')}
+            </tr>
+            <tr><td colspan="8"></td></tr>
+          `;
+        }
       } else {
         const wpCards = [
-          { key: 'total_calls', label: 'Calls', val: report.kpi_summary.total_calls || 0, color: '#1e3a8a' },
+          { key: 'total_calls', label: 'Total Calls Made', val: report.kpi_summary.total_calls || 0, color: '#1e3a8a' },
           { key: 'positive_responses', label: 'Positives', val: report.kpi_summary.positive_responses || 0, color: '#059669' },
-          { key: 'jds_received', label: 'JDs', val: report.kpi_summary.jds_received || 0, color: '#0891b2' },
-          { key: 'drives_completed', label: 'Completed', val: report.kpi_summary.drives_completed || 0, color: '#059669' },
-          { key: 'drives_in_progress', label: 'In Progress', val: report.kpi_summary.drives_in_progress || 0, color: '#2563eb' },
-          { key: 'pipeline_leads', label: 'Pipeline', val: report.kpi_summary.pipeline_leads || 0, color: '#0891b2' },
-          { key: 'top_companies_count', label: 'Top Companies', val: report.kpi_summary.top_companies_count || 0, color: '#d97706' },
-          { key: 'total_offers', label: 'Offers Placed', val: report.kpi_summary.total_offers || 0, color: '#059669' },
+          { key: 'not_hiring', label: 'Not Hiring', val: report.kpi_summary.not_hiring || 0, color: '#e11d48' },
+          { key: 'jds_received', label: 'JD Received', val: report.kpi_summary.jds_received || 0, color: '#0891b2' },
         ].filter((c) => activeKpis[c.key] !== false);
 
         if (wpCards.length > 0) {
@@ -378,10 +396,97 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
 
     // Weekly Placement Report Tables (Sections 1 through 7)
     if (!report.template_type || report.template_type === 'weekly_placement') {
-      // Section 1: Companies Completed
-      if (report.sections?.completed_companies && report.sections.completed_companies.length > 0) {
-      html += `
-        <tr><td colspan="6" class="sec-header">1. COMPANIES COMPLETED (${report.sections.completed_companies.length} Drives)</td></tr>
+      if (report.is_multi_college && Array.isArray(report.colleges_data)) {
+        report.colleges_data.forEach((colData: any, cIdx: number) => {
+          html += `
+            <tr>
+              <td colspan="6" class="sec-header" style="background:#1e3a8a; color:#ffffff; font-size:11pt; padding:8px 12px; font-weight:bold;">
+                ${cIdx + 1}. ${colData.college_name.toUpperCase()} ${colData.college_code ? `(${colData.college_code})` : ''} — ${colData.total_completed || 0} COMPLETED, ${colData.total_in_drive ? colData.total_in_drive + ' IN DRIVE, ' : ''}${colData.total_in_progress || 0} IN PROGRESS, ${colData.total_offers || 0} OFFERS
+              </td>
+            </tr>
+          `;
+
+          if (colData.completed_companies && colData.completed_companies.length > 0) {
+            html += `
+              <tr><td colspan="6" class="sec-header" style="background:#ecfdf5; color:#065f46;">1. COMPANIES COMPLETED (${colData.completed_companies.length})</td></tr>
+              <tr>
+                <th style="width:38px; text-align:center;">#</th>
+                <th>Company Name</th>
+                <th>Role</th>
+                <th>CTC</th>
+                <th>Status</th>
+                <th style="text-align:center;">Offers Received</th>
+              </tr>
+            `;
+            colData.completed_companies.forEach((r: any) => {
+              html += `
+                <tr>
+                  <td style="text-align:center;">${r.s_no}</td>
+                  <td><b>${r.company_name}</b></td>
+                  <td>${r.job_role || '—'}</td>
+                  <td style="color:#059669; font-weight:bold;">${r.ctc_lpa || '—'}</td>
+                  <td>${r.current_status_text || '—'}</td>
+                  <td style="text-align:center; font-weight:bold; color:#059669;">${r.selected_count || 0}</td>
+                </tr>
+              `;
+            });
+          }
+
+          if (colData.companies_in_drive && colData.companies_in_drive.length > 0) {
+            html += `
+              <tr><td colspan="6" class="sec-header" style="background:#fffbeb; color:#92400e;">2. COMPANIES IN DRIVE (${colData.companies_in_drive.length})</td></tr>
+              <tr>
+                <th style="width:38px; text-align:center;">#</th>
+                <th>Company Name</th>
+                <th>Role</th>
+                <th>CTC</th>
+                <th colspan="2">Status / Drive Date</th>
+              </tr>
+            `;
+            colData.companies_in_drive.forEach((r: any) => {
+              html += `
+                <tr>
+                  <td style="text-align:center;">${r.s_no}</td>
+                  <td><b>${r.company_name}</b></td>
+                  <td>${r.job_role || r.role || '—'}</td>
+                  <td style="color:#d97706; font-weight:bold;">${r.ctc_lpa || r.ctc || '—'}</td>
+                  <td colspan="2">${r.current_status_text || r.status || 'Drive in progress'}</td>
+                </tr>
+              `;
+            });
+          }
+
+          if (colData.in_progress && colData.in_progress.length > 0) {
+            html += `
+              <tr><td colspan="6" class="sec-header" style="background:#eff6ff; color:#1e40af;">3. COMPANIES IN PROGRESS (${colData.in_progress.length})</td></tr>
+              <tr>
+                <th style="width:38px; text-align:center;">#</th>
+                <th>Company Name</th>
+                <th>Role</th>
+                <th>CTC</th>
+                <th colspan="2">Status / Follow-up</th>
+              </tr>
+            `;
+            colData.in_progress.forEach((r: any) => {
+              html += `
+                <tr>
+                  <td style="text-align:center;">${r.s_no}</td>
+                  <td><b>${r.company_name}</b></td>
+                  <td>${r.job_role || '—'}</td>
+                  <td style="color:#2563eb; font-weight:bold;">${r.ctc_lpa || '—'}</td>
+                  <td colspan="2">${r.current_status_text || '—'}</td>
+                </tr>
+              `;
+            });
+          }
+
+          html += `<tr><td colspan="6"></td></tr>`;
+        });
+      } else {
+        // Section 1: Companies Completed
+        if (report.sections?.completed_companies && report.sections.completed_companies.length > 0) {
+        html += `
+          <tr><td colspan="6" class="sec-header">1. COMPANIES COMPLETED (${report.sections.completed_companies.length} Drives)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -406,10 +511,36 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       html += `<tr><td colspan="6"></td></tr>`;
     }
 
-    // Section 2: Companies In Progress
+    // Section 2: Companies In Drive
+    if (report.sections?.companies_in_drive && report.sections.companies_in_drive.length > 0) {
+      html += `
+        <tr><td colspan="5" class="sec-header" style="background:#fffbeb; color:#92400e;">2. COMPANIES IN DRIVE (${report.sections.companies_in_drive.length} Drives)</td></tr>
+        <tr>
+          <th style="width:38px; text-align:center;">#</th>
+          <th>Company Name</th>
+          <th>Role</th>
+          <th>CTC</th>
+          <th>Status / Drive Date</th>
+        </tr>
+      `;
+      report.sections.companies_in_drive.forEach((r: any) => {
+        html += `
+          <tr>
+            <td style="text-align:center;">${r.s_no}</td>
+            <td><b>${r.company_name}</b></td>
+            <td>${r.job_role || r.role || '—'}</td>
+            <td style="color:#d97706; font-weight:bold;">${r.ctc_lpa || r.ctc || '—'}</td>
+            <td>${r.current_status_text || r.status || 'Drive in progress'}</td>
+          </tr>
+        `;
+      });
+      html += `<tr><td colspan="5"></td></tr>`;
+    }
+
+    // Section 3: Companies In Progress
     if (report.sections?.in_progress && report.sections.in_progress.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header">2. COMPANIES IN PROGRESS (${report.sections.in_progress.length} Drives)</td></tr>
+        <tr><td colspan="5" class="sec-header">3. COMPANIES IN PROGRESS (${report.sections.in_progress.length} Drives)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -432,10 +563,10 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       html += `<tr><td colspan="5"></td></tr>`;
     }
 
-    // Section 3: Companies in Pipeline
+    // Section 4: Companies in Pipeline
     if (report.sections?.pipeline && report.sections.pipeline.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header">3. COMPANIES IN PIPELINE (${report.sections.pipeline.length} Leads)</td></tr>
+        <tr><td colspan="5" class="sec-header">4. COMPANIES IN PIPELINE (${report.sections.pipeline.length} Leads)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -458,10 +589,10 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       html += `<tr><td colspan="5"></td></tr>`;
     }
 
-    // Section 4: Top Companies
+    // Section 5: Top Companies
     if (report.sections?.top_companies && report.sections.top_companies.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header">4. TOP COMPANIES (${report.sections.top_companies.length} Companies)</td></tr>
+        <tr><td colspan="5" class="sec-header">5. TOP COMPANIES (${report.sections.top_companies.length} Companies)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -484,11 +615,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       html += `<tr><td colspan="5"></td></tr>`;
     }
 
-    // Section 5: Rejected Companies
+    // Section 6: Rejected Companies
     const rejRows = report.sections?.rejected_companies || report.sections?.rejected_by_hr;
     if (rejRows && rejRows.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header" style="background:#fef2f2; color:#991b1b;">5. REJECTED COMPANIES (${rejRows.length} Declined)</td></tr>
+        <tr><td colspan="5" class="sec-header" style="background:#fef2f2; color:#991b1b;">6. REJECTED COMPANIES (${rejRows.length} Declined)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -511,11 +642,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       html += `<tr><td colspan="5"></td></tr>`;
     }
 
-    // Section 6: Companies On Hold By College
+    // Section 7: Companies On Hold By College
     const holdColRows = report.sections?.on_hold_by_college || report.sections?.rejected_by_college;
     if (holdColRows && holdColRows.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header" style="background:#fff7ed; color:#9a3412;">6. COMPANIES ON HOLD BY COLLEGE (${holdColRows.length} Holds)</td></tr>
+        <tr><td colspan="5" class="sec-header" style="background:#fff7ed; color:#9a3412;">7. COMPANIES ON HOLD BY COLLEGE (${holdColRows.length} Holds)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -538,11 +669,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       html += `<tr><td colspan="5"></td></tr>`;
     }
 
-    // Section 7: Companies On Hold By HR
+    // Section 8: Companies On Hold By HR
     const holdHrRows = report.sections?.on_hold_by_hr;
     if (holdHrRows && holdHrRows.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header" style="background:#f1f5f9; color:#334155;">7. COMPANIES ON HOLD BY HR (${holdHrRows.length} Holds)</td></tr>
+        <tr><td colspan="5" class="sec-header" style="background:#f1f5f9; color:#334155;">8. COMPANIES ON HOLD BY HR (${holdHrRows.length} Holds)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -563,6 +694,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         `;
       });
       html += `<tr><td colspan="5"></td></tr>`;
+    }
     }
     }
 
@@ -586,15 +718,20 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         </tr>
       `;
       report.sections.pending_tasks.forEach((r: any) => {
+        const isHl = Boolean(r.is_highlighted);
+        const hlBg = r.highlight_color || '#fef08a';
+        const trHl = isHl ? `style="background-color:${hlBg} !important;" bgcolor="${hlBg}"` : '';
+        const tdHl = isHl ? `style="background-color:${hlBg} !important;" bgcolor="${hlBg}"` : '';
+
         html += `
-          <tr>
-            <td style="text-align:center;">${r.s_no}</td>
-            <td><b>${r.company_name}</b></td>
-            <td>${r.jd_received_date || '—'}</td>
-            <td>${r.db_shared_date || '—'}</td>
-            <td>${r.current_status || '—'}</td>
-            <td>${r.action_to_be_taken || '—'}</td>
-            ${hasDriveDate ? `<td style="color:#7c3aed; font-weight:bold;">${r.drive_date || '—'}</td>` : ''}
+          <tr ${trHl}>
+            <td ${tdHl} style="text-align:center;${isHl ? `background-color:${hlBg} !important;` : ''}">${r.s_no}</td>
+            <td ${tdHl}><b>${r.company_name}</b></td>
+            <td ${tdHl}>${r.jd_received_date || '—'}</td>
+            <td ${tdHl}>${r.db_shared_date || '—'}</td>
+            <td ${tdHl}>${r.current_status || '—'}</td>
+            <td ${tdHl}>${r.action_to_be_taken || '—'}</td>
+            ${hasDriveDate ? `<td ${tdHl} style="color:#7c3aed; font-weight:bold;${isHl ? `background-color:${hlBg} !important;` : ''}">${r.drive_date || '—'}</td>` : ''}
           </tr>
         `;
       });
@@ -760,8 +897,8 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       html += `<tr><td colspan="5"></td></tr>`;
     }
 
-    // Remarks
-    if (report.remarks) {
+    // Remarks (Only if selected)
+    if (report.included_sections?.remarks && report.remarks) {
       html += `
         <tr><td colspan="7" class="sec-header">${report.template_type === 'active_leads' ? 'NOTES' : 'COORDINATOR REMARKS & OBSERVATIONS'}</td></tr>
         <tr><td colspan="7">${report.remarks}</td></tr>
@@ -814,10 +951,13 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
     const fileName = getReportExportBaseFileName(report);
 
     try {
-      const W = 1200;
-      const PADDING = 40;
-      const CONTENT_W = W - PADDING * 2; // 1120px
-      const SCALE = 2.5; // Ultra-HD 3000px output resolution
+      // ── Portrait Document Proportion Layout (Ultra-HD & Mobile-Friendly) ──
+      // W=860 with CONTENT_W=800 matches vertical document proportions (like A4 portrait)
+      // preventing the image from becoming an ultra-wide horizontally compressed banner on mobile.
+      const W = 860;
+      const PADDING = 30;
+      const CONTENT_W = W - PADDING * 2; // 800px
+      const SCALE = 2.5; // 2150px Ultra-HD output resolution for razor-sharp rendering on Retina mobile & 4K laptop screens
 
       // ── Helper: Safe Image Loader ──
       const loadImg = (url: string): Promise<HTMLImageElement | null> => {
@@ -838,17 +978,17 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       ]);
 
       // ── Calculate Layout Coordinates & Height ──
-      let totalH = 40; // Top padding
+      let totalH = 30; // Top padding
 
       // 1. Header height
-      const headerH = 90;
-      totalH += headerH + 20;
+      const headerH = 74;
+      totalH += headerH + 16;
 
       // 2. Metadata pill
-      const metaH = 38;
-      totalH += metaH + 20;
+      const metaH = 34;
+      totalH += metaH + 16;
 
-      // 3. KPI Summary
+      // 3. KPI Summary (for non-pending reports)
       const activeKpis = report.included_kpi_cards || report.included_sections?.kpi_cards || {};
       const hasKpis = report.template_type !== 'pending_tasks' && report.included_sections?.kpi_summary && report.kpi_summary;
       let kpiCards: Array<{ label: string; val: any; color: string; bg?: string; border?: string; labelColor?: string; key?: string }> = [];
@@ -864,25 +1004,30 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             { label: 'Total Active Leads', val: report.kpi_summary.total_leads || 0, color: '#2563eb', bg: '#eff6ff', border: '#93c5fd', labelColor: '#1e40af', key: 'total_leads' },
             { label: 'Graduating Batch', val: report.kpi_summary.graduating_year || '2027', color: '#059669', bg: '#ecfdf5', border: '#6ee7b7', labelColor: '#065f46', key: 'graduating_year' },
           ];
+        } else if (report.is_multi_college) {
+          kpiCards = [
+            { label: 'Colleges Included', val: report.kpi_summary?.total_colleges || report.colleges_data?.length || 0, color: '#1e3a8a', bg: '#eff6ff', border: '#bfdbfe', labelColor: '#1e40af', key: 'total_colleges' },
+            { label: 'Drives Completed', val: report.kpi_summary?.drives_completed || 0, color: '#059669', bg: '#ecfdf5', border: '#a7f3d0', labelColor: '#065f46', key: 'drives_completed' },
+            { label: 'In Progress', val: report.kpi_summary?.drives_in_progress || 0, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', labelColor: '#1e40af', key: 'drives_in_progress' },
+            { label: 'Offers Placed', val: report.kpi_summary?.total_offers || 0, color: '#7c3aed', bg: '#faf5ff', border: '#e9d5ff', labelColor: '#6b21a8', key: 'total_offers' },
+          ];
         } else {
           kpiCards = [
-            { label: 'Calls', val: report.kpi_summary.total_calls || 0, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', labelColor: '#1e40af', key: 'total_calls' },
+            { label: 'Total Calls Made', val: report.kpi_summary.total_calls || 0, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', labelColor: '#1e40af', key: 'total_calls' },
             { label: 'Positives', val: report.kpi_summary.positive_responses || 0, color: '#059669', bg: '#ecfdf5', border: '#a7f3d0', labelColor: '#065f46', key: 'positive_responses' },
-            { label: 'JDs Received', val: report.kpi_summary.jds_received || 0, color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', labelColor: '#155e75', key: 'jds_received' },
-            { label: 'Completed', val: report.kpi_summary.drives_completed || 0, color: '#059669', bg: '#ecfdf5', border: '#a7f3d0', labelColor: '#065f46', key: 'drives_completed' },
-            { label: 'In Progress', val: report.kpi_summary.drives_in_progress || 0, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', labelColor: '#1e40af', key: 'drives_in_progress' },
-            { label: 'Pipeline', val: report.kpi_summary.pipeline_leads || 0, color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', labelColor: '#155e75', key: 'pipeline_leads' },
-            { label: 'Top Companies', val: report.kpi_summary.top_companies_count || 0, color: '#d97706', bg: '#fffbeb', border: '#fde68a', labelColor: '#92400e', key: 'top_companies_count' },
-            { label: 'Offers', val: report.kpi_summary.total_offers || 0, color: '#059669', bg: '#ecfdf5', border: '#a7f3d0', labelColor: '#065f46', key: 'total_offers' },
+            { label: 'Not Hiring', val: report.kpi_summary.not_hiring || 0, color: '#e11d48', bg: '#fff1f2', border: '#fecdd3', labelColor: '#9f1239', key: 'not_hiring' },
+            { label: 'JD Received', val: report.kpi_summary.jds_received || 0, color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', labelColor: '#155e75', key: 'jds_received' },
           ];
         }
         kpiCards = kpiCards.filter((c: any) => activeKpis[c.key] !== false);
         if (kpiCards.length > 0) {
-          totalH += 68 + 20;
+          totalH += 58 + 18;
         }
       }
 
-      // ── Helper: Multi-Line Word Wrapping Engine ──
+      // ── Helper: Multi-Line Word Wrapping Engine (Strict Whole-Word Wrapping) ──
+      // Wraps strictly word by word on whitespace boundaries without letter-by-letter truncation.
+      // Preserves grammatical sentences and natural phrase flow.
       const measureTextLines = (
         measureCtx: CanvasRenderingContext2D,
         text: string,
@@ -906,15 +1051,30 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           } else {
             if (currentLine) {
               lines.push(currentLine);
-              currentLine = word;
+              // Check if the single word itself fits in the column
+              if (measureCtx.measureText(word).width <= maxW) {
+                currentLine = word;
+              } else {
+                // Rare edge case: unbroken token exceeding entire column width (e.g. ultra-long URL)
+                let partial = '';
+                for (const ch of word) {
+                  if (measureCtx.measureText(partial + ch + '-').width <= maxW) {
+                    partial += ch;
+                  } else {
+                    if (partial) lines.push(partial + '-');
+                    partial = ch;
+                  }
+                }
+                currentLine = partial;
+              }
             } else {
-              // Word is longer than max width: break character by character
+              // Word on fresh line exceeds maxW
               let partial = '';
               for (const ch of word) {
-                if (measureCtx.measureText(partial + ch).width <= maxW) {
+                if (measureCtx.measureText(partial + ch + '-').width <= maxW) {
                   partial += ch;
                 } else {
-                  if (partial) lines.push(partial);
+                  if (partial) lines.push(partial + '-');
                   partial = ch;
                 }
               }
@@ -938,6 +1098,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       interface MeasuredRow {
         cells: MeasuredCell[];
         height: number;
+        bg?: string;
       }
 
       interface SectionDef {
@@ -956,7 +1117,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       const scratchCanvas = document.createElement('canvas');
       const scratchCtx = scratchCanvas.getContext('2d')!;
 
-      // Pending Tasks
+      // 1. Pending Tasks (CONTENT_W = 800px)
       if (report.included_sections?.pending_tasks && report.sections?.pending_tasks) {
         const pTasks = report.sections.pending_tasks;
         const hasDriveDate = pTasks.some(
@@ -965,9 +1126,10 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         const headers = hasDriveDate
           ? ['#', 'Company Name', 'JD Received Date', 'DB Shared Date', 'Current Status', 'Remarks / Next Action', 'Drive Date']
           : ['#', 'Company Name', 'JD Received Date', 'DB Shared Date', 'Current Status', 'Remarks / Next Action'];
+        // Precise column widths totaling exactly 800px with generous space for remarks and company names
         const colWidths = hasDriveDate
-          ? [40, 200, 120, 120, 130, 380, 130]
-          : [40, 220, 130, 130, 150, 450];
+          ? [36, 188, 88, 88, 110, 195, 95]
+          : [36, 214, 100, 100, 120, 230];
 
         const rawRows = pTasks.map((r: any) => {
           const base = [
@@ -984,32 +1146,37 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           return base;
         });
 
-        const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
+        const measuredRows: MeasuredRow[] = rawRows.map((row: string[], rIdx: number) => {
+          const taskObj = pTasks[rIdx];
+          const isHl = Boolean(taskObj?.is_highlighted);
+          const hlColor = taskObj?.highlight_color || '#fef08a';
           let maxLines = 1;
           const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
             const colW = colWidths[cIdx];
-            const maxCellW = colW - 16;
+            const maxCellW = colW - 14;
+            // Enhanced, larger readable typography: 12.5px bold for company, 12px for status & actions
             const font = cIdx === 1
-              ? 'bold 11px system-ui, -apple-system, sans-serif'
+              ? 'bold 12.5px system-ui, -apple-system, sans-serif'
               : cIdx === 0
-              ? '500 11px monospace'
+              ? '600 12px monospace'
               : (headers[cIdx] === 'Drive Date')
-              ? 'bold 11px system-ui, -apple-system, sans-serif'
-              : '500 11px system-ui, -apple-system, sans-serif';
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : '500 12px system-ui, -apple-system, sans-serif';
             const fillStyle = cIdx === 1
-              ? '#0f172a'
+              ? (isHl ? '#09090b' : '#0f172a')
               : cIdx === 0
-              ? '#64748b'
+              ? (isHl ? '#27272a' : '#64748b')
               : (headers[cIdx] === 'Drive Date')
-              ? '#4f46e5'
-              : '#334155';
+              ? (isHl ? '#312e81' : '#4f46e5')
+              : (isHl ? '#18181b' : '#334155');
 
             const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
             if (lines.length > maxLines) maxLines = lines.length;
             return { lines, font, fillStyle };
           });
-          const height = Math.max(34, maxLines * 16 + 14);
-          return { cells, height };
+          // Comfortable row height with vertical breathing room
+          const height = Math.max(38, maxLines * 17 + 16);
+          return { cells, height, bg: isHl ? hlColor : undefined };
         });
 
         sectionsToDraw.push({
@@ -1024,11 +1191,173 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
       }
 
-      // Completed Companies
+      // Multi-College Consolidated Weekly Placement Sections
+      if (report.is_multi_college && Array.isArray(report.colleges_data)) {
+        report.colleges_data.forEach((colData: any, cIdx: number) => {
+          if (report.included_sections?.completed_companies !== false && colData.completed_companies && colData.completed_companies.length > 0) {
+            const cRows = colData.completed_companies;
+            const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status', 'Offers'];
+            const colWidths = [36, 200, 174, 90, 180, 120];
+            const rawRows = cRows.map((r: any) => [
+              String(r.s_no || ''),
+              String(r.company_name || '—'),
+              String(r.job_role || '—'),
+              String(r.ctc_lpa || '—'),
+              String(r.current_status_text || '—'),
+              String(r.selected_count || 0),
+            ]);
+
+            const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
+              let maxLines = 1;
+              const cells: MeasuredCell[] = row.map((cellText, cIdx2) => {
+                const colW = colWidths[cIdx2];
+                const maxCellW = colW - 14;
+                const font = cIdx2 === 1 || cIdx2 === 5
+                  ? 'bold 12px system-ui, -apple-system, sans-serif'
+                  : cIdx2 === 0
+                  ? '600 12px monospace'
+                  : (cIdx2 === 3)
+                  ? 'bold 12px system-ui, -apple-system, sans-serif'
+                  : '500 12px system-ui, -apple-system, sans-serif';
+                const fillStyle = cIdx2 === 1
+                  ? '#0f172a'
+                  : cIdx2 === 0
+                  ? '#64748b'
+                  : (cIdx2 === 3 || cIdx2 === 5)
+                  ? '#059669'
+                  : '#334155';
+
+                const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
+                if (lines.length > maxLines) maxLines = lines.length;
+                return { lines, font, fillStyle };
+              });
+              const height = Math.max(38, maxLines * 17 + 16);
+              return { cells, height };
+            });
+
+            sectionsToDraw.push({
+              title: `${cIdx + 1}. ${colData.college_name.toUpperCase()} — COMPLETED`,
+              badge: `${cRows.length} Drives`,
+              accentBg: '#ecfdf5',
+              accentBorder: '#a7f3d0',
+              accentText: '#065f46',
+              headers,
+              colWidths,
+              measuredRows,
+            });
+          }
+
+          if (report.included_sections?.companies_in_drive !== false && colData.companies_in_drive && colData.companies_in_drive.length > 0) {
+            const cidRows = colData.companies_in_drive;
+            const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Drive Date'];
+            const colWidths = [36, 224, 200, 110, 230];
+            const rawRows = cidRows.map((r: any) => [
+              String(r.s_no || ''),
+              String(r.company_name || '—'),
+              String(r.job_role || r.role || '—'),
+              String(r.ctc_lpa || r.ctc || '—'),
+              String(r.current_status_text || r.status || 'Drive in progress'),
+            ]);
+
+            const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
+              let maxLines = 1;
+              const cells: MeasuredCell[] = row.map((cellText, cIdx2) => {
+                const colW = colWidths[cIdx2];
+                const maxCellW = colW - 14;
+                const font = cIdx2 === 1
+                  ? 'bold 12px system-ui, -apple-system, sans-serif'
+                  : cIdx2 === 0
+                  ? '600 12px monospace'
+                  : (cIdx2 === 3)
+                  ? 'bold 12px system-ui, -apple-system, sans-serif'
+                  : '500 12px system-ui, -apple-system, sans-serif';
+                const fillStyle = cIdx2 === 1
+                  ? '#0f172a'
+                  : cIdx2 === 0
+                  ? '#64748b'
+                  : (cIdx2 === 3)
+                  ? '#d97706'
+                  : '#334155';
+
+                const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
+                if (lines.length > maxLines) maxLines = lines.length;
+                return { lines, font, fillStyle };
+              });
+              const height = Math.max(38, maxLines * 17 + 16);
+              return { cells, height };
+            });
+
+            sectionsToDraw.push({
+              title: `${cIdx + 1}. ${colData.college_name.toUpperCase()} — IN DRIVE`,
+              badge: `${cidRows.length} Drives`,
+              accentBg: '#fffbeb',
+              accentBorder: '#fde68a',
+              accentText: '#92400e',
+              headers,
+              colWidths,
+              measuredRows,
+            });
+          }
+
+          if (report.included_sections?.in_progress !== false && colData.in_progress && colData.in_progress.length > 0) {
+            const ipRows = colData.in_progress;
+            const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
+            const colWidths = [36, 224, 200, 110, 230];
+            const rawRows = ipRows.map((r: any) => [
+              String(r.s_no || ''),
+              String(r.company_name || '—'),
+              String(r.job_role || '—'),
+              String(r.ctc_lpa || '—'),
+              String(r.current_status_text || '—'),
+            ]);
+
+            const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
+              let maxLines = 1;
+              const cells: MeasuredCell[] = row.map((cellText, cIdx2) => {
+                const colW = colWidths[cIdx2];
+                const maxCellW = colW - 14;
+                const font = cIdx2 === 1
+                  ? 'bold 12px system-ui, -apple-system, sans-serif'
+                  : cIdx2 === 0
+                  ? '600 12px monospace'
+                  : (cIdx2 === 3)
+                  ? 'bold 12px system-ui, -apple-system, sans-serif'
+                  : '500 12px system-ui, -apple-system, sans-serif';
+                const fillStyle = cIdx2 === 1
+                  ? '#0f172a'
+                  : cIdx2 === 0
+                  ? '#64748b'
+                  : (cIdx2 === 3)
+                  ? '#2563eb'
+                  : '#334155';
+
+                const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
+                if (lines.length > maxLines) maxLines = lines.length;
+                return { lines, font, fillStyle };
+              });
+              const height = Math.max(38, maxLines * 17 + 16);
+              return { cells, height };
+            });
+
+            sectionsToDraw.push({
+              title: `${cIdx + 1}. ${colData.college_name.toUpperCase()} — IN PROGRESS`,
+              badge: `${ipRows.length} Drives`,
+              accentBg: '#eff6ff',
+              accentBorder: '#bfdbfe',
+              accentText: '#1e40af',
+              headers,
+              colWidths,
+              measuredRows,
+            });
+          }
+        });
+      }
+
+      // 2. Completed Companies (CONTENT_W = 800px)
       if (report.included_sections?.completed_companies && report.sections?.completed_companies) {
         const cRows = report.sections.completed_companies;
         const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status', 'Offers Received'];
-        const colWidths = [40, 280, 240, 140, 280, 140];
+        const colWidths = [36, 200, 174, 90, 180, 120];
         const rawRows = cRows.map((r: any) => [
           String(r.s_no || ''),
           String(r.company_name || '—'),
@@ -1042,14 +1371,14 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           let maxLines = 1;
           const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
             const colW = colWidths[cIdx];
-            const maxCellW = colW - 16;
+            const maxCellW = colW - 14;
             const font = cIdx === 1 || cIdx === 5
-              ? 'bold 11px system-ui, -apple-system, sans-serif'
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
               : cIdx === 0
-              ? '500 11px monospace'
+              ? '600 12px monospace'
               : (cIdx === 3)
-              ? 'bold 11px system-ui, -apple-system, sans-serif'
-              : '500 11px system-ui, -apple-system, sans-serif';
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : '500 12px system-ui, -apple-system, sans-serif';
             const fillStyle = cIdx === 1
               ? '#0f172a'
               : cIdx === 0
@@ -1062,7 +1391,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             if (lines.length > maxLines) maxLines = lines.length;
             return { lines, font, fillStyle };
           });
-          const height = Math.max(34, maxLines * 16 + 14);
+          const height = Math.max(38, maxLines * 17 + 16);
           return { cells, height };
         });
 
@@ -1078,137 +1407,31 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
       }
 
-      // In Progress Drives
-      if (report.included_sections?.in_progress && report.sections?.in_progress) {
-        const ipRows = report.sections.in_progress;
-        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
-        const colWidths = [40, 300, 260, 160, 360];
-        const rawRows = ipRows.map((r: any) => [
+      // Section 2: Companies In Drive (CONTENT_W = 800px)
+      if (report.included_sections?.companies_in_drive !== false && report.sections?.companies_in_drive) {
+        const cidRows = report.sections.companies_in_drive;
+        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Drive Date'];
+        const colWidths = [36, 224, 200, 110, 230];
+        const rawRows = cidRows.map((r: any) => [
           String(r.s_no || ''),
           String(r.company_name || '—'),
-          String(r.job_role || '—'),
-          String(r.ctc_lpa || '—'),
-          String(r.current_status_text || '—'),
+          String(r.job_role || r.role || '—'),
+          String(r.ctc_lpa || r.ctc || '—'),
+          String(r.current_status_text || r.status || 'Drive in progress'),
         ]);
 
         const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
           let maxLines = 1;
           const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
             const colW = colWidths[cIdx];
-            const maxCellW = colW - 16;
+            const maxCellW = colW - 14;
             const font = cIdx === 1
-              ? 'bold 11px system-ui, -apple-system, sans-serif'
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
               : cIdx === 0
-              ? '500 11px monospace'
+              ? '600 12px monospace'
               : (cIdx === 3)
-              ? 'bold 11px system-ui, -apple-system, sans-serif'
-              : '500 11px system-ui, -apple-system, sans-serif';
-            const fillStyle = cIdx === 1
-              ? '#0f172a'
-              : cIdx === 0
-              ? '#64748b'
-              : (cIdx === 3)
-              ? '#2563eb'
-              : '#334155';
-
-            const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
-            if (lines.length > maxLines) maxLines = lines.length;
-            return { lines, font, fillStyle };
-          });
-          const height = Math.max(34, maxLines * 16 + 14);
-          return { cells, height };
-        });
-
-        sectionsToDraw.push({
-          title: '2. COMPANIES IN PROGRESS',
-          badge: `${ipRows.length} Drives`,
-          accentBg: '#eff6ff',
-          accentBorder: '#bfdbfe',
-          accentText: '#1e40af',
-          headers,
-          colWidths,
-          measuredRows,
-        });
-      }
-
-      // Pipeline Leads
-      if (report.included_sections?.pipeline && report.sections?.pipeline) {
-        const pipRows = report.sections.pipeline;
-        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
-        const colWidths = [40, 300, 260, 160, 360];
-        const rawRows = pipRows.map((r: any) => [
-          String(r.s_no || ''),
-          String(r.company_name || '—'),
-          String(r.job_role || '—'),
-          String(r.ctc_lpa || '—'),
-          String(r.current_status_text || '—'),
-        ]);
-
-        const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
-          let maxLines = 1;
-          const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
-            const colW = colWidths[cIdx];
-            const maxCellW = colW - 16;
-            const font = cIdx === 1
-              ? 'bold 11px system-ui, -apple-system, sans-serif'
-              : cIdx === 0
-              ? '500 11px monospace'
-              : (cIdx === 3)
-              ? 'bold 11px system-ui, -apple-system, sans-serif'
-              : '500 11px system-ui, -apple-system, sans-serif';
-            const fillStyle = cIdx === 1
-              ? '#0f172a'
-              : cIdx === 0
-              ? '#64748b'
-              : (cIdx === 3)
-              ? '#0891b2'
-              : '#334155';
-
-            const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
-            if (lines.length > maxLines) maxLines = lines.length;
-            return { lines, font, fillStyle };
-          });
-          const height = Math.max(34, maxLines * 16 + 14);
-          return { cells, height };
-        });
-
-        sectionsToDraw.push({
-          title: '3. COMPANIES IN PIPELINE',
-          badge: `${pipRows.length} Leads`,
-          accentBg: '#ecfeff',
-          accentBorder: '#a5f3fc',
-          accentText: '#155e75',
-          headers,
-          colWidths,
-          measuredRows,
-        });
-      }
-
-      // Top Companies
-      if (report.included_sections?.top_companies && report.sections?.top_companies) {
-        const topRows = report.sections.top_companies;
-        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
-        const colWidths = [40, 300, 260, 160, 360];
-        const rawRows = topRows.map((r: any) => [
-          String(r.s_no || ''),
-          String(r.company_name || '—'),
-          String(r.job_role || '—'),
-          String(r.ctc_lpa || '—'),
-          String(r.current_status_text || '—'),
-        ]);
-
-        const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
-          let maxLines = 1;
-          const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
-            const colW = colWidths[cIdx];
-            const maxCellW = colW - 16;
-            const font = cIdx === 1
-              ? 'bold 11px system-ui, -apple-system, sans-serif'
-              : cIdx === 0
-              ? '500 11px monospace'
-              : (cIdx === 3)
-              ? 'bold 11px system-ui, -apple-system, sans-serif'
-              : '500 11px system-ui, -apple-system, sans-serif';
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : '500 12px system-ui, -apple-system, sans-serif';
             const fillStyle = cIdx === 1
               ? '#0f172a'
               : cIdx === 0
@@ -1221,12 +1444,171 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             if (lines.length > maxLines) maxLines = lines.length;
             return { lines, font, fillStyle };
           });
-          const height = Math.max(34, maxLines * 16 + 14);
+          const height = Math.max(38, maxLines * 17 + 16);
           return { cells, height };
         });
 
         sectionsToDraw.push({
-          title: '4. TOP COMPANIES',
+          title: '2. COMPANIES IN DRIVE',
+          badge: `${cidRows.length} Drives`,
+          accentBg: '#fffbeb',
+          accentBorder: '#fde68a',
+          accentText: '#92400e',
+          headers,
+          colWidths,
+          measuredRows,
+        });
+      }
+
+      // 3. In Progress Drives (CONTENT_W = 800px)
+      if (report.included_sections?.in_progress && report.sections?.in_progress) {
+        const ipRows = report.sections.in_progress;
+        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
+        const colWidths = [36, 224, 200, 110, 230];
+        const rawRows = ipRows.map((r: any) => [
+          String(r.s_no || ''),
+          String(r.company_name || '—'),
+          String(r.job_role || '—'),
+          String(r.ctc_lpa || '—'),
+          String(r.current_status_text || '—'),
+        ]);
+
+        const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
+          let maxLines = 1;
+          const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
+            const colW = colWidths[cIdx];
+            const maxCellW = colW - 14;
+            const font = cIdx === 1
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : cIdx === 0
+              ? '600 12px monospace'
+              : (cIdx === 3)
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : '500 12px system-ui, -apple-system, sans-serif';
+            const fillStyle = cIdx === 1
+              ? '#0f172a'
+              : cIdx === 0
+              ? '#64748b'
+              : (cIdx === 3)
+              ? '#2563eb'
+              : '#334155';
+
+            const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
+            if (lines.length > maxLines) maxLines = lines.length;
+            return { lines, font, fillStyle };
+          });
+          const height = Math.max(38, maxLines * 17 + 16);
+          return { cells, height };
+        });
+
+        sectionsToDraw.push({
+          title: '3. COMPANIES IN PROGRESS',
+          badge: `${ipRows.length} Drives`,
+          accentBg: '#eff6ff',
+          accentBorder: '#bfdbfe',
+          accentText: '#1e40af',
+          headers,
+          colWidths,
+          measuredRows,
+        });
+      }
+
+      // 4. Pipeline Leads (CONTENT_W = 800px)
+      if (report.included_sections?.pipeline && report.sections?.pipeline) {
+        const pipRows = report.sections.pipeline;
+        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
+        const colWidths = [36, 224, 200, 110, 230];
+        const rawRows = pipRows.map((r: any) => [
+          String(r.s_no || ''),
+          String(r.company_name || '—'),
+          String(r.job_role || '—'),
+          String(r.ctc_lpa || '—'),
+          String(r.current_status_text || '—'),
+        ]);
+
+        const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
+          let maxLines = 1;
+          const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
+            const colW = colWidths[cIdx];
+            const maxCellW = colW - 14;
+            const font = cIdx === 1
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : cIdx === 0
+              ? '600 12px monospace'
+              : (cIdx === 3)
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : '500 12px system-ui, -apple-system, sans-serif';
+            const fillStyle = cIdx === 1
+              ? '#0f172a'
+              : cIdx === 0
+              ? '#64748b'
+              : (cIdx === 3)
+              ? '#0891b2'
+              : '#334155';
+
+            const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
+            if (lines.length > maxLines) maxLines = lines.length;
+            return { lines, font, fillStyle };
+          });
+          const height = Math.max(38, maxLines * 17 + 16);
+          return { cells, height };
+        });
+
+        sectionsToDraw.push({
+          title: '4. COMPANIES IN PIPELINE',
+          badge: `${pipRows.length} Leads`,
+          accentBg: '#ecfeff',
+          accentBorder: '#a5f3fc',
+          accentText: '#155e75',
+          headers,
+          colWidths,
+          measuredRows,
+        });
+      }
+
+      // 5. Top Companies (CONTENT_W = 800px)
+      if (report.included_sections?.top_companies && report.sections?.top_companies) {
+        const topRows = report.sections.top_companies;
+        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
+        const colWidths = [36, 224, 200, 110, 230];
+        const rawRows = topRows.map((r: any) => [
+          String(r.s_no || ''),
+          String(r.company_name || '—'),
+          String(r.job_role || '—'),
+          String(r.ctc_lpa || '—'),
+          String(r.current_status_text || '—'),
+        ]);
+
+        const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
+          let maxLines = 1;
+          const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
+            const colW = colWidths[cIdx];
+            const maxCellW = colW - 14;
+            const font = cIdx === 1
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : cIdx === 0
+              ? '600 12px monospace'
+              : (cIdx === 3)
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : '500 12px system-ui, -apple-system, sans-serif';
+            const fillStyle = cIdx === 1
+              ? '#0f172a'
+              : cIdx === 0
+              ? '#64748b'
+              : (cIdx === 3)
+              ? '#d97706'
+              : '#334155';
+
+            const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
+            if (lines.length > maxLines) maxLines = lines.length;
+            return { lines, font, fillStyle };
+          });
+          const height = Math.max(38, maxLines * 17 + 16);
+          return { cells, height };
+        });
+
+        sectionsToDraw.push({
+          title: '5. TOP COMPANIES',
           badge: `${topRows.length} Companies`,
           accentBg: '#fffbeb',
           accentBorder: '#fde68a',
@@ -1237,13 +1619,66 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
       }
 
-      // 5. Companies On Hold / Rejected by College
+      // 6. Rejected Companies (CONTENT_W = 800px)
+      const rejCanvasRows = report.sections?.rejected_companies || report.sections?.rejected_by_hr;
+      if (rejCanvasRows && rejCanvasRows.length > 0) {
+        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Reason'];
+        const colWidths = [36, 224, 200, 110, 230];
+        const rawRows = rejCanvasRows.map((r: any) => [
+          String(r.s_no || ''),
+          String(r.company_name || '—'),
+          String(r.job_role || '—'),
+          String(r.ctc_lpa || '—'),
+          String(r.current_status_text || '—'),
+        ]);
+
+        const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
+          let maxLines = 1;
+          const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
+            const colW = colWidths[cIdx];
+            const maxCellW = colW - 14;
+            const font = cIdx === 1
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : cIdx === 0
+              ? '600 12px monospace'
+              : (cIdx === 3)
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : '500 12px system-ui, -apple-system, sans-serif';
+            const fillStyle = cIdx === 1
+              ? '#0f172a'
+              : cIdx === 0
+              ? '#64748b'
+              : (cIdx === 3 || cIdx === 4)
+              ? '#dc2626'
+              : '#334155';
+
+            const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
+            if (lines.length > maxLines) maxLines = lines.length;
+            return { lines, font, fillStyle };
+          });
+          const height = Math.max(38, maxLines * 17 + 16);
+          return { cells, height };
+        });
+
+        sectionsToDraw.push({
+          title: '6. REJECTED COMPANIES',
+          badge: `${rejCanvasRows.length} Declined`,
+          accentBg: '#fef2f2',
+          accentBorder: '#fecaca',
+          accentText: '#991b1b',
+          headers,
+          colWidths,
+          measuredRows,
+        });
+      }
+
+      // 7. Companies On Hold / Rejected by College (CONTENT_W = 800px)
       if ((report.included_sections?.on_hold_by_college && report.sections?.on_hold_by_college) ||
           (report.included_sections?.rejected_by_college && report.sections?.rejected_by_college)) {
         const hRows = report.sections.on_hold_by_college || report.sections.rejected_by_college || [];
         if (hRows.length > 0) {
           const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Reason'];
-          const colWidths = [40, 300, 260, 160, 360];
+          const colWidths = [36, 224, 200, 110, 230];
           const rawRows = hRows.map((r: any) => [
             String(r.s_no || ''),
             String(r.company_name || '—'),
@@ -1256,14 +1691,14 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             let maxLines = 1;
             const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
               const colW = colWidths[cIdx];
-              const maxCellW = colW - 16;
+              const maxCellW = colW - 14;
               const font = cIdx === 1
-                ? 'bold 11px system-ui, -apple-system, sans-serif'
+                ? 'bold 12px system-ui, -apple-system, sans-serif'
                 : cIdx === 0
-                ? '500 11px monospace'
+                ? '600 12px monospace'
                 : (cIdx === 3)
-                ? 'bold 11px system-ui, -apple-system, sans-serif'
-                : '500 11px system-ui, -apple-system, sans-serif';
+                ? 'bold 12px system-ui, -apple-system, sans-serif'
+                : '500 12px system-ui, -apple-system, sans-serif';
               const fillStyle = cIdx === 1
                 ? '#0f172a'
                 : cIdx === 0
@@ -1276,12 +1711,12 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               if (lines.length > maxLines) maxLines = lines.length;
               return { lines, font, fillStyle };
             });
-            const height = Math.max(34, maxLines * 16 + 14);
+            const height = Math.max(38, maxLines * 17 + 16);
             return { cells, height };
           });
 
           sectionsToDraw.push({
-            title: '5. COMPANIES ON HOLD BY COLLEGE',
+            title: '7. COMPANIES ON HOLD BY COLLEGE',
             badge: `${hRows.length} Holds`,
             accentBg: '#fff7ed',
             accentBorder: '#ffedd5',
@@ -1293,12 +1728,12 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         }
       }
 
-      // 6. Companies On Hold by HR
+      // 8. Companies On Hold by HR (CONTENT_W = 800px)
       if (report.included_sections?.on_hold_by_hr && report.sections?.on_hold_by_hr) {
         const hrHoldRows = report.sections.on_hold_by_hr || [];
         if (hrHoldRows.length > 0) {
           const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Reason'];
-          const colWidths = [40, 300, 260, 160, 360];
+          const colWidths = [36, 224, 200, 110, 230];
           const rawRows = hrHoldRows.map((r: any) => [
             String(r.s_no || ''),
             String(r.company_name || '—'),
@@ -1311,14 +1746,14 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             let maxLines = 1;
             const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
               const colW = colWidths[cIdx];
-              const maxCellW = colW - 16;
+              const maxCellW = colW - 14;
               const font = cIdx === 1
-                ? 'bold 11px system-ui, -apple-system, sans-serif'
+                ? 'bold 12px system-ui, -apple-system, sans-serif'
                 : cIdx === 0
-                ? '500 11px monospace'
+                ? '600 12px monospace'
                 : (cIdx === 3)
-                ? 'bold 11px system-ui, -apple-system, sans-serif'
-                : '500 11px system-ui, -apple-system, sans-serif';
+                ? 'bold 12px system-ui, -apple-system, sans-serif'
+                : '500 12px system-ui, -apple-system, sans-serif';
               const fillStyle = cIdx === 1
                 ? '#0f172a'
                 : cIdx === 0
@@ -1329,12 +1764,12 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               if (lines.length > maxLines) maxLines = lines.length;
               return { lines, font, fillStyle };
             });
-            const height = Math.max(34, maxLines * 16 + 14);
+            const height = Math.max(38, maxLines * 17 + 16);
             return { cells, height };
           });
 
           sectionsToDraw.push({
-            title: '6. COMPANIES ON HOLD BY HR',
+            title: '8. COMPANIES ON HOLD BY HR',
             badge: `${hrHoldRows.length} Holds`,
             accentBg: '#f1f5f9',
             accentBorder: '#e2e8f0',
@@ -1346,7 +1781,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         }
       }
 
-      // 7. Active Corporate Leads (Strictly 4 columns: #, Company Name, Role, CTC)
+      // 8. Active Corporate Leads (CONTENT_W = 800px)
       if (report.included_sections?.active_leads && report.sections?.active_leads) {
         const alRows = report.sections.active_leads;
         const isCanvasJdOnly = Boolean(
@@ -1366,24 +1801,24 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         if (showCanvasRole) headers.push('Role');
         if (showCanvasCtc) headers.push('CTC');
 
-        // Total available width after # (50px) is 1070px
+        // Total available width: 800px
         let colWidths: number[];
         if (showCanvasColleges && showCanvasRole && showCanvasCtc) {
-          colWidths = [50, 310, 250, 310, 200];
+          colWidths = [40, 230, 190, 210, 130];
         } else if (showCanvasColleges && showCanvasRole && !showCanvasCtc) {
-          colWidths = [50, 390, 310, 370];
+          colWidths = [40, 280, 220, 260];
         } else if (showCanvasColleges && !showCanvasRole && showCanvasCtc) {
-          colWidths = [50, 450, 370, 250];
+          colWidths = [40, 330, 270, 160];
         } else if (showCanvasColleges && !showCanvasRole && !showCanvasCtc) {
-          colWidths = [50, 600, 470];
+          colWidths = [40, 420, 340];
         } else if (!showCanvasColleges && showCanvasRole && showCanvasCtc) {
-          colWidths = [50, 420, 420, 230];
+          colWidths = [40, 280, 320, 160];
         } else if (!showCanvasColleges && showCanvasRole && !showCanvasCtc) {
-          colWidths = [50, 540, 530];
+          colWidths = [40, 380, 380];
         } else if (!showCanvasColleges && !showCanvasRole && showCanvasCtc) {
-          colWidths = [50, 720, 350];
+          colWidths = [40, 520, 240];
         } else {
-          colWidths = [50, 1070];
+          colWidths = [40, 760];
         }
 
         const rawRows = alRows.map((r: any) => {
@@ -1398,15 +1833,15 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           let maxLines = 1;
           const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
             const colW = colWidths[cIdx];
-            const maxCellW = colW - 16;
+            const maxCellW = colW - 14;
             const isLastCtc = showCanvasCtc && cIdx === headers.length - 1;
             const font = cIdx === 1
-              ? 'bold 11px system-ui, -apple-system, sans-serif'
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
               : cIdx === 0
-              ? '500 11px monospace'
+              ? '600 12px monospace'
               : isLastCtc
-              ? 'bold 11px system-ui, -apple-system, sans-serif'
-              : '500 11px system-ui, -apple-system, sans-serif';
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : '500 12px system-ui, -apple-system, sans-serif';
             const fillStyle = cIdx === 1
               ? '#0f172a'
               : cIdx === 0
@@ -1419,7 +1854,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             if (lines.length > maxLines) maxLines = lines.length;
             return { lines, font, fillStyle };
           });
-          const height = Math.max(34, maxLines * 16 + 14);
+          const height = Math.max(38, maxLines * 17 + 16);
           return { cells, height };
         });
 
@@ -1437,11 +1872,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
       }
 
-      // 8. Month-End Section 1: Companies Completed
+      // 9. Month-End Sections (CONTENT_W = 800px)
       if (report.template_type === 'month_end' && report.included_sections?.completed_companies && report.sections?.completed_companies) {
         const compRows = report.sections.completed_companies;
         const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status', 'Offers'];
-        const colWidths = [50, 320, 260, 160, 210, 120];
+        const colWidths = [36, 204, 180, 100, 180, 100];
         const rawRows = compRows.map((r: any) => [
           String(r.s_no || ''),
           String(r.company_name || '—'),
@@ -1455,14 +1890,14 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           let maxLines = 1;
           const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
             const colW = colWidths[cIdx];
-            const maxCellW = colW - 16;
+            const maxCellW = colW - 14;
             const font = cIdx === 1
-              ? 'bold 11px system-ui, -apple-system, sans-serif'
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
               : cIdx === 0
-              ? '500 11px monospace'
+              ? '600 12px monospace'
               : (cIdx === 3 || cIdx === 5)
-              ? 'bold 11px system-ui, -apple-system, sans-serif'
-              : '500 11px system-ui, -apple-system, sans-serif';
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : '500 12px system-ui, -apple-system, sans-serif';
             const fillStyle = cIdx === 1
               ? '#0f172a'
               : cIdx === 0
@@ -1475,7 +1910,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             if (lines.length > maxLines) maxLines = lines.length;
             return { lines, font, fillStyle };
           });
-          const height = Math.max(34, maxLines * 16 + 14);
+          const height = Math.max(38, maxLines * 17 + 16);
           return { cells, height };
         });
 
@@ -1491,11 +1926,10 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
       }
 
-      // 8.5. Month-End Section 2: Company Conversions
       if (report.template_type === 'month_end' && report.included_sections?.company_conversions && report.sections?.company_conversions) {
         const convRows = report.sections.company_conversions;
         const headers = ['#', 'Company Name', 'Role', 'CTC', 'JD Received Date'];
-        const colWidths = [50, 380, 330, 180, 180];
+        const colWidths = [36, 234, 210, 110, 210];
         const rawRows = convRows.map((r: any) => [
           String(r.s_no || ''),
           String(r.company_name || '—'),
@@ -1508,14 +1942,14 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           let maxLines = 1;
           const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
             const colW = colWidths[cIdx];
-            const maxCellW = colW - 16;
+            const maxCellW = colW - 14;
             const font = cIdx === 1
-              ? 'bold 11px system-ui, -apple-system, sans-serif'
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
               : cIdx === 0
-              ? '500 11px monospace'
+              ? '600 12px monospace'
               : (cIdx === 3)
-              ? 'bold 11px system-ui, -apple-system, sans-serif'
-              : '500 11px system-ui, -apple-system, sans-serif';
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : '500 12px system-ui, -apple-system, sans-serif';
             const fillStyle = cIdx === 1
               ? '#0f172a'
               : cIdx === 0
@@ -1528,7 +1962,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             if (lines.length > maxLines) maxLines = lines.length;
             return { lines, font, fillStyle };
           });
-          const height = Math.max(34, maxLines * 16 + 14);
+          const height = Math.max(38, maxLines * 17 + 16);
           return { cells, height };
         });
 
@@ -1544,11 +1978,10 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
       }
 
-      // 9. Month-End Section 2: Companies in Drive
       const inDriveCanvasRows = report.sections?.companies_in_drive || report.sections?.company_drives_scheduled;
       if (report.template_type === 'month_end' && (report.included_sections?.companies_in_drive || report.included_sections?.company_drives_scheduled) && inDriveCanvasRows) {
         const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
-        const colWidths = [50, 320, 260, 160, 330];
+        const colWidths = [36, 224, 200, 110, 230];
         const rawRows = inDriveCanvasRows.map((r: any) => [
           String(r.s_no || ''),
           String(r.company_name || '—'),
@@ -1561,14 +1994,14 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           let maxLines = 1;
           const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
             const colW = colWidths[cIdx];
-            const maxCellW = colW - 16;
+            const maxCellW = colW - 14;
             const font = cIdx === 1
-              ? 'bold 11px system-ui, -apple-system, sans-serif'
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
               : cIdx === 0
-              ? '500 11px monospace'
+              ? '600 12px monospace'
               : (cIdx === 4)
-              ? '500 11px system-ui, -apple-system, sans-serif'
-              : '500 11px system-ui, -apple-system, sans-serif';
+              ? '500 12px system-ui, -apple-system, sans-serif'
+              : '500 12px system-ui, -apple-system, sans-serif';
             const fillStyle = cIdx === 1
               ? '#0f172a'
               : cIdx === 0
@@ -1581,7 +2014,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             if (lines.length > maxLines) maxLines = lines.length;
             return { lines, font, fillStyle };
           });
-          const height = Math.max(34, maxLines * 16 + 14);
+          const height = Math.max(38, maxLines * 17 + 16);
           return { cells, height };
         });
 
@@ -1599,36 +2032,45 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
 
       // Calculate total sections height using exact measured rows
       sectionsToDraw.forEach((sec) => {
-        totalH += 34; // Section title bar
-        totalH += 32; // Table header
+        totalH += 32; // Section title bar
+        totalH += 38; // Table header (38px for clean two-line header wrapping)
         if (sec.measuredRows.length === 0) {
-          totalH += 34; // Empty row
+          totalH += 36; // Empty row
         } else {
           sec.measuredRows.forEach((r) => {
             totalH += r.height;
           });
         }
-        totalH += 24; // Margin bottom
+        totalH += 18; // Margin bottom between sections
       });
 
-      // Observations Box Multi-Line Calculation
-      const obsText = (report.remarks || report.observations || '').trim();
-      const hasObservations = Boolean(obsText);
+      // Observations Box Multi-Line Calculation (Only if Coordinator Remarks & Observations is selected)
+      const hasObservations = Boolean(
+        report.included_sections?.remarks !== false &&
+        report.included_sections?.remarks &&
+        (report.remarks || report.observations)?.trim()
+      );
+      const obsText = hasObservations ? (report.remarks || report.observations || '').trim() : '';
       let obsLines: string[] = [];
-      let obsBoxH = 80;
+      let obsBoxH = 75;
       if (hasObservations) {
         obsLines = measureTextLines(
           scratchCtx,
           obsText,
           CONTENT_W - 32,
-          '500 11px system-ui, -apple-system, sans-serif'
+          '500 12px system-ui, -apple-system, sans-serif'
         );
-        obsBoxH = Math.max(70, obsLines.length * 18 + 40);
-        totalH += obsBoxH + 20;
+        obsBoxH = Math.max(68, obsLines.length * 19 + 38);
+        totalH += obsBoxH + 18;
       }
 
-      // Footer
-      totalH += 60;
+      // Footer (Only if Footer & Sign-off Options enabled)
+      const hasFooter = report.include_prepared_by !== false;
+      if (hasFooter) {
+        totalH += 50;
+      } else {
+        totalH += 20; // Clean bottom padding when footer is omitted
+      }
 
       // ── Create High-Resolution Canvas ──
       const canvas = document.createElement('canvas');
@@ -1679,71 +2121,78 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       let currentY = PADDING;
 
       // ── 2. Header: Logos & Centered Title ──
-      // Infoziant Logo (Left)
-      drawRoundRect(PADDING, currentY, 150, 60, 10, '#ffffff', '#e2e8f0', 1);
+      // Infoziant Logo (Left) — Enlarged for clear-cut branding definition
+      const logoBoxW = 154;
+      const logoBoxH = 66;
+      drawRoundRect(PADDING, currentY, logoBoxW, logoBoxH, 8, '#ffffff', '#e2e8f0', 1);
       if (infoziantImg) {
         const aspect = infoziantImg.width / infoziantImg.height;
-        const imgH = 46;
-        const imgW = Math.min(130, imgH * aspect);
-        ctx.drawImage(infoziantImg, PADDING + (150 - imgW) / 2, currentY + (60 - imgH) / 2, imgW, imgH);
+        const imgH = 54;
+        const imgW = Math.min(142, imgH * aspect);
+        ctx.drawImage(infoziantImg, PADDING + (logoBoxW - imgW) / 2, currentY + (logoBoxH - imgH) / 2, imgW, imgH);
       } else {
         ctx.fillStyle = '#0f172a';
         ctx.font = 'bold 16px system-ui, -apple-system, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('Infoziant', PADDING + 75, currentY + 36);
+        ctx.fillText('Infoziant', PADDING + logoBoxW / 2, currentY + 39);
       }
 
       // Title & Subtitle (Center)
       ctx.textAlign = 'center';
       ctx.fillStyle = '#0f172a';
-      ctx.font = 'bold 20px system-ui, -apple-system, sans-serif';
-      const mainTitle =
+      ctx.font = 'bold 18.5px system-ui, -apple-system, sans-serif';
+      let rawTitle =
         report.report_title ||
         (report.template_type === 'month_end'
           ? `${report.report_period?.split(' ')[0] || 'August'} Month Placement Operations Report`
           : report.template_type === 'pending_tasks'
-          ? 'Pending Tasks Action Report'
+          ? 'Pending Task Placement Report'
           : report.template_type === 'active_leads'
           ? 'Active Leads Pipeline Report'
           : 'Weekly Placement Report');
-      ctx.fillText(mainTitle, W / 2, currentY + 28);
+      
+      // Ensure Pending Task Placement Report always has each word capitalized
+      if (/pending\s*task/i.test(rawTitle)) {
+        rawTitle = 'Pending Task Placement Report';
+      }
+      ctx.fillText(rawTitle, W / 2, currentY + 32);
 
       if (collegeName && collegeName !== 'Consolidated Partner Institutions' && report.template_type !== 'active_leads') {
         ctx.fillStyle = '#475569';
-        ctx.font = 'bold 14px system-ui, -apple-system, sans-serif';
-        ctx.fillText(collegeName, W / 2, currentY + 52);
+        ctx.font = 'bold 13.5px system-ui, -apple-system, sans-serif';
+        ctx.fillText(collegeName, W / 2, currentY + 55);
       }
 
-      // College Logo / Code Badge (Right) — Hidden for Active Leads
-      if (report.template_type !== 'active_leads') {
-        const rightLogoX = W - PADDING - 150;
-        drawRoundRect(rightLogoX, currentY, 150, 60, 10, '#ffffff', '#e2e8f0', 1);
+      // College Logo / Code Badge (Right) — Hidden for Active Leads & Multi-College Weekly Reports
+      if (report.template_type !== 'active_leads' && !report.is_multi_college) {
+        const rightLogoX = W - PADDING - logoBoxW;
+        drawRoundRect(rightLogoX, currentY, logoBoxW, logoBoxH, 8, '#ffffff', '#e2e8f0', 1);
         if (!isConsolidated && collegeImg) {
           const aspect = collegeImg.width / collegeImg.height;
-          const imgH = 46;
-          const imgW = Math.min(130, imgH * aspect);
-          ctx.drawImage(collegeImg, rightLogoX + (150 - imgW) / 2, currentY + (60 - imgH) / 2, imgW, imgH);
+          const imgH = 54;
+          const imgW = Math.min(142, imgH * aspect);
+          ctx.drawImage(collegeImg, rightLogoX + (logoBoxW - imgW) / 2, currentY + (logoBoxH - imgH) / 2, imgW, imgH);
         } else {
           ctx.fillStyle = '#0284c7';
           ctx.font = 'bold 16px system-ui, -apple-system, sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText(isConsolidated ? 'iPOMS' : collegeCode, rightLogoX + 75, currentY + 36);
+          ctx.fillText(isConsolidated ? 'iPOMS' : collegeCode, rightLogoX + logoBoxW / 2, currentY + 39);
         }
       }
 
       // Header Bottom Line
       currentY += headerH;
       ctx.strokeStyle = '#cbd5e1';
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.25;
       ctx.beginPath();
       ctx.moveTo(PADDING, currentY);
       ctx.lineTo(W - PADDING, currentY);
       ctx.stroke();
 
-      currentY += 16;
+      currentY += 14;
 
       // ── 3. Metadata Strip ──
-      drawRoundRect(PADDING, currentY, CONTENT_W, metaH, 8, '#f8fafc', '#e2e8f0', 1);
+      drawRoundRect(PADDING, currentY, CONTENT_W, metaH, 6, '#f8fafc', '#e2e8f0', 1);
       ctx.fillStyle = '#334155';
       ctx.font = '500 12px system-ui, -apple-system, sans-serif';
       ctx.textAlign = 'center';
@@ -1754,36 +2203,36 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       } else {
         metaText = `Generated Date: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
       }
-      ctx.fillText(metaText, W / 2, currentY + 24);
+      ctx.fillText(metaText, W / 2, currentY + 21);
 
-      currentY += metaH + 18;
+      currentY += metaH + 16;
 
       // ── 4. KPI Cards Strip ──
       if (kpiCards.length > 0) {
-        const kpiCardW = (CONTENT_W - (kpiCards.length - 1) * 10) / kpiCards.length;
+        const kpiCardW = (CONTENT_W - (kpiCards.length - 1) * 8) / kpiCards.length;
         kpiCards.forEach((kpi, idx) => {
-          const cardX = PADDING + idx * (kpiCardW + 10);
-          drawRoundRect(cardX, currentY, kpiCardW, 60, 8, kpi.bg || '#f8fafc', kpi.border || '#e2e8f0', 1);
+          const cardX = PADDING + idx * (kpiCardW + 8);
+          drawRoundRect(cardX, currentY, kpiCardW, 58, 6, kpi.bg || '#f8fafc', kpi.border || '#e2e8f0', 1);
 
           ctx.textAlign = 'center';
           ctx.fillStyle = kpi.labelColor || '#64748b';
-          ctx.font = 'bold 10px system-ui, -apple-system, sans-serif';
-          ctx.fillText(kpi.label.toUpperCase(), cardX + kpiCardW / 2, currentY + 22);
+          ctx.font = 'bold 9.5px system-ui, -apple-system, sans-serif';
+          ctx.fillText(kpi.label.toUpperCase(), cardX + kpiCardW / 2, currentY + 20);
 
           ctx.fillStyle = kpi.color;
-          ctx.font = 'bold 18px system-ui, -apple-system, monospace';
-          ctx.fillText(String(kpi.val), cardX + kpiCardW / 2, currentY + 48);
+          ctx.font = 'bold 17px system-ui, -apple-system, monospace';
+          ctx.fillText(String(kpi.val), cardX + kpiCardW / 2, currentY + 46);
         });
-        currentY += 60 + 20;
+        currentY += 58 + 18;
       }
 
-      // ── 5. Render Section Tables (With Multi-Line Wrapped Cells) ──
+      // ── 5. Render Section Tables (With Excel-Style Full Borders & Two-Line Headers) ──
       sectionsToDraw.forEach((sec) => {
         // Section Title Pill
         drawRoundRect(PADDING, currentY, CONTENT_W, 30, 6, sec.accentBg, sec.accentBorder, 1);
         ctx.textAlign = 'left';
         ctx.fillStyle = sec.accentText;
-        ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+        ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
         ctx.fillText(sec.title, PADDING + 12, currentY + 20);
 
         // Badge on right
@@ -1794,44 +2243,71 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           ctx.fillText(sec.badge, W - PADDING - 12, currentY + 20);
         }
 
-        currentY += 34;
+        currentY += 32;
+        const tableTopY = currentY;
+        const tableHeaderH = 38;
 
-        // Table Header
-        drawRoundRect(PADDING, currentY, CONTENT_W, 30, 0, '#f1f5f9', '#cbd5e1', 1);
+        // Table Header Background Fill
+        ctx.fillStyle = '#f1f5f9';
+        ctx.fillRect(PADDING, currentY, CONTENT_W, tableHeaderH);
+
         ctx.textAlign = 'center';
-        ctx.fillStyle = '#475569';
+        ctx.fillStyle = '#0f172a';
         ctx.font = 'bold 10px system-ui, -apple-system, sans-serif';
 
         let curColX = PADDING;
         sec.headers.forEach((hName, hIdx) => {
           const colW = sec.colWidths[hIdx];
-          ctx.fillText(hName.toUpperCase(), curColX + colW / 2, currentY + 19);
-          if (hIdx < sec.headers.length - 1) {
-            ctx.strokeStyle = '#cbd5e1';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(curColX + colW, currentY);
-            ctx.lineTo(curColX + colW, currentY + 30);
-            ctx.stroke();
+          const maxCellW = colW - 8;
+          let hLines: string[];
+          const upper = hName.trim().toUpperCase();
+
+          // Explicit two-line wrapping for date & compound headers to strictly prevent crossing column boundaries
+          if (upper === 'JD RECEIVED DATE') {
+            hLines = ['JD RECEIVED', 'DATE'];
+          } else if (upper === 'DB SHARED DATE') {
+            hLines = ['DB SHARED', 'DATE'];
+          } else if (upper === 'REMARKS / NEXT ACTION' && maxCellW < 180) {
+            hLines = ['REMARKS /', 'NEXT ACTION'];
+          } else if (upper === 'CURRENT STATUS' && maxCellW < 95) {
+            hLines = ['CURRENT', 'STATUS'];
+          } else if (upper === 'OFFERS RECEIVED' && maxCellW < 110) {
+            hLines = ['OFFERS', 'RECEIVED'];
+          } else if (upper === 'STATUS / REASON' && maxCellW < 130) {
+            hLines = ['STATUS /', 'REASON'];
+          } else {
+            hLines = measureTextLines(scratchCtx, upper, maxCellW, 'bold 10px system-ui, -apple-system, sans-serif');
           }
+
+          const hLineHeight = 13;
+          const totalTextH = hLines.length * hLineHeight;
+          const startY = currentY + (tableHeaderH - totalTextH) / 2 + hLineHeight * 0.76;
+
+          hLines.forEach((line, lIdx) => {
+            ctx.fillText(line, curColX + colW / 2, startY + lIdx * hLineHeight);
+          });
+
           curColX += colW;
         });
 
-        currentY += 30;
+        currentY += tableHeaderH;
 
-        // Table Rows (With Vertically Centered Multi-Line Text)
+        // Table Rows (With Vertically Centered Multi-Line Text and Row Highlight Support)
         if (sec.measuredRows.length === 0) {
-          drawRoundRect(PADDING, currentY, CONTENT_W, 32, 0, '#ffffff', '#e2e8f0', 1);
+          const emptyH = 34;
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(PADDING, currentY, CONTENT_W, emptyH);
           ctx.textAlign = 'center';
           ctx.fillStyle = '#94a3b8';
-          ctx.font = 'italic 11px system-ui, -apple-system, sans-serif';
-          ctx.fillText('No records found for this section.', W / 2, currentY + 20);
-          currentY += 32;
+          ctx.font = 'italic 11.5px system-ui, -apple-system, sans-serif';
+          ctx.fillText('No records found for this section.', W / 2, currentY + 21);
+          currentY += emptyH;
         } else {
           sec.measuredRows.forEach((mRow, rIdx) => {
-            const rowBg = rIdx % 2 === 0 ? '#ffffff' : '#f8fafc';
+            const rowBg = mRow.bg || (rIdx % 2 === 0 ? '#ffffff' : '#f8fafc');
             const rowH = mRow.height;
-            drawRoundRect(PADDING, currentY, CONTENT_W, rowH, 0, rowBg, '#e2e8f0', 1);
+            ctx.fillStyle = rowBg;
+            ctx.fillRect(PADDING, currentY, CONTENT_W, rowH);
 
             let rowColX = PADDING;
             mRow.cells.forEach((cell, cIdx) => {
@@ -1840,23 +2316,14 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               ctx.fillStyle = cell.fillStyle;
               ctx.font = cell.font;
 
-              const lineHeight = 15;
+              const lineHeight = 17;
               const totalTextH = cell.lines.length * lineHeight;
-              const startY = currentY + (rowH - totalTextH) / 2 + lineHeight * 0.78;
+              const startY = currentY + (rowH - totalTextH) / 2 + lineHeight * 0.76;
 
               cell.lines.forEach((line, lineIdx) => {
                 ctx.fillText(line, rowColX + colW / 2, startY + lineIdx * lineHeight);
               });
 
-              // Column divider
-              if (cIdx < mRow.cells.length - 1) {
-                ctx.strokeStyle = '#e2e8f0';
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.moveTo(rowColX + colW, currentY);
-                ctx.lineTo(rowColX + colW, currentY + rowH);
-                ctx.stroke();
-              }
               rowColX += colW;
             });
 
@@ -1864,49 +2331,94 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           });
         }
 
+        const tableBottomY = currentY;
+
+        // ── Full Excel-Style Grid Borders (Minimal Charcoal-Black Grid) ──
+        // Minimal, crisp thin border (#374151) like Excel "All Borders"
+        // Ensures complete framing of every single row and column without being excessively dark or thick
+        ctx.strokeStyle = '#374151';
+        ctx.lineWidth = 1;
+
+        // 1. Outer perimeter border around the entire table
+        ctx.strokeRect(PADDING, tableTopY, CONTENT_W, tableBottomY - tableTopY);
+
+        // 2. Horizontal divider line below table header
+        ctx.beginPath();
+        ctx.moveTo(PADDING, tableTopY + tableHeaderH);
+        ctx.lineTo(PADDING + CONTENT_W, tableTopY + tableHeaderH);
+        ctx.stroke();
+
+        // 3. Horizontal divider lines between each data row
+        let rowYTracker = tableTopY + tableHeaderH;
+        if (sec.measuredRows.length > 0) {
+          sec.measuredRows.forEach((mRow, rIdx) => {
+            if (rIdx < sec.measuredRows.length - 1) {
+              rowYTracker += mRow.height;
+              ctx.beginPath();
+              ctx.moveTo(PADDING, rowYTracker);
+              ctx.lineTo(PADDING + CONTENT_W, rowYTracker);
+              ctx.stroke();
+            }
+          });
+        }
+
+        // 4. Vertical column divider lines (spanning from top of header to bottom of table)
+        let colXTracker = PADDING;
+        sec.colWidths.forEach((colW, cIdx) => {
+          if (cIdx < sec.colWidths.length - 1) {
+            colXTracker += colW;
+            ctx.beginPath();
+            ctx.moveTo(colXTracker, tableTopY);
+            ctx.lineTo(colXTracker, tableBottomY);
+            ctx.stroke();
+          }
+        });
+
         currentY += 18;
       });
 
-      // ── 6. Observations Box (Multi-Line Wrapped) ──
+      // ── 6. Observations Box (Multi-Line Wrapped, ONLY if selected) ──
       if (hasObservations) {
-        drawRoundRect(PADDING, currentY, CONTENT_W, obsBoxH, 8, '#f8fafc', '#e2e8f0', 1);
+        drawRoundRect(PADDING, currentY, CONTENT_W, obsBoxH, 6, '#f8fafc', '#e2e8f0', 1);
         ctx.textAlign = 'left';
         ctx.fillStyle = '#0f172a';
-        ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+        ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
         const obsHeader = report.template_type === 'active_leads' ? 'Notes' : 'Key Placement Observations';
         ctx.fillText(obsHeader, PADDING + 16, currentY + 24);
 
         ctx.fillStyle = '#475569';
-        ctx.font = '500 11px system-ui, -apple-system, sans-serif';
+        ctx.font = '500 12px system-ui, -apple-system, sans-serif';
         obsLines.forEach((line, lIdx) => {
-          ctx.fillText(line, PADDING + 16, currentY + 46 + lIdx * 18);
+          ctx.fillText(line, PADDING + 16, currentY + 46 + lIdx * 19);
         });
 
-        currentY += obsBoxH + 20;
+        currentY += obsBoxH + 18;
       }
 
-      // ── 7. Footer ──
-      ctx.strokeStyle = '#e2e8f0';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(PADDING, currentY);
-      ctx.lineTo(W - PADDING, currentY);
-      ctx.stroke();
+      // ── 7. Footer (ONLY if Footer & Sign-off Options enabled) ──
+      if (hasFooter) {
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(PADDING, currentY);
+        ctx.lineTo(W - PADDING, currentY);
+        ctx.stroke();
 
-      currentY += 24;
-      ctx.fillStyle = '#64748b';
-      ctx.font = '500 11px system-ui, -apple-system, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('© 2026 Infoziant. All rights reserved.', PADDING, currentY);
+        currentY += 22;
+        ctx.fillStyle = '#64748b';
+        ctx.font = '500 11.5px system-ui, -apple-system, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('© 2026 Infoziant. All rights reserved.', PADDING, currentY);
 
-      if (report.include_prepared_by !== false && Boolean(report.generated_by || report.branding?.prepared_by)) {
-        ctx.textAlign = 'right';
-        ctx.fillStyle = '#0f172a';
-        ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
-        ctx.fillText(`Prepared by: ${report.generated_by || report.branding?.prepared_by}`, W - PADDING, currentY);
+        if (Boolean(report.generated_by || report.branding?.prepared_by)) {
+          ctx.textAlign = 'right';
+          ctx.fillStyle = '#0f172a';
+          ctx.font = 'bold 11.5px system-ui, -apple-system, sans-serif';
+          ctx.fillText(`Prepared by: ${report.generated_by || report.branding?.prepared_by}`, W - PADDING, currentY);
+        }
       }
 
-      // ── 8. Export High-Res PNG (3000px Ultra-HD for WhatsApp) ──
+      // ── 8. Export High-Res PNG (2150px Ultra-HD for Mobile & WhatsApp) ──
       canvas.toBlob(
         (blob) => {
           if (blob) {
@@ -1983,12 +2495,12 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         <div className="flex items-center justify-between border-b-2 border-border print:border-slate-300 pb-4 gap-4 mb-2">
           {/* Left: Infoziant Logo */}
           <div className="flex items-center shrink-0">
-            <div className="bg-white rounded-xl p-1.5 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0">
+            <div className="bg-white rounded-xl p-2 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/infoziant-head.png"
                 alt="Infoziant"
-                className="h-12 w-auto object-contain shrink-0"
+                className="h-14 w-auto object-contain shrink-0"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = '/college-logos/Infozianthead.png';
                 }}
@@ -2005,7 +2517,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                 (report.template_type === 'month_end'
                   ? `${report.report_period?.split(' ')[0] || 'August'} Month Placement Operations Report`
                   : report.template_type === 'pending_tasks'
-                  ? 'Pending Tasks Action Report'
+                  ? 'Pending Task Placement Report'
                   : report.template_type === 'active_leads'
                   ? 'Active Leads Pipeline Report'
                   : 'Weekly Placement Report')
@@ -2020,20 +2532,20 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             )}
           </div>
 
-          {/* Right: Target College Logo (Hidden for Active Leads) */}
+          {/* Right: Target College Logo (Hidden for Active Leads & Multi-College Weekly Reports) */}
           <div className="flex items-center shrink-0 justify-end min-w-[100px]">
-            {report.template_type === 'active_leads' ? null : !isConsolidated && !logoFailed ? (
+            {report.template_type === 'active_leads' || report.is_multi_college ? null : !isConsolidated && !logoFailed ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 key={collegeLogoUrl}
                 src={collegeLogoUrl}
                 alt={collegeName}
-                className="h-12 w-auto max-w-[140px] object-contain shrink-0"
+                className="h-14 w-auto max-w-[160px] object-contain shrink-0"
                 onError={() => setLogoFailed(true)}
               />
             ) : (
-              <div className="h-9 px-3 bg-surface-sunken border border-border rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-fg shadow-2xs">
-                <Building2 size={14} className="text-primary shrink-0" />
+              <div className="h-10 px-3.5 bg-surface-sunken border border-border rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-fg shadow-2xs">
+                <Building2 size={15} className="text-primary shrink-0" />
                 <span>{isConsolidated ? 'iPOMS' : collegeCode}</span>
               </div>
             )}
@@ -2163,16 +2675,29 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                 ))}
               </div>
             );
+          } else if (report.is_multi_college) {
+            const multiCards = [
+              { key: 'total_colleges', label: 'Colleges Included', val: report.kpi_summary.total_colleges || report.colleges_data?.length || 0, bgClass: 'bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-200 dark:border-indigo-800', labelText: 'text-indigo-800 dark:text-indigo-300 font-bold', valText: 'text-indigo-700 dark:text-indigo-400 font-bold' },
+              { key: 'drives_completed', label: 'Companies Completed', val: report.kpi_summary.drives_completed || 0, bgClass: 'bg-emerald-50/80 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800', labelText: 'text-emerald-800 dark:text-emerald-300 font-bold', valText: 'text-emerald-700 dark:text-emerald-400 font-bold' },
+              { key: 'drives_in_progress', label: 'Companies In Progress', val: report.kpi_summary.drives_in_progress || 0, bgClass: 'bg-blue-50/80 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800', labelText: 'text-blue-800 dark:text-blue-300 font-bold', valText: 'text-blue-700 dark:text-blue-400 font-bold' },
+              { key: 'total_offers', label: 'Total Offers Placed', val: report.kpi_summary.total_offers || 0, bgClass: 'bg-purple-50/80 dark:bg-purple-950/50 border-purple-200 dark:border-purple-800', labelText: 'text-purple-800 dark:text-purple-300 font-bold', valText: 'text-purple-700 dark:text-purple-400 font-bold' },
+            ];
+            return (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {multiCards.map((card) => (
+                  <div key={card.key} className={`flex-1 min-w-[90px] border p-2 rounded-xl text-center shadow-xs ${card.bgClass}`}>
+                    <span className={`text-micro uppercase block truncate ${card.labelText}`}>{card.label}</span>
+                    <span className={`text-sm font-mono tabular-nums ${card.valText}`}>{card.val}</span>
+                  </div>
+                ))}
+              </div>
+            );
           } else {
             const wpCards = [
-              { key: 'total_calls', label: 'Calls', val: report.kpi_summary.total_calls || 0, bgClass: 'bg-blue-50/80 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800', labelText: 'text-blue-800 dark:text-blue-300 font-bold', valText: 'text-blue-700 dark:text-blue-400 font-bold' },
+              { key: 'total_calls', label: 'Total Calls Made', val: report.kpi_summary.total_calls || 0, bgClass: 'bg-blue-50/80 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800', labelText: 'text-blue-800 dark:text-blue-300 font-bold', valText: 'text-blue-700 dark:text-blue-400 font-bold' },
               { key: 'positive_responses', label: 'Positives', val: report.kpi_summary.positive_responses || 0, bgClass: 'bg-emerald-50/80 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800', labelText: 'text-emerald-800 dark:text-emerald-300 font-bold', valText: 'text-emerald-700 dark:text-emerald-400 font-bold' },
-              { key: 'jds_received', label: 'JDs Received', val: report.kpi_summary.jds_received || 0, bgClass: 'bg-cyan-50/80 dark:bg-cyan-950/50 border-cyan-200 dark:border-cyan-800', labelText: 'text-cyan-800 dark:text-cyan-300 font-bold', valText: 'text-cyan-700 dark:text-cyan-400 font-bold' },
-              { key: 'drives_completed', label: 'Completed', val: report.kpi_summary.drives_completed || 0, bgClass: 'bg-emerald-50/80 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800', labelText: 'text-emerald-800 dark:text-emerald-300 font-bold', valText: 'text-emerald-700 dark:text-emerald-400 font-bold' },
-              { key: 'drives_in_progress', label: 'In Progress', val: report.kpi_summary.drives_in_progress || 0, bgClass: 'bg-blue-50/80 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800', labelText: 'text-blue-800 dark:text-blue-300 font-bold', valText: 'text-blue-700 dark:text-blue-400 font-bold' },
-              { key: 'pipeline_leads', label: 'Pipeline', val: report.kpi_summary.pipeline_leads || 0, bgClass: 'bg-cyan-50/80 dark:bg-cyan-950/50 border-cyan-200 dark:border-cyan-800', labelText: 'text-cyan-800 dark:text-cyan-300 font-bold', valText: 'text-cyan-700 dark:text-cyan-400 font-bold' },
-              { key: 'top_companies_count', label: 'Top Companies', val: report.kpi_summary.top_companies_count || 0, bgClass: 'bg-purple-50/80 dark:bg-purple-950/50 border-purple-200 dark:border-purple-800', labelText: 'text-purple-800 dark:text-purple-300 font-bold', valText: 'text-purple-700 dark:text-purple-400 font-bold' },
-              { key: 'total_offers', label: 'Offers', val: report.kpi_summary.total_offers || 0, bgClass: 'bg-emerald-50/80 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800', labelText: 'text-emerald-800 dark:text-emerald-300 font-bold', valText: 'text-emerald-700 dark:text-emerald-400 font-bold' },
+              { key: 'not_hiring', label: 'Not Hiring', val: report.kpi_summary.not_hiring || 0, bgClass: 'bg-rose-50/80 dark:bg-rose-950/50 border-rose-200 dark:border-rose-800', labelText: 'text-rose-800 dark:text-rose-300 font-bold', valText: 'text-rose-700 dark:text-rose-400 font-bold' },
+              { key: 'jds_received', label: 'JD Received', val: report.kpi_summary.jds_received || 0, bgClass: 'bg-cyan-50/80 dark:bg-cyan-950/50 border-cyan-200 dark:border-cyan-800', labelText: 'text-cyan-800 dark:text-cyan-300 font-bold', valText: 'text-cyan-700 dark:text-cyan-400 font-bold' },
             ].filter((c) => activeKpis[c.key] !== false);
 
             if (wpCards.length === 0) return null;
@@ -2189,8 +2714,205 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           }
         })()}
 
-        {/* ── Weekly Placement Report Standard Sections 1-7 ── */}
-        {(!report.template_type || report.template_type === 'weekly_placement') && (
+        {/* ── Multi-College Consolidated Weekly Report ── */}
+        {report.is_multi_college && Array.isArray(report.colleges_data) && (
+          <div className="space-y-6 pt-2">
+            {report.colleges_data.map((colData: any, cIdx: number) => {
+              const hasCompleted = colData.completed_companies && colData.completed_companies.length > 0;
+              const hasProgress = colData.in_progress && colData.in_progress.length > 0;
+
+              return (
+                <div
+                  key={colData.college_id || cIdx}
+                  className="space-y-3 print:break-inside-avoid break-inside-avoid border border-border rounded-2xl p-4 bg-surface-sunken/30 shadow-xs"
+                >
+                  {/* Institution Banner */}
+                  <div className="flex items-center justify-between flex-wrap gap-2 px-3.5 py-2 bg-primary text-white rounded-xl shadow-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-white/20 text-white flex items-center justify-center text-[10px] font-mono font-bold shrink-0">
+                        {cIdx + 1}
+                      </span>
+                      <span className="font-bold text-xs sm:text-sm">
+                        {colData.college_name} {colData.college_code ? `(${colData.college_code})` : ''}
+                      </span>
+                      {colData.location && (
+                        <span className="text-xs text-blue-200 font-normal">
+                          • {colData.location}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs font-medium">
+                      <span className="px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-100 border border-emerald-400/30">
+                        {colData.total_completed || 0} Completed
+                      </span>
+                      {(colData.total_in_drive || 0) > 0 && (
+                        <span className="px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-100 border border-amber-400/30">
+                          {colData.total_in_drive} In Drive
+                        </span>
+                      )}
+                      <span className="px-2 py-0.5 rounded-lg bg-blue-500/20 text-blue-100 border border-blue-400/30">
+                        {colData.total_in_progress || 0} In Progress
+                      </span>
+                      <span className="px-2 py-0.5 rounded-lg bg-purple-500/20 text-purple-100 border border-purple-400/30 font-bold">
+                        {colData.total_offers || 0} Offers
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 1. Companies Completed Table */}
+                  {report.included_sections?.completed_companies !== false && (
+                    <div className="space-y-1.5">
+                      {!hasCompleted ? (
+                        <p className="text-xs text-fg-subtle italic px-2 py-1">
+                          No completed drives for this institution during this period.
+                        </p>
+                      ) : (
+                        <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+                          <table className="w-full text-xs text-center border-collapse table-fixed">
+                            <colgroup>
+                              <col style={{ width: '38px' }} />
+                              <col style={{ width: '25%' }} />
+                              <col style={{ width: '23%' }} />
+                              <col style={{ width: '12%' }} />
+                              <col style={{ width: '28%' }} />
+                              <col style={{ width: '12%' }} />
+                            </colgroup>
+                            <thead>
+                              <tr className="bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 border-b border-border font-bold text-xs">
+                                <th colSpan={6} className="py-1.5 px-3 text-left">
+                                  <span className="flex items-center gap-1.5">
+                                    <Trophy size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" /> 1. COMPANIES COMPLETED ({colData.completed_companies.length})
+                                  </span>
+                                </th>
+                              </tr>
+                              <tr className="bg-surface-sunken text-fg-muted font-semibold text-micro uppercase border-b border-border">
+                                <th className="py-1.5 px-1 text-center border-r border-border/80 font-mono">#</th>
+                                <th className="py-1.5 px-2 text-center border-r border-border/80">Company Name</th>
+                                <th className="py-1.5 px-2 text-center border-r border-border/80">Role</th>
+                                <th className="py-1.5 px-1 text-center border-r border-border/80">CTC</th>
+                                <th className="py-1.5 px-2 text-center border-r border-border/80">Status</th>
+                                <th className="py-1.5 px-1 text-center">Offers</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/60">
+                              {colData.completed_companies.map((r: any, rIdx: number) => (
+                                <tr key={rIdx} className={rIdx % 2 === 0 ? 'bg-surface' : 'bg-surface-sunken/40'}>
+                                  <td className="py-1.5 px-1 text-fg-subtle font-mono border-r border-border/60">{r.s_no || rIdx + 1}</td>
+                                  <td className="py-1.5 px-2 font-bold text-fg border-r border-border/60 text-left leading-tight break-words">{r.company_name}</td>
+                                  <td className="py-1.5 px-2 text-fg-muted border-r border-border/60 text-left leading-tight break-words">{r.job_role}</td>
+                                  <td className="py-1.5 px-1 text-emerald-600 dark:text-emerald-400 font-semibold border-r border-border/60 whitespace-nowrap">{r.ctc_lpa}</td>
+                                  <td className="py-1.5 px-2 text-fg-muted border-r border-border/60 text-left leading-tight break-words">{r.current_status_text}</td>
+                                  <td className="py-1.5 px-1 font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">{r.selected_count || 0}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 2. Companies in Drive Table */}
+                  {report.included_sections?.companies_in_drive !== false && colData.companies_in_drive && colData.companies_in_drive.length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+                        <table className="w-full text-xs text-center border-collapse table-fixed">
+                          <colgroup>
+                            <col style={{ width: '38px' }} />
+                            <col style={{ width: '27%' }} />
+                            <col style={{ width: '25%' }} />
+                            <col style={{ width: '13%' }} />
+                            <col style={{ width: '35%' }} />
+                          </colgroup>
+                          <thead>
+                            <tr className="bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 border-b border-border font-bold text-xs">
+                              <th colSpan={5} className="py-1.5 px-3 text-left">
+                                <span className="flex items-center gap-1.5">
+                                  <Flame size={13} className="text-amber-600 dark:text-amber-400 shrink-0" /> 2. COMPANIES IN DRIVE ({colData.companies_in_drive.length})
+                                </span>
+                              </th>
+                            </tr>
+                            <tr className="bg-surface-sunken text-fg-muted font-semibold text-micro uppercase border-b border-border">
+                              <th className="py-1.5 px-1 text-center border-r border-border/80 font-mono">#</th>
+                              <th className="py-1.5 px-2 text-center border-r border-border/80">Company Name</th>
+                              <th className="py-1.5 px-2 text-center border-r border-border/80">Role</th>
+                              <th className="py-1.5 px-1 text-center border-r border-border/80">CTC</th>
+                              <th className="py-1.5 px-2 text-center">Status / Drive Date</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/60">
+                            {colData.companies_in_drive.map((r: any, rIdx: number) => (
+                              <tr key={rIdx} className={rIdx % 2 === 0 ? 'bg-surface' : 'bg-surface-sunken/40'}>
+                                <td className="py-1.5 px-1 text-fg-subtle font-mono border-r border-border/60">{r.s_no || rIdx + 1}</td>
+                                <td className="py-1.5 px-2 font-bold text-fg border-r border-border/60 text-left leading-tight break-words">{r.company_name}</td>
+                                <td className="py-1.5 px-2 text-fg-muted border-r border-border/60 text-left leading-tight break-words">{r.job_role || r.role || '—'}</td>
+                                <td className="py-1.5 px-1 text-amber-600 dark:text-amber-400 font-semibold border-r border-border/60 whitespace-nowrap">{r.ctc_lpa || r.ctc || 'Competitive'}</td>
+                                <td className="py-1.5 px-2 text-fg-muted text-left leading-tight break-words">{r.current_status_text || r.status || 'Drive in progress'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. Companies In Progress Table */}
+                  {report.included_sections?.in_progress !== false && (
+                    <div className="space-y-1.5">
+                      {!hasProgress ? (
+                        <p className="text-xs text-fg-subtle italic px-2 py-1">
+                          No ongoing drives currently in progress for this institution.
+                        </p>
+                      ) : (
+                        <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+                          <table className="w-full text-xs text-center border-collapse table-fixed">
+                            <colgroup>
+                              <col style={{ width: '38px' }} />
+                              <col style={{ width: '27%' }} />
+                              <col style={{ width: '25%' }} />
+                              <col style={{ width: '13%' }} />
+                              <col style={{ width: '35%' }} />
+                            </colgroup>
+                            <thead>
+                              <tr className="bg-blue-50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 border-b border-border font-bold text-xs">
+                                <th colSpan={5} className="py-1.5 px-3 text-left">
+                                  <span className="flex items-center gap-1.5">
+                                    <Rocket size={13} className="text-blue-600 dark:text-blue-400 shrink-0" /> 3. COMPANIES IN PROGRESS ({colData.in_progress.length})
+                                  </span>
+                                </th>
+                              </tr>
+                              <tr className="bg-surface-sunken text-fg-muted font-semibold text-micro uppercase border-b border-border">
+                                <th className="py-1.5 px-1 text-center border-r border-border/80 font-mono">#</th>
+                                <th className="py-1.5 px-2 text-center border-r border-border/80">Company Name</th>
+                                <th className="py-1.5 px-2 text-center border-r border-border/80">Role</th>
+                                <th className="py-1.5 px-1 text-center border-r border-border/80">CTC</th>
+                                <th className="py-1.5 px-2 text-center">Status / Follow-up</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/60">
+                              {colData.in_progress.map((r: any, rIdx: number) => (
+                                <tr key={rIdx} className={rIdx % 2 === 0 ? 'bg-surface' : 'bg-surface-sunken/40'}>
+                                  <td className="py-1.5 px-1 text-fg-subtle font-mono border-r border-border/60">{r.s_no || rIdx + 1}</td>
+                                  <td className="py-1.5 px-2 font-bold text-fg border-r border-border/60 text-left leading-tight break-words">{r.company_name}</td>
+                                  <td className="py-1.5 px-2 text-fg-muted border-r border-border/60 text-left leading-tight break-words">{r.job_role}</td>
+                                  <td className="py-1.5 px-1 text-primary font-semibold border-r border-border/60 whitespace-nowrap">{r.ctc_lpa}</td>
+                                  <td className="py-1.5 px-2 text-fg-muted text-left leading-tight break-words">{r.current_status_text}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── Weekly Placement Report Standard Sections 1-8 ── */}
+        {(!report.template_type || report.template_type === 'weekly_placement') && !report.is_multi_college && (
           <>
             {/* 4. Section 1: Companies Completed */}
             {report.included_sections?.completed_companies && report.sections?.completed_companies && (
@@ -2292,12 +3014,99 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           </div>
         )}
 
-        {/* 5. Section 2: Companies In Progress */}
+        {/* Section 2: Companies In Drive */}
+        {report.included_sections?.companies_in_drive !== false && report.sections?.companies_in_drive && (
+          <div className="space-y-2 pt-2">
+            <div className="px-3 py-1.5 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/70 dark:bg-amber-950/40 font-bold text-xs flex items-center text-amber-800 dark:text-amber-300 print:hidden">
+              <span className="flex items-center gap-1.5">
+                <Flame size={14} strokeWidth={2.25} className="text-amber-600 dark:text-amber-400" /> 2. COMPANIES IN DRIVE
+              </span>
+            </div>
+
+            {report.sections.companies_in_drive.length === 0 ? (
+              <p className="text-xs text-fg-subtle italic py-2">No active drives conducting recruitment today.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <table className="w-full text-xs text-center border-collapse table-fixed">
+                  <colgroup>
+                    <col style={{ width: '38px' }} />
+                    <col style={{ width: '27%' }} />
+                    <col style={{ width: '28%' }} />
+                    <col style={{ width: '11.5%' }} />
+                    <col style={{ width: '30%' }} />
+                  </colgroup>
+                  <thead className="print:table-header-group">
+                    <tr className="hidden print:table-row bg-amber-50 border-b border-amber-200 text-amber-900">
+                      <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-amber-50 text-amber-900">
+                        <span className="flex items-center gap-1.5">
+                          <Flame size={13} className="text-amber-600 shrink-0" /> 2. COMPANIES IN DRIVE
+                        </span>
+                      </th>
+                    </tr>
+                    <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
+                      <th className="py-2 px-1 w-10 text-center font-mono" style={{ width: '38px' }}>#</th>
+                      <th className="py-2 px-2.5 w-[27%] text-center whitespace-normal font-semibold">Company Name</th>
+                      <th className="py-2 px-2 w-[28%] text-center whitespace-normal">Role</th>
+                      <th className="py-2 px-1.5 w-[11.5%] text-center whitespace-nowrap">CTC</th>
+                      <th className="py-2 px-2.5 w-[30%] text-center whitespace-normal">Status / Drive Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
+                    {report.sections.companies_in_drive.map((r: any, idx: number) => (
+                      <tr key={idx} className="hover:bg-surface-sunken/60">
+                        <td className="py-2 px-1 w-10 text-center text-fg-subtle font-mono" style={{ width: '38px' }}>{r.s_no}</td>
+                        <td className="py-2 px-2.5 w-[27%] font-semibold text-fg text-center whitespace-normal">
+                          <EditableReportCell
+                            value={r.company_name}
+                            onChange={(val) =>
+                              handleUpdateCell('companies_in_drive', idx, 'company_name', val)
+                            }
+                            className="font-semibold text-fg text-center"
+                          />
+                        </td>
+                        <td className="py-2 px-2 w-[28%] text-fg-muted text-center whitespace-normal">
+                          <EditableReportCell
+                            value={r.job_role || r.role || ''}
+                            onChange={(val) =>
+                              handleUpdateCell('companies_in_drive', idx, 'job_role', val)
+                            }
+                            className="text-fg-muted text-center"
+                          />
+                        </td>
+                        <td className="py-2 px-1.5 w-[11.5%] text-amber-600 dark:text-amber-400 font-medium text-center whitespace-nowrap">
+                          <EditableReportCell
+                            value={r.ctc_lpa || r.ctc || ''}
+                            onChange={(val) =>
+                              handleUpdateCell('companies_in_drive', idx, 'ctc_lpa', val)
+                            }
+                            nowrap={true}
+                            className="text-amber-600 dark:text-amber-400 font-medium text-center whitespace-nowrap"
+                          />
+                        </td>
+                        <td className="py-2 px-2.5 w-[30%] text-fg-subtle text-center whitespace-normal leading-snug">
+                          <EditableReportCell
+                            value={r.current_status_text || r.status || ''}
+                            onChange={(val) =>
+                              handleUpdateCell('companies_in_drive', idx, 'current_status_text', val)
+                            }
+                            className="text-fg-subtle text-center"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 5. Section 3: Companies In Progress */}
         {report.included_sections?.in_progress && report.sections?.in_progress && (
           <div className="space-y-2 pt-2">
             <div className="px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800/60 bg-blue-50/70 dark:bg-blue-950/40 font-bold text-xs flex items-center text-blue-800 dark:text-blue-300 print:hidden">
               <span className="flex items-center gap-1.5">
-                <Rocket size={14} strokeWidth={2.25} className="text-blue-700 dark:text-blue-400" /> 2. COMPANIES IN PROGRESS
+                <Rocket size={14} strokeWidth={2.25} className="text-blue-700 dark:text-blue-400" /> 3. COMPANIES IN PROGRESS
               </span>
             </div>
 
@@ -2317,7 +3126,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     <tr className="hidden print:table-row bg-blue-50 border-b border-blue-200 text-blue-900">
                       <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-blue-50 text-blue-900">
                         <span className="flex items-center gap-1.5">
-                          <Rocket size={13} className="text-blue-700 shrink-0" /> 2. COMPANIES IN PROGRESS
+                          <Rocket size={13} className="text-blue-700 shrink-0" /> 3. COMPANIES IN PROGRESS
                         </span>
                       </th>
                     </tr>
@@ -2379,12 +3188,12 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           </div>
         )}
 
-        {/* 6. Section 3: Companies in Pipeline */}
+        {/* 6. Section 4: Companies in Pipeline */}
         {report.included_sections?.pipeline && report.sections?.pipeline && (
           <div className="space-y-2 pt-2">
             <div className="px-3 py-1.5 rounded-xl border border-cyan-200 dark:border-cyan-800/60 bg-cyan-50/70 dark:bg-cyan-950/40 font-bold text-xs flex items-center text-cyan-800 dark:text-cyan-300 print:hidden">
               <span className="flex items-center gap-1.5">
-                <Inbox size={14} strokeWidth={2.25} className="text-cyan-700 dark:text-cyan-400" /> 3. COMPANIES IN PIPELINE
+                <Inbox size={14} strokeWidth={2.25} className="text-cyan-700 dark:text-cyan-400" /> 4. COMPANIES IN PIPELINE
               </span>
             </div>
 
@@ -2404,7 +3213,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     <tr className="hidden print:table-row bg-cyan-50 border-b border-cyan-200 text-cyan-900">
                       <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-cyan-50 text-cyan-900">
                         <span className="flex items-center gap-1.5">
-                          <Inbox size={13} className="text-cyan-700 shrink-0" /> 3. COMPANIES IN PIPELINE
+                          <Inbox size={13} className="text-cyan-700 shrink-0" /> 4. COMPANIES IN PIPELINE
                         </span>
                       </th>
                     </tr>
@@ -2466,12 +3275,12 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           </div>
         )}
 
-        {/* 6. Section 4: Top Companies */}
+        {/* 6. Section 5: Top Companies */}
         {report.included_sections?.top_companies && report.sections?.top_companies && (
           <div className="space-y-2 pt-2">
             <div className="px-3 py-1.5 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/70 dark:bg-amber-950/40 font-bold text-xs flex items-center text-amber-800 dark:text-amber-300 print:hidden">
               <span className="flex items-center gap-1.5">
-                <Star size={14} strokeWidth={2.25} className="text-amber-600 dark:text-amber-400" /> 4. TOP COMPANIES
+                <Star size={14} strokeWidth={2.25} className="text-amber-600 dark:text-amber-400" /> 5. TOP COMPANIES
               </span>
             </div>
 
@@ -2491,7 +3300,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     <tr className="hidden print:table-row bg-amber-50 border-b border-amber-200 text-amber-900">
                       <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-amber-50 text-amber-900">
                         <span className="flex items-center gap-1.5">
-                          <Star size={13} className="text-amber-600 shrink-0" /> 4. TOP COMPANIES
+                          <Star size={13} className="text-amber-600 shrink-0" /> 5. TOP COMPANIES
                         </span>
                       </th>
                     </tr>
@@ -2553,139 +3362,232 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           </div>
         )}
 
-        {/* 7. Section 5: Rejected Companies */}
-        {((report.included_sections?.rejected_companies && report.sections?.rejected_companies && report.sections.rejected_companies.length > 0) ||
-          (report.included_sections?.rejected_by_hr && report.sections?.rejected_by_hr && report.sections.rejected_by_hr.length > 0)) && (
+        {/* 7. Section 6: Rejected Companies */}
+        {(report.included_sections?.rejected_companies || report.included_sections?.rejected_by_hr) && (
           <div className="space-y-2 pt-2">
             <div className="px-3 py-1.5 rounded-xl border border-rose-200 dark:border-rose-800/60 bg-rose-50/70 dark:bg-rose-950/40 font-bold text-xs flex items-center text-rose-800 dark:text-rose-300 print:hidden">
               <span className="flex items-center gap-1.5">
-                <XCircle size={14} strokeWidth={2.25} className="text-rose-600 dark:text-rose-400" /> 5. REJECTED COMPANIES
+                <XCircle size={14} strokeWidth={2.25} className="text-rose-600 dark:text-rose-400" /> 6. REJECTED COMPANIES
               </span>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-border">
-              <table className="w-full text-xs text-center border-collapse table-fixed">
-                <colgroup>
-                  <col style={{ width: '38px' }} />
-                  <col style={{ width: '27%' }} />
-                  <col style={{ width: '28%' }} />
-                  <col style={{ width: '11.5%' }} />
-                  <col style={{ width: '30%' }} />
-                </colgroup>
-                <thead className="print:table-header-group">
-                  <tr className="hidden print:table-row bg-rose-50 border-b border-rose-200 text-rose-900">
-                    <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-rose-50 text-rose-900">
-                      <span className="flex items-center gap-1.5">
-                        <XCircle size={13} className="text-rose-600 shrink-0" /> 5. REJECTED COMPANIES
-                      </span>
-                    </th>
-                  </tr>
-                  <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
-                    <th className="py-2 px-1 w-10 text-center font-mono" style={{ width: '38px' }}>#</th>
-                    <th className="py-2 px-2.5 w-[27%] text-center whitespace-normal font-semibold">Company Name</th>
-                    <th className="py-2 px-2 w-[28%] text-center whitespace-normal">Role</th>
-                    <th className="py-2 px-1.5 w-[11.5%] text-center whitespace-nowrap">CTC</th>
-                    <th className="py-2 px-2.5 w-[30%] text-center whitespace-normal">Status / Reason</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
-                  {(report.sections.rejected_companies || report.sections.rejected_by_hr).map((r: any, idx: number) => {
-                    const secKey = report.sections.rejected_companies ? 'rejected_companies' : 'rejected_by_hr';
-                    return (
-                      <tr key={idx} className="hover:bg-surface-sunken/60">
-                        <td className="py-2 px-1 w-10 text-center text-fg-subtle font-mono" style={{ width: '38px' }}>{r.s_no}</td>
-                        <td className="py-2 px-2.5 w-[27%] font-semibold text-fg text-center whitespace-normal">
-                          <EditableReportCell
-                            value={r.company_name}
-                            onChange={(val) =>
-                              handleUpdateCell(secKey, idx, 'company_name', val)
-                            }
-                            className="font-semibold text-fg text-center"
-                          />
-                        </td>
-                        <td className="py-2 px-2 w-[28%] text-fg-muted text-center whitespace-normal">
-                          <EditableReportCell
-                            value={r.job_role}
-                            onChange={(val) =>
-                              handleUpdateCell(secKey, idx, 'job_role', val)
-                            }
-                            className="text-fg-muted text-center"
-                          />
-                        </td>
-                        <td className="py-2 px-1.5 w-[11.5%] text-rose-600 dark:text-rose-400 font-medium text-center whitespace-nowrap">
-                          <EditableReportCell
-                            value={r.ctc_lpa || '—'}
-                            onChange={(val) =>
-                              handleUpdateCell(secKey, idx, 'ctc_lpa', val)
-                            }
-                            nowrap={true}
-                            className="text-rose-600 dark:text-rose-400 font-medium text-center whitespace-nowrap"
-                          />
-                        </td>
-                        <td className="py-2 px-2.5 w-[30%] text-rose-600 dark:text-rose-400 text-center font-medium whitespace-normal leading-snug">
-                          <EditableReportCell
-                            value={r.current_status_text}
-                            onChange={(val) =>
-                              handleUpdateCell(secKey, idx, 'current_status_text', val)
-                            }
-                            className="text-rose-600 dark:text-rose-400 font-medium text-center"
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            {(report.sections?.rejected_companies || report.sections?.rejected_by_hr || []).length === 0 ? (
+              <p className="text-xs text-fg-subtle italic py-2">No rejected companies recorded for this period.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <table className="w-full text-xs text-center border-collapse table-fixed">
+                  <colgroup>
+                    <col style={{ width: '38px' }} />
+                    <col style={{ width: '27%' }} />
+                    <col style={{ width: '28%' }} />
+                    <col style={{ width: '11.5%' }} />
+                    <col style={{ width: '30%' }} />
+                  </colgroup>
+                  <thead className="print:table-header-group">
+                    <tr className="hidden print:table-row bg-rose-50 border-b border-rose-200 text-rose-900">
+                      <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-rose-50 text-rose-900">
+                        <span className="flex items-center gap-1.5">
+                          <XCircle size={13} className="text-rose-600 shrink-0" /> 6. REJECTED COMPANIES
+                        </span>
+                      </th>
+                    </tr>
+                    <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
+                      <th className="py-2 px-1 w-10 text-center font-mono" style={{ width: '38px' }}>#</th>
+                      <th className="py-2 px-2.5 w-[27%] text-center whitespace-normal font-semibold">Company Name</th>
+                      <th className="py-2 px-2 w-[28%] text-center whitespace-normal">Role</th>
+                      <th className="py-2 px-1.5 w-[11.5%] text-center whitespace-nowrap">CTC</th>
+                      <th className="py-2 px-2.5 w-[30%] text-center whitespace-normal">Status / Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
+                    {(report.sections?.rejected_companies || report.sections?.rejected_by_hr || []).map((r: any, idx: number) => {
+                      const secKey = report.sections?.rejected_companies ? 'rejected_companies' : 'rejected_by_hr';
+                      return (
+                        <tr key={idx} className="hover:bg-surface-sunken/60">
+                          <td className="py-2 px-1 w-10 text-center text-fg-subtle font-mono" style={{ width: '38px' }}>{r.s_no}</td>
+                          <td className="py-2 px-2.5 w-[27%] font-semibold text-fg text-center whitespace-normal">
+                            <EditableReportCell
+                              value={r.company_name}
+                              onChange={(val) =>
+                                handleUpdateCell(secKey, idx, 'company_name', val)
+                              }
+                              className="font-semibold text-fg text-center"
+                            />
+                          </td>
+                          <td className="py-2 px-2 w-[28%] text-fg-muted text-center whitespace-normal">
+                            <EditableReportCell
+                              value={r.job_role}
+                              onChange={(val) =>
+                                handleUpdateCell(secKey, idx, 'job_role', val)
+                              }
+                              className="text-fg-muted text-center"
+                            />
+                          </td>
+                          <td className="py-2 px-1.5 w-[11.5%] text-rose-600 dark:text-rose-400 font-medium text-center whitespace-nowrap">
+                            <EditableReportCell
+                              value={r.ctc_lpa || '—'}
+                              onChange={(val) =>
+                                handleUpdateCell(secKey, idx, 'ctc_lpa', val)
+                              }
+                              nowrap={true}
+                              className="text-rose-600 dark:text-rose-400 font-medium text-center whitespace-nowrap"
+                            />
+                          </td>
+                          <td className="py-2 px-2.5 w-[30%] text-rose-600 dark:text-rose-400 text-center font-medium whitespace-normal leading-snug">
+                            <EditableReportCell
+                              value={r.current_status_text}
+                              onChange={(val) =>
+                                handleUpdateCell(secKey, idx, 'current_status_text', val)
+                              }
+                              className="text-rose-600 dark:text-rose-400 font-medium text-center"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
-        {/* 8. Section 6: Companies On Hold By College */}
-        {((report.included_sections?.on_hold_by_college && report.sections?.on_hold_by_college && report.sections.on_hold_by_college.length > 0) ||
-          (report.included_sections?.rejected_by_college && report.sections?.rejected_by_college && report.sections.rejected_by_college.length > 0)) && (
+        {/* 8. Section 7: Companies On Hold By College */}
+        {(report.included_sections?.on_hold_by_college || report.included_sections?.rejected_by_college) && (
           <div className="space-y-2 pt-2">
             <div className="px-3 py-1.5 rounded-xl border border-orange-200 dark:border-orange-800/60 bg-orange-50/70 dark:bg-orange-950/40 font-bold text-xs flex items-center text-orange-800 dark:text-orange-300 print:hidden">
               <span className="flex items-center gap-1.5">
-                <Clock size={14} strokeWidth={2.25} className="text-orange-600 dark:text-orange-400" /> 6. COMPANIES ON HOLD BY COLLEGE
+                <Clock size={14} strokeWidth={2.25} className="text-orange-600 dark:text-orange-400" /> 7. COMPANIES ON HOLD BY COLLEGE
               </span>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-border">
-              <table className="w-full text-xs text-center border-collapse table-fixed">
-                <colgroup>
-                  <col style={{ width: '38px' }} />
-                  <col style={{ width: '27%' }} />
-                  <col style={{ width: '28%' }} />
-                  <col style={{ width: '11.5%' }} />
-                  <col style={{ width: '30%' }} />
-                </colgroup>
-                <thead className="print:table-header-group">
-                  <tr className="hidden print:table-row bg-orange-50 border-b border-orange-200 text-orange-900">
-                    <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-orange-50 text-orange-900">
-                      <span className="flex items-center gap-1.5">
-                        <Clock size={13} className="text-orange-600 shrink-0" /> 6. COMPANIES ON HOLD BY COLLEGE
-                      </span>
-                    </th>
-                  </tr>
-                  <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
-                    <th className="py-2 px-1 w-10 text-center font-mono" style={{ width: '38px' }}>#</th>
-                    <th className="py-2 px-2.5 w-[27%] text-center whitespace-normal font-semibold">Company Name</th>
-                    <th className="py-2 px-2 w-[28%] text-center whitespace-normal">Role</th>
-                    <th className="py-2 px-1.5 w-[11.5%] text-center whitespace-nowrap">CTC</th>
-                    <th className="py-2 px-2.5 w-[30%] text-center whitespace-normal">Status / Reason</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
-                  {(report.sections.on_hold_by_college || report.sections.rejected_by_college).map((r: any, idx: number) => {
-                    const secKey = report.sections.on_hold_by_college ? 'on_hold_by_college' : 'rejected_by_college';
-                    return (
+            {(report.sections?.on_hold_by_college || report.sections?.rejected_by_college || []).length === 0 ? (
+              <p className="text-xs text-fg-subtle italic py-2">No companies currently on hold by college.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <table className="w-full text-xs text-center border-collapse table-fixed">
+                  <colgroup>
+                    <col style={{ width: '38px' }} />
+                    <col style={{ width: '27%' }} />
+                    <col style={{ width: '28%' }} />
+                    <col style={{ width: '11.5%' }} />
+                    <col style={{ width: '30%' }} />
+                  </colgroup>
+                  <thead className="print:table-header-group">
+                    <tr className="hidden print:table-row bg-orange-50 border-b border-orange-200 text-orange-900">
+                      <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-orange-50 text-orange-900">
+                        <span className="flex items-center gap-1.5">
+                          <Clock size={13} className="text-orange-600 shrink-0" /> 7. COMPANIES ON HOLD BY COLLEGE
+                        </span>
+                      </th>
+                    </tr>
+                    <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
+                      <th className="py-2 px-1 w-10 text-center font-mono" style={{ width: '38px' }}>#</th>
+                      <th className="py-2 px-2.5 w-[27%] text-center whitespace-normal font-semibold">Company Name</th>
+                      <th className="py-2 px-2 w-[28%] text-center whitespace-normal">Role</th>
+                      <th className="py-2 px-1.5 w-[11.5%] text-center whitespace-nowrap">CTC</th>
+                      <th className="py-2 px-2.5 w-[30%] text-center whitespace-normal">Status / Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
+                    {(report.sections?.on_hold_by_college || report.sections?.rejected_by_college || []).map((r: any, idx: number) => {
+                      const secKey = report.sections?.on_hold_by_college ? 'on_hold_by_college' : 'rejected_by_college';
+                      return (
+                        <tr key={idx} className="hover:bg-surface-sunken/60">
+                          <td className="py-2 px-1 w-10 text-center text-fg-subtle font-mono" style={{ width: '38px' }}>{r.s_no}</td>
+                          <td className="py-2 px-2.5 w-[27%] font-semibold text-fg text-center whitespace-normal">
+                            <EditableReportCell
+                              value={r.company_name}
+                              onChange={(val) =>
+                                handleUpdateCell(secKey, idx, 'company_name', val)
+                              }
+                              className="font-semibold text-fg text-center"
+                            />
+                          </td>
+                          <td className="py-2 px-2 w-[28%] text-fg-muted text-center whitespace-normal">
+                            <EditableReportCell
+                              value={r.job_role}
+                              onChange={(val) =>
+                                handleUpdateCell(secKey, idx, 'job_role', val)
+                              }
+                              className="text-fg-muted text-center"
+                            />
+                          </td>
+                          <td className="py-2 px-1.5 w-[11.5%] text-orange-600 dark:text-orange-400 font-medium text-center whitespace-nowrap">
+                            <EditableReportCell
+                              value={r.ctc_lpa || '—'}
+                              onChange={(val) =>
+                                handleUpdateCell(secKey, idx, 'ctc_lpa', val)
+                              }
+                              nowrap={true}
+                              className="text-orange-600 dark:text-orange-400 font-medium text-center whitespace-nowrap"
+                            />
+                          </td>
+                          <td className="py-2 px-2.5 w-[30%] text-orange-600 dark:text-orange-400 text-center font-medium whitespace-normal leading-snug">
+                            <EditableReportCell
+                              value={r.current_status_text}
+                              onChange={(val) =>
+                                handleUpdateCell(secKey, idx, 'current_status_text', val)
+                              }
+                              className="text-orange-600 dark:text-orange-400 font-medium text-center"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 9. Section 8: Companies On Hold By HR */}
+        {report.included_sections?.on_hold_by_hr && (
+          <div className="space-y-2 pt-2">
+            <div className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100/70 dark:bg-slate-900/40 font-bold text-xs flex items-center text-slate-800 dark:text-slate-300 print:hidden">
+              <span className="flex items-center gap-1.5">
+                <Clock size={14} strokeWidth={2.25} className="text-slate-600 dark:text-slate-400" /> 8. COMPANIES ON HOLD BY HR
+              </span>
+            </div>
+
+            {(report.sections?.on_hold_by_hr || []).length === 0 ? (
+              <p className="text-xs text-fg-subtle italic py-2">No companies currently on hold by HR.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <table className="w-full text-xs text-center border-collapse table-fixed">
+                  <colgroup>
+                    <col style={{ width: '38px' }} />
+                    <col style={{ width: '27%' }} />
+                    <col style={{ width: '28%' }} />
+                    <col style={{ width: '11.5%' }} />
+                    <col style={{ width: '30%' }} />
+                  </colgroup>
+                  <thead className="print:table-header-group">
+                    <tr className="hidden print:table-row bg-slate-100 border-b border-slate-300 text-slate-800">
+                      <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-slate-100 text-slate-800">
+                        <span className="flex items-center gap-1.5">
+                          <Clock size={13} className="text-slate-600 shrink-0" /> 8. COMPANIES ON HOLD BY HR
+                        </span>
+                      </th>
+                    </tr>
+                    <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
+                      <th className="py-2 px-1 w-10 text-center font-mono" style={{ width: '38px' }}>#</th>
+                      <th className="py-2 px-2.5 w-[27%] text-center whitespace-normal font-semibold">Company Name</th>
+                      <th className="py-2 px-2 w-[28%] text-center whitespace-normal">Role</th>
+                      <th className="py-2 px-1.5 w-[11.5%] text-center whitespace-nowrap">CTC</th>
+                      <th className="py-2 px-2.5 w-[30%] text-center whitespace-normal">Status / Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
+                    {(report.sections?.on_hold_by_hr || []).map((r: any, idx: number) => (
                       <tr key={idx} className="hover:bg-surface-sunken/60">
                         <td className="py-2 px-1 w-10 text-center text-fg-subtle font-mono" style={{ width: '38px' }}>{r.s_no}</td>
                         <td className="py-2 px-2.5 w-[27%] font-semibold text-fg text-center whitespace-normal">
                           <EditableReportCell
                             value={r.company_name}
                             onChange={(val) =>
-                              handleUpdateCell(secKey, idx, 'company_name', val)
+                              handleUpdateCell('on_hold_by_hr', idx, 'company_name', val)
                             }
                             className="font-semibold text-fg text-center"
                           />
@@ -2694,119 +3596,36 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                           <EditableReportCell
                             value={r.job_role}
                             onChange={(val) =>
-                              handleUpdateCell(secKey, idx, 'job_role', val)
+                              handleUpdateCell('on_hold_by_hr', idx, 'job_role', val)
                             }
                             className="text-fg-muted text-center"
                           />
                         </td>
-                        <td className="py-2 px-1.5 w-[11.5%] text-orange-600 dark:text-orange-400 font-medium text-center whitespace-nowrap">
+                        <td className="py-2 px-1.5 w-[11.5%] text-slate-700 dark:text-slate-300 font-medium text-center whitespace-nowrap">
                           <EditableReportCell
                             value={r.ctc_lpa || '—'}
                             onChange={(val) =>
-                              handleUpdateCell(secKey, idx, 'ctc_lpa', val)
+                              handleUpdateCell('on_hold_by_hr', idx, 'ctc_lpa', val)
                             }
                             nowrap={true}
-                            className="text-orange-600 dark:text-orange-400 font-medium text-center whitespace-nowrap"
+                            className="text-slate-700 dark:text-slate-300 font-medium text-center whitespace-nowrap"
                           />
                         </td>
-                        <td className="py-2 px-2.5 w-[30%] text-orange-600 dark:text-orange-400 text-center font-medium whitespace-normal leading-snug">
+                        <td className="py-2 px-2.5 w-[30%] text-slate-700 dark:text-slate-300 text-center font-medium whitespace-normal leading-snug">
                           <EditableReportCell
                             value={r.current_status_text}
                             onChange={(val) =>
-                              handleUpdateCell(secKey, idx, 'current_status_text', val)
+                              handleUpdateCell('on_hold_by_hr', idx, 'current_status_text', val)
                             }
-                            className="text-orange-600 dark:text-orange-400 font-medium text-center"
+                            className="text-slate-700 dark:text-slate-300 font-medium text-center"
                           />
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* 9. Section 7: Companies On Hold By HR */}
-        {report.included_sections?.on_hold_by_hr && report.sections?.on_hold_by_hr && report.sections.on_hold_by_hr.length > 0 && (
-          <div className="space-y-2 pt-2">
-            <div className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100/70 dark:bg-slate-900/40 font-bold text-xs flex items-center text-slate-800 dark:text-slate-300 print:hidden">
-              <span className="flex items-center gap-1.5">
-                <Clock size={14} strokeWidth={2.25} className="text-slate-600 dark:text-slate-400" /> 7. COMPANIES ON HOLD BY HR
-              </span>
-            </div>
-
-            <div className="overflow-x-auto rounded-xl border border-border">
-              <table className="w-full text-xs text-center border-collapse table-fixed">
-                <colgroup>
-                  <col style={{ width: '38px' }} />
-                  <col style={{ width: '27%' }} />
-                  <col style={{ width: '28%' }} />
-                  <col style={{ width: '11.5%' }} />
-                  <col style={{ width: '30%' }} />
-                </colgroup>
-                <thead className="print:table-header-group">
-                  <tr className="hidden print:table-row bg-slate-100 border-b border-slate-300 text-slate-800">
-                    <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-slate-100 text-slate-800">
-                      <span className="flex items-center gap-1.5">
-                        <Clock size={13} className="text-slate-600 shrink-0" /> 7. COMPANIES ON HOLD BY HR
-                      </span>
-                    </th>
-                  </tr>
-                  <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
-                    <th className="py-2 px-1 w-10 text-center font-mono" style={{ width: '38px' }}>#</th>
-                    <th className="py-2 px-2.5 w-[27%] text-center whitespace-normal font-semibold">Company Name</th>
-                    <th className="py-2 px-2 w-[28%] text-center whitespace-normal">Role</th>
-                    <th className="py-2 px-1.5 w-[11.5%] text-center whitespace-nowrap">CTC</th>
-                    <th className="py-2 px-2.5 w-[30%] text-center whitespace-normal">Status / Reason</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
-                  {report.sections.on_hold_by_hr.map((r: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-surface-sunken/60">
-                      <td className="py-2 px-1 w-10 text-center text-fg-subtle font-mono" style={{ width: '38px' }}>{r.s_no}</td>
-                      <td className="py-2 px-2.5 w-[27%] font-semibold text-fg text-center whitespace-normal">
-                        <EditableReportCell
-                          value={r.company_name}
-                          onChange={(val) =>
-                            handleUpdateCell('on_hold_by_hr', idx, 'company_name', val)
-                          }
-                          className="font-semibold text-fg text-center"
-                        />
-                      </td>
-                      <td className="py-2 px-2 w-[28%] text-fg-muted text-center whitespace-normal">
-                        <EditableReportCell
-                          value={r.job_role}
-                          onChange={(val) =>
-                            handleUpdateCell('on_hold_by_hr', idx, 'job_role', val)
-                          }
-                          className="text-fg-muted text-center"
-                        />
-                      </td>
-                      <td className="py-2 px-1.5 w-[11.5%] text-slate-700 dark:text-slate-300 font-medium text-center whitespace-nowrap">
-                        <EditableReportCell
-                          value={r.ctc_lpa || '—'}
-                          onChange={(val) =>
-                            handleUpdateCell('on_hold_by_hr', idx, 'ctc_lpa', val)
-                          }
-                          nowrap={true}
-                          className="text-slate-700 dark:text-slate-300 font-medium text-center whitespace-nowrap"
-                        />
-                      </td>
-                      <td className="py-2 px-2.5 w-[30%] text-slate-700 dark:text-slate-300 text-center font-medium whitespace-normal leading-snug">
-                        <EditableReportCell
-                          value={r.current_status_text}
-                          onChange={(val) =>
-                            handleUpdateCell('on_hold_by_hr', idx, 'current_status_text', val)
-                          }
-                          className="text-slate-700 dark:text-slate-300 font-medium text-center"
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
           </>
@@ -2859,67 +3678,97 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
-                      {report.sections.pending_tasks.map((r: any, idx: number) => (
-                        <tr key={idx} className="hover:bg-surface-sunken/60">
-                          <td className="py-2 px-1 w-10 text-center text-fg-subtle font-mono" style={{ width: '38px' }}>{r.s_no}</td>
-                          <td className={`py-2 px-2.5 ${hasDriveDate ? 'w-[25%]' : 'w-[29%]'} font-semibold text-fg text-center whitespace-normal`}>
-                            <EditableReportCell
-                              value={r.company_name}
-                              onChange={(val) =>
-                                handleUpdateCell('pending_tasks', idx, 'company_name', val)
-                              }
-                              className="font-semibold text-fg text-center"
-                            />
-                          </td>
-                          <td className={`py-2 px-1.5 ${hasDriveDate ? 'w-[11%]' : 'w-[12%]'} text-fg-muted text-center whitespace-nowrap`}>
-                            <EditableReportCell
-                              value={r.jd_received_date}
-                              onChange={(val) =>
-                                handleUpdateCell('pending_tasks', idx, 'jd_received_date', val)
-                              }
-                              className="text-fg-muted text-center"
-                            />
-                          </td>
-                          <td className={`py-2 px-1.5 ${hasDriveDate ? 'w-[11%]' : 'w-[12%]'} text-fg-muted text-center whitespace-nowrap`}>
-                            <EditableReportCell
-                              value={r.db_shared_date}
-                              onChange={(val) =>
-                                handleUpdateCell('pending_tasks', idx, 'db_shared_date', val)
-                              }
-                              className="text-fg-muted text-center"
-                            />
-                          </td>
-                          <td className={`py-2 px-2 ${hasDriveDate ? 'w-[20%]' : 'w-[23%]'} text-fg text-center whitespace-normal leading-snug`}>
-                            <EditableReportCell
-                              value={r.current_status}
-                              onChange={(val) =>
-                                handleUpdateCell('pending_tasks', idx, 'current_status', val)
-                              }
-                              className="text-fg font-medium text-center"
-                            />
-                          </td>
-                          <td className={`py-2 px-2 ${hasDriveDate ? 'w-[20%]' : 'w-[23%]'} text-fg font-medium text-center whitespace-normal leading-snug`}>
-                            <EditableReportCell
-                              value={r.action_to_be_taken}
-                              onChange={(val) =>
-                                handleUpdateCell('pending_tasks', idx, 'action_to_be_taken', val)
-                              }
-                              className="text-fg font-medium text-center"
-                            />
-                          </td>
-                          {hasDriveDate && (
-                            <td className="py-2 px-1.5 w-[11%] text-indigo-600 dark:text-indigo-400 font-semibold text-center whitespace-nowrap">
+                      {report.sections.pending_tasks.map((r: any, idx: number) => {
+                        const isHl = Boolean(r.is_highlighted);
+                        const hlBg = r.highlight_color || '#fef08a';
+                        return (
+                          <tr
+                            key={idx}
+                            style={isHl ? { backgroundColor: hlBg, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' } : undefined}
+                            className={isHl ? 'font-semibold text-slate-950 transition-colors shadow-2xs' : 'hover:bg-surface-sunken/60'}
+                          >
+                            <td className="py-2 px-1 w-10 text-center font-mono relative group" style={{ width: '38px', backgroundColor: isHl ? hlBg : undefined }}>
+                              <div className="flex items-center justify-center gap-1">
+                                <span className={isHl ? 'text-slate-900 font-bold' : 'text-fg-subtle'}>{r.s_no}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const next = !isHl;
+                                    handleUpdateCell('pending_tasks', idx, 'is_highlighted', next);
+                                    if (next && !r.highlight_color) {
+                                      handleUpdateCell('pending_tasks', idx, 'highlight_color', '#fef08a');
+                                    }
+                                  }}
+                                  title={isHl ? 'Click to remove row highlight' : 'Click to highlight row (pending from college side)'}
+                                  className={`print:hidden p-1 rounded-md transition-all cursor-pointer ${
+                                    isHl
+                                      ? 'text-amber-900 bg-amber-300/80 hover:bg-amber-400'
+                                      : 'text-fg-subtle/40 hover:text-amber-600 hover:bg-amber-100 dark:hover:bg-amber-950/60 opacity-0 group-hover:opacity-100 focus:opacity-100'
+                                  }`}
+                                >
+                                  <Highlighter size={12} className={isHl ? 'fill-amber-400' : ''} />
+                                </button>
+                              </div>
+                            </td>
+                            <td className={`py-2 px-2.5 ${hasDriveDate ? 'w-[25%]' : 'w-[29%]'} font-semibold text-center whitespace-normal`} style={{ backgroundColor: isHl ? hlBg : undefined }}>
                               <EditableReportCell
-                                value={r.drive_date}
+                                value={r.company_name}
                                 onChange={(val) =>
-                                  handleUpdateCell('pending_tasks', idx, 'drive_date', val)
+                                  handleUpdateCell('pending_tasks', idx, 'company_name', val)
                                 }
-                                className="text-indigo-600 dark:text-indigo-400 font-semibold text-center"
+                                className={`font-semibold text-center ${isHl ? 'text-slate-950 font-bold' : 'text-fg'}`}
                               />
                             </td>
-                          )}
-                        </tr>
-                      ))}
+                            <td className={`py-2 px-1.5 ${hasDriveDate ? 'w-[11%]' : 'w-[12%]'} text-center whitespace-nowrap`} style={{ backgroundColor: isHl ? hlBg : undefined }}>
+                              <EditableReportCell
+                                value={r.jd_received_date}
+                                onChange={(val) =>
+                                  handleUpdateCell('pending_tasks', idx, 'jd_received_date', val)
+                                }
+                                className={`text-center ${isHl ? 'text-slate-800 font-medium' : 'text-fg-muted'}`}
+                              />
+                            </td>
+                            <td className={`py-2 px-1.5 ${hasDriveDate ? 'w-[11%]' : 'w-[12%]'} text-center whitespace-nowrap`} style={{ backgroundColor: isHl ? hlBg : undefined }}>
+                              <EditableReportCell
+                                value={r.db_shared_date}
+                                onChange={(val) =>
+                                  handleUpdateCell('pending_tasks', idx, 'db_shared_date', val)
+                                }
+                                className={`text-center ${isHl ? 'text-slate-800 font-medium' : 'text-fg-muted'}`}
+                              />
+                            </td>
+                            <td className={`py-2 px-2 ${hasDriveDate ? 'w-[20%]' : 'w-[23%]'} text-center whitespace-normal leading-snug`} style={{ backgroundColor: isHl ? hlBg : undefined }}>
+                              <EditableReportCell
+                                value={r.current_status}
+                                onChange={(val) =>
+                                  handleUpdateCell('pending_tasks', idx, 'current_status', val)
+                                }
+                                className={`text-center font-medium ${isHl ? 'text-slate-900 font-bold' : 'text-fg'}`}
+                              />
+                            </td>
+                            <td className={`py-2 px-2 ${hasDriveDate ? 'w-[20%]' : 'w-[23%]'} text-center whitespace-normal leading-snug`} style={{ backgroundColor: isHl ? hlBg : undefined }}>
+                              <EditableReportCell
+                                value={r.action_to_be_taken}
+                                onChange={(val) =>
+                                  handleUpdateCell('pending_tasks', idx, 'action_to_be_taken', val)
+                                }
+                                className={`text-center font-medium ${isHl ? 'text-slate-950 font-bold' : 'text-fg'}`}
+                              />
+                            </td>
+                            {hasDriveDate && (
+                              <td className="py-2 px-1.5 w-[11%] font-semibold text-center whitespace-nowrap" style={{ backgroundColor: isHl ? hlBg : undefined }}>
+                                <EditableReportCell
+                                  value={r.drive_date}
+                                  onChange={(val) =>
+                                    handleUpdateCell('pending_tasks', idx, 'drive_date', val)
+                                  }
+                                  className={`font-semibold text-center ${isHl ? 'text-indigo-900 font-bold' : 'text-indigo-600 dark:text-indigo-400'}`}
+                                />
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -3508,19 +4357,21 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
 
         </div>
 
-        {/* 8. Master Institutional Footer — Always at the End of the Report */}
-        <div className="border-t border-border print:border-slate-300 pt-4 mt-auto flex items-center justify-between text-xs text-fg-subtle print:text-slate-500 avoid-break shrink-0">
-          <div>
-            <p className="text-[11px] text-fg-subtle print:text-slate-500 font-medium">© 2026 Infoziant. All rights reserved.</p>
-          </div>
-          {/* Prepared By in Footer Area */}
-          {report.include_prepared_by !== false && Boolean(report.generated_by || report.branding?.prepared_by) && (
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-fg print:text-slate-800">
-              <User size={13} className="text-primary shrink-0" />
-              <span>Prepared by: <strong className="font-bold">{report.generated_by || report.branding?.prepared_by}</strong></span>
+        {/* 8. Master Institutional Footer — Always at the End of the Report (Only when Footer & Sign-off Options enabled) */}
+        {report.include_prepared_by !== false && (
+          <div className="border-t border-border print:border-slate-300 pt-4 mt-auto flex items-center justify-between text-xs text-fg-subtle print:text-slate-500 avoid-break shrink-0">
+            <div>
+              <p className="text-[11px] text-fg-subtle print:text-slate-500 font-medium">© 2026 Infoziant. All rights reserved.</p>
             </div>
-          )}
-        </div>
+            {/* Prepared By in Footer Area */}
+            {Boolean(report.generated_by || report.branding?.prepared_by) && (
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-fg print:text-slate-800">
+                <User size={13} className="text-primary shrink-0" />
+                <span>Prepared by: <strong className="font-bold">{report.generated_by || report.branding?.prepared_by}</strong></span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Bottom Action Toolbar (Bottom Right Corner at End of Page) ────────── */}

@@ -12,6 +12,7 @@ exports.findPolicy = findPolicy;
 const ADMIN = ['ADMINISTRATOR'];
 const TL_ADMIN = ['ADMINISTRATOR', 'TEAM_LEADER'];
 const STAFF = ['ADMINISTRATOR', 'TEAM_LEADER', 'PLACEMENT_COORDINATOR'];
+const COORDINATOR_ONLY = ['PLACEMENT_COORDINATOR'];
 /**
  * Legacy/misspelled role codes found in live `users.role_codes`.
  *
@@ -58,7 +59,7 @@ const POLICIES = [
     { method: '*', pattern: /^\/metadata\/import-unique-companies\/?$/, roles: ADMIN },
     { method: '*', pattern: /^\/metadata\/export-missing-excel\/?$/, roles: ADMIN },
     { method: '*', pattern: /^\/metadata\/renumber\/?$/, roles: ADMIN },
-    { method: 'DELETE', pattern: new RegExp(`^/metadata/${ID}/purge/?$`), roles: ADMIN },
+    { method: 'DELETE', pattern: new RegExp(`^/metadata/${ID}/purge/?$`), roles: STAFF },
     { method: 'POST', pattern: new RegExp(`^/metadata/${ID}/restore/?$`), roles: STAFF },
     { method: 'POST', pattern: new RegExp(`^/metadata/bulk-import/?$`), roles: STAFF },
     { method: 'PATCH', pattern: new RegExp(`^/metadata/${ID}/?$`), roles: STAFF },
@@ -85,6 +86,14 @@ const POLICIES = [
     { method: 'GET', pattern: /^\/health\/daily-leads-diagnostics\/?$/, roles: ADMIN },
     { method: '*', pattern: /^\/weekly-tracker(\/.*)?$/, roles: STAFF },
     // ── Daily Leads & Active Leads ────────────────────────────────────────────
+    // Module 05: "Coordinator-only write; everyone else read-only." The three
+    // write verbs are Coordinator-only here (deliberately narrower than
+    // scopeToSelf's usual TL/Admin-as-supervisor pattern — a Team Leader may
+    // view a coordinator's leads but must not create or delete one on their
+    // behalf); GET stays open to all staff via the wildcard below.
+    { method: 'POST', pattern: /^\/daily-leads(\/.*)?$/, roles: COORDINATOR_ONLY },
+    { method: 'PATCH', pattern: /^\/daily-leads(\/.*)?$/, roles: COORDINATOR_ONLY },
+    { method: 'DELETE', pattern: /^\/daily-leads(\/.*)?$/, roles: COORDINATOR_ONLY },
     { method: '*', pattern: /^\/daily-leads(\/.*)?$/, roles: STAFF },
     { method: '*', pattern: /^\/active-leads(\/.*)?$/, roles: STAFF },
     // ── Pending Tasks ─────────────────────────────────────────────────────────

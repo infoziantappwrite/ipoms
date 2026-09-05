@@ -104,7 +104,7 @@ export function WeeklyHeader({
   onSelectCollege,
   weekOffset,
   onWeekChange,
-  academicYear = '2027',
+  academicYear = 'all',
   onAcademicYearChange,
   onOpenAddModal,
   onSyncDailyPositives,

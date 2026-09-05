@@ -249,7 +249,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
             <SnoRangeSelector
               fromSno={fromSno}
               toSno={toSno}
-              minSno={isRecent ? 3548 : 1}
+              minSno={isRecent ? Math.max(1, masterTotal - 99) : 1}
               maxSno={masterTotal}
               onApplyRange={(f, t) => {
                 setFromSno(f);

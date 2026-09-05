@@ -41,3 +41,4 @@ version 1/PDF/
 node_modules/
 .next/
 *.node
+backups/

@@ -5,8 +5,11 @@ import { Plus, X, Building2, Briefcase, Layers, GraduationCap } from 'lucide-rea
 import { apiFetch } from '@/lib/api';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
+import { useToast } from '@/components/ui/Toast';
 
 const BATCH_YEARS = ['2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
+
+import { COMPANY_TYPES } from '../constants/companyTypes';
 
 interface Props {
   collegeId: string;
@@ -14,17 +17,6 @@ interface Props {
   onClose: () => void;
   onAdded: () => void;
 }
-
-const COMPANY_TYPES = [
-  'Software / IT',
-  'Software / Product',
-  'Core / Engineering',
-  'Banking / Finance',
-  'Healthcare / Pharma',
-  'EdTech / Education',
-  'Consulting',
-  'BPO / KPO',
-];
 
 const SECTIONS = [
   { value: 'completed', label: '1. Companies Completed' },
@@ -43,9 +35,10 @@ export function AddCompanyModal({
   onClose,
   onAdded,
 }: Props) {
+  const { toast } = useToast();
   const [companyName, setCompanyName] = useState('');
   const [jobRole, setJobRole] = useState('Graduate Trainee');
-  const [companyType, setCompanyType] = useState('Software / IT');
+  const [companyType, setCompanyType] = useState('IT / Software & Technology');
   const [ctcValue, setCtcValue] = useState('');
   const [ctcUnit, setCtcUnit] = useState<'LPA' | '/ Month'>('LPA');
   const [eligibleBatch, setEligibleBatch] = useState('2026');
@@ -80,19 +73,19 @@ export function AddCompanyModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!companyName.trim()) {
-      alert('Company Name is mandatory.');
+      toast('Company Name is mandatory.', 'warning');
       return;
     }
     if (!jobRole.trim()) {
-      alert('Job Role is mandatory.');
+      toast('Job Role is mandatory.', 'warning');
       return;
     }
     if (!ctcValue.trim()) {
-      alert('CTC is mandatory.');
+      toast('CTC is mandatory.', 'warning');
       return;
     }
     if (!currentStatusText.trim()) {
-      alert('Current Status Remarks is mandatory.');
+      toast('Current Status Remarks is mandatory.', 'warning');
       return;
     }
 
@@ -102,7 +95,7 @@ export function AddCompanyModal({
 
     setLoading(true);
     try {
-      const res = await apiFetch('/weekly-tracker', {
+      const res = await apiFetch<any>('/weekly-tracker', {
         method: 'POST',
         body: JSON.stringify({
           college_id: collegeId,
@@ -120,14 +113,17 @@ export function AddCompanyModal({
       });
 
       if (res.success) {
+        // The backend now refuses (400 COMPANY_NOT_IN_METADATA) any company not
+        // already in Metadata, so a successful response is always is_in_metadata.
+        toast(`"${companyName.trim()}" added to Weekly Tracker.`, 'success');
         onAdded();
         onClose();
       } else {
-        alert(res.message || (res as any)?.error?.message || 'Failed to add company');
+        toast(res.message || res.error?.message || 'Failed to add company', 'error');
       }
     } catch (err: any) {
       console.error('Add company error:', err);
-      alert('Network error while saving company');
+      toast('Network error while saving company', 'error');
     } finally {
       setLoading(false);
     }
