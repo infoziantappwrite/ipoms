@@ -254,7 +254,7 @@ export function SmoothYearDropdown({
                     <div
                       className={`w-[18px] h-[18px] min-w-[18px] min-h-[18px] rounded-[5px] border-2 flex items-center justify-center transition-all shadow-xs shrink-0 ${
                         isSelected
-                          ? 'bg-primary border-primary text-white ring-2 ring-primary/25'
+                          ? 'bg-primary border-primary text-primary-foreground ring-2 ring-primary/25'
                           : 'border-slate-500 dark:border-slate-400 bg-white dark:bg-slate-900 group-hover:border-primary dark:group-hover:border-primary'
                       }`}
                     >
@@ -278,7 +278,7 @@ export function SmoothYearDropdown({
                   setIsOpen(false);
                   setCoords((prev) => ({ ...prev, ready: false }));
                 }}
-                className="px-3 py-1 rounded-lg bg-primary hover:bg-primary/90 text-white text-[11px] font-bold shadow-xs transition-colors cursor-pointer active:scale-95"
+                className="px-3 py-1 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-[11px] font-bold shadow-xs transition-colors cursor-pointer active:scale-95"
               >
                 Done
               </button>

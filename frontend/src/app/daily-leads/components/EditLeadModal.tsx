@@ -335,7 +335,7 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
             type="submit"
             form="edit-lead-form"
             disabled={loading || deleting}
-            className="px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-primary/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+            className="px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-md shadow-primary/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
           >
             <CheckCircle2 size={14} />
             <span>{loading ? 'Saving…' : 'Save Changes'}</span>

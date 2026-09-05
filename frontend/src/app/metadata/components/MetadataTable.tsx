@@ -22,6 +22,7 @@ interface Props {
   isRecycleBin: boolean;
   page?: number;
   limit?: number;
+  canDelete?: boolean;
   onEdit: (company: CompanyRecord) => void;
   onDelete: (id: string, name: string) => void;
   onRestore: (id: string, name: string) => void;
@@ -33,6 +34,7 @@ export function MetadataTable({
   isRecycleBin,
   page = 1,
   limit = 50,
+  canDelete = true,
   onEdit,
   onDelete,
   onRestore,
@@ -168,14 +170,16 @@ export function MetadataTable({
                           >
                             <Pencil size={13} strokeWidth={2} aria-hidden />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => onDelete(c._id, c.company_name)}
-                            className="w-7 h-7 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 border border-rose-500/20 flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
-                            title="Move to Recycle Bin"
-                          >
-                            <Trash2 size={13} strokeWidth={2} />
-                          </button>
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={() => onDelete(c._id, c.company_name)}
+                              className="w-7 h-7 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 border border-rose-500/20 flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                              title="Move to Recycle Bin"
+                            >
+                              <Trash2 size={13} strokeWidth={2} />
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <div className="flex items-center justify-center gap-1.5">
@@ -187,14 +191,16 @@ export function MetadataTable({
                           >
                             <RotateCcw size={13} strokeWidth={2} aria-hidden />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => onPurge(c._id, c.company_name)}
-                            className="w-7 h-7 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-600 border border-rose-500/30 flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
-                            title="Permanently Purge"
-                          >
-                            <X size={13} strokeWidth={2} aria-hidden />
-                          </button>
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={() => onPurge(c._id, c.company_name)}
+                              className="w-7 h-7 rounded-lg bg-rose-500/15 hover:bg-rose-500/30 text-rose-600 border border-rose-500/30 flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                              title="Permanently Purge"
+                            >
+                              <X size={13} strokeWidth={2} aria-hidden />
+                            </button>
+                          )}
                         </div>
                       )}
                     </td>

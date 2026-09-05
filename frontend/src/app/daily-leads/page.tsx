@@ -9,7 +9,7 @@ import { LeadsTable, DailyLeadRow } from './components/LeadsTable';
 import { AddLeadModal } from './components/AddLeadModal';
 import { CopyToJdModal } from './components/CopyToJdModal';
 import { apiFetch } from '@/lib/api';
-import { readSessionUser } from '@/lib/session';
+import { readSessionUser, roleOf } from '@/lib/session';
 import { getActiveCollege, setActiveCollege } from '@/lib/collegeSession';
 import { exportToXlsx } from '@/lib/exportExcel';
 import { useToast } from '@/components/ui/Toast';
@@ -51,6 +51,7 @@ export default function DailyLeadsPage() {
   const [loading, setLoading] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [coordinatorId, setCoordinatorId] = useState<string>('');
+  const [isCoordinator, setIsCoordinator] = useState<boolean>(true);
 
   // Multi-Selection State for Bulk Deletion
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -59,6 +60,8 @@ export default function DailyLeadsPage() {
   useEffect(() => {
     const user = readSessionUser();
     if (user?._id) setCoordinatorId(user._id);
+    const r = roleOf(user);
+    setIsCoordinator(r === 'coordinator');
 
     // Fetch colleges list for row-level dropdowns
     apiFetch('/colleges')
@@ -412,14 +415,14 @@ export default function DailyLeadsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
+    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-primary-foreground">
       {/* ── Top Header with Tab Bar (Just Above Section Before the Calendar) ─ */}
       <LeadsHeader
         selectedDate={selectedDate}
         onDateChange={setSelectedDate}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        onOpenAddModal={() => setIsAddModalOpen(true)}
+        onOpenAddModal={isCoordinator ? () => setIsAddModalOpen(true) : undefined}
         onExportXlsx={handleExportXlsx}
         onExportPdf={handleOpenPdfModal}
         onExportImage={handleOpenImageModal}
@@ -427,17 +430,17 @@ export default function DailyLeadsPage() {
           loadLeads();
           loadSummary();
         }}
-        isDeleteMode={isDeleteMode}
-        onToggleDeleteMode={handleToggleDeleteMode}
-        onSyncPositives={handleSyncPositives}
+        isDeleteMode={isCoordinator ? isDeleteMode : false}
+        onToggleDeleteMode={isCoordinator ? handleToggleDeleteMode : undefined}
+        onSyncPositives={isCoordinator ? handleSyncPositives : undefined}
         isSyncing={isSyncing}
         activeTab={activeTab}
         onTabChange={handleTabChange}
         positivesCount={summary.positives_count}
         jdCount={summary.jd_received_count}
         selectedCount={selectedIds.length}
-        onBulkDelete={handleBulkDelete}
-        onOpenCopyToJdModal={() => setIsCopyToJdModalOpen(true)}
+        onBulkDelete={isCoordinator ? handleBulkDelete : undefined}
+        onOpenCopyToJdModal={isCoordinator ? () => setIsCopyToJdModalOpen(true) : undefined}
       />
 
       {/* ── Table Workspace ───────────────────────────────────────────────── */}

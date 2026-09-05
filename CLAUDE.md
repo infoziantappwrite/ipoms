@@ -369,14 +369,11 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     `AdminSystemHealthWidget.tsx`; and the stale values from the live `system_settings`
     document itself (one-time `$unset`). Verified: both `tsc --noEmit` clean, server boots
     against the real `.env`, and a live `GET /settings` response contains no `announcement*`
-    key. **A separate, unrelated "Broadcast Announcement" feature still exists** at
-    `frontend/src/app/notifications/components/BroadcastModal.tsx` — it is NOT what was
-    removed here, and it has its own bug: it POSTs to `/notifications/broadcast`, which has no
-    backend route (the real, working, TL/Admin-gated endpoint is `POST /api/v1/notifications`,
-    `server.ts` line ~5242) — so clicking it 404s. Not touched; flagged for a future fix. If
-    that gets fixed, `RoleMatrixTab.tsx`'s "Dispatch Broadcast Announcements" row (currently
-    `tl: true, admin: true`) should be re-verified against it working end-to-end, not just the
-    backend route existing.
+    key. ~~A separate, unrelated "Broadcast Announcement" feature existed at
+    `BroadcastModal.tsx`~~ — **removed 3 Sep 2026, see §5 item 27.** Correction to what this
+    entry said at the time: it was never actually a live, clickable, 404-ing button — the
+    whole `/notifications` page was already `redirect('/dashboard')`, so the component holding
+    it was unreachable dead code, not a reachable bug. Deleted rather than fixed.
 12. ~~**Administrator could self-recover by email OTP, contradicting the documented CLI-only
     policy.**~~ **FIXED 30 Aug 2026.** §2's "Lockout & recovery" rule says a blocked
     Administrator has no email-OTP path specifically so a compromised admin mailbox can't be
@@ -422,7 +419,251 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     `globals.css`; `.apple-glass` using `backdrop-filter` in direct contradiction of the
     "no glassmorphism anywhere" rule stated in the same file; scrollbars globally killed with
     `!important`, which makes the styled scrollbar block above it dead code.
+14. ~~**Metadata restore had no ownership check.**~~ **FIXED 3 Sep 2026.** Any coordinator could
+    restore any deleted company record, not just their own — the documented rule
+    ("Coordinators may restore what they themselves deleted") was never enforced, and the
+    schema didn't even track who deleted a record. Added `deleted_by` to `CompanyMetadata`
+    (set on delete, cleared on restore); the restore handler now calls
+    `refuseForeignOwner(req, res, record.deleted_by)` — Admin/Team Leader (`isSupervisor`)
+    may still restore anything, a Coordinator only their own. Verified live: Mohanaradha
+    deleted a record, Lizenya's restore attempt got `403 FORBIDDEN_NOT_OWNER`, Mohanaradha's
+    own restore succeeded, and Admin's supervisor-override restore succeeded too.
+15. ~~**Daily Leads write access was not Coordinator-only, and had no ownership scoping.**~~
+    **FIXED 3 Sep 2026.** Contradicted Module 05 ("Coordinator-only write; everyone else
+    read-only") on two counts: `routePolicy.ts` gated `/daily-leads*` to `STAFF` (all three
+    roles, every method), and the handlers took `coordinator_id` straight from the request
+    body with no check, so a Team Leader could create or delete a lead attributed to any
+    coordinator. Split the policy: POST/PATCH/DELETE now require `PLACEMENT_COORDINATOR`
+    specifically (GET stays `STAFF`); the create handler ignores any client-supplied
+    `coordinator_id` and always attributes to the caller; the edit, move-to-JD, and delete
+    handlers each added `refuseForeignOwner()` against the lead's real `coordinator_id`.
+    Verified live: Team Leader's POST now gets `403`; a coordinator's spoofed
+    `coordinator_id` in the request body is silently ignored and the record is correctly
+    attributed to the real caller instead.
+16. ~~**Self-signup produced a fully-working Coordinator account with zero human review.**~~
+    **FIXED 3 Sep 2026.** A verified `@infoziant.com`/`@icl.today` inbox was the *only* gate —
+    OTP success immediately created an `active` account and auto-logged the user in. Added a
+    `pending` `account_status`: the account is created as `pending` (not auto-logged-in) after
+    OTP verification, and login refuses `pending` with `403 ACCOUNT_PENDING_APPROVAL` pointing
+    at Team Leader/Administrator review. **No new approval UI was needed** — `PATCH /users/:id`
+    (already TL/Admin-accessible) accepts `account_status`, and `UserModal.tsx`'s status dropdown
+    now includes "Pending Approval (Self-Registered)" so an existing Team Leader/Admin can spot
+    and activate one through the User Management screen they already have. Frontend signup flow
+    updated to show the pending message instead of "Welcome" + dashboard redirect when no token
+    comes back. Verified live end-to-end: a `pending` account's login attempt is refused; Team
+    Leader's `PATCH .../users/:id {"account_status":"active"}` flips it; the same account then
+    logs in successfully.
+    **Undocumented finding from the same testing pass:** signup's domain check accepts
+    `@icl.today` in addition to `@infoziant.com` — surfaced in the error copy itself, not
+    documented anywhere. **Confirmed genuinely in use** (not a stray config entry): the live
+    `users` collection already has a real seeded account on `@icl.today` (Seshmitha Tamilselvi
+    R). Still not documented anywhere outside the code itself — worth a proper mention here
+    once confirmed with the user, but functionally safe as-is.
+17. ~~**Weekly Tracker and Daily Leads search crashed (500) on regex special characters.**~~
+    **FIXED 3 Sep 2026.** Both endpoints passed the raw `search` query straight into
+    `$regex` with no escaping — a bare `(`, ordinary in real company names ("ABC (India) Pvt
+    Ltd"), threw an uncaught `"Regular expression is invalid: missing closing parenthesis"`.
+    `Metadata` and `Active Leads` search already escaped correctly (via the existing
+    `escapeRegex()` helper) and were the reference for the fix — applied the same helper at
+    all three unescaped call sites (`GET /weekly-tracker`, `GET /weekly-tracker/export-xlsx`,
+    `GET /daily-leads`). Verified live: `?search=(` now returns `200` on all three instead
+    of `500`.
+18. ~~**Signup's Primary Mobile field accepted non-numeric input with zero validation.**~~
+    **FIXED 3 Sep 2026.** `abc123xyz` passed straight through, client and server, and would
+    have been stored as a coordinator's "phone number." Added `isValidMobile()`
+    (10-13 digits after stripping spaces/hyphens/a leading `+`) to both backend signup
+    handlers and a matching frontend check — but only when a mobile *is* supplied, since the
+    field has no `required` attribute in the UI and was already legitimately optional; the
+    fix targets the garbage-data bug, not scope-creeps the field into mandatory. Verified
+    live: `abc123xyz` → `400 INVALID_MOBILE`; a real 10-digit number → proceeds normally.
+19. ~~**Daily Leads summary badge counted every coordinator, not just the caller.**~~
+    **FIXED 3 Sep 2026.** `GET /daily-leads/summary` never called `scopeToSelf()` — a
+    coordinator's Positives/JD badge silently showed the org-wide total while the row list
+    right below it (which already scoped correctly) showed only her own. Added the same
+    `scopeToSelf()` call the list endpoint already uses. Verified live: a coordinator's own
+    summary (305 positives) is now genuinely lower than the true org-wide total requested
+    explicitly by Admin with `coordinator_id=all` (315) — confirming real scoping, not a
+    coincidental match.
+20. ~~**Team Leader's User Management permission had no UI to reach it.**~~ **FIXED 3 Sep
+    2026.** Backend already allowed `TL_ADMIN` on `POST`/`PATCH /users`; every path to it was
+    hard-gated to Administrator only. Two independent surfaces both needed opening: the
+    standalone `/users` page (`AppSidebar.tsx`'s nav entry, `roles: ['admin']` →
+    `['admin', 'team_leader']`, matching the pattern already used for `/system-settings`) and
+    the `/settings?tab=users` path (`settings/page.tsx`'s `isAdmin` gates on the sidebar, the
+    users section, and the modal all switched to a new `canManageUsers = isAdmin ||
+    isTeamLeader`; `SettingsNav.tsx` reworked from a single `forCoordinator` flag to a
+    3-tier `visible: 'all' | 'staff' | 'admin'` per section so Team Leader sees Profile +
+    User Management only — Role Matrix/System Config/Organization/System Info stay
+    Administrator-only on both nav surfaces). Verified live as Sujitha (Team Leader): the
+    Settings sidebar now shows both sections (previously showed nothing but Profile), and
+    User Management renders the real 8-account list.
+21. **Real PDF/PNG export, a real recycle-bin screen, and wiring up the built-but-orphaned
+    chat module are each their own project, not a bug fix** — deliberately not started
+    without a scoping conversation first. See release gate items 2 and 5, and the "chat
+    module" finding in the QA report.
+22. ~~**Signup OTP's "0 attempt(s) remaining" was off by one — a 6th guess still got
+    evaluated.**~~ **FIXED 3 Sep 2026.** The signup verify-OTP handler incremented the
+    attempt counter *then* checked the cap (`attempts > 5`), so the 5th wrong guess showed
+    "0 remaining" while the block only actually fired on a 6th call. The forgot-password OTP
+    flow already did this correctly (check `>=` cap *before* incrementing) and never had the
+    bug — signup's handler was rewritten to match that same order. Verified live: 5 wrong
+    attempts show 4→3→2→1→0 remaining exactly as before, but the 6th call is now a flat
+    `400 OTP_MAX_ATTEMPTS` with no code evaluated, instead of silently taking one more guess.
+23. **`@icl.today` alongside `@infoziant.com` in signup's allowed domains is real and in
+    active use** — not a stray config entry. Confirmed live: an existing seeded account
+    (Seshmitha Tamilselvi R) already has an `@icl.today` address. Still worth a one-line
+    mention in whatever onboarding doc explains the staff email domain, since nothing outside
+    the code currently says two domains are valid.
+24. ~~**System Info's growth percentages were hardcoded constants, never computed.**~~
+    **FIXED 3 Sep 2026.** `4.8` / `6.2` / `12.5` were literal numbers returned on every load
+    regardless of real data. There's no historical-snapshot table to diff a real trend
+    against, so rather than invent a different kind of fake number, replaced them with a real
+    7-day window computed straight from `created_at` timestamps (recently-added ÷ everything
+    before that window) on `CompanyMetadata` and `ReportLibrary` — genuinely small honest
+    numbers instead of confident fake ones. Verified live: a quiet week now correctly shows
+    `0` across all three instead of the old constants.
+25. ~~**Five System Config preferences (default landing page, default theme, 3 notification
+    toggles) saved but nothing ever read them back.**~~ **REMOVED 3 Sep 2026 (not wired up)** —
+    same call as the Organization Announcement Broadcaster removal: each was a single
+    org-wide value with no role-aware consumer (a global "default landing page" doesn't suit
+    every role equally; the app already has a proper per-viewer dark/light toggle, making a
+    server-side "default theme" low-value and awkward to apply before first paint; the 3
+    notification toggles had no single gated send-path to wire against, tied to the same
+    incompleteness as the orphaned chat module). Removed the "Application Delivery &
+    Preferences" section from `SystemConfigTab.tsx`, the 5 fields from `SystemSettings.ts`
+    and both `server.ts` handlers, and the stale values from the live document (`$unset`).
+26. ~~**No password-reset control for an existing user in the Admin UI.**~~ **FIXED
+    3 Sep 2026.** `PATCH /users/:id` already accepted a `password` field; the edit modal only
+    ever showed a password input when *creating* a user. Added a "Reset this user's password"
+    checkbox to `UserModal.tsx` (off by default, so editing unrelated fields never risks
+    silently touching the password) that reveals a field validated against the shared
+    `passwordPolicy` module client-side; backend handler now also enforces `isPasswordValid()`
+    server-side on this path (previously accepted anything). Verified live: a weak password
+    on this endpoint now returns `400 PASSWORD_POLICY` with the specific missing requirement.
+27. ~~**"Broadcast Announcement" button 404s.**~~ **REMOVED 3 Sep 2026 (user decision — "we
+    don't want broadcast announce button"), not fixed.** Turned out to be moot either way:
+    `/notifications/page.tsx` is currently just `redirect('/dashboard')` — the whole page
+    that held this button (`NotificationsHeader.tsx`, `BroadcastModal.tsx`) was **already
+    unreachable dead code**, imported by nothing. Deleted both files outright and removed the
+    "Dispatch Broadcast Announcements" row from the Role Permissions Matrix rather than
+    fixing its target endpoint. **Correction to this file's own earlier entry** (§5 item 11's
+    closing note, and the original QA report): both described this as a live, clickable,
+    404-ing button — it was real orphaned source code, but not something any user could
+    actually have reached. Worth remembering: a component existing in `src/` is not the same
+    claim as a component being on a rendered page — check the route, not just the file, next
+    time.
+28. **Housekeeping, 3 Sep 2026:** removed the last 3 stray `.tsx.bak` files, the
+    `.playwright-cli` console-log dumps, and stale `playwright-report`/`test-results`
+    directories (all gitignored, zero version-control impact). Removed 3 confirmed-dead
+    dependencies — backend `winston` and `zod`, frontend `axios` — after re-verifying zero
+    references in either `src/` tree; `package-lock.json` resynced with a real `npm install`
+    on both sides. **`ogl` was on the original suspect list but is no longer dead** — a
+    `GradientWaves` WebGL component now imports it, added by someone else's concurrent commit
+    mid-session; re-checked before touching anything and left it alone.
 
+29. ~~**Every server restart (and every backend file save) wiped the Nehru and HITS weekly
+    tracker rows.**~~ **FIXED 4 Sep 2026 — a regression of trap 10, reintroduced by new code.**
+    `startServer()` called `updateNehruWeeklyTracker()` and `updateHitsWeeklyTracker()`
+    unconditionally, positioned immediately *below* the `SEED_ON_BOOT` block — visually next to
+    the guard but outside it. Despite their names both are wipe-and-rebuild: each runs
+    `WeeklyTracker.deleteMany({college_id: ...})` for its college, then re-inserts a hardcoded
+    snapshot transcribed from screenshots (65 rows HITS, 54 Nehru). Because the snapshot is
+    deterministic the screen always looked correct afterwards — what vanished was the *drift*:
+    every status, follow-up date and note entered since the snapshot was written. Verified live:
+    a restart removed 50 Nehru + 61 HITS rows and wrote back 54 + 65, so live data had genuinely
+    diverged and that divergence was lost (no backup existed; unrecoverable). Amplified by
+    `"dev": "ts-node-dev --respawn"` — this fired on *every backend file save*, not just restarts.
+    Fix: both calls moved inside `if (SEED_ON_BOOT)`, and a deliberate runner added —
+    `npm run seed:nehru` / `npm run seed:hits` (`scripts/runWeeklySnapshot.ts`), **dry-run by
+    default**, reporting how many rows would be deleted and requiring `--apply` to act, matching
+    the `fix:roles` convention. Verified: `tsc --noEmit` clean; dry run reports 61 at-risk rows
+    and changes nothing; a full boot leaves counts identical (61/50/869 before and after) and logs
+    only "Boot seeding skipped". **The lesson trap 10 already recorded still stands and was
+    re-learned the hard way: application startup must never mutate business data. Boot runs on
+    every crash-restart, deploy, autoscale event and file save. One-off data loaders belong in
+    `package.json` as explicit commands, never in `startServer()`.**
+
+30. ~~**Weekly Tracker's `academic_year` filter could never actually filter — and the
+    response mislabeled unfiltered data as whatever year was requested.**~~ **FIXED
+    4 Sep 2026.** Two independent bugs compounded: (a) the frontend's `academicYear`
+    state was frozen at `'2027'` — `onAcademicYearChange` was accepted as a prop by
+    `WeeklyHeader.tsx` but never actually wired to any control, so every request from
+    every user, forever, sent `academic_year=2027`; (b) `GET /weekly-tracker`,
+    `/weekly-tracker/kpi`, and `/weekly-tracker/export-xlsx` each silently discarded
+    the filter whenever it matched zero rows (`if (rows.length === 0 && filter.academic_year)`
+    → re-query without it) and then **echoed the requested year back anyway** — so a
+    live session requesting `academic_year=2027` was served all 968 rows, every one of
+    them genuinely `academic_year: 2026`, with the response itself claiming `"academic_year":
+    2027`. Caught live: a real frontend session was doing exactly this mid-audit. Fixed by
+    removing all three silent fallbacks (an empty result is now a real empty result) and
+    replacing two hardcoded `|| 2027` echoes with `'all'`/`'All Years'` — the response never
+    invents a year again. `sync-daily-positives`'s creation-time default also moved from
+    `2027` to `2026` so newly-synced rows stay consistent with the other 969. Frontend default
+    changed to `'all'` rather than hardcoding `'2026'` — since there is still no working year
+    picker, a hardcoded year would just recreate this bug the next season. Verified live via
+    both curl and a real browser session: unfiltered → `academic_year: "all"`, 968 rows;
+    `academic_year=2026` → same 968, honestly filtered; `academic_year=2027` → genuinely `0`,
+    not a silent full dataset; browser header updated from the old frozen "2027 Season" to
+    the correct **"2026 Season"**. `tsc --noEmit` clean both sides.
+31. ~~**Manually adding a company to Weekly Tracker that wasn't in Metadata created a
+    dangling `company_id` pointing at nothing.**~~ **FIXED 4 Sep 2026 (user decision:
+    Option A — refuse rather than save with a broken link).** `POST /weekly-tracker`'s
+    metadata-resolution step correctly never auto-created a metadata record (per the
+    "only Daily Tracker / Metadata module may add contacts" rule), but its fallback when
+    no match was found was `resolvedCompanyId = new Types.ObjectId()` — a freshly minted,
+    random ID saved onto the new WeeklyTracker row with **no document behind it at all**,
+    in either collection. Unlike the 192 tagged placeholders created by the 2027 batch
+    import (`METADATA_TAG`), this orphan had nothing to find it by. Now refuses with
+    `400 COMPANY_NOT_IN_METADATA` before creating anything, same shape as the existing
+    mandatory-field check in the same handler. Removed the now-dead `is_in_metadata: false`
+    success branch in both the backend response and `AddCompanyModal.tsx` (a success
+    response can no longer carry `is_in_metadata: false` — the only false path returns
+    early). Verified live: an unknown company → `400`, no row written; a real metadata
+    company → `201` as before. `tsc --noEmit` clean both sides.
+
+32. **Weekly Tracker cross-college soft-warning + owner notification, 5 Sep 2026 (new
+    feature, user-requested).** Access remains fully open by design - any coordinator can
+    still create/edit/delete on any college, exactly as before. What changed: if the acting
+    coordinator isn't a real assigned owner of the college they're touching, the browser
+    shows a plain confirm (`window.confirm`) before the save fires - "This isn't one of your
+    assigned colleges, continue anyway?" - and if they proceed, every active/non-deleted real
+    owner of that college gets an email from iPOMS naming who changed what and when. Cancel
+    aborts before any request is sent (verified live: no PATCH left the browser). An
+    unassigned college notifies nobody (nothing to protect yet); an oversight account
+    (Administrator, who holds all 27 colleges by design for dashboards) is explicitly excluded
+    from being counted as a "real owner" so it never gets CC'd on every edit in the system.
+    Scoped to create, edit (both the inline PATCH and the drag/drop section-move), and delete;
+    deliberately *not* the pin-toggle (cosmetic, no notification value). Weekly Tracker only -
+    Daily Tracker was explicitly deferred.
+    Prerequisite fixed first: `users.assigned_college_ids` was still the broken "everyone holds
+    nearly all 25 colleges" state from the old boot bug (§5 item 0h) - corrected via
+    `scripts/fixCollegeAssignments.ts` (dry-run by default) against a human-confirmed roster:
+    Mohanaradha→Karpagam/AIHT/Achariya/KPR, Thirisha→PSNA/DSU/SMVEC, Malavika→KLU/NGCE,
+    Lizenya→NPR/KIOT/ACEW, Megala→NGP/Kamaraj, Seshmitha→MCET/MEC, and Sujitha (a Team Leader,
+    deliberately treated as a focus owner for these 5 despite TL status)→Nehru/Mar Ephraem/
+    KPR/HITS/SONA. KPR is genuinely shared (Mohanaradha handles calls, Sujitha handles email) -
+    both get notified on a foreign edit there. 7 colleges (Karunya, AVS, AAA, Sri Shanmugha,
+    EGS, MKCE, KGISL) are deliberately left unassigned until real owners are named - no warning
+    fires for them yet. Backed up both `users` and `weekly_tracker` before the assignment fix.
+    New: `lib/mailer.ts`'s `sendForeignCollegeEditEmail()` (reuses the existing SMTP transporter
+    - no new integration, no cost); the `notifyForeignCollegeOwners()` helper in `server.ts`,
+    called (fire-and-forget, never blocking the coordinator's own save) from `POST
+    /weekly-tracker`, `PATCH /weekly-tracker/:id`, `PATCH /weekly-tracker/:id/section`, and
+    `DELETE /weekly-tracker/:id`; the `myCollegeIds`/`isForeignCollege` check and confirm
+    dialogs in `weekly-tracker/page.tsx` and `AddCompanyModal.tsx`.
+    Verified live end-to-end: Mohanaradha editing Nehru (Sujitha's college) → confirm dialog →
+    Cancel → zero network requests sent, nothing saved; Accept path proven via 5 direct API
+    tests (create/edit/move/delete all correctly notify Sujitha and correctly exclude the
+    Administrator after that exclusion was added mid-build - the first pass wrongly CC'd
+    Administrator on every foreign edit, since it holds all 27 colleges for oversight).
+    Mohanaradha editing her own college (Achariya) → zero friction, real `PATCH → 200`, no
+    dialog at all. Unassigned-college edit (Karunya) → no notification sent, confirmed against
+    the mailer log. WhatsApp was explicitly ruled out by the user (cost/setup) in favor of
+    email; can be added later as a second channel on the same `notifyForeignCollegeOwners()`
+    call without touching the warning-dialog side.
+
+## 6. Module map
+## 6. Module map
 ## 6. Module map
 
 Data flow: `company_metadata → assigned_work → daily_tracker → weekly_tracker → daily_leads → reports/dashboards`

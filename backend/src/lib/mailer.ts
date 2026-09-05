@@ -54,6 +54,80 @@ function otpHtml(fullName: string, code: string, minutes: number): string {
   </div>`;
 }
 
+function foreignCollegeEditHtml(opts: {
+  ownerName: string;
+  actorName: string;
+  collegeName: string;
+  companyName: string;
+  action: 'created' | 'updated' | 'deleted';
+  timestamp: Date;
+}): string {
+  const actionLabel = { created: 'added', updated: 'updated', deleted: 'deleted' }[opts.action];
+  const when = opts.timestamp.toLocaleString('en-IN', {
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+  return `
+  <div style="font-family:'Segoe UI',Arial,sans-serif;background:#f8fafc;padding:32px">
+    <div style="max-width:480px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:32px">
+      <p style="margin:0 0 4px;font-size:18px;font-weight:700;color:#0f172a">Weekly Tracker change on your college</p>
+      <p style="margin:0 0 24px;font-size:13px;color:#64748b">Infoziant Placement Operations Management System</p>
+
+      <p style="margin:0 0 16px;font-size:14px;color:#334155">
+        Hello ${opts.ownerName}, <strong>${opts.actorName}</strong> ${actionLabel} a Weekly Tracker
+        entry for <strong>${opts.companyName}</strong> on <strong>${opts.collegeName}</strong> —
+        a college assigned to you — on ${when}.
+      </p>
+
+      <p style="margin:0;font-size:13px;color:#334155">
+        This is an informational notice only. No action is needed unless the change looks
+        incorrect, in which case check the Weekly Tracker or contact your Team Leader.
+      </p>
+
+      <p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8">
+        Automated message from iPOMS.
+      </p>
+    </div>
+  </div>`;
+}
+
+export async function sendForeignCollegeEditEmail(
+  to: string,
+  opts: {
+    ownerName: string;
+    actorName: string;
+    collegeName: string;
+    companyName: string;
+    action: 'created' | 'updated' | 'deleted';
+    timestamp: Date;
+  }
+): Promise<{ delivered: boolean; reason?: string }> {
+  const mailSetup = getTransport();
+
+  if (!mailSetup) {
+    console.warn(`[mailer] SMTP not configured — skipping foreign-college-edit notice to ${to}`);
+    return { delivered: false, reason: 'SMTP is not configured on the server' };
+  }
+
+  const actionLabel = { created: 'added', updated: 'updated', deleted: 'deleted' }[opts.action];
+
+  try {
+    await mailSetup.transporter.sendMail({
+      from: mailSetup.from,
+      to,
+      subject: `iPOMS: ${opts.actorName} ${actionLabel} a Weekly Tracker entry on ${opts.collegeName}`,
+      text: `${opts.actorName} ${actionLabel} a Weekly Tracker entry for ${opts.companyName} on `
+        + `${opts.collegeName} (a college assigned to you) at ${opts.timestamp.toISOString()}. `
+        + `This is informational only.`,
+      html: foreignCollegeEditHtml(opts),
+    });
+    console.log(`[mailer] Delivered foreign-college-edit notice to ${to}`);
+    return { delivered: true };
+  } catch (err: any) {
+    console.error('[mailer] Failed to send foreign-college-edit notice:', err?.message || err);
+    return { delivered: false, reason: 'Email delivery failed' };
+  }
+}
+
 export async function sendOtpEmail(
   to: string,
   fullName: string,

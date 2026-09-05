@@ -220,8 +220,8 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
               panelState === 'calling'
                 ? 'bg-emerald-600 text-white animate-pulse'
                 : panelState === 'wrapup'
-                ? 'bg-primary text-white'
-                : 'bg-primary text-white'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-primary text-primary-foreground'
             }`}>
               <Phone size={17} strokeWidth={2.25} />
             </div>
@@ -338,7 +338,7 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
             <button
               onClick={handleSaveWrapUp}
               disabled={!outcome}
-              className="w-full bg-primary hover:bg-primary-hover active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-2xl py-3 text-xs font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
+              className="w-full bg-primary hover:bg-primary-hover active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed text-primary-foreground rounded-2xl py-3 text-xs font-bold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer mt-2"
             >
               <CheckCircle2 size={16} strokeWidth={2.25} />
               Save to Daily Tracker

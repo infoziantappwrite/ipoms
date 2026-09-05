@@ -1,30 +1,25 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, X, Building2, Briefcase, Layers, GraduationCap } from 'lucide-react';
+import { Plus, X, Building2, Briefcase, Layers, GraduationCap, Trophy } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
+import { useToast } from '@/components/ui/Toast';
 
 const BATCH_YEARS = ['2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
+
+import { COMPANY_TYPES } from '../constants/companyTypes';
 
 interface Props {
   collegeId: string;
   coordinatorId: string;
   onClose: () => void;
   onAdded: () => void;
+  /** True when collegeId isn't one of the acting coordinator's assigned colleges. */
+  isForeignCollege?: boolean;
+  collegeName?: string;
 }
-
-const COMPANY_TYPES = [
-  'Software / IT',
-  'Software / Product',
-  'Core / Engineering',
-  'Banking / Finance',
-  'Healthcare / Pharma',
-  'EdTech / Education',
-  'Consulting',
-  'BPO / KPO',
-];
 
 const SECTIONS = [
   { value: 'completed', label: '1. Companies Completed' },
@@ -42,14 +37,18 @@ export function AddCompanyModal({
   coordinatorId,
   onClose,
   onAdded,
+  isForeignCollege,
+  collegeName,
 }: Props) {
+  const { toast } = useToast();
   const [companyName, setCompanyName] = useState('');
   const [jobRole, setJobRole] = useState('Graduate Trainee');
-  const [companyType, setCompanyType] = useState('Software / IT');
+  const [companyType, setCompanyType] = useState('IT / Software & Technology');
   const [ctcValue, setCtcValue] = useState('');
   const [ctcUnit, setCtcUnit] = useState<'LPA' | '/ Month'>('LPA');
   const [eligibleBatch, setEligibleBatch] = useState('2026');
   const [pipelineSection, setPipelineSection] = useState('completed');
+  const [offersReceived, setOffersReceived] = useState<string>('0');
   const [followUpDate, setFollowUpDate] = useState('');
   const [currentStatusText, setCurrentStatusText] = useState('Drive confirmed and scheduled');
   const [loading, setLoading] = useState(false);
@@ -80,20 +79,42 @@ export function AddCompanyModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!companyName.trim()) {
-      alert('Company Name is mandatory.');
+      toast('Company Name is mandatory.', 'warning');
       return;
     }
     if (!jobRole.trim()) {
-      alert('Job Role is mandatory.');
+      toast('Job Role is mandatory.', 'warning');
       return;
     }
     if (!ctcValue.trim()) {
-      alert('CTC is mandatory.');
+      toast('CTC is mandatory.', 'warning');
       return;
     }
     if (!currentStatusText.trim()) {
-      alert('Current Status Remarks is mandatory.');
+      toast('Current Status Remarks is mandatory.', 'warning');
       return;
+    }
+
+    if (isForeignCollege) {
+      const proceed = window.confirm(
+        `${collegeName || 'This college'} is not one of your assigned colleges. `
+        + `Continue adding this company anyway? The coordinator who handles it will be notified.`
+      );
+      if (!proceed) return;
+    }
+
+    let finalOffersCount = 0;
+    if (pipelineSection === 'completed') {
+      if (offersReceived === '' || offersReceived === undefined || offersReceived === null) {
+        toast('Offers Received is mandatory for Completed companies.', 'warning');
+        return;
+      }
+      const num = parseInt(offersReceived, 10);
+      if (isNaN(num) || num < 0 || num > 50 || String(offersReceived).includes('.')) {
+        toast('Offers Received must be a whole number between 0 and 50.', 'warning');
+        return;
+      }
+      finalOffersCount = num;
     }
 
     const formattedCtc = ctcValue.includes('LPA') || ctcValue.toLowerCase().includes('month')
@@ -102,7 +123,7 @@ export function AddCompanyModal({
 
     setLoading(true);
     try {
-      const res = await apiFetch('/weekly-tracker', {
+      const res = await apiFetch<any>('/weekly-tracker', {
         method: 'POST',
         body: JSON.stringify({
           college_id: collegeId,
@@ -116,18 +137,23 @@ export function AddCompanyModal({
           pipeline_section: pipelineSection,
           current_status_text: currentStatusText.trim(),
           follow_up_date: followUpDate || undefined,
+          selected_count: finalOffersCount,
+          offers_received: finalOffersCount,
         }),
       });
 
       if (res.success) {
+        // The backend now refuses (400 COMPANY_NOT_IN_METADATA) any company not
+        // already in Metadata, so a successful response is always is_in_metadata.
+        toast(`"${companyName.trim()}" added to Weekly Tracker.`, 'success');
         onAdded();
         onClose();
       } else {
-        alert(res.message || (res as any)?.error?.message || 'Failed to add company');
+        toast(res.message || res.error?.message || 'Failed to add company', 'error');
       }
     } catch (err: any) {
       console.error('Add company error:', err);
-      alert('Network error while saving company');
+      toast('Network error while saving company', 'error');
     } finally {
       setLoading(false);
     }
@@ -237,7 +263,7 @@ export function AddCompanyModal({
                   onClick={() => setCtcUnit('LPA')}
                   className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
                     ctcUnit === 'LPA'
-                      ? 'bg-primary text-white shadow-xs'
+                      ? 'bg-primary text-primary-foreground shadow-xs'
                       : 'text-fg-muted hover:text-fg hover:bg-surface-raised'
                   }`}
                 >
@@ -248,7 +274,7 @@ export function AddCompanyModal({
                   onClick={() => setCtcUnit('/ Month')}
                   className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
                     ctcUnit === '/ Month'
-                      ? 'bg-primary text-white shadow-xs'
+                      ? 'bg-primary text-primary-foreground shadow-xs'
                       : 'text-fg-muted hover:text-fg hover:bg-surface-raised'
                   }`}
                 >
@@ -284,7 +310,7 @@ export function AddCompanyModal({
             </div>
           </div>
 
-          <div className={`grid gap-3.5 ${pipelineSection === 'in_progress' || pipelineSection === 'pipeline' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+          <div className={`grid gap-3.5 ${pipelineSection === 'completed' || pipelineSection === 'in_progress' || pipelineSection === 'pipeline' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
             {/* Eligible Batch (Year Dropdown) */}
             <div>
               <label className="block text-fg font-semibold mb-1.5">Eligible Batch (Year)</label>
@@ -299,6 +325,71 @@ export function AddCompanyModal({
                 }))}
               />
             </div>
+
+            {/* Offers Received (Visible only when Target Section is Companies Completed) */}
+            {pipelineSection === 'completed' && (
+              <div className="animate-fadeIn">
+                <label className="block text-fg font-semibold mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Trophy size={13} className="text-emerald-600 dark:text-emerald-400" />
+                    Offers Received <span className="text-rose-500">*</span>
+                  </span>
+                  <span className="text-micro font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-300 dark:border-emerald-800 font-bold shadow-2xs">
+                    0 – 50 only
+                  </span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max="50"
+                    step="1"
+                    required
+                    value={offersReceived}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === '') {
+                        setOffersReceived('');
+                        return;
+                      }
+                      // Allow only non-negative digits
+                      const clean = raw.replace(/[^0-9]/g, '');
+                      if (clean === '') {
+                        setOffersReceived('');
+                        return;
+                      }
+                      const num = parseInt(clean, 10);
+                      if (isNaN(num)) return;
+                      if (num < 0) {
+                        setOffersReceived('0');
+                      } else if (num > 50) {
+                        setOffersReceived('50');
+                        toast('Offers received cannot exceed 50.', 'warning');
+                      } else {
+                        setOffersReceived(String(num));
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      // Block negative, decimal, plus, e/E
+                      if (['-', '+', '.', 'e', 'E'].includes(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
+                    onBlur={() => {
+                      if (offersReceived === '' || isNaN(parseInt(offersReceived, 10))) {
+                        setOffersReceived('0');
+                      } else {
+                        const num = parseInt(offersReceived, 10);
+                        if (num < 0) setOffersReceived('0');
+                        else if (num > 50) setOffersReceived('50');
+                      }
+                    }}
+                    placeholder="e.g. 12 (Max 50)"
+                    className="w-full bg-surface-sunken border border-border focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl px-3.5 py-2.5 text-fg font-bold text-xs transition-all outline-none font-mono"
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Follow-up Date */}
             {(pipelineSection === 'in_progress' || pipelineSection === 'pipeline') && (
@@ -347,7 +438,7 @@ export function AddCompanyModal({
             type="submit"
             form="add-company-form"
             disabled={loading}
-            className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 hover:shadow-md hover:shadow-primary/25"
+            className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 hover:shadow-md hover:shadow-primary/25"
           >
             <Plus size={15} strokeWidth={2.5} />
             <span>{loading ? 'Adding…' : 'Add'}</span>

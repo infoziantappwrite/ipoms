@@ -291,7 +291,7 @@ export function EditTrackerRowModal({ row, onClose, onSave, onDelete }: Props) {
               <button
                 type="submit"
                 disabled={loading}
-                className="px-5 py-2 rounded-xl bg-primary hover:bg-primary-hover active:scale-95 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all disabled:opacity-60 cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-primary hover:bg-primary-hover active:scale-95 text-primary-foreground text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all disabled:opacity-60 cursor-pointer"
               >
                 <CheckCircle2 size={14} strokeWidth={2} />
                 {loading ? 'Saving...' : 'Save Changes'}

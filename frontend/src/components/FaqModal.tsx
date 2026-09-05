@@ -193,7 +193,7 @@ export function FaqModal({ isOpen, onClose, defaultCategory = 'all' }: FaqModalP
                   onClick={() => setSelectedCategory(cat.id)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all whitespace-nowrap cursor-pointer shrink-0 border ${
                     isSelected
-                      ? 'bg-primary text-white border-primary shadow-xs'
+                      ? 'bg-primary text-primary-foreground border-primary shadow-xs'
                       : 'bg-surface hover:bg-surface-raised text-fg-subtle hover:text-fg border-border'
                   }`}
                 >
@@ -263,7 +263,7 @@ export function FaqModal({ isOpen, onClose, defaultCategory = 'all' }: FaqModalP
                       <span
                         className={`text-[11px] font-mono font-bold w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5 border ${
                           isExpanded
-                            ? 'bg-primary text-white border-primary'
+                            ? 'bg-primary text-primary-foreground border-primary'
                             : 'bg-surface-sunken border-border text-fg-subtle'
                         }`}
                       >
@@ -346,7 +346,7 @@ export function FaqModal({ isOpen, onClose, defaultCategory = 'all' }: FaqModalP
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 bg-primary hover:bg-primary-hover text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-[0.98]"
+            className="px-4 py-1.5 bg-primary hover:bg-primary-hover text-primary-foreground rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-[0.98]"
           >
             Close Guide
           </button>

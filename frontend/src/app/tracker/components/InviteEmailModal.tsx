@@ -349,7 +349,7 @@ export function InviteEmailModal({
           <button
             type="button"
             onClick={handleLaunchGmail}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2 bg-primary hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-xs transition-all cursor-pointer hover:shadow-md active:scale-95"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2 bg-primary hover:bg-blue-700 text-primary-foreground font-bold rounded-xl text-xs shadow-xs transition-all cursor-pointer hover:shadow-md active:scale-95"
             title="Send Email via Gmail"
           >
             <Mail size={15} strokeWidth={2.25} />

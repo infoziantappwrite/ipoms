@@ -10,16 +10,7 @@ import { WeeklyRow } from './WeeklyTable';
 
 const BATCH_YEARS = ['2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
 
-const COMPANY_TYPES = [
-  'Software / IT',
-  'Software / Product',
-  'Core / Engineering',
-  'Banking / Finance',
-  'Healthcare / Pharma',
-  'EdTech / Education',
-  'Consulting',
-  'BPO / KPO',
-];
+import { COMPANY_TYPES } from '../constants/companyTypes';
 
 const SECTIONS = [
   { value: 'completed', label: '1. Companies Completed' },
@@ -47,7 +38,7 @@ export function EditCompanyModal({
 }: Props) {
   const [companyName, setCompanyName] = useState(row.company_name || '');
   const [jobRole, setJobRole] = useState(row.job_role || '');
-  const [companyType, setCompanyType] = useState(row.company_type || 'Software / IT');
+  const [companyType, setCompanyType] = useState(row.company_type || 'IT / Software & Technology');
   const [ctcValue, setCtcValue] = useState(() => {
     if (!row.ctc_lpa) return '';
     return row.ctc_lpa.replace(/LPA|\/ Month/gi, '').trim();
@@ -235,7 +226,7 @@ export function EditCompanyModal({
                   onClick={() => setCtcUnit('LPA')}
                   className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
                     ctcUnit === 'LPA'
-                      ? 'bg-primary text-white shadow-xs'
+                      ? 'bg-primary text-primary-foreground shadow-xs'
                       : 'text-fg-muted hover:text-fg hover:bg-surface-raised'
                   }`}
                 >
@@ -246,7 +237,7 @@ export function EditCompanyModal({
                   onClick={() => setCtcUnit('/ Month')}
                   className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
                     ctcUnit === '/ Month'
-                      ? 'bg-primary text-white shadow-xs'
+                      ? 'bg-primary text-primary-foreground shadow-xs'
                       : 'text-fg-muted hover:text-fg hover:bg-surface-raised'
                   }`}
                 >
@@ -323,7 +314,7 @@ export function EditCompanyModal({
           {/* Student Candidate Counts (if in progress or completed) */}
           <div className="grid grid-cols-3 gap-3 bg-surface-sunken/60 p-3 rounded-xl border border-border/80">
             <div>
-              <label className="block text-[11px] font-semibold text-fg-subtle mb-1">Registered</label>
+              <label className="block text-micro font-semibold text-fg-subtle mb-1">Registered</label>
               <input
                 type="number"
                 min="0"
@@ -333,7 +324,7 @@ export function EditCompanyModal({
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-fg-subtle mb-1">Shortlisted</label>
+              <label className="block text-micro font-semibold text-fg-subtle mb-1">Shortlisted</label>
               <input
                 type="number"
                 min="0"
@@ -343,12 +334,29 @@ export function EditCompanyModal({
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 mb-1">Offers / Selected</label>
+              <label className="block text-micro font-semibold text-emerald-600 dark:text-emerald-400 mb-1">Offers Received (0–50)</label>
               <input
                 type="number"
                 min="0"
+                max="50"
+                step="1"
                 value={selectedCount}
-                onChange={(e) => setSelectedCount(Number(e.target.value))}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === '') {
+                    setSelectedCount(0);
+                    return;
+                  }
+                  const num = parseInt(raw.replace(/[^0-9]/g, ''), 10);
+                  if (isNaN(num) || num < 0) setSelectedCount(0);
+                  else if (num > 50) setSelectedCount(50);
+                  else setSelectedCount(num);
+                }}
+                onKeyDown={(e) => {
+                  if (['-', '+', '.', 'e', 'E'].includes(e.key)) {
+                    e.preventDefault();
+                  }
+                }}
                 className="w-full bg-surface border border-emerald-500/40 text-emerald-600 dark:text-emerald-400 rounded-lg px-2 py-1.5 text-xs text-center outline-none font-mono font-bold"
               />
             </div>
@@ -401,7 +409,7 @@ export function EditCompanyModal({
               type="submit"
               form="edit-company-form"
               disabled={loading}
-              className="px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 hover:shadow-md hover:shadow-primary/25"
+              className="px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 hover:shadow-md hover:shadow-primary/25"
             >
               <CheckCircle2 size={15} />
               <span>{loading ? 'Saving Changes…' : 'Save Changes'}</span>

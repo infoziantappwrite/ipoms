@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { FolderOpen, Pencil } from 'lucide-react';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { MoveSectionDropdown } from './MoveSectionDropdown';
+import { CompanyTypeDropdown } from './CompanyTypeDropdown';
 
 export interface WeeklyRow {
   _id: string;
@@ -92,7 +93,12 @@ export function WeeklyTable({
               CTC <span className="text-rose-500 font-bold">*</span>
             </th>
             <th className="py-2.5 px-3 min-w-[240px]">
-              Status <span className="text-rose-500 font-bold">*</span>
+              <span title="Free-text notes only — to move a company between Pipeline / In Progress / Completed etc., use Edit instead.">
+                Status <span className="text-rose-500 font-bold">*</span>
+              </span>
+            </th>
+            <th className="py-2.5 px-3 min-w-[190px]">
+              Company Type
             </th>
             {hasFollowUpColumn && (
               <th className="py-2.5 px-3 min-w-[140px] text-center">Follow Up</th>
@@ -308,6 +314,14 @@ function TableRow({
         )}
       </td>
 
+      {/* 5b. Company Type */}
+      <td className="py-2.5 px-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+        <CompanyTypeDropdown
+          value={row.company_type}
+          onChange={(newType) => onUpdateRow(row._id, { company_type: newType })}
+        />
+      </td>
+
       {/* Follow Up Date Picker (Smooth application-themed calendar across all sections) */}
       {/* Follow Up Date Picker (Smooth application-themed calendar across all sections, strictly today or future) */}
       {hasFollowUpColumn && (
@@ -352,12 +366,30 @@ function TableRow({
             <input
               type="number"
               min="0"
+              max="50"
+              step="1"
               value={tempValue}
-              onChange={(e) => setTempValue(Number(e.target.value))}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === '') {
+                  setTempValue(0);
+                  return;
+                }
+                const num = parseInt(raw.replace(/[^0-9]/g, ''), 10);
+                if (isNaN(num) || num < 0) setTempValue(0);
+                else if (num > 50) setTempValue(50);
+                else setTempValue(num);
+              }}
+              onKeyDown={(e) => {
+                if (['-', '+', '.', 'e', 'E'].includes(e.key)) {
+                  e.preventDefault();
+                } else {
+                  handleKeyDown(e, 'selected_count');
+                }
+              }}
               onBlur={() => commitEdit('selected_count')}
-              onKeyDown={(e) => handleKeyDown(e, 'selected_count')}
               autoFocus
-              className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg text-center w-16 outline-none shadow-xs"
+              className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg text-center w-16 outline-none shadow-xs font-mono font-bold"
             />
           ) : (
             <span

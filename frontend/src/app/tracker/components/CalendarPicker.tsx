@@ -143,7 +143,7 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
                       ? 'text-fg-disabled cursor-not-allowed font-normal'
                       : 'cursor-pointer hover:bg-surface-raised hover:text-primary font-medium'
                   }
-                  ${isToday ? 'bg-primary text-white font-bold shadow-xs hover:bg-primary-hover hover:text-white' : ''}
+                  ${isToday ? 'bg-primary text-primary-foreground font-bold shadow-xs hover:bg-primary-hover hover:text-primary-foreground' : ''}
                   ${hasActivity && !isToday ? 'text-fg font-bold' : ''}
                   ${!hasActivity && !isToday && !isFuture ? 'text-fg-muted' : ''}
                 `}
@@ -170,7 +170,7 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
               <span className="text-micro">Has calls</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded-md bg-primary text-white text-micro font-bold inline-flex items-center justify-center">
+              <span className="w-3.5 h-3.5 rounded-md bg-primary text-primary-foreground text-micro font-bold inline-flex items-center justify-center">
                 T
               </span>
               <span className="text-micro">Today</span>

@@ -146,7 +146,7 @@ export function UserManagementTab({
 
         <button
           onClick={onOpenAddUser}
-          className="px-4 py-2 bg-primary hover:bg-primary text-white rounded-xl text-xs font-bold shadow-3 transition-colors flex items-center gap-1.5 cursor-pointer"
+          className="px-4 py-2 bg-primary hover:bg-primary text-primary-foreground rounded-xl text-xs font-bold shadow-3 transition-colors flex items-center gap-1.5 cursor-pointer"
         >
           <Plus size={14} strokeWidth={2} aria-hidden /> Add New User
         </button>

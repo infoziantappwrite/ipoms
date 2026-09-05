@@ -11,10 +11,12 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { exportToXlsx } from '@/lib/exportExcel';
 import { useToast } from '@/components/ui/Toast';
+import { readSessionUser, roleOf } from '@/lib/session';
 
 export default function MetadataPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const [canDelete, setCanDelete] = useState<boolean>(false);
   const [companies, setCompanies] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(1);
@@ -63,6 +65,16 @@ export default function MetadataPage() {
       setLoading(false);
     }
   }, [page, searchQuery, selectedType, isRecycleBin, isRecent, fromSno, toSno]);
+
+  useEffect(() => {
+    const user = readSessionUser();
+    const role = roleOf(user);
+    const isMohana =
+      (user?.official_email || '').toLowerCase().includes('mohanaradha') ||
+      (user?.full_name || '').toLowerCase().includes('mohana') ||
+      (user?.username || '').toLowerCase().includes('mohana');
+    setCanDelete(role === 'admin' || role === 'team_leader' || isMohana);
+  }, []);
 
   useEffect(() => {
     loadMetadata();
@@ -144,6 +156,10 @@ export default function MetadataPage() {
   };
 
   const handleDelete = async (id: string, name: string) => {
+    if (!canDelete) {
+      alert('Access Denied: Only A. Mohanaradha among coordinators has authorization to delete from the Master Metadata Database.');
+      return;
+    }
     if (!confirm(`Are you sure you want to move "${name}" to the Recycle Bin?`)) return;
     try {
       const res = await apiFetch(`/metadata/${id}`, { method: 'DELETE' });
@@ -172,6 +188,10 @@ export default function MetadataPage() {
   };
 
   const handlePurge = async (id: string, name: string) => {
+    if (!canDelete) {
+      alert('Access Denied: Only A. Mohanaradha among coordinators has authorization to permanently purge records from the Master Metadata Database.');
+      return;
+    }
     if (!confirm(`⚠️ PERMANENT PURGE: Are you sure you want to completely delete "${name}" from the database? This cannot be undone.`)) return;
     try {
       const res = await apiFetch(`/metadata/${id}/purge`, { method: 'DELETE' });
@@ -293,7 +313,7 @@ export default function MetadataPage() {
   const isRangeActive = fromSno !== null || toSno !== null;
 
   return (
-    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
+    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-primary-foreground">
 
       {/* ── Top Header Bar ────────────────────────────────────────────────── */}
       <MetadataHeader
@@ -324,6 +344,7 @@ export default function MetadataPage() {
         page={page}
         totalPages={totalPages}
         onPageChange={setPage}
+        canDelete={canDelete}
       />
 
       {/* ── Main Working Table View ───────────────────────────────────────── */}
@@ -368,6 +389,7 @@ export default function MetadataPage() {
             isRecycleBin={isRecycleBin}
             page={page}
             limit={50}
+            canDelete={canDelete}
             onEdit={handleOpenEdit}
             onDelete={handleDelete}
             onRestore={handleRestore}

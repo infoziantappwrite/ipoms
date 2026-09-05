@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { CheckSquare, ChevronLeft, ChevronRight, Download, Loader2, Sparkles, X, Search, Clock, Database } from 'lucide-react';
+import { CheckSquare, ChevronLeft, ChevronRight, Loader2, Sparkles, Upload, X, Search, Clock, Database } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { SnoRangeSelector } from '@/app/metadata/components/SnoRangeSelector';
 
@@ -180,7 +180,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
         <div className="flex items-center justify-between px-6 py-3.5 bg-surface-sunken border-b border-border shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-[inset_1px_1px_2px_rgba(0,0,0,0.04)]">
-              <Download size={16} strokeWidth={2} />
+              <Upload size={16} strokeWidth={2} />
             </div>
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-bold text-fg tracking-tight">Load Today's Contacts</h2>
@@ -202,7 +202,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
               }}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer active:scale-95 ${
                 isRecent
-                  ? 'bg-primary text-white border border-primary shadow-xs ring-1 ring-primary/30'
+                  ? 'bg-primary text-primary-foreground border border-primary shadow-xs ring-1 ring-primary/30'
                   : 'bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 hover:border-primary/40'
               }`}
               title={isRecent ? 'Switch back to all metadata from Serial Number 1' : 'Toggle to view recently added contacts'}
@@ -249,7 +249,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
             <SnoRangeSelector
               fromSno={fromSno}
               toSno={toSno}
-              minSno={isRecent ? 3548 : 1}
+              minSno={isRecent ? Math.max(1, masterTotal - 99) : 1}
               maxSno={masterTotal}
               onApplyRange={(f, t) => {
                 setFromSno(f);
@@ -452,7 +452,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
             <button
               onClick={handleLoad}
               disabled={selected.size === 0}
-              className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold transition-all shadow-[2px_2px_8px_rgba(30,58,138,0.25)] active:scale-[0.99] cursor-pointer"
+              className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-primary-foreground text-xs font-bold transition-all shadow-[2px_2px_8px_rgba(30,58,138,0.25)] active:scale-[0.99] cursor-pointer"
             >
               Load Selected ({selected.size})
             </button>

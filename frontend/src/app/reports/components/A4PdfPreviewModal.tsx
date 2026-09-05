@@ -22,62 +22,38 @@ import {
   XCircle,
   Clock,
   Briefcase,
+  Flame,
 } from 'lucide-react';
+import { COLLEGE_LOGO_MAP, getCollegeLogoUrl } from '@/lib/collegeLogo';
 
-const COLLEGE_LOGO_MAP: Record<string, string> = {
-  ACET: '/college-logos/acet.png',
-  KIOT: '/college-logos/kiot.jfif',
-  KLU: '/college-logos/klu.png',
-  KPR: '/college-logos/kpr.png',
-  KARPAGAM: '/college-logos/karpagam.png',
-  AIHT: '/college-logos/aiht.png',
-  PSNA: '/college-logos/psna.png',
-  SMVEC: '/college-logos/smvec.png',
-  DSU: '/college-logos/dsu.png',
-  MKCE: '/college-logos/mkce.png',
-  SONA: '/college-logos/sona.png',
-  KARUNYA: '/college-logos/karunya.png',
-  KAMARAJ: '/college-logos/kamaraj.png',
-  NPR: '/college-logos/npr.png',
-  AVS: '/college-logos/avs.png',
-  AAA: '/college-logos/aaa.png',
-  KGISL: '/college-logos/kgisl.png',
-  SSEI: '/college-logos/sri shanmuga.png',
-  NGP: '/college-logos/ngp.png',
-  HITS: '/college-logos/hits.png',
-  MAR: '/college-logos/mar ephream.png',
-  NGCE: '/college-logos/narayanaguru.png',
-  ACEW: '/college-logos/ACEW.jfif',
-  KCT: '/college-logos/kumaraguru.png',
-  PSG: '/college-logos/psg.png',
-  LICET: '/college-logos/layola.png',
-  PEC: '/college-logos/panimalar.png',
-  RTC: '/college-logos/Rathinam - RTC.png',
-  SIT: '/college-logos/sethu institue.png',
-  SECE: '/college-logos/srieshwar.png',
-  SRM: '/college-logos/srm .png',
-  VIT: '/college-logos/vit.png',
-  KIT: '/college-logos/kit.png',
-  EGS: '/college-logos/egs.png',
-  GCT: '/college-logos/gnyanamani.png',
-  IFET: '/college-logos/ifet.png',
-  CHRIST: '/college-logos/christ.png',
-  VCE: '/college-logos/vaigai.png',
-  MCET: '/college-logos/MCET.png',
-  MEC: '/college-logos/MEC.png',
-};
 
 function getCleanPeriod(period?: string): string {
   if (!period) return '';
-  if (period.includes(': ')) {
-    const parts = period.split(': ');
-    return parts[parts.length - 1].trim();
+  const trimmed = String(period).trim();
+  if (
+    !trimmed ||
+    trimmed.toLowerCase() === 'cumulative' ||
+    trimmed.toLowerCase() === 'all dates (cumulative)' ||
+    trimmed.toLowerCase() === 'all dates' ||
+    trimmed.toLowerCase().includes('cumulative')
+  ) {
+    return '';
   }
-  if (period.includes('(') && period.includes(')')) {
-    const match = period.match(/\((.*?)\)/);
-    if (match && match[1]) return match[1].trim();
+  if (trimmed.includes(': ')) {
+    const parts = trimmed.split(': ');
+    const last = parts[parts.length - 1].trim();
+    if (last.toLowerCase() === 'cumulative' || last.toLowerCase().includes('cumulative')) return '';
+    return last;
   }
-  return period.trim();
+  if (trimmed.includes('(') && trimmed.includes(')')) {
+    const match = trimmed.match(/\((.*?)\)/);
+    if (match && match[1]) {
+      const inside = match[1].trim();
+      if (inside.toLowerCase() === 'cumulative' || inside.toLowerCase().includes('cumulative')) return '';
+      return inside;
+    }
+  }
+  return trimmed;
 }
 
 interface Props {
@@ -110,7 +86,7 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
   const collegeName = report.branding?.college_name || 'Consolidated Partner Institutions';
   const collegeCode = (report.branding?.college_code || 'iPOMS').toUpperCase();
   const isConsolidated = !collegeCode || collegeCode === 'IPOMS';
-  const collegeLogoUrl = COLLEGE_LOGO_MAP[collegeCode] || `/college-logos/${collegeCode.toLowerCase()}.png`;
+  const collegeLogoUrl = getCollegeLogoUrl(collegeCode, collegeName, report.branding?.college_logo);
 
   const handleZoomIn = () => setZoomLevel((z) => Math.min(z + 15, 140));
   const handleZoomOut = () => setZoomLevel((z) => Math.max(z - 15, 60));
@@ -242,7 +218,7 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                 onPrint();
               }, 100);
             }}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-primary hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-1.5 bg-primary hover:bg-blue-700 text-primary-foreground rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer"
           >
             <Printer size={14} />
             <span>Save PDF / Print</span>
@@ -501,22 +477,24 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                   )}
                 </div>
 
-                {/* Master Institutional Footer on Every Page */}
-                <div className="border-t border-slate-300 pt-2.5 pb-0.5 mt-auto flex items-center justify-between text-[10px] text-slate-500 shrink-0">
-                  <div>
-                    <p className="mt-0.5">© 2026 Infoziant. All rights reserved.</p>
-                  </div>
-                  {/* Prepared by in Footer */}
-                  {hasPreparedBy && (
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
-                      <User size={12} className="text-blue-900 shrink-0" />
-                      <span>Prepared by: <strong className="font-bold">{preparedByName}</strong></span>
+                {/* Master Institutional Footer on Every Page (Only when Footer & Sign-off Options enabled) */}
+                {report.include_prepared_by !== false && (
+                  <div className="border-t border-slate-300 pt-2.5 pb-0.5 mt-auto flex items-center justify-between text-[10px] text-slate-500 shrink-0">
+                    <div>
+                      <p className="mt-0.5">© 2026 Infoziant. All rights reserved.</p>
                     </div>
-                  )}
-                  <div className="font-semibold text-slate-600">
-                    Page {pageNum} of {totalPages}
+                    {/* Prepared by in Footer */}
+                    {hasPreparedBy && (
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                        <User size={12} className="text-blue-900 shrink-0" />
+                        <span>Prepared by: <strong className="font-bold">{preparedByName}</strong></span>
+                      </div>
+                    )}
+                    <div className="font-semibold text-slate-600">
+                      Page {pageNum} of {totalPages}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             );
           })
@@ -554,7 +532,7 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                   (report.template_type === 'month_end'
                     ? `${report.report_period?.split(' ')[0] || 'August'} Month Placement Operations Report`
                     : report.template_type === 'pending_tasks'
-                    ? 'Pending Tasks Action Report'
+                    ? 'Pending Task Placement Report'
                     : report.template_type === 'active_leads'
                     ? 'Active Leads Pipeline Report'
                     : 'Weekly Placement Report')}
@@ -564,21 +542,21 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
               </p>
             </div>
 
-            {/* Right: Target College Logo (Hidden for Active Leads) */}
+            {/* Right: Target College Logo (Hidden for Multi-College Weekly Reports and Consolidated reports) */}
             <div className="flex items-center shrink-0 justify-end min-w-[100px]">
-              {report.template_type === 'active_leads' ? null : !isConsolidated && !logoFailed ? (
+              {report.is_multi_college || isConsolidated ? null : !logoFailed ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   key={collegeLogoUrl}
                   src={collegeLogoUrl}
                   alt={collegeName}
-                  className="h-12 w-auto max-w-[140px] object-contain shrink-0"
+                  className="h-14 w-auto max-w-[160px] object-contain shrink-0"
                   onError={() => setLogoFailed(true)}
                 />
               ) : (
-                <div className="h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700">
-                  <Building2 size={14} className="text-blue-900 shrink-0" />
-                  <span>{isConsolidated ? 'iPOMS' : collegeCode}</span>
+                <div className="h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700">
+                  <Building2 size={15} className="text-blue-900 shrink-0" />
+                  <span>{collegeCode}</span>
                 </div>
               )}
             </div>
@@ -586,7 +564,7 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
 
           {/* 2. Report Metadata Ribbon */}
           <div className="flex items-center justify-between flex-wrap gap-4 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-5 py-2.5 font-medium mb-4">
-            {report.template_type === 'weekly_placement' ? (
+            {report.template_type === 'weekly_placement' && getCleanPeriod(report.report_period) ? (
               <>
                 <div className="flex items-center gap-1.5">
                   <Calendar size={13} className="text-blue-700 shrink-0" />
@@ -598,7 +576,7 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                 </div>
               </>
             ) : (
-              <div>
+              <div className="w-full flex items-center justify-end">
                 <div className="flex items-center gap-1.5">
                   <Calendar size={13} className="text-slate-500 shrink-0" />
                   <span>Generated Date: <strong className="text-slate-900 font-semibold">{report.generated_date}</strong></span>
@@ -648,16 +626,29 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                     ))}
                   </div>
                 );
+              } else if (report.is_multi_college) {
+                const multiCards = [
+                  { key: 'total_colleges', label: 'Colleges Included', val: report.kpi_summary.total_colleges || report.colleges_data?.length || 0, bg: 'bg-indigo-50/80 border-indigo-200', text: 'text-indigo-700', labelText: 'text-indigo-800' },
+                  { key: 'drives_completed', label: 'Companies Completed', val: report.kpi_summary.drives_completed || 0, bg: 'bg-emerald-50/80 border-emerald-200', text: 'text-emerald-700', labelText: 'text-emerald-800' },
+                  { key: 'drives_in_progress', label: 'Companies In Progress', val: report.kpi_summary.drives_in_progress || 0, bg: 'bg-blue-50/80 border-blue-200', text: 'text-blue-700', labelText: 'text-blue-800' },
+                  { key: 'total_offers', label: 'Total Offers Placed', val: report.kpi_summary.total_offers || 0, bg: 'bg-purple-50/80 border-purple-200', text: 'text-purple-700', labelText: 'text-purple-800' },
+                ];
+                return (
+                  <div className="flex flex-wrap gap-2">
+                    {multiCards.map((c) => (
+                      <div key={c.key} className={`flex-1 min-w-[80px] border p-2 rounded-lg text-center shadow-xs ${c.bg}`}>
+                        <span className={`text-[10px] font-bold uppercase block truncate ${c.labelText}`}>{c.label}</span>
+                        <span className={`text-sm font-bold font-mono ${c.text}`}>{c.val}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
               } else {
                 const wpCards = [
-                  { key: 'total_calls', label: 'Calls', val: report.kpi_summary.total_calls || 0, bg: 'bg-blue-50/80 border-blue-200', text: 'text-blue-700', labelText: 'text-blue-800' },
+                  { key: 'total_calls', label: 'Total Calls Made', val: report.kpi_summary.total_calls || 0, bg: 'bg-blue-50/80 border-blue-200', text: 'text-blue-700', labelText: 'text-blue-800' },
                   { key: 'positive_responses', label: 'Positives', val: report.kpi_summary.positive_responses || 0, bg: 'bg-emerald-50/80 border-emerald-200', text: 'text-emerald-700', labelText: 'text-emerald-800' },
-                  { key: 'jds_received', label: 'JDs', val: report.kpi_summary.jds_received || 0, bg: 'bg-cyan-50/80 border-cyan-200', text: 'text-cyan-700', labelText: 'text-cyan-800' },
-                  { key: 'drives_completed', label: 'Completed', val: report.kpi_summary.drives_completed || 0, bg: 'bg-emerald-50/80 border-emerald-200', text: 'text-emerald-700', labelText: 'text-emerald-800' },
-                  { key: 'drives_in_progress', label: 'In Progress', val: report.kpi_summary.drives_in_progress || 0, bg: 'bg-blue-50/80 border-blue-200', text: 'text-blue-700', labelText: 'text-blue-800' },
-                  { key: 'pipeline_leads', label: 'Pipeline', val: report.kpi_summary.pipeline_leads || 0, bg: 'bg-cyan-50/80 border-cyan-200', text: 'text-cyan-700', labelText: 'text-cyan-800' },
-                  { key: 'top_companies_count', label: 'Top Cos', val: report.kpi_summary.top_companies_count || 0, bg: 'bg-purple-50/80 border-purple-200', text: 'text-purple-700', labelText: 'text-purple-800' },
-                  { key: 'total_offers', label: 'Offers', val: report.kpi_summary.total_offers || 0, bg: 'bg-emerald-50/80 border-emerald-200', text: 'text-emerald-700', labelText: 'text-emerald-800' },
+                  { key: 'not_hiring', label: 'Not Hiring', val: report.kpi_summary.not_hiring || 0, bg: 'bg-rose-50/80 border-rose-200', text: 'text-rose-700', labelText: 'text-rose-800' },
+                  { key: 'jds_received', label: 'JD Received', val: report.kpi_summary.jds_received || 0, bg: 'bg-cyan-50/80 border-cyan-200', text: 'text-cyan-700', labelText: 'text-cyan-800' },
                 ].filter((c) => activeKpis[c.key] !== false);
 
                 if (wpCards.length === 0) return null;
@@ -674,8 +665,200 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
               }
             })()}
 
-            {/* ── Weekly Placement Report Standard Sections 1-7 ── */}
-            {(!report.template_type || report.template_type === 'weekly_placement') && (
+            {/* ── Multi-College Consolidated Weekly Report ── */}
+            {report.is_multi_college && Array.isArray(report.colleges_data) && (
+              <div className="space-y-6">
+                {report.colleges_data.map((colData: any, cIdx: number) => {
+                  const hasCompleted = colData.completed_companies && colData.completed_companies.length > 0;
+                  const hasInDrive = colData.companies_in_drive && colData.companies_in_drive.length > 0;
+                  const hasProgress = colData.in_progress && colData.in_progress.length > 0;
+
+                  return (
+                    <div
+                      key={colData.college_id || cIdx}
+                      className="space-y-2.5 print:break-inside-avoid break-inside-avoid border border-slate-200 rounded-xl p-3 bg-slate-50/30"
+                    >
+                      {/* Institution Banner */}
+                      <div className="flex items-center justify-between flex-wrap gap-2 px-3 py-1.5 bg-blue-900 text-white rounded-lg shadow-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full bg-white/20 text-white flex items-center justify-center text-[10px] font-mono font-bold shrink-0">
+                            {cIdx + 1}
+                          </span>
+                          <span className="font-bold text-xs">
+                            {colData.college_name} {colData.college_code ? `(${colData.college_code})` : ''}
+                          </span>
+                          {colData.location && (
+                            <span className="text-[10px] text-blue-200 font-normal">
+                              • {colData.location}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px] font-medium">
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
+                            {colData.total_completed || 0} Completed
+                          </span>
+                          {(colData.total_in_drive || 0) > 0 && (
+                            <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-200 border border-amber-400/30">
+                              {colData.total_in_drive} In Drive
+                            </span>
+                          )}
+                          <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-200 border border-blue-400/30">
+                            {colData.total_in_progress || 0} In Progress
+                          </span>
+                          <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-200 border border-purple-400/30 font-bold">
+                            {colData.total_offers || 0} Offers
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 1. Companies Completed Table */}
+                      {report.included_sections?.completed_companies !== false && (
+                        <div>
+                          {!hasCompleted ? (
+                            <p className="text-[10.5px] text-slate-400 italic px-2 py-0.5">
+                              No completed drives for this institution during this period.
+                            </p>
+                          ) : (
+                            <table className="w-full text-[10.5px] text-center border-collapse border border-slate-200 table-fixed bg-white rounded">
+                              <colgroup>
+                                <col style={{ width: '32px' }} />
+                                <col style={{ width: '25%' }} />
+                                <col style={{ width: '23%' }} />
+                                <col style={{ width: '12%' }} />
+                                <col style={{ width: '28%' }} />
+                                <col style={{ width: '12%' }} />
+                              </colgroup>
+                              <thead>
+                                <tr className="bg-emerald-50 text-emerald-900 border-b border-emerald-200 font-bold text-[10px]">
+                                  <th colSpan={6} className="py-1 px-2.5 text-left bg-emerald-50 text-emerald-900">
+                                    <span className="flex items-center gap-1.5">
+                                      <Trophy size={11} className="text-emerald-700 shrink-0" /> 1. COMPANIES COMPLETED ({colData.completed_companies.length})
+                                    </span>
+                                  </th>
+                                </tr>
+                                <tr className="bg-slate-100 text-slate-700 font-semibold text-[9.5px] uppercase border-b border-slate-200">
+                                  <th className="py-1 px-1 text-center border-r border-slate-200 font-mono">#</th>
+                                  <th className="py-1 px-1.5 text-center border-r border-slate-200">Company Name</th>
+                                  <th className="py-1 px-1.5 text-center border-r border-slate-200">Role</th>
+                                  <th className="py-1 px-1 text-center border-r border-slate-200">CTC</th>
+                                  <th className="py-1 px-1.5 text-center border-r border-slate-200">Status</th>
+                                  <th className="py-1 px-1 text-center">Offers</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-200">
+                                {colData.completed_companies.map((r: any, rIdx: number) => (
+                                  <tr key={rIdx} className={rIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                                    <td className="py-1 px-1 text-slate-500 font-mono border-r border-slate-200 text-[10px]">{r.s_no || rIdx + 1}</td>
+                                    <td className="py-1 px-1.5 font-bold text-slate-900 border-r border-slate-200 text-[10.5px] leading-tight break-words">{r.company_name}</td>
+                                    <td className="py-1 px-1.5 text-slate-700 border-r border-slate-200 text-[10px] leading-tight break-words">{r.job_role}</td>
+                                    <td className="py-1 px-1 text-emerald-700 font-semibold border-r border-slate-200 whitespace-nowrap text-[10px]">{r.ctc_lpa}</td>
+                                    <td className="py-1 px-1.5 text-slate-600 border-r border-slate-200 text-[10px] leading-tight break-words">{r.current_status_text}</td>
+                                    <td className="py-1 px-1 font-bold text-emerald-700 whitespace-nowrap text-[10.5px]">{r.selected_count || 0}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Companies in Drive Table */}
+                      {report.included_sections?.companies_in_drive !== false && hasInDrive && (
+                        <div>
+                          <table className="w-full text-[10.5px] text-center border-collapse border border-slate-200 table-fixed bg-white rounded">
+                            <colgroup>
+                              <col style={{ width: '32px' }} />
+                              <col style={{ width: '27%' }} />
+                              <col style={{ width: '25%' }} />
+                              <col style={{ width: '13%' }} />
+                              <col style={{ width: '35%' }} />
+                            </colgroup>
+                            <thead>
+                              <tr className="bg-amber-50 text-amber-900 border-b border-amber-200 font-bold text-[10px]">
+                                <th colSpan={5} className="py-1 px-2.5 text-left bg-amber-50 text-amber-900">
+                                  <span className="flex items-center gap-1.5">
+                                    <Flame size={11} className="text-amber-700 shrink-0" /> 2. COMPANIES IN DRIVE ({colData.companies_in_drive.length})
+                                  </span>
+                                </th>
+                              </tr>
+                              <tr className="bg-slate-100 text-slate-700 font-semibold text-[9.5px] uppercase border-b border-slate-200">
+                                <th className="py-1 px-1 text-center border-r border-slate-200 font-mono">#</th>
+                                <th className="py-1 px-1.5 text-center border-r border-slate-200">Company Name</th>
+                                <th className="py-1 px-1.5 text-center border-r border-slate-200">Role</th>
+                                <th className="py-1 px-1 text-center border-r border-slate-200">CTC</th>
+                                <th className="py-1 px-1.5 text-center">Status / Drive Date</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200">
+                              {colData.companies_in_drive.map((r: any, rIdx: number) => (
+                                <tr key={rIdx} className={rIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                                  <td className="py-1 px-1 text-slate-500 font-mono border-r border-slate-200 text-[10px]">{r.s_no || rIdx + 1}</td>
+                                  <td className="py-1 px-1.5 font-bold text-slate-900 border-r border-slate-200 text-[10.5px] leading-tight break-words">{r.company_name}</td>
+                                  <td className="py-1 px-1.5 text-slate-700 border-r border-slate-200 text-[10px] leading-tight break-words">{r.job_role || r.role || '—'}</td>
+                                  <td className="py-1 px-1 text-amber-700 font-semibold border-r border-slate-200 whitespace-nowrap text-[10px]">{r.ctc_lpa || r.ctc || 'Competitive'}</td>
+                                  <td className="py-1 px-1.5 text-slate-600 text-[10px] leading-tight break-words">{r.current_status_text || r.status || 'Drive in progress'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {/* 3. Companies In Progress Table */}
+                      {report.included_sections?.in_progress !== false && (
+                        <div>
+                          {!hasProgress ? (
+                            <p className="text-[10.5px] text-slate-400 italic px-2 py-0.5">
+                              No ongoing drives currently in progress for this institution.
+                            </p>
+                          ) : (
+                            <table className="w-full text-[10.5px] text-center border-collapse border border-slate-200 table-fixed bg-white rounded">
+                              <colgroup>
+                                <col style={{ width: '32px' }} />
+                                <col style={{ width: '27%' }} />
+                                <col style={{ width: '25%' }} />
+                                <col style={{ width: '13%' }} />
+                                <col style={{ width: '35%' }} />
+                              </colgroup>
+                              <thead>
+                                <tr className="bg-blue-50 text-blue-900 border-b border-blue-200 font-bold text-[10px]">
+                                  <th colSpan={5} className="py-1 px-2.5 text-left bg-blue-50 text-blue-900">
+                                    <span className="flex items-center gap-1.5">
+                                      <Rocket size={11} className="text-blue-700 shrink-0" /> 3. COMPANIES IN PROGRESS ({colData.in_progress.length})
+                                    </span>
+                                  </th>
+                                </tr>
+                                <tr className="bg-slate-100 text-slate-700 font-semibold text-[9.5px] uppercase border-b border-slate-200">
+                                  <th className="py-1 px-1 text-center border-r border-slate-200 font-mono">#</th>
+                                  <th className="py-1 px-1.5 text-center border-r border-slate-200">Company Name</th>
+                                  <th className="py-1 px-1.5 text-center border-r border-slate-200">Role</th>
+                                  <th className="py-1 px-1 text-center border-r border-slate-200">CTC</th>
+                                  <th className="py-1 px-1.5 text-center">Status / Follow-up</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-200">
+                                {colData.in_progress.map((r: any, rIdx: number) => (
+                                  <tr key={rIdx} className={rIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                                    <td className="py-1 px-1 text-slate-500 font-mono border-r border-slate-200 text-[10px]">{r.s_no || rIdx + 1}</td>
+                                    <td className="py-1 px-1.5 font-bold text-slate-900 border-r border-slate-200 text-[10.5px] leading-tight break-words">{r.company_name}</td>
+                                    <td className="py-1 px-1.5 text-slate-700 border-r border-slate-200 text-[10px] leading-tight break-words">{r.job_role}</td>
+                                    <td className="py-1 px-1 text-blue-700 font-semibold border-r border-slate-200 whitespace-nowrap text-[10px]">{r.ctc_lpa}</td>
+                                    <td className="py-1 px-1.5 text-slate-600 text-[10px] leading-tight break-words">{r.current_status_text}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ── Weekly Placement Report Standard Sections 1-8 ── */}
+            {(!report.template_type || report.template_type === 'weekly_placement') && !report.is_multi_college && (
               <>
                 {/* 4. Section 1: Companies Completed */}
                 {report.included_sections?.completed_companies && report.sections?.completed_companies && (
@@ -736,14 +919,67 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
               </div>
             )}
 
-            {/* 5. Section 2: Companies In Progress */}
+            {/* Section 2: Companies In Drive */}
+            {report.included_sections?.companies_in_drive !== false && report.sections?.companies_in_drive && (
+              <div className="space-y-1.5">
+                {report.sections.companies_in_drive.length === 0 ? (
+                  <div className="space-y-1">
+                    <div className="px-3 py-1 rounded-md bg-amber-50 border border-amber-200 font-bold text-[11px] flex items-center text-amber-900">
+                      <span className="flex items-center gap-1.5">
+                        <Flame size={13} className="text-amber-600 shrink-0" /> 2. COMPANIES IN DRIVE
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 italic py-1 pl-2">No active drives conducting recruitment today.</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-[11px] text-center border-collapse border border-slate-200 table-fixed">
+                    <colgroup>
+                      <col style={{ width: '38px' }} />
+                      <col style={{ width: '27%' }} />
+                      <col style={{ width: '28%' }} />
+                      <col style={{ width: '11.5%' }} />
+                      <col style={{ width: '30%' }} />
+                    </colgroup>
+                    <thead className="print:table-header-group">
+                      <tr className="bg-amber-50 border-b border-amber-200 text-amber-900">
+                        <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-amber-50 text-amber-900">
+                          <span className="flex items-center gap-1.5">
+                            <Flame size={13} className="text-amber-600 shrink-0" /> 2. COMPANIES IN DRIVE
+                          </span>
+                        </th>
+                      </tr>
+                      <tr className="bg-slate-100 text-slate-700 font-semibold text-[10px] uppercase border-b border-slate-200">
+                        <th className="py-1.5 px-1 w-10 text-center border-r border-slate-200 font-mono" style={{ width: '38px' }}>#</th>
+                        <th className="py-1.5 px-2 w-[27%] text-center border-r border-slate-200 whitespace-normal">Company Name</th>
+                        <th className="py-1.5 px-2 w-[28%] text-center border-r border-slate-200 whitespace-normal">Role</th>
+                        <th className="py-1.5 px-1 w-[11.5%] text-center border-r border-slate-200 whitespace-nowrap">CTC</th>
+                        <th className="py-1.5 px-2 w-[30%] text-center whitespace-normal">Status / Drive Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 text-center">
+                      {report.sections.companies_in_drive.map((r: any, idx: number) => (
+                        <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-amber-50/20'}>
+                          <td className="py-1.5 px-1 w-10 text-center text-slate-500 font-mono border-r border-slate-200" style={{ width: '38px' }}>{r.s_no}</td>
+                          <td className="py-1.5 px-2 w-[27%] text-center font-bold text-slate-900 border-r border-slate-200 whitespace-normal leading-snug">{r.company_name}</td>
+                          <td className="py-1.5 px-2 w-[28%] text-center text-slate-700 border-r border-slate-200 whitespace-normal leading-snug">{r.job_role || r.role || '—'}</td>
+                          <td className="py-1.5 px-1 w-[11.5%] text-center text-amber-700 font-semibold border-r border-slate-200 whitespace-nowrap">{r.ctc_lpa || r.ctc || 'Competitive'}</td>
+                          <td className="py-1.5 px-2 w-[30%] text-center text-slate-600 whitespace-normal leading-snug">{r.current_status_text || r.status || 'Drive in progress'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+
+            {/* 5. Section 3: Companies In Progress */}
             {report.included_sections?.in_progress && report.sections?.in_progress && (
               <div className="space-y-1.5">
                 {report.sections.in_progress.length === 0 ? (
                   <div className="space-y-1">
                     <div className="px-3 py-1 rounded-md bg-blue-50 border border-blue-200 font-bold text-[11px] flex items-center text-blue-900">
                       <span className="flex items-center gap-1.5">
-                        <Rocket size={13} className="text-blue-700" /> 2. COMPANIES IN PROGRESS
+                        <Rocket size={13} className="text-blue-700" /> 3. COMPANIES IN PROGRESS
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-400 italic py-1 pl-2">No active drives currently in progress.</p>
@@ -761,7 +997,7 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                       <tr className="bg-blue-50 border-b border-blue-200 text-blue-900">
                         <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-blue-50 text-blue-900">
                           <span className="flex items-center gap-1.5">
-                            <Rocket size={13} className="text-blue-700 shrink-0" /> 2. COMPANIES IN PROGRESS
+                            <Rocket size={13} className="text-blue-700 shrink-0" /> 3. COMPANIES IN PROGRESS
                           </span>
                         </th>
                       </tr>
@@ -789,14 +1025,14 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
               </div>
             )}
 
-            {/* 6. Section 3: Companies in Pipeline */}
+            {/* 6. Section 4: Companies in Pipeline */}
             {report.included_sections?.pipeline && report.sections?.pipeline && (
               <div className="space-y-1.5">
                 {report.sections.pipeline.length === 0 ? (
                   <div className="space-y-1">
                     <div className="px-3 py-1 rounded-md bg-cyan-50 border border-cyan-200 font-bold text-[11px] flex items-center text-cyan-900">
                       <span className="flex items-center gap-1.5">
-                        <Inbox size={13} className="text-cyan-700" /> 3. COMPANIES IN PIPELINE
+                        <Inbox size={13} className="text-cyan-700" /> 4. COMPANIES IN PIPELINE
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-400 italic py-1 pl-2">No pipeline leads recorded.</p>
@@ -814,7 +1050,7 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                       <tr className="bg-cyan-50 border-b border-cyan-200 text-cyan-900">
                         <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-cyan-50 text-cyan-900">
                           <span className="flex items-center gap-1.5">
-                            <Inbox size={13} className="text-cyan-700 shrink-0" /> 3. COMPANIES IN PIPELINE
+                            <Inbox size={13} className="text-cyan-700 shrink-0" /> 4. COMPANIES IN PIPELINE
                           </span>
                         </th>
                       </tr>
@@ -842,14 +1078,14 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
               </div>
             )}
 
-            {/* 7. Section 4: Top Companies */}
+            {/* 7. Section 5: Top Companies */}
             {report.included_sections?.top_companies && report.sections?.top_companies && (
               <div className="space-y-1.5">
                 {report.sections.top_companies.length === 0 ? (
                   <div className="space-y-1">
                     <div className="px-3 py-1 rounded-md bg-amber-50 border border-amber-200 font-bold text-[11px] flex items-center text-amber-900">
                       <span className="flex items-center gap-1.5">
-                        <Star size={13} className="text-amber-600" /> 4. TOP COMPANIES
+                        <Star size={13} className="text-amber-600" /> 5. TOP COMPANIES
                       </span>
                     </div>
                     <p className="text-[11px] text-slate-400 italic py-1 pl-2">No top companies recorded for this period.</p>
@@ -867,7 +1103,7 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                       <tr className="bg-amber-50 border-b border-amber-200 text-amber-900">
                         <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-amber-50 text-amber-900">
                           <span className="flex items-center gap-1.5">
-                            <Star size={13} className="text-amber-600 shrink-0" /> 4. TOP COMPANIES
+                            <Star size={13} className="text-amber-600 shrink-0" /> 5. TOP COMPANIES
                           </span>
                         </th>
                       </tr>
@@ -895,131 +1131,162 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
               </div>
             )}
 
-            {/* 8. Section 5: Rejected Companies */}
-            {((report.included_sections?.rejected_companies && report.sections?.rejected_companies && report.sections.rejected_companies.length > 0) ||
-              (report.included_sections?.rejected_by_hr && report.sections?.rejected_by_hr && report.sections.rejected_by_hr.length > 0)) && (
+            {/* 8. Section 6: Rejected Companies */}
+            {(report.included_sections?.rejected_companies || report.included_sections?.rejected_by_hr) && (
               <div className="space-y-1.5">
-                <table className="w-full text-[11px] text-center border-collapse border border-slate-200 table-fixed">
-                  <colgroup>
-                    <col style={{ width: '38px' }} />
-                    <col style={{ width: '27%' }} />
-                    <col style={{ width: '28%' }} />
-                    <col style={{ width: '11.5%' }} />
-                    <col style={{ width: '30%' }} />
-                  </colgroup>
-                  <thead className="print:table-header-group">
-                    <tr className="bg-rose-50 border-b border-rose-200 text-rose-900">
-                      <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-rose-50 text-rose-900">
-                        <span className="flex items-center gap-1.5">
-                          <XCircle size={13} className="text-rose-600 shrink-0" /> 5. REJECTED COMPANIES
-                        </span>
-                      </th>
-                    </tr>
-                    <tr className="bg-rose-100/60 text-rose-900 font-semibold text-[10px] uppercase border-b border-rose-200">
-                      <th className="py-1.5 px-1 w-10 text-center border-r border-rose-200 font-mono" style={{ width: '38px' }}>#</th>
-                      <th className="py-1.5 px-2 w-[27%] text-center border-r border-rose-200 whitespace-normal">Company Name</th>
-                      <th className="py-1.5 px-2 w-[28%] text-center border-r border-rose-200 whitespace-normal">Role</th>
-                      <th className="py-1.5 px-1 w-[11.5%] text-center border-r border-rose-200 whitespace-nowrap">CTC</th>
-                      <th className="py-1.5 px-2 w-[30%] text-center whitespace-normal">Status / Reason</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-rose-200 text-center">
-                    {(report.sections.rejected_companies || report.sections.rejected_by_hr).map((r: any, idx: number) => (
-                      <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-rose-50/30'}>
-                        <td className="py-1.5 px-1 w-10 text-center text-slate-500 font-mono border-r border-slate-200" style={{ width: '38px' }}>{r.s_no}</td>
-                        <td className="py-1.5 px-2 w-[27%] text-center font-bold text-slate-900 border-r border-slate-200 whitespace-normal leading-snug">{r.company_name}</td>
-                        <td className="py-1.5 px-2 w-[28%] text-center text-slate-700 border-r border-slate-200 whitespace-normal leading-snug">{r.job_role}</td>
-                        <td className="py-1.5 px-1 w-[11.5%] text-center text-rose-700 font-semibold border-r border-slate-200 whitespace-nowrap">{r.ctc_lpa || '—'}</td>
-                        <td className="py-1.5 px-2 w-[30%] text-center text-rose-700 font-medium whitespace-normal leading-snug">{r.current_status_text}</td>
+                {(report.sections?.rejected_companies || report.sections?.rejected_by_hr || []).length === 0 ? (
+                  <div className="space-y-1">
+                    <div className="px-3 py-1 rounded-md bg-rose-50 border border-rose-200 font-bold text-[11px] flex items-center text-rose-900">
+                      <span className="flex items-center gap-1.5">
+                        <XCircle size={13} className="text-rose-600 shrink-0" /> 6. REJECTED COMPANIES
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 italic py-1 pl-2">No rejected companies recorded for this period.</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-[11px] text-center border-collapse border border-slate-200 table-fixed">
+                    <colgroup>
+                      <col style={{ width: '38px' }} />
+                      <col style={{ width: '27%' }} />
+                      <col style={{ width: '28%' }} />
+                      <col style={{ width: '11.5%' }} />
+                      <col style={{ width: '30%' }} />
+                    </colgroup>
+                    <thead className="print:table-header-group">
+                      <tr className="bg-rose-50 border-b border-rose-200 text-rose-900">
+                        <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-rose-50 text-rose-900">
+                          <span className="flex items-center gap-1.5">
+                            <XCircle size={13} className="text-rose-600 shrink-0" /> 6. REJECTED COMPANIES
+                          </span>
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                      <tr className="bg-rose-100/60 text-rose-900 font-semibold text-[10px] uppercase border-b border-rose-200">
+                        <th className="py-1.5 px-1 w-10 text-center border-r border-rose-200 font-mono" style={{ width: '38px' }}>#</th>
+                        <th className="py-1.5 px-2 w-[27%] text-center border-r border-slate-200 whitespace-normal">Company Name</th>
+                        <th className="py-1.5 px-2 w-[28%] text-center border-r border-slate-200 whitespace-normal">Role</th>
+                        <th className="py-1.5 px-1 w-[11.5%] text-center border-r border-slate-200 whitespace-nowrap">CTC</th>
+                        <th className="py-1.5 px-2 w-[30%] text-center whitespace-normal">Status / Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-rose-200 text-center">
+                      {(report.sections?.rejected_companies || report.sections?.rejected_by_hr || []).map((r: any, idx: number) => (
+                        <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-rose-50/30'}>
+                          <td className="py-1.5 px-1 w-10 text-center text-slate-500 font-mono border-r border-slate-200" style={{ width: '38px' }}>{r.s_no}</td>
+                          <td className="py-1.5 px-2 w-[27%] text-center font-bold text-slate-900 border-r border-slate-200 whitespace-normal leading-snug">{r.company_name}</td>
+                          <td className="py-1.5 px-2 w-[28%] text-center text-slate-700 border-r border-slate-200 whitespace-normal leading-snug">{r.job_role}</td>
+                          <td className="py-1.5 px-1 w-[11.5%] text-center text-rose-700 font-semibold border-r border-slate-200 whitespace-nowrap">{r.ctc_lpa || '—'}</td>
+                          <td className="py-1.5 px-2 w-[30%] text-center text-rose-700 font-medium whitespace-normal leading-snug">{r.current_status_text}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             )}
 
-            {/* 9. Section 6: Companies On Hold By College */}
-            {((report.included_sections?.on_hold_by_college && report.sections?.on_hold_by_college && report.sections.on_hold_by_college.length > 0) ||
-              (report.included_sections?.rejected_by_college && report.sections?.rejected_by_college && report.sections.rejected_by_college.length > 0)) && (
+            {/* 9. Section 7: Companies On Hold By College */}
+            {(report.included_sections?.on_hold_by_college || report.included_sections?.rejected_by_college) && (
               <div className="space-y-1.5">
-                <table className="w-full text-[11px] text-center border-collapse border border-slate-200 table-fixed">
-                  <colgroup>
-                    <col style={{ width: '38px' }} />
-                    <col style={{ width: '27%' }} />
-                    <col style={{ width: '28%' }} />
-                    <col style={{ width: '11.5%' }} />
-                    <col style={{ width: '30%' }} />
-                  </colgroup>
-                  <thead className="print:table-header-group">
-                    <tr className="bg-orange-50 border-b border-orange-200 text-orange-900">
-                      <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-orange-50 text-orange-900">
-                        <span className="flex items-center gap-1.5">
-                          <Clock size={13} className="text-orange-600 shrink-0" /> 6. COMPANIES ON HOLD BY COLLEGE
-                        </span>
-                      </th>
-                    </tr>
-                    <tr className="bg-orange-100/60 text-orange-900 font-semibold text-[10px] uppercase border-b border-orange-200">
-                      <th className="py-1.5 px-1 w-10 text-center border-r border-orange-200 font-mono" style={{ width: '38px' }}>#</th>
-                      <th className="py-1.5 px-2 w-[27%] text-center border-r border-orange-200 whitespace-normal">Company Name</th>
-                      <th className="py-1.5 px-2 w-[28%] text-center border-r border-orange-200 whitespace-normal">Role</th>
-                      <th className="py-1.5 px-1 w-[11.5%] text-center border-r border-slate-200 whitespace-nowrap">CTC</th>
-                      <th className="py-1.5 px-2 w-[30%] text-center whitespace-normal">Status / Reason</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-orange-200 text-center">
-                    {(report.sections.on_hold_by_college || report.sections.rejected_by_college).map((r: any, idx: number) => (
-                      <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-orange-50/30'}>
-                        <td className="py-1.5 px-1 w-10 text-center text-slate-500 font-mono border-r border-slate-200" style={{ width: '38px' }}>{r.s_no}</td>
-                        <td className="py-1.5 px-2 w-[27%] text-center font-bold text-slate-900 border-r border-slate-200 whitespace-normal leading-snug">{r.company_name}</td>
-                        <td className="py-1.5 px-2 w-[28%] text-center text-slate-700 border-r border-slate-200 whitespace-normal leading-snug">{r.job_role}</td>
-                        <td className="py-1.5 px-1 w-[11.5%] text-orange-700 font-semibold border-r border-slate-200 whitespace-nowrap">{r.ctc_lpa || '—'}</td>
-                        <td className="py-1.5 px-2 w-[30%] text-center text-orange-700 font-medium whitespace-normal leading-snug">{r.current_status_text}</td>
+                {(report.sections?.on_hold_by_college || report.sections?.rejected_by_college || []).length === 0 ? (
+                  <div className="space-y-1">
+                    <div className="px-3 py-1 rounded-md bg-orange-50 border border-orange-200 font-bold text-[11px] flex items-center text-orange-900">
+                      <span className="flex items-center gap-1.5">
+                        <Clock size={13} className="text-orange-600 shrink-0" /> 7. COMPANIES ON HOLD BY COLLEGE
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 italic py-1 pl-2">No companies currently on hold by college.</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-[11px] text-center border-collapse border border-slate-200 table-fixed">
+                    <colgroup>
+                      <col style={{ width: '38px' }} />
+                      <col style={{ width: '27%' }} />
+                      <col style={{ width: '28%' }} />
+                      <col style={{ width: '11.5%' }} />
+                      <col style={{ width: '30%' }} />
+                    </colgroup>
+                    <thead className="print:table-header-group">
+                      <tr className="bg-orange-50 border-b border-orange-200 text-orange-900">
+                        <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-orange-50 text-orange-900">
+                          <span className="flex items-center gap-1.5">
+                            <Clock size={13} className="text-orange-600 shrink-0" /> 7. COMPANIES ON HOLD BY COLLEGE
+                          </span>
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                      <tr className="bg-orange-100/60 text-orange-900 font-semibold text-[10px] uppercase border-b border-orange-200">
+                        <th className="py-1.5 px-1 w-10 text-center border-r border-orange-200 font-mono" style={{ width: '38px' }}>#</th>
+                        <th className="py-1.5 px-2 w-[27%] text-center border-r border-orange-200 whitespace-normal">Company Name</th>
+                        <th className="py-1.5 px-2 w-[28%] text-center border-r border-orange-200 whitespace-normal">Role</th>
+                        <th className="py-1.5 px-1 w-[11.5%] text-center border-r border-slate-200 whitespace-nowrap">CTC</th>
+                        <th className="py-1.5 px-2 w-[30%] text-center whitespace-normal">Status / Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-orange-200 text-center">
+                      {(report.sections?.on_hold_by_college || report.sections?.rejected_by_college || []).map((r: any, idx: number) => (
+                        <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-orange-50/30'}>
+                          <td className="py-1.5 px-1 w-10 text-center text-slate-500 font-mono border-r border-slate-200" style={{ width: '38px' }}>{r.s_no}</td>
+                          <td className="py-1.5 px-2 w-[27%] text-center font-bold text-slate-900 border-r border-slate-200 whitespace-normal leading-snug">{r.company_name}</td>
+                          <td className="py-1.5 px-2 w-[28%] text-center text-slate-700 border-r border-slate-200 whitespace-normal leading-snug">{r.job_role}</td>
+                          <td className="py-1.5 px-1 w-[11.5%] text-orange-700 font-semibold border-r border-slate-200 whitespace-nowrap">{r.ctc_lpa || '—'}</td>
+                          <td className="py-1.5 px-2 w-[30%] text-center text-orange-700 font-medium whitespace-normal leading-snug">{r.current_status_text}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             )}
 
-            {/* 10. Section 7: Companies On Hold By HR */}
-            {report.included_sections?.on_hold_by_hr && report.sections?.on_hold_by_hr && report.sections.on_hold_by_hr.length > 0 && (
+            {/* 10. Section 8: Companies On Hold By HR */}
+            {report.included_sections?.on_hold_by_hr && (
               <div className="space-y-1.5">
-                <table className="w-full text-[11px] text-center border-collapse border border-slate-200 table-fixed">
-                  <colgroup>
-                    <col style={{ width: '38px' }} />
-                    <col style={{ width: '27%' }} />
-                    <col style={{ width: '28%' }} />
-                    <col style={{ width: '11.5%' }} />
-                    <col style={{ width: '30%' }} />
-                  </colgroup>
-                  <thead className="print:table-header-group">
-                    <tr className="bg-slate-100 border-b border-slate-300 text-slate-800">
-                      <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-slate-100 text-slate-800">
-                        <span className="flex items-center gap-1.5">
-                          <Clock size={13} className="text-slate-600 shrink-0" /> 7. COMPANIES ON HOLD BY HR
-                        </span>
-                      </th>
-                    </tr>
-                    <tr className="bg-slate-200/70 text-slate-800 font-semibold text-[10px] uppercase border-b border-slate-300">
-                      <th className="py-1.5 px-1 w-10 text-center border-r border-slate-300 font-mono" style={{ width: '38px' }}>#</th>
-                      <th className="py-1.5 px-2 w-[27%] text-center border-r border-slate-300 whitespace-normal">Company Name</th>
-                      <th className="py-1.5 px-2 w-[28%] text-center border-r border-slate-300 whitespace-normal">Role</th>
-                      <th className="py-1.5 px-1 w-[11.5%] text-center border-r border-slate-300 whitespace-nowrap">CTC</th>
-                      <th className="py-1.5 px-2 w-[30%] text-center whitespace-normal">Status / Reason</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 text-center">
-                    {report.sections.on_hold_by_hr.map((r: any, idx: number) => (
-                      <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
-                        <td className="py-1.5 px-1 w-10 text-center text-slate-500 font-mono border-r border-slate-300" style={{ width: '38px' }}>{r.s_no}</td>
-                        <td className="py-1.5 px-2 w-[27%] text-center font-bold text-slate-900 border-r border-slate-300 whitespace-normal leading-snug">{r.company_name}</td>
-                        <td className="py-1.5 px-2 w-[28%] text-center text-slate-700 border-r border-slate-300 whitespace-normal leading-snug">{r.job_role}</td>
-                        <td className="py-1.5 px-1 w-[11.5%] text-center text-slate-700 font-semibold border-r border-slate-300 whitespace-nowrap">{r.ctc_lpa || '—'}</td>
-                        <td className="py-1.5 px-2 w-[30%] text-center text-slate-700 font-medium whitespace-normal leading-snug">{r.current_status_text}</td>
+                {(report.sections?.on_hold_by_hr || []).length === 0 ? (
+                  <div className="space-y-1">
+                    <div className="px-3 py-1 rounded-md bg-slate-100 border border-slate-300 font-bold text-[11px] flex items-center text-slate-800">
+                      <span className="flex items-center gap-1.5">
+                        <Clock size={13} className="text-slate-600 shrink-0" /> 8. COMPANIES ON HOLD BY HR
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 italic py-1 pl-2">No companies currently on hold by HR.</p>
+                  </div>
+                ) : (
+                  <table className="w-full text-[11px] text-center border-collapse border border-slate-200 table-fixed">
+                    <colgroup>
+                      <col style={{ width: '38px' }} />
+                      <col style={{ width: '27%' }} />
+                      <col style={{ width: '28%' }} />
+                      <col style={{ width: '11.5%' }} />
+                      <col style={{ width: '30%' }} />
+                    </colgroup>
+                    <thead className="print:table-header-group">
+                      <tr className="bg-slate-100 border-b border-slate-300 text-slate-800">
+                        <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-slate-100 text-slate-800">
+                          <span className="flex items-center gap-1.5">
+                            <Clock size={13} className="text-slate-600 shrink-0" /> 8. COMPANIES ON HOLD BY HR
+                          </span>
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                      <tr className="bg-slate-200/70 text-slate-800 font-semibold text-[10px] uppercase border-b border-slate-300">
+                        <th className="py-1.5 px-1 w-10 text-center border-r border-slate-300 font-mono" style={{ width: '38px' }}>#</th>
+                        <th className="py-1.5 px-2 w-[27%] text-center border-r border-slate-300 whitespace-normal">Company Name</th>
+                        <th className="py-1.5 px-2 w-[28%] text-center border-r border-slate-300 whitespace-normal">Role</th>
+                        <th className="py-1.5 px-1 w-[11.5%] text-center border-r border-slate-300 whitespace-nowrap">CTC</th>
+                        <th className="py-1.5 px-2 w-[30%] text-center whitespace-normal">Status / Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 text-center">
+                      {(report.sections?.on_hold_by_hr || []).map((r: any, idx: number) => (
+                        <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                          <td className="py-1.5 px-1 w-10 text-center text-slate-500 font-mono border-r border-slate-300" style={{ width: '38px' }}>{r.s_no}</td>
+                          <td className="py-1.5 px-2 w-[27%] text-center font-bold text-slate-900 border-r border-slate-300 whitespace-normal leading-snug">{r.company_name}</td>
+                          <td className="py-1.5 px-2 w-[28%] text-center text-slate-700 border-r border-slate-300 whitespace-normal leading-snug">{r.job_role}</td>
+                          <td className="py-1.5 px-1 w-[11.5%] text-center text-slate-700 font-semibold border-r border-slate-300 whitespace-nowrap">{r.ctc_lpa || '—'}</td>
+                          <td className="py-1.5 px-2 w-[30%] text-center text-slate-700 font-medium whitespace-normal leading-snug">{r.current_status_text}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             )}
               </>
@@ -1072,19 +1339,27 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 text-center">
-                        {report.sections.pending_tasks.map((r: any, idx: number) => (
-                          <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
-                            <td className="py-1.5 px-1 w-10 text-center text-slate-500 font-mono border-r border-slate-200" style={{ width: '38px' }}>{r.s_no}</td>
-                            <td className={`py-1.5 px-2 ${hasDriveDate ? 'w-[25%]' : 'w-[29%]'} text-center font-bold text-slate-900 border-r border-slate-200 whitespace-normal leading-snug`}>{r.company_name}</td>
-                            <td className={`py-1.5 px-1.5 ${hasDriveDate ? 'w-[11%]' : 'w-[12%]'} text-center text-slate-600 border-r border-slate-200 whitespace-nowrap`}>{r.jd_received_date || '—'}</td>
-                            <td className={`py-1.5 px-1.5 ${hasDriveDate ? 'w-[11%]' : 'w-[12%]'} text-center text-slate-600 border-r border-slate-200 whitespace-nowrap`}>{r.db_shared_date || '—'}</td>
-                            <td className={`py-1.5 px-2 ${hasDriveDate ? 'w-[20%]' : 'w-[23%]'} text-center text-slate-700 border-r border-slate-200 whitespace-normal leading-snug`}>{r.current_status || '—'}</td>
-                            <td className={`py-1.5 px-2 ${hasDriveDate ? 'w-[20%]' : 'w-[23%]'} text-center text-slate-900 font-medium border-r border-slate-200 whitespace-normal leading-snug`}>{r.action_to_be_taken || '—'}</td>
-                            {hasDriveDate && (
-                              <td className="py-1.5 px-1.5 w-[11%] text-center text-indigo-700 font-semibold whitespace-nowrap">{r.drive_date || '—'}</td>
-                            )}
-                          </tr>
-                        ))}
+                        {report.sections.pending_tasks.map((r: any, idx: number) => {
+                          const isHl = Boolean(r.is_highlighted);
+                          const hlBg = r.highlight_color || '#fef08a';
+                          return (
+                            <tr
+                              key={idx}
+                              style={isHl ? { backgroundColor: hlBg, WebkitPrintColorAdjust: 'exact', printColorAdjust: 'exact' } : undefined}
+                              className={isHl ? 'font-semibold text-slate-950 shadow-2xs' : (idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50')}
+                            >
+                              <td className="py-1.5 px-1 w-10 text-center font-mono border-r border-slate-200" style={{ width: '38px', backgroundColor: isHl ? hlBg : undefined }}>{r.s_no}</td>
+                              <td className={`py-1.5 px-2 ${hasDriveDate ? 'w-[25%]' : 'w-[29%]'} text-center font-bold text-slate-900 border-r border-slate-200 whitespace-normal leading-snug`} style={{ backgroundColor: isHl ? hlBg : undefined }}>{r.company_name}</td>
+                              <td className={`py-1.5 px-1.5 ${hasDriveDate ? 'w-[11%]' : 'w-[12%]'} text-center text-slate-700 border-r border-slate-200 whitespace-nowrap`} style={{ backgroundColor: isHl ? hlBg : undefined }}>{r.jd_received_date || '—'}</td>
+                              <td className={`py-1.5 px-1.5 ${hasDriveDate ? 'w-[11%]' : 'w-[12%]'} text-center text-slate-700 border-r border-slate-200 whitespace-nowrap`} style={{ backgroundColor: isHl ? hlBg : undefined }}>{r.db_shared_date || '—'}</td>
+                              <td className={`py-1.5 px-2 ${hasDriveDate ? 'w-[20%]' : 'w-[23%]'} text-center text-slate-800 border-r border-slate-200 whitespace-normal leading-snug`} style={{ backgroundColor: isHl ? hlBg : undefined }}>{r.current_status || '—'}</td>
+                              <td className={`py-1.5 px-2 ${hasDriveDate ? 'w-[20%]' : 'w-[23%]'} text-center text-slate-950 font-medium border-r border-slate-200 whitespace-normal leading-snug`} style={{ backgroundColor: isHl ? hlBg : undefined }}>{r.action_to_be_taken || '—'}</td>
+                              {hasDriveDate && (
+                                <td className="py-1.5 px-1.5 w-[11%] text-center text-indigo-800 font-semibold whitespace-nowrap" style={{ backgroundColor: isHl ? hlBg : undefined }}>{r.drive_date || '—'}</td>
+                              )}
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   )}
@@ -1444,19 +1719,21 @@ export function A4PdfPreviewModal({ report, isOpen, onClose, onPrint }: Props) {
 
           </div>
 
-          {/* 9. Master Institutional Footer — Always at the End of the Report */}
-          <div className="border-t border-slate-300 pt-3 pb-1 mt-auto flex items-center justify-between text-[10px] text-slate-500 avoid-break shrink-0">
-            <div>
-              <p className="mt-0.5">© 2026 Infoziant. All rights reserved.</p>
-            </div>
-            {/* Prepared by in Footer */}
-            {hasPreparedBy && (
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
-                <User size={12} className="text-blue-900 shrink-0" />
-                <span>Prepared by: <strong className="font-bold">{preparedByName}</strong></span>
+          {/* 9. Master Institutional Footer — Always at the End of the Report (Only when Footer & Sign-off Options enabled) */}
+          {report.include_prepared_by !== false && (
+            <div className="border-t border-slate-300 pt-3 pb-1 mt-auto flex items-center justify-between text-[10px] text-slate-500 avoid-break shrink-0">
+              <div>
+                <p className="mt-0.5">© 2026 Infoziant. All rights reserved.</p>
               </div>
-            )}
-          </div>
+              {/* Prepared by in Footer */}
+              {hasPreparedBy && (
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                  <User size={12} className="text-blue-900 shrink-0" />
+                  <span>Prepared by: <strong className="font-bold">{preparedByName}</strong></span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         )}
       </div>

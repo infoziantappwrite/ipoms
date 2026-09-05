@@ -30,6 +30,7 @@ interface Props {
   page?: number;
   totalPages?: number;
   onPageChange?: (p: number) => void;
+  canDelete?: boolean;
 }
 
 export function MetadataHeader({
@@ -55,6 +56,7 @@ export function MetadataHeader({
   page,
   totalPages,
   onPageChange,
+  canDelete = true,
 }: Props) {
   const [inputPage, setInputPage] = useState<string>(String(page ?? 1));
 
@@ -141,8 +143,8 @@ export function MetadataHeader({
             <SnoRangeSelector
               fromSno={fromSno}
               toSno={toSno}
-              minSno={isRecent ? 3548 : 1}
-              maxSno={isRecent ? 4050 : Math.max(totalCount, 4050)}
+              minSno={isRecent ? Math.max(1, totalCount - 99) : 1}
+              maxSno={totalCount}
               onApplyRange={onApplyRange}
               onClearRange={onClearRange}
             />
@@ -154,7 +156,7 @@ export function MetadataHeader({
             onClick={onToggleRecent}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs ${
               isRecent
-                ? 'bg-primary text-white border-primary shadow-xs ring-1 ring-primary/30'
+                ? 'bg-primary text-primary-foreground border-primary shadow-xs ring-1 ring-primary/30'
                 : 'bg-primary/10 hover:bg-primary/20 text-primary border-primary/25 hover:border-primary/40'
             }`}
             title={isRecent ? 'Switch back to all metadata from Serial Number 1' : 'View contacts added in the past 1 to 2 weeks'}
@@ -224,24 +226,26 @@ export function MetadataHeader({
           )}
 
           {/* Recycle Bin / Back to Online Toggle */}
-          {isRecycleBin ? (
-            <button
-              onClick={onToggleRecycleBin}
-              className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white border border-emerald-500/80 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer ring-2 ring-emerald-500/20"
-              title="Return to Online Metadata Directory"
-              aria-label="Back to Online"
-            >
-              <ArrowLeft size={14} strokeWidth={2.25} /> Back to Online
-            </button>
-          ) : (
-            <button
-              onClick={onToggleRecycleBin}
-              className="w-9 h-9 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center cursor-pointer shadow-xs transition-all active:scale-95"
-              title="Recycle Bin (Deleted Contacts)"
-              aria-label="Recycle Bin"
-            >
-              <Trash2 size={16} strokeWidth={2.2} />
-            </button>
+          {canDelete && (
+            isRecycleBin ? (
+              <button
+                onClick={onToggleRecycleBin}
+                className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white border border-emerald-500/80 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer ring-2 ring-emerald-500/20"
+                title="Return to Online Metadata Directory"
+                aria-label="Back to Online"
+              >
+                <ArrowLeft size={14} strokeWidth={2.25} /> Back to Online
+              </button>
+            ) : (
+              <button
+                onClick={onToggleRecycleBin}
+                className="w-9 h-9 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center cursor-pointer shadow-xs transition-all active:scale-95"
+                title="Recycle Bin (Deleted Contacts)"
+                aria-label="Recycle Bin"
+              >
+                <Trash2 size={16} strokeWidth={2.2} />
+              </button>
+            )
           )}
 
           {!isRecycleBin && (
@@ -269,7 +273,7 @@ export function MetadataHeader({
               {/* Add Contact Icon Button (Solid Navy Blue with Tooltip) */}
               <button
                 onClick={onOpenAddModal}
-                className="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 text-white flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-95"
+                className="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-95"
                 title="Add Single Contact"
                 aria-label="Add Contact"
               >

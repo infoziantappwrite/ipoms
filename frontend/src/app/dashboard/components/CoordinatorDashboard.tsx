@@ -37,7 +37,12 @@ export function CoordinatorDashboard({ data }: Props) {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-8 p-6">
-      {/* ── 1. Coordinator Multi-College Focus Selector (Min 1, Max 4) ── */}
+      {/* ── 1. Follow up Due (Follow-Up Smart Queue) ── */}
+      <FollowUpSmartQueueWidget
+        selectedCollegeIds={selectedCollegeIds}
+      />
+
+      {/* ── 2. Coordinator Multi-College Focus Selector (Min 1, Max 4) ── */}
       <CoordinatorCollegeFocusSection
         onSelectionChange={(ids, locked) => {
           setSelectedCollegeIds(ids);
@@ -45,7 +50,7 @@ export function CoordinatorDashboard({ data }: Props) {
         }}
       />
 
-      {/* ── 2. Fresh Dashboard Empty State (When Colleges are Not Yet Locked) ── */}
+      {/* ── 3. Campus Outreach & Conversion Analytics Cards (or Empty State) ── */}
       {(!isLocked || selectedCollegeIds.length === 0) ? (
         <div className="bg-surface border border-dashed border-border rounded-2xl p-12 text-center flex flex-col items-center justify-center gap-3 shadow-2xs animate-in fade-in duration-300">
           <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center mb-1">
@@ -55,21 +60,14 @@ export function CoordinatorDashboard({ data }: Props) {
             Daily Operational Dashboard Ready
           </h3>
           <p className="text-xs text-fg-subtle max-w-md leading-relaxed">
-            Please select between <strong>1 and 4 partner colleges</strong> in the focus area above and click <strong className="text-emerald-600 dark:text-emerald-400">Save & Lock Focus</strong>. Once saved, your live KPIs, follow-up alerts, and system navigation (Daily Tracker, Weekly Tracker, Leads) will automatically activate.
+            Please select between <strong>1 and 4 partner colleges</strong> in the focus area above and click <strong className="text-emerald-600 dark:text-emerald-400">Save & Lock Focus</strong>. Once saved, your live KPIs, outreach metrics, and campus cards will automatically activate.
           </p>
         </div>
       ) : (
-        <>
-          {/* ── 3. Dedicated Per-College KPI Analytics Cards (1 to 4 cards) ── */}
-          <CoordinatorCollegeKpiCards
-            selectedCollegeIds={selectedCollegeIds}
-          />
-
-          {/* ── 4. Hot Follow-Ups Due — Smart Queue & Alarm ── */}
-          <FollowUpSmartQueueWidget
-            selectedCollegeIds={selectedCollegeIds}
-          />
-        </>
+        /* Dedicated Per-College KPI Analytics Cards (Campus Outreach & Conversion Analytics) */
+        <CoordinatorCollegeKpiCards
+          selectedCollegeIds={selectedCollegeIds}
+        />
       )}
     </div>
   );

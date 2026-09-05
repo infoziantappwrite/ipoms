@@ -255,7 +255,7 @@ export function SnoRangeSelector({
             <button
               type="button"
               onClick={handleApply}
-              className="px-4 py-1.5 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1 cursor-pointer active:scale-95 ml-auto"
+              className="px-4 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1 cursor-pointer active:scale-95 ml-auto"
             >
               <span>Apply Range</span>
               <ArrowRight size={12} strokeWidth={2.5} />

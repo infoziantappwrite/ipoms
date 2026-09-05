@@ -18,14 +18,14 @@ import { isPasswordValid } from '@/lib/passwordPolicy';
 import { getApiBase } from '@/lib/api';
 
 const API = getApiBase();
-const STAFF_DOMAIN = 'infoziant.com';
+const STAFF_DOMAINS = ['infoziant.com', 'icl.today'] as const;
 
 type Mode = 'login' | 'signup' | 'signup_verify_otp' | 'forgot' | 'verify_otp' | 'set_new_password';
 
 function completeEmail(raw: string): string {
   const v = raw.trim();
   if (!v || v.includes('@')) return v;
-  return `${v}@${STAFF_DOMAIN}`;
+  return `${v}@infoziant.com`;
 }
 
 export default function LoginPage() {
@@ -169,6 +169,12 @@ export default function LoginPage() {
       return;
     }
 
+    const mobileDigits = mobile.trim().replace(/[\s\-()]/g, '').replace(/^\+/, '');
+    if (mobile.trim() && !/^\d{10,13}$/.test(mobileDigits)) {
+      setErrorMsg('Enter a valid 10-digit mobile number.');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -240,6 +246,15 @@ export default function LoginPage() {
           localStorage.setItem('ipoms_user', raw);
           sessionStorage.setItem('ipoms_user', raw);
         } catch {}
+      }
+
+      // No token means the account was created but is pending Team
+      // Leader/Administrator approval, not signed in yet — stay on the
+      // login screen with the server's own explanation rather than
+      // claiming "Welcome" and bouncing off a dashboard with no session.
+      if (!token) {
+        setSuccessMsg(data.message || `Your email is verified, ${user?.full_name || ''}. Your account is pending approval.`);
+        return;
       }
 
       setSuccessMsg(`Account verified successfully! Welcome, ${user?.full_name || 'Coordinator'}.`);
@@ -511,13 +526,13 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onBlur={(e) => setEmail(completeEmail(e.target.value))}
-                placeholder={`name@${STAFF_DOMAIN}`}
+                placeholder="name@infoziant.com or name@icl.today"
                 autoComplete="username"
                 required
                 className={`${inputClass} font-mono`}
               />
               <p className="mt-1 text-micro text-slate-500">
-                Type your name and press Tab — @{STAFF_DOMAIN} is added for you.
+                Supports @infoziant.com and @icl.today domains.
               </p>
             </div>
 
@@ -545,7 +560,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded focus:outline-none"
+                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <Eye size={16} strokeWidth={2} /> : <EyeOff size={16} strokeWidth={2} />}
@@ -566,7 +581,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-primary hover:bg-primary/90 disabled:opacity-60 text-white rounded-xl font-bold shadow-md transition-all active:scale-[0.99] text-xs cursor-pointer"
+              className="w-full py-3 bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground rounded-xl font-bold shadow-md transition-all active:scale-[0.99] text-xs cursor-pointer"
             >
               {loading ? 'Authenticating…' : 'Sign-In'}
             </button>
@@ -594,7 +609,7 @@ export default function LoginPage() {
                 <input type="text"
                 inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)}
                   onBlur={(e) => setEmail(completeEmail(e.target.value))}
-                  placeholder={`priya.k@${STAFF_DOMAIN}`} required className={`${inputClass} font-mono`} />
+                  placeholder="name@infoziant.com or name@icl.today" required className={`${inputClass} font-mono`} />
               </div>
               <div>
                 <label className="block text-slate-700 font-bold mb-1">Primary Mobile</label>
@@ -618,7 +633,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded focus:outline-none"
+                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <Eye size={16} strokeWidth={2} /> : <EyeOff size={16} strokeWidth={2} />}
@@ -630,7 +645,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-primary hover:bg-primary/90 disabled:opacity-60 text-white rounded-xl font-bold shadow-md transition-all active:scale-[0.99] text-xs cursor-pointer"
+              className="w-full py-3 bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground rounded-xl font-bold shadow-md transition-all active:scale-[0.99] text-xs cursor-pointer"
             >
               {loading ? 'Creating Account…' : 'Create Account'}
             </button>
@@ -672,7 +687,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading || signupOtp.length !== 6}
-              className="w-full py-3.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-xl font-bold shadow-md transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-[0.99]"
+              className="w-full py-3.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground rounded-xl font-bold shadow-md transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-[0.99]"
             >
               <CheckCircle2 size={16} strokeWidth={2} />
               <span>{loading ? 'Verifying & Activating…' : 'Verify OTP & Activate Account'}</span>
@@ -710,11 +725,11 @@ export default function LoginPage() {
               <input type="text"
                 inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)}
                 onBlur={(e) => setEmail(completeEmail(e.target.value))}
-                placeholder={`name@${STAFF_DOMAIN}`} required className={`${inputClass} font-mono`} />
+                placeholder="name@infoziant.com or name@icl.today" required className={`${inputClass} font-mono`} />
             </div>
 
             <button type="submit" disabled={loading}
-              className="w-full py-3 bg-primary hover:bg-primary/90 disabled:opacity-60 text-white rounded-xl font-bold shadow-md transition-colors text-xs cursor-pointer">
+              className="w-full py-3 bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground rounded-xl font-bold shadow-md transition-colors text-xs cursor-pointer">
               {loading ? 'Sending…' : 'Send Verification Code'}
             </button>
 
@@ -761,7 +776,7 @@ export default function LoginPage() {
               className={`w-full py-3.5 rounded-xl font-bold text-xs transition-all shadow-md flex items-center justify-center gap-2 select-none cursor-pointer ${
                 isUnlocked
                   ? 'bg-emerald-600 text-white scale-[1.02] shadow-emerald-500/25 ring-2 ring-emerald-400'
-                  : 'bg-primary hover:bg-primary/90 disabled:opacity-50 text-white active:scale-[0.99]'
+                  : 'bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground active:scale-[0.99]'
               }`}
             >
               {isUnlocked ? (
@@ -818,7 +833,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded focus:outline-none"
+                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded"
                   aria-label={showNewPassword ? 'Hide password' : 'Show password'}
                 >
                   {showNewPassword ? <Eye size={16} strokeWidth={2} /> : <EyeOff size={16} strokeWidth={2} />}
@@ -842,7 +857,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded focus:outline-none"
+                  className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded"
                   aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                 >
                   {showConfirmPassword ? <Eye size={16} strokeWidth={2} /> : <EyeOff size={16} strokeWidth={2} />}
@@ -858,7 +873,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading || !newPassword || newPassword !== confirmPassword || !isPasswordValid(newPassword)}
-              className="w-full py-3.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white rounded-xl font-bold shadow-md transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-[0.99]"
+              className="w-full py-3.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground rounded-xl font-bold shadow-md transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-[0.99]"
             >
               <KeyRound size={16} strokeWidth={2} />
               <span>{loading ? 'Saving & Authenticating…' : 'Save & Sign In'}</span>

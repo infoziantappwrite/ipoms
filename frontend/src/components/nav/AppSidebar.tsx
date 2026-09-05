@@ -68,7 +68,7 @@ const NAV: NavItem[] = [
   { href: '/faq', label: 'Help & FAQs', Icon: HelpCircle },
 
   // Dedicated Standalone Administrator Governance Modules
-  { href: '/users', label: 'User Management', Icon: Users, roles: ['admin'] },
+  { href: '/users', label: 'User Management', Icon: Users, roles: ['admin', 'team_leader'] },
   { href: '/roles', label: 'Role Permissions Matrix', Icon: Shield, roles: ['admin'] },
   { href: '/system-settings', label: 'Season & System Settings', Icon: Sliders, roles: ['admin', 'team_leader'] },
   { href: '/system-health', label: 'System Health & Modules', Icon: ShieldCheck, roles: ['admin'] },

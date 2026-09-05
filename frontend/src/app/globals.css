@@ -180,23 +180,19 @@
      mode read generic rather than Infoziant. These stay on hue 224: the
      same navy, lit for a dark canvas rather than swapped for another blue.
 
-     KNOWN LIMITATION — `--primary` cannot satisfy both of its callers.
-     It is used as text 315 times (wants a LIGHT value for contrast against
-     the card) and as a button fill under a hardcoded `text-white` 91 times
-     (wants a DARK value for contrast against that white). Solving both at
-     once is arithmetically impossible: the crossover point where the two
-     ratios are equal is 4.10:1, still short of AA's 4.5:1. So this token is
-     tuned for the dominant caller (text, 4.64:1 ✓) and `--primary-foreground`
-     deliberately stays white to match the 91 buttons that ignore it — a
-     half-migration would leave 7 dark-label buttons beside 91 white-label
-     ones. The real fix is a component sweep replacing hardcoded `text-white`
-     with `text-primary-foreground`, after which this token flips to a dark
-     foreground and white-on-primary stops being a concern. Until then
-     white-on-primary is 3.63:1, unchanged from the 3.68:1 it was before. */
+     RESOLVED 5 Sep 2026 — the component sweep this note asked for is done.
+     101 lines across 56 files that hardcoded `text-white` on a solid
+     `bg-primary` fill now use `text-primary-foreground`, so this token is
+     finally free to be what the dark theme actually needs: a DARK label on
+     the light-blue fill. `--primary` stays tuned for its dominant caller
+     (text on card, 4.64:1 ✓) and button labels now read 5.34:1 instead of
+     the 3.63:1 white-on-primary this block previously had to accept.
+     Only tinted fills (`bg-primary/10`) still pair with `text-primary`,
+     which is correct — a dark label belongs on a solid fill, not a 10% tint. */
   --primary:          85 128 245;  /* #5580F5  hue 224 — 4.64:1 as text on card */
   --primary-hover:   122 155 250;  /* #7A9BFA  hue 224 — 6.3:1 as text on card  */
   --primary-subtle:   23  37  84;  /* #172554  navy tint background             */
-  --primary-foreground: 255 255 255;
+  --primary-foreground: 9  13  22;  /* dark label on the bright fill — 5.34:1   */
   --accent:          138 166 242;  /* #8AA6F2  hue 224 — 7.1:1 on card          */
   --accent-foreground: 9  13  22;  /* dark label on the bright accent — 8.2:1   */
 

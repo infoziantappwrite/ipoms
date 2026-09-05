@@ -9,11 +9,12 @@ import { CalendarPicker } from './components/CalendarPicker';
 import { SoftphonePanel, SoftphoneCallResult } from './components/SoftphonePanel';
 import { SmoothOutcomeDropdown } from '@/components/ui/SmoothOutcomeDropdown';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
-import { AlertTriangle, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Cloud, Download, Loader2, PhoneCall, Plus, Save, Search } from 'lucide-react';
+import { AlertTriangle, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Cloud, Loader2, PhoneCall, Plus, Save, Search, Trash2, Upload } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
 import { ManualAddRowModal } from './components/ManualAddRowModal';
 import { EditTrackerRowModal } from './components/EditTrackerRowModal';
+import { BulkDeleteTrackerModal } from './components/BulkDeleteTrackerModal';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -90,6 +91,8 @@ export default function DailyTrackerPage() {
   const [sessionDate, setSessionDate] = useState<string>('');
   const [isManualAddOpen, setIsManualAddOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<TrackerRow | null>(null);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [bulkDeleteSuccessMsg, setBulkDeleteSuccessMsg] = useState<string | null>(null);
 
   // Real signed-in identity. The backend still enforces ownership itself
   // (scopeToSelf pins a coordinator to their own id regardless of what's
@@ -352,6 +355,42 @@ export default function DailyTrackerPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [handleSaveProgress]);
 
+  // ── Bulk Delete Tracker Data
+  const handleBulkDelete = useCallback(async (scope: 'today' | 'college_all' | 'entire_database') => {
+    if (!selectedCollegeId || !coordinatorId) return;
+
+    try {
+      const res = await apiFetch('/daily-tracker/bulk', {
+        method: 'DELETE',
+        body: JSON.stringify({
+          coordinator_id: coordinatorId,
+          college_id: scope === 'entire_database' ? 'all' : selectedCollegeId,
+          scope,
+          session_date: sessionDate || undefined,
+        }),
+      });
+
+      if (res.success) {
+        await loadTodayRows();
+        await loadKpi();
+        const code = selectedCollegeObj?.college_code || selectedCollegeName;
+        const msg = (res.data as any)?.message ||
+          (scope === 'today'
+            ? `Successfully cleared today's calling sheet for [${code}].`
+            : scope === 'college_all'
+            ? `Successfully deleted all daily tracker records for [${code}].`
+            : 'Successfully wiped entire daily tracker database.');
+        setBulkDeleteSuccessMsg(msg);
+        setTimeout(() => setBulkDeleteSuccessMsg(null), 5000);
+      } else {
+        alert(res.error?.message || 'Failed to delete daily tracker records');
+      }
+    } catch (err: any) {
+      console.error('[DT] Bulk delete error', err);
+      alert(err.message || 'Error occurred while deleting tracker records');
+    }
+  }, [selectedCollegeId, coordinatorId, sessionDate, selectedCollegeObj, selectedCollegeName, loadTodayRows, loadKpi]);
+
   // ── Load history view
   const handleViewHistory = async (date: string) => {
     if (!coordinatorId) return;
@@ -465,6 +504,23 @@ export default function DailyTrackerPage() {
           </div>
         </div>
 
+        {/* Bulk Delete Success Banner */}
+        {bulkDeleteSuccessMsg && (
+          <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-semibold animate-in fade-in slide-in-from-top-1 duration-200">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+              <span>{bulkDeleteSuccessMsg}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setBulkDeleteSuccessMsg(null)}
+              className="text-emerald-700 dark:text-emerald-300 hover:opacity-75 cursor-pointer font-bold px-1"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* ── Sub-bar: Unified Controls Row (College Selector + Actions + Filter + Search) ── */}
         <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t border-border/80 relative z-30">
           <div className="flex items-center gap-2.5 flex-wrap">
@@ -503,21 +559,34 @@ export default function DailyTrackerPage() {
                     }
                     window.open('/tracker/load-contacts', '_blank');
                   }}
-                  className="flex items-center gap-1.5 bg-primary hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
+                  className="flex items-center gap-1.5 bg-primary hover:bg-blue-700 text-primary-foreground px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
                   title="Click me to load contacts from metadata base"
                 >
-                  <Download size={14} strokeWidth={2.5} aria-hidden /> Load
+                  <Upload size={14} strokeWidth={2.5} aria-hidden /> Load
                 </button>
 
-                {/* Save Button */}
+                {/* Save Button (Icon-Only) */}
                 <button
                   type="button"
                   onClick={handleSaveProgress}
                   disabled={!selectedCollegeId}
-                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
+                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95 shrink-0"
                   title="Save Progress (Ctrl + S)"
+                  aria-label="Save Progress (Ctrl + S)"
                 >
-                  <Save size={14} strokeWidth={2.5} aria-hidden /> Save
+                  <Save size={15} strokeWidth={2.5} aria-hidden />
+                </button>
+
+                {/* Delete Button (Icon-Only Dustbin) */}
+                <button
+                  type="button"
+                  onClick={() => setIsBulkDeleteOpen(true)}
+                  disabled={!selectedCollegeId}
+                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95 shrink-0"
+                  title="Bulk Delete Daily Tracker Data"
+                  aria-label="Bulk Delete Daily Tracker Data"
+                >
+                  <Trash2 size={15} strokeWidth={2.2} aria-hidden />
                 </button>
 
                 {/* History / Calendar */}
@@ -534,7 +603,7 @@ export default function DailyTrackerPage() {
                   type="button"
                   onClick={() => setIsManualAddOpen(true)}
                   title="Add Custom Entry (Row-wise)"
-                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary hover:bg-blue-700 text-white shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95 shrink-0"
+                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary hover:bg-blue-700 text-primary-foreground shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95 shrink-0"
                 >
                   <Plus size={16} strokeWidth={2.5} aria-hidden />
                 </button>
@@ -569,7 +638,7 @@ export default function DailyTrackerPage() {
                 <button
                   type="button"
                   onClick={() => setIsHistoryMode(false)}
-                  className="flex items-center gap-1.5 bg-primary hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
+                  className="flex items-center gap-1.5 bg-primary hover:bg-blue-700 text-primary-foreground px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
                 >
                   Back to Today
                 </button>
@@ -716,6 +785,18 @@ export default function DailyTrackerPage() {
           onDelete={async (id) => {
             await handleDeleteRow(id);
           }}
+        />
+      )}
+
+      {/* ── Bulk Delete Tracker Modal ────────────────────────────────────── */}
+      {isBulkDeleteOpen && (
+        <BulkDeleteTrackerModal
+          collegeId={selectedCollegeId}
+          collegeCode={selectedCollegeObj?.college_code || selectedCollegeName}
+          collegeName={selectedCollegeName}
+          todayCount={rows.length}
+          onClose={() => setIsBulkDeleteOpen(false)}
+          onConfirmDelete={handleBulkDelete}
         />
       )}
 

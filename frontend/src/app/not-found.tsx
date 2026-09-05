@@ -46,7 +46,7 @@ export default function NotFound() {
 
           <Link
             href="/dashboard"
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer hover:shadow-md active:scale-95"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-blue-700 text-primary-foreground text-xs font-bold shadow-xs transition-all cursor-pointer hover:shadow-md active:scale-95"
           >
             <Home size={15} />
             <span>Back to Dashboard</span>

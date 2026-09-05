@@ -44,7 +44,11 @@ export default function WeeklyTrackerPage() {
   const [selectedCollegeName, setSelectedCollegeName] = useState<string>(() => {
     return getActiveCollege().name || '';
   });
-  const [academicYear, setAcademicYear] = useState<string>('2027');
+  // 'all' - there is no working year selector in the UI (onAcademicYearChange is
+  // never actually wired to a control), so a hardcoded year here silently filters
+  // out real data forever whenever the current season's number doesn't match it.
+  // 'all' means "don't filter", matching what the backend now does honestly.
+  const [academicYear, setAcademicYear] = useState<string>('all');
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [sections, setSections] = useState<SectionsResponse | null>(null);
   const [kpi, setKpi] = useState<WeeklyKpiData | null>(null);
@@ -55,6 +59,13 @@ export default function WeeklyTrackerPage() {
   const [activeSectionFilter, setActiveSectionFilter] = useState<string>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [coordinatorId, setCoordinatorId] = useState<string | null>(null);
+  // The real colleges this account is assigned to (not a permission gate -
+  // every coordinator can still act on any college). Used only to show a
+  // "this isn't your college" confirmation before create/edit/delete, and an
+  // empty set here means "don't warn" (nothing known to compare against yet),
+  // not "everything is foreign."
+  const [myCollegeIds, setMyCollegeIds] = useState<Set<string>>(new Set());
+  const isForeignCollege = myCollegeIds.size > 0 && !!selectedCollegeId && !myCollegeIds.has(selectedCollegeId);
 
   // ── Global Delete Mode State ──
   const [isDeleteMode, setIsDeleteMode] = useState(false);
@@ -102,7 +113,15 @@ export default function WeeklyTrackerPage() {
 
   useEffect(() => {
     const user = readSessionUser();
-    if (user?._id) setCoordinatorId(user._id);
+    if (user?._id) {
+      setCoordinatorId(user._id);
+      apiFetch<any>(`/profile/${user._id}`).then((res) => {
+        const ids = (res?.data?.assigned_college_ids || [])
+          .map((c: any) => (typeof c === 'string' ? c : c?._id))
+          .filter(Boolean);
+        setMyCollegeIds(new Set(ids));
+      }).catch((err) => console.error('Failed to load assigned colleges:', err));
+    }
 
     resolveDefaultCollege().then((col) => {
       if (col.id) {
@@ -158,8 +177,20 @@ export default function WeeklyTrackerPage() {
     }
   }, [selectedCollegeId, academicYear, loadWeeklyTracker, loadKpi]);
 
+  // Access is never blocked - any coordinator can act on any college. This is
+  // just a chance to reconsider before doing so on a college that isn't theirs;
+  // the real owner is notified by email regardless of the answer given here.
+  const confirmForeignAction = (actionLabel: string): boolean => {
+    if (!isForeignCollege) return true;
+    return window.confirm(
+      `${selectedCollegeName || 'This college'} is not one of your assigned colleges. `
+      + `Continue with this ${actionLabel} anyway? The coordinator who handles it will be notified.`
+    );
+  };
+
   // ── Row Patch (Inline Edit)
   const handleUpdateRow = async (rowId: string, patch: Partial<WeeklyRow>) => {
+    if (!confirmForeignAction('edit')) return;
     try {
       const res = await apiFetch(`/weekly-tracker/${rowId}`, {
         method: 'PATCH',
@@ -176,6 +207,7 @@ export default function WeeklyTrackerPage() {
 
   // ── Move Section
   const handleMoveSection = async (rowId: string, newSection: string) => {
+    if (!confirmForeignAction('edit')) return;
     try {
       const res = await apiFetch(`/weekly-tracker/${rowId}/section`, {
         method: 'PATCH',
@@ -207,6 +239,7 @@ export default function WeeklyTrackerPage() {
 
   // ── Delete Row (Soft delete)
   const handleDeleteRow = async (rowId: string) => {
+    if (!confirmForeignAction('delete')) return;
     try {
       const res = await apiFetch(`/weekly-tracker/${rowId}`, {
         method: 'DELETE',
@@ -229,6 +262,7 @@ export default function WeeklyTrackerPage() {
         body: JSON.stringify({
           college_id: selectedCollegeId,
           coordinator_id: coordinatorId,
+          academic_year: academicYear,
         }),
       });
       if (res.success) {
@@ -344,7 +378,7 @@ export default function WeeklyTrackerPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
+    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-primary-foreground">
 
       {/* ── Top Header ────────────────────────────────────────────────────── */}
       <WeeklyHeader
@@ -562,6 +596,8 @@ export default function WeeklyTrackerPage() {
         <AddCompanyModal
           collegeId={selectedCollegeId}
           coordinatorId={coordinatorId ?? ''}
+          isForeignCollege={isForeignCollege}
+          collegeName={selectedCollegeName}
           onClose={() => setIsAddModalOpen(false)}
           onAdded={() => {
             loadWeeklyTracker();

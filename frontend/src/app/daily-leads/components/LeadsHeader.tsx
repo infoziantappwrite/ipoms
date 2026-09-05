@@ -10,7 +10,7 @@ interface Props {
   onDateChange: (d: string) => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
-  onOpenAddModal: () => void;
+  onOpenAddModal?: () => void;
   onExportXlsx: () => void;
   onExportPdf?: () => void;
   onExportImage?: () => void;
@@ -232,15 +232,21 @@ export function LeadsHeader({
             iconOnly={true}
           />
 
-          <button
-            type="button"
-            onClick={onOpenAddModal}
-            className="w-9 h-9 flex items-center justify-center bg-primary hover:bg-blue-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer active:scale-95 shrink-0"
-            title="Add Daily Opportunity Entry"
-            aria-label="Add Lead"
-          >
-            <Plus size={18} strokeWidth={2.5} />
-          </button>
+          {onOpenAddModal ? (
+            <button
+              type="button"
+              onClick={onOpenAddModal}
+              className="w-9 h-9 flex items-center justify-center bg-primary hover:bg-blue-700 text-primary-foreground rounded-xl shadow-xs transition-colors cursor-pointer active:scale-95 shrink-0"
+              title="Add Daily Opportunity Entry"
+              aria-label="Add Lead"
+            >
+              <Plus size={18} strokeWidth={2.5} />
+            </button>
+          ) : (
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 rounded-xl whitespace-nowrap">
+              Supervisor (Read-Only)
+            </span>
+          )}
         </div>
       </div>
     </header>
