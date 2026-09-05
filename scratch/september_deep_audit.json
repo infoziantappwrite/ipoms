@@ -1,0 +1,123 @@
+{
+  "stats": {
+    "totalExtractedCalls": 20,
+    "uniqueCompanies": 0,
+    "completeMatches": 0,
+    "placeholderEnrichments": 0,
+    "notInMetadataCount": 0
+  },
+  "collegeStats": {
+    "KARPAGAM": {
+      "totalRows": 160,
+      "validContacts": 0,
+      "coordinator": "Bhavana (Mohanaradha)"
+    },
+    "MCET": {
+      "totalRows": 129,
+      "validContacts": 0,
+      "coordinator": "SeshmithTamizh"
+    },
+    "ACET": {
+      "totalRows": 146,
+      "validContacts": 0,
+      "coordinator": "Mohana"
+    },
+    "KPR": {
+      "totalRows": 153,
+      "validContacts": 0,
+      "coordinator": "Suji + Mohanaradha"
+    },
+    "AIHT": {
+      "totalRows": 140,
+      "validContacts": 0,
+      "coordinator": "Kalpana( Mohanaradha)"
+    },
+    "KAMARAJ": {
+      "totalRows": 160,
+      "validContacts": 0,
+      "coordinator": "(VARSHINI) MEGALA DEVI"
+    },
+    "NGP": {
+      "totalRows": 160,
+      "validContacts": 0,
+      "coordinator": "MEGALA DEVI"
+    },
+    "MAR EPHRAEM": {
+      "totalRows": 160,
+      "validContacts": 0,
+      "coordinator": "NISHA (MEGALA DEVI)"
+    },
+    "MKCE": {
+      "totalRows": 160,
+      "validContacts": 0,
+      "coordinator": "???"
+    },
+    "ACEW": {
+      "totalRows": 158,
+      "validContacts": 0,
+      "coordinator": "Lizenya S"
+    },
+    "NPR": {
+      "totalRows": 185,
+      "validContacts": 0,
+      "coordinator": "Deepa (Lizenya)"
+    },
+    "KIOT": {
+      "totalRows": 168,
+      "validContacts": 0,
+      "coordinator": "Shalini (Lizenya)"
+    },
+    "KLU": {
+      "totalRows": 468,
+      "validContacts": 0,
+      "coordinator": "Malavika"
+    },
+    "SMVEC": {
+      "totalRows": 99,
+      "validContacts": 20,
+      "coordinator": ""
+    },
+    "DSU": {
+      "totalRows": 102,
+      "validContacts": 0,
+      "coordinator": "thirisha"
+    },
+    "PSNA": {
+      "totalRows": 322,
+      "validContacts": 0,
+      "coordinator": "Thrisha"
+    },
+    "SONA": {
+      "totalRows": 160,
+      "validContacts": 0,
+      "coordinator": "???"
+    },
+    "NEHRU": {
+      "totalRows": 158,
+      "validContacts": 0,
+      "coordinator": "Suji"
+    },
+    "NGCE": {
+      "totalRows": 105,
+      "validContacts": 0,
+      "coordinator": "MEGALA DEVI"
+    },
+    "HITS": {
+      "totalRows": 161,
+      "validContacts": 0,
+      "coordinator": "Suji"
+    },
+    "AVS": {
+      "totalRows": 2,
+      "validContacts": 0,
+      "coordinator": "Bhavana (Mohana)"
+    },
+    "KARUNYA": {
+      "totalRows": 2,
+      "validContacts": 0,
+      "coordinator": "Bhavana (Mohana)"
+    }
+  },
+  "placeholderEnrichments": [],
+  "notInMetadataList": []
+}

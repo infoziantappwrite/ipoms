@@ -14,7 +14,9 @@
     "fix:roles": "ts-node src/scripts/fixRoleCodes.ts",
     "seed:nehru": "ts-node src/scripts/runWeeklySnapshot.ts nehru",
     "seed:hits": "ts-node src/scripts/runWeeklySnapshot.ts hits",
-    "fix:college-assignments": "ts-node src/scripts/fixCollegeAssignments.ts"
+    "fix:college-assignments": "ts-node src/scripts/fixCollegeAssignments.ts",
+    "fill:placeholders": "ts-node src/scripts/fillCleanMetadataPlaceholders.ts",
+    "import:152": "ts-node src/scripts/importFilled152Placeholders.ts"
   },
   "keywords": [
     "ipoms",
