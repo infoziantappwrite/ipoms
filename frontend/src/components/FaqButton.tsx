@@ -30,7 +30,7 @@ export function FaqButton({
       href={href}
       title="Frequently Asked Questions & Placement Operations Manual (25 Topics)"
       aria-label="Open Frequently Asked Questions"
-      className={`flex items-center justify-center gap-1.5 rounded-xl border border-border/80 bg-surface/90 hover:bg-surface-raised hover:border-primary/40 text-fg-subtle hover:text-primary transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95 group select-none ${
+      className={`flex items-center justify-center gap-1.5 rounded-xl border border-border/80 bg-surface/90 hover:bg-surface-raised hover:border-primary/40 text-fg-subtle hover:text-primary transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-[0.992] group select-none ${
         showLabel ? 'px-3 py-1.5' : sizeClasses
       } ${className}`}
     >

@@ -65,6 +65,36 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
     fetchKpis(selectedCollegeIds);
   }, [selectedCollegeIds]);
 
+  // ── Auto-refresh every morning at 12:00:00 AM Midnight & on Tab Visibility ──
+  useEffect(() => {
+    // Calculate time until next 12:00:00 AM midnight
+    const now = new Date();
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+    const msUntilMidnight = Math.max(1000, tomorrow.getTime() - now.getTime());
+
+    const midnightTimer = setTimeout(() => {
+      fetchKpis(selectedCollegeIds);
+      // Recurring 24-hour interval after first midnight hit
+      const dailyInterval = setInterval(() => {
+        fetchKpis(selectedCollegeIds);
+      }, 24 * 60 * 60 * 1000);
+      return () => clearInterval(dailyInterval);
+    }, msUntilMidnight);
+
+    // Re-check and refresh immediately when the user returns to the tab next morning
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchKpis(selectedCollegeIds);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearTimeout(midnightTimer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [selectedCollegeIds]);
+
   // Listen to global changes
   useEffect(() => {
     const handleCollegesChange = (e: any) => {
@@ -103,8 +133,10 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
       : kpiData.length === 2
       ? 'grid-cols-1 md:grid-cols-2'
       : kpiData.length === 3
-      ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-      : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4';
+      ? 'grid-cols-1 md:grid-cols-3'
+      : kpiData.length === 4
+      ? 'grid-cols-1 md:grid-cols-2'
+      : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
 
   return (
     <div className="space-y-4">
@@ -121,7 +153,7 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
         </div>
 
         <p className="text-xs text-fg-subtle">
-          Real-time metrics for your {kpiData.length} focus institutions
+          Today&apos;s outreach metrics (Refreshes daily at 12:00 AM)
         </p>
       </div>
 
@@ -231,7 +263,7 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
                 {/* Proportion Bar */}
                 <div className="space-y-1.5 pt-0.5">
                   <div className="flex items-center justify-end text-micro text-fg-subtle font-medium">
-                    <span>{item.total_calls} Total Calls Logged</span>
+                    <span>{item.total_calls} Calls Logged Today</span>
                   </div>
                   <div className="w-full h-1.5 rounded-full bg-surface-sunken overflow-hidden flex">
                     {item.total_positives > 0 && (

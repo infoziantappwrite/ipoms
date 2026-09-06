@@ -104,7 +104,7 @@ export function WeeklyHeader({
   onSelectCollege,
   weekOffset,
   onWeekChange,
-  academicYear = '2027',
+  academicYear = 'all',
   onAcademicYearChange,
   onOpenAddModal,
   onSyncDailyPositives,
@@ -211,16 +211,16 @@ export function WeeklyHeader({
               <span className="text-xs font-bold text-fg whitespace-nowrap">
                 {weekInfo.monthName} {weekInfo.year}
               </span>
-              <span className="text-[11px] font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded-full whitespace-nowrap leading-none">
+              <span className="text-micro font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded-full whitespace-nowrap leading-none">
                 Week {weekInfo.monthlyWeekNumber}
               </span>
               {weekInfo.isCurrent && (
-                <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 px-1.5 py-0.5 rounded-md font-semibold whitespace-nowrap leading-none">
+                <span className="text-micro bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 px-1.5 py-0.5 rounded-md font-semibold whitespace-nowrap leading-none">
                   Current
                 </span>
               )}
             </div>
-            <div className="text-[10px] text-fg-subtle font-mono mt-0.5 whitespace-nowrap leading-none">
+            <div className="text-micro text-fg-subtle font-mono mt-0.5 whitespace-nowrap leading-none">
               {weekInfo.rangeStr}
             </div>
           </div>
@@ -269,7 +269,7 @@ export function WeeklyHeader({
                 <button
                   type="button"
                   onClick={onOpenAddModal}
-                  className="w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center justify-center shadow-xs transition-all cursor-pointer shrink-0 active:scale-95"
+                  className="w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center justify-center shadow-xs transition-all cursor-pointer shrink-0 active:scale-[0.992]"
                   title="Add Company / Entry"
                   aria-label="Add Company"
                 >
@@ -281,7 +281,7 @@ export function WeeklyHeader({
                 <button
                   type="button"
                   onClick={onSyncDailyPositives}
-                  className="w-8 h-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl flex items-center justify-center shadow-xs transition-all cursor-pointer shrink-0 active:scale-95"
+                  className="w-8 h-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl flex items-center justify-center shadow-xs transition-all cursor-pointer shrink-0 active:scale-[0.992]"
                   title="Sync Daily Tracker Positives"
                   aria-label="Sync"
                 >
@@ -306,7 +306,7 @@ export function WeeklyHeader({
                   <button
                     type="button"
                     onClick={onToggleDeleteMode}
-                    className="w-8 h-8 bg-rose-600 hover:bg-rose-700 text-white rounded-xl flex items-center justify-center shadow-xs transition-all cursor-pointer shrink-0 active:scale-95"
+                    className="w-8 h-8 bg-rose-600 hover:bg-rose-700 text-white rounded-xl flex items-center justify-center shadow-xs transition-all cursor-pointer shrink-0 active:scale-[0.992]"
                     title="Delete Rows"
                     aria-label="Delete Rows"
                   >

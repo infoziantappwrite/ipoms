@@ -78,7 +78,7 @@ const LOGO_MAP: Record<string, string> = {
   SSEI: '/college-logos/sri shanmuga.png',
   NGP: '/college-logos/ngp.png',
   HITS: '/college-logos/hits.png',
-  NEHRU: '/college-logos/Infozianthead.png',
+  NEHRU: '/college-logos/nehru.png',
   MAR: '/college-logos/mar ephream.png',
   NGCE: '/college-logos/narayanaguru.png',
   ACEW: '/college-logos/ACEW.jfif',

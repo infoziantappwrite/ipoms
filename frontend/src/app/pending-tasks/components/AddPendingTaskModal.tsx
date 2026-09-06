@@ -410,7 +410,7 @@ export function AddPendingTaskModal({
             <button
               type="submit"
               disabled={submitting}
-              className="w-full sm:w-auto px-6 py-2 text-xs font-bold text-white bg-primary hover:bg-primary-hover rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+              className="w-full sm:w-auto px-6 py-2 text-xs font-bold text-primary-foreground bg-primary hover:bg-primary-hover rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50"
             >
               {submitting ? 'Saving...' : initialData ? 'Update Task' : 'Create Task'}
             </button>

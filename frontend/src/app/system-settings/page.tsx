@@ -56,7 +56,7 @@ export default function SystemSettingsPage() {
 
   if (userRole === 'coordinator') {
     return (
-      <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
+      <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-primary-foreground">
         <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-border px-6 py-4 flex items-center justify-between gap-4 shadow-2xs">
           <div>
             <h1 className="text-xl font-bold text-fg tracking-tight flex items-center gap-2">
@@ -80,7 +80,7 @@ export default function SystemSettingsPage() {
           <button
             type="button"
             onClick={() => router.push('/dashboard')}
-            className="px-4 py-2 text-xs font-semibold text-white bg-primary hover:bg-primary-hover rounded-lg transition shadow-xs"
+            className="px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary-hover rounded-lg transition shadow-xs"
           >
             Return to Dashboard
           </button>
@@ -90,7 +90,7 @@ export default function SystemSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
+    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-primary-foreground">
       {/* ── Top Header Bar (Frozen / Sticky at top) ── */}
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-border px-6 py-4 flex items-center justify-between gap-4 shadow-2xs">
         <div>

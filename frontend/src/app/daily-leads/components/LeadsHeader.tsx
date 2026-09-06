@@ -10,7 +10,7 @@ interface Props {
   onDateChange: (d: string) => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
-  onOpenAddModal: () => void;
+  onOpenAddModal?: () => void;
   onExportXlsx: () => void;
   onExportPdf?: () => void;
   onExportImage?: () => void;
@@ -174,7 +174,7 @@ export function LeadsHeader({
             <button
               type="button"
               onClick={onBulkDelete}
-              className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer active:scale-95 animate-in fade-in shrink-0"
+              className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer active:scale-[0.992] animate-in fade-in shrink-0"
             >
               <Trash2 size={13} strokeWidth={2.2} aria-hidden />
               <span>Delete ({selectedCount})</span>
@@ -185,7 +185,7 @@ export function LeadsHeader({
             <button
               type="button"
               onClick={onToggleDeleteMode}
-              className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 shrink-0 ${
+              className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all shadow-xs cursor-pointer active:scale-[0.992] shrink-0 ${
                 isDeleteMode
                   ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-200 dark:shadow-none'
                   : 'bg-surface border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:border-rose-300'
@@ -202,7 +202,7 @@ export function LeadsHeader({
             <button
               type="button"
               onClick={onOpenCopyToJdModal}
-              className="w-9 h-9 flex items-center justify-center bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 hover:shadow-amber-500/20 shrink-0"
+              className="w-9 h-9 flex items-center justify-center bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-xl transition-all shadow-xs cursor-pointer active:scale-[0.992] hover:shadow-amber-500/20 shrink-0"
               title="Copy positive leads to JD Received section for selected colleges"
               aria-label="Copy to JD"
             >
@@ -215,7 +215,7 @@ export function LeadsHeader({
               type="button"
               disabled={isSyncing}
               onClick={onSyncPositives}
-              className="w-9 h-9 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 hover:shadow-indigo-500/20 shrink-0"
+              className="w-9 h-9 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl transition-all shadow-xs cursor-pointer active:scale-[0.992] hover:shadow-indigo-500/20 shrink-0"
               title="Sync positive calls and scheduled pipeline leads for this date"
               aria-label="Sync Positives"
             >
@@ -232,15 +232,21 @@ export function LeadsHeader({
             iconOnly={true}
           />
 
-          <button
-            type="button"
-            onClick={onOpenAddModal}
-            className="w-9 h-9 flex items-center justify-center bg-primary hover:bg-blue-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer active:scale-95 shrink-0"
-            title="Add Daily Opportunity Entry"
-            aria-label="Add Lead"
-          >
-            <Plus size={18} strokeWidth={2.5} />
-          </button>
+          {onOpenAddModal ? (
+            <button
+              type="button"
+              onClick={onOpenAddModal}
+              className="w-9 h-9 flex items-center justify-center bg-primary hover:bg-blue-700 text-primary-foreground rounded-xl shadow-xs transition-colors cursor-pointer active:scale-[0.992] shrink-0"
+              title="Add Daily Opportunity Entry"
+              aria-label="Add Lead"
+            >
+              <Plus size={18} strokeWidth={2.5} />
+            </button>
+          ) : (
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 rounded-xl whitespace-nowrap">
+              Supervisor (Read-Only)
+            </span>
+          )}
         </div>
       </div>
     </header>

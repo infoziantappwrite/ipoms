@@ -249,7 +249,7 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
               type="button"
               onClick={handleSaveAndLock}
               disabled={selectedIds.length === 0 || isSubmitting}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xs cursor-pointer select-none active:scale-95 shrink-0"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xs cursor-pointer select-none active:scale-[0.992] shrink-0"
             >
               {isSubmitting ? (
                 <RefreshCw size={14} className="animate-spin text-white" />
@@ -263,7 +263,7 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
               type="button"
               onClick={handleUnlockToEdit}
               disabled={isSubmitting}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-surface-sunken hover:bg-surface-raised border border-border text-fg hover:border-primary/40 hover:text-primary transition-all shadow-xs cursor-pointer select-none active:scale-95 shrink-0 disabled:opacity-50"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-surface-sunken hover:bg-surface-raised border border-border text-fg hover:border-primary/40 hover:text-primary transition-all shadow-xs cursor-pointer select-none active:scale-[0.992] shrink-0 disabled:opacity-50"
             >
               {isSubmitting ? (
                 <RefreshCw size={14} className="animate-spin text-primary" />

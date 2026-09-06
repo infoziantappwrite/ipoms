@@ -168,7 +168,7 @@ export function SmoothYearDropdown({
         disabled={disabled}
         onClick={handleToggle}
         title={selectedYears.length > 0 ? `Batch: ${selectedYears.join(', ')}` : placeholder}
-        className="inline-flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-surface hover:bg-surface-raised text-fg border border-border transition-all cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50 select-none whitespace-nowrap min-w-[100px] max-w-[160px]"
+        className="inline-flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-surface hover:bg-surface-raised text-fg border border-border transition-all cursor-pointer shadow-2xs active:scale-[0.992] disabled:opacity-50 select-none whitespace-nowrap min-w-[100px] max-w-[160px]"
       >
         <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
           <GraduationCap size={13} className="text-primary dark:text-sky-400 shrink-0" />
@@ -254,7 +254,7 @@ export function SmoothYearDropdown({
                     <div
                       className={`w-[18px] h-[18px] min-w-[18px] min-h-[18px] rounded-[5px] border-2 flex items-center justify-center transition-all shadow-xs shrink-0 ${
                         isSelected
-                          ? 'bg-primary border-primary text-white ring-2 ring-primary/25'
+                          ? 'bg-primary border-primary text-primary-foreground ring-2 ring-primary/25'
                           : 'border-slate-500 dark:border-slate-400 bg-white dark:bg-slate-900 group-hover:border-primary dark:group-hover:border-primary'
                       }`}
                     >
@@ -278,7 +278,7 @@ export function SmoothYearDropdown({
                   setIsOpen(false);
                   setCoords((prev) => ({ ...prev, ready: false }));
                 }}
-                className="px-3 py-1 rounded-lg bg-primary hover:bg-primary/90 text-white text-[11px] font-bold shadow-xs transition-colors cursor-pointer active:scale-95"
+                className="px-3 py-1 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-[11px] font-bold shadow-xs transition-colors cursor-pointer active:scale-[0.992]"
               >
                 Done
               </button>

@@ -89,7 +89,7 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
+    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-primary-foreground">
       {/* ── Top Header Bar (Frozen / Sticky at top) ── */}
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-border px-6 py-4 flex items-center justify-between gap-4 shadow-2xs">
         <div>

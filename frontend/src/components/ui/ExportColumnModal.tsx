@@ -181,7 +181,7 @@ export function ExportColumnModal({
                   <div
                     className={`w-5 h-5 rounded-md flex items-center justify-center transition-colors shrink-0 ${
                       isSelected
-                        ? 'bg-primary text-white shadow-2xs'
+                        ? 'bg-primary text-primary-foreground shadow-2xs'
                         : 'border border-border bg-surface'
                     }`}
                   >
@@ -207,7 +207,7 @@ export function ExportColumnModal({
           <button
             type="button"
             onClick={handleProceed}
-            className={`px-5 py-2 text-xs font-bold text-white rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-95 ${
+            className={`px-5 py-2 text-xs font-bold text-white rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-[0.992] ${
               isPdf
                 ? 'bg-rose-600 hover:bg-rose-700'
                 : 'bg-blue-600 hover:bg-blue-700'

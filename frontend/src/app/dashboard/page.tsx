@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { DashboardHeader, DashboardRole } from './components/DashboardHeader';
 import { CoordinatorDashboard } from './components/CoordinatorDashboard';
@@ -10,15 +11,26 @@ import { DashboardSkeleton } from './components/DashboardSkeleton';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser, roleOf } from '@/lib/session';
 import { useToast } from '@/components/ui/Toast';
+import { Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
+
+interface AutoSyncAlert {
+  _id: string;
+  title: string;
+  message: string;
+  action_url?: string | null;
+}
 
 export default function DashboardPage() {
   const { toast } = useToast();
+  const router = useRouter();
 
   const [role, setRole] = useState<DashboardRole>('coordinator');
   const [coordinatorId, setCoordinatorId] = useState<string | null>(null);
   const [sessionRead, setSessionRead] = useState(false);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [autoSyncAlert, setAutoSyncAlert] = useState<AutoSyncAlert | null>(null);
 
   // Identity comes from the signed-in session, not a hardcoded id: two
   // coordinators on the same machine must never see each other's work.
@@ -101,6 +113,45 @@ export default function DashboardPage() {
     if (sessionRead) loadDashboard();
   }, [sessionRead, loadDashboard]);
 
+  // Auto-sync review prompt: a coordinator's positive Daily Tracker calls that
+  // went unsynced past 10 PM get auto-synced overnight (see
+  // backend/src/jobs/positiveSyncReminder.ts) and raise a Notification here —
+  // shown once, next morning, on the coordinator's own dashboard.
+  useEffect(() => {
+    if (!sessionRead || role !== 'coordinator' || !coordinatorId) return;
+    (async () => {
+      const res = await apiFetch(`/notifications?user_id=${coordinatorId}&tab=unread`);
+      if (!res.success || !res.data) return;
+      const list = (res.data as any).notifications as any[];
+      const match = list?.find(
+        (n) => n.action_url === '/weekly-tracker' && n.notification_type === 'reminder' && n.requires_acknowledgment
+      );
+      if (match) {
+        setAutoSyncAlert({ _id: match._id, title: match.title, message: match.message, action_url: match.action_url });
+      }
+    })();
+  }, [sessionRead, role, coordinatorId]);
+
+  const acknowledgeAutoSyncAlert = useCallback(async () => {
+    if (!autoSyncAlert || !coordinatorId) return;
+    await apiFetch(`/notifications/${autoSyncAlert._id}/acknowledge`, {
+      method: 'PATCH',
+      body: JSON.stringify({ user_id: coordinatorId, response: 'acknowledged' }),
+    });
+  }, [autoSyncAlert, coordinatorId]);
+
+  const handleAutoSyncReview = useCallback(async () => {
+    const url = autoSyncAlert?.action_url || '/weekly-tracker';
+    await acknowledgeAutoSyncAlert();
+    setAutoSyncAlert(null);
+    router.push(url);
+  }, [autoSyncAlert, acknowledgeAutoSyncAlert, router]);
+
+  const handleAutoSyncDismiss = useCallback(async () => {
+    await acknowledgeAutoSyncAlert();
+    setAutoSyncAlert(null);
+  }, [acknowledgeAutoSyncAlert]);
+
   /** Signature feature: Metadata Merge Engine (Spec Section 12). */
   const handleLoadToMetadata = async (assignmentId: string) => {
     const res = await apiFetch(`/assigned-work/${assignmentId}/load-to-metadata`, { method: 'POST' });
@@ -143,6 +194,27 @@ export default function DashboardPage() {
           )}
           {role === 'admin' && <AdminDashboard data={dashboardData} onRefresh={loadDashboard} />}
         </>
+      )}
+
+      {autoSyncAlert && (
+        <Modal
+          open
+          onClose={handleAutoSyncDismiss}
+          title={autoSyncAlert.title}
+          size="sm"
+          footer={
+            <>
+              <Button variant="secondary" onClick={handleAutoSyncDismiss}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={handleAutoSyncReview}>
+                OK, review now
+              </Button>
+            </>
+          }
+        >
+          <p className="text-body text-fg-subtle leading-relaxed">{autoSyncAlert.message}</p>
+        </Modal>
       )}
     </div>
   );

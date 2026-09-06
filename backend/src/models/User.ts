@@ -28,7 +28,7 @@ export interface IUser extends Document {
   last_password_change_month?: string;
   is_password_locked: boolean;
   password_locked_at?: Date | null;
-  account_status: 'active' | 'inactive' | 'blocked' | 'deactivated' | 'partial_working' | 'on_leave';
+  account_status: 'active' | 'pending' | 'inactive' | 'blocked' | 'deactivated' | 'partial_working' | 'on_leave';
   presence_status: 'available' | 'busy' | 'be_right_back' | 'away' | 'appear_offline' | 'out_of_office';
   role_ids: Types.ObjectId[];
   role_codes: string[];
@@ -187,7 +187,7 @@ const UserSchema: Schema<IUser> = new Schema(
     },
     account_status: {
       type: String,
-      enum: ['active', 'inactive', 'blocked', 'deactivated', 'partial_working', 'on_leave'],
+      enum: ['active', 'pending', 'inactive', 'blocked', 'deactivated', 'partial_working', 'on_leave'],
       default: 'active',
       index: true,
     },

@@ -224,7 +224,7 @@ export function Modal({
             type="button"
             onClick={handleClose}
             aria-label="Close dialog"
-            className="shrink-0 rounded-control p-1.5 text-fg-subtle hover:bg-surface-sunken hover:text-fg active:scale-95 active:shadow-inset-1 transition-all duration-150"
+            className="shrink-0 rounded-control p-1.5 text-fg-subtle hover:bg-surface-sunken hover:text-fg active:scale-[0.992] active:shadow-inset-1 transition-all duration-150"
           >
             <X size={18} strokeWidth={2} aria-hidden />
           </button>

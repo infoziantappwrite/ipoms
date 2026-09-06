@@ -105,7 +105,7 @@ export function SmoothOutcomeDropdown({
         onClick={handleToggle}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className={`flex items-center justify-between gap-2.5 px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-150 active:scale-[0.98] shadow-xs cursor-pointer select-none ${
+        className={`flex items-center justify-between gap-2.5 px-3.5 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-150 active:scale-[0.992] shadow-xs cursor-pointer select-none ${
           value !== 'all'
             ? 'bg-surface-raised border-primary/40 text-fg ring-1 ring-primary/20'
             : 'bg-surface border-border text-fg hover:bg-surface-raised'

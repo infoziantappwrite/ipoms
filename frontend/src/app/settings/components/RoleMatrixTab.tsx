@@ -16,6 +16,11 @@ export function RoleMatrixTab() {
   // live connection to routePolicy.ts, so it can still drift again the next
   // time a permission rule changes — re-verify against POLICIES before
   // trusting it blindly.
+  // "Dispatch Broadcast Announcements" row removed 3 Sep 2026 (user
+  // decision) — the feature it described (BroadcastModal.tsx, posting to a
+  // /notifications/broadcast route that never existed) was already
+  // unreachable dead code: the real /notifications route is a redirect
+  // stub, so no user could ever have clicked it. Removed rather than fixed.
   const matrix = [
     { feature: 'Login / Logout', coord: true, tl: true, admin: true },
     { feature: 'View own dashboard', coord: true, tl: true, admin: true },
@@ -29,7 +34,6 @@ export function RoleMatrixTab() {
     { feature: 'Delete / Archive Company Records', coord: true, tl: true, admin: true },
     { feature: 'Restore from Recycle Bin', coord: true, tl: true, admin: true },
     { feature: 'Permanently Purge Records', coord: false, tl: false, admin: true },
-    { feature: 'Dispatch Broadcast Announcements', coord: false, tl: true, admin: true },
     { feature: 'User & Coordinator Management', coord: false, tl: true, admin: true },
     { feature: 'Global Season & App Configuration', coord: false, tl: false, admin: true },
   ];

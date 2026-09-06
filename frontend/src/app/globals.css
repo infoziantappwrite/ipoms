@@ -180,23 +180,19 @@
      mode read generic rather than Infoziant. These stay on hue 224: the
      same navy, lit for a dark canvas rather than swapped for another blue.
 
-     KNOWN LIMITATION — `--primary` cannot satisfy both of its callers.
-     It is used as text 315 times (wants a LIGHT value for contrast against
-     the card) and as a button fill under a hardcoded `text-white` 91 times
-     (wants a DARK value for contrast against that white). Solving both at
-     once is arithmetically impossible: the crossover point where the two
-     ratios are equal is 4.10:1, still short of AA's 4.5:1. So this token is
-     tuned for the dominant caller (text, 4.64:1 ✓) and `--primary-foreground`
-     deliberately stays white to match the 91 buttons that ignore it — a
-     half-migration would leave 7 dark-label buttons beside 91 white-label
-     ones. The real fix is a component sweep replacing hardcoded `text-white`
-     with `text-primary-foreground`, after which this token flips to a dark
-     foreground and white-on-primary stops being a concern. Until then
-     white-on-primary is 3.63:1, unchanged from the 3.68:1 it was before. */
+     RESOLVED 5 Sep 2026 — the component sweep this note asked for is done.
+     101 lines across 56 files that hardcoded `text-white` on a solid
+     `bg-primary` fill now use `text-primary-foreground`, so this token is
+     finally free to be what the dark theme actually needs: a DARK label on
+     the light-blue fill. `--primary` stays tuned for its dominant caller
+     (text on card, 4.64:1 ✓) and button labels now read 5.34:1 instead of
+     the 3.63:1 white-on-primary this block previously had to accept.
+     Only tinted fills (`bg-primary/10`) still pair with `text-primary`,
+     which is correct — a dark label belongs on a solid fill, not a 10% tint. */
   --primary:          85 128 245;  /* #5580F5  hue 224 — 4.64:1 as text on card */
   --primary-hover:   122 155 250;  /* #7A9BFA  hue 224 — 6.3:1 as text on card  */
   --primary-subtle:   23  37  84;  /* #172554  navy tint background             */
-  --primary-foreground: 255 255 255;
+  --primary-foreground: 9  13  22;  /* dark label on the bright fill — 5.34:1   */
   --accent:          138 166 242;  /* #8AA6F2  hue 224 — 7.1:1 on card          */
   --accent-foreground: 9  13  22;  /* dark label on the bright accent — 8.2:1   */
 
@@ -333,6 +329,27 @@
     padding-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
   }
 
+  /* Suppress native browser password reveal/clear icons (Microsoft Edge / Windows Chromium)
+     to prevent duplicate eye icons overlapping with our custom Eye toggle button */
+  input[type="password"]::-ms-reveal,
+  input[type="password"]::-ms-clear {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  input[type="password"]::-webkit-contacts-auto-fill-button,
+  input[type="password"]::-webkit-credentials-auto-fill-button {
+    visibility: hidden !important;
+    display: none !important;
+    pointer-events: none !important;
+    height: 0 !important;
+    width: 0 !important;
+    margin: 0 !important;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -350,7 +367,7 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @layer components {
-  /* Apple tactile active response: instant feedback on pointer down */
+  /* Apple tactile active response: ultra-mild, subtle feedback on pointer down */
   .tactile-press {
     transform: scale(1);
     transition: transform 140ms var(--ease-apple-out);
@@ -358,8 +375,17 @@
     -webkit-user-select: none;
   }
   .tactile-press:active {
-    transform: scale(0.965);
+    transform: scale(0.992);
     transition: transform 70ms ease-out;
+  }
+
+  /* Global mild active keypress depression for all buttons across the application */
+  button:active:not(:disabled),
+  [role="button"]:active,
+  .btn:active,
+  a:active {
+    --tw-scale-x: 0.992 !important;
+    --tw-scale-y: 0.992 !important;
   }
 
   /* Apple Glass / Frosted Material layer with light rim border */
@@ -803,19 +829,20 @@ body::-webkit-scrollbar,
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   TACTILE MECHANICAL BUTTON PHYSICS (Micro-interactions & Pressed Movement)
+   TACTILE MECHANICAL BUTTON PHYSICS (Mild & Subtle Micro-interactions)
    ═══════════════════════════════════════════════════════════════════════════ */
 
 button,
 [role="button"],
 .btn,
-.btn-tactile {
-  transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1),
-              box-shadow 0.15s ease,
-              background-color 0.15s ease,
-              color 0.15s ease,
-              border-color 0.15s ease,
-              filter 0.15s ease;
+.btn-tactile,
+a[role="button"] {
+  transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.12s ease,
+              background-color 0.12s ease,
+              color 0.12s ease,
+              border-color 0.12s ease,
+              filter 0.12s ease;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
@@ -824,38 +851,42 @@ button,
 button:not(:disabled):not([aria-disabled="true"]):hover,
 [role="button"]:not([aria-disabled="true"]):hover,
 .btn-tactile:not(:disabled):hover {
-  transform: translateY(-1.5px);
+  transform: translateY(-0.5px);
 }
 
-/* Tactile Mechanical Press Depression on Click / MouseDown / Touch */
+/* Mild & Gentle Physical Keypress Depression on Click / MouseDown / Touch */
 button:not(:disabled):not([aria-disabled="true"]):active,
 [role="button"]:not([aria-disabled="true"]):active,
-.btn-tactile:not(:disabled):active {
-  transform: translateY(2px) scale(0.965) !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25) inset, 0 1px 2px rgba(0, 0, 0, 0.1) !important;
-  filter: brightness(0.96);
-  transition-duration: 0.05s !important;
+.btn-tactile:not(:disabled):active,
+.btn:active,
+a:active {
+  transform: translateY(0.5px) scale(0.992) !important;
+  --tw-scale-x: 0.992 !important;
+  --tw-scale-y: 0.992 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) inset !important;
+  filter: brightness(0.98);
+  transition-duration: 0.06s !important;
 }
 
 /* Rich Shadow Depth on Hover for solid brand buttons */
 button.bg-primary:not(:disabled):hover,
 button.bg-blue-600:not(:disabled):hover,
 button.bg-indigo-600:not(:disabled):hover {
-  box-shadow: 0 6px 20px -3px rgba(37, 99, 235, 0.4), 0 3px 8px -2px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 4px 14px -3px rgba(37, 99, 235, 0.35), 0 2px 6px -2px rgba(37, 99, 235, 0.2);
 }
 
 button.bg-rose-600:not(:disabled):hover,
 button.bg-red-600:not(:disabled):hover {
-  box-shadow: 0 6px 20px -3px rgba(225, 29, 72, 0.4), 0 3px 8px -2px rgba(225, 29, 72, 0.25);
+  box-shadow: 0 4px 14px -3px rgba(225, 29, 72, 0.35), 0 2px 6px -2px rgba(225, 29, 72, 0.2);
 }
 
 button.bg-emerald-600:not(:disabled):hover,
 button.bg-green-600:not(:disabled):hover {
-  box-shadow: 0 6px 20px -3px rgba(5, 150, 105, 0.4), 0 3px 8px -2px rgba(5, 150, 105, 0.25);
+  box-shadow: 0 4px 14px -3px rgba(5, 150, 105, 0.35), 0 2px 6px -2px rgba(5, 150, 105, 0.2);
 }
 
 button.bg-surface:not(:disabled):hover {
-  box-shadow: 0 4px 14px -2px rgba(0, 0, 0, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 3px 10px -2px rgba(0, 0, 0, 0.06), 0 1px 4px -1px rgba(0, 0, 0, 0.03);
 }
 
 

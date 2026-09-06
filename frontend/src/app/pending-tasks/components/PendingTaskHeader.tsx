@@ -166,7 +166,7 @@ export function PendingTaskHeader({
             type="button"
             onClick={onToggleSelectionMode}
             title={isSelectionMode ? 'Cancel deletion / Exit selection' : 'Delete pending tasks'}
-            className={`group w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-2xs active:scale-95 border ${
+            className={`group w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-2xs active:scale-[0.992] border ${
               isSelectionMode
                 ? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-600 shadow-xs'
                 : 'text-fg-subtle bg-surface hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/30 border-border'
@@ -180,7 +180,7 @@ export function PendingTaskHeader({
             <button
               type="button"
               onClick={onDeleteSelected}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 border border-rose-700 rounded-xl shadow-xs transition-all cursor-pointer animate-in fade-in duration-150 active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 border border-rose-700 rounded-xl shadow-xs transition-all cursor-pointer animate-in fade-in duration-150 active:scale-[0.992]"
             >
               <Trash2 size={13} />
               <span>Delete ({selectedCount})</span>
@@ -199,7 +199,7 @@ export function PendingTaskHeader({
           <button
             type="button"
             onClick={onOpenAddModal}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-primary hover:bg-primary-hover border border-primary/40 rounded-lg shadow-2xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary-hover border border-primary/40 rounded-lg shadow-2xs transition-colors cursor-pointer"
           >
             <Plus size={15} strokeWidth={2.5} />
             <span>Add</span>

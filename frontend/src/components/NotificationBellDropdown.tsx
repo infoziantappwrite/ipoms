@@ -94,7 +94,7 @@ export function NotificationBellDropdown({ userId = '6a84719afa3bf51271bc1548' }
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-slate-200/80 bg-white/90 hover:bg-white text-slate-700 hover:text-slate-900 transition-all shadow-2xs active:scale-95 cursor-pointer flex items-center justify-center relative"
+        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-slate-200/80 bg-white/90 hover:bg-white text-slate-700 hover:text-slate-900 transition-all shadow-2xs active:scale-[0.992] cursor-pointer flex items-center justify-center relative"
         title="Notifications & Alerts"
       >
         <Bell size={17} strokeWidth={2} aria-hidden className="text-slate-700" />

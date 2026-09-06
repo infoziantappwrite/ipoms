@@ -169,7 +169,7 @@ const UserSchema = new mongoose_1.Schema({
     },
     account_status: {
         type: String,
-        enum: ['active', 'inactive', 'blocked', 'deactivated', 'partial_working', 'on_leave'],
+        enum: ['active', 'pending', 'inactive', 'blocked', 'deactivated', 'partial_working', 'on_leave'],
         default: 'active',
         index: true,
     },

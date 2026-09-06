@@ -115,7 +115,7 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-bold text-fg tracking-tight">
-                Hot Follow-Ups Due — Smart Queue
+                Follow up Due
               </h2>
               {dueNowCount > 0 && (
                 <span className="text-micro font-bold bg-rose-500 text-white px-2 py-0.5 rounded-full shadow-2xs animate-bounce">
@@ -136,7 +136,7 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
               onClick={() => setActiveTab('all')}
               className={`px-3 py-1 rounded-lg transition-colors cursor-pointer ${
                 activeTab === 'all'
-                  ? 'bg-primary text-white shadow-xs'
+                  ? 'bg-primary text-primary-foreground shadow-xs'
                   : 'text-fg-subtle hover:text-fg'
               }`}
             >

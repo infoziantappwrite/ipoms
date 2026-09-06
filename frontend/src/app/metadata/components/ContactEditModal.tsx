@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Pencil, X, Building2, Briefcase } from 'lucide-react';
+import { Plus, Pencil, X, Building2, Briefcase, Sparkles, Info } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
 
 interface Props {
   initialData?: any | null;
+  returnTo?: string | null;
   onClose: () => void;
   onSuccess: () => void;
   onDuplicateFound: (conflict: any, pending: any, isExact: boolean) => void;
@@ -14,6 +15,7 @@ interface Props {
 
 export function ContactEditModal({
   initialData,
+  returnTo,
   onClose,
   onSuccess,
   onDuplicateFound,
@@ -53,6 +55,11 @@ export function ContactEditModal({
       return;
     }
 
+    if (!primaryMobile.trim() && !primaryEmail.trim() && !altMobiles.trim()) {
+      alert('At least one contact method is required. Please provide a Mobile Number or an Email ID.');
+      return;
+    }
+
     setLoading(true);
     try {
       const altMobilesList = altMobiles
@@ -88,9 +95,12 @@ export function ContactEditModal({
       }
 
       if (res.success) {
-        alert(isEditing ? 'Company details updated!' : 'Company contact created successfully!');
+        alert(isEditing ? 'Company details updated in Meta Database!' : 'Company contact created successfully in Meta Database!');
         onSuccess();
         onClose();
+        if (returnTo) {
+          window.location.href = returnTo;
+        }
       } else {
         alert(res.error?.message || 'Operation failed');
       }
@@ -101,22 +111,34 @@ export function ContactEditModal({
     }
   };
 
+  const handleCancel = () => {
+    onClose();
+    if (returnTo) {
+      window.location.href = returnTo;
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
       <div className="bg-surface text-fg rounded-2xl w-full max-w-xl border border-border shadow-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto animate-scaleIn">
 
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border pb-3.5">
-          <h3 className="text-sm font-bold text-fg flex items-center gap-2">
-            {isEditing ? (
-              <Pencil size={16} strokeWidth={2} className="text-primary" aria-hidden />
-            ) : (
-              <Plus size={16} strokeWidth={2} className="text-primary" aria-hidden />
-            )}
-            {isEditing ? 'Edit Company & HR Contact' : 'Add New Company & HR Contact'}
-          </h3>
+          <div>
+            <h3 className="text-sm font-bold text-fg flex items-center gap-2">
+              {isEditing ? (
+                <Pencil size={16} strokeWidth={2} className="text-primary" aria-hidden />
+              ) : (
+                <Plus size={16} strokeWidth={2} className="text-primary" aria-hidden />
+              )}
+              {isEditing ? 'Edit Company & HR Contact' : 'Add New Company & HR Contact'}
+            </h3>
+            <p className="text-[11px] text-fg-subtle mt-0.5">
+              Permanently registers company metadata in the Master Directory
+            </p>
+          </div>
           <button
-            onClick={onClose}
+            onClick={handleCancel}
             aria-label="Close"
             className="w-7 h-7 rounded-lg hover:bg-surface-sunken text-fg-subtle hover:text-fg flex items-center justify-center transition-colors cursor-pointer"
           >
@@ -124,18 +146,33 @@ export function ContactEditModal({
           </button>
         </div>
 
+        {/* Placeholder Notice if editing an existing placeholder */}
+        {isEditing && (
+          <div className="p-3 bg-amber-500/10 dark:bg-amber-950/40 border border-amber-500/30 rounded-xl space-y-1 text-xs text-amber-800 dark:text-amber-300 animate-in fade-in duration-150">
+            <div className="flex items-center gap-1.5 font-bold">
+              <Sparkles size={13} className="text-amber-500" />
+              Existing Company Placeholder Found {initialData?.serial_number ? `(S.No #${initialData.serial_number})` : ''}
+            </div>
+            <p className="text-[11px] text-amber-700/90 dark:text-amber-400/90 leading-relaxed">
+              This company is already registered in the Meta Database directory. Please fill in the missing phone number, email ID, and HR contact details below to enrich this record.
+            </p>
+          </div>
+        )}
+
         <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-4 text-xs">
 
           {/* Company Name & Type Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-fg-muted mb-1">Company Name *</label>
+              <label className="block text-xs font-semibold text-fg-muted mb-1">
+                Company Name <span className="text-rose-500">*</span>
+              </label>
               <input
                 type="text"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 placeholder="e.g. Infosys, TCS, Microsoft"
-                className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-xs text-fg placeholder:text-fg-subtle/60 focus:bg-surface focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-xs text-fg placeholder:text-fg-subtle/60 focus:bg-surface focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium"
                 required
               />
             </div>
@@ -152,6 +189,42 @@ export function ContactEditModal({
                   label: t.label,
                 }))}
               />
+            </div>
+          </div>
+
+          {/* Mobile & Email Row (Required: at least one) */}
+          <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-xl p-3 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-primary uppercase tracking-wider">
+                Contact Information <span className="text-rose-500">*</span>
+              </span>
+              <span className="text-micro font-medium text-fg-subtle">
+                (At least Mobile or Email is required)
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-fg-muted mb-1">Primary Mobile Number</label>
+                <input
+                  type="text"
+                  value={primaryMobile}
+                  onChange={(e) => setPrimaryMobile(e.target.value)}
+                  placeholder="e.g. 9876543210"
+                  className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-fg font-mono placeholder:text-fg-subtle/60 focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-fg-muted mb-1">Primary Official Email</label>
+                <input
+                  type="email"
+                  value={primaryEmail}
+                  onChange={(e) => setPrimaryEmail(e.target.value)}
+                  placeholder="e.g. hr@company.com"
+                  className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-xs text-fg font-mono placeholder:text-fg-subtle/60 focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                />
+              </div>
             </div>
           </div>
 
@@ -176,31 +249,6 @@ export function ContactEditModal({
                 onChange={(e) => setHrDesignation(e.target.value)}
                 placeholder="e.g. Lead Campus Recruiter"
                 className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-xs text-fg placeholder:text-fg-subtle/60 focus:bg-surface focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-              />
-            </div>
-          </div>
-
-          {/* Mobile & Email Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-fg-muted mb-1">Primary Mobile Number</label>
-              <input
-                type="text"
-                value={primaryMobile}
-                onChange={(e) => setPrimaryMobile(e.target.value)}
-                placeholder="e.g. 9876543210"
-                className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-xs text-fg font-mono placeholder:text-fg-subtle/60 focus:bg-surface focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-fg-muted mb-1">Primary Official Email</label>
-              <input
-                type="email"
-                value={primaryEmail}
-                onChange={(e) => setPrimaryEmail(e.target.value)}
-                placeholder="e.g. hr@company.com"
-                className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-xs text-fg font-mono placeholder:text-fg-subtle/60 focus:bg-surface focus:outline-hidden focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
               />
             </div>
           </div>
@@ -232,13 +280,21 @@ export function ContactEditModal({
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end pt-3 border-t border-border">
+          <div className="flex items-center justify-between pt-3 border-t border-border">
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="px-5 py-2 bg-surface-sunken hover:bg-surface-raised border border-border text-fg rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+
             <button
               type="submit"
               disabled={loading}
-              className="w-full sm:w-auto px-6 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-7 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
-              {loading ? 'Saving…' : isEditing ? 'Save Changes' : 'Create Contact'}
+              {loading ? 'Saving…' : isEditing ? 'Save' : 'Create'}
             </button>
           </div>
         </form>

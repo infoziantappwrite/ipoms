@@ -19,6 +19,10 @@ import {
   Lock,
   Calendar,
   Check,
+  Info,
+  ArrowRight,
+  Sparkles,
+  AlertCircle,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { triggerHaptic } from '@/lib/haptics';
@@ -40,6 +44,39 @@ function formatDurationSec(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return `${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+}
+
+// Helper: detect if a company record in database is an incomplete placeholder
+function getCompanyMissingDetails(comp: any) {
+  if (!comp) return { isPlaceholder: false, missing: [], hasMobile: false, hasEmail: false, hasHr: false };
+
+  const hasMobile = Boolean(
+    (comp.primary_mobile && comp.primary_mobile.trim()) ||
+    (Array.isArray(comp.mobile_numbers) && comp.mobile_numbers.some((m: string) => m && m.trim()))
+  );
+  const hasEmail = Boolean(
+    (comp.primary_email && comp.primary_email.trim()) ||
+    (Array.isArray(comp.email_ids) && comp.email_ids.some((e: string) => e && e.trim()))
+  );
+  const hasHr = Boolean(
+    comp.hr_name &&
+    comp.hr_name.trim() !== '' &&
+    comp.hr_name.trim().toLowerCase() !== 'hr contact' &&
+    comp.hr_name.trim().toLowerCase() !== 'contact'
+  );
+
+  const missing: string[] = [];
+  if (!hasMobile) missing.push('Mobile Number');
+  if (!hasEmail) missing.push('Email ID');
+  if (!hasHr) missing.push('HR Contact Name');
+
+  return {
+    isPlaceholder: missing.length > 0,
+    missing,
+    hasMobile,
+    hasEmail,
+    hasHr,
+  };
 }
 
 // Helper: smart parse time string or return current date
@@ -121,12 +158,15 @@ export function ManualAddRowModal({
 
   const [comments, setComments] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [checkingMeta, setCheckingMeta] = useState(false);
+  const [showNotInMetaModal, setShowNotInMetaModal] = useState(false);
 
-  // Meta Database auto-complete state
+  // Meta Database auto-complete & matched record state
   const [companySuggestions, setCompanySuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [autoFilled, setAutoFilled] = useState(false);
+  const [matchedMetaRecord, setMatchedMetaRecord] = useState<any | null>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -158,6 +198,17 @@ export function ManualAddRowModal({
       if (res.success && res.data?.companies) {
         setCompanySuggestions(res.data.companies);
         setShowSuggestions(true);
+
+        // Auto-detect if what the user typed matches an exact placeholder in the results
+        if (query.trim()) {
+          const exact = res.data.companies.find(
+            (c: any) => (c.company_name || '').trim().toLowerCase() === query.trim().toLowerCase()
+          );
+          if (exact) {
+            setMatchedMetaRecord(exact);
+            setAutoFilled(true);
+          }
+        }
       }
     } catch (err) {
       console.error('Error fetching companies for autocomplete:', err);
@@ -169,6 +220,9 @@ export function ManualAddRowModal({
   const handleCompanyInputChange = (val: string) => {
     setCompanyName(val);
     setAutoFilled(false);
+    if (matchedMetaRecord && (matchedMetaRecord.company_name || '').trim().toLowerCase() !== val.trim().toLowerCase()) {
+      setMatchedMetaRecord(null);
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       fetchSuggestions(val);
@@ -182,9 +236,10 @@ export function ManualAddRowModal({
   const handleSelectCompany = (comp: any) => {
     triggerHaptic('light');
     setCompanyName(comp.company_name);
-    setHrName(comp.hr_name || '');
-    setMobileNumber(comp.primary_mobile || comp.contact_numbers?.[0] || '');
+    setHrName(comp.hr_name && comp.hr_name !== 'HR Contact' ? comp.hr_name : '');
+    setMobileNumber(comp.primary_mobile || comp.contact_numbers?.[0] || comp.mobile_numbers?.[0] || '');
     setEmailId(comp.primary_email || comp.email_ids?.[0] || '');
+    setMatchedMetaRecord(comp);
     setShowSuggestions(false);
     setAutoFilled(true);
   };
@@ -245,26 +300,7 @@ export function ManualAddRowModal({
     setIsMonthOpen(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!companyName.trim()) {
-      toast('Company name is required', 'warning');
-      return;
-    }
-    if (!mobileNumber.trim()) {
-      toast('Mobile number is required', 'warning');
-      return;
-    }
-    if (!outcome) {
-      toast('Call Status is mandatory to log this entry', 'warning');
-      return;
-    }
-    if (outcome === 'follow_up' && !followUpMonth) {
-      toast('Follow Up Month is mandatory when Call Status is Follow Up', 'warning');
-      return;
-    }
-
+  const saveRowToTracker = async (matchedComp?: any) => {
     try {
       setSubmitting(true);
       triggerHaptic('medium');
@@ -295,8 +331,14 @@ export function ManualAddRowModal({
       });
 
       if (res.success && (res.data as any)?.row) {
-        toast('New entry added to tracker', 'success');
+        const rec = matchedComp || matchedMetaRecord;
+        if (rec && getCompanyMissingDetails(rec).isPlaceholder) {
+          toast(`Enriched company placeholder for "${companyName.trim()}" & logged entry`, 'success');
+        } else {
+          toast('New entry added to tracker', 'success');
+        }
         onRowAdded((res.data as any).row);
+        setShowNotInMetaModal(false);
         onClose();
       } else {
         toast(res.error?.message || 'Failed to add entry', 'error');
@@ -308,7 +350,86 @@ export function ManualAddRowModal({
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!companyName.trim()) {
+      toast('Company name is required', 'warning');
+      return;
+    }
+    if (!mobileNumber.trim()) {
+      toast('Mobile number is required', 'warning');
+      return;
+    }
+    if (!outcome) {
+      toast('Call Status is mandatory to log this entry', 'warning');
+      return;
+    }
+    if (outcome === 'follow_up' && !followUpMonth) {
+      toast('Follow Up Month is mandatory when Call Status is Follow Up', 'warning');
+      return;
+    }
+
+    // 1. If auto-filled or matched from Meta Database suggestion, it is present in Meta Database
+    if (autoFilled || matchedMetaRecord) {
+      await saveRowToTracker(matchedMetaRecord);
+      return;
+    }
+
+    // 2. Otherwise, check whether this company/contact is present in Meta Database
+    setCheckingMeta(true);
+    let matchedCompanyDoc: any = null;
+    try {
+      const res = await apiFetch<any>(`/companies/search?q=${encodeURIComponent(companyName.trim())}&limit=10`);
+      if (res.success && Array.isArray(res.data?.companies)) {
+        const normInputName = companyName.trim().toLowerCase();
+        const normInputMobile = mobileNumber.trim();
+        const match = res.data.companies.find((c: any) => {
+          const cName = (c.company_name || '').trim().toLowerCase();
+          const cMobile = (c.primary_mobile || '').trim();
+          const cMobArray = Array.isArray(c.mobile_numbers) ? c.mobile_numbers.map((m: string) => m.trim()) : [];
+          return cName === normInputName || (normInputMobile && (cMobile === normInputMobile || cMobArray.includes(normInputMobile)));
+        });
+        if (match) {
+          matchedCompanyDoc = match;
+          setMatchedMetaRecord(match);
+        }
+      }
+    } catch (err) {
+      console.error('Error checking Meta Database:', err);
+    } finally {
+      setCheckingMeta(false);
+    }
+
+    if (matchedCompanyDoc) {
+      // Present in Meta Database -> skip info popup and save directly (with live enrichment)
+      await saveRowToTracker(matchedCompanyDoc);
+    } else {
+      // Not present in Meta Database -> show polite information pop-up
+      setShowNotInMetaModal(true);
+    }
+  };
+
+  const handleRedirectToMeta = () => {
+    triggerHaptic('light');
+    const params = new URLSearchParams({
+      add: 'true',
+      company_name: companyName.trim(),
+      hr_name: hrName.trim(),
+      primary_mobile: mobileNumber.trim(),
+      primary_email: emailId.trim().toLowerCase(),
+      return_to: '/tracker',
+    });
+    window.location.href = `/metadata?${params.toString()}`;
+  };
+
+  const handleSkipAndSave = () => {
+    setShowNotInMetaModal(false);
+    saveRowToTracker();
+  };
+
   const selectedOutcomeOption = ROW_OUTCOMES.find((o) => o.value === outcome);
+  const placeholderInfo = matchedMetaRecord ? getCompanyMissingDetails(matchedMetaRecord) : null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
@@ -345,8 +466,20 @@ export function ManualAddRowModal({
                 Company Name <span className="text-rose-500">*</span>
               </label>
               {autoFilled ? (
-                <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                  <CheckCircle2 size={11} strokeWidth={2.5} /> Auto-filled from Meta DB
+                <span className={`text-[11px] font-semibold flex items-center gap-1 px-2 py-0.5 rounded-full border ${
+                  placeholderInfo?.isPlaceholder
+                    ? 'text-amber-700 dark:text-amber-300 bg-amber-500/10 border-amber-500/30'
+                    : 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                }`}>
+                  {placeholderInfo?.isPlaceholder ? (
+                    <>
+                      <Sparkles size={11} strokeWidth={2.5} className="text-amber-500" /> Existing Placeholder in DB
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={11} strokeWidth={2.5} /> Auto-filled from Meta DB
+                    </>
+                  )}
                 </span>
               ) : (
                 <span className="text-[11px] text-primary flex items-center gap-1 font-medium bg-primary/10 px-2 py-0.5 rounded-full">
@@ -366,7 +499,9 @@ export function ManualAddRowModal({
                 placeholder="Click or type to search Meta Database (e.g. 100Pillars, Google, Zoho)…"
                 className={`w-full bg-surface-sunken border text-xs text-fg pl-9 pr-9 py-2 rounded-xl outline-none transition-all placeholder:text-fg-disabled shadow-2xs font-medium ${
                   autoFilled
-                    ? 'border-emerald-500/60 ring-2 ring-emerald-500/15'
+                    ? placeholderInfo?.isPlaceholder
+                      ? 'border-amber-500/60 ring-2 ring-amber-500/15'
+                      : 'border-emerald-500/60 ring-2 ring-emerald-500/15'
                     : 'border-border focus:border-primary focus:ring-2 focus:ring-primary/20'
                 }`}
               />
@@ -392,53 +527,103 @@ export function ManualAddRowModal({
                     No matching companies found. You can manually type contact details below.
                   </div>
                 ) : (
-                  companySuggestions.map((comp) => (
-                    <button
-                      key={comp._id || comp.company_name}
-                      type="button"
-                      onClick={() => handleSelectCompany(comp)}
-                      className="w-full text-left p-3 hover:bg-surface-raised transition-colors flex items-center justify-between gap-3 group cursor-pointer"
-                    >
-                      <div className="space-y-0.5 flex-1 min-w-0">
-                        <div className="text-xs font-bold text-fg group-hover:text-primary transition-colors flex items-center gap-1.5 truncate">
-                          <Building2 size={13} className="text-fg-subtle shrink-0 group-hover:text-primary" />
-                          <span className="truncate">{comp.company_name}</span>
+                  companySuggestions.map((comp) => {
+                    const itemPlaceholderInfo = getCompanyMissingDetails(comp);
+                    return (
+                      <button
+                        key={comp._id || comp.company_name}
+                        type="button"
+                        onClick={() => handleSelectCompany(comp)}
+                        className="w-full text-left p-3 hover:bg-surface-raised transition-colors flex items-center justify-between gap-3 group cursor-pointer"
+                      >
+                        <div className="space-y-0.5 flex-1 min-w-0">
+                          <div className="text-xs font-bold text-fg group-hover:text-primary transition-colors flex items-center gap-1.5 truncate">
+                            <Building2 size={13} className="text-fg-subtle shrink-0 group-hover:text-primary" />
+                            <span className="truncate">{comp.company_name}</span>
+                            {itemPlaceholderInfo.isPlaceholder && (
+                              <span className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/25 shrink-0">
+                                Placeholder • Needs Details
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-fg-muted font-medium flex items-center gap-2.5 flex-wrap">
+                            {comp.hr_name && comp.hr_name !== 'HR Contact' ? (
+                              <span className="flex items-center gap-1">
+                                <User size={11} className="text-fg-subtle" /> {comp.hr_name}
+                              </span>
+                            ) : (
+                              <span className="text-amber-600 dark:text-amber-400 text-[10.5px] italic flex items-center gap-0.5">
+                                No HR Name
+                              </span>
+                            )}
+                            {comp.primary_mobile || comp.contact_numbers?.[0] || comp.mobile_numbers?.[0] ? (
+                              <span className="flex items-center gap-1 font-mono text-[10.5px] text-fg-subtle">
+                                <Phone size={10} className="text-emerald-500" /> {comp.primary_mobile || comp.contact_numbers?.[0] || comp.mobile_numbers?.[0]}
+                              </span>
+                            ) : (
+                              <span className="text-amber-600 dark:text-amber-400 text-[10.5px] italic flex items-center gap-0.5">
+                                No Phone
+                              </span>
+                            )}
+                            {comp.primary_email || comp.email_ids?.[0] ? (
+                              <span className="flex items-center gap-1 font-mono text-[10.5px] text-fg-subtle truncate max-w-[180px]">
+                                <Mail size={10} className="text-blue-500" /> {comp.primary_email || comp.email_ids?.[0]}
+                              </span>
+                            ) : (
+                              <span className="text-amber-600 dark:text-amber-400 text-[10.5px] italic flex items-center gap-0.5">
+                                No Email
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-[11px] text-fg-muted font-medium flex items-center gap-2.5 flex-wrap">
-                          {comp.hr_name && (
-                            <span className="flex items-center gap-1">
-                              <User size={11} className="text-fg-subtle" /> {comp.hr_name}
-                            </span>
-                          )}
-                          {comp.primary_mobile && (
-                            <span className="flex items-center gap-1 font-mono text-[10.5px] text-fg-subtle">
-                              <Phone size={10} className="text-emerald-500" /> {comp.primary_mobile}
-                            </span>
-                          )}
-                          {comp.primary_email && (
-                            <span className="flex items-center gap-1 font-mono text-[10.5px] text-fg-subtle truncate max-w-[180px]">
-                              <Mail size={10} className="text-blue-500" /> {comp.primary_email}
-                            </span>
-                          )}
+                        <div className={`shrink-0 flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg transition-opacity ${
+                          itemPlaceholderInfo.isPlaceholder
+                            ? 'text-amber-700 dark:text-amber-300 bg-amber-500/15 group-hover:bg-amber-500/25'
+                            : 'text-primary bg-primary/10 opacity-0 group-hover:opacity-100'
+                        }`}>
+                          <span>{itemPlaceholderInfo.isPlaceholder ? 'Fill Details' : 'Auto-Fill'}</span>
+                          <ChevronRight size={12} />
                         </div>
-                      </div>
-                      <div className="shrink-0 flex items-center gap-1 text-primary text-[11px] font-bold opacity-0 group-hover:opacity-100 transition-opacity bg-primary/10 px-2.5 py-1 rounded-lg">
-                        <span>Auto-Fill</span>
-                        <ChevronRight size={12} />
-                      </div>
-                    </button>
-                  ))
+                      </button>
+                    );
+                  })
                 )}
               </div>
             )}
           </div>
 
+          {/* Placeholder Notification Banner */}
+          {matchedMetaRecord && placeholderInfo?.isPlaceholder && (
+            <div className="p-3 bg-amber-500/10 dark:bg-amber-950/40 border border-amber-500/30 rounded-xl space-y-1 text-xs text-amber-900 dark:text-amber-200 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300">
+                  <Sparkles size={14} className="text-amber-500 shrink-0" />
+                  <span>Existing Company Placeholder Found {matchedMetaRecord.serial_number ? `(S.No #${matchedMetaRecord.serial_number})` : ''}</span>
+                </div>
+                <span className="text-[10px] font-semibold bg-amber-500/20 text-amber-800 dark:text-amber-200 px-2 py-0.5 rounded-full border border-amber-500/30">
+                  Needs Contact Info
+                </span>
+              </div>
+              <p className="text-[11.5px] text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
+                This company is already present in the database, but missing <strong>{placeholderInfo.missing.join(', ')}</strong>.
+                Fill in the numbers and details below to enrich this record directly rather than creating a duplicate entry.
+              </p>
+            </div>
+          )}
+
           {/* Section 2: HR Name & Mobile Number (2-column Grid) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <label className="block text-[11px] font-bold text-fg uppercase tracking-wider mb-1">
-                HR / Contact Name
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[11px] font-bold text-fg uppercase tracking-wider">
+                  HR / Contact Name
+                </label>
+                {matchedMetaRecord && !placeholderInfo?.hasHr && (
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
+                    Missing in DB
+                  </span>
+                )}
+              </div>
               <div className="relative">
                 <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
                 <input
@@ -452,9 +637,16 @@ export function ManualAddRowModal({
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-fg uppercase tracking-wider mb-1">
-                Mobile Number <span className="text-rose-500">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[11px] font-bold text-fg uppercase tracking-wider">
+                  Mobile Number <span className="text-rose-500">*</span>
+                </label>
+                {matchedMetaRecord && !placeholderInfo?.hasMobile && (
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
+                    Missing in DB
+                  </span>
+                )}
+              </div>
               <div className="relative">
                 <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
                 <input
@@ -471,9 +663,16 @@ export function ManualAddRowModal({
 
           {/* Section 3: Email ID */}
           <div>
-            <label className="block text-[11px] font-bold text-fg uppercase tracking-wider mb-1">
-              Email ID <span className="text-fg-disabled text-micro font-normal lowercase">(optional)</span>
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[11px] font-bold text-fg uppercase tracking-wider">
+                Email ID <span className="text-fg-disabled text-micro font-normal lowercase">(optional)</span>
+              </label>
+              {matchedMetaRecord && !placeholderInfo?.hasEmail && (
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
+                  Missing in DB
+                </span>
+              )}
+            </div>
             <div className="relative">
               <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
               <input
@@ -721,13 +920,13 @@ export function ManualAddRowModal({
           <div className="flex items-center justify-end pt-2 border-t border-border/60">
             <button
               type="submit"
-              disabled={submitting}
-              className="flex items-center justify-center gap-2 px-7 py-2 rounded-xl bg-primary hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold shadow-sm transition-all cursor-pointer hover:scale-[1.02] active:scale-98"
+              disabled={submitting || checkingMeta}
+              className="flex items-center justify-center gap-2 px-7 py-2 rounded-xl bg-primary hover:bg-blue-700 disabled:opacity-50 text-primary-foreground text-xs font-bold shadow-sm transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.992]"
             >
-              {submitting ? (
+              {submitting || checkingMeta ? (
                 <>
                   <Loader2 size={14} className="animate-spin" />
-                  <span>Adding Entry…</span>
+                  <span>{checkingMeta ? 'Verifying Meta DB…' : 'Adding Entry…'}</span>
                 </>
               ) : (
                 <>
@@ -739,6 +938,57 @@ export function ManualAddRowModal({
           </div>
         </form>
       </div>
+
+      {/* ── Information Pop-up Modal: Contact Not Present in Meta Database ── */}
+      {showNotInMetaModal && (
+        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-surface text-fg rounded-2xl w-full max-w-md border border-border shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 border-b border-border pb-3.5">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0">
+                <Database size={20} strokeWidth={2.2} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-fg">Contact Not in Meta Database</h3>
+                <p className="text-micro text-fg-subtle">Directory synchronization notice</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs text-fg-muted leading-relaxed">
+              <p>
+                The contact <strong className="text-fg font-semibold">&ldquo;{companyName}&rdquo;</strong> is not present in the Master Meta Database directory.
+              </p>
+              <div className="p-3 bg-surface-sunken border border-border rounded-xl space-y-1.5 text-[11.5px]">
+                <p className="font-semibold text-fg flex items-center gap-1.5">
+                  <Info size={14} className="text-primary" />
+                  Do you want to add this contact to the Meta Database?
+                </p>
+                <p className="text-fg-subtle leading-normal">
+                  Adding it to the Meta Database will register this company and HR details permanently for all future calling rosters and analytics.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border">
+              <button
+                type="button"
+                onClick={handleSkipAndSave}
+                disabled={submitting}
+                className="px-5 py-2 bg-surface-sunken hover:bg-surface-raised border border-border text-fg rounded-xl text-xs font-semibold transition-colors cursor-pointer active:scale-[0.992]"
+              >
+                Not Now
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRedirectToMeta}
+                className="px-6 py-2 bg-primary hover:bg-blue-700 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer hover:scale-[1.02] active:scale-[0.992]"
+              >
+                Yes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -84,7 +84,7 @@ export function PendingTaskTable({
           <button
             type="button"
             onClick={onOpenAddModal}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-xs font-bold shadow-sm transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary-hover text-primary-foreground rounded-lg text-xs font-bold shadow-sm transition-colors cursor-pointer"
           >
             <Plus size={15} />
             <span>Add First Task</span>

@@ -268,7 +268,7 @@ export function EditTrackerRowModal({ row, onClose, onSave, onDelete }: Props) {
               <button
                 type="button"
                 onClick={handleDelete}
-                className="px-3.5 py-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 flex items-center gap-1.5 text-xs font-semibold transition-all active:scale-95 cursor-pointer shadow-2xs"
+                className="px-3.5 py-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 flex items-center gap-1.5 text-xs font-semibold transition-all active:scale-[0.992] cursor-pointer shadow-2xs"
               >
                 <Trash2 size={13} strokeWidth={2} />
                 Delete Row
@@ -291,7 +291,7 @@ export function EditTrackerRowModal({ row, onClose, onSave, onDelete }: Props) {
               <button
                 type="submit"
                 disabled={loading}
-                className="px-5 py-2 rounded-xl bg-primary hover:bg-primary-hover active:scale-95 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all disabled:opacity-60 cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-primary hover:bg-primary-hover active:scale-[0.992] text-primary-foreground text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all disabled:opacity-60 cursor-pointer"
               >
                 <CheckCircle2 size={14} strokeWidth={2} />
                 {loading ? 'Saving...' : 'Save Changes'}

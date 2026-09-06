@@ -67,7 +67,7 @@ function ReportsPageContent() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
+    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-primary-foreground">
       {/* ── Report Builder Header ────────────────────────────────────────── */}
       <ReportsNavigation />
 

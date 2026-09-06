@@ -105,20 +105,22 @@ const REFRESH_COOKIE_PATH = '/api/v1/auth';
 function signRefreshToken(user) {
     return jsonwebtoken_1.default.sign({ userId: user._id }, JWT_REFRESH_SECRET, { expiresIn: `${REFRESH_TOKEN_TTL_DAYS}d` });
 }
-function refreshCookieOptions() {
+function refreshCookieOptions(req) {
+    const isHttps = process.env.NODE_ENV === 'production' ||
+        Boolean(req && (req.secure || req.headers['x-forwarded-proto'] === 'https' || req.headers['x-forwarded-ssl'] === 'on'));
     return {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        secure: isHttps,
+        sameSite: isHttps ? 'none' : 'lax',
         path: REFRESH_COOKIE_PATH,
         maxAge: REFRESH_TOKEN_MAX_AGE_MS,
     };
 }
-function setRefreshCookie(res, user) {
-    res.cookie(REFRESH_TOKEN_COOKIE, signRefreshToken(user), refreshCookieOptions());
+function setRefreshCookie(res, user, req) {
+    res.cookie(REFRESH_TOKEN_COOKIE, signRefreshToken(user), refreshCookieOptions(req));
 }
-function clearRefreshCookie(res) {
-    res.clearCookie(REFRESH_TOKEN_COOKIE, { path: REFRESH_COOKIE_PATH });
+function clearRefreshCookie(res, req) {
+    res.clearCookie(REFRESH_TOKEN_COOKIE, refreshCookieOptions(req));
 }
 /**
  * The only role self-registration is permitted to create (Module 08 §12/§16:
@@ -127,6 +129,17 @@ function clearRefreshCookie(res) {
  */
 const SELF_SIGNUP_ROLE = 'PLACEMENT_COORDINATOR';
 const isAdmin = (roles = []) => roles.includes('ADMINISTRATOR') || roles.includes('ADMIN');
+/**
+ * 10-13 digits after stripping spaces/hyphens/parens and an optional leading
+ * "+" (covers a bare 10-digit Indian mobile and a +91-prefixed one). Signup
+ * previously accepted anything at all here — a mobile field with letters in
+ * it ("abc123xyz") passed straight through with no validation, client or
+ * server side.
+ */
+function isValidMobile(mobile) {
+    const digits = String(mobile).replace(/[\s\-()]/g, '').replace(/^\+/, '');
+    return /^\d{10,13}$/.test(digits);
+}
 function fail(res, status, code, message, extra = {}) {
     return res.status(status).json({ success: false, error: { code, message, ...extra } });
 }
@@ -179,6 +192,9 @@ function registerAuthRoutes(app) {
             }
             if (!isStaffDomain(email)) {
                 return fail(res, 400, 'INVALID_DOMAIN', `Only @${STAFF_DOMAINS.join(' or @')} email addresses are permitted.`);
+            }
+            if (String(primary_mobile).trim() && !isValidMobile(primary_mobile)) {
+                return fail(res, 400, 'INVALID_MOBILE', 'Enter a valid 10-digit mobile number.');
             }
             if (!(0, passwordPolicy_1.isPasswordValid)(password)) {
                 return fail(res, 400, 'PASSWORD_POLICY', (0, passwordPolicy_1.firstPasswordError)(password) || 'Password does not meet the policy.');
@@ -260,13 +276,17 @@ function registerAuthRoutes(app) {
                 pendingSignups.delete(email);
                 return fail(res, 400, 'OTP_EXPIRED', 'Verification code has expired. Please request a new code.');
             }
-            pending.attempts += 1;
-            if (pending.attempts > OTP_MAX_ATTEMPTS) {
+            // Was increment-then-check (>), which let a 6th guess through evaluation
+            // right after the "0 attempt(s) remaining" message on the 5th wrong
+            // one — check-then-increment (matching the forgot-password OTP flow
+            // below, which never had this bug) so "0 remaining" is actually true.
+            if (pending.attempts >= OTP_MAX_ATTEMPTS) {
                 pendingSignups.delete(email);
                 return fail(res, 400, 'OTP_MAX_ATTEMPTS', 'Too many invalid attempts. Please sign up again.');
             }
             const match = await bcryptjs_1.default.compare(otp, pending.otp_hash);
             if (!match) {
+                pending.attempts += 1;
                 const remaining = Math.max(0, OTP_MAX_ATTEMPTS - pending.attempts);
                 return fail(res, 400, 'INVALID_OTP', `Invalid verification code. ${remaining} attempt(s) remaining.`);
             }
@@ -289,12 +309,17 @@ function registerAuthRoutes(app) {
                 role_codes: [SELF_SIGNUP_ROLE],
                 role_ids: roleIds,
                 primary_mobile: pending.primary_mobile,
-                account_status: 'active',
+                // Self-registration verifies the account belongs to a real
+                // @infoziant.com/@icl.today inbox, but that is identity, not
+                // authorization — 'pending' until a Team Leader or Administrator
+                // reviews and activates it (Settings → User Management), so a
+                // verified email can no longer walk straight into a working
+                // Coordinator account with zero human review.
+                account_status: 'pending',
                 presence_status: 'available',
                 is_deleted: false,
             });
             pendingSignups.delete(email);
-            setRefreshCookie(res, user);
             await (0, audit_1.writeAudit)({
                 action: 'CREATE',
                 result: 'SUCCESS',
@@ -305,14 +330,13 @@ function registerAuthRoutes(app) {
                 performedByEmail: email,
                 module: 'Security & Audit',
                 severity: 'info',
-                summary: `Self-registered Placement Coordinator account for ${user.full_name} (${email}) verified via Outlook OTP`,
+                summary: `Self-registered Placement Coordinator account for ${user.full_name} (${email}) verified via Outlook OTP — awaiting Team Leader/Administrator approval`,
                 req,
             });
             return res.status(201).json({
                 success: true,
-                message: `Welcome to Infoziant iPOMS, ${user.full_name}! Your Placement Coordinator account is now active.`,
+                message: `Your email is verified, ${user.full_name}. Your account is now pending review — a Team Leader or Administrator will activate it shortly, and you'll be able to sign in once approved.`,
                 data: {
-                    token: signToken(user),
                     user: publicUser(user),
                 },
             });
@@ -337,6 +361,9 @@ function registerAuthRoutes(app) {
             }
             if (!isStaffDomain(email)) {
                 return fail(res, 400, 'INVALID_DOMAIN', `Only @${STAFF_DOMAINS.join(' or @')} email addresses are permitted.`);
+            }
+            if (String(primary_mobile).trim() && !isValidMobile(primary_mobile)) {
+                return fail(res, 400, 'INVALID_MOBILE', 'Enter a valid 10-digit mobile number.');
             }
             if (!(0, passwordPolicy_1.isPasswordValid)(password)) {
                 return fail(res, 400, 'PASSWORD_POLICY', (0, passwordPolicy_1.firstPasswordError)(password) || 'Password does not meet the policy.');
@@ -402,11 +429,16 @@ function registerAuthRoutes(app) {
                     performedByEmail: rawEmail, module: 'Security & Audit', severity: 'warning',
                     summary: `Sign-in attempted for unknown address ${rawEmail}`, req,
                 });
-                return fail(res, 404, 'ACCOUNT_NOT_FOUND', 'No iPOMS account exists for this email address.');
+                // Dummy hash compare to normalize response timing and prevent timing attacks
+                await bcryptjs_1.default.compare(password, '$2a$12$e8m.4U4pX4Z0U8NfQ12VKeVzQz/t9F2L1vK6H0j9x7L1s0r1w2e3u');
+                return fail(res, 401, 'INVALID_CREDENTIALS', 'Invalid email or password.');
             }
             // Already locked — send them straight to recovery.
             if (user.account_status === 'blocked') {
                 return fail(res, 423, 'ACCOUNT_LOCKED', 'Your account is locked after repeated failed attempts. Verify by email to set a new password.', { requiresReset: true });
+            }
+            if (user.account_status === 'pending') {
+                return fail(res, 403, 'ACCOUNT_PENDING_APPROVAL', 'Your account is pending review. A Team Leader or Administrator needs to approve it before you can sign in.');
             }
             if (user.account_status !== 'active') {
                 return fail(res, 403, 'ACCOUNT_INACTIVE', 'This account is not active. Contact your administrator.');
@@ -436,9 +468,9 @@ function registerAuthRoutes(app) {
                     severity: user.failed_login_attempts >= MAX_FAILED_ATTEMPTS ? 'critical' : 'warning',
                     summary: `Incorrect password (attempt ${user.failed_login_attempts} of ${MAX_FAILED_ATTEMPTS})`, req,
                 });
-                return fail(res, 401, 'WRONG_PASSWORD', remaining > 0
-                    ? `Incorrect password. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining before your account is locked.`
-                    : 'Incorrect password. One more failed attempt will lock your account.', { attemptsRemaining: Math.max(remaining, 0) });
+                return fail(res, 401, 'INVALID_CREDENTIALS', remaining > 0
+                    ? `Invalid email or password. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining before your account is locked.`
+                    : 'Invalid email or password. One more failed attempt will lock your account.', { attemptsRemaining: Math.max(remaining, 0) });
             }
             // Success — clear the failure streak so it counts consecutive misses only.
             user.failed_login_attempts = 0;
@@ -451,12 +483,12 @@ function registerAuthRoutes(app) {
                 module: 'Security & Audit', severity: 'info', summary: 'Signed in successfully', req,
             });
             if (rememberMe) {
-                setRefreshCookie(res, user);
+                setRefreshCookie(res, user, req);
             }
             else {
                 // Guards against a stale 30-day cookie surviving a login where the
                 // user deliberately unchecked "remember me" this time.
-                clearRefreshCookie(res);
+                clearRefreshCookie(res, req);
             }
             return res.status(200).json({
                 success: true,
@@ -482,17 +514,17 @@ function registerAuthRoutes(app) {
                 decoded = jsonwebtoken_1.default.verify(rawToken, JWT_REFRESH_SECRET);
             }
             catch {
-                clearRefreshCookie(res);
+                clearRefreshCookie(res, req);
                 return fail(res, 401, 'REFRESH_INVALID', 'Your remembered session has expired. Please sign in again.');
             }
             const user = await User_1.User.findOne({ _id: decoded.userId, is_deleted: false });
             if (!user || user.account_status !== 'active') {
-                clearRefreshCookie(res);
+                clearRefreshCookie(res, req);
                 return fail(res, 401, 'REFRESH_INVALID', 'Your remembered session is no longer valid. Please sign in again.');
             }
             // Sliding window: a device that's actually in use stays remembered
             // for a full 30 days from its last activity, not just from login.
-            setRefreshCookie(res, user);
+            setRefreshCookie(res, user, req);
             return res.status(200).json({
                 success: true,
                 data: { token: signToken(user), user: publicUser(user) },
@@ -506,7 +538,7 @@ function registerAuthRoutes(app) {
        revocation itself is out of scope (stateless 8h tokens, same as the
        rest of the app) — this only stops this device from silently refreshing. */
     app.post('/api/v1/auth/logout', async (req, res) => {
-        clearRefreshCookie(res);
+        clearRefreshCookie(res, req);
         return res.status(200).json({ success: true, message: 'Signed out.' });
     });
     /* ── Request an OTP ───────────────────────────────────────────────────── */

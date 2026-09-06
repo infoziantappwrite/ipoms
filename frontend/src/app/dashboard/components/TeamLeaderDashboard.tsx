@@ -406,6 +406,12 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
 
       {/* ── 4. Team Leader Active College Focus & Operational Workflow ── */}
       <div className="space-y-6 pt-2">
+        {/* 1. Follow up Due */}
+        <FollowUpSmartQueueWidget
+          selectedCollegeIds={selectedCollegeIds}
+        />
+
+        {/* 2. Active College Focus */}
         <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6">
           <CoordinatorCollegeFocusSection
             onSelectionChange={(ids, locked) => {
@@ -415,7 +421,7 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
           />
         </div>
 
-        {/* Operational Cards & Follow-Up Smart Queue for Selected Colleges */}
+        {/* 3. Campus Outreach Analytics Cards for Selected Colleges */}
         {selectedCollegeIds.length === 0 ? (
           <div className="bg-zinc-50/60 dark:bg-zinc-900/40 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl p-8 text-center flex flex-col items-center justify-center gap-2.5">
             <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60 flex items-center justify-center">
@@ -430,13 +436,8 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
           </div>
         ) : (
           <div className="space-y-8 animate-in fade-in duration-200">
-            {/* Per-College KPI Analytics Cards */}
+            {/* Campus Outreach & Conversion Analytics Cards */}
             <CoordinatorCollegeKpiCards
-              selectedCollegeIds={selectedCollegeIds}
-            />
-
-            {/* Hot Follow-Ups Due — Smart Queue & Alarm */}
-            <FollowUpSmartQueueWidget
               selectedCollegeIds={selectedCollegeIds}
             />
           </div>

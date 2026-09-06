@@ -11,10 +11,12 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { exportToXlsx } from '@/lib/exportExcel';
 import { useToast } from '@/components/ui/Toast';
+import { readSessionUser, roleOf } from '@/lib/session';
 
 export default function MetadataPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const [canDelete, setCanDelete] = useState<boolean>(false);
   const [companies, setCompanies] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(1);
@@ -38,6 +40,72 @@ export default function MetadataPage() {
 
   const [showBulkPasteModal, setShowBulkPasteModal] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [returnTo, setReturnTo] = useState<string | null>(null);
+
+  // Check for auto-open query parameters (e.g. from Daily Tracker)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const isAdd = params.get('add') === 'true';
+      const companyNameParam = params.get('company_name');
+      const hrNameParam = params.get('hr_name');
+      const mobileParam = params.get('primary_mobile') || params.get('mobile');
+      const emailParam = params.get('primary_email') || params.get('email');
+      const returnToParam = params.get('return_to');
+
+      if (returnToParam) {
+        setReturnTo(returnToParam);
+      }
+
+      if (isAdd || companyNameParam || mobileParam || emailParam) {
+        if (companyNameParam && companyNameParam.trim()) {
+          apiFetch<any>(`/companies/search?q=${encodeURIComponent(companyNameParam.trim())}&limit=5`)
+            .then((res) => {
+              if (res.success && Array.isArray(res.data?.companies) && res.data.companies.length > 0) {
+                const exact = res.data.companies.find(
+                  (c: any) => (c.company_name || '').trim().toLowerCase() === companyNameParam.trim().toLowerCase()
+                );
+                if (exact) {
+                  setEditingData({
+                    ...exact,
+                    hr_name: hrNameParam || (exact.hr_name !== 'HR Contact' ? exact.hr_name : '') || '',
+                    primary_mobile: mobileParam || exact.primary_mobile || '',
+                    primary_email: emailParam || exact.primary_email || '',
+                  });
+                  setShowEditModal(true);
+                  return;
+                }
+              }
+              // Fallback: new contact
+              setEditingData({
+                company_name: companyNameParam || '',
+                hr_name: hrNameParam || '',
+                primary_mobile: mobileParam || '',
+                primary_email: emailParam || '',
+              });
+              setShowEditModal(true);
+            })
+            .catch(() => {
+              setEditingData({
+                company_name: companyNameParam || '',
+                hr_name: hrNameParam || '',
+                primary_mobile: mobileParam || '',
+                primary_email: emailParam || '',
+              });
+              setShowEditModal(true);
+            });
+        } else {
+          setEditingData({
+            company_name: companyNameParam || '',
+            hr_name: hrNameParam || '',
+            primary_mobile: mobileParam || '',
+            primary_email: emailParam || '',
+          });
+          setShowEditModal(true);
+        }
+      }
+    }
+  }, []);
 
   const loadMetadata = useCallback(async () => {
     setLoading(true);
@@ -63,6 +131,16 @@ export default function MetadataPage() {
       setLoading(false);
     }
   }, [page, searchQuery, selectedType, isRecycleBin, isRecent, fromSno, toSno]);
+
+  useEffect(() => {
+    const user = readSessionUser();
+    const role = roleOf(user);
+    const isMohana =
+      (user?.official_email || '').toLowerCase().includes('mohanaradha') ||
+      (user?.full_name || '').toLowerCase().includes('mohana') ||
+      (user?.username || '').toLowerCase().includes('mohana');
+    setCanDelete(role === 'admin' || role === 'team_leader' || isMohana);
+  }, []);
 
   useEffect(() => {
     loadMetadata();
@@ -144,6 +222,10 @@ export default function MetadataPage() {
   };
 
   const handleDelete = async (id: string, name: string) => {
+    if (!canDelete) {
+      alert('Access Denied: Only A. Mohanaradha among coordinators has authorization to delete from the Master Metadata Database.');
+      return;
+    }
     if (!confirm(`Are you sure you want to move "${name}" to the Recycle Bin?`)) return;
     try {
       const res = await apiFetch(`/metadata/${id}`, { method: 'DELETE' });
@@ -172,6 +254,10 @@ export default function MetadataPage() {
   };
 
   const handlePurge = async (id: string, name: string) => {
+    if (!canDelete) {
+      alert('Access Denied: Only A. Mohanaradha among coordinators has authorization to permanently purge records from the Master Metadata Database.');
+      return;
+    }
     if (!confirm(`⚠️ PERMANENT PURGE: Are you sure you want to completely delete "${name}" from the database? This cannot be undone.`)) return;
     try {
       const res = await apiFetch(`/metadata/${id}/purge`, { method: 'DELETE' });
@@ -293,7 +379,7 @@ export default function MetadataPage() {
   const isRangeActive = fromSno !== null || toSno !== null;
 
   return (
-    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-white">
+    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-primary-foreground">
 
       {/* ── Top Header Bar ────────────────────────────────────────────────── */}
       <MetadataHeader
@@ -324,6 +410,7 @@ export default function MetadataPage() {
         page={page}
         totalPages={totalPages}
         onPageChange={setPage}
+        canDelete={canDelete}
       />
 
       {/* ── Main Working Table View ───────────────────────────────────────── */}
@@ -368,6 +455,7 @@ export default function MetadataPage() {
             isRecycleBin={isRecycleBin}
             page={page}
             limit={50}
+            canDelete={canDelete}
             onEdit={handleOpenEdit}
             onDelete={handleDelete}
             onRestore={handleRestore}
@@ -382,6 +470,7 @@ export default function MetadataPage() {
       {showEditModal && (
         <ContactEditModal
           initialData={editingData}
+          returnTo={returnTo}
           onClose={() => setShowEditModal(false)}
           onSuccess={loadMetadata}
           onDuplicateFound={handleDuplicateFound}

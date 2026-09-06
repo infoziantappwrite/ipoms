@@ -1,5 +1,6 @@
 import cron from 'node-cron';
-import { DailyTracker, POSITIVE_OUTCOMES } from '../models/DailyTracker';
+import { DailyTracker, POSITIVE_OUTCOMES, PIPELINE_SYNC_OUTCOME } from '../models/DailyTracker';
+import { promoteDailyTrackerRowToWeekly } from '../lib/weeklyTrackerSync';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 5:00 AM Dashboard Analytics Refresh & 6:00 AM Daily Tracker Finalization Jobs
@@ -52,19 +53,23 @@ export function startFinalizationJob(): void {
     try {
       const prevSessionDate = getPreviousSessionDate();
 
-      // Step 1: Promote any remaining unpromoted positive outcomes from prior sessions
+      // Step 1: Promote any remaining unpromoted Invite Mail calls from prior sessions.
+      // Invite Mail alone triggers Weekly Tracker promotion (user decision, 6 Sep 2026
+      // — see PIPELINE_SYNC_OUTCOME in DailyTracker.ts).
       const unpromoted = await DailyTracker.find({
         session_date: { $lte: prevSessionDate },
-        outcome_status: { $in: POSITIVE_OUTCOMES },
+        outcome_status: PIPELINE_SYNC_OUTCOME,
         is_promoted_to_weekly: false,
         is_finalized: false,
       });
 
       if (unpromoted.length > 0) {
         console.log(`📤 [Daily Tracker Reset Job] Auto-promoting ${unpromoted.length} positive outcome(s) to Weekly Tracker...`);
+        // Actually creates the Weekly Tracker row — this used to just flip
+        // is_promoted_to_weekly with nothing behind it, silently losing the
+        // promotion while claiming it happened. See weeklyTrackerSync.ts.
         for (const row of unpromoted) {
-          row.is_promoted_to_weekly = true;
-          await row.save();
+          await promoteDailyTrackerRowToWeekly(row as any);
         }
       }
 

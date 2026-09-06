@@ -427,7 +427,7 @@ function TableRow({
             type="button"
             onClick={handleMoveAction}
             disabled={isDeleteMode || isMoving}
-            className="inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 shadow-2xs hover:shadow-xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer mx-auto text-[11px] font-bold"
+            className="inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 shadow-2xs hover:shadow-xs transition-all active:scale-[0.992] disabled:opacity-50 cursor-pointer mx-auto text-[11px] font-bold"
             title="Move this lead to JD Received tab"
             aria-label="Move to JD Received"
           >

@@ -50,8 +50,6 @@ async function inspectSettingsDatabase() {
     console.log(`  Daily Target   : ${settings.daily_calling_target} calls/day`);
     console.log(`  Org Name       : "${settings.org_name}"`);
     console.log(`  Support Email  : "${settings.org_support_email}"`);
-    console.log(`  Theme Style    : "${settings.theme_default}"`);
-    console.log(`  Landing Page   : "${settings.default_landing_page}"`);
   }
 
   await disconnectDatabase();

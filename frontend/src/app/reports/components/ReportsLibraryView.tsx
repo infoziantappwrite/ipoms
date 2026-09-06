@@ -131,7 +131,7 @@ export function ReportsLibraryView({ onSelectTemplate, onLoadPreset }: Props) {
                 <button
                   type="button"
                   onClick={() => onSelectTemplate(t.id)}
-                  className="w-full mt-5 bg-primary hover:bg-primary-hover text-white py-2 rounded-xl text-xs font-bold shadow-2xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="w-full mt-5 bg-primary hover:bg-primary-hover text-primary-foreground py-2 rounded-xl text-xs font-bold shadow-2xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Wrench size={13} strokeWidth={2} />
                   <span>Build This Report</span>
@@ -192,7 +192,7 @@ export function ReportsLibraryView({ onSelectTemplate, onLoadPreset }: Props) {
                         <button
                           type="button"
                           onClick={() => onLoadPreset(p)}
-                          className="bg-primary hover:bg-primary-hover text-white px-3 py-1 rounded-lg text-micro font-bold transition-colors cursor-pointer shadow-2xs"
+                          className="bg-primary hover:bg-primary-hover text-primary-foreground px-3 py-1 rounded-lg text-micro font-bold transition-colors cursor-pointer shadow-2xs"
                         >
                           Load & Build
                         </button>
