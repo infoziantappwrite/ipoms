@@ -771,6 +771,72 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     tool got stuck at a blank/0×0 viewport) — verification here is via direct API calls
     proving the same code paths the frontend calls, not a screenshot.
 
+35b. **Metadata database-wide duplicate cleanup, 6 Sep 2026.** User provided
+    `ipoms missing metadatabase contact.xlsx` (the session's earlier missing-contacts
+    export, since hand-filled) to backfill blank `hr_name`/`mobile_numbers`/`email_ids`
+    fields — 103 clean fills applied directly, plus 10 records where the sheet's new
+    value conflicted with an existing one (append as an additional contact rather than
+    overwrite, per explicit instruction), including 4 with real corrections (Mitsogo/
+    Optum/Siemens had a phone number wrongly stored as `hr_name` — cleared and folded into
+    `mobile_numbers`; Presidio's `hr_name` was corrupted to `"] / Lakshman"` — fixed to
+    `"Lakshman"`) and 7 brand-name casing picks (AstraZeneca, DevRev, MBit Wireless,
+    LumberFi, OJ Commerce, SAP, Saint-Gobain).
+    Then a full duplicate scan across all ~4,060 active records, three cases the user
+    defined: same name+HR+mobile with a different email (merge, union emails), same
+    name+mobile with a different HR (merge, comma-separate names), and full exact matches
+    (merge, no judgment needed) — **plus a fuzzy pass for differently-spelled versions of
+    the same company** (e.g. "Adya AI"/"Adya.ai"/"Adya. AI", "SAP"/"Sap", a genuine x/z
+    typo "Genworx"/"Genworz" that exact canon-matching missed entirely). **Governing rule,
+    corrected mid-cleanup after the user caught an error:** two records merge into one
+    whenever ANY of name/mobile/email overlaps at all; they stay as two separate rows
+    ONLY when name, mobile, AND email are all simultaneously different. Every duplicate
+    pair was already required to share at least one mobile number just to be detected, so
+    in practice this means merge, full stop — "keep as two rows for a shared office line"
+    (my first instinct, used in early batches) was wrong and had to be retroactively
+    fixed for ~13 clusters. Sub-clustering used connected-components (shared mobile OR
+    email as the graph edge) within each same-name/same-canon group, not a blanket
+    same-name merge — this is what correctly left ABB's 4 unrelated contacts as separate
+    rows (no field in common at all) while still merging the 2 that shared an email.
+    **Result: 4,060 → 3,702 records** (358 duplicates removed) across ~230 merge
+    operations. Found and excluded **9 cases of cross-company email contamination**
+    (a record for one company carrying another company's email verbatim — e.g. Agilisium
+    holding a `@dxc.com` address, DoodleBlue holding Flex's email, Mphasis holding a
+    `@mouser.com` address with the correct contact confirmed live by the user) — these
+    were copy-paste errors from the original import, not real shared contacts, so the
+    wrong email was dropped rather than preserved. 240 records that share a similar or
+    identical company name but no contact-field overlap were correctly left as separate
+    rows per the governing rule. Full JSON backups taken before every write throughout
+    (`backend/backups/company_metadata_before_*`); all scratch analysis scripts deleted
+    after use.
+    **Same-day follow-ups:** (a) 91 records had zero phone AND zero email; cross-checking
+    those by name against the whole database (not just each other) found 18 duplicate
+    stubs the phone/email-based scan could never catch on its own — 6 had a real HR name
+    worth preserving (merged), 10 were pure junk (deleted). (b) A broader health check
+    (malformed contact entries, cross-company field collisions, blank names, duplicate
+    serials) surfaced 388 phone + 194 email collisions across *unrelated* company names —
+    explicitly **left untouched**: this evidence is much weaker than a name-match, and at
+    that scale a wrong auto-merge risks fusing two genuinely different companies (shared
+    staffing-vendor lines and corrupted placeholder numbers like `1234567890` account for
+    many of them). Only fixed the 31 records with unambiguous evidence of glued-together
+    phone/email entries (a real comma or a second `+` country-code marker in the raw
+    string) — first attempt was too aggressive and briefly deleted a few genuine
+    international numbers (e.g. a UK `+44...` contact) by assuming every valid number was
+    Indian-format; caught before applying and rewritten to only touch entries with
+    unambiguous split evidence, leaving anything merely unfamiliar-looking alone. 0
+    duplicate `serial_number`s found.
+    **Follow-up the same day:** checked for records with zero phone AND zero email
+    (91 found). Cross-referencing those by name against the *whole* database (not just
+    against each other) surfaced exactly the blind spot named above — 18 were duplicate
+    stubs of an existing company that the phone/email-based scan structurally could never
+    catch (nothing to match on). 6 had a genuine HR name worth preserving (e.g. Agiliq,
+    Harman, Techasoft) and were merged properly; 10 were pure noise (blank or
+    phone-string-junk `hr_name`) and were deleted outright. **3702 → verified 16 records
+    correctly removed** (the raw total moved by a different amount due to concurrent real
+    usage of the app mid-session, unrelated to this cleanup — confirmed by checking each
+    deleted serial individually). The remaining 72 blank-contact records are genuinely
+    standalone — a real company name on file with no way to reach them, same situation as
+    the rows that stayed blank in the user's own missing-contacts export.
+
 36. **"Positive" for pipeline/sync purposes narrowed to Invite Mail only (user decision,
     6 Sep 2026).** Immediately after building item 35, the user redefined what should
     actually trigger a sync: **only `invite_mail`** creates a Weekly Tracker "Companies in
