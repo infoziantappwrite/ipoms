@@ -19,13 +19,23 @@ export type CallOutcome =
   | 'invalid'
   | 'drive_completed';
 
-// Outcomes that auto-promote to Weekly Tracker after finalization
+// Outcomes counted as "positive" for reporting/KPI purposes (dashboards,
+// admin analytics, funnel stats). Broader than PIPELINE_SYNC_OUTCOME below —
+// do not use this for deciding what gets promoted into Weekly Tracker or the
+// Daily Leads Positives tab.
 export const POSITIVE_OUTCOMES: CallOutcome[] = [
   'jd_received',
   'hiring',
   'invite_mail',
   'drive_completed',
 ];
+
+// The ONLY outcome that creates a Weekly Tracker "Companies in Pipeline" row
+// or a Daily Leads Positives-tab row (user decision, 6 Sep 2026 — narrowed
+// from the broader POSITIVE_OUTCOMES set above, which stays as-is for
+// reporting). `jd_received` is handled separately: it goes to the JD Received
+// tab specifically, only when a JD has actually come in for that company.
+export const PIPELINE_SYNC_OUTCOME: CallOutcome = 'invite_mail';
 
 // ─── Interface ───────────────────────────────────────────────────────────────
 

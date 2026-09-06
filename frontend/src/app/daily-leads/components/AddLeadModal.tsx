@@ -426,7 +426,7 @@ export function AddLeadModal({
             type="submit"
             form="add-lead-form"
             disabled={loading}
-            className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 hover:shadow-md hover:shadow-primary/25"
+            className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.992] hover:shadow-md hover:shadow-primary/25"
           >
             <CheckCircle2 size={15} />
             <span>{loading ? 'Saving…' : 'Save Entry'}</span>

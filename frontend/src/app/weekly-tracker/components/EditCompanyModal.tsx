@@ -398,7 +398,7 @@ export function EditCompanyModal({
             type="button"
             onClick={handleDelete}
             disabled={deleting}
-            className="flex items-center gap-1.5 px-3.5 py-2.5 text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-xs"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-[0.992] shadow-xs"
           >
             <Trash2 size={14} />
             <span>{deleting ? 'Deleting…' : 'Delete Row'}</span>
@@ -409,7 +409,7 @@ export function EditCompanyModal({
               type="submit"
               form="edit-company-form"
               disabled={loading}
-              className="px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 hover:shadow-md hover:shadow-primary/25"
+              className="px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.992] hover:shadow-md hover:shadow-primary/25"
             >
               <CheckCircle2 size={15} />
               <span>{loading ? 'Saving Changes…' : 'Save Changes'}</span>

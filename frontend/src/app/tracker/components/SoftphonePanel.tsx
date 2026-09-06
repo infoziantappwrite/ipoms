@@ -380,7 +380,7 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
                       key={key}
                       type="button"
                       onPointerDown={() => handleDialpadPress(key)}
-                      className="h-11 rounded-2xl bg-surface-sunken hover:bg-surface-raised active:bg-surface-raised active:scale-90
+                      className="h-11 rounded-2xl bg-surface-sunken hover:bg-surface-raised active:bg-surface-raised active:scale-[0.992]
                                  border border-border text-sm font-bold text-fg font-mono select-none
                                  transition-transform duration-100 cursor-pointer shadow-2xs flex items-center justify-center"
                     >

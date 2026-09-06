@@ -140,7 +140,7 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
           <button
             type="button"
             onClick={onClose}
-            className="w-7 h-7 rounded-lg bg-surface hover:bg-surface-raised border border-border/80 hover:border-border text-fg-subtle hover:text-fg flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
+            className="w-7 h-7 rounded-lg bg-surface hover:bg-surface-raised border border-border/80 hover:border-border text-fg-subtle hover:text-fg flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-[0.992] shrink-0"
             title="Close"
           >
             <X size={14} />
@@ -322,7 +322,7 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
               type="button"
               onClick={handleDelete}
               disabled={deleting || loading}
-              className="flex items-center gap-1.5 px-3 py-2 text-rose-600 hover:text-rose-700 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95"
+              className="flex items-center gap-1.5 px-3 py-2 text-rose-600 hover:text-rose-700 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-[0.992]"
             >
               <Trash2 size={13} />
               <span>{deleting ? 'Deleting…' : 'Delete'}</span>
@@ -335,7 +335,7 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
             type="submit"
             form="edit-lead-form"
             disabled={loading || deleting}
-            className="px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-md shadow-primary/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+            className="px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-md shadow-primary/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.992]"
           >
             <CheckCircle2 size={14} />
             <span>{loading ? 'Saving…' : 'Save Changes'}</span>

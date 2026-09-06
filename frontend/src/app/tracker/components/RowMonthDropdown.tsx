@@ -62,8 +62,8 @@ export function RowMonthDropdown({ value, onChange, disabled = false }: Props) {
           disabled
             ? 'bg-surface-sunken/40 border-border/40 text-fg-disabled/50 cursor-not-allowed'
             : value
-            ? 'bg-warning-subtle/50 border-warning/70 text-warning-strong cursor-pointer active:scale-[0.98]'
-            : 'bg-amber-500/10 border-amber-500/70 text-amber-700 dark:text-amber-300 ring-2 ring-amber-500/20 font-semibold cursor-pointer active:scale-[0.98]'
+            ? 'bg-warning-subtle/50 border-warning/70 text-warning-strong cursor-pointer active:scale-[0.992]'
+            : 'bg-amber-500/10 border-amber-500/70 text-amber-700 dark:text-amber-300 ring-2 ring-amber-500/20 font-semibold cursor-pointer active:scale-[0.992]'
         }`}
       >
         <div className="flex items-center gap-2 truncate">

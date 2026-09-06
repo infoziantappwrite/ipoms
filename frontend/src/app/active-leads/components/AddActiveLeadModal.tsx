@@ -277,7 +277,7 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full sm:w-auto px-6 py-2 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              className="w-full sm:w-auto px-6 py-2 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.992]"
             >
               <Plus size={14} strokeWidth={2.5} />
               <span>{submitting ? 'Saving…' : 'Add'}</span>

@@ -383,7 +383,7 @@ export default function ActiveLeadsPage() {
                 disabled={page <= 1}
                 onClick={() => setPage(page - 1)}
                 title="Previous Page"
-                className="w-8 h-8 rounded-xl bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
+                className="w-8 h-8 rounded-xl bg-surface border border-border hover:bg-surface-raised active:scale-[0.992] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
               >
                 <ChevronLeft size={16} strokeWidth={2.25} />
               </button>
@@ -395,7 +395,7 @@ export default function ActiveLeadsPage() {
                 disabled={page >= totalPages}
                 onClick={() => setPage(page + 1)}
                 title="Next Page"
-                className="w-8 h-8 rounded-xl bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
+                className="w-8 h-8 rounded-xl bg-surface border border-border hover:bg-surface-raised active:scale-[0.992] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
               >
                 <ChevronRight size={16} strokeWidth={2.25} />
               </button>

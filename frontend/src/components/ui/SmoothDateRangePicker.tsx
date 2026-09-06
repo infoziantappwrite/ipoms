@@ -88,7 +88,7 @@ export function SmoothDateRangePicker({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-800 dark:text-slate-200 rounded-full px-4 py-2 shadow-xs hover:shadow-sm transition-all text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-slate-400/20 active:scale-[0.98]"
+        className="flex items-center gap-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 text-slate-800 dark:text-slate-200 rounded-full px-4 py-2 shadow-xs hover:shadow-sm transition-all text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-slate-400/20 active:scale-[0.992]"
       >
         <CalendarDays size={15} className="text-slate-400 shrink-0" />
         <span className="truncate">{displayText}</span>

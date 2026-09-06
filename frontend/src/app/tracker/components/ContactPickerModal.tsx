@@ -200,7 +200,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
                 setToSno(null);
                 setPage(1);
               }}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer active:scale-95 ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer active:scale-[0.992] ${
                 isRecent
                   ? 'bg-primary text-primary-foreground border border-primary shadow-xs ring-1 ring-primary/30'
                   : 'bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 hover:border-primary/40'
@@ -284,7 +284,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
                   disabled={page <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   title="Previous Page"
-                  className="w-7 h-7 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
+                  className="w-7 h-7 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-[0.992] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
                 >
                   <ChevronLeft size={14} strokeWidth={2.25} />
                 </button>
@@ -318,7 +318,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
                   disabled={page >= totalPages}
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   title="Next Page"
-                  className="w-7 h-7 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
+                  className="w-7 h-7 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-[0.992] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
                 >
                   <ChevronRight size={14} strokeWidth={2.25} />
                 </button>

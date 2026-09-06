@@ -269,7 +269,7 @@ export function WeeklyHeader({
                 <button
                   type="button"
                   onClick={onOpenAddModal}
-                  className="w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center justify-center shadow-xs transition-all cursor-pointer shrink-0 active:scale-95"
+                  className="w-8 h-8 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center justify-center shadow-xs transition-all cursor-pointer shrink-0 active:scale-[0.992]"
                   title="Add Company / Entry"
                   aria-label="Add Company"
                 >
@@ -281,7 +281,7 @@ export function WeeklyHeader({
                 <button
                   type="button"
                   onClick={onSyncDailyPositives}
-                  className="w-8 h-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl flex items-center justify-center shadow-xs transition-all cursor-pointer shrink-0 active:scale-95"
+                  className="w-8 h-8 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl flex items-center justify-center shadow-xs transition-all cursor-pointer shrink-0 active:scale-[0.992]"
                   title="Sync Daily Tracker Positives"
                   aria-label="Sync"
                 >
@@ -306,7 +306,7 @@ export function WeeklyHeader({
                   <button
                     type="button"
                     onClick={onToggleDeleteMode}
-                    className="w-8 h-8 bg-rose-600 hover:bg-rose-700 text-white rounded-xl flex items-center justify-center shadow-xs transition-all cursor-pointer shrink-0 active:scale-95"
+                    className="w-8 h-8 bg-rose-600 hover:bg-rose-700 text-white rounded-xl flex items-center justify-center shadow-xs transition-all cursor-pointer shrink-0 active:scale-[0.992]"
                     title="Delete Rows"
                     aria-label="Delete Rows"
                   >

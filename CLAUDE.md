@@ -103,7 +103,10 @@ opt-in via "Remember this device for 30 days" at login, `JWT_REFRESH_SECRET`, st
 30-day token in an httpOnly cookie scoped to `/api/v1/auth`, sliding window (renewed on
 each use via `POST /auth/refresh`), cleared by `POST /auth/logout`. No DB-backed
 revocation list — matches the rest of this app's stateless-JWT model.
-**Jobs:** 1 of 4 (`finalizeDailyTracker`, 23:59:59).
+**Jobs:** was documented as 1 of 4 at `23:59:59` — **wrong, corrected 6 Sep 2026.**
+`finalizeDailyTracker.ts` actually runs two cron jobs: 5:00 AM IST (dashboard analytics
+refresh) and 6:00 AM IST (finalizes/locks yesterday's Daily Tracker rows). A third job,
+`positiveSyncReminder.ts` (8:00 PM + 10:00 PM IST), was added 6 Sep 2026 — see §5 item 35.
 **Tests:** none. No test directory, no test script, no framework.
 
 ---
@@ -661,6 +664,133 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     the mailer log. WhatsApp was explicitly ruled out by the user (cost/setup) in favor of
     email; can be added later as a second channel on the same `notifyForeignCollegeOwners()`
     call without touching the warning-dialog side.
+
+33. **Daily Tracker History is now organization-wide, not per-coordinator (user decision,
+    6 Sep 2026).** Caught live: an Administrator opened History Archive for Kamaraj/
+    3 Sep 2026 (freshly imported from the September Tracker workbook — see below) and saw
+    "0 / 0 rows", even though the data genuinely existed — 27 real rows, attributed to
+    coordinator Megala Devi P S. `GET /daily-tracker/history` pinned `coordinator_id` via
+    `scopeToSelf()`, so any account other than the row's own coordinator saw nothing,
+    regardless of which college was selected — and the frontend's history call
+    (`tracker/page.tsx`) never even sent `college_id`, so the college dropdown shown in
+    History Archive mode wasn't filtering anything server-side either. The user's decision:
+    Coordinator, Team Leader, and Administrator should **all** be able to browse any
+    college's historical daily-tracker data, not just their own. Fixed: `coordinator_id` is
+    now an optional narrowing filter on `/daily-tracker/history`, never an ownership pin;
+    the endpoint populates and returns `coordinator_name` since a college's history can now
+    span multiple coordinators; the frontend sends `college_id` and re-fetches automatically
+    if the college selector changes mid-review; `TrackerGrid`/`TrackerRow` grow a
+    **Coordinator** column, shown only in read-only/history mode. **Deliberately NOT
+    touched:** `/daily-tracker/today` — the live, in-progress calling workspace — stays
+    self-scoped; this change is about historical record visibility, not about who may work
+    whose active queue. Verified live: Administrator's history request for Kamaraj/
+    2026-09-03 with no `coordinator_id` param returned all 27 real rows, each correctly
+    carrying `coordinator_name: "Megala Devi P S"`. `tsc --noEmit` clean both sides.
+
+34. **September Tracker 2026 import — COMPLETE, 6 Sep 2026.** The user provided
+    `September Tracker 2026.xlsx` (25 sheets: 22 colleges + Tracker/POSITIVES/JD RECEIVED,
+    the last three explicitly skipped) to reload Daily Tracker after a full history wipe
+    (565 records, Jan–Sept 2026, hard-deleted since `DailyTracker` has no `is_deleted`
+    field — Weekly Tracker/Daily Leads/Active Leads/Company Metadata/Report Library
+    deliberately untouched). Workflow per sheet: inspect exact sheet name → dry-run parse
+    (content-based phone/name classification, not header-declared column order — real
+    coordinator-entered data frequently swaps columns) → cross-check every company/phone
+    against existing metadata, creating a new metadata record only on genuine certainty
+    nothing already matches → present findings → wait for explicit confirmation → backup
+    `daily_tracker` → apply → verify counts on target and all protected collections →
+    clean up scratch scripts.
+    **Result: 535 daily_tracker rows across 10 sheets with real data** — MCET 122,
+    KAMARAJ 104, NGP 90, MAR EPHRAEM 8, ACEW 5, NPR 49, KIOT 16, KLU 60, SMVEC 62, DSU 19.
+    **2 new metadata companies created:** GEP World (MCET), TCS BPS (ACEW) — everything
+    else in all 10 sheets matched an existing metadata record, so this is also the answer
+    to "list any contact not already in the metadata base."
+    **7 rows skipped — no phone number anywhere (sheet or metadata), same pattern each
+    time:** Novacept (NGP), Volopay (ACEW), Tata Capital Housing Finance + Cosmic Micro
+    Systems (NPR), Sedin + Aethrone Aerospace + Rane Group (SMVEC).
+    **Confirmed empty, no calls logged, correctly skipped:** ACET, AIHT, KPR, MKCE, PSNA,
+    SONA, NEHRU, NGCE, HITS, AVS, KARUNYA.
+    **Recurring data-entry bug found and corrected on 7 of the 10 real sheets:** a
+    calendar-picker glitch left the day field stuck at a fixed value (commonly "9") while
+    the month cycled — e.g. a sheet meant to represent Sep 1–4 decodes to Jan 9/Feb 9/
+    Mar 9/Apr 9. The user confirmed each sheet's serial→target-date mapping explicitly
+    before import, arithmetic-checked against the sheet's real non-header row count.
+    KLU additionally had 3 confirmed exact-duplicate rows (identical company/phone/date/
+    comment) — deduped to 1 each per the user's call. A handful of rows also matched
+    metadata by phone even though the sheet itself had no number (metadata's own number
+    used as a legitimate fallback) — e.g. Tata Elxsi (NPR), the whole DSU sheet (HR names
+    entirely sourced from metadata since the sheet's HR column was blank throughout).
+    `backend/_manual14.js` was kept for MCET's messy-name overrides; every other sheet's
+    scratch scripts (`_peek_*`, `_dryrun_*`, `_insert_*`, `_*_parsed.json`) were deleted
+    after use, per the established convention.
+
+35. **Same-day positive-call safety net, 6 Sep 2026 (new feature, user-requested) — plus
+    a real bug found and fixed in the existing 6 AM job while building it.** User described
+    the daily workflow (login ~10 AM, log off ~7 PM, invite_mail outcomes = "positive",
+    synced into Weekly Tracker / Daily Leads via the Sync buttons or manual entry) and asked
+    to confirm it against the real code. Two corrections to what the user believed: (a) the
+    tracker does NOT reset at 12:00 AM — there are two separate jobs, a 5:00 AM IST dashboard-
+    analytics refresh and a 6:00 AM IST job that actually finalizes/locks yesterday's rows
+    (the "today" screen only *looks* fresh at midnight because it queries by calendar date,
+    independent of any job); (b) that 6 AM job's own "auto-promote" step for old unsynced
+    positive rows was a real bug — it only set `is_promoted_to_weekly = true` and saved,
+    **never actually creating the Weekly Tracker row**, so old positives could be marked
+    "promoted" while nothing existed in Weekly Tracker. Confirmed live before fixing: called
+    the exact same logic path via a throwaway test row — it flipped the flag with zero
+    Weekly Tracker documents created.
+    Fixed and extended: `backend/src/lib/weeklyTrackerSync.ts` (new) holds
+    `promoteDailyTrackerRowToWeekly()`, extracted from `POST /weekly-tracker/
+    sync-daily-positives`'s per-row logic — checks for an existing Weekly Tracker row by
+    company+college+year, creates one only if missing, always sets
+    `is_promoted_to_weekly = true` afterward. The 6 AM job (`finalizeDailyTracker.ts`) now
+    calls this instead of just flipping the flag. Verified live via a throwaway test
+    Daily Tracker row: first call creates the Weekly Tracker row and returns `created: true`;
+    a second call on the same row is idempotent (`created: false`, still exactly 1 Weekly
+    Tracker row) — confirms no duplicate risk from being called by multiple jobs.
+    New: `backend/src/jobs/positiveSyncReminder.ts` — **8:00 PM IST**: emails each coordinator
+    (via new `sendPositiveSyncReminderEmail()` in `mailer.ts`) a list of that day's positive
+    (`invite_mail`/`hiring`/`jd_received`/`drive_completed`) Daily Tracker calls, grouped by
+    college, that still aren't in Weekly Tracker. **10:00 PM IST**: same query — anything
+    still unsynced gets really auto-synced via `promoteDailyTrackerRowToWeekly()` (not just
+    flagged), and a `Notification` (`notification_type: 'reminder'`, `action_url:
+    '/weekly-tracker'`, `requires_acknowledgment: true`) is created per coordinator listing
+    what was auto-synced. Both jobs registered in `server.ts`'s `startPositiveSyncReminderJob()`
+    alongside the existing 5/6 AM job — the 6 AM catch-all still exists for anything that
+    slips through both (e.g. server down at 10 PM).
+    Frontend: `dashboard/page.tsx` (coordinator role only, per user's choice) fetches
+    `GET /notifications?tab=unread` on load; if one matches
+    `action_url === '/weekly-tracker' && notification_type === 'reminder' &&
+    requires_acknowledgment`, shows a `Modal` with OK ("review now" → navigates to
+    `/weekly-tracker`, marks acknowledged) / Cancel (dismiss, marks acknowledged, stays on
+    dashboard) — both buttons call the existing `PATCH /notifications/:id/acknowledge`
+    (`response: 'acknowledged'`), no new endpoint needed there. Verified live end-to-end:
+    inserted a real reminder-type Notification for Megala Devi P S, confirmed it surfaces
+    correctly through the exact `GET /notifications?tab=unread` query the dashboard uses,
+    then confirmed `PATCH .../acknowledge` removes it from the unread list — matching what
+    the dashboard's fetch effect and modal dismiss handler do. `tsc --noEmit` clean both
+    sides. Browser-based UI verification was not possible this session (the in-app preview
+    tool got stuck at a blank/0×0 viewport) — verification here is via direct API calls
+    proving the same code paths the frontend calls, not a screenshot.
+
+36. **"Positive" for pipeline/sync purposes narrowed to Invite Mail only (user decision,
+    6 Sep 2026).** Immediately after building item 35, the user redefined what should
+    actually trigger a sync: **only `invite_mail`** creates a Weekly Tracker "Companies in
+    Pipeline" row or a Daily Leads Positives-tab row — not `hiring`/`drive_completed`/
+    `in_connect`/`follow_up` as before. `jd_received` keeps its own separate, unchanged
+    behavior (JD Received tab only, when a JD has genuinely come in). New constant
+    `PIPELINE_SYNC_OUTCOME = 'invite_mail'` in `DailyTracker.ts`, deliberately kept distinct
+    from the existing `POSITIVE_OUTCOMES` array — that broader set (`jd_received`/`hiring`/
+    `invite_mail`/`drive_completed`) still drives KPI cards, dashboard funnels, and admin
+    analytics, which the user did NOT ask to change. Updated to use `PIPELINE_SYNC_OUTCOME`:
+    `POST /weekly-tracker/sync-daily-positives`'s `dailyFilter`, `POST /daily-leads/
+    sync-positives`'s `dtFilter` (now `['jd_received', 'invite_mail']` only, down from 6
+    statuses), the 6 AM catch-all's "unpromoted" query in `finalizeDailyTracker.ts`, and
+    `positiveSyncReminder.ts`'s `findTodaysUnsyncedPositives()` (both the 8 PM email and the
+    10 PM auto-sync). Reminder-email copy in `mailer.ts` updated to say "Invite Mail" instead
+    of the old 4-status list. Verified live with three throwaway Daily Tracker rows on NGP
+    (hiring/invite_mail/jd_received): the manual Weekly Tracker sync correctly promoted only
+    the invite_mail row (`hiring` untouched); the Daily Leads sync correctly split
+    invite_mail→Positives and jd_received→JD Received, with `hiring` producing neither.
+    `tsc --noEmit` clean.
 
 ## 6. Module map
 ## 6. Module map

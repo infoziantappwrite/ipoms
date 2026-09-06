@@ -261,7 +261,7 @@ export default function LoadContactsPage() {
                   setToSno(null);
                   setPage(1);
                 }}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer active:scale-95 ${
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer active:scale-[0.992] ${
                   isRecent
                     ? 'bg-primary text-primary-foreground border border-primary shadow-xs ring-1 ring-primary/30'
                     : 'bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 hover:border-primary/40'
@@ -342,7 +342,7 @@ export default function LoadContactsPage() {
                     disabled={page <= 1}
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     title="Previous Page"
-                    className="w-7 h-7 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
+                    className="w-7 h-7 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-[0.992] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
                   >
                     <ChevronLeft size={14} strokeWidth={2.25} />
                   </button>
@@ -376,7 +376,7 @@ export default function LoadContactsPage() {
                     disabled={page >= totalPages}
                     onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                     title="Next Page"
-                    className="w-7 h-7 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
+                    className="w-7 h-7 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-[0.992] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg hover:text-primary shadow-2xs transition-all cursor-pointer"
                   >
                     <ChevronRight size={14} strokeWidth={2.25} />
                   </button>
@@ -532,7 +532,7 @@ export default function LoadContactsPage() {
             <button
               onClick={handleImportToTracker}
               disabled={selected.size === 0 || importedSuccess}
-              className="px-6 py-2.5 bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-primary-foreground text-xs font-bold rounded-xl shadow-[2px_2px_8px_rgba(30,58,138,0.25)] flex items-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+              className="px-6 py-2.5 bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-primary-foreground text-xs font-bold rounded-xl shadow-[2px_2px_8px_rgba(30,58,138,0.25)] flex items-center gap-2 transition-all active:scale-[0.992] cursor-pointer"
             >
               {importedSuccess ? (
                 <>

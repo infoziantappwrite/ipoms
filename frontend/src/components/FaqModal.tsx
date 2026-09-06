@@ -346,7 +346,7 @@ export function FaqModal({ isOpen, onClose, defaultCategory = 'all' }: FaqModalP
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 bg-primary hover:bg-primary-hover text-primary-foreground rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-[0.98]"
+            className="px-4 py-1.5 bg-primary hover:bg-primary-hover text-primary-foreground rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-[0.992]"
           >
             Close Guide
           </button>

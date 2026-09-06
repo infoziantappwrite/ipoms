@@ -150,7 +150,7 @@ export function SmoothLeadStatusDropdown({
         type="button"
         disabled={disabled}
         onClick={handleToggle}
-        className={`inline-flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50 select-none whitespace-nowrap w-full ${
+        className={`inline-flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer shadow-2xs active:scale-[0.992] disabled:opacity-50 select-none whitespace-nowrap w-full ${
           isAll
             ? 'bg-surface hover:bg-surface-raised text-fg border-border'
             : currentOption?.badgeClass || 'bg-surface text-fg border-border'

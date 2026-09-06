@@ -93,7 +93,7 @@ export function LeadsTabBar({
             type="button"
             disabled={selectedCount === 0}
             onClick={onBulkDelete}
-            className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer active:scale-95"
+            className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer active:scale-[0.992]"
           >
             <Trash2 size={13} strokeWidth={2.2} aria-hidden />
             <span>Delete Selected ({selectedCount})</span>

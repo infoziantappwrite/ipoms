@@ -207,7 +207,7 @@ export function ExportColumnModal({
           <button
             type="button"
             onClick={handleProceed}
-            className={`px-5 py-2 text-xs font-bold text-white rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-95 ${
+            className={`px-5 py-2 text-xs font-bold text-white rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-[0.992] ${
               isPdf
                 ? 'bg-rose-600 hover:bg-rose-700'
                 : 'bg-blue-600 hover:bg-blue-700'

@@ -81,7 +81,7 @@ export function RowOutcomeDropdown({ value, onChange, disabled = false, placemen
         type="button"
         disabled={disabled}
         onClick={handleToggle}
-        className={`w-full flex items-center justify-between gap-1.5 pl-2.5 pr-2 py-1 rounded-xl border text-xs font-medium transition-all duration-150 active:scale-[0.98] cursor-pointer select-none shadow-2xs ${
+        className={`w-full flex items-center justify-between gap-1.5 pl-2.5 pr-2 py-1 rounded-xl border text-xs font-medium transition-all duration-150 active:scale-[0.992] cursor-pointer select-none shadow-2xs ${
           currentOption
             ? 'bg-surface border-border-strong text-fg hover:border-primary/40'
             : 'bg-surface/80 border-border text-fg-subtle hover:border-border-strong hover:text-fg'

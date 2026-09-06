@@ -154,7 +154,7 @@ export function MetadataHeader({
           <button
             type="button"
             onClick={onToggleRecent}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer active:scale-[0.992] shadow-2xs ${
               isRecent
                 ? 'bg-primary text-primary-foreground border-primary shadow-xs ring-1 ring-primary/30'
                 : 'bg-primary/10 hover:bg-primary/20 text-primary border-primary/25 hover:border-primary/40'
@@ -184,7 +184,7 @@ export function MetadataHeader({
                 disabled={page <= 1}
                 onClick={() => onPageChange(page - 1)}
                 title="Previous Page"
-                className="w-8 h-8 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
+                className="w-8 h-8 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-[0.992] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
               >
                 <ChevronLeft size={14} strokeWidth={2.25} />
               </button>
@@ -218,7 +218,7 @@ export function MetadataHeader({
                 disabled={page >= totalPages}
                 onClick={() => onPageChange(page + 1)}
                 title="Next Page"
-                className="w-8 h-8 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
+                className="w-8 h-8 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-[0.992] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
               >
                 <ChevronRight size={14} strokeWidth={2.25} />
               </button>
@@ -230,7 +230,7 @@ export function MetadataHeader({
             isRecycleBin ? (
               <button
                 onClick={onToggleRecycleBin}
-                className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white border border-emerald-500/80 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer ring-2 ring-emerald-500/20"
+                className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-600 hover:bg-emerald-700 active:scale-[0.992] text-white border border-emerald-500/80 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer ring-2 ring-emerald-500/20"
                 title="Return to Online Metadata Directory"
                 aria-label="Back to Online"
               >
@@ -239,7 +239,7 @@ export function MetadataHeader({
             ) : (
               <button
                 onClick={onToggleRecycleBin}
-                className="w-9 h-9 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center cursor-pointer shadow-xs transition-all active:scale-95"
+                className="w-9 h-9 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center cursor-pointer shadow-xs transition-all active:scale-[0.992]"
                 title="Recycle Bin (Deleted Contacts)"
                 aria-label="Recycle Bin"
               >
@@ -263,7 +263,7 @@ export function MetadataHeader({
               {/* Bulk Paste Icon Button (Solid Mango Orange with Tooltip) */}
               <button
                 onClick={onOpenBulkPasteModal}
-                className="w-9 h-9 rounded-full bg-amber-500 hover:bg-amber-600 text-white flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-95"
+                className="w-9 h-9 rounded-full bg-amber-500 hover:bg-amber-600 text-white flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-[0.992]"
                 title="Bulk Paste & Import Contacts"
                 aria-label="Bulk Paste Contacts"
               >
@@ -273,7 +273,7 @@ export function MetadataHeader({
               {/* Add Contact Icon Button (Solid Navy Blue with Tooltip) */}
               <button
                 onClick={onOpenAddModal}
-                className="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-95"
+                className="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-[0.992]"
                 title="Add Single Contact"
                 aria-label="Add Contact"
               >

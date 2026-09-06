@@ -237,10 +237,14 @@ export function TrackerRow({ row, index, isReadOnly, onUpdate, onEdit, onDelete,
     onUpdate({ comments: text });
   }, [onUpdate]);
 
+  const gridTemplate = isReadOnly
+    ? 'grid-cols-[48px_110px_95px_95px_220px_130px_150px_170px_130px_170px_140px_minmax(220px,1fr)_64px]'
+    : 'grid-cols-[48px_110px_95px_95px_240px_140px_150px_180px_180px_150px_minmax(260px,1fr)_64px]';
+
   return (
     <div
       data-row-id={row._id}
-      className={`grid grid-cols-[48px_110px_95px_95px_240px_140px_150px_180px_180px_150px_minmax(260px,1fr)_64px] divide-x divide-border/60 min-h-[44px] text-xs ${rowBg} hover:bg-primary/5 focus-within:bg-primary/5 transition-colors group border-b border-border`}
+      className={`grid ${gridTemplate} divide-x divide-border/60 min-h-[44px] text-xs ${rowBg} hover:bg-primary/5 focus-within:bg-primary/5 transition-colors group border-b border-border`}
     >
       {/* S.No / # */}
       <div className="px-2 py-2 text-center text-fg-subtle tabular-nums flex items-center justify-center font-medium">
@@ -302,7 +306,7 @@ export function TrackerRow({ row, index, isReadOnly, onUpdate, onEdit, onDelete,
                   onCall?.(row);
                 }}
                 title={`Click to call ${row.hr_name || row.company_name} (${row.mobile_number})`}
-                className="w-5 h-5 rounded-md bg-blue-500/15 hover:bg-blue-500/30 border border-blue-500/40 dark:border-blue-400/60 text-blue-600 dark:text-blue-400 flex items-center justify-center transition-all hover:scale-110 active:scale-90 cursor-pointer shrink-0 shadow-2xs"
+                className="w-5 h-5 rounded-md bg-blue-500/15 hover:bg-blue-500/30 border border-blue-500/40 dark:border-blue-400/60 text-blue-600 dark:text-blue-400 flex items-center justify-center transition-all hover:scale-105 active:scale-[0.992] cursor-pointer shrink-0 shadow-2xs"
               >
                 <Phone size={11} strokeWidth={2.5} className="text-blue-600 dark:text-blue-400" />
               </button>
@@ -330,6 +334,13 @@ export function TrackerRow({ row, index, isReadOnly, onUpdate, onEdit, onDelete,
           <span className="text-fg-muted italic text-xs">—</span>
         )}
       </div>
+
+      {/* Coordinator — only shown in read-only history, which now spans every coordinator */}
+      {isReadOnly && (
+        <div className="px-2.5 py-2 overflow-hidden min-w-0 flex items-center" title={row.coordinator_name || ''}>
+          <span className="text-fg-subtle truncate block text-xs w-full">{row.coordinator_name || '—'}</span>
+        </div>
+      )}
 
       {/* Call Status */}
       <div className="px-2 py-1.5 min-w-0 flex items-center">
@@ -401,7 +412,7 @@ export function TrackerRow({ row, index, isReadOnly, onUpdate, onEdit, onDelete,
                 onEdit?.(row);
               }}
               title="Edit this calling row"
-              className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-600 transition-all active:scale-90 p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/40 cursor-pointer"
+              className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-600 transition-all active:scale-[0.992] p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/40 cursor-pointer"
             >
               <Pencil size={14} strokeWidth={2} />
             </button>
@@ -412,7 +423,7 @@ export function TrackerRow({ row, index, isReadOnly, onUpdate, onEdit, onDelete,
                 onDelete();
               }}
               title="Delete this contact row from today's tracker"
-              className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 transition-all active:scale-90 p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+              className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 transition-all active:scale-[0.992] p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
             >
               <Trash2 size={14} strokeWidth={2} />
             </button>

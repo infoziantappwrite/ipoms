@@ -221,7 +221,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
             <div className="w-full flex items-center justify-center py-1">
               <Link
                 href="/dashboard"
-                className="bg-white rounded-xl p-1 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0 hover:scale-105 active:scale-95 transition-transform duration-300 cursor-pointer"
+                className="bg-white rounded-xl p-1 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0 hover:scale-105 active:scale-[0.992] transition-transform duration-300 cursor-pointer"
                 title="iPOMS Placement Suite"
               >
                 <InfoziantMark size={28} />
@@ -300,7 +300,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                     onMouseLeave={() => setHovered(null)}
                     onFocus={(e) => showLabel(e.currentTarget, isLocked ? `${label} (Locked)` : label)}
                     onBlur={() => setHovered(null)}
-                    className={`group relative flex items-center rounded-xl cursor-pointer active:scale-[0.98] ${
+                    className={`group relative flex items-center rounded-xl cursor-pointer active:scale-[0.992] ${
                       mounted ? 'transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]' : ''
                     } ${
                       collapsed
@@ -538,7 +538,7 @@ function MobileDrawer({
             type="button"
             onClick={handleClose}
             aria-label="Close navigation"
-            className="w-8 h-8 rounded-control text-fg-subtle hover:bg-surface-sunken hover:text-fg flex items-center justify-center active:scale-90 transition-transform"
+            className="w-8 h-8 rounded-control text-fg-subtle hover:bg-surface-sunken hover:text-fg flex items-center justify-center active:scale-[0.992] transition-transform"
           >
             <X size={18} />
           </button>
@@ -575,7 +575,7 @@ function MobileDrawer({
                   <Link
                     href={href}
                     onClick={handleClick}
-                    className={`group flex items-center justify-between px-3 py-2 rounded-xl text-[12.5px] transition-all active:scale-[0.98] ${
+                    className={`group flex items-center justify-between px-3 py-2 rounded-xl text-[12.5px] transition-all active:scale-[0.992] ${
                       isLocked
                         ? 'text-zinc-400 dark:text-zinc-600 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60'
                         : active

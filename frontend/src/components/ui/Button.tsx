@@ -8,16 +8,16 @@ import { triggerHaptic } from '@/lib/haptics';
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
 
-// Apple Design tactile press: resting state is embossed with instant active compression (scale(0.97) + shadow-inset)
+// Apple Design tactile press: resting state is embossed with mild active compression (scale(0.992))
 const VARIANTS: Record<Variant, string> = {
   primary:
-    'bg-primary text-primary-foreground hover:bg-primary-hover shadow-1 active:shadow-inset-1 active:scale-[0.975]',
+    'bg-primary text-primary-foreground hover:bg-primary-hover shadow-1 active:shadow-inset-1 active:scale-[0.992]',
   secondary:
-    'bg-surface text-fg border border-border-strong hover:bg-surface-sunken shadow-1 active:shadow-inset-1 active:scale-[0.975]',
+    'bg-surface text-fg border border-border-strong hover:bg-surface-sunken shadow-1 active:shadow-inset-1 active:scale-[0.992]',
   ghost:
-    'bg-transparent text-fg-muted hover:bg-surface-sunken hover:text-fg active:shadow-inset-1 active:scale-[0.975]',
+    'bg-transparent text-fg-muted hover:bg-surface-sunken hover:text-fg active:shadow-inset-1 active:scale-[0.992]',
   danger:
-    'bg-destructive text-destructive-foreground hover:brightness-110 shadow-1 active:shadow-inset-1 active:scale-[0.975]',
+    'bg-destructive text-destructive-foreground hover:brightness-110 shadow-1 active:shadow-inset-1 active:scale-[0.992]',
 };
 
 const SIZES: Record<Size, string> = {

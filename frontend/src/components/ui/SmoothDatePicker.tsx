@@ -244,8 +244,8 @@ export function SmoothDatePicker({
           aria-label={label ? `${label}: ${formattedDisplay}` : `Select date, currently ${formattedDisplay}`}
           className={`flex items-center transition-all font-semibold cursor-pointer ${
             size === 'sm'
-              ? 'gap-1.5 bg-surface-sunken hover:bg-surface border border-border hover:border-primary text-fg rounded-lg px-2 py-1 text-[11px] shadow-2xs hover:shadow-xs font-mono focus:ring-1 focus:ring-primary/30 active:scale-[0.98]'
-              : 'gap-2 bg-surface border border-border hover:border-border-strong text-fg rounded-full px-3.5 py-1.5 shadow-xs hover:shadow-sm text-xs focus:ring-2 focus:ring-primary/30 active:scale-[0.98]'
+              ? 'gap-1.5 bg-surface-sunken hover:bg-surface border border-border hover:border-primary text-fg rounded-lg px-2 py-1 text-[11px] shadow-2xs hover:shadow-xs font-mono focus:ring-1 focus:ring-primary/30 active:scale-[0.992]'
+              : 'gap-2 bg-surface border border-border hover:border-border-strong text-fg rounded-full px-3.5 py-1.5 shadow-xs hover:shadow-sm text-xs focus:ring-2 focus:ring-primary/30 active:scale-[0.992]'
           } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           <CalendarDays

@@ -174,7 +174,7 @@ export function InlineCollegeSelector({
         type="button"
         disabled={disabled}
         onClick={handleToggle}
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer shadow-2xs border select-none group active:scale-95 ${
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer shadow-2xs border select-none group active:scale-[0.992] ${
           selectedCollege
             ? 'bg-blue-50/90 dark:bg-blue-950/40 text-primary dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-100/80 dark:hover:bg-blue-950/70 hover:border-blue-300'
             : 'bg-surface-sunken hover:bg-surface text-fg-disabled border-border hover:border-border-strong font-sans'

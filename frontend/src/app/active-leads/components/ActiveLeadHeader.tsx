@@ -116,7 +116,7 @@ export function ActiveLeadHeader({
                 disabled={page <= 1}
                 onClick={() => onPageChange(page - 1)}
                 title="Previous Page"
-                className="w-7 h-7 rounded-lg bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
+                className="w-7 h-7 rounded-lg bg-surface border border-border hover:bg-surface-raised active:scale-[0.992] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
               >
                 <ChevronLeft size={14} strokeWidth={2.25} />
               </button>
@@ -128,7 +128,7 @@ export function ActiveLeadHeader({
                 disabled={page >= totalPages}
                 onClick={() => onPageChange(page + 1)}
                 title="Next Page"
-                className="w-7 h-7 rounded-lg bg-surface border border-border hover:bg-surface-raised active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
+                className="w-7 h-7 rounded-lg bg-surface border border-border hover:bg-surface-raised active:scale-[0.992] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
               >
                 <ChevronRight size={14} strokeWidth={2.25} />
               </button>
@@ -189,7 +189,7 @@ export function ActiveLeadHeader({
               type="button"
               disabled={isSyncing}
               onClick={onSyncTracker}
-              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 hover:shadow-indigo-500/20 whitespace-nowrap"
+              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-[0.992] hover:shadow-indigo-500/20 whitespace-nowrap"
               title="Datas will be synced from the daily tracker for the status follow, hiring and invite email"
               aria-label="Sync leads from Daily Tracker"
             >
@@ -225,7 +225,7 @@ export function ActiveLeadHeader({
             <button
               type="button"
               onClick={onToggleDeleteMode}
-              className="px-3.5 py-1.5 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-500/50 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 ring-1 ring-rose-400/30 dark:ring-rose-400/30 whitespace-nowrap shrink-0"
+              className="px-3.5 py-1.5 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-500/50 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-[0.992] ring-1 ring-rose-400/30 dark:ring-rose-400/30 whitespace-nowrap shrink-0"
               title="Enter Delete mode to select and delete leads"
             >
               <Trash2 size={13} strokeWidth={2.2} className="text-rose-600 dark:text-rose-400 shrink-0" />
@@ -238,7 +238,7 @@ export function ActiveLeadHeader({
                 type="button"
                 onClick={onDeleteSelected}
                 disabled={selectedCount === 0 || isDeletingSelected}
-                className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-95 whitespace-nowrap shrink-0"
+                className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-[0.992] whitespace-nowrap shrink-0"
               >
                 {isDeletingSelected ? (
                   <Loader2 size={13} className="animate-spin shrink-0" />
@@ -256,7 +256,7 @@ export function ActiveLeadHeader({
               <button
                 type="button"
                 onClick={onToggleDeleteMode}
-                className="px-3 py-1.5 bg-surface-sunken hover:bg-surface border border-border text-fg-subtle hover:text-fg rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1 cursor-pointer active:scale-95 whitespace-nowrap shrink-0"
+                className="px-3 py-1.5 bg-surface-sunken hover:bg-surface border border-border text-fg-subtle hover:text-fg rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1 cursor-pointer active:scale-[0.992] whitespace-nowrap shrink-0"
               >
                 <X size={13} strokeWidth={2.5} className="shrink-0" />
                 <span>Exit Delete</span>
@@ -268,7 +268,7 @@ export function ActiveLeadHeader({
           <button
             type="button"
             onClick={onOpenAddModal}
-            className="px-4 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 whitespace-nowrap shrink-0"
+            className="px-4 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-[0.992] whitespace-nowrap shrink-0"
           >
             <Plus size={13} strokeWidth={2.5} className="shrink-0" />
             <span>Add</span>

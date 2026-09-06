@@ -40,6 +40,72 @@ export default function MetadataPage() {
 
   const [showBulkPasteModal, setShowBulkPasteModal] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [returnTo, setReturnTo] = useState<string | null>(null);
+
+  // Check for auto-open query parameters (e.g. from Daily Tracker)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const isAdd = params.get('add') === 'true';
+      const companyNameParam = params.get('company_name');
+      const hrNameParam = params.get('hr_name');
+      const mobileParam = params.get('primary_mobile') || params.get('mobile');
+      const emailParam = params.get('primary_email') || params.get('email');
+      const returnToParam = params.get('return_to');
+
+      if (returnToParam) {
+        setReturnTo(returnToParam);
+      }
+
+      if (isAdd || companyNameParam || mobileParam || emailParam) {
+        if (companyNameParam && companyNameParam.trim()) {
+          apiFetch<any>(`/companies/search?q=${encodeURIComponent(companyNameParam.trim())}&limit=5`)
+            .then((res) => {
+              if (res.success && Array.isArray(res.data?.companies) && res.data.companies.length > 0) {
+                const exact = res.data.companies.find(
+                  (c: any) => (c.company_name || '').trim().toLowerCase() === companyNameParam.trim().toLowerCase()
+                );
+                if (exact) {
+                  setEditingData({
+                    ...exact,
+                    hr_name: hrNameParam || (exact.hr_name !== 'HR Contact' ? exact.hr_name : '') || '',
+                    primary_mobile: mobileParam || exact.primary_mobile || '',
+                    primary_email: emailParam || exact.primary_email || '',
+                  });
+                  setShowEditModal(true);
+                  return;
+                }
+              }
+              // Fallback: new contact
+              setEditingData({
+                company_name: companyNameParam || '',
+                hr_name: hrNameParam || '',
+                primary_mobile: mobileParam || '',
+                primary_email: emailParam || '',
+              });
+              setShowEditModal(true);
+            })
+            .catch(() => {
+              setEditingData({
+                company_name: companyNameParam || '',
+                hr_name: hrNameParam || '',
+                primary_mobile: mobileParam || '',
+                primary_email: emailParam || '',
+              });
+              setShowEditModal(true);
+            });
+        } else {
+          setEditingData({
+            company_name: companyNameParam || '',
+            hr_name: hrNameParam || '',
+            primary_mobile: mobileParam || '',
+            primary_email: emailParam || '',
+          });
+          setShowEditModal(true);
+        }
+      }
+    }
+  }, []);
 
   const loadMetadata = useCallback(async () => {
     setLoading(true);
@@ -404,6 +470,7 @@ export default function MetadataPage() {
       {showEditModal && (
         <ContactEditModal
           initialData={editingData}
+          returnTo={returnTo}
           onClose={() => setShowEditModal(false)}
           onSuccess={loadMetadata}
           onDuplicateFound={handleDuplicateFound}

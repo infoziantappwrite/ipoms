@@ -142,7 +142,7 @@ export function SmoothMonthDropdown({
         ref={triggerRef}
         type="button"
         onClick={handleToggle}
-        className="inline-flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-surface hover:bg-surface-raised text-fg border border-border transition-all cursor-pointer shadow-2xs active:scale-95 select-none whitespace-nowrap w-full"
+        className="inline-flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-surface hover:bg-surface-raised text-fg border border-border transition-all cursor-pointer shadow-2xs active:scale-[0.992] select-none whitespace-nowrap w-full"
       >
         <div className="flex items-center gap-1.5 shrink-0">
           <Calendar size={13} className="text-amber-500 shrink-0" />

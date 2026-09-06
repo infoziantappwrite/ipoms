@@ -49,11 +49,15 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
     );
   }
 
+  const gridTemplate = isReadOnly
+    ? 'grid-cols-[48px_110px_95px_95px_220px_130px_150px_170px_130px_170px_140px_minmax(220px,1fr)_64px]'
+    : 'grid-cols-[48px_110px_95px_95px_240px_140px_150px_180px_180px_150px_minmax(260px,1fr)_64px]';
+
   return (
     <div className="flex-1 overflow-auto rounded-xl border border-border bg-surface">
-      <div className="min-w-[1720px]">
+      <div className={isReadOnly ? 'min-w-[1860px]' : 'min-w-[1720px]'}>
         {/* Sticky Column Headers (Exact Sheet-grade CSS Grid - Generous tracks to prevent collision) */}
-        <div className="sticky top-0 z-10 grid grid-cols-[48px_110px_95px_95px_240px_140px_150px_180px_180px_150px_minmax(260px,1fr)_64px] divide-x divide-border bg-surface-sunken border-b border-border text-xs font-semibold text-fg-subtle uppercase tracking-wider shadow-2xs whitespace-nowrap select-none">
+        <div className={`sticky top-0 z-10 grid ${gridTemplate} divide-x divide-border bg-surface-sunken border-b border-border text-xs font-semibold text-fg-subtle uppercase tracking-wider shadow-2xs whitespace-nowrap select-none`}>
           <div className="px-2 py-2.5 text-center flex items-center justify-center whitespace-nowrap">#</div>
           <div className="px-2.5 py-2.5 flex items-center whitespace-nowrap">Start Time</div>
           <div className="px-2.5 py-2.5 flex items-center whitespace-nowrap">End Time</div>
@@ -62,6 +66,9 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
           <div className="px-2.5 py-2.5 flex items-center whitespace-nowrap">HR Name</div>
           <div className="px-2.5 py-2.5 flex items-center whitespace-nowrap">Contact</div>
           <div className="px-2.5 py-2.5 flex items-center whitespace-nowrap">Email ID</div>
+          {isReadOnly && (
+            <div className="px-2.5 py-2.5 flex items-center whitespace-nowrap">Coordinator</div>
+          )}
           <div className="px-2.5 py-2.5 flex items-center whitespace-nowrap">Call Status</div>
           <div className="px-2.5 py-2.5 flex items-center whitespace-nowrap">Follow Up</div>
           <div className="px-2.5 py-2.5 flex items-center whitespace-nowrap">Comments</div>

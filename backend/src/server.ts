@@ -15,7 +15,7 @@ import { CompanyMetadata } from './models/CompanyMetadata';
 import { User } from './models/User';
 import { Role } from './models/Role';
 import { College } from './models/College';
-import { DailyTracker, POSITIVE_OUTCOMES } from './models/DailyTracker';
+import { DailyTracker, POSITIVE_OUTCOMES, PIPELINE_SYNC_OUTCOME } from './models/DailyTracker';
 import { WeeklyTracker, PIPELINE_SECTIONS, PipelineSection } from './models/WeeklyTracker';
 import { DailyLead, LEAD_TYPES, LeadType } from './models/DailyLead';
 import { ReportLibrary, REPORT_TEMPLATE_TYPES, ReportTemplateType, REPORT_THEMES, ReportTheme } from './models/ReportLibrary';
@@ -28,6 +28,7 @@ import { AuditLog } from './models/AuditLog';
 import { writeAudit } from './lib/audit';
 import mongoose, { Types } from 'mongoose';
 import { startFinalizationJob } from './jobs/finalizeDailyTracker';
+import { startPositiveSyncReminderJob } from './jobs/positiveSyncReminder';
 import rateLimit from 'express-rate-limit';
 import { registerAuthRoutes } from './lib/authRoutes';
 import { registerActiveLeadRoutes, syncLeadFromDailyTracker } from './lib/activeLeadRoutes';
@@ -130,20 +131,13 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// Get today's operational calendar date as midnight UTC with 6:00 AM IST cutoff
-// - Between 00:00:00 and 05:59:59 IST: Active session belongs to previous day (coordinators can edit and sync).
-// - At and after 06:00:00 IST: Fresh new day session starts.
+// Get today's operational calendar date as midnight UTC with 12:00 AM (00:00:00 IST) cutoff
+// Refreshes every morning early at 12:00 AM midnight IST
 function getTodayDate(): Date {
   const now = new Date();
   // IST offset: UTC + 5 hours 30 mins
   const istOffsetMs = (5 * 60 + 30) * 60 * 1000;
   const istTime = new Date(now.getTime() + istOffsetMs);
-
-  const istHour = istTime.getUTCHours();
-  if (istHour < 6) {
-    // Before 6:00 AM IST -> still part of yesterday's active session
-    istTime.setUTCDate(istTime.getUTCDate() - 1);
-  }
   return new Date(Date.UTC(istTime.getUTCFullYear(), istTime.getUTCMonth(), istTime.getUTCDate(), 0, 0, 0, 0));
 }
 
@@ -1849,12 +1843,19 @@ app.post('/api/v1/daily-tracker/save-progress', async (req: Request, res: Respon
 app.get('/api/v1/daily-tracker/history', async (req: Request, res: Response) => {
   try {
     const date = req.query.date as string | undefined;
-    const coordinator_id = scopeToSelf(req, req.query.coordinator_id as string | undefined);
+    // Deliberately NOT scoped to the caller — history is a shared organizational
+    // record, and the user decided (6 Sep 2026) that every role (Coordinator,
+    // Team Leader, Administrator) may view any college's past daily-tracker
+    // data, not just their own. `coordinator_id` is now an optional narrowing
+    // filter, never an ownership pin. This is a deliberate divergence from
+    // `/daily-tracker/today`, which stays self-scoped since that view is the
+    // live, in-progress calling session, not historical record-keeping.
+    const coordinator_id = req.query.coordinator_id as string | undefined;
 
-    if (!coordinator_id || !date) {
+    if (!date) {
       return res.status(400).json({
         success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'coordinator_id and date (YYYY-MM-DD) are required' },
+        error: { code: 'VALIDATION_ERROR', message: 'date (YYYY-MM-DD) is required' },
       });
     }
 
@@ -1867,25 +1868,35 @@ app.get('/api/v1/daily-tracker/history', async (req: Request, res: Response) => 
     const endOfDay = new Date(Date.UTC(yr, mo - 1, dy, 23, 59, 59, 999));
 
     const filter: any = {
-      coordinator_id: new Types.ObjectId(String(coordinator_id)),
       $or: [
         { session_date: sessionDate },
         { session_date: { $gte: startOfDay, $lte: endOfDay } },
         { year: yr, month: mo, day: dy },
       ],
     };
+    if (coordinator_id) {
+      filter.coordinator_id = new Types.ObjectId(String(coordinator_id));
+    }
     if (req.query.college_id) {
       filter.college_id = new Types.ObjectId(String(req.query.college_id));
     }
 
-    const rows = await DailyTracker.find(filter).sort({ serial_no: 1, created_at: 1 });
+    const rows = await DailyTracker.find(filter)
+      .populate('coordinator_id', 'full_name official_email')
+      .sort({ serial_no: 1, created_at: 1 });
 
-    const enriched = rows.map((row, idx) => ({
-      ...row.toObject(),
-      serial_no: idx + 1,
-      duration_formatted: row.duration_seconds != null ? formatDuration(row.duration_seconds) : null,
-      is_read_only: true,
-    }));
+    const enriched = rows.map((row, idx) => {
+      const obj = row.toObject();
+      const coordinator = obj.coordinator_id as any;
+      return {
+        ...obj,
+        coordinator_id: coordinator?._id ?? obj.coordinator_id,
+        coordinator_name: coordinator?.full_name || undefined,
+        serial_no: idx + 1,
+        duration_formatted: row.duration_seconds != null ? formatDuration(row.duration_seconds) : null,
+        is_read_only: true,
+      };
+    });
 
     return res.status(200).json({
       success: true,
@@ -3302,10 +3313,12 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
       foundCols.forEach((fc) => queryCollegeIds.push(fc._id));
     }
 
-    // Daily Tracker filter: look for positive outcomes (invite_mail, hiring, jd_received, drive_completed)
+    // Daily Tracker filter: Invite Mail is the sole trigger for a Companies-in-Pipeline
+    // row (user decision, 6 Sep 2026 — narrowed from the old jd_received/hiring/
+    // invite_mail/drive_completed set). See PIPELINE_SYNC_OUTCOME in DailyTracker.ts.
     const dailyFilter: any = {
       college_id: { $in: queryCollegeIds },
-      outcome_status: { $in: POSITIVE_OUTCOMES },
+      outcome_status: PIPELINE_SYNC_OUTCOME,
     };
 
     if (coordinator_id && Types.ObjectId.isValid(String(coordinator_id))) {
@@ -3836,13 +3849,17 @@ app.post('/api/v1/daily-leads/sync-positives', async (req: Request, res: Respons
 
     let syncedCount = 0;
 
-    // 1. Pull from DailyTracker calls for this date with positive outcomes
+    // 1. Pull from DailyTracker calls for this date — Invite Mail is the sole
+    // trigger for the Positives tab; JD Received fills only when the outcome
+    // is genuinely jd_received for that company/college (user decision,
+    // 6 Sep 2026 — narrowed from also including hiring/drive_completed/
+    // in_connect/follow_up).
     const dtFilter: any = {
       $or: [
         { session_date: { $gte: targetDate, $lt: nextDate } },
         { call_start_time: { $gte: targetDate, $lt: nextDate } },
       ],
-      outcome_status: { $in: ['jd_received', 'hiring', 'drive_completed', 'invite_mail', 'in_connect', 'follow_up'] },
+      outcome_status: { $in: ['jd_received', PIPELINE_SYNC_OUTCOME] },
     };
     if (college_id && college_id !== 'all' && Types.ObjectId.isValid(String(college_id))) {
       dtFilter.college_id = new Types.ObjectId(String(college_id));
@@ -4732,6 +4749,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
 
     // ── CASE 2: ACTIVE LEADS REPORT ────────────────────────────────────────────
     if (template_type === 'active_leads') {
+      const isConsolidated = !college_id || college_id === 'all';
       const hasSpecificBatch = academic_year && academic_year !== 'all' && String(academic_year).trim() !== '';
       const selectedBatch = hasSpecificBatch ? String(academic_year).trim() : '';
 
@@ -4999,8 +5017,8 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         branding: {
           company_name: 'Infoziant IT Solutions Inc.',
           company_logo: '/infoziant-head.png',
-          college_name: targetCollege?.college_name || '',
-          college_code: targetCollege?.college_code || 'iPOMS',
+          college_name: targetCollege?.college_name || (isConsolidated ? 'All Partner Institutions' : 'Target Institution'),
+          college_code: targetCollege?.college_code || (isConsolidated ? 'iPOMS' : 'COLLEGE'),
           college_logo: (isConsolidated || !targetCollege) ? null : resolveCollegeLogoUrl(targetCollege),
           confidential_notice: 'Prepared by Infoziant',
         },
@@ -6248,6 +6266,10 @@ app.get('/api/v1/dashboard/college-kpis', async (req: Request, res: Response) =>
     const NEGATIVE_STATUSES = ['invalid', 'no_response', 'hiring_freezed', 'call_back'];
     const NOT_HIRING_STATUSES = ['not_hiring'];
 
+    const sessionDateParam = req.query.date as string | undefined;
+    const isAllTime = req.query.all_time === 'true';
+    const targetSessionDate = sessionDateParam ? parseDateParam(sessionDateParam) : buildSessionDate();
+
     const kpiResults = await Promise.all(
       targetCollegeIds.map(async (cIdStr) => {
         let college: any = null;
@@ -6270,6 +6292,12 @@ app.get('/api/v1/dashboard/college-kpis', async (req: Request, res: Response) =>
           coordinator_id: coordinator._id,
         };
 
+        // Daily outreach filter for today (resets every morning at 12:00 AM)
+        const dailyFilter: any = {
+          ...coordinatorBaseFilter,
+          ...(isAllTime ? {} : { session_date: targetSessionDate }),
+        };
+
         const [
           totalCalls,
           totalPositives,
@@ -6278,27 +6306,27 @@ app.get('/api/v1/dashboard/college-kpis', async (req: Request, res: Response) =>
           activeLeadsCount,
           weeklyPipelineCount,
         ] = await Promise.all([
-          // Total Calls Made
+          // Total Calls Made (Today's Daily Outreach)
           DailyTracker.countDocuments({
-            ...coordinatorBaseFilter,
+            ...dailyFilter,
             is_skipped: { $ne: true },
           }),
-          // Positives (Hiring, Invite Email, Follow Up, JD Received, Drive Completed)
+          // Positives (Today)
           DailyTracker.countDocuments({
-            ...coordinatorBaseFilter,
+            ...dailyFilter,
             outcome_status: { $in: POSITIVE_STATUSES },
           }),
-          // Negatives (Invalid, No Response, Freeze)
+          // Negatives (Today)
           DailyTracker.countDocuments({
-            ...coordinatorBaseFilter,
+            ...dailyFilter,
             outcome_status: { $in: NEGATIVE_STATUSES },
           }),
-          // Not Hiring
+          // Not Hiring (Today)
           DailyTracker.countDocuments({
-            ...coordinatorBaseFilter,
+            ...dailyFilter,
             outcome_status: { $in: NOT_HIRING_STATUSES },
           }),
-          // Daily Leads
+          // Daily Leads (Open active leads)
           DailyLead.countDocuments({
             ...coordinatorBaseFilter,
             is_deleted: false,
@@ -6334,6 +6362,8 @@ app.get('/api/v1/dashboard/college-kpis', async (req: Request, res: Response) =>
     return res.status(200).json({
       success: true,
       data: {
+        session_date: targetSessionDate,
+        is_daily_refresh: !isAllTime,
         colleges: validKpis,
         total_selected: validKpis.length,
       },
@@ -7629,6 +7659,13 @@ app.post('/api/v1/metadata', async (req: Request, res: Response) => {
     const trimmedHr = hr_name.trim();
     const trimmedMobile = primary_mobile.trim();
     const trimmedEmail = primary_email.trim().toLowerCase();
+
+    if (!trimmedMobile && !trimmedEmail && (!mobile_numbers || mobile_numbers.length === 0) && (!email_ids || email_ids.length === 0)) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'At least one contact method (Mobile Number or Email ID) is required' },
+      });
+    }
 
     // Duplicate Check (Spec Section 7 & 11)
     if (!force_save && trimmedMobile) {
@@ -9770,6 +9807,9 @@ const startServer = async () => {
 
   // Start midnight finalization cron job (Spec Section 14)
   startFinalizationJob();
+  // Same-day positive-call safety net: 8 PM reminder email, 10 PM auto-sync
+  // fallback (user-requested, 6 Sep 2026 — see jobs/positiveSyncReminder.ts)
+  startPositiveSyncReminderJob();
 };
 
 startServer().catch((err) => {

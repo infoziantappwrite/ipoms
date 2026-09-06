@@ -1800,7 +1800,7 @@ export function ReportBuilderWizard({
                   type="button"
                   onClick={handleAutoHighlightCollegePending}
                   title="Auto-highlight pending tasks from college side (DB Pending, Database Pending, etc.)"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 dark:text-amber-200 border border-amber-500/40 transition-all cursor-pointer shadow-2xs active:scale-95"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 dark:text-amber-200 border border-amber-500/40 transition-all cursor-pointer shadow-2xs active:scale-[0.992]"
                 >
                   <Sparkles size={13} className="text-amber-600" />
                   <span>Auto-Highlight DB Pending</span>

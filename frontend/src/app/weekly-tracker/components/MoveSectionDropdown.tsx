@@ -195,7 +195,7 @@ export function MoveSectionDropdown({
         onClick={handleOpen}
         disabled={isMoving}
         title={`Move ${companyName} to another section`}
-        className="p-1.5 rounded-lg text-fg-subtle hover:text-primary hover:bg-primary/10 transition-all cursor-pointer inline-flex items-center justify-center shadow-2xs active:scale-95 disabled:opacity-50"
+        className="p-1.5 rounded-lg text-fg-subtle hover:text-primary hover:bg-primary/10 transition-all cursor-pointer inline-flex items-center justify-center shadow-2xs active:scale-[0.992] disabled:opacity-50"
       >
         <ArrowUpDown size={13} strokeWidth={2.25} className="shrink-0 text-primary" />
       </button>

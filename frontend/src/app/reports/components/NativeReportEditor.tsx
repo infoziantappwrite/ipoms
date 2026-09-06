@@ -4351,7 +4351,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         <button
           type="button"
           onClick={onBackToBuilder}
-          className="px-4 py-2 bg-surface hover:bg-surface-raised text-fg border border-border rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-[0.98]"
+          className="px-4 py-2 bg-surface hover:bg-surface-raised text-fg border border-border rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-[0.992]"
         >
           Back
         </button>
@@ -4360,7 +4360,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         <button
           type="button"
           onClick={() => setShowA4Preview(true)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.98]"
+          className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.992]"
           title="Preview exactly how this report will look printed on an A4 sheet"
         >
           <Eye size={14} strokeWidth={2} aria-hidden /> Preview
@@ -4370,7 +4370,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         <button
           type="button"
           onClick={handleExportExcel}
-          className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.98]"
+          className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.992]"
         >
           <FileSpreadsheet size={14} strokeWidth={2} aria-hidden /> Export XLSX
         </button>
@@ -4380,7 +4380,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           type="button"
           onClick={handleExportImage}
           disabled={exportingImage}
-          className="flex items-center gap-1.5 px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.98]"
+          className="flex items-center gap-1.5 px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.992]"
         >
           <Download size={14} strokeWidth={2} aria-hidden /> {exportingImage ? 'Saving…' : 'Save Image'}
         </button>
@@ -4389,7 +4389,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         <button
           type="button"
           onClick={handlePrintPdf}
-          className="flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary-hover text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.98]"
+          className="flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary-hover text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.992]"
         >
           <Download size={14} strokeWidth={2} aria-hidden /> Save PDF
         </button>
@@ -4411,7 +4411,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             onClick={handleScrollToTop}
             title="Scroll to Top of Report"
             aria-label="Scroll to Top of Report"
-            className="w-11 h-11 rounded-full bg-surface/95 hover:bg-surface text-primary hover:text-primary-hover border border-border shadow-2xl backdrop-blur-md flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer ring-1 ring-black/5 dark:ring-white/10 group"
+            className="w-11 h-11 rounded-full bg-surface/95 hover:bg-surface text-primary hover:text-primary-hover border border-border shadow-2xl backdrop-blur-md flex items-center justify-center transition-all hover:scale-105 active:scale-[0.992] cursor-pointer ring-1 ring-black/5 dark:ring-white/10 group"
           >
             <ArrowUp size={19} strokeWidth={2.5} className="group-hover:-translate-y-0.5 transition-transform" />
           </button>
@@ -4421,7 +4421,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             onClick={handleScrollToBottom}
             title="Jump to End of Report"
             aria-label="Jump to End of Report"
-            className="w-11 h-11 rounded-full bg-primary hover:bg-primary-hover text-primary-foreground border border-primary/40 shadow-2xl backdrop-blur-md flex items-center justify-center transition-all hover:scale-110 active:scale-95 cursor-pointer ring-2 ring-primary/30 group"
+            className="w-11 h-11 rounded-full bg-primary hover:bg-primary-hover text-primary-foreground border border-primary/40 shadow-2xl backdrop-blur-md flex items-center justify-center transition-all hover:scale-105 active:scale-[0.992] cursor-pointer ring-2 ring-primary/30 group"
           >
             <ArrowDown size={19} strokeWidth={2.5} className="group-hover:translate-y-0.5 transition-transform" />
           </button>

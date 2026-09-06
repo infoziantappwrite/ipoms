@@ -319,7 +319,7 @@ export function UserManagementTab({
                                 type="button"
                                 onClick={() => handleRestore(u)}
                                 disabled={restoringUserId === u._id}
-                                className="bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded text-micro font-bold transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                                className="bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded text-micro font-bold transition-all hover:scale-105 active:scale-[0.992] cursor-pointer flex items-center gap-1 disabled:opacity-50"
                                 title="Restore account to Active status (Available within 1 week of deactivation)"
                               >
                                 <RotateCcw size={11} className={`inline shrink-0 ${restoringUserId === u._id ? 'animate-spin' : ''}`} />

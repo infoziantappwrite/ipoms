@@ -49,6 +49,8 @@ export interface TrackerRow {
   is_skipped: boolean;
   is_finalized: boolean;
   last_saved_at?: string;
+  /** Only present in history mode — whose call this was, now that history spans every coordinator. */
+  coordinator_name?: string;
 }
 
 export interface KpiData {
@@ -392,18 +394,33 @@ export default function DailyTrackerPage() {
   }, [selectedCollegeId, coordinatorId, sessionDate, selectedCollegeObj, selectedCollegeName, loadTodayRows, loadKpi]);
 
   // ── Load history view
-  const handleViewHistory = async (date: string) => {
-    if (!coordinatorId) return;
+  // Deliberately organization-wide, not scoped to the signed-in coordinator:
+  // any Coordinator, Team Leader, or Administrator can review any college's
+  // past daily-tracker calls (user decision, 6 Sep 2026) — history is a shared
+  // record, unlike the live "Today" workspace which stays per-coordinator.
+  const handleViewHistory = useCallback(async (date: string, collegeIdOverride?: string) => {
     setIsCalendarOpen(false);
     setHistoryDate(date);
     try {
-      const res = await apiFetch(`/daily-tracker/history?coordinator_id=${coordinatorId}&date=${date}`);
+      const collegeId = collegeIdOverride ?? selectedCollegeId;
+      const collegeParam = collegeId ? `&college_id=${collegeId}` : '';
+      const res = await apiFetch(`/daily-tracker/history?date=${date}${collegeParam}`);
       if (res.success) {
         setHistoryRows((res.data as any).rows);
         setIsHistoryMode(true);
       }
     } catch (e) { console.error('[DT] History load failed', e); }
-  };
+  }, [selectedCollegeId]);
+
+  // Re-fetch history when the college selector changes while already viewing
+  // history — otherwise switching colleges mid-review would silently keep
+  // showing the previous college's rows.
+  useEffect(() => {
+    if (isHistoryMode && historyDate) {
+      handleViewHistory(historyDate, selectedCollegeId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCollegeId]);
 
   // ── Filtered rows for display
   const activeRows = isHistoryMode ? historyRows : rows;
@@ -570,7 +587,7 @@ export default function DailyTrackerPage() {
                   type="button"
                   onClick={handleSaveProgress}
                   disabled={!selectedCollegeId}
-                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95 shrink-0"
+                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-[0.992] shrink-0"
                   title="Save Progress (Ctrl + S)"
                   aria-label="Save Progress (Ctrl + S)"
                 >
@@ -582,11 +599,21 @@ export default function DailyTrackerPage() {
                   type="button"
                   onClick={() => setIsBulkDeleteOpen(true)}
                   disabled={!selectedCollegeId}
-                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95 shrink-0"
+                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-[0.992] shrink-0"
                   title="Bulk Delete Daily Tracker Data"
                   aria-label="Bulk Delete Daily Tracker Data"
                 >
                   <Trash2 size={15} strokeWidth={2.2} aria-hidden />
+                </button>
+
+                {/* + Add Manual Row Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsManualAddOpen(true)}
+                  title="Add Custom Entry (Row-wise)"
+                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary hover:bg-blue-700 text-primary-foreground shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-[0.992] shrink-0"
+                >
+                  <Plus size={16} strokeWidth={2.5} aria-hidden />
                 </button>
 
                 {/* History / Calendar */}
@@ -596,16 +623,6 @@ export default function DailyTrackerPage() {
                   className="flex items-center gap-1.5 bg-surface hover:bg-surface-sunken text-fg border border-border px-3 py-1.5 rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer shrink-0"
                 >
                   <CalendarDays size={14} strokeWidth={2} aria-hidden /> History
-                </button>
-
-                {/* + Add Manual Row Button (Next to History) */}
-                <button
-                  type="button"
-                  onClick={() => setIsManualAddOpen(true)}
-                  title="Add Custom Entry (Row-wise)"
-                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary hover:bg-blue-700 text-primary-foreground shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-95 shrink-0"
-                >
-                  <Plus size={16} strokeWidth={2.5} aria-hidden />
                 </button>
 
                 {/* Divider */}

@@ -233,7 +233,7 @@ export function CopyToJdModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-lg bg-surface hover:bg-surface-raised border border-border/80 hover:border-border text-fg-subtle hover:text-fg flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
+            className="w-8 h-8 rounded-lg bg-surface hover:bg-surface-raised border border-border/80 hover:border-border text-fg-subtle hover:text-fg flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-[0.992] shrink-0"
             title="Close"
           >
             <X size={15} />
@@ -475,7 +475,7 @@ export function CopyToJdModal({
             type="submit"
             form="copy-to-jd-form"
             disabled={loading || !selectedLead || selectedCollegeIds.length === 0}
-            className="w-full sm:w-auto px-6 py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+            className="w-full sm:w-auto px-6 py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.992]"
           >
             <Copy size={14} strokeWidth={2.5} />
             <span>{loading ? 'Copying…' : `Copy to JD (${selectedCollegeIds.length} Colleges)`}</span>

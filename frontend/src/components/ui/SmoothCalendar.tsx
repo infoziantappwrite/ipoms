@@ -240,7 +240,7 @@ export function SmoothCalendar({
           <button
             type="button"
             onClick={handlePrevMonth}
-            className="w-7 h-7 rounded-full flex items-center justify-center text-fg-subtle hover:text-fg hover:bg-surface-raised dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-700/80 transition-all active:scale-95 cursor-pointer"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-fg-subtle hover:text-fg hover:bg-surface-raised dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-700/80 transition-all active:scale-[0.992] cursor-pointer"
             aria-label="Previous Month"
           >
             <ChevronLeft size={15} strokeWidth={2.5} />
@@ -248,7 +248,7 @@ export function SmoothCalendar({
           <button
             type="button"
             onClick={handleNextMonth}
-            className="w-7 h-7 rounded-full flex items-center justify-center text-fg-subtle hover:text-fg hover:bg-surface-raised dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-700/80 transition-all active:scale-95 cursor-pointer"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-fg-subtle hover:text-fg hover:bg-surface-raised dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-700/80 transition-all active:scale-[0.992] cursor-pointer"
             aria-label="Next Month"
           >
             <ChevronRight size={15} strokeWidth={2.5} />
