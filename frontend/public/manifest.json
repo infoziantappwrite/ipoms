@@ -1,0 +1,17 @@
+{
+  "name": "Infoziant iPOMS",
+  "short_name": "iPOMS",
+  "description": "Placement Operations & Management System",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0F172A",
+  "theme_color": "#1E3A8A",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}

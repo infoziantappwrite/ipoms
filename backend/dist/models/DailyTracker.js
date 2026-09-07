@@ -33,15 +33,24 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DailyTracker = exports.POSITIVE_OUTCOMES = void 0;
+exports.DailyTracker = exports.PIPELINE_SYNC_OUTCOME = exports.POSITIVE_OUTCOMES = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
-// Outcomes that auto-promote to Weekly Tracker after finalization
+// Outcomes counted as "positive" for reporting/KPI purposes (dashboards,
+// admin analytics, funnel stats). Broader than PIPELINE_SYNC_OUTCOME below —
+// do not use this for deciding what gets promoted into Weekly Tracker or the
+// Daily Leads Positives tab.
 exports.POSITIVE_OUTCOMES = [
     'jd_received',
     'hiring',
     'invite_mail',
     'drive_completed',
 ];
+// The ONLY outcome that creates a Weekly Tracker "Companies in Pipeline" row
+// or a Daily Leads Positives-tab row (user decision, 6 Sep 2026 — narrowed
+// from the broader POSITIVE_OUTCOMES set above, which stays as-is for
+// reporting). `jd_received` is handled separately: it goes to the JD Received
+// tab specifically, only when a JD has actually come in for that company.
+exports.PIPELINE_SYNC_OUTCOME = 'invite_mail';
 // ─── Schema ──────────────────────────────────────────────────────────────────
 const DailyTrackerSchema = new mongoose_1.Schema({
     // ── Ownership

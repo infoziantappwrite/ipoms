@@ -59,6 +59,8 @@ export default function WeeklyTrackerPage() {
   const [activeSectionFilter, setActiveSectionFilter] = useState<string>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [coordinatorId, setCoordinatorId] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   // The real colleges this account is assigned to (not a permission gate -
   // every coordinator can still act on any college). Used only to show a
   // "this isn't your college" confirmation before create/edit/delete, and an
@@ -177,6 +179,14 @@ export default function WeeklyTrackerPage() {
     }
   }, [selectedCollegeId, academicYear, loadWeeklyTracker, loadKpi]);
 
+  // ── Auto-reset saved badge status
+  useEffect(() => {
+    if (saveStatus === 'saved') {
+      const t = setTimeout(() => setSaveStatus('idle'), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [saveStatus]);
+
   // Access is never blocked - any coordinator can act on any college. This is
   // just a chance to reconsider before doing so on a college that isn't theirs;
   // the real owner is notified by email regardless of the answer given here.
@@ -191,6 +201,7 @@ export default function WeeklyTrackerPage() {
   // ── Row Patch (Inline Edit)
   const handleUpdateRow = async (rowId: string, patch: Partial<WeeklyRow>) => {
     if (!confirmForeignAction('edit')) return;
+    setSaveStatus('saving');
     try {
       const res = await apiFetch(`/weekly-tracker/${rowId}`, {
         method: 'PATCH',
@@ -199,15 +210,21 @@ export default function WeeklyTrackerPage() {
       if (res.success) {
         await loadWeeklyTracker();
         await loadKpi();
+        setSaveStatus('saved');
+        setLastSavedAt(new Date());
+      } else {
+        setSaveStatus('idle');
       }
     } catch (err) {
       console.error('Failed to update row:', err);
+      setSaveStatus('idle');
     }
   };
 
   // ── Move Section
   const handleMoveSection = async (rowId: string, newSection: string) => {
     if (!confirmForeignAction('edit')) return;
+    setSaveStatus('saving');
     try {
       const res = await apiFetch(`/weekly-tracker/${rowId}/section`, {
         method: 'PATCH',
@@ -216,14 +233,20 @@ export default function WeeklyTrackerPage() {
       if (res.success) {
         await loadWeeklyTracker();
         await loadKpi();
+        setSaveStatus('saved');
+        setLastSavedAt(new Date());
+      } else {
+        setSaveStatus('idle');
       }
     } catch (err) {
       console.error('Failed to move section:', err);
+      setSaveStatus('idle');
     }
   };
 
   // ── Toggle Pin Top Companies
   const handleTogglePin = async (rowId: string) => {
+    setSaveStatus('saving');
     try {
       const res = await apiFetch(`/weekly-tracker/${rowId}/pin`, {
         method: 'PATCH',
@@ -231,9 +254,14 @@ export default function WeeklyTrackerPage() {
       if (res.success) {
         await loadWeeklyTracker();
         await loadKpi();
+        setSaveStatus('saved');
+        setLastSavedAt(new Date());
+      } else {
+        setSaveStatus('idle');
       }
     } catch (err) {
       console.error('Failed to toggle pin:', err);
+      setSaveStatus('idle');
     }
   };
 
@@ -387,6 +415,8 @@ export default function WeeklyTrackerPage() {
           setSelectedCollegeId(id);
           setSelectedCollegeName(name);
         }}
+        saveStatus={saveStatus}
+        lastSavedAt={lastSavedAt}
         weekOffset={weekOffset}
         onWeekChange={setWeekOffset}
         academicYear={academicYear}

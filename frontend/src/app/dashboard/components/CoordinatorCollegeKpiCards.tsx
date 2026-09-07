@@ -139,26 +139,26 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
       : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* ── Section Title ────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2">
-          <Target size={18} className="text-primary" />
-          <h2 className="text-lg font-bold tracking-tight text-fg">
+          <Target size={16} className="text-primary" />
+          <h2 className="text-sm font-bold tracking-tight text-fg">
             Campus Outreach &amp; Conversion Analytics
           </h2>
-          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
-            {kpiData.length} {kpiData.length === 1 ? 'Campus Card' : 'Campus Cards'}
+          <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-primary/10 text-primary border border-primary/20">
+            {kpiData.length} {kpiData.length === 1 ? 'Campus' : 'Campuses'}
           </span>
         </div>
 
-        <p className="text-xs text-fg-subtle">
+        <p className="text-[11px] text-fg-subtle">
           Today&apos;s outreach metrics (Refreshes daily at 12:00 AM)
         </p>
       </div>
 
       {/* ── Dynamic Per-College KPI Cards Grid ────────────────────────── */}
-      <div className={`grid ${gridColsClass} gap-4`}>
+      <div className={`grid ${gridColsClass} gap-3`}>
         {kpiData.map((item, index) => {
           const totalOutreach = item.total_calls || 1;
           const positivePct = Math.round(((item.total_positives || 0) / totalOutreach) * 100);
@@ -168,104 +168,107 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
           return (
             <div
               key={item.college_id}
-              className="rounded-2xl border border-border bg-surface shadow-xs hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col justify-between"
+              className="rounded-xl border border-border/80 bg-surface shadow-2xs hover:border-border-strong hover:shadow-xs transition-all duration-200 overflow-hidden flex flex-col justify-between"
             >
-              {/* Card Top Strip / Header */}
-              <div className="p-4 border-b border-border/70 bg-gradient-to-br from-surface via-surface to-surface-sunken/40 space-y-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="space-y-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-mono font-black text-xs px-2 py-0.5 rounded-md bg-blue-600/15 text-blue-700 dark:text-sky-300 border border-blue-600/25">
-                        [{item.college_code}]
-                      </span>
-                      <span className="text-micro font-bold uppercase tracking-wider text-fg-subtle">
-                        Focus #{index + 1}
-                      </span>
-                    </div>
-                    <h3 className="text-sm font-bold text-fg line-clamp-2 leading-tight" title={item.college_name}>
-                      {item.college_name}
-                    </h3>
+              {/* Card Header: Single Unified Link with College Details */}
+              <div className="px-3.5 py-2.5 border-b border-border/60 bg-surface">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1 flex items-center gap-2">
+                    <Link
+                      href="/tracker"
+                      onClick={() => {
+                        setActiveCollege(item.college_id, item.college_name);
+                      }}
+                      title={`${item.college_name}${item.location ? ` • ${item.location}` : ''} (Click to open tracker)`}
+                      className="min-w-0 flex items-center gap-1.5 text-xs sm:text-sm font-bold text-fg hover:text-primary transition-colors group truncate"
+                    >
+                      <Building2 size={13} className="text-primary shrink-0 opacity-80 group-hover:opacity-100" />
+                      <span className="truncate group-hover:underline">{item.college_name}</span>
+                      {item.location && (
+                        <span className="text-[11px] font-normal text-fg-subtle shrink-0 hidden sm:inline">
+                          • {item.location}
+                        </span>
+                      )}
+                    </Link>
+
+                    <span className="text-[9.5px] font-semibold text-fg-subtle shrink-0 bg-surface-sunken/80 px-1.5 py-0.5 rounded border border-border/60">
+                      Focus #{index + 1}
+                    </span>
                   </div>
 
                   {/* Positive Rate Badge */}
-                  <div className="flex flex-col items-end shrink-0">
-                    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 font-bold text-micro border border-emerald-500/20 shadow-2xs">
-                      <TrendingUp size={12} />
+                  <div className="flex items-center shrink-0">
+                    <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold text-[10.5px] border border-emerald-500/20">
+                      <TrendingUp size={11} />
                       <span>{item.positive_rate}%</span>
                     </div>
                   </div>
                 </div>
-
-                {item.location && (
-                  <p className="text-micro text-fg-subtle truncate flex items-center gap-1">
-                    <Building2 size={11} className="text-fg-subtle shrink-0" />
-                    <span className="truncate">{item.location}</span>
-                  </p>
-                )}
               </div>
 
-              {/* Card 4 KPI Metrics Grid */}
-              <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
-                <div className="grid grid-cols-2 gap-2">
+              {/* Minimal 4 KPI Metrics Grid */}
+              <div className="p-3 sm:p-3.5 space-y-2.5 flex-1 flex flex-col justify-between">
+                <div className="grid grid-cols-2 gap-1.5">
                   {/* 1. Total Calls Made */}
-                  <div className="p-2.5 sm:p-3 rounded-xl bg-surface-sunken border border-border/80 flex flex-col justify-between space-y-1 shadow-2xs">
-                    <div className="flex items-center justify-between text-fg-subtle">
-                      <span className="text-micro font-bold uppercase tracking-wider text-fg-subtle">
+                  <div className="p-2 rounded-lg bg-surface-sunken/60 border border-border/60 flex items-center justify-between gap-2">
+                    <div className="space-y-0.5 min-w-0">
+                      <span className="text-[9.5px] font-semibold uppercase tracking-wider text-fg-subtle block truncate">
                         Calls Made
                       </span>
-                      <PhoneCall size={14} className="text-blue-600 dark:text-sky-400 shrink-0" />
+                      <span className="text-sm sm:text-base font-bold font-mono tracking-tight text-fg block">
+                        {item.total_calls}
+                      </span>
                     </div>
-                    <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-fg">
-                      {item.total_calls}
-                    </span>
+                    <PhoneCall size={12} className="text-primary shrink-0 opacity-70" />
                   </div>
 
                   {/* 2. Total Positives Received */}
-                  <div className="p-2.5 sm:p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-300/60 dark:border-emerald-500/30 flex flex-col justify-between space-y-1 shadow-2xs">
-                    <div className="flex items-center justify-between text-emerald-800 dark:text-emerald-300">
-                      <span className="text-micro font-bold uppercase tracking-wider">
+                  <div className="p-2 rounded-lg bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/20 flex items-center justify-between gap-2">
+                    <div className="space-y-0.5 min-w-0">
+                      <span className="text-[9.5px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block truncate">
                         Positives
                       </span>
-                      <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <span className="text-sm sm:text-base font-bold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 block">
+                        {item.total_positives}
+                      </span>
                     </div>
-                    <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-emerald-700 dark:text-emerald-300">
-                      {item.total_positives}
-                    </span>
+                    <CheckCircle2 size={12} className="text-emerald-600 dark:text-emerald-400 shrink-0 opacity-80" />
                   </div>
 
                   {/* 3. Total Negatives Received */}
-                  <div className="p-2.5 sm:p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 flex flex-col justify-between space-y-1 shadow-2xs">
-                    <div className="flex items-center justify-between text-fg-subtle">
-                      <span className="text-micro font-bold uppercase tracking-wider">
+                  <div className="p-2 rounded-lg bg-surface-sunken/60 border border-border/60 flex items-center justify-between gap-2">
+                    <div className="space-y-0.5 min-w-0">
+                      <span className="text-[9.5px] font-semibold uppercase tracking-wider text-fg-subtle block truncate">
                         Negatives
                       </span>
-                      <XCircle size={14} className="text-rose-500 dark:text-rose-400 shrink-0" />
+                      <span className="text-sm sm:text-base font-bold font-mono tracking-tight text-fg block">
+                        {item.total_negatives}
+                      </span>
                     </div>
-                    <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-fg">
-                      {item.total_negatives}
-                    </span>
+                    <XCircle size={12} className="text-rose-500 shrink-0 opacity-70" />
                   </div>
 
                   {/* 4. Total Not Hiring Received */}
-                  <div className="p-2.5 sm:p-3 rounded-xl bg-amber-50/60 dark:bg-amber-950/30 border border-amber-300/60 dark:border-amber-500/30 flex flex-col justify-between space-y-1 shadow-2xs">
-                    <div className="flex items-center justify-between text-amber-800 dark:text-amber-300">
-                      <span className="text-micro font-bold uppercase tracking-wider">
+                  <div className="p-2 rounded-lg bg-amber-500/5 dark:bg-amber-950/20 border border-amber-500/20 flex items-center justify-between gap-2">
+                    <div className="space-y-0.5 min-w-0">
+                      <span className="text-[9.5px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400 block truncate">
                         Not Hiring
                       </span>
-                      <Ban size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span className="text-sm sm:text-base font-bold font-mono tracking-tight text-amber-600 dark:text-amber-400 block">
+                        {item.total_not_hiring}
+                      </span>
                     </div>
-                    <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-amber-700 dark:text-amber-300">
-                      {item.total_not_hiring}
-                    </span>
+                    <Ban size={12} className="text-amber-600 dark:text-amber-400 shrink-0 opacity-80" />
                   </div>
                 </div>
 
-                {/* Proportion Bar */}
-                <div className="space-y-1.5 pt-0.5">
-                  <div className="flex items-center justify-end text-micro text-fg-subtle font-medium">
-                    <span>{item.total_calls} Calls Logged Today</span>
+                {/* Minimal Proportion Bar */}
+                <div className="space-y-1 pt-0.5">
+                  <div className="flex items-center justify-between text-[10px] text-fg-subtle font-medium">
+                    <span>Distribution</span>
+                    <span>{item.total_calls} Calls Logged</span>
                   </div>
-                  <div className="w-full h-1.5 rounded-full bg-surface-sunken overflow-hidden flex">
+                  <div className="w-full h-1 rounded-full bg-surface-sunken overflow-hidden flex">
                     {item.total_positives > 0 && (
                       <div
                         style={{ width: `${positivePct}%` }}
@@ -292,16 +295,16 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
               </div>
 
               {/* Card Footer Quick Links */}
-              <div className="px-5 py-3 border-t border-border bg-surface-sunken/30 flex items-center justify-between gap-3 text-xs">
+              <div className="px-3.5 py-2 border-t border-border/60 bg-surface-sunken/20 flex items-center justify-between gap-3 text-xs">
                 <Link
                   href={`/tracker`}
                   onClick={() => {
                     setActiveCollege(item.college_id, item.college_name);
                   }}
-                  className="font-semibold text-primary hover:text-primary-hover inline-flex items-center gap-1.5 transition-colors group"
+                  className="font-medium text-xs text-primary hover:text-primary-hover inline-flex items-center gap-1 transition-colors group"
                 >
                   <span>Open Daily Tracker</span>
-                  <ArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
+                  <ArrowRight size={11} className="group-hover:translate-x-0.5 transition-transform" />
                 </Link>
 
                 <Link
@@ -309,10 +312,10 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
                   onClick={() => {
                     setActiveCollege(item.college_id, item.college_name);
                   }}
-                  className="text-fg-subtle hover:text-fg font-medium inline-flex items-center gap-1 transition-colors"
+                  className="text-fg-subtle hover:text-fg text-xs font-medium inline-flex items-center gap-1 transition-colors"
                 >
                   <span>Leads ({item.active_leads})</span>
-                  <ExternalLink size={12} />
+                  <ExternalLink size={11} />
                 </Link>
               </div>
             </div>

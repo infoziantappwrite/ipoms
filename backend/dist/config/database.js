@@ -24,7 +24,8 @@ const connectDatabase = async () => {
         console.log(`🔌 [MongoDB] Connecting to ${sanitizeMongoUri(MONGODB_URI)}...`);
         const connection = await mongoose_1.default.connect(MONGODB_URI, {
             autoIndex: true, // Build compound indexes automatically in development
-            serverSelectionTimeoutMS: 5000,
+            serverSelectionTimeoutMS: 15000,
+            connectTimeoutMS: 15000,
         });
         console.log(`✅ [MongoDB] Successfully connected to database: "${connection.connection.name}"`);
         console.log(`📍 [MongoDB] Host: ${connection.connection.host}:${connection.connection.port}`);

@@ -143,8 +143,8 @@ export function SmoothOutcomeDropdown({
             <span className="font-mono tabular-nums text-[10px] text-fg-disabled">{CALL_OUTCOME_OPTIONS.length} statuses</span>
           </div>
 
-          {/* Status List */}
-          <div className="max-h-72 overflow-y-auto p-1.5 space-y-0.5 custom-scrollbar bg-surface divide-y divide-border/40">
+          {/* Status List (Capped with invisible scroller) */}
+          <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden bg-surface divide-y divide-border/40">
             {CALL_OUTCOME_OPTIONS.map((opt) => {
               const isSelected = opt.value === value;
               return (

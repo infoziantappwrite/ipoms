@@ -91,7 +91,7 @@ export function EditTrackerRowModal({ row, onClose, onSave, onDelete }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
       <div className="bg-surface border border-border w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-150">
         {/* ── Modal Header (iPOMS Standard Solid Tone) ────────────────── */}
         <div className="px-5 sm:px-6 py-3.5 border-b border-border bg-surface flex items-center justify-between shrink-0">

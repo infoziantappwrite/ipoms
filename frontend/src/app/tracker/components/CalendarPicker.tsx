@@ -49,6 +49,17 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
     };
   }, [coordinatorId, viewYear, viewMonth]);
 
+  // Close on Escape key
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const prevMonth = () => {
     if (viewMonth === 1) {
       setViewMonth(12);
@@ -76,9 +87,15 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
   };
 
   return (
-    <div className="fixed inset-0 bg-overlay/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-fadeIn">
+    <div
+      onClick={onClose}
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fadeIn cursor-pointer"
+    >
       {/* Themed Modal Card */}
-      <div className="w-full max-w-sm rounded-2xl bg-surface border border-border shadow-2xl overflow-hidden flex flex-col text-fg">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm rounded-2xl bg-surface border border-border shadow-2xl overflow-hidden flex flex-col text-fg cursor-default"
+      >
 
         {/* ── Modern Header ─────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-sunken">

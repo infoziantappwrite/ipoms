@@ -204,7 +204,7 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
 
   // ── Centered Main Minimal SaaS Popup ───────────────────────────────────────
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-overlay/50 backdrop-blur-xs animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 animate-fadeIn">
       <div className="w-full max-w-[420px] bg-surface rounded-3xl border border-border shadow-2xl overflow-hidden flex flex-col transition-all text-fg">
 
         {/* ── Top Modal Header ─────────────────────────────────────────────── */}

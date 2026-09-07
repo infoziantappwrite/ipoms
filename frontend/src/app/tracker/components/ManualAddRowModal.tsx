@@ -163,18 +163,52 @@ export function ManualAddRowModal({
 
   // Meta Database auto-complete & matched record state
   const [companySuggestions, setCompanySuggestions] = useState<any[]>([]);
+  const [totalMetaCount, setTotalMetaCount] = useState<number | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
   const [autoFilled, setAutoFilled] = useState(false);
   const [matchedMetaRecord, setMatchedMetaRecord] = useState<any | null>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  const hrNameInputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fetch live total count of companies in Meta Database on mount & sync on events
+  useEffect(() => {
+    let isMounted = true;
+    apiFetch<any>('/companies/search?limit=1')
+      .then((res) => {
+        if (isMounted && res.success && typeof res.data?.pagination?.total === 'number') {
+          setTotalMetaCount(res.data.pagination.total);
+        }
+      })
+      .catch((err) => console.error('Failed to fetch meta directory total count:', err));
+
+    const handleSync = () => {
+      apiFetch<any>('/companies/search?limit=1')
+        .then((res) => {
+          if (isMounted && res.success && typeof res.data?.pagination?.total === 'number') {
+            setTotalMetaCount(res.data.pagination.total);
+          }
+        })
+        .catch(() => {});
+    };
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('ipoms_metadata_updated', handleSync);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('ipoms_metadata_updated', handleSync);
+    };
+  }, []);
 
   // Close outside handlers
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node)) {
         setShowSuggestions(false);
+        setHighlightedIndex(-1);
       }
       if (outcomeRef.current && !outcomeRef.current.contains(e.target as Node)) {
         setIsOutcomeOpen(false);
@@ -187,6 +221,30 @@ export function ManualAddRowModal({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !submitting && !showNotInMetaModal) {
+        if (showSuggestions) {
+          setShowSuggestions(false);
+          setHighlightedIndex(-1);
+          return;
+        }
+        if (isOutcomeOpen) {
+          setIsOutcomeOpen(false);
+          return;
+        }
+        if (isMonthOpen) {
+          setIsMonthOpen(false);
+          return;
+        }
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [submitting, showNotInMetaModal, showSuggestions, isOutcomeOpen, isMonthOpen, onClose]);
+
   // Fetch company suggestions from Meta Database
   const fetchSuggestions = async (query: string) => {
     try {
@@ -198,6 +256,11 @@ export function ManualAddRowModal({
       if (res.success && res.data?.companies) {
         setCompanySuggestions(res.data.companies);
         setShowSuggestions(true);
+        setHighlightedIndex(-1);
+
+        if (!query.trim() && typeof res.data?.pagination?.total === 'number') {
+          setTotalMetaCount(res.data.pagination.total);
+        }
 
         // Auto-detect if what the user typed matches an exact placeholder in the results
         if (query.trim()) {
@@ -220,6 +283,7 @@ export function ManualAddRowModal({
   const handleCompanyInputChange = (val: string) => {
     setCompanyName(val);
     setAutoFilled(false);
+    setHighlightedIndex(-1);
     if (matchedMetaRecord && (matchedMetaRecord.company_name || '').trim().toLowerCase() !== val.trim().toLowerCase()) {
       setMatchedMetaRecord(null);
     }
@@ -241,7 +305,36 @@ export function ManualAddRowModal({
     setEmailId(comp.primary_email || comp.email_ids?.[0] || '');
     setMatchedMetaRecord(comp);
     setShowSuggestions(false);
+    setHighlightedIndex(-1);
     setAutoFilled(true);
+    // Focus HR Name input so user can seamlessly continue data entry
+    setTimeout(() => hrNameInputRef.current?.focus(), 50);
+  };
+
+  const handleCompanyKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Tab') {
+      // When pressing Tab, close the suggestions dropdown immediately so focus flows directly to HR Name input
+      setShowSuggestions(false);
+      setHighlightedIndex(-1);
+      // Native browser Tab moves directly to hr_name field without cycling through dropdown options
+    } else if (e.key === 'ArrowDown') {
+      if (companySuggestions.length > 0) {
+        e.preventDefault();
+        setShowSuggestions(true);
+        setHighlightedIndex((prev) => (prev < companySuggestions.length - 1 ? prev + 1 : 0));
+      }
+    } else if (e.key === 'ArrowUp') {
+      if (companySuggestions.length > 0) {
+        e.preventDefault();
+        setShowSuggestions(true);
+        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : companySuggestions.length - 1));
+      }
+    } else if (e.key === 'Enter') {
+      if (showSuggestions && highlightedIndex >= 0 && companySuggestions[highlightedIndex]) {
+        e.preventDefault();
+        handleSelectCompany(companySuggestions[highlightedIndex]);
+      }
+    }
   };
 
   const handleSetCurrentTime = () => {
@@ -432,7 +525,7 @@ export function ManualAddRowModal({
   const placeholderInfo = matchedMetaRecord ? getCompanyMissingDetails(matchedMetaRecord) : null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
       <div className="bg-surface border border-border w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Modal Header */}
         <div className="px-5 sm:px-6 py-3.5 border-b border-border bg-surface flex items-center justify-between shrink-0">
@@ -442,16 +535,24 @@ export function ManualAddRowModal({
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-bold text-fg tracking-tight">Add Contact Entry</h2>
-              <p className="text-micro text-fg-subtle">Auto-fill from Meta Database (3,577 records) or add custom details</p>
+              <p className="text-micro text-fg-subtle">
+                Auto-fill from Meta Database ({totalMetaCount !== null ? `${totalMetaCount.toLocaleString('en-IN')} records` : 'fetching…'}) or add custom details
+              </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-7 h-7 rounded-lg hover:bg-surface-raised flex items-center justify-center text-fg-subtle hover:text-fg transition-colors cursor-pointer"
-          >
-            <X size={16} />
-          </button>
+          <div className="flex items-center gap-2">
+            <kbd className="hidden sm:inline-flex items-center text-[10px] font-mono font-bold text-fg-subtle bg-surface-sunken border border-border px-1.5 py-0.5 rounded">
+              Shift+A
+            </kbd>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-7 h-7 rounded-lg hover:bg-surface-raised flex items-center justify-center text-fg-subtle hover:text-fg transition-colors cursor-pointer"
+              title="Close (Esc)"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         {/* Form Body (Invisible Scrollbar) */}
@@ -483,7 +584,7 @@ export function ManualAddRowModal({
                 </span>
               ) : (
                 <span className="text-[11px] text-primary flex items-center gap-1 font-medium bg-primary/10 px-2 py-0.5 rounded-full">
-                  <Database size={10} /> 3,577 Meta Companies
+                  <Database size={10} /> {totalMetaCount !== null ? `${totalMetaCount.toLocaleString('en-IN')} Meta Companies` : 'Meta Database'}
                 </span>
               )}
             </div>
@@ -496,6 +597,7 @@ export function ManualAddRowModal({
                 value={companyName}
                 onChange={(e) => handleCompanyInputChange(e.target.value)}
                 onFocus={handleCompanyInputFocus}
+                onKeyDown={handleCompanyKeyDown}
                 placeholder="Click or type to search Meta Database (e.g. 100Pillars, Google, Zoho)…"
                 className={`w-full bg-surface-sunken border text-xs text-fg pl-9 pr-9 py-2 rounded-xl outline-none transition-all placeholder:text-fg-disabled shadow-2xs font-medium ${
                   autoFilled
@@ -527,14 +629,21 @@ export function ManualAddRowModal({
                     No matching companies found. You can manually type contact details below.
                   </div>
                 ) : (
-                  companySuggestions.map((comp) => {
+                  companySuggestions.map((comp, idx) => {
                     const itemPlaceholderInfo = getCompanyMissingDetails(comp);
+                    const isHighlighted = highlightedIndex === idx;
                     return (
                       <button
                         key={comp._id || comp.company_name}
                         type="button"
+                        tabIndex={-1}
                         onClick={() => handleSelectCompany(comp)}
-                        className="w-full text-left p-3 hover:bg-surface-raised transition-colors flex items-center justify-between gap-3 group cursor-pointer"
+                        onMouseEnter={() => setHighlightedIndex(idx)}
+                        className={`w-full text-left p-3 transition-colors flex items-center justify-between gap-3 group cursor-pointer ${
+                          isHighlighted
+                            ? 'bg-primary/10 text-primary ring-1 ring-primary/20'
+                            : 'hover:bg-surface-raised'
+                        }`}
                       >
                         <div className="space-y-0.5 flex-1 min-w-0">
                           <div className="text-xs font-bold text-fg group-hover:text-primary transition-colors flex items-center gap-1.5 truncate">
@@ -627,6 +736,7 @@ export function ManualAddRowModal({
               <div className="relative">
                 <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
                 <input
+                  ref={hrNameInputRef}
                   type="text"
                   value={hrName}
                   onChange={(e) => setHrName(e.target.value)}
@@ -816,6 +926,7 @@ export function ManualAddRowModal({
                       <button
                         key={opt.value}
                         type="button"
+                        tabIndex={-1}
                         onClick={() => handleSelectOutcome(opt.value)}
                         className={`w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between gap-2.5 transition-colors cursor-pointer ${
                           isSelected
@@ -882,6 +993,7 @@ export function ManualAddRowModal({
                         <button
                           key={m}
                           type="button"
+                          tabIndex={-1}
                           onClick={() => handleSelectMonth(m)}
                           className={`w-full text-left px-3 py-1.5 rounded-lg text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer ${
                             isSelected
@@ -941,7 +1053,7 @@ export function ManualAddRowModal({
 
       {/* ── Information Pop-up Modal: Contact Not Present in Meta Database ── */}
       {showNotInMetaModal && (
-        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-surface text-fg rounded-2xl w-full max-w-md border border-border shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-150">
             <div className="flex items-center gap-3 border-b border-border pb-3.5">
               <div className="w-10 h-10 rounded-xl bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0">
