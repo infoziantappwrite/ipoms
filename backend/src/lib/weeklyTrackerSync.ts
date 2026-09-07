@@ -1,6 +1,7 @@
 import { Types } from 'mongoose';
 import { WeeklyTracker } from '../models/WeeklyTracker';
 import type { IDailyTracker } from '../models/DailyTracker';
+import { getCurrentAcademicYear, getCurrentGraduatingBatchYear } from './academicYear';
 
 // Same pure date-math as server.ts's getFridayWeekBounds() — duplicated here
 // (not exported from server.ts) rather than risking a wider refactor.
@@ -38,14 +39,16 @@ function getFridayWeekBounds(targetDate: Date = new Date()) {
  */
 export async function promoteDailyTrackerRowToWeekly(
   dRow: IDailyTracker & { _id: Types.ObjectId; save: () => Promise<any> },
-  targetYear = 2026,
+  targetYear?: number,
 ): Promise<boolean> {
   if (!dRow.company_name || !dRow.company_name.trim()) return false;
+  const resolvedYear = targetYear ?? (await getCurrentAcademicYear());
+  const batchYear = await getCurrentGraduatingBatchYear();
 
   const escapedName = dRow.company_name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const existing = await WeeklyTracker.findOne({
     college_id: dRow.college_id,
-    academic_year: targetYear,
+    academic_year: resolvedYear,
     company_name: { $regex: `^${escapedName}$`, $options: 'i' },
     is_deleted: false,
   });
@@ -54,7 +57,7 @@ export async function promoteDailyTrackerRowToWeekly(
   if (!existing) {
     const { startFriday, endThursday, weekNumber } = getFridayWeekBounds();
     await WeeklyTracker.create({
-      academic_year: targetYear,
+      academic_year: resolvedYear,
       college_id: dRow.college_id,
       coordinator_id: dRow.coordinator_id,
       company_id: dRow.company_id || new Types.ObjectId(),
@@ -64,7 +67,7 @@ export async function promoteDailyTrackerRowToWeekly(
       cdc_reference: dRow.hr_name ? `${dRow.hr_name}${dRow.mobile_number ? ` (${dRow.mobile_number})` : ''}` : '',
       company_type: 'Software / IT',
       ctc_lpa: 'To be disclosed',
-      eligible_batch: `${targetYear} Batch`,
+      eligible_batch: `${batchYear} Batch`,
       pipeline_section: 'pipeline',
       current_status_text: dRow.outcome_status === 'invite_mail'
         ? 'Invite email sent'

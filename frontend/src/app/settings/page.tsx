@@ -118,9 +118,22 @@ function SettingsPageContent() {
       });
       if (res.success) {
         setSettingsData(res.data);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('ipoms_trigger_autosave_banner', {
+              detail: {
+                title: 'Settings Saved',
+                subtitle: 'System configuration updated for all users',
+              },
+            })
+          );
+        }
+      } else {
+        alert(res.error?.message || 'Failed to save system configuration.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Update settings error:', err);
+      alert(err?.message || 'Network error saving system configuration.');
     }
   };
 

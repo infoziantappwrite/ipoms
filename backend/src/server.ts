@@ -26,6 +26,7 @@ import { ActiveLead } from './models/ActiveLead';
 import { SystemSettings } from './models/SystemSettings';
 import { AuditLog } from './models/AuditLog';
 import { writeAudit } from './lib/audit';
+import { getCurrentAcademicYear, getCurrentGraduatingBatchYear, clearAcademicYearCache } from './lib/academicYear';
 import mongoose, { Types } from 'mongoose';
 import { startFinalizationJob } from './jobs/finalizeDailyTracker';
 import { startPositiveSyncReminderJob } from './jobs/positiveSyncReminder';
@@ -1594,9 +1595,11 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
         daily_tracker_id: row._id,
       }).catch((e) => console.error('Auto-lead sync error:', e));
 
-      // Auto-sync into Weekly Tracker (Companies in Pipeline) if positive outcome (invite_mail, hiring, jd_received, in_connect, drive_completed)
-      const POSITIVE_WEEKLY_OUTCOMES = ['invite_mail', 'hiring', 'jd_received', 'drive_completed', 'in_connect'];
-      if (POSITIVE_WEEKLY_OUTCOMES.includes(row.outcome_status)) {
+      // Auto-sync into Weekly Tracker (Companies in Pipeline) — Invite Mail only
+      // (narrowed 6 Sep 2026, see PIPELINE_SYNC_OUTCOME in DailyTracker.ts; this
+      // inline live-save path had been missed by that change and was still
+      // firing on the old 5-outcome list until corrected here).
+      if (row.outcome_status === PIPELINE_SYNC_OUTCOME) {
         (async () => {
           try {
             const { startFriday, endThursday, weekNumber } = getFridayWeekBounds(row.session_date || new Date());
@@ -1607,8 +1610,10 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
             });
 
             if (!existingWeekly) {
+              const year = await getCurrentAcademicYear();
+              const batchYear = await getCurrentGraduatingBatchYear();
               await WeeklyTracker.create({
-                academic_year: 2026,
+                academic_year: year,
                 college_id: row.college_id,
                 coordinator_id: row.coordinator_id,
                 company_id: row.company_id,
@@ -1618,7 +1623,7 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
                 cdc_reference: '',
                 company_type: 'Software / IT',
                 ctc_lpa: '',
-                eligible_batch: '2026 Batch',
+                eligible_batch: `${batchYear} Batch`,
                 pipeline_section: 'pipeline',
                 current_status_text: row.comments || `Invite email sent (${(row.outcome_status || 'positive').replace(/_/g, ' ')})`,
                 follow_up_date: row.follow_up_date || null,
@@ -2860,6 +2865,7 @@ app.post('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
       follow_up_date,
       drive_date,
       selected_count,
+      academic_year,
     } = req.body;
 
     if (
@@ -2927,8 +2933,10 @@ app.post('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
       }
     }
 
+    const resolvedYear = Number(academic_year) || (await getCurrentAcademicYear());
+    const resolvedBatchYear = await getCurrentGraduatingBatchYear();
     const newDrive = await WeeklyTracker.create({
-      academic_year: 2026,
+      academic_year: resolvedYear,
       college_id: new Types.ObjectId(String(college_id)),
       coordinator_id: new Types.ObjectId(String(coordinator_id)),
       company_id: new Types.ObjectId(String(resolvedCompanyId)),
@@ -2937,7 +2945,7 @@ app.post('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
       cdc_reference: cdc_reference?.trim() || '',
       company_type: company_type?.trim() || 'Software / IT',
       ctc_lpa: ctc_lpa.trim(),
-      eligible_batch: eligible_batch?.trim() || '2026 Batch',
+      eligible_batch: eligible_batch?.trim() || `${resolvedBatchYear} Batch`,
       pipeline_section: effectiveSection,
       current_status_text: current_status_text.trim(),
       follow_up_date: effectiveFollowUp,
@@ -3209,7 +3217,7 @@ app.get('/api/v1/weekly-tracker/kpi', async (req: Request, res: Response) => {
       });
     }
 
-    const year = Number(academic_year) || 2026;
+    const year = Number(academic_year) || (await getCurrentAcademicYear());
     const baseFilter = {
       college_id: new Types.ObjectId(String(college_id)),
       academic_year: year,
@@ -3282,7 +3290,10 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
     // UI plumbing, no control ever changed it) while every real row is 2026, matching
     // system_settings' "2025-2026" season. Rows created here now stay consistent with
     // the rest of the dataset instead of silently drifting onto their own year.
-    const targetYear = Number(academic_year) || 2026;
+    // Falls through to the live Settings -> System Config -> Academic Year value
+    // (see getCurrentAcademicYear()) rather than a hardcoded literal, so an
+    // Administrator's season change takes effect here immediately.
+    const targetYear = Number(academic_year) || (await getCurrentAcademicYear());
     const { startFriday, endThursday, weekNumber } = getFridayWeekBounds();
 
     // Resolve all matching college IDs (aliases/codes) so college references are consistent
@@ -3326,6 +3337,7 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
     }
 
     const positiveDailyRows = await DailyTracker.find(dailyFilter).sort({ session_date: 1, created_at: 1 });
+    const batchYear = await getCurrentGraduatingBatchYear();
 
     let syncedCount = 0;
 
@@ -3350,7 +3362,7 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
           cdc_reference: dRow.hr_name ? `${dRow.hr_name}${dRow.mobile_number ? ` (${dRow.mobile_number})` : ''}` : '',
           company_type: 'Software / IT',
           ctc_lpa: 'To be disclosed',
-          eligible_batch: `${targetYear} Batch`,
+          eligible_batch: `${batchYear} Batch`,
           pipeline_section: 'pipeline',
           current_status_text: dRow.outcome_status === 'invite_mail'
             ? 'Invite email sent'
@@ -4146,7 +4158,8 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req: Request, res: Response) =
 // Live BI overview: KPI counters, conversion rates, and 4-category automated insights
 app.get('/api/v1/analytics/overview', async (req: Request, res: Response) => {
   try {
-    const { college_id, coordinator_id, academic_year = '2026' } = req.query;
+    const { college_id, coordinator_id } = req.query;
+    const academic_year = req.query.academic_year ?? (await getCurrentAcademicYear());
 
     const baseDtFilter: any = {};
     const baseWtFilter: any = { academic_year, is_deleted: false };
@@ -4262,7 +4275,7 @@ app.get('/api/v1/analytics/overview', async (req: Request, res: Response) => {
 // Period and College comparative metrics (Spec Section 7.3)
 app.get('/api/v1/analytics/comparisons', async (req: Request, res: Response) => {
   try {
-    const { academic_year = '2026' } = req.query;
+    const academic_year = req.query.academic_year ?? (await getCurrentAcademicYear());
 
     const colleges = await College.find({ status: 'active' }).limit(10);
 
@@ -4309,7 +4322,8 @@ app.get('/api/v1/analytics/comparisons', async (req: Request, res: Response) => 
 // Company Responsiveness Rankings & Follow-up status (Spec Section 7.4)
 app.get('/api/v1/analytics/company-responsiveness', async (req: Request, res: Response) => {
   try {
-    const { college_id, academic_year = '2026' } = req.query;
+    const { college_id } = req.query;
+    const academic_year = req.query.academic_year ?? (await getCurrentAcademicYear());
 
     const wtFilter: any = { academic_year, is_deleted: false };
     if (college_id && college_id !== 'all') {
@@ -5820,7 +5834,7 @@ app.post('/api/v1/reports/presets', async (req: Request, res: Response) => {
       preset_name,
       college_id,
       coordinator_id,
-      academic_year = '2026',
+      academic_year,
       filters,
       included_sections,
       custom_remarks,
@@ -5839,7 +5853,7 @@ app.post('/api/v1/reports/presets', async (req: Request, res: Response) => {
       preset_name: preset_name.trim(),
       college_id: college_id && college_id !== 'all' ? new Types.ObjectId(String(college_id)) : null,
       coordinator_id: new Types.ObjectId(String(coordinator_id)),
-      academic_year,
+      academic_year: academic_year ?? (await getCurrentAcademicYear()),
       filters: filters || {},
       included_sections: included_sections || {},
       custom_remarks: custom_remarks?.trim() || '',
@@ -8843,6 +8857,7 @@ app.get('/api/v1/settings', authenticateJWT, async (req: Request, res: Response)
     if (!settings) {
       settings = await SystemSettings.create({
         academic_year: '2025-2026',
+        graduating_batch_year: 2026,
         season_name: 'Campus Recruitment Season 2025-26',
         daily_calling_target: 30,
         working_days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
@@ -9034,6 +9049,7 @@ app.patch('/api/v1/settings', authenticateJWT, authorizeRoles('ADMINISTRATOR', '
   try {
     const {
       academic_year,
+      graduating_batch_year,
       season_name,
       daily_calling_target,
       working_days,
@@ -9052,7 +9068,14 @@ app.patch('/api/v1/settings', authenticateJWT, authorizeRoles('ADMINISTRATOR', '
       settings = new SystemSettings({});
     }
 
-    if (academic_year !== undefined) settings.academic_year = academic_year.trim();
+    if (academic_year !== undefined) {
+      settings.academic_year = academic_year.trim();
+      clearAcademicYearCache();
+    }
+    if (graduating_batch_year !== undefined) {
+      settings.graduating_batch_year = Number(graduating_batch_year);
+      clearAcademicYearCache();
+    }
     if (season_name !== undefined) settings.season_name = season_name.trim();
     if (daily_calling_target !== undefined) settings.daily_calling_target = Number(daily_calling_target);
     if (working_days !== undefined) settings.working_days = working_days;

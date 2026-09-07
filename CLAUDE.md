@@ -858,6 +858,70 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     invite_mail→Positives and jd_received→JD Received, with `hiring` producing neither.
     `tsc --noEmit` clean.
 
+37. **Live-wired the season/academic-year switch, 7 Sep 2026 (user decision — season start
+    is not a fixed calendar date, so the switch must be a deliberate manual action, not a
+    cron flip).** Settings → System Config's "Academic Year" field
+    (`SystemSettings.academic_year`) already existed and looked like a real control, but was
+    **cosmetic** — read back only for the admin dashboard's System Info label
+    (`server.ts` System Telemetry block), never consulted by anything that actually tags a
+    new record. Every real creation site hardcoded the literal `2026` instead: the inline
+    live auto-sync inside the Daily Tracker save handler, `POST /weekly-tracker` (manual add
+    company), `POST /weekly-tracker/sync-daily-positives`, `POST /reports/presets`, three
+    analytics endpoints' query defaults, and — most impactful — `weeklyTrackerSync.ts`'s
+    `promoteDailyTrackerRowToWeekly()`, the function the 6 AM catch-all and the 8 PM/10 PM
+    reminder+auto-sync jobs (item 35) all call with no year argument, so every automatic
+    promotion was silently pinned to 2026 regardless of what Settings said.
+    Fixed by wiring all of these to a new single source of truth,
+    `getCurrentAcademicYear()` in `backend/src/lib/academicYear.ts` — reads
+    `SystemSettings.academic_year`, parses the leading 4-digit year out of the season label
+    (so an admin can type "2027-2028" or just "2027"), 60-second in-memory cache to avoid a
+    DB hit on every single row creation, falls back to 2026 only if the setting is genuinely
+    unset. `PATCH /settings` calls `clearAcademicYearCache()` on any academic_year change so
+    the effect is immediate rather than waiting out the cache window. Existing records keep
+    whatever year they were created with — this only changes what NEW records get stamped
+    with going forward. **Also found and fixed a real bug while touching the same code**:
+    the inline Daily Tracker auto-sync path (separate from the manual sync button and the
+    cron jobs) had been missed by item 36's Invite-Mail-only narrowing and was still firing
+    Weekly Tracker promotion on the old 5-outcome list (`hiring`/`drive_completed`/
+    `in_connect`/`jd_received`/`invite_mail`) — now uses `PIPELINE_SYNC_OUTCOME` like every
+    other path. Deliberately left untouched: the boot-time seed defaults gated behind
+    `SEED_ON_BOOT` (dev-only, off by default, out of scope per trap 10/29's "never let boot
+    touch business data" rule) and `GET /weekly-tracker`/`GET /weekly-tracker/kpi`'s own
+    `academic_year` query handling (already correct since item 30 — 'all' when unfiltered,
+    never a hardcoded fallback).
+    **Same-day follow-up, still 7 Sep 2026** — the user pointed out three real gaps in the
+    first pass: (a) clicking Save gave zero visible feedback, so there was no way to confirm
+    a save actually happened; (b) "Academic Year" (a season range, "2026-2027") was being
+    conflated with "graduating batch" (a single year, "2027 Batch") — they're different
+    concepts that had been sharing one hardcoded-2026 value; (c) both should be dropdowns,
+    not free text an admin could mistype. Fixed all three:
+    **New field** `SystemSettings.graduating_batch_year` (Number, independent of
+    `academic_year`) — `getCurrentGraduatingBatchYear()` added alongside
+    `getCurrentAcademicYear()` in `academicYear.ts` (both now share one cached settings read).
+    Every `eligible_batch: \`${year} Batch\`` call site that had been reusing the *season*
+    year now uses the *batch* year instead — `weeklyTrackerSync.ts`, the inline Daily Tracker
+    auto-sync, `POST /weekly-tracker`, and `POST /weekly-tracker/sync-daily-positives`.
+    **Settings UI**: both fields are now `SmoothSelect` dropdowns (component already existed,
+    imported but unused) — season options generated as a rolling 6-year window
+    (current year ±2/+3) and batch-year options as a rolling window of plain years, so the
+    list never needs manual updating. A preview line below the fields spells out in plain
+    language what saving will change ("every new Weekly Tracker row... will be tagged X
+    season, Y Batch... on their very next action, no login or refresh required").
+    **Save feedback**: `handleUpdateSettings` in `settings/page.tsx` had no success or
+    failure path at all — silently did nothing visible either way, which is exactly the "did
+    my click work?" gap the user hit. Now dispatches the existing shared
+    `ipoms_trigger_autosave_banner` event (the same floating pill used elsewhere in the app,
+    see item 0g(c)) on success, and `alert()`s the real server error on failure, matching the
+    pattern already used for user deactivation on the same page.
+    **Verified live** end-to-end against the real dev server (`SEED_ON_BOOT` confirmed off —
+    boot left existing data untouched): set `graduating_batch_year` to a throwaway `2099` via
+    `PATCH /settings`, created a real throwaway Weekly Tracker row via `POST /weekly-tracker`
+    — came back `"eligible_batch": "2099 Batch"` while `academic_year` stayed the untouched
+    `2026`, proving the two fields are wired independently and the change is instant (no
+    cache delay, since `PATCH /settings` clears it). Row then deleted (confirmed `0` results
+    on a follow-up search) and both settings fields reverted to their real values
+    (`2026-2027` / `2027`) before finishing. `tsc --noEmit` clean both sides.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map
