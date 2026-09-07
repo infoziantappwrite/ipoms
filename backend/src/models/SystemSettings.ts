@@ -2,6 +2,7 @@ import mongoose, { Document, Schema, Model } from 'mongoose';
 
 export interface ISystemSettings extends Document {
   academic_year: string;
+  graduating_batch_year: number;
   season_name: string;
   daily_calling_target: number;
   working_days: string[];
@@ -23,6 +24,14 @@ const SystemSettingsSchema: Schema<ISystemSettings> = new Schema(
       type: String,
       default: '2025-2026',
       trim: true,
+    },
+    // The single graduation year shown to companies/colleges ("2027 Batch"),
+    // distinct from academic_year (the season range, "2026-2027"). Defaults to
+    // the season's second year but is independently settable — a college's
+    // graduating batch is one year, not a range.
+    graduating_batch_year: {
+      type: Number,
+      default: 2027,
     },
     season_name: {
       type: String,

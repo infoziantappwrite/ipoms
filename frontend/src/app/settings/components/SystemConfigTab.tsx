@@ -18,8 +18,38 @@ interface Props {
   onUpdateSettings: (settings: any) => void;
 }
 
+// Generates season-range options ("2025-2026", "2026-2027", ...) centered on
+// the current calendar year, so the list stays relevant without ever needing
+// a manual update — an Administrator picks a season instead of typing one.
+function buildSeasonOptions(): { value: string; label: string }[] {
+  const nowYear = new Date().getFullYear();
+  const options: { value: string; label: string }[] = [];
+  for (let y = nowYear - 2; y <= nowYear + 3; y++) {
+    const value = `${y}-${y + 1}`;
+    options.push({ value, label: value });
+  }
+  return options;
+}
+
+// Graduating-batch options are a single year each — the batch a season's
+// hiring is actually for, independent of the season range itself.
+function buildBatchYearOptions(): { value: string; label: string }[] {
+  const nowYear = new Date().getFullYear();
+  const options: { value: string; label: string }[] = [];
+  for (let y = nowYear - 1; y <= nowYear + 4; y++) {
+    options.push({ value: String(y), label: `${y} Batch` });
+  }
+  return options;
+}
+
+const SEASON_OPTIONS = buildSeasonOptions();
+const BATCH_YEAR_OPTIONS = buildBatchYearOptions();
+
 export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
   const [academicYear, setAcademicYear] = useState(settingsData?.academic_year || '2026-2027');
+  const [graduatingBatchYear, setGraduatingBatchYear] = useState(
+    String(settingsData?.graduating_batch_year || '2027')
+  );
   const [seasonName, setSeasonName] = useState(settingsData?.season_name || 'Campus Recruitment Season 2026-27');
   const [dailyTarget, setDailyTarget] = useState(settingsData?.daily_calling_target || 30);
   const [orgName, setOrgName] = useState(settingsData?.org_name || 'Infoziant Placement Operations');
@@ -42,6 +72,7 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
   useEffect(() => {
     if (settingsData) {
       setAcademicYear(settingsData.academic_year || '2026-2027');
+      setGraduatingBatchYear(String(settingsData.graduating_batch_year || '2027'));
       setSeasonName(settingsData.season_name || 'Campus Recruitment Season 2026-27');
       setDailyTarget(settingsData.daily_calling_target || 30);
       setOrgName(settingsData.org_name || 'Infoziant Placement Operations');
@@ -72,6 +103,7 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
     e.preventDefault();
     onUpdateSettings({
       academic_year: academicYear.trim(),
+      graduating_batch_year: Number(graduatingBatchYear),
       season_name: seasonName.trim(),
       daily_calling_target: Number(dailyTarget),
       org_name: orgName.trim(),
@@ -191,14 +223,26 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
-            <label className="block text-fg-muted font-semibold mb-1">Academic Year</label>
-            <input
-              type="text"
+            <label className="block text-fg-muted font-semibold mb-1">Academic Year (Season)</label>
+            <SmoothSelect
               value={academicYear}
-              onChange={(e) => setAcademicYear(e.target.value)}
-              className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-fg font-mono text-xs"
+              onChange={setAcademicYear}
+              options={SEASON_OPTIONS}
+              icon={CalendarDays}
+              placeholder="Select season"
+            />
+          </div>
+
+          <div>
+            <label className="block text-fg-muted font-semibold mb-1">Graduating Batch</label>
+            <SmoothSelect
+              value={graduatingBatchYear}
+              onChange={setGraduatingBatchYear}
+              options={BATCH_YEAR_OPTIONS}
+              icon={CalendarDays}
+              placeholder="Select batch year"
             />
           </div>
 
@@ -223,6 +267,15 @@ export function SystemConfigTab({ settingsData, onUpdateSettings }: Props) {
               className="w-full bg-surface-sunken border border-border rounded-lg px-3 py-2 text-fg font-mono text-xs"
             />
           </div>
+        </div>
+
+        <div className="p-3 bg-primary/5 rounded-xl border border-primary/20 text-micro text-fg-subtle">
+          <span className="font-semibold text-fg">On save:</span> every new Weekly Tracker
+          row, Active Lead, and positive-call promotion will be tagged{' '}
+          <span className="font-mono font-semibold text-primary">{academicYear} season</span>,{' '}
+          <span className="font-mono font-semibold text-primary">{graduatingBatchYear} Batch</span> —
+          for every coordinator and Team Leader, on their very next action, no login or
+          refresh required. Records already saved under the prior season are never changed.
         </div>
       </div>
 
