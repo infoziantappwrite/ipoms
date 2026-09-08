@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { CheckSquare, ChevronLeft, ChevronRight, Loader2, Sparkles, Upload, X, Search, Clock, Database } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { triggerHaptic } from '@/lib/haptics';
 import { SnoRangeSelector } from '@/app/metadata/components/SnoRangeSelector';
 
 interface Company {
@@ -156,23 +157,30 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
     onClose();
   };
 
-  // Keyboard: Escape deselects all or closes
+  // ── Keyboard: 2-step Escape key (1st Escape = deselect all; 2nd Escape = close modal)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
         setSelected((prev) => {
-          if (prev.size > 0) return new Set();
+          if (prev.size > 0) {
+            triggerHaptic('light');
+            return new Set();
+          }
+          triggerHaptic('light');
           onClose();
           return prev;
         });
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener('keydown', handler, { capture: true });
+    return () => window.removeEventListener('keydown', handler, { capture: true });
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-overlay/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fade-in">
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-6 animate-fade-in">
       {/* Expansive Window Container with Semantic Theming */}
       <div className="bg-surface border border-border rounded-3xl w-full max-w-6xl h-[92vh] flex flex-col shadow-2xl overflow-hidden text-fg">
 
@@ -264,17 +272,11 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
             />
           </div>
 
-          {/* Quick Selection Actions & Top Pagination with Jump Input */}
+          {/* Top Pagination with Jump Input */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="text-fg-muted font-medium mr-1 text-[11px]">
               {loading ? 'Searching…' : `${total.toLocaleString()} companies`}
             </span>
-            <button
-              onClick={handleSelectAll}
-              className="px-2.5 py-1.5 rounded-lg bg-surface hover:bg-surface-raised border border-border text-fg-muted hover:text-fg font-semibold transition-all shadow-xs cursor-pointer text-[11px]"
-            >
-              Select All on Page ({companies.length})
-            </button>
 
             {/* Top Pagination with Jump-to-Page Input */}
             {totalPages > 1 && (
@@ -454,7 +456,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
               disabled={selected.size === 0}
               className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-primary-foreground text-xs font-bold transition-all shadow-[2px_2px_8px_rgba(30,58,138,0.25)] active:scale-[0.99] cursor-pointer"
             >
-              Load Selected ({selected.size})
+              Load
             </button>
           </div>
         </div>

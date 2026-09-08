@@ -66,8 +66,10 @@ const ActiveLead_1 = require("./models/ActiveLead");
 const SystemSettings_1 = require("./models/SystemSettings");
 const AuditLog_1 = require("./models/AuditLog");
 const audit_1 = require("./lib/audit");
+const academicYear_1 = require("./lib/academicYear");
 const mongoose_1 = __importStar(require("mongoose"));
 const finalizeDailyTracker_1 = require("./jobs/finalizeDailyTracker");
+const positiveSyncReminder_1 = require("./jobs/positiveSyncReminder");
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const authRoutes_1 = require("./lib/authRoutes");
 const activeLeadRoutes_1 = require("./lib/activeLeadRoutes");
@@ -85,6 +87,7 @@ const updateHitsWeeklyTracker_1 = require("./scripts/updateHitsWeeklyTracker");
 const authMiddleware_1 = require("./lib/authMiddleware");
 const routePolicy_1 = require("./lib/routePolicy");
 const passwordPolicy_1 = require("./lib/passwordPolicy");
+const mailer_1 = require("./lib/mailer");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
@@ -153,19 +156,13 @@ app.use((0, morgan_1.default)('dev'));
 function escapeRegex(str) {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
-// Get today's operational calendar date as midnight UTC with 6:00 AM IST cutoff
-// - Between 00:00:00 and 05:59:59 IST: Active session belongs to previous day (coordinators can edit and sync).
-// - At and after 06:00:00 IST: Fresh new day session starts.
+// Get today's operational calendar date as midnight UTC with 12:00 AM (00:00:00 IST) cutoff
+// Refreshes every morning early at 12:00 AM midnight IST
 function getTodayDate() {
     const now = new Date();
     // IST offset: UTC + 5 hours 30 mins
     const istOffsetMs = (5 * 60 + 30) * 60 * 1000;
     const istTime = new Date(now.getTime() + istOffsetMs);
-    const istHour = istTime.getUTCHours();
-    if (istHour < 6) {
-        // Before 6:00 AM IST -> still part of yesterday's active session
-        istTime.setUTCDate(istTime.getUTCDate() - 1);
-    }
     return new Date(Date.UTC(istTime.getUTCFullYear(), istTime.getUTCMonth(), istTime.getUTCDate(), 0, 0, 0, 0));
 }
 // Build session_date as midnight UTC for a given local date string (YYYY-MM-DD) or today
@@ -1456,9 +1453,11 @@ app.patch('/api/v1/daily-tracker/:id', async (req, res) => {
                 college_id: row.college_id,
                 daily_tracker_id: row._id,
             }).catch((e) => console.error('Auto-lead sync error:', e));
-            // Auto-sync into Weekly Tracker (Companies in Pipeline) if positive outcome (invite_mail, hiring, jd_received, in_connect, drive_completed)
-            const POSITIVE_WEEKLY_OUTCOMES = ['invite_mail', 'hiring', 'jd_received', 'drive_completed', 'in_connect'];
-            if (POSITIVE_WEEKLY_OUTCOMES.includes(row.outcome_status)) {
+            // Auto-sync into Weekly Tracker (Companies in Pipeline) — Invite Mail only
+            // (narrowed 6 Sep 2026, see PIPELINE_SYNC_OUTCOME in DailyTracker.ts; this
+            // inline live-save path had been missed by that change and was still
+            // firing on the old 5-outcome list until corrected here).
+            if (row.outcome_status === DailyTracker_1.PIPELINE_SYNC_OUTCOME) {
                 (async () => {
                     try {
                         const { startFriday, endThursday, weekNumber } = getFridayWeekBounds(row.session_date || new Date());
@@ -1468,8 +1467,10 @@ app.patch('/api/v1/daily-tracker/:id', async (req, res) => {
                             is_deleted: false,
                         });
                         if (!existingWeekly) {
+                            const year = await (0, academicYear_1.getCurrentAcademicYear)();
+                            const batchYear = await (0, academicYear_1.getCurrentGraduatingBatchYear)();
                             await WeeklyTracker_1.WeeklyTracker.create({
-                                academic_year: 2026,
+                                academic_year: year,
                                 college_id: row.college_id,
                                 coordinator_id: row.coordinator_id,
                                 company_id: row.company_id,
@@ -1479,7 +1480,7 @@ app.patch('/api/v1/daily-tracker/:id', async (req, res) => {
                                 cdc_reference: '',
                                 company_type: 'Software / IT',
                                 ctc_lpa: '',
-                                eligible_batch: '2026 Batch',
+                                eligible_batch: `${batchYear} Batch`,
                                 pipeline_section: 'pipeline',
                                 current_status_text: row.comments || `Invite email sent (${(row.outcome_status || 'positive').replace(/_/g, ' ')})`,
                                 follow_up_date: row.follow_up_date || null,
@@ -1685,11 +1686,18 @@ app.post('/api/v1/daily-tracker/save-progress', async (req, res) => {
 app.get('/api/v1/daily-tracker/history', async (req, res) => {
     try {
         const date = req.query.date;
-        const coordinator_id = (0, routePolicy_1.scopeToSelf)(req, req.query.coordinator_id);
-        if (!coordinator_id || !date) {
+        // Deliberately NOT scoped to the caller — history is a shared organizational
+        // record, and the user decided (6 Sep 2026) that every role (Coordinator,
+        // Team Leader, Administrator) may view any college's past daily-tracker
+        // data, not just their own. `coordinator_id` is now an optional narrowing
+        // filter, never an ownership pin. This is a deliberate divergence from
+        // `/daily-tracker/today`, which stays self-scoped since that view is the
+        // live, in-progress calling session, not historical record-keeping.
+        const coordinator_id = req.query.coordinator_id;
+        if (!date) {
             return res.status(400).json({
                 success: false,
-                error: { code: 'VALIDATION_ERROR', message: 'coordinator_id and date (YYYY-MM-DD) are required' },
+                error: { code: 'VALIDATION_ERROR', message: 'date (YYYY-MM-DD) is required' },
             });
         }
         const sessionDate = buildSessionDate(String(date));
@@ -1700,23 +1708,33 @@ app.get('/api/v1/daily-tracker/history', async (req, res) => {
         const startOfDay = new Date(Date.UTC(yr, mo - 1, dy, 0, 0, 0, 0));
         const endOfDay = new Date(Date.UTC(yr, mo - 1, dy, 23, 59, 59, 999));
         const filter = {
-            coordinator_id: new mongoose_1.Types.ObjectId(String(coordinator_id)),
             $or: [
                 { session_date: sessionDate },
                 { session_date: { $gte: startOfDay, $lte: endOfDay } },
                 { year: yr, month: mo, day: dy },
             ],
         };
+        if (coordinator_id) {
+            filter.coordinator_id = new mongoose_1.Types.ObjectId(String(coordinator_id));
+        }
         if (req.query.college_id) {
             filter.college_id = new mongoose_1.Types.ObjectId(String(req.query.college_id));
         }
-        const rows = await DailyTracker_1.DailyTracker.find(filter).sort({ serial_no: 1, created_at: 1 });
-        const enriched = rows.map((row, idx) => ({
-            ...row.toObject(),
-            serial_no: idx + 1,
-            duration_formatted: row.duration_seconds != null ? formatDuration(row.duration_seconds) : null,
-            is_read_only: true,
-        }));
+        const rows = await DailyTracker_1.DailyTracker.find(filter)
+            .populate('coordinator_id', 'full_name official_email')
+            .sort({ serial_no: 1, created_at: 1 });
+        const enriched = rows.map((row, idx) => {
+            const obj = row.toObject();
+            const coordinator = obj.coordinator_id;
+            return {
+                ...obj,
+                coordinator_id: coordinator?._id ?? obj.coordinator_id,
+                coordinator_name: coordinator?.full_name || undefined,
+                serial_no: idx + 1,
+                duration_formatted: row.duration_seconds != null ? formatDuration(row.duration_seconds) : null,
+                is_read_only: true,
+            };
+        });
         return res.status(200).json({
             success: true,
             data: {
@@ -2014,39 +2032,45 @@ function getFridayWeekBounds(targetDate = new Date()) {
 app.get('/api/v1/weekly-tracker', async (req, res) => {
     try {
         const { college_id, academic_year, search, company_type, week_offset } = req.query;
-        const year = academic_year && academic_year !== 'all' ? Number(academic_year) : 2027;
+        // Echo back what was actually filtered on - 'all' when no year was requested,
+        // never an invented default. A hardcoded fallback here previously mislabeled
+        // unfiltered results as a specific year (see the removed fallback-query below).
+        const year = academic_year && academic_year !== 'all' ? Number(academic_year) : 'all';
         const filter = {
             is_deleted: false,
         };
         if (college_id && college_id !== 'all') {
             const queryCollegeIds = [];
-            if (mongoose_1.Types.ObjectId.isValid(String(college_id))) {
-                queryCollegeIds.push(new mongoose_1.Types.ObjectId(String(college_id)));
-                const targetCol = await College_1.College.findById(college_id);
-                if (targetCol) {
-                    const sameCodeCols = await College_1.College.find({
+            const idTokens = String(college_id).split(',').map((s) => s.trim()).filter(Boolean);
+            for (const token of idTokens) {
+                if (mongoose_1.Types.ObjectId.isValid(token)) {
+                    queryCollegeIds.push(new mongoose_1.Types.ObjectId(token));
+                    const targetCol = await College_1.College.findById(token);
+                    if (targetCol) {
+                        const sameCodeCols = await College_1.College.find({
+                            $or: [
+                                { college_code: targetCol.college_code },
+                                { college_name: targetCol.college_name },
+                            ],
+                        });
+                        sameCodeCols.forEach((sc) => {
+                            if (!queryCollegeIds.some((id) => String(id) === String(sc._id))) {
+                                queryCollegeIds.push(sc._id);
+                            }
+                        });
+                    }
+                }
+                else {
+                    const foundCols = await College_1.College.find({
                         $or: [
-                            { college_code: targetCol.college_code },
-                            { college_name: targetCol.college_name },
+                            { college_code: String(token).toUpperCase() },
+                            { college_name: new RegExp(String(token), 'i') },
                         ],
                     });
-                    sameCodeCols.forEach((sc) => {
-                        if (!queryCollegeIds.some((id) => String(id) === String(sc._id))) {
-                            queryCollegeIds.push(sc._id);
-                        }
-                    });
+                    foundCols.forEach((fc) => queryCollegeIds.push(fc._id));
                 }
+                queryCollegeIds.push(String(token));
             }
-            else {
-                const foundCols = await College_1.College.find({
-                    $or: [
-                        { college_code: String(college_id).toUpperCase() },
-                        { college_name: new RegExp(String(college_id), 'i') },
-                    ],
-                });
-                foundCols.forEach((fc) => queryCollegeIds.push(fc._id));
-            }
-            queryCollegeIds.push(String(college_id));
             filter.college_id = { $in: queryCollegeIds };
         }
         if (academic_year && academic_year !== 'all') {
@@ -2078,17 +2102,9 @@ app.get('/api/v1/weekly-tracker', async (req, res) => {
                 { current_status_text: { $regex: q, $options: 'i' } },
             ];
         }
-        let rows = await WeeklyTracker_1.WeeklyTracker.find(filter)
+        const rows = await WeeklyTracker_1.WeeklyTracker.find(filter)
             .sort({ follow_up_date: 1, company_name: 1 })
             .populate('coordinator_id', 'full_name official_email');
-        // If 0 rows found and academic_year was specified, fallback to querying all records for that college
-        if (rows.length === 0 && filter.academic_year) {
-            const fallbackFilter = { ...filter };
-            delete fallbackFilter.academic_year;
-            rows = await WeeklyTracker_1.WeeklyTracker.find(fallbackFilter)
-                .sort({ follow_up_date: 1, company_name: 1 })
-                .populate('coordinator_id', 'full_name official_email');
-        }
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
         const todayEnd = new Date();
@@ -2292,12 +2308,7 @@ app.get('/api/v1/weekly-tracker/kpi', async (req, res) => {
             const { startFriday } = getFridayWeekBounds(targetDate);
             filter.week_start_date = startFriday;
         }
-        let rows = await WeeklyTracker_1.WeeklyTracker.find(filter);
-        if (rows.length === 0 && filter.academic_year) {
-            const fallbackFilter = { ...filter };
-            delete fallbackFilter.academic_year;
-            rows = await WeeklyTracker_1.WeeklyTracker.find(fallbackFilter);
-        }
+        const rows = await WeeklyTracker_1.WeeklyTracker.find(filter);
         const todayEnd = new Date();
         todayEnd.setHours(23, 59, 59, 999);
         const followUps = rows.filter((r) => r.follow_up_date &&
@@ -2345,7 +2356,8 @@ app.get('/api/v1/weekly-tracker/export-xlsx', async (req, res) => {
         const college = await College_1.College.findById(college_id);
         const collegeCode = college?.college_code || 'COLLEGE';
         const collegeName = college?.college_name || 'Weekly Placement Tracker';
-        const year = Number(academic_year) || 2027;
+        // Label only - never invents a year. Reflects exactly what was filtered on.
+        const year = academic_year && academic_year !== 'all' ? String(academic_year) : 'All Years';
         const filter = {
             college_id: new mongoose_1.Types.ObjectId(String(college_id)),
             is_deleted: false,
@@ -2368,16 +2380,9 @@ app.get('/api/v1/weekly-tracker/export-xlsx', async (req, res) => {
                 { current_status_text: { $regex: q, $options: 'i' } },
             ];
         }
-        let rows = await WeeklyTracker_1.WeeklyTracker.find(filter)
+        const rows = await WeeklyTracker_1.WeeklyTracker.find(filter)
             .sort({ follow_up_date: 1, company_name: 1 })
             .populate('coordinator_id', 'full_name official_email');
-        if (rows.length === 0 && filter.academic_year) {
-            const fallbackFilter = { ...filter };
-            delete fallbackFilter.academic_year;
-            rows = await WeeklyTracker_1.WeeklyTracker.find(fallbackFilter)
-                .sort({ follow_up_date: 1, company_name: 1 })
-                .populate('coordinator_id', 'full_name official_email');
-        }
         // Partition into sections
         const completed = rows.filter((r) => r.pipeline_section === 'completed');
         const inDrive = rows.filter((r) => r.pipeline_section === 'in_drive' || r.pipeline_section === 'companies_in_drive');
@@ -2531,11 +2536,60 @@ app.get('/api/v1/weekly-tracker/export-xlsx', async (req, res) => {
         });
     }
 });
+/**
+ * Weekly Tracker deliberately allows any coordinator to create/edit/delete on
+ * any college - there is no access lock. This only reports it afterwards: if
+ * the acting coordinator isn't one of the college's real assigned owners
+ * (users.assigned_college_ids), every active, non-deleted owner gets an email.
+ * A college with nobody assigned yet notifies no one (nothing to protect).
+ * Fire-and-forget - a notification failure must never affect the coordinator's
+ * own save/delete, which has already succeeded by the time this runs.
+ */
+async function notifyForeignCollegeOwners(actorUserId, collegeId, companyName, action) {
+    try {
+        if (!actorUserId || !collegeId)
+            return;
+        const owners = await User_1.User.find({
+            assigned_college_ids: collegeId,
+            is_deleted: false,
+            account_status: 'active',
+            // Administrator holds every college for oversight dashboards (all 27, by
+            // design) - that is not "the person who really handles it." Excluding
+            // the role, not naming an account, so it still works if the admin ever
+            // changes.
+            role_codes: { $ne: 'ADMINISTRATOR' },
+        }).select('_id full_name official_email');
+        if (owners.length === 0)
+            return;
+        if (owners.some((o) => String(o._id) === String(actorUserId)))
+            return;
+        const [actor, college] = await Promise.all([
+            User_1.User.findById(actorUserId).select('full_name'),
+            College_1.College.findById(collegeId).select('college_name'),
+        ]);
+        if (!actor || !college)
+            return;
+        const timestamp = new Date();
+        for (const owner of owners) {
+            (0, mailer_1.sendForeignCollegeEditEmail)(owner.official_email, {
+                ownerName: owner.full_name,
+                actorName: actor.full_name,
+                collegeName: college.college_name,
+                companyName,
+                action,
+                timestamp,
+            }).catch((e) => console.error('[weekly-tracker] notify owner failed:', e?.message || e));
+        }
+    }
+    catch (e) {
+        console.error('[weekly-tracker] notifyForeignCollegeOwners error:', e?.message || e);
+    }
+}
 // ── WT-2: POST /api/v1/weekly-tracker
 // Add a recruitment drive record manually
 app.post('/api/v1/weekly-tracker', async (req, res) => {
     try {
-        const { college_id, coordinator_id, company_id, company_name, job_role, cdc_reference, company_type, ctc_lpa, eligible_batch, pipeline_section, current_status_text, follow_up_date, drive_date, selected_count, } = req.body;
+        const { college_id, coordinator_id, company_id, company_name, job_role, cdc_reference, company_type, ctc_lpa, eligible_batch, pipeline_section, current_status_text, follow_up_date, drive_date, selected_count, academic_year, } = req.body;
         if (!college_id ||
             !coordinator_id ||
             !company_name?.trim() ||
@@ -2550,7 +2604,12 @@ app.post('/api/v1/weekly-tracker', async (req, res) => {
                 },
             });
         }
-        // Check whether the company exists in Master Company Metadata (Never auto-create in metadata from weekly tracker)
+        // The company must already exist in Master Company Metadata. Never auto-create
+        // it here, and never invent a company_id for one that isn't found - that used
+        // to mint a random ObjectId pointing at no document in either collection, an
+        // orphan reference with no metadata record to even flag it by. Refuse instead,
+        // same shape as the mandatory-field check above: add the company via Daily
+        // Tracker or the Metadata module first, then retry.
         let resolvedCompanyId = company_id;
         let isInMetadata = false;
         if (resolvedCompanyId && mongoose_1.Types.ObjectId.isValid(String(resolvedCompanyId))) {
@@ -2569,15 +2628,30 @@ app.post('/api/v1/weekly-tracker', async (req, res) => {
                 isInMetadata = true;
             }
             else {
-                resolvedCompanyId = new mongoose_1.Types.ObjectId();
-                isInMetadata = false;
+                return res.status(400).json({
+                    success: false,
+                    error: {
+                        code: 'COMPANY_NOT_IN_METADATA',
+                        message: `"${company_name.trim()}" is not in the Metadata database. Add it via Daily Tracker or the Metadata module first, then try again.`,
+                    },
+                });
             }
         }
         const effectiveSection = pipeline_section === 'follow_ups_due_today' ? 'in_progress' : (pipeline_section || 'pipeline');
         const effectiveFollowUp = pipeline_section === 'follow_ups_due_today' && !follow_up_date ? new Date() : (follow_up_date ? new Date(follow_up_date) : null);
         const { startFriday, endThursday, weekNumber } = getFridayWeekBounds();
+        const rawOffers = req.body.offers_received !== undefined ? req.body.offers_received : req.body.selected_count;
+        let finalSelectedCount = 0;
+        if (rawOffers !== undefined && rawOffers !== null && rawOffers !== '') {
+            const parsed = parseInt(String(rawOffers), 10);
+            if (!isNaN(parsed)) {
+                finalSelectedCount = Math.min(50, Math.max(0, parsed));
+            }
+        }
+        const resolvedYear = Number(academic_year) || (await (0, academicYear_1.getCurrentAcademicYear)());
+        const resolvedBatchYear = await (0, academicYear_1.getCurrentGraduatingBatchYear)();
         const newDrive = await WeeklyTracker_1.WeeklyTracker.create({
-            academic_year: 2026,
+            academic_year: resolvedYear,
             college_id: new mongoose_1.Types.ObjectId(String(college_id)),
             coordinator_id: new mongoose_1.Types.ObjectId(String(coordinator_id)),
             company_id: new mongoose_1.Types.ObjectId(String(resolvedCompanyId)),
@@ -2586,23 +2660,22 @@ app.post('/api/v1/weekly-tracker', async (req, res) => {
             cdc_reference: cdc_reference?.trim() || '',
             company_type: company_type?.trim() || 'Software / IT',
             ctc_lpa: ctc_lpa.trim(),
-            eligible_batch: eligible_batch?.trim() || '2026 Batch',
+            eligible_batch: eligible_batch?.trim() || `${resolvedBatchYear} Batch`,
             pipeline_section: effectiveSection,
             current_status_text: current_status_text.trim(),
             follow_up_date: effectiveFollowUp,
             drive_date: drive_date ? new Date(drive_date) : null,
-            selected_count: Number(selected_count) || 0,
+            selected_count: finalSelectedCount,
             week_number: weekNumber,
             week_start_date: startFriday,
             week_end_date: endThursday,
             is_pinned_top: pipeline_section === 'top_companies',
         });
+        notifyForeignCollegeOwners(req.user?.userId, newDrive.college_id, newDrive.company_name, 'created');
         return res.status(201).json({
             success: true,
-            message: isInMetadata
-                ? 'Recruitment drive record created successfully'
-                : `Company "${company_name.trim()}" is not available in the Metadata database. You can search or add it to Metadata manually if needed.`,
-            is_in_metadata: isInMetadata,
+            message: 'Recruitment drive record created successfully',
+            is_in_metadata: true,
             data: newDrive,
         });
     }
@@ -2667,13 +2740,22 @@ app.patch('/api/v1/weekly-tracker/:id', async (req, res) => {
                 if (['follow_up_date', 'drive_date'].includes(field)) {
                     row[field] = patchData[field] ? new Date(patchData[field]) : null;
                 }
+                else if (field === 'selected_count') {
+                    const num = parseInt(String(patchData[field]), 10);
+                    row[field] = isNaN(num) ? 0 : Math.min(50, Math.max(0, num));
+                }
                 else {
                     row[field] = typeof patchData[field] === 'string' ? patchData[field].trim() : patchData[field];
                 }
             }
         });
+        if (patchData.offers_received !== undefined && patchData.selected_count === undefined) {
+            const num = parseInt(String(patchData.offers_received), 10);
+            row.selected_count = isNaN(num) ? 0 : Math.min(50, Math.max(0, num));
+        }
         row.last_status_updated_at = new Date();
         await row.save();
+        notifyForeignCollegeOwners(req.user?.userId, row.college_id, row.company_name, 'updated');
         return res.status(200).json({
             success: true,
             message: 'Weekly tracker record updated successfully',
@@ -2713,6 +2795,7 @@ app.patch('/api/v1/weekly-tracker/:id/section', async (req, res) => {
         }
         row.last_status_updated_at = new Date();
         await row.save();
+        notifyForeignCollegeOwners(req.user?.userId, row.college_id, row.company_name, 'updated');
         return res.status(200).json({
             success: true,
             message: `Moved to ${pipeline_section}`,
@@ -2768,6 +2851,7 @@ app.delete('/api/v1/weekly-tracker/:id', async (req, res) => {
         row.is_deleted = true;
         row.deleted_at = new Date();
         await row.save();
+        notifyForeignCollegeOwners(req.user?.userId, row.college_id, row.company_name, 'deleted');
         return res.status(200).json({
             success: true,
             message: `${row.company_name} moved to Recycle Bin`,
@@ -2816,7 +2900,7 @@ app.get('/api/v1/weekly-tracker/kpi', async (req, res) => {
                 error: { code: 'VALIDATION_ERROR', message: 'college_id is required' },
             });
         }
-        const year = Number(academic_year) || 2026;
+        const year = Number(academic_year) || (await (0, academicYear_1.getCurrentAcademicYear)());
         const baseFilter = {
             college_id: new mongoose_1.Types.ObjectId(String(college_id)),
             academic_year: year,
@@ -2871,7 +2955,14 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req, res) => {
                 error: { code: 'VALIDATION_ERROR', message: 'college_id is required' },
             });
         }
-        const targetYear = Number(academic_year) || 2027;
+        // Was || 2027 - the frontend's academicYear default was frozen at '2027' (dead
+        // UI plumbing, no control ever changed it) while every real row is 2026, matching
+        // system_settings' "2025-2026" season. Rows created here now stay consistent with
+        // the rest of the dataset instead of silently drifting onto their own year.
+        // Falls through to the live Settings -> System Config -> Academic Year value
+        // (see getCurrentAcademicYear()) rather than a hardcoded literal, so an
+        // Administrator's season change takes effect here immediately.
+        const targetYear = Number(academic_year) || (await (0, academicYear_1.getCurrentAcademicYear)());
         const { startFriday, endThursday, weekNumber } = getFridayWeekBounds();
         // Resolve all matching college IDs (aliases/codes) so college references are consistent
         const queryCollegeIds = [];
@@ -2901,15 +2992,18 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req, res) => {
             });
             foundCols.forEach((fc) => queryCollegeIds.push(fc._id));
         }
-        // Daily Tracker filter: look for positive outcomes (invite_mail, hiring, jd_received, drive_completed)
+        // Daily Tracker filter: Invite Mail is the sole trigger for a Companies-in-Pipeline
+        // row (user decision, 6 Sep 2026 — narrowed from the old jd_received/hiring/
+        // invite_mail/drive_completed set). See PIPELINE_SYNC_OUTCOME in DailyTracker.ts.
         const dailyFilter = {
             college_id: { $in: queryCollegeIds },
-            outcome_status: { $in: DailyTracker_1.POSITIVE_OUTCOMES },
+            outcome_status: DailyTracker_1.PIPELINE_SYNC_OUTCOME,
         };
         if (coordinator_id && mongoose_1.Types.ObjectId.isValid(String(coordinator_id))) {
             dailyFilter.coordinator_id = new mongoose_1.Types.ObjectId(String(coordinator_id));
         }
         const positiveDailyRows = await DailyTracker_1.DailyTracker.find(dailyFilter).sort({ session_date: 1, created_at: 1 });
+        const batchYear = await (0, academicYear_1.getCurrentGraduatingBatchYear)();
         let syncedCount = 0;
         for (const dRow of positiveDailyRows) {
             // Check if already present in weekly_tracker for this academic year
@@ -2931,7 +3025,7 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req, res) => {
                     cdc_reference: dRow.hr_name ? `${dRow.hr_name}${dRow.mobile_number ? ` (${dRow.mobile_number})` : ''}` : '',
                     company_type: 'Software / IT',
                     ctc_lpa: 'To be disclosed',
-                    eligible_batch: `${targetYear} Batch`,
+                    eligible_batch: `${batchYear} Batch`,
                     pipeline_section: 'pipeline',
                     current_status_text: dRow.outcome_status === 'invite_mail'
                         ? 'Invite email sent'
@@ -3358,13 +3452,17 @@ app.post('/api/v1/daily-leads/sync-positives', async (req, res) => {
         const targetDate = date ? parseDateParam(String(date)) : getTodayDate();
         const nextDate = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
         let syncedCount = 0;
-        // 1. Pull from DailyTracker calls for this date with positive outcomes
+        // 1. Pull from DailyTracker calls for this date — Invite Mail is the sole
+        // trigger for the Positives tab; JD Received fills only when the outcome
+        // is genuinely jd_received for that company/college (user decision,
+        // 6 Sep 2026 — narrowed from also including hiring/drive_completed/
+        // in_connect/follow_up).
         const dtFilter = {
             $or: [
                 { session_date: { $gte: targetDate, $lt: nextDate } },
                 { call_start_time: { $gte: targetDate, $lt: nextDate } },
             ],
-            outcome_status: { $in: ['jd_received', 'hiring', 'drive_completed', 'invite_mail', 'in_connect', 'follow_up'] },
+            outcome_status: { $in: ['jd_received', DailyTracker_1.PIPELINE_SYNC_OUTCOME] },
         };
         if (college_id && college_id !== 'all' && mongoose_1.Types.ObjectId.isValid(String(college_id))) {
             dtFilter.college_id = new mongoose_1.Types.ObjectId(String(college_id));
@@ -3631,7 +3729,8 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req, res) => {
 // Live BI overview: KPI counters, conversion rates, and 4-category automated insights
 app.get('/api/v1/analytics/overview', async (req, res) => {
     try {
-        const { college_id, coordinator_id, academic_year = '2026' } = req.query;
+        const { college_id, coordinator_id } = req.query;
+        const academic_year = req.query.academic_year ?? (await (0, academicYear_1.getCurrentAcademicYear)());
         const baseDtFilter = {};
         const baseWtFilter = { academic_year, is_deleted: false };
         const baseDlFilter = { is_deleted: false };
@@ -3729,7 +3828,7 @@ app.get('/api/v1/analytics/overview', async (req, res) => {
 // Period and College comparative metrics (Spec Section 7.3)
 app.get('/api/v1/analytics/comparisons', async (req, res) => {
     try {
-        const { academic_year = '2026' } = req.query;
+        const academic_year = req.query.academic_year ?? (await (0, academicYear_1.getCurrentAcademicYear)());
         const colleges = await College_1.College.find({ status: 'active' }).limit(10);
         // Calculate per-college breakdown
         const collegeComparisons = await Promise.all(colleges.map(async (c) => {
@@ -3770,7 +3869,8 @@ app.get('/api/v1/analytics/comparisons', async (req, res) => {
 // Company Responsiveness Rankings & Follow-up status (Spec Section 7.4)
 app.get('/api/v1/analytics/company-responsiveness', async (req, res) => {
     try {
-        const { college_id, academic_year = '2026' } = req.query;
+        const { college_id } = req.query;
+        const academic_year = req.query.academic_year ?? (await (0, academicYear_1.getCurrentAcademicYear)());
         const wtFilter = { academic_year, is_deleted: false };
         if (college_id && college_id !== 'all') {
             wtFilter.college_id = new mongoose_1.Types.ObjectId(String(college_id));
@@ -3861,11 +3961,195 @@ function matchesMinCtcHelper(ctcStr, minCtc, includeCompetitive = false) {
         return includeCompetitive;
     return Math.max(...numbers) >= minCtc;
 }
+const SERVER_COLLEGE_LOGO_MAP = {
+    // Nehru Group of Institutions / NCET
+    NEHRU: '/college-logos/nehru.png',
+    NCET: '/college-logos/nehru.png',
+    'NEHRU GROUP': '/college-logos/nehru.png',
+    'NEHRU GROUP OF INSTITUTIONS': '/college-logos/nehru.png',
+    // Narayana Guru College of Engineering
+    NGCE: '/college-logos/narayanaguru.png',
+    NGC: '/college-logos/narayanaguru.png',
+    NARAYANAGURU: '/college-logos/narayanaguru.png',
+    'NARAYANA GURU': '/college-logos/narayanaguru.png',
+    ACET: '/college-logos/acet.png',
+    ACEW: '/college-logos/ACEW.jfif',
+    AIHT: '/college-logos/aiht.png',
+    AAA: '/college-logos/aaa.png',
+    AMCET: '/college-logos/AMCET.png',
+    'ANNAI MIRA': '/college-logos/annai mira.png',
+    AUDISANKAR: '/college-logos/audisankar.png',
+    AUDISANKARA: '/college-logos/audisankar.png',
+    AVS: '/college-logos/avs.png',
+    BHARATHIYAR: '/college-logos/bharathiyar institue.png',
+    CHRIST: '/college-logos/christ.png',
+    DSU: '/college-logos/dsu.png',
+    EGS: '/college-logos/egs.png',
+    GANESH: '/college-logos/ganesg.png',
+    GANESG: '/college-logos/ganesg.png',
+    GCT: '/college-logos/gnyanamani.png',
+    GNYANAMANI: '/college-logos/gnyanamani.png',
+    GNANAMANI: '/college-logos/gnyanamani.png',
+    HITS: '/college-logos/hits.png',
+    HINDUSTAN: '/college-logos/hits.png',
+    IFET: '/college-logos/ifet.png',
+    KAMARAJ: '/college-logos/kamaraj.png',
+    KARPAGAM: '/college-logos/karpagam.png',
+    KARUNYA: '/college-logos/karunya.png',
+    KCT: '/college-logos/kumaraguru.png',
+    KGISL: '/college-logos/kgisl.png',
+    KIOT: '/college-logos/kiot.jfif',
+    KIT: '/college-logos/kit.png',
+    KLU: '/college-logos/klu.png',
+    KALASALINGAM: '/college-logos/klu.png',
+    KPR: '/college-logos/kpr.png',
+    KUMARAGURU: '/college-logos/kumaraguru.png',
+    LICET: '/college-logos/layola.png',
+    LAYOLA: '/college-logos/layola.png',
+    LOYOLA: '/college-logos/layola.png',
+    MAR: '/college-logos/mar ephream.png',
+    'MAR EPHRAEM': '/college-logos/mar ephream.png',
+    'MAR EPHREAM': '/college-logos/mar ephream.png',
+    MCET: '/college-logos/MCET.png',
+    MAHALINGAM: '/college-logos/MCET.png',
+    MEC: '/college-logos/MEC.png',
+    MUTHAYAMMAL: '/college-logos/MEC.png',
+    MKCE: '/college-logos/mkce.png',
+    'M.KUMARASAMY': '/college-logos/mkce.png',
+    NGP: '/college-logos/ngp.png',
+    'DR. N.G.P.': '/college-logos/ngp.png',
+    'DR. NGP': '/college-logos/ngp.png',
+    NPR: '/college-logos/npr.png',
+    PANIMALAR: '/college-logos/panimalar.png',
+    PEC: '/college-logos/panimalar.png',
+    PSG: '/college-logos/psg.png',
+    PSNA: '/college-logos/psna.png',
+    RATHINAM: '/college-logos/Rathinam - RTC.png',
+    RTC: '/college-logos/Rathinam - RTC.png',
+    SECE: '/college-logos/srieshwar.png',
+    SETHU: '/college-logos/sethu institue.png',
+    SIT: '/college-logos/sethu institue.png',
+    SMVEC: '/college-logos/smvec.png',
+    SONA: '/college-logos/sona.png',
+    SRI_SHANMUGA: '/college-logos/sri shanmuga.png',
+    'SRI SHANMUGA': '/college-logos/sri shanmuga.png',
+    'SRI SHANMUGHA': '/college-logos/sri shanmuga.png',
+    SRIESHWAR: '/college-logos/srieshwar.png',
+    'SRI ESHWAR': '/college-logos/srieshwar.png',
+    SRM: '/college-logos/srm.png',
+    SSEI: '/college-logos/sri shanmuga.png',
+    VAIGAI: '/college-logos/vaigai.png',
+    VCE: '/college-logos/vaigai.png',
+    VIT: '/college-logos/vit.png',
+};
+function resolveCollegeLogoUrl(targetCollege) {
+    if (!targetCollege)
+        return null;
+    const rawLogo = targetCollege.logo_url;
+    if (rawLogo &&
+        typeof rawLogo === 'string' &&
+        rawLogo.trim() !== '' &&
+        !rawLogo.includes('Infozianthead.png') &&
+        !rawLogo.includes('clearbit')) {
+        return rawLogo.trim();
+    }
+    const code = (targetCollege.college_code || '').toUpperCase().trim();
+    if (code && SERVER_COLLEGE_LOGO_MAP[code]) {
+        return SERVER_COLLEGE_LOGO_MAP[code];
+    }
+    const name = (targetCollege.college_name || '').toLowerCase().trim();
+    if (name.includes('nehru'))
+        return '/college-logos/nehru.png';
+    if (name.includes('narayana guru') || name.includes('narayanaguru'))
+        return '/college-logos/narayanaguru.png';
+    if (name.includes('hindustan') || name.includes('hits'))
+        return '/college-logos/hits.png';
+    if (name.includes('kalasalingam') || name.includes('klu'))
+        return '/college-logos/klu.png';
+    if (name.includes('karpagam'))
+        return '/college-logos/karpagam.png';
+    if (name.includes('karunya'))
+        return '/college-logos/karunya.png';
+    if (name.includes('kumaraguru') || name.includes('kct'))
+        return '/college-logos/kumaraguru.png';
+    if (name.includes('rathinam'))
+        return '/college-logos/Rathinam - RTC.png';
+    if (name.includes('ngp') || name.includes('n.g.p'))
+        return '/college-logos/ngp.png';
+    if (name.includes('kumarasamy') || name.includes('mkce'))
+        return '/college-logos/mkce.png';
+    if (name.includes('sethu'))
+        return '/college-logos/sethu institue.png';
+    if (name.includes('shanmuga') || name.includes('shanmugha') || name.includes('ssei'))
+        return '/college-logos/sri shanmuga.png';
+    if (name.includes('eshwar') || name.includes('srieshwar') || name.includes('sece'))
+        return '/college-logos/srieshwar.png';
+    if (name.includes('panimalar'))
+        return '/college-logos/panimalar.png';
+    if (name.includes('kamaraj'))
+        return '/college-logos/kamaraj.png';
+    if (name.includes('psna'))
+        return '/college-logos/psna.png';
+    if (name.includes('psg'))
+        return '/college-logos/psg.png';
+    if (name.includes('smvec') || name.includes('manakula'))
+        return '/college-logos/smvec.png';
+    if (name.includes('dsu') || name.includes('dhanalakshmi'))
+        return '/college-logos/dsu.png';
+    if (name.includes('kiot') || name.includes('knowledge'))
+        return '/college-logos/kiot.jfif';
+    if (name.includes('sona'))
+        return '/college-logos/sona.png';
+    if (name.includes('avs'))
+        return '/college-logos/avs.png';
+    if (name.includes('aaa'))
+        return '/college-logos/aaa.png';
+    if (name.includes('kgisl'))
+        return '/college-logos/kgisl.png';
+    if (name.includes('mar ephraem') || name.includes('mar ephream'))
+        return '/college-logos/mar ephream.png';
+    if (name.includes('akshaya') || name.includes('acet'))
+        return '/college-logos/acet.png';
+    if (name.includes('anand') || name.includes('aiht'))
+        return '/college-logos/aiht.png';
+    if (name.includes('npr'))
+        return '/college-logos/npr.png';
+    if (name.includes('vaigai'))
+        return '/college-logos/vaigai.png';
+    if (name.includes('ifet'))
+        return '/college-logos/ifet.png';
+    if (name.includes('egs') || name.includes('pillay'))
+        return '/college-logos/egs.png';
+    if (name.includes('gnyanamani') || name.includes('gnanamani'))
+        return '/college-logos/gnyanamani.png';
+    if (name.includes('christ'))
+        return '/college-logos/christ.png';
+    if (name.includes('srm'))
+        return '/college-logos/srm.png';
+    if (name.includes('vit') || name.includes('vellore'))
+        return '/college-logos/vit.png';
+    if (name.includes('mcet') || name.includes('mahalingam'))
+        return '/college-logos/MCET.png';
+    if (name.includes('mec') || name.includes('muthayammal'))
+        return '/college-logos/MEC.png';
+    if (name.includes('amcet') || name.includes('annai mira'))
+        return '/college-logos/AMCET.png';
+    if (name.includes('audisankar'))
+        return '/college-logos/audisankar.png';
+    if (name.includes('bharathiyar'))
+        return '/college-logos/bharathiyar institue.png';
+    if (name.includes('loyola') || name.includes('layola') || name.includes('licet'))
+        return '/college-logos/layola.png';
+    if (code && code !== 'IPOMS' && code !== 'COLLEGE' && code !== 'MULTI') {
+        return `/college-logos/${code.toLowerCase()}.png`;
+    }
+    return null;
+}
 // ── RA-5: POST /api/v1/reports/generate
 // Dynamic Report Generator reading live from M03, M04, and M05 (Spec Section 9.7 & 10.3)
 app.post('/api/v1/reports/generate', async (req, res) => {
     try {
-        const { template_type = 'weekly_placement', college_id, coordinator_id, academic_year = 'all', date_from, date_to, week_label = 'Week 3: 21 Aug - 27 Aug 2026', theme = 'blue', included_sections, included_kpi_cards, kpi_cards, custom_remarks, lead_sources, include_prepared_by, prepared_by, active_leads_columns, min_ctc, include_competitive_ctc = false, company_name_filter, company_type_filter, status_filter, custom_weekly_companies, } = req.body;
+        const { template_type = 'weekly_placement', college_id, coordinator_id, academic_year = 'all', date_from, date_to, week_label = '', theme = 'blue', included_sections, included_kpi_cards, kpi_cards, custom_remarks, lead_sources, include_prepared_by, prepared_by, active_leads_columns, min_ctc, include_competitive_ctc = false, company_name_filter, company_type_filter, status_filter, custom_weekly_companies, } = req.body;
         const isMultiCollegeWeekly = template_type === 'weekly_placement' &&
             Boolean(req.body.is_multi_college || (Array.isArray(req.body.college_ids) && req.body.college_ids.length > 0) || college_id === 'all' || college_id === 'multi');
         if (template_type !== 'active_leads' && !isMultiCollegeWeekly) {
@@ -3993,7 +4277,7 @@ app.post('/api/v1/reports/generate', async (req, res) => {
                     company_logo: '/infoziant-head.png',
                     college_name: targetCollege?.college_name || (college_id === 'all' ? 'All Partner Institutions' : 'Target Institution'),
                     college_code: targetCollege?.college_code || (college_id === 'all' ? 'IPOMS' : 'COLLEGE'),
-                    college_logo: targetCollege?.logo_url || null,
+                    college_logo: resolveCollegeLogoUrl(targetCollege),
                     confidential_notice: 'Prepared by Infoziant',
                 },
                 sections: {
@@ -4013,6 +4297,7 @@ app.post('/api/v1/reports/generate', async (req, res) => {
         }
         // ── CASE 2: ACTIVE LEADS REPORT ────────────────────────────────────────────
         if (template_type === 'active_leads') {
+            const isConsolidated = !college_id || college_id === 'all';
             const hasSpecificBatch = academic_year && academic_year !== 'all' && String(academic_year).trim() !== '';
             const selectedBatch = hasSpecificBatch ? String(academic_year).trim() : '';
             // Stream selection options: jd_received (Hot), positives (Warm), weekly_tracker (Pipeline/In Progress)
@@ -4262,10 +4547,10 @@ app.post('/api/v1/reports/generate', async (req, res) => {
                 theme: theme || 'blue',
                 branding: {
                     company_name: 'Infoziant IT Solutions Inc.',
-                    company_logo: '/infoziant-logo.png',
-                    college_name: targetCollege?.college_name || '',
-                    college_code: targetCollege?.college_code || 'iPOMS',
-                    college_logo: targetCollege?.college_website ? `https://logo.clearbit.com/${targetCollege.college_website.replace(/https?:\/\//, '')}` : null,
+                    company_logo: '/infoziant-head.png',
+                    college_name: targetCollege?.college_name || (isConsolidated ? 'All Partner Institutions' : 'Target Institution'),
+                    college_code: targetCollege?.college_code || (isConsolidated ? 'iPOMS' : 'COLLEGE'),
+                    college_logo: (isConsolidated || !targetCollege) ? null : resolveCollegeLogoUrl(targetCollege),
                     confidential_notice: 'Prepared by Infoziant',
                 },
                 kpi_summary: {
@@ -4511,7 +4796,7 @@ app.post('/api/v1/reports/generate', async (req, res) => {
                     company_logo: '/infoziant-head.png',
                     college_name: targetCollege?.college_name || (college_id === 'all' ? 'All Handled Institutions' : 'Target Institution'),
                     college_code: targetCollege?.college_code || (college_id === 'all' ? 'IPOMS' : 'COLLEGE'),
-                    college_logo: targetCollege?.logo_url || null,
+                    college_logo: resolveCollegeLogoUrl(targetCollege),
                     confidential_notice: `Prepared by Infoziant • ${coordinator?.full_name || 'Placement Coordinator'}`,
                     prepared_by: coordinator?.full_name || 'Placement Coordinator',
                     coordinator_name: coordinator?.full_name || 'Placement Coordinator',
@@ -4660,7 +4945,7 @@ app.post('/api/v1/reports/generate', async (req, res) => {
                 is_multi_college: true,
                 colleges_data,
                 report_title: 'Consolidated Weekly Placement Report',
-                report_period: week_label || 'All Dates (Cumulative)',
+                report_period: (week_label && !String(week_label).toLowerCase().includes('cumulative')) ? String(week_label).trim() : '',
                 include_prepared_by: include_prepared_by !== false,
                 generated_by: (include_prepared_by === false) ? '' : (prepared_by || coordinator?.full_name || 'Placement Coordinator'),
                 generated_date: new Date().toLocaleDateString('en-IN', {
@@ -4855,7 +5140,7 @@ app.post('/api/v1/reports/generate', async (req, res) => {
                 : template_type === 'monthly_placement'
                     ? `Monthly Placement Review — ${academic_year} Season`
                     : 'Placement Operations Report',
-            report_period: week_label,
+            report_period: (week_label && !String(week_label).toLowerCase().includes('cumulative')) ? String(week_label).trim() : '',
             include_prepared_by: include_prepared_by !== false,
             generated_by: (include_prepared_by === false) ? '' : (prepared_by || coordinator?.full_name || 'Placement Coordinator'),
             active_leads_columns: active_leads_columns || { colleges: true, role: true, ctc: true },
@@ -4867,10 +5152,10 @@ app.post('/api/v1/reports/generate', async (req, res) => {
             theme: theme || 'blue',
             branding: {
                 company_name: 'Infoziant IT Solutions Inc.',
-                company_logo: '/infoziant-logo.png',
+                company_logo: '/infoziant-head.png',
                 college_name: targetCollege?.college_name || 'Consolidated Partner Institutions',
                 college_code: targetCollege?.college_code || 'iPOMS',
-                college_logo: targetCollege?.college_website ? `https://logo.clearbit.com/${targetCollege.college_website.replace(/https?:\/\//, '')}` : null,
+                college_logo: resolveCollegeLogoUrl(targetCollege),
                 confidential_notice: 'Prepared by Infoziant',
             },
             kpi_summary: {
@@ -5020,7 +5305,7 @@ app.post('/api/v1/reports/generate', async (req, res) => {
 // Save Custom Builder Configuration Preset (Spec Section 12)
 app.post('/api/v1/reports/presets', async (req, res) => {
     try {
-        const { template_type, preset_name, college_id, coordinator_id, academic_year = '2026', filters, included_sections, custom_remarks, theme, } = req.body;
+        const { template_type, preset_name, college_id, coordinator_id, academic_year, filters, included_sections, custom_remarks, theme, } = req.body;
         if (!template_type || !preset_name || !coordinator_id) {
             return res.status(400).json({
                 success: false,
@@ -5032,7 +5317,7 @@ app.post('/api/v1/reports/presets', async (req, res) => {
             preset_name: preset_name.trim(),
             college_id: college_id && college_id !== 'all' ? new mongoose_1.Types.ObjectId(String(college_id)) : null,
             coordinator_id: new mongoose_1.Types.ObjectId(String(coordinator_id)),
-            academic_year,
+            academic_year: academic_year ?? (await (0, academicYear_1.getCurrentAcademicYear)()),
             filters: filters || {},
             included_sections: included_sections || {},
             custom_remarks: custom_remarks?.trim() || '',
@@ -5408,6 +5693,9 @@ app.get('/api/v1/dashboard/college-kpis', async (req, res) => {
         const POSITIVE_STATUSES = ['hiring', 'invite_mail', 'follow_up', 'jd_received', 'drive_completed', 'in_connect'];
         const NEGATIVE_STATUSES = ['invalid', 'no_response', 'hiring_freezed', 'call_back'];
         const NOT_HIRING_STATUSES = ['not_hiring'];
+        const sessionDateParam = req.query.date;
+        const isAllTime = req.query.all_time === 'true';
+        const targetSessionDate = sessionDateParam ? parseDateParam(sessionDateParam) : buildSessionDate();
         const kpiResults = await Promise.all(targetCollegeIds.map(async (cIdStr) => {
             let college = null;
             if (mongoose_1.Types.ObjectId.isValid(cIdStr)) {
@@ -5428,28 +5716,33 @@ app.get('/api/v1/dashboard/college-kpis', async (req, res) => {
                 college_id: cObjectId,
                 coordinator_id: coordinator._id,
             };
+            // Daily outreach filter for today (resets every morning at 12:00 AM)
+            const dailyFilter = {
+                ...coordinatorBaseFilter,
+                ...(isAllTime ? {} : { session_date: targetSessionDate }),
+            };
             const [totalCalls, totalPositives, totalNegatives, totalNotHiring, activeLeadsCount, weeklyPipelineCount,] = await Promise.all([
-                // Total Calls Made
+                // Total Calls Made (Today's Daily Outreach)
                 DailyTracker_1.DailyTracker.countDocuments({
-                    ...coordinatorBaseFilter,
+                    ...dailyFilter,
                     is_skipped: { $ne: true },
                 }),
-                // Positives (Hiring, Invite Email, Follow Up, JD Received, Drive Completed)
+                // Positives (Today)
                 DailyTracker_1.DailyTracker.countDocuments({
-                    ...coordinatorBaseFilter,
+                    ...dailyFilter,
                     outcome_status: { $in: POSITIVE_STATUSES },
                 }),
-                // Negatives (Invalid, No Response, Freeze)
+                // Negatives (Today)
                 DailyTracker_1.DailyTracker.countDocuments({
-                    ...coordinatorBaseFilter,
+                    ...dailyFilter,
                     outcome_status: { $in: NEGATIVE_STATUSES },
                 }),
-                // Not Hiring
+                // Not Hiring (Today)
                 DailyTracker_1.DailyTracker.countDocuments({
-                    ...coordinatorBaseFilter,
+                    ...dailyFilter,
                     outcome_status: { $in: NOT_HIRING_STATUSES },
                 }),
-                // Daily Leads
+                // Daily Leads (Open active leads)
                 DailyLead_1.DailyLead.countDocuments({
                     ...coordinatorBaseFilter,
                     is_deleted: false,
@@ -5480,6 +5773,8 @@ app.get('/api/v1/dashboard/college-kpis', async (req, res) => {
         return res.status(200).json({
             success: true,
             data: {
+                session_date: targetSessionDate,
+                is_daily_refresh: !isAllTime,
                 colleges: validKpis,
                 total_selected: validKpis.length,
             },
@@ -6618,6 +6913,12 @@ app.post('/api/v1/metadata', async (req, res) => {
         const trimmedHr = hr_name.trim();
         const trimmedMobile = primary_mobile.trim();
         const trimmedEmail = primary_email.trim().toLowerCase();
+        if (!trimmedMobile && !trimmedEmail && (!mobile_numbers || mobile_numbers.length === 0) && (!email_ids || email_ids.length === 0)) {
+            return res.status(400).json({
+                success: false,
+                error: { code: 'VALIDATION_ERROR', message: 'At least one contact method (Mobile Number or Email ID) is required' },
+            });
+        }
         // Duplicate Check (Spec Section 7 & 11)
         if (!force_save && trimmedMobile) {
             const existing = await CompanyMetadata_1.CompanyMetadata.findOne({
@@ -7663,6 +7964,7 @@ app.get('/api/v1/settings', authMiddleware_1.authenticateJWT, async (req, res) =
         if (!settings) {
             settings = await SystemSettings_1.SystemSettings.create({
                 academic_year: '2025-2026',
+                graduating_batch_year: 2026,
                 season_name: 'Campus Recruitment Season 2025-26',
                 daily_calling_target: 30,
                 working_days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
@@ -7828,13 +8130,19 @@ app.get('/api/v1/settings', authMiddleware_1.authenticateJWT, async (req, res) =
 // Update global system settings
 app.patch('/api/v1/settings', authMiddleware_1.authenticateJWT, (0, authMiddleware_1.authorizeRoles)('ADMINISTRATOR', 'ADMIN'), async (req, res) => {
     try {
-        const { academic_year, season_name, daily_calling_target, working_days, org_name, org_support_email, org_support_phone, maintenance_mode_enabled, maintenance_affected_roles, maintenance_reason, maintenance_start_time, maintenance_end_time, } = req.body;
+        const { academic_year, graduating_batch_year, season_name, daily_calling_target, working_days, org_name, org_support_email, org_support_phone, maintenance_mode_enabled, maintenance_affected_roles, maintenance_reason, maintenance_start_time, maintenance_end_time, } = req.body;
         let settings = await SystemSettings_1.SystemSettings.findOne({});
         if (!settings) {
             settings = new SystemSettings_1.SystemSettings({});
         }
-        if (academic_year !== undefined)
+        if (academic_year !== undefined) {
             settings.academic_year = academic_year.trim();
+            (0, academicYear_1.clearAcademicYearCache)();
+        }
+        if (graduating_batch_year !== undefined) {
+            settings.graduating_batch_year = Number(graduating_batch_year);
+            (0, academicYear_1.clearAcademicYearCache)();
+        }
         if (season_name !== undefined)
             settings.season_name = season_name.trim();
         if (daily_calling_target !== undefined)
@@ -8519,6 +8827,9 @@ const startServer = async () => {
     });
     // Start midnight finalization cron job (Spec Section 14)
     (0, finalizeDailyTracker_1.startFinalizationJob)();
+    // Same-day positive-call safety net: 8 PM reminder email, 10 PM auto-sync
+    // fallback (user-requested, 6 Sep 2026 — see jobs/positiveSyncReminder.ts)
+    (0, positiveSyncReminder_1.startPositiveSyncReminderJob)();
 };
 startServer().catch((err) => {
     // Without this, a throw anywhere in boot (a malformed seed workbook, an

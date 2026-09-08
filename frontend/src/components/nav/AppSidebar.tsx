@@ -20,11 +20,11 @@ import {
   ShieldCheck,
   Shield,
   Sliders,
-  HelpCircle,
 } from 'lucide-react';
 
 import { InfoziantMark } from '@/components/InfoziantMark';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { FullScreenToggle } from '@/components/ui/FullScreenToggle';
 import { RailTooltip } from './RailTooltip';
 import { initialsFor } from '@/lib/initials';
 import {
@@ -65,7 +65,6 @@ const NAV: NavItem[] = [
   // Intelligence & Reporting
   { href: '/metadata', label: 'Metadata DB', Icon: Database },
   { href: '/reports', label: 'Report Builder', Icon: TrendingUp },
-  { href: '/faq', label: 'Help & FAQs', Icon: HelpCircle },
 
   // Dedicated Standalone Administrator Governance Modules
   { href: '/users', label: 'User Management', Icon: Users, roles: ['admin', 'team_leader'] },
@@ -345,7 +344,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
           </ul>
         </nav>
 
-        {/* ── Signed-in Profile Identity Avatar & Theme Changer Toggle ───── */}
+        {/* ── Signed-in Profile Identity Avatar & Controls Toggle ───── */}
         <div className="shrink-0 border-t border-zinc-200 dark:border-zinc-800 px-2.5 py-2.5">
           {collapsed ? (
             <div className="flex flex-col items-center gap-2">
@@ -367,7 +366,10 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                   </span>
                 )}
               </Link>
-              <ThemeToggle className="w-9 h-9 rounded-xl text-xs" />
+              <div className="flex flex-col items-center gap-1.5">
+                <FullScreenToggle className="w-9 h-9 rounded-xl text-xs" />
+                <ThemeToggle className="w-9 h-9 rounded-xl text-xs" />
+              </div>
             </div>
           ) : (
             <div className="flex items-center justify-between gap-1.5 p-1.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 shadow-xs">
@@ -396,8 +398,9 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                   </span>
                 </div>
               </Link>
-              <div className="shrink-0">
-                <ThemeToggle className="w-9 h-9 rounded-xl text-xs" />
+              <div className="flex items-center gap-1 shrink-0">
+                <FullScreenToggle className="w-8 h-8 rounded-lg text-xs" />
+                <ThemeToggle className="w-8 h-8 rounded-lg text-xs" />
               </div>
             </div>
           )}
@@ -622,7 +625,8 @@ function MobileDrawer({
             <span className="text-xs font-bold text-fg truncate">{fullName}</span>
           </Link>
 
-          <div className="shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <FullScreenToggle className="w-9 h-9 rounded-xl text-xs" />
             <ThemeToggle />
           </div>
         </div>

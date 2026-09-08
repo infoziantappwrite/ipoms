@@ -41,6 +41,14 @@ const SystemSettingsSchema = new mongoose_1.Schema({
         default: '2025-2026',
         trim: true,
     },
+    // The single graduation year shown to companies/colleges ("2027 Batch"),
+    // distinct from academic_year (the season range, "2026-2027"). Defaults to
+    // the season's second year but is independently settable — a college's
+    // graduating batch is one year, not a range.
+    graduating_batch_year: {
+        type: Number,
+        default: 2027,
+    },
     season_name: {
         type: String,
         default: 'Campus Recruitment Season 2025-26',

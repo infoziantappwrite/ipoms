@@ -165,7 +165,7 @@ export function InviteEmailModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-overlay/50 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 animate-in fade-in duration-150">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-3 sm:p-4 animate-in fade-in duration-150">
       {/* Modal Container */}
       <div className="w-full max-w-2xl rounded-2xl bg-surface border border-border shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-fg">
         

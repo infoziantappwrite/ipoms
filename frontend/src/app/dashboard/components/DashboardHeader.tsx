@@ -11,10 +11,12 @@ import {
   PhoneCall,
   ArrowRight,
   Sparkles,
+  HelpCircle,
   type LucideIcon
 } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { DashboardAmbientScene } from '@/components/dashboard/DashboardAmbientScene';
+import { triggerHaptic } from '@/lib/haptics';
 import { readSessionUser, roleOf, updateSessionUser, type SessionUser } from '@/lib/session';
 import { apiFetch } from '@/lib/api';
 import { initialsFor } from '@/lib/initials';
@@ -83,6 +85,21 @@ export function DashboardHeader() {
   }>(getLocalTimeGreeting);
   const [quoteIndex, setQuoteIndex] = useState(0);
   const [isFading, setIsFading] = useState(false);
+
+  // Keyboard shortcut: Press '?' or 'Shift + /' to open FAQs in a new tab
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+      if (!isInput && e.key === '?') {
+        e.preventDefault();
+        triggerHaptic('selection');
+        window.open('/faq', '_blank', 'noopener,noreferrer');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Time-of-day greeting updater & 30-Second quote auto-rotator
   useEffect(() => {
@@ -200,8 +217,24 @@ export function DashboardHeader() {
             <span>{toTitleCase(greetingData?.greeting ?? `Good ${period}`)}</span>
           </div>
 
-          {/* Top-Right Sign Out */}
-          <div className="flex items-center gap-2.5">
+          {/* Top-Right Action Controls (Help & FAQs in new tab + Sign Out) */}
+          <div className="flex items-center gap-2">
+            <Link
+              href="/faq"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => triggerHaptic('light')}
+              title="Frequently Asked Questions & Guides (Opens in a new tab • Press ?)"
+              aria-label="Frequently Asked Questions & Guides"
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200 active:scale-95 cursor-pointer shadow-2xs border select-none group ${
+                isNight
+                  ? 'bg-white/85 dark:bg-white/10 border-slate-200 dark:border-white/20 text-slate-700 dark:text-slate-200 hover:text-primary hover:bg-white dark:hover:bg-white/20 backdrop-blur-md'
+                  : 'bg-surface hover:bg-surface-raised border-border text-fg-subtle hover:text-primary'
+              }`}
+            >
+              <HelpCircle size={18} strokeWidth={2.2} className="group-hover:scale-110 transition-transform duration-200" />
+            </Link>
+
             <UserSignOutButton
               className={
                 isNight

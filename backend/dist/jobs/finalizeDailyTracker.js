@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.startFinalizationJob = startFinalizationJob;
 const node_cron_1 = __importDefault(require("node-cron"));
 const DailyTracker_1 = require("../models/DailyTracker");
+const weeklyTrackerSync_1 = require("../lib/weeklyTrackerSync");
 // ─────────────────────────────────────────────────────────────────────────────
 // 5:00 AM Dashboard Analytics Refresh & 6:00 AM Daily Tracker Finalization Jobs
 //
@@ -52,18 +53,22 @@ function startFinalizationJob() {
         console.log(`\n⏰ [Daily Tracker 6:00 AM Reset Job] Triggered at ${now.toISOString()} (06:00 AM IST)`);
         try {
             const prevSessionDate = getPreviousSessionDate();
-            // Step 1: Promote any remaining unpromoted positive outcomes from prior sessions
+            // Step 1: Promote any remaining unpromoted Invite Mail calls from prior sessions.
+            // Invite Mail alone triggers Weekly Tracker promotion (user decision, 6 Sep 2026
+            // — see PIPELINE_SYNC_OUTCOME in DailyTracker.ts).
             const unpromoted = await DailyTracker_1.DailyTracker.find({
                 session_date: { $lte: prevSessionDate },
-                outcome_status: { $in: DailyTracker_1.POSITIVE_OUTCOMES },
+                outcome_status: DailyTracker_1.PIPELINE_SYNC_OUTCOME,
                 is_promoted_to_weekly: false,
                 is_finalized: false,
             });
             if (unpromoted.length > 0) {
                 console.log(`📤 [Daily Tracker Reset Job] Auto-promoting ${unpromoted.length} positive outcome(s) to Weekly Tracker...`);
+                // Actually creates the Weekly Tracker row — this used to just flip
+                // is_promoted_to_weekly with nothing behind it, silently losing the
+                // promotion while claiming it happened. See weeklyTrackerSync.ts.
                 for (const row of unpromoted) {
-                    row.is_promoted_to_weekly = true;
-                    await row.save();
+                    await (0, weeklyTrackerSync_1.promoteDailyTrackerRowToWeekly)(row);
                 }
             }
             // Step 2: Finalize all rows from previous sessions (is_finalized = true)

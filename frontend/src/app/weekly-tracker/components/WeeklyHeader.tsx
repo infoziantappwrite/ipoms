@@ -5,11 +5,14 @@ import { CalendarDays, ChevronLeft, ChevronRight, Plus, RefreshCw, FileSpreadshe
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { CollegeSelector, College } from '@/components/CollegeSelector';
 import { SmoothExportDropdown } from '@/components/ui/SmoothExportDropdown';
+import { AutoSaveBadge } from '@/components/ui/AutoSaveBadge';
 import { apiFetch } from '@/lib/api';
 
 interface Props {
   selectedCollegeId: string;
   onSelectCollege: (id: string, name: string) => void;
+  saveStatus?: 'saved' | 'saving' | 'idle';
+  lastSavedAt?: Date | null;
   weekOffset: number;
   onWeekChange: (offset: number) => void;
   academicYear?: string;
@@ -102,6 +105,8 @@ function formatWeekDisplay(offset: number) {
 export function WeeklyHeader({
   selectedCollegeId,
   onSelectCollege,
+  saveStatus = 'idle',
+  lastSavedAt = null,
   weekOffset,
   onWeekChange,
   academicYear = 'all',
@@ -188,6 +193,7 @@ export function WeeklyHeader({
           )}
 
           <div className="flex items-center gap-2 shrink-0">
+            <AutoSaveBadge status={saveStatus} lastSavedAt={lastSavedAt} />
             <UserSignOutButton />
           </div>
         </div>

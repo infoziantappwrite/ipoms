@@ -922,6 +922,36 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     on a follow-up search) and both settings fields reverted to their real values
     (`2026-2027` / `2027`) before finishing. `tsc --noEmit` clean both sides.
 
+38. ~~**Daily Tracker's per-edit "Saving…/Saved at" badge was dead code — never rendered
+    on screen.**~~ **FIXED 7 Sep 2026.** Found while verifying Daily Tracker's auto-save
+    for the user: `AutoSaveBadge.tsx` existed, and `saveStatus`/`lastSavedAt` state in
+    `tracker/page.tsx` genuinely updated on every save (confirmed live earlier the same
+    day) — but the component was never imported or rendered anywhere. The underlying
+    save itself always worked; there was simply no visible confirmation of it beyond the
+    shared Ctrl+S banner. **Correction to what this session told the user minutes
+    earlier**: it had claimed Daily Tracker gives "instant, per-edit visual proof" based on
+    reading the component's code without checking it was actually placed on the page —
+    wrong, and corrected in the same turn once caught while building the Weekly Tracker
+    version. Moved `AutoSaveBadge` from `app/tracker/components/` to the shared
+    `components/ui/` (both pages need it now) and rendered it in Daily Tracker's header,
+    next to the sign-out button, hidden in read-only History mode.
+    **Weekly Tracker parity (user-requested, same session)**: Weekly Tracker's inline
+    cell edits (`commitEdit` on blur in `WeeklyTable.tsx`) already saved for real via
+    `PATCH /weekly-tracker/:id` — verified live earlier the same day — but gave zero
+    per-edit feedback; the only visible "Saved" confirmation was the shared banner, and
+    only on manual Ctrl+S. Added the same `saveStatus`/`lastSavedAt` state to
+    `weekly-tracker/page.tsx`, wired into the three silent-save handlers
+    (`handleUpdateRow`, `handleMoveSection`, `handleTogglePin`), and rendered via
+    `WeeklyHeader.tsx` (new optional `saveStatus`/`lastSavedAt` props, default `'idle'`/
+    `null` so no other caller breaks). Deliberately left `handleSaveAll` (Ctrl+S) alone —
+    it still drives the separate floating banner, which is the correct signal for "I just
+    explicitly flushed everything," distinct from the inline per-edit badge.
+    `tsc --noEmit` clean. **Not verified visually in-browser** — the in-app preview tool
+    hit the same blank/0×0-viewport failure documented in item 35; the frontend itself
+    was confirmed live and responding (`curl` 200 on `/`), so this is a tooling limitation
+    in this session, not evidence against the fix. Confirmed correct only by code trace and
+    a clean typecheck — visually re-check next time the preview tool is available.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

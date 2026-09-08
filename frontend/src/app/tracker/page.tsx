@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { KpiCards } from './components/KpiCards';
 import { CollegeSelector, College } from './components/CollegeSelector';
 import { ContactPickerModal } from './components/ContactPickerModal';
 import { TrackerGrid } from './components/TrackerGrid';
@@ -9,12 +8,18 @@ import { CalendarPicker } from './components/CalendarPicker';
 import { SoftphonePanel, SoftphoneCallResult } from './components/SoftphonePanel';
 import { SmoothOutcomeDropdown } from '@/components/ui/SmoothOutcomeDropdown';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
+import { AutoSaveBadge } from '@/components/ui/AutoSaveBadge';
 import { AlertTriangle, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Cloud, Loader2, PhoneCall, Plus, Save, Search, Trash2, Upload } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
 import { ManualAddRowModal } from './components/ManualAddRowModal';
 import { EditTrackerRowModal } from './components/EditTrackerRowModal';
 import { BulkDeleteTrackerModal } from './components/BulkDeleteTrackerModal';
+import { DeleteRowConfirmModal } from './components/DeleteRowConfirmModal';
+import { TrackerActionsDropdown } from './components/TrackerActionsDropdown';
+import { DailySummaryModal } from './components/DailySummaryModal';
+import { useToast } from '@/components/ui/Toast';
+import { triggerHaptic } from '@/lib/haptics';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -82,7 +87,7 @@ export default function DailyTrackerPage() {
   const [kpi, setKpi] = useState<KpiData | null>(null);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle' | 'error'>('idle');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [isHistoryMode, setIsHistoryMode] = useState(false);
   const [historyDate, setHistoryDate] = useState<string>('');
@@ -92,9 +97,37 @@ export default function DailyTrackerPage() {
   const [activeCallRow, setActiveCallRow] = useState<TrackerRow | null>(null);
   const [sessionDate, setSessionDate] = useState<string>('');
   const [isManualAddOpen, setIsManualAddOpen] = useState(false);
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<TrackerRow | null>(null);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [bulkDeleteSuccessMsg, setBulkDeleteSuccessMsg] = useState<string | null>(null);
+  const [selectedRowCount, setSelectedRowCount] = useState<number>(0);
+  const [isDeleteMode, setIsDeleteMode] = useState<boolean>(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState<boolean>(false);
+  const { toast } = useToast();
+
+  // Listen for selection count, delete mode, and confirmation events from TrackerGrid
+  useEffect(() => {
+    const handleCount = (e: Event) => {
+      const customEvent = e as CustomEvent<{ count: number; isDeleteMode?: boolean }>;
+      setSelectedRowCount(customEvent.detail?.count || 0);
+      if (customEvent.detail?.isDeleteMode !== undefined) {
+        setIsDeleteMode(customEvent.detail.isDeleteMode);
+      }
+    };
+
+    const handleOpenConfirm = () => {
+      setIsDeleteConfirmOpen(true);
+    };
+
+    window.addEventListener('ipoms_tracker_selection_count', handleCount);
+    window.addEventListener('ipoms_tracker_open_delete_confirm', handleOpenConfirm);
+
+    return () => {
+      window.removeEventListener('ipoms_tracker_selection_count', handleCount);
+      window.removeEventListener('ipoms_tracker_open_delete_confirm', handleOpenConfirm);
+    };
+  }, []);
 
   // Real signed-in identity. The backend still enforces ownership itself
   // (scopeToSelf pins a coordinator to their own id regardless of what's
@@ -271,7 +304,7 @@ export default function DailyTrackerPage() {
       }
     } catch (e) {
       console.error('[DT] Row update failed', e);
-      setSaveStatus('idle');
+      setSaveStatus('error');
     }
   }, [loadKpi, coordinatorId, selectedCollegeId]);
 
@@ -313,19 +346,49 @@ export default function DailyTrackerPage() {
     } catch (e) { console.error('[DT] Delete failed', e); }
   }, [loadKpi]);
 
-  // ── Save Progress (Ctrl+S)
+  // ── Handle bulk delete selected rows in active college
+  const handleDeleteSelectedRows = useCallback(async (rowIds: string[]) => {
+    if (!rowIds || rowIds.length === 0) return;
+    const confirmMsg = rowIds.length === 1
+      ? 'Are you sure you want to remove this contact from today\'s calling sheet?'
+      : `Are you sure you want to remove ${rowIds.length} selected contacts from today's calling sheet for ${selectedCollegeName}?`;
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      const results = await Promise.all(
+        rowIds.map((id) => apiFetch(`/daily-tracker/${id}`, { method: 'DELETE' }))
+      );
+      const allSuccess = results.every((r) => r.success);
+      if (allSuccess) {
+        setRows((prev) => prev.filter((row) => !rowIds.includes(row._id)).map((r, idx) => ({ ...r, serial_no: idx + 1 })));
+        await loadKpi();
+      } else {
+        await loadTodayRows();
+        await loadKpi();
+      }
+    } catch (e) {
+      console.error('[DT] Bulk delete selected rows failed', e);
+      alert('Error occurred while deleting selected contacts.');
+    }
+  }, [selectedCollegeName, loadKpi, loadTodayRows]);
+
+  // ── Save Progress (Ctrl+S / Save Button)
   const handleSaveProgress = useCallback(async () => {
-    if (!selectedCollegeId || !coordinatorId) return;
+    if (!selectedCollegeId || !coordinatorId) {
+      toast('Please select a college first', 'warning');
+      return;
+    }
 
     // Verify mandatory Follow Up Month for rows marked as follow_up
     const missingFollowUp = rows.find((r) => !r.is_skipped && r.outcome_status === 'follow_up' && !r.follow_up_month);
     if (missingFollowUp) {
-      alert(`Follow Up Month is mandatory for "${missingFollowUp.company_name}" (Row #${missingFollowUp.serial_no}). Please select a month.`);
+      toast(`Follow Up Month is mandatory for "${missingFollowUp.company_name}" (Row #${missingFollowUp.serial_no}). Please select a month.`, 'warning');
       setSaveStatus('idle');
       return;
     }
 
     setSaveStatus('saving');
+    triggerHaptic('selection');
     try {
       const res = await apiFetch('/daily-tracker/save-progress', {
         method: 'POST',
@@ -334,28 +397,103 @@ export default function DailyTrackerPage() {
       if (res.success) {
         setSaveStatus('saved');
         setLastSavedAt(new Date());
+        triggerHaptic('success');
         const data = res.data as any;
-        if (data.positive_promoted > 0) {
-          console.log(`${data.positive_promoted} positive outcome(s) queued for Weekly Tracker`);
+        if (data?.positive_promoted > 0) {
+          toast(`Saved! ${data.positive_promoted} positive outcome(s) queued for Weekly Tracker`, 'success');
+        } else {
+          toast('All changes saved successfully', 'success');
         }
+      } else {
+        setSaveStatus('error');
+        toast(res.message || 'Failed to save progress', 'error');
       }
     } catch (e) {
       console.error('[DT] Save progress failed', e);
-      setSaveStatus('idle');
+      setSaveStatus('error');
+      toast('Failed to save progress. Please check your network connection.', 'error');
     }
-  }, [selectedCollegeId, coordinatorId]);
+  }, [selectedCollegeId, coordinatorId, rows, toast]);
 
-  // ── Ctrl+S keyboard shortcut
+  // ── Keyboard shortcuts (Ctrl+S to save, Shift+S for summary pop-up, Shift+H for history, Shift+A for manual entry, Escape to close/exit)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      const targetTag = (e.target as HTMLElement)?.tagName;
+      const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(targetTag);
+
+      // Handle Shift+Key global shortcuts when not typing in text fields
+      if (!isInput && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // Shift+S: Toggle Daily Calling Summary Pop-up Window
+        if (e.key === 'S' || e.key === 's') {
+          e.preventDefault();
+          setIsSummaryOpen((prev) => !prev);
+          return;
+        }
+
+        // Shift+H: Open / Toggle Call History (Calendar)
+        if (e.key === 'H' || e.key === 'h') {
+          e.preventDefault();
+          setIsCalendarOpen((prev) => !prev);
+          return;
+        }
+
+        // Shift+A: Open / Toggle Add Manual Entry Modal
+        if (e.key === 'A' || e.key === 'a') {
+          e.preventDefault();
+          if (!selectedCollegeId) {
+            alert('Please select a college first');
+            return;
+          }
+          setIsManualAddOpen((prev) => !prev);
+          return;
+        }
+
+        // Shift+L: Open / Toggle Load Contacts Picker Modal
+        if (e.key === 'L' || e.key === 'l') {
+          e.preventDefault();
+          if (!selectedCollegeId) {
+            alert('Please select a college first');
+            return;
+          }
+          setIsPickerOpen((prev) => !prev);
+          return;
+        }
+      }
+
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
         handleSaveProgress();
+      } else if (e.key === 'Escape') {
+        if (isPickerOpen) {
+          return;
+        }
+        if (isSummaryOpen) {
+          setIsSummaryOpen(false);
+          return;
+        }
+        if (isCalendarOpen) {
+          setIsCalendarOpen(false);
+          return;
+        }
+        if (isManualAddOpen) {
+          setIsManualAddOpen(false);
+          return;
+        }
+        if (
+          isHistoryMode &&
+          !isPickerOpen &&
+          !isCalendarOpen &&
+          !isManualAddOpen &&
+          !editingRow &&
+          !isBulkDeleteOpen
+        ) {
+          setIsHistoryMode(false);
+        }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleSaveProgress]);
+  }, [handleSaveProgress, isPickerOpen, isSummaryOpen, isCalendarOpen, isManualAddOpen, isHistoryMode, editingRow, isBulkDeleteOpen, selectedCollegeId]);
 
   // ── Bulk Delete Tracker Data
   const handleBulkDelete = useCallback(async (scope: 'today' | 'college_all' | 'entire_database') => {
@@ -451,10 +589,10 @@ export default function DailyTrackerPage() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-background text-fg flex flex-col font-sans">
+    <div className="h-screen bg-background text-fg flex flex-col font-sans overflow-hidden">
 
       {/* ── Top Section: Title & Top-Right Header ───────────────────────── */}
-      <header className="sticky top-0 z-40 bg-surface/95 backdrop-blur-md border-b border-border px-6 py-4 space-y-3 shrink-0 shadow-xs text-fg">
+      <header className="sticky top-0 z-40 bg-surface border-b border-border px-6 py-4 space-y-3 shrink-0 shadow-xs text-fg">
         <div className="flex items-center justify-between gap-4">
           {/* Left: Tracker title + date */}
           <div>
@@ -516,6 +654,7 @@ export default function DailyTrackerPage() {
             )}
 
             <div className="flex items-center gap-2 shrink-0">
+              {!isHistoryMode && <AutoSaveBadge status={saveStatus} lastSavedAt={lastSavedAt} />}
               <UserSignOutButton />
             </div>
           </div>
@@ -566,68 +705,6 @@ export default function DailyTrackerPage() {
 
             {!isHistoryMode ? (
               <>
-                {/* Load Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!selectedCollegeId) {
-                      alert('Please select a college first');
-                      return;
-                    }
-                    window.open('/tracker/load-contacts', '_blank');
-                  }}
-                  className="flex items-center gap-1.5 bg-primary hover:bg-blue-700 text-primary-foreground px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
-                  title="Click me to load contacts from metadata base"
-                >
-                  <Upload size={14} strokeWidth={2.5} aria-hidden /> Load
-                </button>
-
-                {/* Save Button (Icon-Only) */}
-                <button
-                  type="button"
-                  onClick={handleSaveProgress}
-                  disabled={!selectedCollegeId}
-                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-[0.992] shrink-0"
-                  title="Save Progress (Ctrl + S)"
-                  aria-label="Save Progress (Ctrl + S)"
-                >
-                  <Save size={15} strokeWidth={2.5} aria-hidden />
-                </button>
-
-                {/* Delete Button (Icon-Only Dustbin) */}
-                <button
-                  type="button"
-                  onClick={() => setIsBulkDeleteOpen(true)}
-                  disabled={!selectedCollegeId}
-                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-[0.992] shrink-0"
-                  title="Bulk Delete Daily Tracker Data"
-                  aria-label="Bulk Delete Daily Tracker Data"
-                >
-                  <Trash2 size={15} strokeWidth={2.2} aria-hidden />
-                </button>
-
-                {/* + Add Manual Row Button */}
-                <button
-                  type="button"
-                  onClick={() => setIsManualAddOpen(true)}
-                  title="Add Custom Entry (Row-wise)"
-                  className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary hover:bg-blue-700 text-primary-foreground shadow-xs transition-all cursor-pointer hover:scale-105 active:scale-[0.992] shrink-0"
-                >
-                  <Plus size={16} strokeWidth={2.5} aria-hidden />
-                </button>
-
-                {/* History / Calendar */}
-                <button
-                  type="button"
-                  onClick={() => setIsCalendarOpen(true)}
-                  className="flex items-center gap-1.5 bg-surface hover:bg-surface-sunken text-fg border border-border px-3 py-1.5 rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer shrink-0"
-                >
-                  <CalendarDays size={14} strokeWidth={2} aria-hidden /> History
-                </button>
-
-                {/* Divider */}
-                <div className="h-5 w-px bg-border mx-0.5 shrink-0 hidden sm:block" />
-
                 {/* Filter by outcome (Smooth UI Dropdown) */}
                 <SmoothOutcomeDropdown
                   value={outcomeFilter}
@@ -692,19 +769,89 @@ export default function DailyTrackerPage() {
             )}
           </div>
 
-          {/* Row count summary */}
-          <div className="ml-auto text-xs text-fg-subtle font-medium shrink-0">
-            Showing {displayRows.length} / {isHistoryMode ? historyRows.length : rows.length} rows
-          </div>
+          {/* ── Right Top Corner: Delete Bin Button & 3 Vertical Dots (Actions Menu) ── */}
+          {!isHistoryMode && (
+            <div className="ml-auto shrink-0 flex items-center gap-2">
+              {isDeleteMode && (
+                <div className="flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedRowCount === 0) {
+                        toast('Please select at least 1 row to delete.', 'warning');
+                        return;
+                      }
+                      setIsDeleteConfirmOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.96] ring-2 ring-rose-500/30"
+                    title={selectedRowCount > 0 ? `Delete ${selectedRowCount} selected row(s)` : 'Select rows to delete'}
+                  >
+                    <Trash2 size={13} strokeWidth={2.5} />
+                    <span>Delete {selectedRowCount > 0 ? `(${selectedRowCount})` : ''}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent('ipoms_tracker_exit_delete_mode'));
+                      setIsDeleteMode(false);
+                    }}
+                    className="w-7 h-7 rounded-xl bg-surface hover:bg-surface-sunken border border-border flex items-center justify-center text-fg-subtle hover:text-fg text-xs transition-colors cursor-pointer"
+                    title="Cancel delete mode"
+                    aria-label="Cancel delete mode"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              <TrackerActionsDropdown
+                selectedCollegeId={selectedCollegeId}
+                isReadOnly={false}
+                selectedCount={selectedRowCount}
+                kpi={kpi}
+                rows={rows}
+                onFilterOutcome={setOutcomeFilter}
+                onLoadContacts={() => {
+                  if (!selectedCollegeId) {
+                    alert('Please select a college first');
+                    return;
+                  }
+                  setIsPickerOpen(true);
+                }}
+                onSaveProgress={handleSaveProgress}
+                onAddManualRow={() => setIsManualAddOpen(true)}
+                onOpenHistory={() => setIsCalendarOpen(true)}
+                onToggleDeleteMode={() => {
+                  if (selectedRowCount > 0 && isDeleteMode) {
+                    setIsDeleteConfirmOpen(true);
+                  } else {
+                    window.dispatchEvent(new CustomEvent('ipoms_tracker_toggle_delete_mode'));
+                  }
+                }}
+                onToggleSelectMode={() => {
+                  window.dispatchEvent(new CustomEvent('ipoms_tracker_toggle_select_mode'));
+                }}
+                onCopyAll={() => {
+                  window.dispatchEvent(new CustomEvent('ipoms_tracker_copy_all'));
+                }}
+                onCopyContacts={() => {
+                  window.dispatchEvent(new CustomEvent('ipoms_tracker_copy_contacts'));
+                }}
+                onCopyEmails={() => {
+                  window.dispatchEvent(new CustomEvent('ipoms_tracker_copy_emails'));
+                }}
+                onCopyBoth={() => {
+                  window.dispatchEvent(new CustomEvent('ipoms_tracker_copy_both'));
+                }}
+                onCopyEntireRows={() => {
+                  window.dispatchEvent(new CustomEvent('ipoms_tracker_copy_entire_row'));
+                }}
+                onOpenSummary={() => setIsSummaryOpen(true)}
+              />
+            </div>
+          )}
         </div>
       </header>
-
-      {/* ── KPI Cards (Slim Single-Row Profile) ──────────────────────────── */}
-      {kpi && !isHistoryMode && (
-        <div className="px-6 py-2">
-          <KpiCards kpi={kpi} />
-        </div>
-      )}
 
       {/* ── No College Selected state ──────────────────────────────────────── */}
       {!selectedCollegeId && (
@@ -717,53 +864,18 @@ export default function DailyTrackerPage() {
 
       {/* ── Tracker Grid ──────────────────────────────────────────────────── */}
       {selectedCollegeId && (
-        <div className="flex-1 overflow-hidden flex flex-col px-6 pb-2">
+        <div className="flex-1 overflow-hidden flex flex-col px-6 pb-2 min-h-0">
           <TrackerGrid
             rows={displayRows}
             isReadOnly={isHistoryMode}
             onRowUpdate={handleRowUpdate}
             onEdit={(row) => setEditingRow(row)}
             onDelete={handleDeleteRow}
+            onDeleteSelected={handleDeleteSelectedRows}
             onCall={(row) => setActiveCallRow(row)}
           />
         </div>
       )}
-
-      {/* ── Bottom Unified Status Bar ─────────────────────────────────────── */}
-      <footer className="bg-surface border-t border-border px-6 py-2.5 flex items-center justify-between gap-4 text-xs text-fg-subtle font-medium shrink-0 flex-wrap shadow-2xs">
-        {/* Left: Friendly Reminder (in live mode) */}
-        {!isHistoryMode ? (
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20 font-semibold text-[11px] shadow-2xs">
-            <Save size={12} className="text-amber-600 dark:text-amber-400 shrink-0" />
-            <span>Don&apos;t forget to save with <kbd className="bg-amber-500/20 border border-amber-500/30 px-1.5 py-0.2 rounded font-mono text-[10.5px]">Ctrl+S</kbd> or the <strong>Save</strong> button to record your call data!</span>
-          </div>
-        ) : (
-          <div className="text-xs text-fg-subtle font-medium flex items-center gap-2">
-            <span className="font-semibold text-fg">Historical Archive</span> (Read-Only)
-          </div>
-        )}
-
-        {/* Right Corner: Keyboard Shortcuts & Last Saved Timestamp */}
-        <div className="flex items-center gap-4 shrink-0">
-          {!isHistoryMode && (
-            <div className="hidden md:flex items-center gap-3 text-micro text-fg-subtle font-normal">
-              <span><kbd className="bg-surface-sunken border border-border px-1.5 py-0.5 rounded text-fg font-mono font-medium shadow-2xs">Tab</kbd> Next cell</span>
-              <span><kbd className="bg-surface-sunken border border-border px-1.5 py-0.5 rounded text-fg font-mono font-medium shadow-2xs">Enter</kbd> Save row</span>
-              <span><kbd className="bg-surface-sunken border border-border px-1.5 py-0.5 rounded text-fg font-mono font-medium shadow-2xs">Del</kbd> Clear cell</span>
-            </div>
-          )}
-
-          {isHistoryMode ? (
-            <span className="text-fg-subtle font-medium text-xs">
-              {historyDate}
-            </span>
-          ) : lastSavedAt ? (
-            <span className="text-fg-subtle text-xs">
-              Last saved: <strong className="text-fg font-mono">{lastSavedAt.toLocaleTimeString('en-IN')}</strong>
-            </span>
-          ) : null}
-        </div>
-      </footer>
 
       {/* ── Modals ────────────────────────────────────────────────────────── */}
       {isPickerOpen && (
@@ -805,6 +917,17 @@ export default function DailyTrackerPage() {
         />
       )}
 
+      {/* ── Delete Row Confirmation Mini Pop-up Modal ── */}
+      <DeleteRowConfirmModal
+        isOpen={isDeleteConfirmOpen}
+        count={selectedRowCount}
+        onClose={() => setIsDeleteConfirmOpen(false)}
+        onConfirm={async () => {
+          window.dispatchEvent(new CustomEvent('ipoms_tracker_execute_delete_selected'));
+          setIsDeleteMode(false);
+        }}
+      />
+
       {/* ── Bulk Delete Tracker Modal ────────────────────────────────────── */}
       {isBulkDeleteOpen && (
         <BulkDeleteTrackerModal
@@ -817,6 +940,20 @@ export default function DailyTrackerPage() {
         />
       )}
 
+      {/* ── Daily Summary Pop-up Modal (Shift+S) ─────────────────────────── */}
+      <DailySummaryModal
+        isOpen={isSummaryOpen}
+        onClose={() => setIsSummaryOpen(false)}
+        kpi={kpi}
+        rows={isHistoryMode ? historyRows : rows}
+        collegeName={selectedCollegeName}
+        collegeCode={selectedCollegeObj?.college_code}
+        sessionDate={isHistoryMode ? historyDate : sessionDate}
+        onFilterOutcome={(outcome) => {
+          setOutcomeFilter(outcome);
+          setIsSummaryOpen(false);
+        }}
+      />
 
       {/* ── Softphone Panel (Click-to-Call) ───────────────────────────────── */}
       <SoftphonePanel
