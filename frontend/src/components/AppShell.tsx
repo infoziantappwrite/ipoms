@@ -10,6 +10,7 @@ import { InfoziantMark } from './InfoziantMark';
 import { initTheme } from '@/lib/theme';
 import { isFocusLockedToday } from '@/lib/collegeSession';
 import { useToast } from '@/components/ui/Toast';
+import { usePresenceHeartbeat } from '@/lib/usePresenceHeartbeat';
 
 import { readSessionUser, roleOf } from '@/lib/session';
 
@@ -27,6 +28,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Stable identity: the sidebar closes on route change via an effect keyed to
   // this callback, so a fresh function each render would re-fire it endlessly.
   const closeMobile = useCallback(() => setMobileOpen(false), []);
+
+  // Real-Time Active College & Online Presence Heartbeat
+  usePresenceHeartbeat();
 
   useEffect(() => {
     initTheme(pathname);
@@ -98,10 +102,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
           <Link
             href="/dashboard"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white p-1 shadow-2xs border border-slate-200/80 dark:border-white/20"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white p-0.5 shadow-2xs border border-slate-200/80 dark:border-white/20"
             aria-label="iPOMS home"
           >
-            <InfoziantMark size={22} />
+            <InfoziantMark size={34} className="w-full h-full object-contain" />
           </Link>
           <span className="text-body font-bold tracking-tight text-fg">iPOMS</span>
         </div>

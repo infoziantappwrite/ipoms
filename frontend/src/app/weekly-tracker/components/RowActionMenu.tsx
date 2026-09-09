@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Trash2, Star, FolderInput, ChevronRight, MoreVertical } from 'lucide-react';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 interface Props {
   isPinned: boolean;
@@ -30,6 +31,7 @@ export function RowActionMenu({
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [showMoveSubmenu, setShowMoveSubmenu] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,81 +46,89 @@ export function RowActionMenu({
   }, []);
 
   return (
-    <div className="relative inline-block text-left" ref={menuRef}>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="p-1 rounded-lg text-fg-subtle hover:text-fg hover:bg-surface-raised transition-colors cursor-pointer"
-        title="Actions"
-      >
-        <MoreVertical size={15} />
-      </button>
+    <>
+      <div className="relative inline-block text-left" ref={menuRef}>
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="p-1 rounded-lg text-fg-subtle hover:text-fg hover:bg-surface-raised transition-colors cursor-pointer"
+          title="More actions"
+        >
+          <MoreVertical size={15} />
+        </button>
 
-      {isOpen && (
-        <div className="absolute right-0 mt-1 w-52 rounded-xl bg-surface border border-border shadow-xl z-50 py-1 text-xs text-fg">
-
-          {/* Toggle Pin Top */}
-          <button
-            onClick={() => {
-              onTogglePin();
-              setIsOpen(false);
-            }}
-            className="w-full text-left px-3 py-2 hover:bg-surface-raised flex items-center gap-2 transition-colors cursor-pointer"
-          >
-            <Star size={14} className={isPinned ? 'fill-amber-400 text-amber-500' : 'text-fg-subtle'} />
-            <span>{isPinned ? 'Unpin from Top' : 'Pin to Top Companies'}</span>
-          </button>
-
-          {/* Move to Section */}
-          <div className="relative">
+        {isOpen && (
+          <div className="absolute right-0 top-full mt-1 w-52 bg-surface rounded-xl shadow-xl border border-border py-1 z-30 text-xs text-fg divide-y divide-border">
+            {/* Toggle Pin to Top */}
             <button
-              onClick={() => setShowMoveSubmenu(!showMoveSubmenu)}
-              className="w-full text-left px-3 py-2 hover:bg-surface-raised flex items-center justify-between transition-colors cursor-pointer"
+              onClick={() => {
+                onTogglePin();
+                setIsOpen(false);
+              }}
+              className="w-full text-left px-3 py-2 hover:bg-surface-raised flex items-center gap-2 transition-colors cursor-pointer"
             >
-              <div className="flex items-center gap-2">
-                <FolderInput size={14} className="text-fg-subtle" />
-                <span>Move Section</span>
-              </div>
-              <ChevronRight size={13} className="text-fg-subtle" />
+              <Star size={14} className={isPinned ? 'text-amber-500 fill-amber-500' : 'text-fg-subtle'} />
+              <span>{isPinned ? 'Unpin from Top' : 'Pin to Top (Top Companies)'}</span>
             </button>
 
-            {showMoveSubmenu && (
-              <div className="absolute left-full top-0 ml-1 w-52 rounded-xl bg-surface border border-border shadow-xl py-1">
-                {SECTIONS.map((s) => (
-                  <button
-                    key={s.key}
-                    onClick={() => {
-                      onMoveSection(s.key);
-                      setIsOpen(false);
-                      setShowMoveSubmenu(false);
-                    }}
-                    className={`w-full text-left px-3 py-1.5 hover:bg-surface-raised transition-colors text-xs cursor-pointer
-                                ${currentSection === s.key ? 'text-primary font-bold bg-primary/10' : 'text-fg'}`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+            {/* Move Section Submenu */}
+            <div className="relative">
+              <button
+                onClick={() => setShowMoveSubmenu(!showMoveSubmenu)}
+                className="w-full text-left px-3 py-2 hover:bg-surface-raised flex items-center justify-between transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <FolderInput size={14} className="text-fg-subtle" />
+                  <span>Move to Section</span>
+                </div>
+                <ChevronRight size={13} className="text-fg-subtle" />
+              </button>
 
-          <div className="h-px bg-border my-1" />
+              {showMoveSubmenu && (
+                <div className="absolute right-full top-0 mr-1 w-52 bg-surface rounded-xl shadow-xl border border-border py-1 z-40 text-xs text-fg">
+                  {SECTIONS.map((s) => (
+                    <button
+                      key={s.key}
+                      onClick={() => {
+                        onMoveSection(s.key);
+                        setIsOpen(false);
+                        setShowMoveSubmenu(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 hover:bg-surface-raised transition-colors text-xs cursor-pointer
+                                  ${currentSection === s.key ? 'text-primary font-bold bg-primary/10' : 'text-fg'}`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-          {/* Delete */}
-          <button
-            onClick={() => {
-              if (confirm('Move this recruitment drive to Recycle Bin?')) {
-                onDelete();
+            <div className="h-px bg-border my-1" />
+
+            {/* Delete */}
+            <button
+              onClick={() => {
                 setIsOpen(false);
-              }
-            }}
-            className="w-full text-left px-3 py-2 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center gap-2 transition-colors cursor-pointer"
-          >
-            <Trash2 size={14} strokeWidth={2} />
-            <span>Move to Recycle Bin</span>
-          </button>
+                setIsConfirmOpen(true);
+              }}
+              className="w-full text-left px-3 py-2 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center gap-2 transition-colors cursor-pointer"
+            >
+              <Trash2 size={14} strokeWidth={2} />
+              <span>Move to Recycle Bin</span>
+            </button>
+          </div>
+        )}
+      </div>
 
-        </div>
-      )}
-    </div>
+      <DeleteConfirmModal
+        count={1}
+        isOpen={isConfirmOpen}
+        onClose={() => setIsConfirmOpen(false)}
+        onConfirm={() => {
+          setIsConfirmOpen(false);
+          onDelete();
+        }}
+      />
+    </>
   );
 }

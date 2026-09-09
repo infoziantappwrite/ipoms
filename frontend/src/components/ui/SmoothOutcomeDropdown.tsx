@@ -111,11 +111,9 @@ export function SmoothOutcomeDropdown({
             : 'bg-surface border-border text-fg hover:bg-surface-raised'
         }`}
       >
-        <div className="flex items-center gap-2 truncate">
+        <div className="flex items-center gap-2 min-w-0">
           <span
-            className={`w-2.5 h-2.5 rounded-full shrink-0 ${currentOption.dotColor} ${
-              value !== 'all' ? 'shadow-[0_0_8px_currentColor] animate-pulse' : ''
-            }`}
+            className={`w-2.5 h-2.5 rounded-full shrink-0 ${currentOption.dotColor} ring-1 ring-black/10 dark:ring-white/20`}
           />
           <span className="truncate tracking-tight">{currentOption.label}</span>
         </div>
@@ -160,8 +158,8 @@ export function SmoothOutcomeDropdown({
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
                     <span
-                      className={`w-2.5 h-2.5 rounded-full shrink-0 ${opt.dotColor} ${
-                        isSelected ? 'ring-2 ring-primary/40' : ''
+                      className={`w-2.5 h-2.5 rounded-full shrink-0 ${opt.dotColor} ring-1 ring-black/10 dark:ring-white/20 ${
+                        isSelected ? 'ring-2 ring-primary/50' : ''
                       }`}
                     />
                     <span className="truncate">{opt.label}</span>

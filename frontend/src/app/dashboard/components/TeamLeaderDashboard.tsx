@@ -20,7 +20,7 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
   const [selectedCollegeIds, setSelectedCollegeIds] = useState<string[]>([]);
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [showTeamMatrix, setShowTeamMatrix] = useState(true);
-  const [presenceFilter, setPresenceFilter] = useState<'all' | 'online' | 'active_today' | 'leave'>('all');
+  const [presenceFilter, setPresenceFilter] = useState<'all' | 'online' | 'away' | 'offline' | 'active_today'>('all');
 
   useEffect(() => {
     setSelectedCollegeIds(getCoordinatorSelectedColleges());
@@ -36,19 +36,36 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
     };
   }, []);
 
+  // Live Auto-Refresh every 15 seconds for real-time coordinator monitoring
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (typeof onRefresh === 'function') {
+        onRefresh();
+      }
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [onRefresh]);
+
   if (!data) return null;
 
   const { team_matrix = [], online_summary } = data;
 
+  const onlineCoordinators = team_matrix.filter((m: any) => m.online_status === 'online');
+  const awayCoordinators = team_matrix.filter((m: any) => m.online_status === 'away');
+  const offlineCoordinators = team_matrix.filter((m: any) => m.online_status === 'offline' || m.online_status === 'on_leave' || m.online_status === 'partial_working');
+
+  const onlineCount = online_summary?.currently_online ?? onlineCoordinators.length;
+  const awayCount = awayCoordinators.length;
+  const offlineCount = offlineCoordinators.length;
+  const activeTodayCount = online_summary?.active_today ?? team_matrix.filter((m: any) => m.calls_today > 0 || m.online_status === 'online' || m.online_status === 'away').length;
+
   const filteredMatrix = team_matrix.filter((c: any) => {
     if (presenceFilter === 'online') return c.online_status === 'online';
+    if (presenceFilter === 'away') return c.online_status === 'away';
+    if (presenceFilter === 'offline') return c.online_status === 'offline' || c.online_status === 'on_leave' || c.online_status === 'partial_working';
     if (presenceFilter === 'active_today') return c.calls_today > 0 || c.online_status === 'online' || c.online_status === 'away';
-    if (presenceFilter === 'leave') return c.online_status === 'on_leave' || c.online_status === 'partial_working';
     return true;
   });
-
-  const onlineCount = online_summary?.currently_online ?? team_matrix.filter((m: any) => m.online_status === 'online').length;
-  const activeTodayCount = online_summary?.active_today ?? team_matrix.filter((m: any) => m.calls_today > 0 || m.online_status === 'online' || m.online_status === 'away').length;
 
   const totalCallsToday = team_matrix.reduce((acc: number, c: any) => acc + (c.calls_today || 0), 0);
   const totalPositives = team_matrix.reduce((acc: number, c: any) => acc + (c.positive_leads || 0), 0);
@@ -64,7 +81,7 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
             <Briefcase size={18} className="text-blue-600 dark:text-blue-400" aria-hidden /> Team Leader Operations & Workforce Hub
           </h2>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Monitor real-time coordinator online activity, track daily call velocity, and manage institutional pipelines.
+            Real-time coordinator monitoring, live institutional deployment, daily call velocity, and active pipeline tracking.
           </p>
         </div>
 
@@ -97,10 +114,12 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
             </div>
           </div>
           <div className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-micro text-emerald-600 dark:text-emerald-400 font-medium">
-            <span>Active on portal right now</span>
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
+              Active on portal now
+            </span>
+            <span className="text-[10px] font-bold font-mono bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-800">
+              Live Sync (15s)
             </span>
           </div>
         </div>
@@ -125,7 +144,7 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
           </div>
           <div className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-micro text-zinc-500 dark:text-zinc-400">
             <span>Logged calls / leads today</span>
-            <span className="font-semibold text-zinc-700 dark:text-zinc-300">Live Metric</span>
+            <span className="font-semibold text-zinc-700 dark:text-zinc-300">Daily Activity</span>
           </div>
         </div>
 
@@ -178,16 +197,70 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
         </div>
       </div>
 
-      {/* ── 3. Team Coordinator Profile & Online Activity Matrix ── */}
+      {/* ── 3. Live Active Deployment Bar (Quick Glance) ── */}
+      {onlineCoordinators.length > 0 && (
+        <div className="bg-emerald-500/10 dark:bg-emerald-950/30 border border-emerald-300/80 dark:border-emerald-700/60 rounded-xl p-4 shadow-2xs">
+          <div className="flex items-center justify-between gap-3 mb-2.5">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+              </span>
+              <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-200 uppercase tracking-wider">
+                Live Coordinator Deployment by College
+              </h4>
+            </div>
+            <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 font-mono">
+              {onlineCoordinators.length} Coordinator{onlineCoordinators.length === 1 ? '' : 's'} Active Right Now
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
+            {onlineCoordinators.map((c: any) => (
+              <div
+                key={c.coordinator_id}
+                className="bg-white dark:bg-zinc-900 rounded-lg p-2.5 border border-emerald-200 dark:border-emerald-800/80 shadow-xs flex items-center justify-between gap-2"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold flex items-center justify-center text-xs shrink-0 border border-emerald-300 dark:border-emerald-700">
+                    {c.name?.charAt(0) || 'C'}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate block">
+                      {c.name}
+                    </span>
+                    <span className="text-micro text-zinc-500 dark:text-zinc-400 font-mono truncate block">
+                      {c.email.split('@')[0]}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  {c.active_college ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold font-mono">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      [{c.active_college.college_code || c.active_college.college_name}]
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[10px] font-medium border border-zinc-200 dark:border-zinc-700">
+                      Dashboard
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── 4. Team Coordinator Profile & Online Activity Matrix ── */}
       <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm">
         {/* Table Header & Presence Filters */}
         <div className="px-5 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/50 flex items-center justify-between flex-wrap gap-3">
           <div>
             <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-              <Users size={16} className="text-blue-600 dark:text-blue-400" aria-hidden /> Coordinators Profile & Live Online Activity
+              <Users size={16} className="text-blue-600 dark:text-blue-400" aria-hidden /> Coordinators Profile & Live Institutional Presence
             </h3>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-              Live coordinator profiles, real-time presence indicators, last actions, and daily metrics
+              Live active college status, real-time presence indicators, last actions, and daily metrics
             </p>
           </div>
 
@@ -214,8 +287,32 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
                     : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
                 }`}
               >
-                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                 Online ({onlineCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPresenceFilter('away')}
+                className={`px-3 py-1 rounded-md font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  presenceFilter === 'away'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                Away ({awayCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPresenceFilter('offline')}
+                className={`px-3 py-1 rounded-md font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  presenceFilter === 'offline'
+                    ? 'bg-zinc-600 text-white shadow-xs'
+                    : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-zinc-400"></span>
+                Offline ({offlineCount})
               </button>
               <button
                 type="button"
@@ -245,9 +342,10 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
             <table className="w-full text-xs text-left">
               <thead>
                 <tr className="bg-zinc-50/70 dark:bg-zinc-800/40 text-zinc-500 dark:text-zinc-400 font-semibold border-b border-zinc-200 dark:border-zinc-800 uppercase text-[10px] tracking-wider">
-                  <th className="py-3.5 px-5 min-w-[220px]">Coordinator Profile</th>
-                  <th className="py-3.5 px-4 min-w-[180px]">Online Activity & Status</th>
-                  <th className="py-3.5 px-4 min-w-[180px]">Assigned Institutions</th>
+                  <th className="py-3.5 px-5 min-w-[210px]">Coordinator Profile</th>
+                  <th className="py-3.5 px-4 min-w-[230px]">Currently Active In (College)</th>
+                  <th className="py-3.5 px-4 min-w-[160px]">Presence Status</th>
+                  <th className="py-3.5 px-4 min-w-[180px]">Assigned Focus Institutions</th>
                   <th className="py-3.5 px-3 text-center">Calls Today</th>
                   <th className="py-3.5 px-3 text-center">Positive Leads</th>
                   <th className="py-3.5 px-3 text-center">JDs</th>
@@ -256,7 +354,7 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
               <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
                 {filteredMatrix.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-10 text-center text-zinc-400 italic">
+                    <td colSpan={7} className="py-10 text-center text-zinc-400 italic">
                       No coordinators match the selected presence filter.
                     </td>
                   </tr>
@@ -311,7 +409,7 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
                                   </span>
                                 )}
                               </div>
-                              <div className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono truncate max-w-[180px]">
+                              <div className="text-[11px] text-zinc-500 dark:text-zinc-400 font-mono truncate max-w-[170px]">
                                 {c.email}
                               </div>
                               {c.mobile && (
@@ -323,7 +421,59 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
                           </div>
                         </td>
 
-                        {/* 2. Online Activity & Presence Status */}
+                        {/* 2. Currently Active In (College) — Dedicated Live Status Column */}
+                        <td className="py-3.5 px-4">
+                          {isOnline ? (
+                            c.active_college ? (
+                              <div className="inline-flex flex-col gap-1">
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-200 font-bold shadow-2xs">
+                                  <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                  </span>
+                                  <span className="font-mono text-xs">
+                                    [{c.active_college.college_code || c.active_college.college_name}]
+                                  </span>
+                                  {c.active_college.location && (
+                                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-normal">
+                                      {c.active_college.location}
+                                    </span>
+                                  )}
+                                </div>
+                                {c.current_page && (
+                                  <span className="text-micro font-medium text-zinc-500 dark:text-zinc-400 flex items-center gap-1 pl-1">
+                                    <span>on</span>
+                                    <span className="font-mono text-zinc-700 dark:text-zinc-300">
+                                      {c.current_page.replace(/^\//, '').replace('-', ' ') || 'dashboard'}
+                                    </span>
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-300 font-medium text-xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                Online • General Dashboard
+                              </span>
+                            )
+                          ) : isAway ? (
+                            <div className="inline-flex flex-col gap-0.5">
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 font-semibold text-xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                                {c.active_college ? `Last: [${c.active_college.college_code || c.active_college.college_name}]` : 'Away'}
+                              </span>
+                              <span className="text-micro text-amber-600/80 dark:text-amber-400/80 font-mono pl-1">
+                                {c.online_status_label}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 text-xs font-medium">
+                              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+                              Offline
+                            </span>
+                          )}
+                        </td>
+
+                        {/* 3. Online Activity & Presence Status */}
                         <td className="py-3.5 px-4">
                           <span
                             className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border ${
@@ -355,7 +505,7 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
                           </span>
                         </td>
 
-                        {/* 3. Assigned Institutions */}
+                        {/* 4. Assigned Focus Institutions */}
                         <td className="py-3.5 px-4">
                           {c.assigned_colleges && c.assigned_colleges.length > 0 ? (
                             <div className="flex flex-wrap gap-1 max-w-[200px]">
@@ -374,21 +524,21 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
                           )}
                         </td>
 
-                        {/* 4. Calls Today */}
+                        {/* 5. Calls Today */}
                         <td className="py-3.5 px-3 text-center">
                           <span className="font-bold font-mono text-sm text-blue-600 dark:text-blue-400">
                             {c.calls_today}
                           </span>
                         </td>
 
-                        {/* 5. Positive Leads (Invite Mail) */}
+                        {/* 6. Positive Leads (Invite Mail) */}
                         <td className="py-3.5 px-3 text-center">
                           <span className="font-bold font-mono text-sm text-emerald-600 dark:text-emerald-400">
                             {c.positive_leads}
                           </span>
                         </td>
 
-                        {/* 6. JDs (JD Received) */}
+                        {/* 7. JDs (JD Received) */}
                         <td className="py-3.5 px-3 text-center">
                           <span className="font-bold font-mono text-sm text-cyan-600 dark:text-cyan-400">
                             {c.jds_received}

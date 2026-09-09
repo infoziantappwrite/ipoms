@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, X, Building2, Briefcase, Layers, GraduationCap, Trophy } from 'lucide-react';
+import { Plus, X, Building2, Briefcase, Layers, GraduationCap, Trophy, Phone, Mail, Calendar } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
 import { useToast } from '@/components/ui/Toast';
+import { validateAndNormalizeIndianMobile, validateAndNormalizeEmail } from '@/lib/contactValidation';
 
 const BATCH_YEARS = ['2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
 
@@ -23,13 +24,14 @@ interface Props {
 
 const SECTIONS = [
   { value: 'completed', label: '1. Companies Completed' },
-  { value: 'in_drive', label: '2. Companies in Drive' },
-  { value: 'in_progress', label: '3. Companies In Progress' },
-  { value: 'pipeline', label: '4. Companies In Pipeline' },
-  { value: 'top_companies', label: '5. Top Companies' },
-  { value: 'rejected_companies', label: '6. Rejected Companies' },
-  { value: 'on_hold_by_college', label: '7. Companies On Hold By College' },
-  { value: 'on_hold_by_hr', label: '8. Companies On Hold By HR' },
+  { value: 'drive_in_progress', label: '2. Drive in Progress' },
+  { value: 'in_drive', label: '3. Upcoming Drives' },
+  { value: 'in_progress', label: '4. Companies In Progress' },
+  { value: 'pipeline', label: '5. Companies In Pipeline' },
+  { value: 'top_companies', label: '6. Top Companies' },
+  { value: 'rejected_companies', label: '7. Rejected Companies' },
+  { value: 'on_hold_by_college', label: '8. Companies On Hold By College' },
+  { value: 'on_hold_by_hr', label: '9. Companies On Hold By HR' },
 ];
 
 export function AddCompanyModal({
@@ -42,6 +44,10 @@ export function AddCompanyModal({
 }: Props) {
   const { toast } = useToast();
   const [companyName, setCompanyName] = useState('');
+  const [contactNumber, setContactNumber] = useState('');
+  const [emailId, setEmailId] = useState('');
+  const [jdReceivedDate, setJdReceivedDate] = useState('');
+  const [dbSharedDate, setDbSharedDate] = useState('');
   const [jobRole, setJobRole] = useState('Graduate Trainee');
   const [companyType, setCompanyType] = useState('IT / Software & Technology');
   const [ctcValue, setCtcValue] = useState('');
@@ -95,6 +101,26 @@ export function AddCompanyModal({
       return;
     }
 
+    let normalizedContact = '';
+    if (contactNumber.trim()) {
+      const res = validateAndNormalizeIndianMobile(contactNumber.trim());
+      if (!res.valid) {
+        toast(res.error || 'Invalid Indian mobile number', 'warning');
+        return;
+      }
+      normalizedContact = res.normalized;
+    }
+
+    let normalizedEmail = '';
+    if (emailId.trim()) {
+      const res = validateAndNormalizeEmail(emailId.trim());
+      if (!res.valid) {
+        toast(res.error || 'Invalid email address', 'warning');
+        return;
+      }
+      normalizedEmail = res.normalized;
+    }
+
     if (isForeignCollege) {
       const proceed = window.confirm(
         `${collegeName || 'This college'} is not one of your assigned colleges. `
@@ -129,6 +155,12 @@ export function AddCompanyModal({
           college_id: collegeId,
           coordinator_id: coordinatorId,
           company_name: companyName.trim(),
+          contact_number: normalizedContact || undefined,
+          mobile_numbers: normalizedContact ? [normalizedContact] : [],
+          email_id: normalizedEmail || undefined,
+          email_ids: normalizedEmail ? [normalizedEmail] : [],
+          jd_received_date: jdReceivedDate || undefined,
+          db_shared_date: dbSharedDate || undefined,
           job_role: jobRole.trim(),
           cdc_reference: '',
           company_type: companyType,
@@ -143,8 +175,6 @@ export function AddCompanyModal({
       });
 
       if (res.success) {
-        // The backend now refuses (400 COMPANY_NOT_IN_METADATA) any company not
-        // already in Metadata, so a successful response is always is_in_metadata.
         toast(`"${companyName.trim()}" added to Weekly Tracker.`, 'success');
         onAdded();
         onClose();
@@ -214,6 +244,12 @@ export function AddCompanyModal({
                     onClick={() => {
                       setCompanyName(s.company_name);
                       if (s.company_type) setCompanyType(s.company_type);
+                      if (s.primary_mobile || (s.mobile_numbers && s.mobile_numbers[0])) {
+                        setContactNumber(s.primary_mobile || s.mobile_numbers[0]);
+                      }
+                      if (s.primary_email || (s.email_ids && s.email_ids[0])) {
+                        setEmailId(s.primary_email || s.email_ids[0]);
+                      }
                       setShowSuggestions(false);
                     }}
                     className="px-3.5 py-2.5 hover:bg-surface-raised cursor-pointer flex items-center justify-between transition-colors"
@@ -226,6 +262,66 @@ export function AddCompanyModal({
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Contact Number & Email ID */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label className="block text-fg font-semibold mb-1.5 flex items-center gap-1.5">
+                <Phone size={13} className="text-blue-600 dark:text-blue-400" />
+                <span>Contact Number</span>
+              </label>
+              <input
+                type="text"
+                value={contactNumber}
+                onChange={(e) => setContactNumber(e.target.value)}
+                placeholder="e.g. 9876543210"
+                className="w-full bg-surface-sunken border border-border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-3.5 py-2.5 text-fg placeholder:text-fg-disabled text-xs transition-all outline-none font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-fg font-semibold mb-1.5 flex items-center gap-1.5">
+                <Mail size={13} className="text-indigo-600 dark:text-indigo-400" />
+                <span>Email ID</span>
+              </label>
+              <input
+                type="email"
+                value={emailId}
+                onChange={(e) => setEmailId(e.target.value)}
+                placeholder="e.g. hr@company.com"
+                className="w-full bg-surface-sunken border border-border focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-3.5 py-2.5 text-fg placeholder:text-fg-disabled text-xs transition-all outline-none"
+              />
+            </div>
+          </div>
+
+          {/* JD Received Date & DB Shared Date */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <SmoothDatePicker
+                label="JD Received Date"
+                value={jdReceivedDate}
+                onChange={setJdReceivedDate}
+                variant="input"
+                fullWidth
+                usePortal
+                clearable
+                placeholder="dd-mm-yyyy"
+              />
+            </div>
+
+            <div>
+              <SmoothDatePicker
+                label="Database Shared Date"
+                value={dbSharedDate}
+                onChange={setDbSharedDate}
+                variant="input"
+                fullWidth
+                usePortal
+                clearable
+                placeholder="dd-mm-yyyy"
+              />
+            </div>
           </div>
 
           {/* Role(s) */}

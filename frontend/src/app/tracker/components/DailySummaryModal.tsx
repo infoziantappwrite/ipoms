@@ -134,10 +134,11 @@ export function DailySummaryModal({
                 triggerHaptic('light');
                 onClose();
               }}
-              className="w-7 h-7 rounded-lg hover:bg-surface-raised flex items-center justify-center text-fg-subtle hover:text-fg transition-colors cursor-pointer border border-transparent hover:border-border"
+              className="w-7 h-7 rounded-lg bg-surface-sunken hover:bg-surface-raised border border-border flex items-center justify-center text-fg-subtle hover:text-fg transition-colors cursor-pointer"
               title="Close (Esc)"
+              aria-label="Close"
             >
-              <X size={16} />
+              <X size={14} />
             </button>
           </div>
         </div>
@@ -295,22 +296,9 @@ export function DailySummaryModal({
         </div>
 
         {/* ── Footer ──────────────────────────────────────────────────────── */}
-        <div className="px-5 py-3 border-t border-border bg-surface flex items-center justify-between shrink-0 text-xs">
-          <div className="flex items-center gap-1.5 text-fg-subtle text-[11px]">
-            <Filter size={12} className="text-primary" />
-            <span>Click any card to filter calling table</span>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              triggerHaptic('light');
-              onClose();
-            }}
-            className="px-4 py-1.5 rounded-xl bg-primary hover:bg-blue-700 text-primary-foreground font-bold text-xs shadow-xs transition-colors cursor-pointer"
-          >
-            Close
-          </button>
+        <div className="px-5 py-3 border-t border-border bg-surface-sunken/50 flex items-center gap-1.5 text-fg-subtle text-[11px] shrink-0">
+          <Filter size={12} className="text-primary shrink-0" />
+          <span>Click any card to filter calling table</span>
         </div>
       </div>
     </div>

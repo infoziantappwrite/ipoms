@@ -9,9 +9,6 @@ import {
   Ban,
   Building2,
   TrendingUp,
-  ArrowRight,
-  Sparkles,
-  ExternalLink,
   Target,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
@@ -292,31 +289,6 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
                     )}
                   </div>
                 </div>
-              </div>
-
-              {/* Card Footer Quick Links */}
-              <div className="px-3.5 py-2 border-t border-border/60 bg-surface-sunken/20 flex items-center justify-between gap-3 text-xs">
-                <Link
-                  href={`/tracker`}
-                  onClick={() => {
-                    setActiveCollege(item.college_id, item.college_name);
-                  }}
-                  className="font-medium text-xs text-primary hover:text-primary-hover inline-flex items-center gap-1 transition-colors group"
-                >
-                  <span>Open Daily Tracker</span>
-                  <ArrowRight size={11} className="group-hover:translate-x-0.5 transition-transform" />
-                </Link>
-
-                <Link
-                  href={`/daily-leads`}
-                  onClick={() => {
-                    setActiveCollege(item.college_id, item.college_name);
-                  }}
-                  className="text-fg-subtle hover:text-fg text-xs font-medium inline-flex items-center gap-1 transition-colors"
-                >
-                  <span>Leads ({item.active_leads})</span>
-                  <ExternalLink size={11} />
-                </Link>
               </div>
             </div>
           );

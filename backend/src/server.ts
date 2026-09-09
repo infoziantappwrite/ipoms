@@ -1344,42 +1344,59 @@ app.post('/api/v1/daily-tracker/manual-row', async (req: Request, res: Response)
         .select('serial_number');
       const nextSerial = (highestDoc?.serial_number || 0) + 1;
 
+      const mobList = mobile_number ? mobile_number.split(/[,;/]+/).map((s: string) => s.trim()).filter(Boolean) : [];
+      const emailList = email_id ? email_id.split(/[,;/]+/).map((s: string) => s.trim().toLowerCase()).filter(Boolean) : [];
+
       company = await CompanyMetadata.create({
         serial_number: nextSerial,
         company_name: company_name.trim(),
         hr_name: hr_name?.trim() || 'HR Contact',
-        primary_mobile: mobile_number?.trim() || '',
-        mobile_numbers: mobile_number ? [mobile_number.trim()] : [],
-        primary_email: email_id?.trim().toLowerCase() || '',
-        email_ids: email_id ? [email_id.trim().toLowerCase()] : [],
+        primary_mobile: mobList[0] || '',
+        mobile_numbers: mobList,
+        primary_email: emailList[0] || '',
+        email_ids: emailList,
         notes: `Created via Daily Tracker manual entry on ${new Date().toLocaleDateString('en-IN')}`,
       });
     } else {
-      // Lively sync contact details if provided and missing on the company record
       let metaUpdated = false;
-      if (hr_name && hr_name.trim() && (!company.hr_name || company.hr_name === 'HR Contact')) {
-        company.hr_name = hr_name.trim();
-        metaUpdated = true;
-      }
-      if (mobile_number && mobile_number.trim()) {
-        const mob = mobile_number.trim();
-        if (!company.mobile_numbers.includes(mob)) {
-          company.mobile_numbers.push(mob);
+      if (hr_name && hr_name.trim()) {
+        const existingHrs = (company.hr_name || '')
+          .split(/[,;/]+/)
+          .map((s: string) => s.trim())
+          .filter((s: string) => s && s.toLowerCase() !== 'hr contact' && s.toLowerCase() !== 'contact');
+        const incomingHrs = hr_name
+          .split(/[,;/]+/)
+          .map((s: string) => s.trim())
+          .filter((s: string) => s && s.toLowerCase() !== 'hr contact' && s.toLowerCase() !== 'contact');
+        const mergedHrs = Array.from(new Set([...existingHrs, ...incomingHrs]));
+        if (mergedHrs.length > 0 && mergedHrs.join(', ') !== company.hr_name) {
+          company.hr_name = mergedHrs.join(', ');
           metaUpdated = true;
         }
-        if (!company.primary_mobile) {
-          company.primary_mobile = mob;
+      }
+      if (mobile_number && mobile_number.trim()) {
+        const mobList = mobile_number.split(/[,;/]+/).map((s: string) => s.trim()).filter(Boolean);
+        for (const mob of mobList) {
+          if (!company.mobile_numbers.includes(mob)) {
+            company.mobile_numbers.push(mob);
+            metaUpdated = true;
+          }
+        }
+        if (!company.primary_mobile && mobList[0]) {
+          company.primary_mobile = mobList[0];
           metaUpdated = true;
         }
       }
       if (email_id && email_id.trim()) {
-        const em = email_id.trim().toLowerCase();
-        if (!company.email_ids.includes(em)) {
-          company.email_ids.push(em);
-          metaUpdated = true;
+        const emailList = email_id.split(/[,;/]+/).map((s: string) => s.trim().toLowerCase()).filter(Boolean);
+        for (const em of emailList) {
+          if (!company.email_ids.includes(em)) {
+            company.email_ids.push(em);
+            metaUpdated = true;
+          }
         }
-        if (!company.primary_email) {
-          company.primary_email = em;
+        if (!company.primary_email && emailList[0]) {
+          company.primary_email = emailList[0];
           metaUpdated = true;
         }
       }
@@ -1548,9 +1565,20 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
           }
           if (meta && !meta.is_deleted) {
             let metaUpdated = false;
-            if (row.hr_name && row.hr_name.trim() && (!meta.hr_name || meta.hr_name === 'HR Contact')) {
-              meta.hr_name = row.hr_name.trim();
-              metaUpdated = true;
+            if (row.hr_name && row.hr_name.trim()) {
+              const existingHrs = (meta.hr_name || '')
+                .split(/[,;/]+/)
+                .map((s: string) => s.trim())
+                .filter((s: string) => s && s.toLowerCase() !== 'hr contact' && s.toLowerCase() !== 'contact');
+              const incomingHrs = row.hr_name
+                .split(/[,;/]+/)
+                .map((s: string) => s.trim())
+                .filter((s: string) => s && s.toLowerCase() !== 'hr contact' && s.toLowerCase() !== 'contact');
+              const mergedHrs = Array.from(new Set([...existingHrs, ...incomingHrs]));
+              if (mergedHrs.length > 0 && mergedHrs.join(', ') !== meta.hr_name) {
+                meta.hr_name = mergedHrs.join(', ');
+                metaUpdated = true;
+              }
             }
             if (row.mobile_number && row.mobile_number.trim()) {
               const mob = row.mobile_number.trim();
@@ -2319,6 +2347,7 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
     // Dynamic partition into the standard operational sections
     const followUpsDueToday: any[] = [];
     const completed: any[] = [];
+    const driveInProgress: any[] = [];
     const inDrive: any[] = [];
     const inProgress: any[] = [];
     const pipeline: any[] = [];
@@ -2349,8 +2378,12 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
         case 'completed':
           completed.push(r);
           break;
+        case 'drive_in_progress':
+          driveInProgress.push(r);
+          break;
         case 'in_drive':
         case 'companies_in_drive':
+        case 'upcoming_drives':
           inDrive.push(r);
           break;
         case 'in_progress':
@@ -2377,12 +2410,68 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
       }
     });
 
-    // Ensure "Companies in Pipeline" preserves chronological order so newly synced leads are appended from the last
-    pipeline.sort((a, b) => {
-      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return timeA - timeB;
-    });
+    // Sorting helper: Automatically arrange pipeline by follow-up date ascending (dated items first, undated items second),
+    // and respect custom row swapping (order_index) across all sections.
+    const sortSectionRows = (sectionKey: string, list: any[]) => {
+      if (sectionKey === 'pipeline') {
+        return list.sort((a, b) => {
+          const dateA = a.follow_up_date ? new Date(a.follow_up_date).getTime() : null;
+          const dateB = b.follow_up_date ? new Date(b.follow_up_date).getTime() : null;
+
+          // Follow-up date present vs absent
+          if (dateA !== null && dateB !== null) {
+            if (dateA !== dateB) return dateA - dateB;
+          } else if (dateA !== null && dateB === null) {
+            return -1; // Companies with scheduled follow-up dates come first
+          } else if (dateA === null && dateB !== null) {
+            return 1; // Companies without follow-up dates come second
+          }
+
+          // If dates match or both are null, sort by custom row order (order_index)
+          const orderA = typeof a.order_index === 'number' ? a.order_index : 0;
+          const orderB = typeof b.order_index === 'number' ? b.order_index : 0;
+          if (orderA !== orderB) return orderA - orderB;
+
+          const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return timeA - timeB;
+        });
+      }
+
+      // Other sections: sort by custom row order (order_index), then secondary dates / created_at
+      return list.sort((a, b) => {
+        const orderA = typeof a.order_index === 'number' ? a.order_index : 0;
+        const orderB = typeof b.order_index === 'number' ? b.order_index : 0;
+        if (orderA !== orderB) return orderA - orderB;
+
+        if (sectionKey === 'follow_ups_due_today' || sectionKey === 'in_progress') {
+          const dateA = a.follow_up_date ? new Date(a.follow_up_date).getTime() : Infinity;
+          const dateB = b.follow_up_date ? new Date(b.follow_up_date).getTime() : Infinity;
+          if (dateA !== dateB) return dateA - dateB;
+        }
+
+        if (['drive_in_progress', 'in_drive', 'upcoming_drives', 'companies_in_drive'].includes(sectionKey)) {
+          const driveA = a.drive_date ? new Date(a.drive_date).getTime() : Infinity;
+          const driveB = b.drive_date ? new Date(b.drive_date).getTime() : Infinity;
+          if (driveA !== driveB) return driveA - driveB;
+        }
+
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return timeA - timeB;
+      });
+    };
+
+    sortSectionRows('follow_ups_due_today', followUpsDueToday);
+    sortSectionRows('completed', completed);
+    sortSectionRows('drive_in_progress', driveInProgress);
+    sortSectionRows('in_drive', inDrive);
+    sortSectionRows('in_progress', inProgress);
+    sortSectionRows('pipeline', pipeline);
+    sortSectionRows('top_companies', topCompanies);
+    sortSectionRows('rejected_companies', rejectedCompanies);
+    sortSectionRows('on_hold_by_college', onHoldByCollege);
+    sortSectionRows('on_hold_by_hr', onHoldByHr);
 
     return res.status(200).json({
       success: true,
@@ -2402,51 +2491,63 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
             summary_metric: `${completed.length} Drives Completed • ${completed.reduce((acc, curr) => acc + (curr.selected_count || 0), 0)} Offers Placed`,
             rows: completed,
           },
-          in_drive: {
-            title: 'Companies in Drive',
+          drive_in_progress: {
+            title: 'Drive in Progress',
             order: 2,
-            summary_metric: `${inDrive.length} Drives Scheduled & In Progress`,
+            summary_metric: `${driveInProgress.length} Drives Currently In Progress`,
+            rows: driveInProgress,
+          },
+          in_drive: {
+            title: 'Upcoming Drives',
+            order: 3,
+            summary_metric: `${inDrive.length} Upcoming Placement Drives`,
             rows: inDrive,
           },
           companies_in_drive: {
-            title: 'Companies in Drive',
-            order: 2,
-            summary_metric: `${inDrive.length} Drives Scheduled & In Progress`,
+            title: 'Upcoming Drives',
+            order: 3,
+            summary_metric: `${inDrive.length} Upcoming Placement Drives`,
+            rows: inDrive,
+          },
+          upcoming_drives: {
+            title: 'Upcoming Drives',
+            order: 3,
+            summary_metric: `${inDrive.length} Upcoming Placement Drives`,
             rows: inDrive,
           },
           in_progress: {
             title: 'Companies In Progress',
-            order: 3,
+            order: 4,
             summary_metric: `${inProgress.length} Active Operations • JD Received & Pipeline`,
             rows: inProgress,
           },
           pipeline: {
             title: 'Companies In Pipeline',
-            order: 4,
+            order: 5,
             summary_metric: `${pipeline.length} Total Leads • Awaiting JD`,
             rows: pipeline,
           },
           top_companies: {
             title: 'Top Companies',
-            order: 5,
+            order: 6,
             summary_metric: `${topCompanies.length} Priority Hiring Partners`,
             rows: topCompanies,
           },
           rejected_companies: {
             title: 'Rejected Companies',
-            order: 6,
+            order: 7,
             summary_metric: `${rejectedCompanies.length} Employer / Process Declines`,
             rows: rejectedCompanies,
           },
           on_hold_by_college: {
             title: 'Companies On Hold By College',
-            order: 7,
+            order: 8,
             summary_metric: `${onHoldByCollege.length} Institutional Holds`,
             rows: onHoldByCollege,
           },
           on_hold_by_hr: {
             title: 'Companies On Hold By HR',
-            order: 8,
+            order: 9,
             summary_metric: `${onHoldByHr.length} Corporate Holds`,
             rows: onHoldByHr,
           },
@@ -2538,7 +2639,8 @@ app.get('/api/v1/weekly-tracker/kpi', async (req: Request, res: Response) => {
         !['completed', 'rejected_by_hr', 'rejected_by_college'].includes(r.pipeline_section)
     ).length;
     const completed = rows.filter((r) => r.pipeline_section === 'completed').length;
-    const inDrive = rows.filter((r) => r.pipeline_section === 'in_drive' || r.pipeline_section === 'companies_in_drive').length;
+    const driveInProgress = rows.filter((r) => r.pipeline_section === 'drive_in_progress').length;
+    const inDrive = rows.filter((r) => r.pipeline_section === 'in_drive' || r.pipeline_section === 'companies_in_drive' || r.pipeline_section === 'upcoming_drives').length;
     const inProgress = rows.filter((r) => r.pipeline_section === 'in_progress').length;
     const pipeline = rows.filter((r) => r.pipeline_section === 'pipeline').length;
     const topCompanies = rows.filter((r) => r.is_pinned_top || r.pipeline_section === 'top_companies').length;
@@ -2552,6 +2654,8 @@ app.get('/api/v1/weekly-tracker/kpi', async (req: Request, res: Response) => {
         kpi: {
           follow_ups_due_today: followUps,
           completed_companies: completed,
+          drive_in_progress: driveInProgress,
+          upcoming_drives: inDrive,
           in_drive: inDrive,
           in_progress: inProgress,
           pipeline_leads: pipeline,
@@ -2567,7 +2671,7 @@ app.get('/api/v1/weekly-tracker/kpi', async (req: Request, res: Response) => {
 });
 
 // ── WT-1X: GET /api/v1/weekly-tracker/export-xlsx
-// Export all 6 sections to a single-sheet styled XLSX workbook with college acronym tab name
+// Export all sections to a single-sheet styled XLSX workbook with college acronym tab name
 app.get('/api/v1/weekly-tracker/export-xlsx', async (req: Request, res: Response) => {
   try {
     const { college_id, academic_year, search, company_type } = req.query;
@@ -2617,12 +2721,13 @@ app.get('/api/v1/weekly-tracker/export-xlsx', async (req: Request, res: Response
 
     // Partition into sections
     const completed = rows.filter((r) => r.pipeline_section === 'completed');
-    const inDrive = rows.filter((r) => r.pipeline_section === 'in_drive' || r.pipeline_section === 'companies_in_drive');
+    const driveInProgress = rows.filter((r) => r.pipeline_section === 'drive_in_progress');
+    const inDrive = rows.filter((r) => r.pipeline_section === 'in_drive' || r.pipeline_section === 'companies_in_drive' || r.pipeline_section === 'upcoming_drives');
     const inProgress = rows.filter((r) => r.pipeline_section === 'in_progress');
     const pipeline = rows.filter((r) => r.pipeline_section === 'pipeline');
     const topCompanies = rows.filter((r) => r.is_pinned_top || r.pipeline_section === 'top_companies');
-    const rejectedByHr = rows.filter((r) => r.pipeline_section === 'rejected_by_hr');
-    const rejectedByCollege = rows.filter((r) => r.pipeline_section === 'rejected_by_college');
+    const rejectedByHr = rows.filter((r) => r.pipeline_section === 'rejected_by_hr' || r.pipeline_section === 'rejected_companies');
+    const rejectedByCollege = rows.filter((r) => r.pipeline_section === 'rejected_by_college' || r.pipeline_section === 'on_hold_by_college');
 
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'iPOMS Placement Operations Management System';
@@ -2758,20 +2863,23 @@ app.get('/api/v1/weekly-tracker/export-xlsx', async (req: Request, res: Response
     // 1. Companies Completed (Green Banner)
     renderSection('1. COMPANIES COMPLETED', completed, 'FF047857', 'Offers Released');
 
-    // 2. Companies in Drive (Indigo Banner)
-    renderSection('2. COMPANIES IN DRIVE', inDrive, 'FF4338CA', 'Drive Date / Stage');
+    // 2. Drive in Progress (Amber / Orange Banner)
+    renderSection('2. DRIVE IN PROGRESS', driveInProgress, 'FFD97706', 'Drive Date / Stage');
 
-    // 3. Companies in Progress (Blue Banner)
-    renderSection('3. COMPANIES IN PROGRESS', inProgress, 'FF2563EB', 'Follow-up / Drive Date');
+    // 3. Upcoming Drives (Indigo Banner)
+    renderSection('3. UPCOMING DRIVES', inDrive, 'FF4338CA', 'Drive Date / Stage');
 
-    // 4. Companies in Pipeline (Indigo Banner)
-    renderSection('4. COMPANIES IN PIPELINE', pipeline, 'FF4F46E5', 'Timeline');
+    // 4. Companies in Progress (Blue Banner)
+    renderSection('4. COMPANIES IN PROGRESS', inProgress, 'FF2563EB', 'Follow-up / Drive Date');
 
-    // 5. Top Companies (Amber Banner)
-    renderSection('5. TOP COMPANIES', topCompanies, 'FFD97706', 'Package / Tier');
+    // 5. Companies in Pipeline (Indigo Banner)
+    renderSection('5. COMPANIES IN PIPELINE', pipeline, 'FF4F46E5', 'Timeline');
 
-    // 6. Companies Rejected by HR (Rose / Coral Banner)
-    renderSection('6. COMPANIES REJECTED BY HR', rejectedByHr, 'FFE11D48', 'Reason');
+    // 6. Top Companies (Purple Banner)
+    renderSection('6. TOP COMPANIES', topCompanies, 'FF7C3AED', 'Package / Tier');
+
+    // 7. Companies Rejected by HR (Rose / Coral Banner)
+    renderSection('7. COMPANIES REJECTED BY HR', rejectedByHr, 'FFE11D48', 'Reason');
 
     // 7. Companies Rejected by TPO (Slate / Purple Banner)
     renderSection('7. COMPANIES REJECTED BY TPO', rejectedByCollege, 'FF64748B', 'Reason');
@@ -2864,6 +2972,12 @@ app.post('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
       current_status_text,
       follow_up_date,
       drive_date,
+      jd_received_date,
+      db_shared_date,
+      contact_number,
+      mobile_numbers,
+      email_id,
+      email_ids,
       selected_count,
       academic_year,
     } = req.body;
@@ -2942,6 +3056,10 @@ app.post('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
       company_id: new Types.ObjectId(String(resolvedCompanyId)),
       company_name: company_name.trim(),
       job_role: job_role.trim(),
+      contact_number: (contact_number || '').trim(),
+      mobile_numbers: Array.isArray(mobile_numbers) ? mobile_numbers.map((m: string) => String(m).trim()).filter(Boolean) : (contact_number ? [contact_number.trim()] : []),
+      email_id: (email_id || '').trim(),
+      email_ids: Array.isArray(email_ids) ? email_ids.map((e: string) => String(e).trim()).filter(Boolean) : (email_id ? [email_id.trim()] : []),
       cdc_reference: cdc_reference?.trim() || '',
       company_type: company_type?.trim() || 'Software / IT',
       ctc_lpa: ctc_lpa.trim(),
@@ -2950,6 +3068,8 @@ app.post('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
       current_status_text: current_status_text.trim(),
       follow_up_date: effectiveFollowUp,
       drive_date: drive_date ? new Date(drive_date) : null,
+      jd_received_date: jd_received_date ? new Date(jd_received_date) : null,
+      db_shared_date: db_shared_date ? new Date(db_shared_date) : null,
       selected_count: finalSelectedCount,
       week_number: weekNumber,
       week_start_date: startFriday,
@@ -3017,6 +3137,10 @@ app.patch('/api/v1/weekly-tracker/:id', async (req: Request, res: Response) => {
     const allowedFields = [
       'company_name',
       'job_role',
+      'contact_number',
+      'mobile_numbers',
+      'email_id',
+      'email_ids',
       'cdc_reference',
       'company_type',
       'ctc_lpa',
@@ -3024,6 +3148,8 @@ app.patch('/api/v1/weekly-tracker/:id', async (req: Request, res: Response) => {
       'current_status_text',
       'follow_up_date',
       'drive_date',
+      'jd_received_date',
+      'db_shared_date',
       'registered_count',
       'shortlisted_count',
       'selected_count',
@@ -3033,11 +3159,13 @@ app.patch('/api/v1/weekly-tracker/:id', async (req: Request, res: Response) => {
 
     allowedFields.forEach((field) => {
       if (patchData[field] !== undefined) {
-        if (['follow_up_date', 'drive_date'].includes(field)) {
+        if (['follow_up_date', 'drive_date', 'jd_received_date', 'db_shared_date'].includes(field)) {
           (row as any)[field] = patchData[field] ? new Date(patchData[field]) : null;
         } else if (field === 'selected_count') {
           const num = parseInt(String(patchData[field]), 10);
           (row as any)[field] = isNaN(num) ? 0 : Math.min(50, Math.max(0, num));
+        } else if (['mobile_numbers', 'email_ids'].includes(field)) {
+          (row as any)[field] = Array.isArray(patchData[field]) ? patchData[field] : [];
         } else {
           (row as any)[field] = typeof patchData[field] === 'string' ? patchData[field].trim() : patchData[field];
         }
@@ -3112,6 +3240,55 @@ app.patch('/api/v1/weekly-tracker/:id/section', async (req: Request, res: Respon
   }
 });
 
+// ── WT-4B: POST /api/v1/weekly-tracker/batch-move-section
+// Move multiple companies between pipeline sections in bulk
+app.post('/api/v1/weekly-tracker/batch-move-section', async (req: Request, res: Response) => {
+  try {
+    const { row_ids, pipeline_section } = req.body;
+
+    if (!Array.isArray(row_ids) || row_ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'row_ids array is required' },
+      });
+    }
+
+    if (!pipeline_section || !PIPELINE_SECTIONS.includes(pipeline_section)) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'Valid pipeline_section is required' },
+      });
+    }
+
+    const objectIds = row_ids
+      .filter((id: string) => Types.ObjectId.isValid(id))
+      .map((id: string) => new Types.ObjectId(id));
+    const isPinnedTop = pipeline_section === 'top_companies';
+
+    await WeeklyTracker.updateMany(
+      { _id: { $in: objectIds }, is_deleted: false },
+      {
+        $set: {
+          pipeline_section,
+          is_pinned_top: isPinnedTop,
+          last_status_updated_at: new Date(),
+        },
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `Moved ${objectIds.length} companies to ${pipeline_section.replace(/_/g, ' ')}`,
+      data: { moved_count: objectIds.length, target_section: pipeline_section },
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to bulk move companies' },
+    });
+  }
+});
+
 // ── WT-5: PATCH /api/v1/weekly-tracker/:id/pin
 // Toggle Top Companies pinning
 app.patch('/api/v1/weekly-tracker/:id/pin', async (req: Request, res: Response) => {
@@ -3138,6 +3315,46 @@ app.patch('/api/v1/weekly-tracker/:id/pin', async (req: Request, res: Response) 
     return res.status(500).json({
       success: false,
       error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to toggle pin' },
+    });
+  }
+});
+
+// ── WT-5B: PATCH /api/v1/weekly-tracker/reorder
+// Excel-like row reordering: updates custom order_index for rows within a section
+app.patch('/api/v1/weekly-tracker/reorder', async (req: Request, res: Response) => {
+  try {
+    const { row_ids, section, college_id } = req.body;
+    if (!Array.isArray(row_ids) || row_ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'row_ids array is required' },
+      });
+    }
+
+    // Bulk update order_index for all rows
+    const bulkOps = row_ids
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id: string, index: number) => ({
+        updateOne: {
+          filter: { _id: new Types.ObjectId(id) },
+          update: { $set: { order_index: index } },
+        },
+      }));
+
+    if (bulkOps.length > 0) {
+      await WeeklyTracker.bulkWrite(bulkOps);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Rows reordered successfully',
+      data: { reordered_count: bulkOps.length },
+    });
+  } catch (error: any) {
+    console.error('[weekly-tracker] reorder error:', error?.message || error);
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to reorder rows' },
     });
   }
 });
@@ -3200,6 +3417,67 @@ app.post('/api/v1/weekly-tracker/batch-delete', async (req: Request, res: Respon
     return res.status(500).json({
       success: false,
       error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to batch delete records' },
+    });
+  }
+});
+
+// ── WT-6C: POST /api/v1/weekly-tracker/:id/restore
+// Un-delete / Restore a soft-deleted record
+app.post('/api/v1/weekly-tracker/:id/restore', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const row = await WeeklyTracker.findById(id);
+
+    if (!row) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Weekly tracker record not found' },
+      });
+    }
+
+    row.is_deleted = false;
+    row.deleted_at = undefined;
+    await row.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `${row.company_name} restored successfully`,
+      data: row,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to restore record' },
+    });
+  }
+});
+
+// ── WT-6D: POST /api/v1/weekly-tracker/batch-restore
+// Batch restore multiple soft-deleted records
+app.post('/api/v1/weekly-tracker/batch-restore', async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'ids array is required' },
+      });
+    }
+
+    const objectIds = ids.map((id: string) => new Types.ObjectId(id));
+    await WeeklyTracker.updateMany(
+      { _id: { $in: objectIds } },
+      { $set: { is_deleted: false }, $unset: { deleted_at: 1 } }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `${ids.length} records restored from Recycle Bin`,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to batch restore records' },
     });
   }
 });
@@ -5375,17 +5653,19 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
             cFilter.academic_year = { $in: [academic_year, Number(academic_year), String(academic_year)] };
           }
 
-          let [cCompleted, cInDrive, cInProgress] = await Promise.all([
+          let [cCompleted, cDriveInProgress, cInDrive, cInProgress] = await Promise.all([
             WeeklyTracker.find({ ...cFilter, pipeline_section: 'completed' }).sort({ created_at: -1 }),
-            WeeklyTracker.find({ ...cFilter, pipeline_section: { $in: ['in_drive', 'companies_in_drive'] } }).sort({ drive_date: 1, created_at: -1 }),
+            WeeklyTracker.find({ ...cFilter, pipeline_section: 'drive_in_progress' }).sort({ created_at: -1 }),
+            WeeklyTracker.find({ ...cFilter, pipeline_section: { $in: ['in_drive', 'companies_in_drive', 'upcoming_drives'] } }).sort({ drive_date: 1, created_at: -1 }),
             WeeklyTracker.find({ ...cFilter, pipeline_section: 'in_progress' }).sort({ created_at: -1 }),
           ]);
 
-          if (cCompleted.length === 0 && cInDrive.length === 0 && cInProgress.length === 0 && cFilter.academic_year) {
+          if (cCompleted.length === 0 && cDriveInProgress.length === 0 && cInDrive.length === 0 && cInProgress.length === 0 && cFilter.academic_year) {
             delete cFilter.academic_year;
-            [cCompleted, cInDrive, cInProgress] = await Promise.all([
+            [cCompleted, cDriveInProgress, cInDrive, cInProgress] = await Promise.all([
               WeeklyTracker.find({ ...cFilter, pipeline_section: 'completed' }).sort({ created_at: -1 }),
-              WeeklyTracker.find({ ...cFilter, pipeline_section: { $in: ['in_drive', 'companies_in_drive'] } }).sort({ drive_date: 1, created_at: -1 }),
+              WeeklyTracker.find({ ...cFilter, pipeline_section: 'drive_in_progress' }).sort({ created_at: -1 }),
+              WeeklyTracker.find({ ...cFilter, pipeline_section: { $in: ['in_drive', 'companies_in_drive', 'upcoming_drives'] } }).sort({ drive_date: 1, created_at: -1 }),
               WeeklyTracker.find({ ...cFilter, pipeline_section: 'in_progress' }).sort({ created_at: -1 }),
             ]);
           }
@@ -5394,6 +5674,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
             const mVal = Number(min_ctc);
             const inclComp = Boolean(include_competitive_ctc);
             cCompleted = cCompleted.filter((r) => matchesMinCtcHelper(r.ctc_lpa, mVal, inclComp));
+            cDriveInProgress = cDriveInProgress.filter((r) => matchesMinCtcHelper(r.ctc_lpa, mVal, inclComp));
             cInDrive = cInDrive.filter((r) => matchesMinCtcHelper(r.ctc_lpa, mVal, inclComp));
             cInProgress = cInProgress.filter((r) => matchesMinCtcHelper(r.ctc_lpa, mVal, inclComp));
           }
@@ -5415,14 +5696,36 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
               current_status_text: r.current_status_text || 'Completed',
               follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
             })),
+            drive_in_progress: cDriveInProgress.map((r, idx) => ({
+              s_no: idx + 1,
+              company_name: r.company_name,
+              job_role: r.job_role || '—',
+              company_type: r.company_type || '—',
+              ctc_lpa: r.ctc_lpa || 'Competitive',
+              status: r.current_status_text || 'Drive in progress',
+              current_status_text: r.current_status_text || 'Drive in progress',
+              drive_date: r.drive_date ? new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+              follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+            })),
             companies_in_drive: cInDrive.map((r, idx) => ({
               s_no: idx + 1,
               company_name: r.company_name,
               job_role: r.job_role || '—',
               company_type: r.company_type || '—',
               ctc_lpa: r.ctc_lpa || 'Competitive',
-              status: r.current_status_text || (r.drive_date ? `Drive on ${new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Drive in progress'),
-              current_status_text: r.current_status_text || (r.drive_date ? `Drive on ${new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Drive in progress'),
+              status: r.current_status_text || (r.drive_date ? `Drive on ${new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Upcoming Drive'),
+              current_status_text: r.current_status_text || (r.drive_date ? `Drive on ${new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Upcoming Drive'),
+              drive_date: r.drive_date ? new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+              follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+            })),
+            upcoming_drives: cInDrive.map((r, idx) => ({
+              s_no: idx + 1,
+              company_name: r.company_name,
+              job_role: r.job_role || '—',
+              company_type: r.company_type || '—',
+              ctc_lpa: r.ctc_lpa || 'Competitive',
+              status: r.current_status_text || (r.drive_date ? `Drive on ${new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Upcoming Drive'),
+              current_status_text: r.current_status_text || (r.drive_date ? `Drive on ${new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Upcoming Drive'),
               drive_date: r.drive_date ? new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
               follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
             })),
@@ -5436,7 +5739,9 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
               follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : (r.drive_date ? new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Scheduled'),
             })),
             total_completed: cCompleted.length,
+            total_drive_in_progress: cDriveInProgress.length,
             total_in_drive: cInDrive.length,
+            total_upcoming_drives: cInDrive.length,
             total_in_progress: cInProgress.length,
             total_offers: totalOffers,
           };
@@ -5444,6 +5749,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       );
 
       const totalCompletedDrives = colleges_data.reduce((sum, c) => sum + c.total_completed, 0);
+      const totalDriveInProgressDrives = colleges_data.reduce((sum, c) => sum + (c.total_drive_in_progress || 0), 0);
       const totalInDriveDrives = colleges_data.reduce((sum, c) => sum + (c.total_in_drive || 0), 0);
       const totalInProgressDrives = colleges_data.reduce((sum, c) => sum + c.total_in_progress, 0);
       const totalOffersMoved = colleges_data.reduce((sum, c) => sum + c.total_offers, 0);
@@ -5473,20 +5779,25 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         kpi_summary: {
           total_colleges: colleges_data.length,
           drives_completed: totalCompletedDrives,
+          drive_in_progress: totalDriveInProgressDrives,
           drives_in_drive: totalInDriveDrives,
+          upcoming_drives: totalInDriveDrives,
           drives_in_progress: totalInProgressDrives,
           total_offers: totalOffersMoved,
         },
         included_sections: included_sections || {
           kpi_summary: true,
           completed_companies: true,
+          drive_in_progress: true,
           companies_in_drive: true,
+          upcoming_drives: true,
           in_progress: true,
           remarks: true,
         },
         included_kpi_cards: kpi_cards || included_kpi_cards || {
           total_colleges: true,
           drives_completed: true,
+          drive_in_progress: true,
           drives_in_progress: true,
           total_offers: true,
         },
@@ -5528,6 +5839,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
     // Parallel fetch of pipeline sections & operational metrics
     let [
       completedRows,
+      driveInProgressRows,
       inDriveRows,
       inProgressRows,
       pipelineRows,
@@ -5541,7 +5853,8 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       totalJds,
     ] = await Promise.all([
       WeeklyTracker.find({ ...wtFilter, pipeline_section: 'completed' }).sort({ created_at: -1 }),
-      WeeklyTracker.find({ ...wtFilter, pipeline_section: { $in: ['in_drive', 'companies_in_drive'] } }).sort({ drive_date: 1, created_at: -1, company_name: 1 }),
+      WeeklyTracker.find({ ...wtFilter, pipeline_section: 'drive_in_progress' }).sort({ created_at: -1 }),
+      WeeklyTracker.find({ ...wtFilter, pipeline_section: { $in: ['in_drive', 'companies_in_drive', 'upcoming_drives'] } }).sort({ drive_date: 1, created_at: -1, company_name: 1 }),
       WeeklyTracker.find({ ...wtFilter, pipeline_section: 'in_progress' }).sort({ created_at: -1 }),
       WeeklyTracker.find({ ...wtFilter, pipeline_section: 'pipeline' }).sort({ created_at: -1 }),
       WeeklyTracker.find({
@@ -5569,6 +5882,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
     // Fallback: If 0 rows found and an academic year filter was applied, search all records for that college
     if (
       completedRows.length === 0 &&
+      driveInProgressRows.length === 0 &&
       inDriveRows.length === 0 &&
       inProgressRows.length === 0 &&
       pipelineRows.length === 0 &&
@@ -5580,9 +5894,10 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
     ) {
       const fallbackFilter = { ...wtFilter };
       delete fallbackFilter.academic_year;
-      const [fCompleted, fInDrive, fInProgress, fPipeline, fTopCompanies, fRejectedCompanies, fOnHoldByCollege, fOnHoldByHr] = await Promise.all([
+      const [fCompleted, fDriveInProgress, fInDrive, fInProgress, fPipeline, fTopCompanies, fRejectedCompanies, fOnHoldByCollege, fOnHoldByHr] = await Promise.all([
         WeeklyTracker.find({ ...fallbackFilter, pipeline_section: 'completed' }).sort({ created_at: -1 }),
-        WeeklyTracker.find({ ...fallbackFilter, pipeline_section: { $in: ['in_drive', 'companies_in_drive'] } }).sort({ drive_date: 1, created_at: -1, company_name: 1 }),
+        WeeklyTracker.find({ ...fallbackFilter, pipeline_section: 'drive_in_progress' }).sort({ created_at: -1 }),
+        WeeklyTracker.find({ ...fallbackFilter, pipeline_section: { $in: ['in_drive', 'companies_in_drive', 'upcoming_drives'] } }).sort({ drive_date: 1, created_at: -1, company_name: 1 }),
         WeeklyTracker.find({ ...fallbackFilter, pipeline_section: 'in_progress' }).sort({ created_at: -1 }),
         WeeklyTracker.find({ ...fallbackFilter, pipeline_section: 'pipeline' }).sort({ created_at: -1 }),
         WeeklyTracker.find({
@@ -5603,6 +5918,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         }).sort({ created_at: -1 }),
       ]);
       completedRows = fCompleted;
+      driveInProgressRows = fDriveInProgress;
       inDriveRows = fInDrive;
       inProgressRows = fInProgress;
       pipelineRows = fPipeline;
@@ -5615,7 +5931,9 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
     // Apply frontend-selected rows or server-side CTC/column filters if provided
     if (custom_weekly_companies && typeof custom_weekly_companies === 'object') {
       if (Array.isArray(custom_weekly_companies.completed)) completedRows = custom_weekly_companies.completed;
+      if (Array.isArray(custom_weekly_companies.drive_in_progress)) driveInProgressRows = custom_weekly_companies.drive_in_progress;
       if (Array.isArray(custom_weekly_companies.in_drive)) inDriveRows = custom_weekly_companies.in_drive;
+      if (Array.isArray(custom_weekly_companies.upcoming_drives)) inDriveRows = custom_weekly_companies.upcoming_drives;
       if (Array.isArray(custom_weekly_companies.in_progress)) inProgressRows = custom_weekly_companies.in_progress;
       if (Array.isArray(custom_weekly_companies.pipeline)) pipelineRows = custom_weekly_companies.pipeline;
       if (Array.isArray(custom_weekly_companies.top_companies)) topCompaniesRows = custom_weekly_companies.top_companies;
@@ -5641,6 +5959,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       };
 
       completedRows = completedRows.filter(filterItem);
+      driveInProgressRows = driveInProgressRows.filter(filterItem);
       inDriveRows = inDriveRows.filter(filterItem);
       inProgressRows = inProgressRows.filter(filterItem);
       pipelineRows = pipelineRows.filter(filterItem);
@@ -5687,7 +6006,9 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         not_hiring: notHiringCalls,
         jds_received: totalJds,
         drives_completed: completedRows.length,
+        drive_in_progress: driveInProgressRows.length,
         drives_in_drive: inDriveRows.length,
+        upcoming_drives: inDriveRows.length,
         drives_in_progress: inProgressRows.length,
         pipeline_leads: pipelineRows.length,
         top_companies_count: topCompaniesRows.length,
@@ -5707,14 +6028,36 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
           current_status_text: r.current_status_text || 'Completed',
           follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
         })),
+        drive_in_progress: driveInProgressRows.map((r, i) => ({
+          s_no: i + 1,
+          company_name: r.company_name,
+          job_role: r.job_role || (r as any).role || '—',
+          company_type: r.company_type || 'Software / IT',
+          ctc_lpa: r.ctc_lpa || 'Competitive',
+          status: r.current_status_text || 'Drive in progress',
+          current_status_text: r.current_status_text || 'Drive in progress',
+          drive_date: r.drive_date ? new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+          follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+        })),
         companies_in_drive: inDriveRows.map((r, i) => ({
           s_no: i + 1,
           company_name: r.company_name,
           job_role: r.job_role || (r as any).role || '—',
           company_type: r.company_type || 'Software / IT',
           ctc_lpa: r.ctc_lpa || 'Competitive',
-          status: r.current_status_text || (r.drive_date ? `Drive on ${new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Drive in progress'),
-          current_status_text: r.current_status_text || (r.drive_date ? `Drive on ${new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Drive in progress'),
+          status: r.current_status_text || (r.drive_date ? `Drive on ${new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Upcoming Drive'),
+          current_status_text: r.current_status_text || (r.drive_date ? `Drive on ${new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Upcoming Drive'),
+          drive_date: r.drive_date ? new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+          follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+        })),
+        upcoming_drives: inDriveRows.map((r, i) => ({
+          s_no: i + 1,
+          company_name: r.company_name,
+          job_role: r.job_role || (r as any).role || '—',
+          company_type: r.company_type || 'Software / IT',
+          ctc_lpa: r.ctc_lpa || 'Competitive',
+          status: r.current_status_text || (r.drive_date ? `Drive on ${new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Upcoming Drive'),
+          current_status_text: r.current_status_text || (r.drive_date ? `Drive on ${new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Upcoming Drive'),
           drive_date: r.drive_date ? new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
           follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
         })),
@@ -5793,7 +6136,9 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       included_sections: included_sections || {
         kpi_summary: true,
         completed_companies: true,
+        drive_in_progress: true,
         companies_in_drive: true,
+        upcoming_drives: true,
         in_progress: true,
         pipeline: true,
         top_companies: true,
@@ -6390,6 +6735,62 @@ app.get('/api/v1/dashboard/college-kpis', async (req: Request, res: Response) =>
   }
 });
 
+// ── Real-Time Presence Heartbeat ──
+app.post('/api/v1/users/heartbeat', async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+    let userId = req.body?.user_id;
+    if (!userId && authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      try {
+        const decoded: any = jwt.verify(token, process.env.JWT_ACCESS_SECRET || 'secret');
+        userId = decoded.userId || decoded.id;
+      } catch {}
+    }
+    if (!userId) {
+      return res.status(200).json({ success: false, message: 'Unauthenticated' });
+    }
+
+    const {
+      college_id,
+      college_name,
+      college_code,
+      college_location,
+      current_page,
+    } = req.body || {};
+
+    const updateDoc: any = {
+      last_active_at: new Date(),
+      is_online: true,
+    };
+
+    if (college_id) {
+      updateDoc.active_college_id = college_id;
+    }
+    if (college_name !== undefined) {
+      updateDoc.active_college_name = college_name;
+    }
+    if (college_code !== undefined) {
+      updateDoc.active_college_code = college_code;
+    }
+    if (college_location !== undefined) {
+      updateDoc.active_college_location = college_location;
+    }
+    if (current_page !== undefined) {
+      updateDoc.current_page = current_page;
+    }
+
+    await User.findByIdAndUpdate(userId, updateDoc);
+
+    return res.status(200).json({
+      success: true,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ── DB-2: GET /api/v1/dashboard/team-leader
 // Team Leader Dashboard (Spec Section 5.2) — Coordinator Profile Online Activity & Live Performance Matrix
 app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => {
@@ -6430,21 +6831,26 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
         ]);
 
         // Determine real-time online status and last activity
-        let lastActiveTime: Date | null = null;
+        let lastActiveTime: Date | null = c.last_active_at ? new Date(c.last_active_at) : null;
         let lastActivitySummary = 'No activity logged today';
 
         if (latestCall?.session_date) {
-          lastActiveTime = new Date(latestCall.session_date);
+          const callTime = new Date(latestCall.session_date);
+          if (!lastActiveTime || callTime > lastActiveTime) {
+            lastActiveTime = callTime;
+          }
           const company = latestCall.company_name || 'Partner Company';
           const college = (latestCall.college_id as any)?.college_code || (latestCall.college_id as any)?.college_name || '';
           lastActivitySummary = `Logged call for ${company}${college ? ` (${college})` : ''}`;
-        } else if (c.last_login_at) {
+        } else if (c.last_login_at && !lastActiveTime) {
           lastActiveTime = new Date(c.last_login_at);
           lastActivitySummary = 'Signed in to portal';
         }
 
         let onlineStatus: 'online' | 'away' | 'offline' | 'on_leave' | 'partial_working' = 'offline';
         let onlineStatusLabel = 'Offline';
+
+        const isExplicitLoggedOut = c.logged_out_at && c.last_active_at && new Date(c.logged_out_at) >= new Date(c.last_active_at);
 
         if (c.account_status === 'on_leave') {
           onlineStatus = 'on_leave';
@@ -6454,20 +6860,30 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
           onlineStatusLabel = 'Partial Working';
         } else if (lastActiveTime) {
           const diffMinutes = Math.floor((nowMs - lastActiveTime.getTime()) / (1000 * 60));
-          if (diffMinutes <= 15) {
+          if (!isExplicitLoggedOut && diffMinutes <= 5) {
             onlineStatus = 'online';
-            onlineStatusLabel = 'Active Now';
+            if (c.active_college_name || c.active_college_code) {
+              onlineStatusLabel = `Active in ${c.active_college_code || c.active_college_name}`;
+            } else {
+              onlineStatusLabel = 'Online';
+            }
           } else if (diffMinutes <= 60) {
             onlineStatus = 'away';
-            onlineStatusLabel = `Away (${diffMinutes}m ago)`;
-          } else if (calls > 0 || (c.last_login_at && new Date(c.last_login_at).toDateString() === new Date().toDateString())) {
-            onlineStatus = 'away';
-            onlineStatusLabel = 'Active Today';
+            onlineStatusLabel = diffMinutes <= 1 ? 'Away (just now)' : `Away (${diffMinutes}m ago)`;
           } else {
             onlineStatus = 'offline';
             onlineStatusLabel = 'Offline';
           }
         }
+
+        const activeCollegeData = (onlineStatus === 'online' || onlineStatus === 'away') && (c.active_college_name || c.active_college_code || c.active_college_id)
+          ? {
+              college_id: c.active_college_id ? String(c.active_college_id) : '',
+              college_code: c.active_college_code || '',
+              college_name: c.active_college_name || '',
+              location: c.active_college_location || '',
+            }
+          : null;
 
         return {
           coordinator_id: c._id,
@@ -6484,6 +6900,8 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
           last_activity_summary: lastActivitySummary,
           online_status: onlineStatus,
           online_status_label: onlineStatusLabel,
+          active_college: activeCollegeData,
+          current_page: c.current_page || '',
           calls_today: calls,
           positive_leads: positives,
           jds_received: jds,
@@ -6583,9 +7001,9 @@ app.get('/api/v1/dashboard/admin', async (req: Request, res: Response) => {
     // ── All Active Colleges for Leaderboard ──
     const allColleges = await College.find({ status: 'active' }).sort({ college_name: 1 }).lean();
     
-    // Fetch all active users to map assigned coordinators
+    // Fetch all active users to map assigned coordinators with presence telemetry
     const allCoordinators = await User.find({ is_deleted: false, account_status: 'active' })
-      .select('_id full_name official_email primary_mobile role_codes assigned_college_ids is_active is_password_locked failed_login_attempts profile_photo_url')
+      .select('_id full_name official_email primary_mobile role_codes assigned_college_ids is_active is_password_locked failed_login_attempts profile_photo_url last_active_at logged_out_at is_online active_college_id active_college_name active_college_code active_college_location current_page last_login_at account_status')
       .lean();
 
     // Aggregations per college
@@ -6715,6 +7133,7 @@ app.get('/api/v1/dashboard/admin', async (req: Request, res: Response) => {
     });
 
     const lockedAccountsList: any[] = [];
+    const nowMs = Date.now();
 
     const workforce = coordinatorUsers.map((u: any) => {
       const uIdStr = String(u._id);
@@ -6731,6 +7150,50 @@ app.get('/api/v1/dashboard/admin', async (req: Request, res: Response) => {
         });
       }
 
+      // Real-time online status calculations
+      let lastActiveTime: Date | null = u.last_active_at ? new Date(u.last_active_at) : null;
+      if (u.last_login_at && !lastActiveTime) {
+        lastActiveTime = new Date(u.last_login_at);
+      }
+
+      let onlineStatus: 'online' | 'away' | 'offline' | 'on_leave' | 'partial_working' = 'offline';
+      let onlineStatusLabel = 'Offline';
+
+      const isExplicitLoggedOut = u.logged_out_at && u.last_active_at && new Date(u.logged_out_at) >= new Date(u.last_active_at);
+
+      if (u.account_status === 'on_leave') {
+        onlineStatus = 'on_leave';
+        onlineStatusLabel = 'On Leave';
+      } else if (u.account_status === 'partial_working') {
+        onlineStatus = 'partial_working';
+        onlineStatusLabel = 'Partial Working';
+      } else if (lastActiveTime) {
+        const diffMinutes = Math.floor((nowMs - lastActiveTime.getTime()) / (1000 * 60));
+        if (!isExplicitLoggedOut && diffMinutes <= 5) {
+          onlineStatus = 'online';
+          if (u.active_college_name || u.active_college_code) {
+            onlineStatusLabel = `Active in ${u.active_college_code || u.active_college_name}`;
+          } else {
+            onlineStatusLabel = 'Online';
+          }
+        } else if (diffMinutes <= 60) {
+          onlineStatus = 'away';
+          onlineStatusLabel = diffMinutes <= 1 ? 'Away (just now)' : `Away (${diffMinutes}m ago)`;
+        } else {
+          onlineStatus = 'offline';
+          onlineStatusLabel = 'Offline';
+        }
+      }
+
+      const activeCollegeData = (onlineStatus === 'online' || onlineStatus === 'away') && (u.active_college_name || u.active_college_code || u.active_college_id)
+        ? {
+            college_id: u.active_college_id ? String(u.active_college_id) : '',
+            college_code: u.active_college_code || '',
+            college_name: u.active_college_name || '',
+            location: u.active_college_location || '',
+          }
+        : null;
+
       return {
         coordinator_id: u._id,
         name: u.full_name,
@@ -6744,6 +7207,10 @@ app.get('/api/v1/dashboard/admin', async (req: Request, res: Response) => {
         is_locked: isLocked,
         is_overloaded: assignedCount > 4,
         is_unassigned: assignedCount === 0,
+        online_status: onlineStatus,
+        online_status_label: onlineStatusLabel,
+        active_college: activeCollegeData,
+        last_active_at: lastActiveTime,
       };
     });
 

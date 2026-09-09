@@ -39,6 +39,14 @@ export interface IUser extends Document {
   is_email_verified: boolean;
   must_change_password: boolean;
   last_login_at?: Date | null;
+  last_active_at?: Date | null;
+  logged_out_at?: Date | null;
+  is_online?: boolean;
+  active_college_id?: Types.ObjectId | null;
+  active_college_code?: string;
+  active_college_name?: string;
+  active_college_location?: string;
+  current_page?: string;
   last_password_changed_at?: Date | null;
   // Lockout + OTP reset state (see server.ts auth routes)
   failed_login_attempts: number;
@@ -242,6 +250,45 @@ const UserSchema: Schema<IUser> = new Schema(
     last_login_at: {
       type: Date,
       default: null,
+    },
+    last_active_at: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    logged_out_at: {
+      type: Date,
+      default: null,
+    },
+    is_online: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    active_college_id: {
+      type: Schema.Types.ObjectId,
+      ref: 'College',
+      default: null,
+    },
+    active_college_code: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    active_college_name: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    active_college_location: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    current_page: {
+      type: String,
+      default: '',
+      trim: true,
     },
     last_password_changed_at: {
       type: Date,

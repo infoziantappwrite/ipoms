@@ -215,25 +215,25 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
           ${collapsed ? 'w-[72px]' : 'w-64'}`}
       >
         {/* ── Brand Header Strip ── */}
-        <div className="h-14 flex items-center px-3 border-b border-border relative shrink-0 justify-between">
+        <div className="h-16 flex items-center px-2.5 border-b border-border relative shrink-0 justify-between">
           {collapsed ? (
-            <div className="w-full flex items-center justify-center py-1">
+            <div className="w-full flex items-center justify-center">
               <Link
                 href="/dashboard"
-                className="bg-white rounded-xl p-1 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0 hover:scale-105 active:scale-[0.992] transition-transform duration-300 cursor-pointer"
+                className="w-12 h-12 bg-white rounded-2xl p-1 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0 hover:scale-105 active:scale-[0.992] transition-transform duration-300 cursor-pointer"
                 title="iPOMS Placement Suite"
               >
-                <InfoziantMark size={28} />
+                <InfoziantMark size={46} className="w-full h-full object-contain" />
               </Link>
             </div>
           ) : (
-            <div className="flex w-full items-center justify-between py-1">
+            <div className="flex w-full items-center justify-between px-1">
               <Link
                 href="/dashboard"
-                className="flex items-center gap-2.5 overflow-hidden focus-visible:outline-hidden"
+                className="flex items-center gap-3 overflow-hidden focus-visible:outline-hidden"
               >
-                <div className="bg-white rounded-xl p-1 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0">
-                  <InfoziantMark size={28} />
+                <div className="w-11 h-11 bg-white rounded-xl p-1 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0">
+                  <InfoziantMark size={42} className="w-full h-full object-contain" />
                 </div>
                 <div
                   className={`flex flex-col min-w-0
@@ -529,8 +529,8 @@ function MobileDrawer({
             onClick={onClose}
             className="flex items-center gap-3 overflow-hidden"
           >
-            <div className="bg-white rounded-xl p-1 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0">
-              <InfoziantMark size={30} />
+            <div className="w-11 h-11 bg-white rounded-xl p-1 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0">
+              <InfoziantMark size={42} className="w-full h-full object-contain" />
             </div>
             <div className="flex flex-col">
               <span className="text-body font-bold text-fg">iPOMS</span>

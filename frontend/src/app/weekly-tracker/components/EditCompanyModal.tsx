@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { Pencil, X, Building2, Trash2, CheckCircle2, Briefcase, Layers, GraduationCap } from 'lucide-react';
+import { Pencil, X, Building2, Trash2, CheckCircle2, Briefcase, Layers, GraduationCap, Phone, Mail, Calendar } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { triggerHaptic } from '@/lib/haptics';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
 import { WeeklyRow } from './WeeklyTable';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
+import { validateAndNormalizeIndianMobile, validateAndNormalizeEmail } from '@/lib/contactValidation';
 
 const BATCH_YEARS = ['2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
 
@@ -14,13 +16,14 @@ import { COMPANY_TYPES } from '../constants/companyTypes';
 
 const SECTIONS = [
   { value: 'completed', label: '1. Companies Completed' },
-  { value: 'in_drive', label: '2. Companies in Drive' },
-  { value: 'in_progress', label: '3. Companies In Progress' },
-  { value: 'pipeline', label: '4. Companies In Pipeline' },
-  { value: 'top_companies', label: '5. Top Companies' },
-  { value: 'rejected_companies', label: '6. Rejected Companies' },
-  { value: 'on_hold_by_college', label: '7. Companies On Hold By College' },
-  { value: 'on_hold_by_hr', label: '8. Companies On Hold By HR' },
+  { value: 'drive_in_progress', label: '2. Drive in Progress' },
+  { value: 'in_drive', label: '3. Upcoming Drives' },
+  { value: 'in_progress', label: '4. Companies In Progress' },
+  { value: 'pipeline', label: '5. Companies In Pipeline' },
+  { value: 'top_companies', label: '6. Top Companies' },
+  { value: 'rejected_companies', label: '7. Rejected Companies' },
+  { value: 'on_hold_by_college', label: '8. Companies On Hold By College' },
+  { value: 'on_hold_by_hr', label: '9. Companies On Hold By HR' },
 ];
 
 interface Props {
@@ -37,6 +40,24 @@ export function EditCompanyModal({
   onDeleted,
 }: Props) {
   const [companyName, setCompanyName] = useState(row.company_name || '');
+  const [contactNumber, setContactNumber] = useState(row.contact_number || (row.mobile_numbers && row.mobile_numbers[0]) || '');
+  const [emailId, setEmailId] = useState(row.email_id || (row.email_ids && row.email_ids[0]) || '');
+  const [jdReceivedDate, setJdReceivedDate] = useState(() => {
+    if (!row.jd_received_date) return '';
+    try {
+      return new Date(row.jd_received_date).toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
+  });
+  const [dbSharedDate, setDbSharedDate] = useState(() => {
+    if (!row.db_shared_date) return '';
+    try {
+      return new Date(row.db_shared_date).toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
+  });
   const [jobRole, setJobRole] = useState(row.job_role || '');
   const [companyType, setCompanyType] = useState(row.company_type || 'IT / Software & Technology');
   const [ctcValue, setCtcValue] = useState(() => {
@@ -72,6 +93,7 @@ export function EditCompanyModal({
   const [isPinnedTop, setIsPinnedTop] = useState(row.is_pinned_top || false);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,6 +114,26 @@ export function EditCompanyModal({
       return;
     }
 
+    let normalizedContact = '';
+    if (contactNumber.trim()) {
+      const res = validateAndNormalizeIndianMobile(contactNumber.trim());
+      if (!res.valid) {
+        alert(res.error || 'Invalid Indian mobile number');
+        return;
+      }
+      normalizedContact = res.normalized;
+    }
+
+    let normalizedEmail = '';
+    if (emailId.trim()) {
+      const res = validateAndNormalizeEmail(emailId.trim());
+      if (!res.valid) {
+        alert(res.error || 'Invalid email address');
+        return;
+      }
+      normalizedEmail = res.normalized;
+    }
+
     const formattedCtc = ctcValue.includes('LPA') || ctcValue.toLowerCase().includes('month')
       ? ctcValue.trim()
       : `${ctcValue.trim()} ${ctcUnit}`;
@@ -101,6 +143,12 @@ export function EditCompanyModal({
     try {
       const patch: Partial<WeeklyRow> = {
         company_name: companyName.trim(),
+        contact_number: normalizedContact || undefined,
+        mobile_numbers: normalizedContact ? [normalizedContact] : [],
+        email_id: normalizedEmail || undefined,
+        email_ids: normalizedEmail ? [normalizedEmail] : [],
+        jd_received_date: jdReceivedDate || undefined,
+        db_shared_date: dbSharedDate || undefined,
         job_role: jobRole.trim(),
         company_type: companyType,
         ctc_lpa: formattedCtc,
@@ -125,8 +173,12 @@ export function EditCompanyModal({
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm(`Are you sure you want to delete "${row.company_name}" from Weekly Tracker?`)) return;
+  const handleDelete = () => {
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    setIsDeleteConfirmOpen(false);
     setDeleting(true);
     triggerHaptic('heavy');
     try {
@@ -160,7 +212,7 @@ export function EditCompanyModal({
                 Edit Company Record
               </h2>
               <p className="text-xs text-fg-subtle font-medium mt-0.5">
-                Update role, CTC, spelling, status notes, and student metrics
+                Update role, CTC, contact, email, JD & DB dates, status notes
               </p>
             </div>
           </div>
@@ -189,6 +241,66 @@ export function EditCompanyModal({
               placeholder="e.g. TCS, Cognizant, NVIDIA..."
               className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-fg placeholder:text-fg-disabled text-xs transition-all outline-none font-semibold"
             />
+          </div>
+
+          {/* Contact Number & Email ID */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label className="block text-fg font-semibold mb-1.5 flex items-center gap-1.5">
+                <Phone size={13} className="text-blue-600 dark:text-blue-400" />
+                <span>Contact Number</span>
+              </label>
+              <input
+                type="text"
+                value={contactNumber}
+                onChange={(e) => setContactNumber(e.target.value)}
+                placeholder="e.g. 9876543210"
+                className="w-full bg-surface-sunken border border-border focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-3.5 py-2.5 text-fg placeholder:text-fg-disabled text-xs transition-all outline-none font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-fg font-semibold mb-1.5 flex items-center gap-1.5">
+                <Mail size={13} className="text-indigo-600 dark:text-indigo-400" />
+                <span>Email ID</span>
+              </label>
+              <input
+                type="email"
+                value={emailId}
+                onChange={(e) => setEmailId(e.target.value)}
+                placeholder="e.g. hr@company.com"
+                className="w-full bg-surface-sunken border border-border focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-3.5 py-2.5 text-fg placeholder:text-fg-disabled text-xs transition-all outline-none"
+              />
+            </div>
+          </div>
+
+          {/* JD Received Date & DB Shared Date */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <SmoothDatePicker
+                label="JD Received Date"
+                value={jdReceivedDate}
+                onChange={setJdReceivedDate}
+                variant="input"
+                fullWidth
+                usePortal
+                clearable
+                placeholder="dd-mm-yyyy"
+              />
+            </div>
+
+            <div>
+              <SmoothDatePicker
+                label="Database Shared Date"
+                value={dbSharedDate}
+                onChange={setDbSharedDate}
+                variant="input"
+                fullWidth
+                usePortal
+                clearable
+                placeholder="dd-mm-yyyy"
+              />
+            </div>
           </div>
 
           {/* Job Role(s) */}
@@ -418,6 +530,14 @@ export function EditCompanyModal({
         </div>
 
       </div>
+
+      <DeleteConfirmModal
+        count={1}
+        isOpen={isDeleteConfirmOpen}
+        isDeleting={deleting}
+        onClose={() => setIsDeleteConfirmOpen(false)}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 }
