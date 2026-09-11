@@ -59,12 +59,9 @@ export function DeleteRowConfirmModal({ isOpen, count, onClose, onConfirm }: Pro
             <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-600 dark:text-rose-400 shrink-0">
               <Trash2 size={18} strokeWidth={2.2} />
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-fg">
-                Delete {count} {count === 1 ? 'Row' : 'Rows'}?
-              </h3>
-              <p className="text-micro text-fg-subtle">Confirmation required</p>
-            </div>
+            <h3 className="text-sm font-bold text-fg">
+              Delete {count} {count === 1 ? 'Row' : 'Rows'}?
+            </h3>
           </div>
           <button
             type="button"
@@ -78,18 +75,10 @@ export function DeleteRowConfirmModal({ isOpen, count, onClose, onConfirm }: Pro
         </div>
 
         {/* Body */}
-        <div className="p-5 space-y-3 text-xs">
-          <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-800 dark:text-rose-300">
-            <AlertCircle size={16} className="text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
-            <div className="space-y-0.5">
-              <p className="font-semibold">
-                You are about to delete {count} {count === 1 ? 'row' : 'rows'}.
-              </p>
-              <p className="text-micro text-rose-700 dark:text-rose-400 leading-relaxed">
-                This will remove the selected {count === 1 ? 'contact' : 'contacts'} from today&apos;s calling sheet. This action cannot be undone.
-              </p>
-            </div>
-          </div>
+        <div className="p-5 text-xs">
+          <p className="text-fg-subtle leading-relaxed">
+            This will remove the selected {count === 1 ? 'entry' : 'entries'} from today&apos;s calling sheet. This action cannot be undone.
+          </p>
         </div>
 
         {/* Footer Actions */}
@@ -98,7 +87,7 @@ export function DeleteRowConfirmModal({ isOpen, count, onClose, onConfirm }: Pro
             type="button"
             onClick={onClose}
             disabled={loading}
-            className="px-3 py-1.5 rounded-xl border border-border text-fg-subtle hover:text-fg hover:bg-surface text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+            className="px-3.5 py-1.5 rounded-xl border border-border text-fg-subtle hover:text-fg hover:bg-surface text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
           >
             Cancel
           </button>
@@ -106,7 +95,7 @@ export function DeleteRowConfirmModal({ isOpen, count, onClose, onConfirm }: Pro
             type="button"
             onClick={handleConfirm}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
           >
             {loading ? (
               <>
@@ -116,7 +105,7 @@ export function DeleteRowConfirmModal({ isOpen, count, onClose, onConfirm }: Pro
             ) : (
               <>
                 <Trash2 size={13} strokeWidth={2.2} />
-                <span>Delete {count} {count === 1 ? 'Row' : 'Rows'}</span>
+                <span>OK</span>
               </>
             )}
           </button>

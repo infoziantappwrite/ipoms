@@ -30,6 +30,11 @@ import { useToast } from '@/components/ui/Toast';
 import type { CallOutcome, TrackerRow } from '../page';
 import { ROW_OUTCOMES, type RowOutcomeOption } from './RowOutcomeDropdown';
 import { MONTHS } from './TrackerRow';
+import { MultiTagInput } from '@/components/ui/MultiTagInput';
+import {
+  validateAndNormalizeIndianMobile,
+  validateAndNormalizeEmail,
+} from '@/lib/contactValidation';
 
 interface Props {
   coordinatorId: string;
@@ -59,10 +64,11 @@ function getCompanyMissingDetails(comp: any) {
     (Array.isArray(comp.email_ids) && comp.email_ids.some((e: string) => e && e.trim()))
   );
   const hasHr = Boolean(
-    comp.hr_name &&
-    comp.hr_name.trim() !== '' &&
-    comp.hr_name.trim().toLowerCase() !== 'hr contact' &&
-    comp.hr_name.trim().toLowerCase() !== 'contact'
+    (comp.hr_name &&
+      comp.hr_name.trim() !== '' &&
+      comp.hr_name.trim().toLowerCase() !== 'hr contact' &&
+      comp.hr_name.trim().toLowerCase() !== 'contact') ||
+    (Array.isArray(comp.hr_names) && comp.hr_names.some((h: string) => h && h.trim()))
   );
 
   const missing: string[] = [];
@@ -129,9 +135,9 @@ export function ManualAddRowModal({
   const { toast } = useToast();
 
   const [companyName, setCompanyName] = useState('');
-  const [hrName, setHrName] = useState('');
-  const [mobileNumber, setMobileNumber] = useState('');
-  const [emailId, setEmailId] = useState('');
+  const [hrNames, setHrNames] = useState<string[]>([]);
+  const [mobileNumbers, setMobileNumbers] = useState<string[]>([]);
+  const [emailIds, setEmailIds] = useState<string[]>([]);
 
   // Start Time & Tracking
   const [startTime, setStartTime] = useState(() => {
@@ -300,9 +306,72 @@ export function ManualAddRowModal({
   const handleSelectCompany = (comp: any) => {
     triggerHaptic('light');
     setCompanyName(comp.company_name);
-    setHrName(comp.hr_name && comp.hr_name !== 'HR Contact' ? comp.hr_name : '');
-    setMobileNumber(comp.primary_mobile || comp.contact_numbers?.[0] || comp.mobile_numbers?.[0] || '');
-    setEmailId(comp.primary_email || comp.email_ids?.[0] || '');
+
+    // Extract all distinct HR names
+    const hrs: string[] = [];
+    if (
+      comp.hr_name &&
+      comp.hr_name.trim() &&
+      comp.hr_name.trim().toLowerCase() !== 'hr contact' &&
+      comp.hr_name.trim().toLowerCase() !== 'contact'
+    ) {
+      comp.hr_name.split(/[,;/]+/).forEach((h: string) => {
+        const clean = h.trim();
+        if (
+          clean &&
+          clean.toLowerCase() !== 'hr contact' &&
+          clean.toLowerCase() !== 'contact' &&
+          !hrs.includes(clean)
+        ) {
+          hrs.push(clean);
+        }
+      });
+    }
+    if (Array.isArray(comp.hr_names)) {
+      comp.hr_names.forEach((h: string) => {
+        const clean = h && h.trim();
+        if (
+          clean &&
+          clean.toLowerCase() !== 'hr contact' &&
+          clean.toLowerCase() !== 'contact' &&
+          !hrs.includes(clean)
+        ) {
+          hrs.push(clean);
+        }
+      });
+    }
+    setHrNames(hrs);
+
+    // Extract all distinct mobile numbers
+    const mobs: string[] = [];
+    if (comp.primary_mobile && comp.primary_mobile.trim()) {
+      mobs.push(comp.primary_mobile.trim());
+    }
+    if (Array.isArray(comp.mobile_numbers)) {
+      comp.mobile_numbers.forEach((m: string) => {
+        if (m && m.trim() && !mobs.includes(m.trim())) mobs.push(m.trim());
+      });
+    }
+    if (Array.isArray(comp.contact_numbers)) {
+      comp.contact_numbers.forEach((m: string) => {
+        if (m && m.trim() && !mobs.includes(m.trim())) mobs.push(m.trim());
+      });
+    }
+    setMobileNumbers(mobs);
+
+    // Extract all distinct email IDs
+    const emails: string[] = [];
+    if (comp.primary_email && comp.primary_email.trim()) {
+      emails.push(comp.primary_email.trim().toLowerCase());
+    }
+    if (Array.isArray(comp.email_ids)) {
+      comp.email_ids.forEach((e: string) => {
+        const clean = e && e.trim().toLowerCase();
+        if (clean && !emails.includes(clean)) emails.push(clean);
+      });
+    }
+    setEmailIds(emails);
+
     setMatchedMetaRecord(comp);
     setShowSuggestions(false);
     setHighlightedIndex(-1);
@@ -406,9 +475,9 @@ export function ManualAddRowModal({
         coordinator_id: coordinatorId,
         college_id: collegeId,
         company_name: companyName.trim(),
-        hr_name: hrName.trim() || 'HR Contact',
-        mobile_number: mobileNumber.trim(),
-        email_id: emailId.trim().toLowerCase(),
+        hr_name: hrNames.join(', ').trim() || 'HR Contact',
+        mobile_number: mobileNumbers.join(', ').trim(),
+        email_id: emailIds.join(', ').trim().toLowerCase(),
         call_start_time: startObj.toISOString(),
         call_end_time: endObj.toISOString(),
         duration_seconds: computedSec,
@@ -450,8 +519,8 @@ export function ManualAddRowModal({
       toast('Company name is required', 'warning');
       return;
     }
-    if (!mobileNumber.trim()) {
-      toast('Mobile number is required', 'warning');
+    if (mobileNumbers.length === 0) {
+      toast('At least one mobile number is required', 'warning');
       return;
     }
     if (!outcome) {
@@ -476,12 +545,12 @@ export function ManualAddRowModal({
       const res = await apiFetch<any>(`/companies/search?q=${encodeURIComponent(companyName.trim())}&limit=10`);
       if (res.success && Array.isArray(res.data?.companies)) {
         const normInputName = companyName.trim().toLowerCase();
-        const normInputMobile = mobileNumber.trim();
+        const inputMobiles = mobileNumbers.map((m) => m.trim());
         const match = res.data.companies.find((c: any) => {
           const cName = (c.company_name || '').trim().toLowerCase();
           const cMobile = (c.primary_mobile || '').trim();
           const cMobArray = Array.isArray(c.mobile_numbers) ? c.mobile_numbers.map((m: string) => m.trim()) : [];
-          return cName === normInputName || (normInputMobile && (cMobile === normInputMobile || cMobArray.includes(normInputMobile)));
+          return cName === normInputName || inputMobiles.some((im) => im === cMobile || cMobArray.includes(im));
         });
         if (match) {
           matchedCompanyDoc = match;
@@ -508,9 +577,9 @@ export function ManualAddRowModal({
     const params = new URLSearchParams({
       add: 'true',
       company_name: companyName.trim(),
-      hr_name: hrName.trim(),
-      primary_mobile: mobileNumber.trim(),
-      primary_email: emailId.trim().toLowerCase(),
+      hr_name: hrNames.join(', ').trim(),
+      primary_mobile: mobileNumbers[0] || '',
+      primary_email: emailIds[0] || '',
       return_to: '/tracker',
     });
     window.location.href = `/metadata?${params.toString()}`;
@@ -725,7 +794,7 @@ export function ManualAddRowModal({
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-[11px] font-bold text-fg uppercase tracking-wider">
-                  HR / Contact Name
+                  HR / Contact Name(s)
                 </label>
                 {matchedMetaRecord && !placeholderInfo?.hasHr && (
                   <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
@@ -733,23 +802,21 @@ export function ManualAddRowModal({
                   </span>
                 )}
               </div>
-              <div className="relative">
-                <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
-                <input
-                  ref={hrNameInputRef}
-                  type="text"
-                  value={hrName}
-                  onChange={(e) => setHrName(e.target.value)}
-                  placeholder="e.g. Rajesh Sharma"
-                  className="w-full bg-surface-sunken border border-border text-xs text-fg pl-9 pr-3 py-2 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-fg-disabled shadow-2xs"
-                />
-              </div>
+              <MultiTagInput
+                values={hrNames}
+                onChange={setHrNames}
+                isMono={false}
+                icon={<User size={14} />}
+                inputRef={hrNameInputRef}
+                placeholder="e.g. Rajesh Sharma (press Enter or comma for multiple)"
+              />
             </div>
 
+            {/* Mobile Numbers MultiTagInput */}
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-[11px] font-bold text-fg uppercase tracking-wider">
-                  Mobile Number <span className="text-rose-500">*</span>
+                  Mobile Number(s) <span className="text-rose-500">*</span>
                 </label>
                 {matchedMetaRecord && !placeholderInfo?.hasMobile && (
                   <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
@@ -757,25 +824,22 @@ export function ManualAddRowModal({
                   </span>
                 )}
               </div>
-              <div className="relative">
-                <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
-                <input
-                  type="text"
-                  required
-                  value={mobileNumber}
-                  onChange={(e) => setMobileNumber(e.target.value)}
-                  placeholder="e.g. 9876543210"
-                  className="w-full bg-surface-sunken border border-border text-xs text-fg pl-9 pr-3 py-2 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-fg-disabled shadow-2xs font-mono"
-                />
-              </div>
+              <MultiTagInput
+                values={mobileNumbers}
+                onChange={setMobileNumbers}
+                validator={validateAndNormalizeIndianMobile}
+                required
+                icon={<Phone size={14} />}
+                placeholder="e.g. 9876543210 (10 digits starting 6-9, Enter/comma for multiple)"
+              />
             </div>
           </div>
 
-          {/* Section 3: Email ID */}
+          {/* Section 3: Email IDs MultiTagInput */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-[11px] font-bold text-fg uppercase tracking-wider">
-                Email ID <span className="text-fg-disabled text-micro font-normal lowercase">(optional)</span>
+                Email ID(s) <span className="text-fg-disabled text-micro font-normal lowercase">(optional)</span>
               </label>
               {matchedMetaRecord && !placeholderInfo?.hasEmail && (
                 <span className="text-[10px] text-amber-600 dark:text-amber-400 font-semibold bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
@@ -783,16 +847,14 @@ export function ManualAddRowModal({
                 </span>
               )}
             </div>
-            <div className="relative">
-              <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
-              <input
-                type="email"
-                value={emailId}
-                onChange={(e) => setEmailId(e.target.value)}
-                placeholder="e.g. hr@company.com"
-                className="w-full bg-surface-sunken border border-border text-xs text-fg pl-9 pr-3 py-2 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-fg-disabled shadow-2xs font-mono"
-              />
-            </div>
+            <MultiTagInput
+              values={emailIds}
+              onChange={setEmailIds}
+              validator={validateAndNormalizeEmail}
+              type="email"
+              icon={<Mail size={14} />}
+              placeholder="e.g. hr@company.com (press Enter or comma for multiple)"
+            />
           </div>
 
           {/* Section 4: Call Timings & Duration (3-column Grid) */}

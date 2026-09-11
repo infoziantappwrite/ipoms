@@ -4,8 +4,10 @@ import mongoose, { Document, Schema, Model, Types } from 'mongoose';
 // Spec: Module_04_Weekly_Tracker_Specification_v1.0.md — Section 7 & 8
 export type PipelineSection =
   | 'completed'
+  | 'drive_in_progress'
   | 'in_drive'
   | 'companies_in_drive'
+  | 'upcoming_drives'
   | 'in_progress'
   | 'pipeline'
   | 'top_companies'
@@ -17,8 +19,10 @@ export type PipelineSection =
 
 export const PIPELINE_SECTIONS: PipelineSection[] = [
   'completed',
+  'drive_in_progress',
   'in_drive',
   'companies_in_drive',
+  'upcoming_drives',
   'in_progress',
   'pipeline',
   'top_companies',
@@ -42,6 +46,10 @@ export interface IWeeklyTracker extends Document {
   // Company Information
   company_name: string;
   job_role: string;                         // Comma-separated roles (e.g. "Software Engineer, AI Engineer")
+  contact_number?: string;                  // Primary mobile / phone number
+  mobile_numbers?: string[];                // Multi-contact numbers
+  email_id?: string;                        // Primary email
+  email_ids?: string[];                     // Multi-emails
   cdc_reference?: string;                   // Campus placement coordinator reference
   company_type?: string;                    // e.g. Software, Core, Banking, Healthcare, etc.
   ctc_lpa?: string;                         // e.g. "6.5 LPA" or "4.0 - 6.0 LPA"
@@ -55,11 +63,16 @@ export interface IWeeklyTracker extends Document {
   // Key Dates
   follow_up_date?: Date;                    // Next scheduled follow-up
   drive_date?: Date;                        // Scheduled placement drive date
+  jd_received_date?: Date;                  // Date when JD was received
+  db_shared_date?: Date;                    // Date when student database was shared
 
   // Student Counts & Offers
   registered_count: number;                 // Total registered students
   shortlisted_count: number;                // Total shortlisted after tests/tech rounds
   selected_count: number;                   // Final offers released (editable in completed)
+
+  // Ordering & Custom Row Swapping
+  order_index?: number;                     // 0-based custom row order within section
 
   // Reporting Week Dimensions
   week_number: number;                      // ISO week number (1-53)
@@ -123,6 +136,24 @@ const WeeklyTrackerSchema: Schema<IWeeklyTracker> = new Schema(
       trim: true,
       default: 'Graduate Trainee',
     },
+    contact_number: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    mobile_numbers: {
+      type: [String],
+      default: [],
+    },
+    email_id: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    email_ids: {
+      type: [String],
+      default: [],
+    },
     cdc_reference: {
       type: String,
       trim: true,
@@ -169,6 +200,14 @@ const WeeklyTrackerSchema: Schema<IWeeklyTracker> = new Schema(
       index: true,
     },
     drive_date: {
+      type: Date,
+      default: null,
+    },
+    jd_received_date: {
+      type: Date,
+      default: null,
+    },
+    db_shared_date: {
       type: Date,
       default: null,
     },
@@ -220,6 +259,11 @@ const WeeklyTrackerSchema: Schema<IWeeklyTracker> = new Schema(
       type: Date,
       default: null,
     },
+    order_index: {
+      type: Number,
+      default: 0,
+      index: true,
+    },
     last_status_updated_at: {
       type: Date,
       default: Date.now,
@@ -235,6 +279,7 @@ const WeeklyTrackerSchema: Schema<IWeeklyTracker> = new Schema(
 
 // Primary view: College pipeline by academic year & section
 WeeklyTrackerSchema.index({ college_id: 1, academic_year: 1, pipeline_section: 1, is_deleted: 1 });
+WeeklyTrackerSchema.index({ college_id: 1, pipeline_section: 1, order_index: 1, is_deleted: 1 });
 
 // Coordinator view
 WeeklyTrackerSchema.index({ coordinator_id: 1, academic_year: 1, is_deleted: 1 });

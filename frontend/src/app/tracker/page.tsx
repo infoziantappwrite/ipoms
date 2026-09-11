@@ -9,7 +9,7 @@ import { SoftphonePanel, SoftphoneCallResult } from './components/SoftphonePanel
 import { SmoothOutcomeDropdown } from '@/components/ui/SmoothOutcomeDropdown';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { AutoSaveBadge } from '@/components/ui/AutoSaveBadge';
-import { AlertTriangle, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Cloud, Loader2, PhoneCall, Plus, Save, Search, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Cloud, Loader2, PhoneCall, Plus, Save, Search, Trash2, Upload, Undo2, Redo2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
 import { ManualAddRowModal } from './components/ManualAddRowModal';
@@ -20,6 +20,7 @@ import { TrackerActionsDropdown } from './components/TrackerActionsDropdown';
 import { DailySummaryModal } from './components/DailySummaryModal';
 import { useToast } from '@/components/ui/Toast';
 import { triggerHaptic } from '@/lib/haptics';
+import { useUndoRedo } from '@/hooks/useUndoRedo';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -105,6 +106,11 @@ export default function DailyTrackerPage() {
   const [isDeleteMode, setIsDeleteMode] = useState<boolean>(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState<boolean>(false);
   const { toast } = useToast();
+
+  // ── Global Undo / Redo Hook ──
+  const { pushAction, undo, redo, canUndo, canRedo } = useUndoRedo({
+    enableKeyboardShortcuts: true,
+  });
 
   // Listen for selection count, delete mode, and confirmation events from TrackerGrid
   useEffect(() => {
@@ -275,8 +281,27 @@ export default function DailyTrackerPage() {
     }
   }, [saveStatus]);
 
-  // ── Handle row update (auto-save on each change)
-  const handleRowUpdate = useCallback(async (rowId: string, patch: Partial<TrackerRow>) => {
+  // ── Handle row update (auto-save on each change) with Undo / Redo
+  const handleRowUpdate = useCallback(async (rowId: string, patch: Partial<TrackerRow>, isUndoRedo = false) => {
+    const existingRow = rows.find((r) => r._id === rowId);
+    if (!isUndoRedo && existingRow) {
+      const oldPatch: Partial<TrackerRow> = {};
+      const newPatch: Partial<TrackerRow> = { ...patch };
+      for (const k of Object.keys(patch) as (keyof TrackerRow)[]) {
+        (oldPatch as any)[k] = existingRow[k];
+      }
+      const companyName = existingRow.company_name || 'contact';
+      pushAction({
+        description: `Update on "${companyName}"`,
+        undo: async () => {
+          await handleRowUpdate(rowId, oldPatch, true);
+        },
+        redo: async () => {
+          await handleRowUpdate(rowId, newPatch, true);
+        },
+      });
+    }
+
     setSaveStatus('saving');
     try {
       const res = await apiFetch(`/daily-tracker/${rowId}`, {
@@ -306,7 +331,7 @@ export default function DailyTrackerPage() {
       console.error('[DT] Row update failed', e);
       setSaveStatus('error');
     }
-  }, [loadKpi, coordinatorId, selectedCollegeId]);
+  }, [rows, pushAction, loadKpi, coordinatorId, selectedCollegeId]);
 
   // ── Handle manual contact row added
   const handleManualRowAdded = useCallback((newRow: TrackerRow) => {
@@ -349,10 +374,6 @@ export default function DailyTrackerPage() {
   // ── Handle bulk delete selected rows in active college
   const handleDeleteSelectedRows = useCallback(async (rowIds: string[]) => {
     if (!rowIds || rowIds.length === 0) return;
-    const confirmMsg = rowIds.length === 1
-      ? 'Are you sure you want to remove this contact from today\'s calling sheet?'
-      : `Are you sure you want to remove ${rowIds.length} selected contacts from today's calling sheet for ${selectedCollegeName}?`;
-    if (!confirm(confirmMsg)) return;
 
     try {
       const results = await Promise.all(
@@ -712,14 +733,14 @@ export default function DailyTrackerPage() {
                 />
 
                 {/* Search */}
-                <div className="relative w-48 sm:w-56 shrink-0">
+                <div className="relative w-64 sm:w-72 shrink-0">
                   <Search
-                    size={13}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-300 pointer-events-none"
+                    size={14}
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-300 pointer-events-none"
                   />
                   <input
                     type="text"
-                    placeholder="Search company, HR, mobile…"
+                    placeholder="Start searching..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full h-8 pl-8 pr-3 bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-300 dark:border-zinc-700/90 hover:border-zinc-400 dark:hover:border-zinc-500 text-zinc-900 dark:text-zinc-100 text-xs rounded-xl shadow-xs placeholder:text-zinc-500 dark:placeholder:text-zinc-300/80 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium"
@@ -769,41 +790,78 @@ export default function DailyTrackerPage() {
             )}
           </div>
 
-          {/* ── Right Top Corner: Delete Bin Button & 3 Vertical Dots (Actions Menu) ── */}
+          {/* ── Right Top Corner: Undo / Redo + Delete Bin Button & 3 Vertical Dots (Actions Menu) ── */}
           {!isHistoryMode && (
             <div className="ml-auto shrink-0 flex items-center gap-2">
-              {isDeleteMode && (
-                <div className="flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-150">
+              {/* Undo & Redo Controls */}
+              {selectedCollegeId && (
+                <div className="flex items-center gap-1 shrink-0">
                   <button
                     type="button"
+                    disabled={!canUndo}
                     onClick={() => {
-                      if (selectedRowCount === 0) {
-                        toast('Please select at least 1 row to delete.', 'warning');
-                        return;
-                      }
-                      setIsDeleteConfirmOpen(true);
+                      triggerHaptic('medium');
+                      undo();
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.96] ring-2 ring-rose-500/30"
-                    title={selectedRowCount > 0 ? `Delete ${selectedRowCount} selected row(s)` : 'Select rows to delete'}
+                    className="relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 bg-surface-sunken hover:bg-surface-raised disabled:opacity-30 disabled:cursor-not-allowed border border-border shadow-2xs active:scale-[0.95] text-fg"
+                    title="Undo (Ctrl+Z)"
+                    aria-label="Undo"
                   >
-                    <Trash2 size={13} strokeWidth={2.5} />
-                    <span>Delete {selectedRowCount > 0 ? `(${selectedRowCount})` : ''}</span>
+                    <Undo2 size={14} strokeWidth={2.2} />
                   </button>
                   <button
                     type="button"
+                    disabled={!canRedo}
                     onClick={() => {
-                      window.dispatchEvent(new CustomEvent('ipoms_tracker_exit_delete_mode'));
-                      setIsDeleteMode(false);
+                      triggerHaptic('medium');
+                      redo();
                     }}
-                    className="w-7 h-7 rounded-xl bg-surface hover:bg-surface-sunken border border-border flex items-center justify-center text-fg-subtle hover:text-fg text-xs transition-colors cursor-pointer"
-                    title="Cancel delete mode"
-                    aria-label="Cancel delete mode"
+                    className="relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 bg-surface-sunken hover:bg-surface-raised disabled:opacity-30 disabled:cursor-not-allowed border border-border shadow-2xs active:scale-[0.95] text-fg"
+                    title="Redo (Ctrl+Y)"
+                    aria-label="Redo"
                   >
-                    ✕
+                    <Redo2 size={14} strokeWidth={2.2} />
                   </button>
                 </div>
               )}
 
+              {/* Standalone Red Dustbin / Trash Icon Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic('medium');
+                  if (isDeleteMode && selectedRowCount > 0) {
+                    setIsDeleteConfirmOpen(true);
+                  } else {
+                    window.dispatchEvent(new CustomEvent('ipoms_tracker_toggle_delete_mode'));
+                  }
+                }}
+                disabled={!selectedCollegeId || rows.length === 0}
+                className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 ${
+                  isDeleteMode && selectedRowCount > 0
+                    ? 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs ring-2 ring-rose-500/30'
+                    : isDeleteMode
+                    ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-400 dark:border-rose-700 ring-2 ring-rose-500/20'
+                    : 'bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/80 shadow-2xs'
+                } disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]`}
+                title={
+                  isDeleteMode && selectedRowCount > 0
+                    ? `Delete ${selectedRowCount} selected row${selectedRowCount > 1 ? 's' : ''}`
+                    : isDeleteMode
+                    ? 'Delete mode active — select rows to delete (click to exit)'
+                    : 'Enter Delete Mode (Shift+D)'
+                }
+                aria-label="Delete Rows"
+              >
+                <Trash2 size={16} strokeWidth={2.2} />
+                {isDeleteMode && selectedRowCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-white dark:bg-zinc-900 text-rose-600 text-[9px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center shadow-xs tabular-nums ring-1 ring-rose-600">
+                    {selectedRowCount}
+                  </span>
+                )}
+              </button>
+
+              {/* 3 Vertical Dots (Actions Menu) */}
               <TrackerActionsDropdown
                 selectedCollegeId={selectedCollegeId}
                 isReadOnly={false}
@@ -821,24 +879,8 @@ export default function DailyTrackerPage() {
                 onSaveProgress={handleSaveProgress}
                 onAddManualRow={() => setIsManualAddOpen(true)}
                 onOpenHistory={() => setIsCalendarOpen(true)}
-                onToggleDeleteMode={() => {
-                  if (selectedRowCount > 0 && isDeleteMode) {
-                    setIsDeleteConfirmOpen(true);
-                  } else {
-                    window.dispatchEvent(new CustomEvent('ipoms_tracker_toggle_delete_mode'));
-                  }
-                }}
-                onToggleSelectMode={() => {
-                  window.dispatchEvent(new CustomEvent('ipoms_tracker_toggle_select_mode'));
-                }}
                 onCopyAll={() => {
                   window.dispatchEvent(new CustomEvent('ipoms_tracker_copy_all'));
-                }}
-                onCopyContacts={() => {
-                  window.dispatchEvent(new CustomEvent('ipoms_tracker_copy_contacts'));
-                }}
-                onCopyEmails={() => {
-                  window.dispatchEvent(new CustomEvent('ipoms_tracker_copy_emails'));
                 }}
                 onCopyBoth={() => {
                   window.dispatchEvent(new CustomEvent('ipoms_tracker_copy_both'));
@@ -864,7 +906,7 @@ export default function DailyTrackerPage() {
 
       {/* ── Tracker Grid ──────────────────────────────────────────────────── */}
       {selectedCollegeId && (
-        <div className="flex-1 overflow-hidden flex flex-col px-6 pb-2 min-h-0">
+        <div className="flex-1 overflow-hidden flex flex-col px-6 pt-5 pb-4 min-h-0">
           <TrackerGrid
             rows={displayRows}
             isReadOnly={isHistoryMode}

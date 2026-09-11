@@ -180,7 +180,7 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
         </div>
 
         {/* ── Legend & Footer ────────────────────────────────── */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-border bg-surface-sunken text-xs">
+        <div className="flex items-center justify-start px-5 py-3 border-t border-border bg-surface-sunken text-xs">
           <div className="flex items-center gap-3 text-fg-muted font-medium">
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-primary" />
@@ -193,13 +193,6 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
               <span className="text-micro">Today</span>
             </div>
           </div>
-          
-          <button
-            onClick={onClose}
-            className="px-3.5 py-1.5 bg-surface hover:bg-surface-raised text-fg font-semibold rounded-lg text-xs border border-border transition-colors shadow-xs cursor-pointer"
-          >
-            Close
-          </button>
         </div>
 
       </div>

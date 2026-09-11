@@ -18,6 +18,11 @@ import type { TrackerRow, CallOutcome } from '../page';
 import { triggerHaptic } from '@/lib/haptics';
 import { ROW_OUTCOMES } from './RowOutcomeDropdown';
 import { MONTHS } from './TrackerRow';
+import { MultiTagInput } from '@/components/ui/MultiTagInput';
+import {
+  validateAndNormalizeIndianMobile,
+  validateAndNormalizeEmail,
+} from '@/lib/contactValidation';
 
 interface Props {
   row: TrackerRow;
@@ -28,9 +33,18 @@ interface Props {
 
 export function EditTrackerRowModal({ row, onClose, onSave, onDelete }: Props) {
   const [companyName, setCompanyName] = useState(row.company_name || '');
-  const [hrName, setHrName] = useState(row.hr_name || '');
-  const [mobileNumber, setMobileNumber] = useState(row.mobile_number || '');
-  const [emailId, setEmailId] = useState(row.email_id || '');
+  const [hrNames, setHrNames] = useState<string[]>(() => {
+    if (!row.hr_name || row.hr_name === 'HR Contact' || row.hr_name === 'Contact') return [];
+    return row.hr_name.split(/[,;/]+/).map((s) => s.trim()).filter(Boolean);
+  });
+  const [mobileNumbers, setMobileNumbers] = useState<string[]>(() => {
+    if (!row.mobile_number) return [];
+    return row.mobile_number.split(/[,;/]+/).map((s) => s.trim()).filter(Boolean);
+  });
+  const [emailIds, setEmailIds] = useState<string[]>(() => {
+    if (!row.email_id) return [];
+    return row.email_id.split(/[,;/]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+  });
   const [outcomeStatus, setOutcomeStatus] = useState<CallOutcome | ''>(row.outcome_status || '');
   const [followUpMonth, setFollowUpMonth] = useState<string>(row.follow_up_month || '');
   const [comments, setComments] = useState(row.comments || '');
@@ -58,9 +72,9 @@ export function EditTrackerRowModal({ row, onClose, onSave, onDelete }: Props) {
 
       const patch: Partial<TrackerRow> = {
         company_name: companyName.trim(),
-        hr_name: hrName.trim(),
-        mobile_number: mobileNumber.trim(),
-        email_id: emailId.trim(),
+        hr_name: hrNames.join(', ').trim() || 'HR Contact',
+        mobile_number: mobileNumbers.join(', ').trim(),
+        email_id: emailIds.join(', ').trim().toLowerCase(),
         comments: comments.trim().slice(0, 200),
       };
 
@@ -153,52 +167,44 @@ export function EditTrackerRowModal({ row, onClose, onSave, onDelete }: Props) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
               <label className="block text-[11px] font-bold text-fg uppercase tracking-wider mb-1">
-                HR / Contact Name
+                HR / Contact Name(s)
               </label>
-              <div className="relative">
-                <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
-                <input
-                  type="text"
-                  value={hrName}
-                  onChange={(e) => setHrName(e.target.value)}
-                  placeholder="e.g. Ramesh Kumar (HR Lead)"
-                  className="w-full bg-surface-sunken border border-border text-xs text-fg pl-9 pr-3 py-2 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-fg-disabled shadow-2xs"
-                />
-              </div>
+              <MultiTagInput
+                values={hrNames}
+                onChange={setHrNames}
+                isMono={false}
+                icon={<User size={14} />}
+                placeholder="e.g. Ramesh Kumar (press Enter or comma for multiple)"
+              />
             </div>
 
             <div>
               <label className="block text-[11px] font-bold text-fg uppercase tracking-wider mb-1">
-                Primary Contact Number
+                Contact Number(s)
               </label>
-              <div className="relative">
-                <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
-                <input
-                  type="text"
-                  value={mobileNumber}
-                  onChange={(e) => setMobileNumber(e.target.value)}
-                  placeholder="e.g. 9876543210"
-                  className="w-full bg-surface-sunken border border-border text-xs text-fg pl-9 pr-3 py-2 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-fg-disabled shadow-2xs font-mono"
-                />
-              </div>
+              <MultiTagInput
+                values={mobileNumbers}
+                onChange={setMobileNumbers}
+                validator={validateAndNormalizeIndianMobile}
+                icon={<Phone size={14} />}
+                placeholder="e.g. 9876543210 (10 digits starting 6-9, Enter/comma for multiple)"
+              />
             </div>
           </div>
 
-          {/* Section 3: Email ID */}
+          {/* Section 3: Email ID(s) */}
           <div>
             <label className="block text-[11px] font-bold text-fg uppercase tracking-wider mb-1">
-              Email ID <span className="text-fg-disabled text-micro font-normal lowercase">(optional)</span>
+              Email ID(s) <span className="text-fg-disabled text-micro font-normal lowercase">(optional)</span>
             </label>
-            <div className="relative">
-              <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
-              <input
-                type="email"
-                value={emailId}
-                onChange={(e) => setEmailId(e.target.value)}
-                placeholder="e.g. hr@company.com"
-                className="w-full bg-surface-sunken border border-border text-xs text-fg pl-9 pr-3 py-2 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-fg-disabled shadow-2xs font-mono"
-              />
-            </div>
+            <MultiTagInput
+              values={emailIds}
+              onChange={setEmailIds}
+              validator={validateAndNormalizeEmail}
+              type="email"
+              icon={<Mail size={14} />}
+              placeholder="e.g. hr@company.com (press Enter or comma for multiple)"
+            />
           </div>
 
           {/* Section 4: Call Status & Follow Up Month */}

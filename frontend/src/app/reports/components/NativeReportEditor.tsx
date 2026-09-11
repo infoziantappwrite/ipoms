@@ -23,6 +23,7 @@ import {
   ArrowUp,
   Highlighter,
   Flame,
+  Zap,
 } from 'lucide-react';
 import { A4PdfPreviewModal } from './A4PdfPreviewModal';
 import { COLLEGE_LOGO_MAP, getCollegeLogoUrl } from '@/lib/collegeLogo';
@@ -407,9 +408,33 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             });
           }
 
+          if (colData.drive_in_progress && colData.drive_in_progress.length > 0) {
+            html += `
+              <tr><td colspan="6" class="sec-header" style="background:#fffbeb; color:#92400e;">2. DRIVE IN PROGRESS (${colData.drive_in_progress.length})</td></tr>
+              <tr>
+                <th style="width:38px; text-align:center;">#</th>
+                <th>Company Name</th>
+                <th>Role</th>
+                <th>CTC</th>
+                <th colspan="2">Status / Follow-up</th>
+              </tr>
+            `;
+            colData.drive_in_progress.forEach((r: any) => {
+              html += `
+                <tr>
+                  <td style="text-align:center;">${r.s_no}</td>
+                  <td><b>${r.company_name}</b></td>
+                  <td>${r.job_role || r.role || '—'}</td>
+                  <td style="color:#d97706; font-weight:bold;">${r.ctc_lpa || r.ctc || '—'}</td>
+                  <td colspan="2">${r.current_status_text || r.status || 'Drive in progress'}</td>
+                </tr>
+              `;
+            });
+          }
+
           if (colData.companies_in_drive && colData.companies_in_drive.length > 0) {
             html += `
-              <tr><td colspan="6" class="sec-header" style="background:#fffbeb; color:#92400e;">2. COMPANIES IN DRIVE (${colData.companies_in_drive.length})</td></tr>
+              <tr><td colspan="6" class="sec-header" style="background:#eef2ff; color:#3730a3;">3. UPCOMING DRIVES (${colData.companies_in_drive.length})</td></tr>
               <tr>
                 <th style="width:38px; text-align:center;">#</th>
                 <th>Company Name</th>
@@ -424,8 +449,8 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                   <td style="text-align:center;">${r.s_no}</td>
                   <td><b>${r.company_name}</b></td>
                   <td>${r.job_role || r.role || '—'}</td>
-                  <td style="color:#d97706; font-weight:bold;">${r.ctc_lpa || r.ctc || '—'}</td>
-                  <td colspan="2">${r.current_status_text || r.status || 'Drive in progress'}</td>
+                  <td style="color:#4f46e5; font-weight:bold;">${r.ctc_lpa || r.ctc || '—'}</td>
+                  <td colspan="2">${r.current_status_text || r.status || 'Upcoming Drive'}</td>
                 </tr>
               `;
             });
@@ -433,7 +458,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
 
           if (colData.in_progress && colData.in_progress.length > 0) {
             html += `
-              <tr><td colspan="6" class="sec-header" style="background:#eff6ff; color:#1e40af;">3. COMPANIES IN PROGRESS (${colData.in_progress.length})</td></tr>
+              <tr><td colspan="6" class="sec-header" style="background:#eff6ff; color:#1e40af;">4. COMPANIES IN PROGRESS (${colData.in_progress.length})</td></tr>
               <tr>
                 <th style="width:38px; text-align:center;">#</th>
                 <th>Company Name</th>
@@ -486,19 +511,19 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       html += `<tr><td colspan="6"></td></tr>`;
     }
 
-    // Section 2: Companies In Drive
-    if (report.sections?.companies_in_drive && report.sections.companies_in_drive.length > 0) {
+    // Section 2: Drive in Progress
+    if (report.sections?.drive_in_progress && report.sections.drive_in_progress.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header" style="background:#fffbeb; color:#92400e;">2. COMPANIES IN DRIVE (${report.sections.companies_in_drive.length} Drives)</td></tr>
+        <tr><td colspan="5" class="sec-header" style="background:#fffbeb; color:#92400e;">2. DRIVE IN PROGRESS (${report.sections.drive_in_progress.length} Drives)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
           <th>Role</th>
           <th>CTC</th>
-          <th>Status / Drive Date</th>
+          <th>Status / Follow-up</th>
         </tr>
       `;
-      report.sections.companies_in_drive.forEach((r: any) => {
+      report.sections.drive_in_progress.forEach((r: any) => {
         html += `
           <tr>
             <td style="text-align:center;">${r.s_no}</td>
@@ -512,10 +537,37 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       html += `<tr><td colspan="5"></td></tr>`;
     }
 
-    // Section 3: Companies In Progress
+    // Section 3: Upcoming Drives
+    const upDrives = report.sections?.companies_in_drive || report.sections?.upcoming_drives;
+    if (upDrives && upDrives.length > 0) {
+      html += `
+        <tr><td colspan="5" class="sec-header" style="background:#eef2ff; color:#3730a3;">3. UPCOMING DRIVES (${upDrives.length} Drives)</td></tr>
+        <tr>
+          <th style="width:38px; text-align:center;">#</th>
+          <th>Company Name</th>
+          <th>Role</th>
+          <th>CTC</th>
+          <th>Status / Drive Date</th>
+        </tr>
+      `;
+      upDrives.forEach((r: any) => {
+        html += `
+          <tr>
+            <td style="text-align:center;">${r.s_no}</td>
+            <td><b>${r.company_name}</b></td>
+            <td>${r.job_role || r.role || '—'}</td>
+            <td style="color:#4f46e5; font-weight:bold;">${r.ctc_lpa || r.ctc || '—'}</td>
+            <td>${r.current_status_text || r.status || 'Upcoming Drive'}</td>
+          </tr>
+        `;
+      });
+      html += `<tr><td colspan="5"></td></tr>`;
+    }
+
+    // Section 4: Companies In Progress
     if (report.sections?.in_progress && report.sections.in_progress.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header">3. COMPANIES IN PROGRESS (${report.sections.in_progress.length} Drives)</td></tr>
+        <tr><td colspan="5" class="sec-header">4. COMPANIES IN PROGRESS (${report.sections.in_progress.length} Drives)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -538,10 +590,10 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       html += `<tr><td colspan="5"></td></tr>`;
     }
 
-    // Section 4: Companies in Pipeline
+    // Section 5: Companies in Pipeline
     if (report.sections?.pipeline && report.sections.pipeline.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header">4. COMPANIES IN PIPELINE (${report.sections.pipeline.length} Leads)</td></tr>
+        <tr><td colspan="5" class="sec-header">5. COMPANIES IN PIPELINE (${report.sections.pipeline.length} Leads)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -564,10 +616,10 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       html += `<tr><td colspan="5"></td></tr>`;
     }
 
-    // Section 5: Top Companies
+    // Section 6: Top Companies
     if (report.sections?.top_companies && report.sections.top_companies.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header">5. TOP COMPANIES (${report.sections.top_companies.length} Companies)</td></tr>
+        <tr><td colspan="5" class="sec-header">6. TOP COMPANIES (${report.sections.top_companies.length} Companies)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -590,11 +642,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       html += `<tr><td colspan="5"></td></tr>`;
     }
 
-    // Section 6: Rejected Companies
+    // Section 7: Rejected Companies
     const rejRows = report.sections?.rejected_companies || report.sections?.rejected_by_hr;
     if (rejRows && rejRows.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header" style="background:#fef2f2; color:#991b1b;">6. REJECTED COMPANIES (${rejRows.length} Declined)</td></tr>
+        <tr><td colspan="5" class="sec-header" style="background:#fef2f2; color:#991b1b;">7. REJECTED COMPANIES (${rejRows.length} Declined)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -617,11 +669,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       html += `<tr><td colspan="5"></td></tr>`;
     }
 
-    // Section 7: Companies On Hold By College
+    // Section 8: Companies On Hold By College
     const holdColRows = report.sections?.on_hold_by_college || report.sections?.rejected_by_college;
     if (holdColRows && holdColRows.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header" style="background:#fff7ed; color:#9a3412;">7. COMPANIES ON HOLD BY COLLEGE (${holdColRows.length} Holds)</td></tr>
+        <tr><td colspan="5" class="sec-header" style="background:#fff7ed; color:#9a3412;">8. COMPANIES ON HOLD BY COLLEGE (${holdColRows.length} Holds)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -644,11 +696,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       html += `<tr><td colspan="5"></td></tr>`;
     }
 
-    // Section 8: Companies On Hold By HR
+    // Section 9: Companies On Hold By HR
     const holdHrRows = report.sections?.on_hold_by_hr;
     if (holdHrRows && holdHrRows.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header" style="background:#f1f5f9; color:#334155;">8. COMPANIES ON HOLD BY HR (${holdHrRows.length} Holds)</td></tr>
+        <tr><td colspan="5" class="sec-header" style="background:#f1f5f9; color:#334155;">9. COMPANIES ON HOLD BY HR (${holdHrRows.length} Holds)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -1222,11 +1274,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             });
           }
 
-          if (report.included_sections?.companies_in_drive !== false && colData.companies_in_drive && colData.companies_in_drive.length > 0) {
-            const cidRows = colData.companies_in_drive;
-            const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Drive Date'];
+          if (report.included_sections?.drive_in_progress !== false && colData.drive_in_progress && colData.drive_in_progress.length > 0) {
+            const dipRows = colData.drive_in_progress;
+            const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Follow-up'];
             const colWidths = [36, 224, 200, 110, 230];
-            const rawRows = cidRows.map((r: any) => [
+            const rawRows = dipRows.map((r: any) => [
               String(r.s_no || ''),
               String(r.company_name || '—'),
               String(r.job_role || r.role || '—'),
@@ -1263,11 +1315,63 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             });
 
             sectionsToDraw.push({
-              title: `${cIdx + 1}. ${colData.college_name.toUpperCase()} — IN DRIVE`,
-              badge: `${cidRows.length} Drives`,
+              title: `${cIdx + 1}. ${colData.college_name.toUpperCase()} — DRIVE IN PROGRESS`,
+              badge: `${dipRows.length} Drives`,
               accentBg: '#fffbeb',
               accentBorder: '#fde68a',
               accentText: '#92400e',
+              headers,
+              colWidths,
+              measuredRows,
+            });
+          }
+
+          if (report.included_sections?.companies_in_drive !== false && colData.companies_in_drive && colData.companies_in_drive.length > 0) {
+            const cidRows = colData.companies_in_drive;
+            const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Drive Date'];
+            const colWidths = [36, 224, 200, 110, 230];
+            const rawRows = cidRows.map((r: any) => [
+              String(r.s_no || ''),
+              String(r.company_name || '—'),
+              String(r.job_role || r.role || '—'),
+              String(r.ctc_lpa || r.ctc || '—'),
+              String(r.current_status_text || r.status || 'Upcoming Drive'),
+            ]);
+
+            const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
+              let maxLines = 1;
+              const cells: MeasuredCell[] = row.map((cellText, cIdx2) => {
+                const colW = colWidths[cIdx2];
+                const maxCellW = colW - 14;
+                const font = cIdx2 === 1
+                  ? 'bold 12px system-ui, -apple-system, sans-serif'
+                  : cIdx2 === 0
+                  ? '600 12px monospace'
+                  : (cIdx2 === 3)
+                  ? 'bold 12px system-ui, -apple-system, sans-serif'
+                  : '500 12px system-ui, -apple-system, sans-serif';
+                const fillStyle = cIdx2 === 1
+                  ? '#0f172a'
+                  : cIdx2 === 0
+                  ? '#64748b'
+                  : (cIdx2 === 3)
+                  ? '#4f46e5'
+                  : '#334155';
+
+                const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
+                if (lines.length > maxLines) maxLines = lines.length;
+                return { lines, font, fillStyle };
+              });
+              const height = Math.max(38, maxLines * 17 + 16);
+              return { cells, height };
+            });
+
+            sectionsToDraw.push({
+              title: `${cIdx + 1}. ${colData.college_name.toUpperCase()} — UPCOMING DRIVES`,
+              badge: `${cidRows.length} Drives`,
+              accentBg: '#eef2ff',
+              accentBorder: '#c7d2fe',
+              accentText: '#3730a3',
               headers,
               colWidths,
               measuredRows,
@@ -1328,7 +1432,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
       }
 
-      // 2. Completed Companies (CONTENT_W = 800px)
+      // 1. Completed Companies (CONTENT_W = 800px)
       if (report.included_sections?.completed_companies && report.sections?.completed_companies) {
         const cRows = report.sections.completed_companies;
         const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status', 'Offers Received'];
@@ -1382,12 +1486,12 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
       }
 
-      // Section 2: Companies In Drive (CONTENT_W = 800px)
-      if (report.included_sections?.companies_in_drive !== false && report.sections?.companies_in_drive) {
-        const cidRows = report.sections.companies_in_drive;
-        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Drive Date'];
+      // Section 2: Drive In Progress (CONTENT_W = 800px)
+      if (report.included_sections?.drive_in_progress !== false && report.sections?.drive_in_progress && report.sections.drive_in_progress.length > 0) {
+        const dipRows = report.sections.drive_in_progress;
+        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Follow-up'];
         const colWidths = [36, 224, 200, 110, 230];
-        const rawRows = cidRows.map((r: any) => [
+        const rawRows = dipRows.map((r: any) => [
           String(r.s_no || ''),
           String(r.company_name || '—'),
           String(r.job_role || r.role || '—'),
@@ -1424,8 +1528,8 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
 
         sectionsToDraw.push({
-          title: '2. COMPANIES IN DRIVE',
-          badge: `${cidRows.length} Drives`,
+          title: '2. DRIVE IN PROGRESS',
+          badge: `${dipRows.length} Drives`,
           accentBg: '#fffbeb',
           accentBorder: '#fde68a',
           accentText: '#92400e',
@@ -1435,7 +1539,61 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
       }
 
-      // 3. In Progress Drives (CONTENT_W = 800px)
+      // Section 3: Upcoming Drives (CONTENT_W = 800px)
+      const upCanvasRows = report.sections?.companies_in_drive || report.sections?.upcoming_drives;
+      if (report.included_sections?.companies_in_drive !== false && upCanvasRows && upCanvasRows.length > 0) {
+        const cidRows = upCanvasRows;
+        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Drive Date'];
+        const colWidths = [36, 224, 200, 110, 230];
+        const rawRows = cidRows.map((r: any) => [
+          String(r.s_no || ''),
+          String(r.company_name || '—'),
+          String(r.job_role || r.role || '—'),
+          String(r.ctc_lpa || r.ctc || '—'),
+          String(r.current_status_text || r.status || 'Upcoming Drive'),
+        ]);
+
+        const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
+          let maxLines = 1;
+          const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
+            const colW = colWidths[cIdx];
+            const maxCellW = colW - 14;
+            const font = cIdx === 1
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : cIdx === 0
+              ? '600 12px monospace'
+              : (cIdx === 3)
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : '500 12px system-ui, -apple-system, sans-serif';
+            const fillStyle = cIdx === 1
+              ? '#0f172a'
+              : cIdx === 0
+              ? '#64748b'
+              : (cIdx === 3)
+              ? '#4f46e5'
+              : '#334155';
+
+            const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
+            if (lines.length > maxLines) maxLines = lines.length;
+            return { lines, font, fillStyle };
+          });
+          const height = Math.max(38, maxLines * 17 + 16);
+          return { cells, height };
+        });
+
+        sectionsToDraw.push({
+          title: '3. UPCOMING DRIVES',
+          badge: `${cidRows.length} Drives`,
+          accentBg: '#eef2ff',
+          accentBorder: '#c7d2fe',
+          accentText: '#3730a3',
+          headers,
+          colWidths,
+          measuredRows,
+        });
+      }
+
+      // 4. In Progress Drives (CONTENT_W = 800px)
       if (report.included_sections?.in_progress && report.sections?.in_progress) {
         const ipRows = report.sections.in_progress;
         const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
@@ -1477,7 +1635,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
 
         sectionsToDraw.push({
-          title: '3. COMPANIES IN PROGRESS',
+          title: '4. COMPANIES IN PROGRESS',
           badge: `${ipRows.length} Drives`,
           accentBg: '#eff6ff',
           accentBorder: '#bfdbfe',
@@ -1488,7 +1646,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
       }
 
-      // 4. Pipeline Leads (CONTENT_W = 800px)
+      // 5. Pipeline Leads (CONTENT_W = 800px)
       if (report.included_sections?.pipeline && report.sections?.pipeline) {
         const pipRows = report.sections.pipeline;
         const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
@@ -1530,7 +1688,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
 
         sectionsToDraw.push({
-          title: '4. COMPANIES IN PIPELINE',
+          title: '5. COMPANIES IN PIPELINE',
           badge: `${pipRows.length} Leads`,
           accentBg: '#ecfeff',
           accentBorder: '#a5f3fc',
@@ -1541,7 +1699,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
       }
 
-      // 5. Top Companies (CONTENT_W = 800px)
+      // 6. Top Companies (CONTENT_W = 800px)
       if (report.included_sections?.top_companies && report.sections?.top_companies) {
         const topRows = report.sections.top_companies;
         const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
@@ -1583,7 +1741,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
 
         sectionsToDraw.push({
-          title: '5. TOP COMPANIES',
+          title: '6. TOP COMPANIES',
           badge: `${topRows.length} Companies`,
           accentBg: '#fffbeb',
           accentBorder: '#fde68a',
@@ -1594,7 +1752,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
       }
 
-      // 6. Rejected Companies (CONTENT_W = 800px)
+      // 7. Rejected Companies (CONTENT_W = 800px)
       const rejCanvasRows = report.sections?.rejected_companies || report.sections?.rejected_by_hr;
       if (rejCanvasRows && rejCanvasRows.length > 0) {
         const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Reason'];
@@ -1636,7 +1794,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
 
         sectionsToDraw.push({
-          title: '6. REJECTED COMPANIES',
+          title: '7. REJECTED COMPANIES',
           badge: `${rejCanvasRows.length} Declined`,
           accentBg: '#fef2f2',
           accentBorder: '#fecaca',
@@ -1647,7 +1805,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
       }
 
-      // 7. Companies On Hold / Rejected by College (CONTENT_W = 800px)
+      // 8. Companies On Hold / Rejected by College (CONTENT_W = 800px)
       if ((report.included_sections?.on_hold_by_college && report.sections?.on_hold_by_college) ||
           (report.included_sections?.rejected_by_college && report.sections?.rejected_by_college)) {
         const hRows = report.sections.on_hold_by_college || report.sections.rejected_by_college || [];
@@ -1691,7 +1849,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           });
 
           sectionsToDraw.push({
-            title: '7. COMPANIES ON HOLD BY COLLEGE',
+            title: '8. COMPANIES ON HOLD BY COLLEGE',
             badge: `${hRows.length} Holds`,
             accentBg: '#fff7ed',
             accentBorder: '#ffedd5',
@@ -1703,7 +1861,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         }
       }
 
-      // 8. Companies On Hold by HR (CONTENT_W = 800px)
+      // 9. Companies On Hold by HR (CONTENT_W = 800px)
       if (report.included_sections?.on_hold_by_hr && report.sections?.on_hold_by_hr) {
         const hrHoldRows = report.sections.on_hold_by_hr || [];
         if (hrHoldRows.length > 0) {
@@ -1744,7 +1902,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           });
 
           sectionsToDraw.push({
-            title: '8. COMPANIES ON HOLD BY HR',
+            title: '9. COMPANIES ON HOLD BY HR',
             badge: `${hrHoldRows.length} Holds`,
             accentBg: '#f1f5f9',
             accentBorder: '#e2e8f0',
@@ -2716,9 +2874,14 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                       <span className="px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-100 border border-emerald-400/30">
                         {colData.total_completed || 0} Completed
                       </span>
-                      {(colData.total_in_drive || 0) > 0 && (
+                      {(colData.total_drive_in_progress || (colData.drive_in_progress && colData.drive_in_progress.length) || 0) > 0 && (
                         <span className="px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-100 border border-amber-400/30">
-                          {colData.total_in_drive} In Drive
+                          {colData.total_drive_in_progress || colData.drive_in_progress.length} Drive in Progress
+                        </span>
+                      )}
+                      {((colData.total_upcoming_drives || colData.total_in_drive || 0) > 0 || (colData.upcoming_drives && colData.upcoming_drives.length > 0) || (colData.companies_in_drive && colData.companies_in_drive.length > 0)) && (
+                        <span className="px-2 py-0.5 rounded-lg bg-orange-500/20 text-orange-100 border border-orange-400/30">
+                          {colData.total_upcoming_drives || colData.total_in_drive || colData.upcoming_drives?.length || colData.companies_in_drive?.length} Upcoming Drives
                         </span>
                       )}
                       <span className="px-2 py-0.5 rounded-lg bg-blue-500/20 text-blue-100 border border-blue-400/30">
@@ -2783,8 +2946,8 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     </div>
                   )}
 
-                  {/* 2. Companies in Drive Table */}
-                  {report.included_sections?.companies_in_drive !== false && colData.companies_in_drive && colData.companies_in_drive.length > 0 && (
+                  {/* 2. Drive in Progress Table */}
+                  {report.included_sections?.drive_in_progress !== false && (colData.drive_in_progress || colData.drive_in_progress_companies) && (colData.drive_in_progress || colData.drive_in_progress_companies).length > 0 && (
                     <div className="space-y-1.5">
                       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
                         <table className="w-full text-xs text-center border-collapse table-fixed">
@@ -2799,7 +2962,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                             <tr className="bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 border-b border-border font-bold text-xs">
                               <th colSpan={5} className="py-1.5 px-3 text-left">
                                 <span className="flex items-center gap-1.5">
-                                  <Flame size={13} className="text-amber-600 dark:text-amber-400 shrink-0" /> 2. COMPANIES IN DRIVE ({colData.companies_in_drive.length})
+                                  <Zap size={13} className="text-amber-600 dark:text-amber-400 shrink-0" /> 2. DRIVE IN PROGRESS ({(colData.drive_in_progress || colData.drive_in_progress_companies).length})
                                 </span>
                               </th>
                             </tr>
@@ -2808,11 +2971,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                               <th className="py-1.5 px-2 text-center border-r border-border/80">Company Name</th>
                               <th className="py-1.5 px-2 text-center border-r border-border/80">Role</th>
                               <th className="py-1.5 px-1 text-center border-r border-border/80">CTC</th>
-                              <th className="py-1.5 px-2 text-center">Status / Drive Date</th>
+                              <th className="py-1.5 px-2 text-center">Status / Drive Progress</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-border/60">
-                            {colData.companies_in_drive.map((r: any, rIdx: number) => (
+                            {(colData.drive_in_progress || colData.drive_in_progress_companies).map((r: any, rIdx: number) => (
                               <tr key={rIdx} className={rIdx % 2 === 0 ? 'bg-surface' : 'bg-surface-sunken/40'}>
                                 <td className="py-1.5 px-1 text-fg-subtle font-mono border-r border-border/60">{r.s_no || rIdx + 1}</td>
                                 <td className="py-1.5 px-2 font-bold text-fg border-r border-border/60 text-left leading-tight break-words">{r.company_name}</td>
@@ -2827,7 +2990,51 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     </div>
                   )}
 
-                  {/* 3. Companies In Progress Table */}
+                  {/* 3. Upcoming Drives Table */}
+                  {(report.included_sections?.upcoming_drives !== false && report.included_sections?.companies_in_drive !== false) && (colData.upcoming_drives || colData.companies_in_drive) && (colData.upcoming_drives || colData.companies_in_drive).length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+                        <table className="w-full text-xs text-center border-collapse table-fixed">
+                          <colgroup>
+                            <col style={{ width: '38px' }} />
+                            <col style={{ width: '27%' }} />
+                            <col style={{ width: '25%' }} />
+                            <col style={{ width: '13%' }} />
+                            <col style={{ width: '35%' }} />
+                          </colgroup>
+                          <thead>
+                            <tr className="bg-orange-50 dark:bg-orange-950/40 text-orange-900 dark:text-orange-200 border-b border-border font-bold text-xs">
+                              <th colSpan={5} className="py-1.5 px-3 text-left">
+                                <span className="flex items-center gap-1.5">
+                                  <Flame size={13} className="text-orange-600 dark:text-orange-400 shrink-0" /> 3. UPCOMING DRIVES ({(colData.upcoming_drives || colData.companies_in_drive).length})
+                                </span>
+                              </th>
+                            </tr>
+                            <tr className="bg-surface-sunken text-fg-muted font-semibold text-micro uppercase border-b border-border">
+                              <th className="py-1.5 px-1 text-center border-r border-border/80 font-mono">#</th>
+                              <th className="py-1.5 px-2 text-center border-r border-border/80">Company Name</th>
+                              <th className="py-1.5 px-2 text-center border-r border-border/80">Role</th>
+                              <th className="py-1.5 px-1 text-center border-r border-border/80">CTC</th>
+                              <th className="py-1.5 px-2 text-center">Status / Drive Date</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/60">
+                            {(colData.upcoming_drives || colData.companies_in_drive).map((r: any, rIdx: number) => (
+                              <tr key={rIdx} className={rIdx % 2 === 0 ? 'bg-surface' : 'bg-surface-sunken/40'}>
+                                <td className="py-1.5 px-1 text-fg-subtle font-mono border-r border-border/60">{r.s_no || rIdx + 1}</td>
+                                <td className="py-1.5 px-2 font-bold text-fg border-r border-border/60 text-left leading-tight break-words">{r.company_name}</td>
+                                <td className="py-1.5 px-2 text-fg-muted border-r border-border/60 text-left leading-tight break-words">{r.job_role || r.role || '—'}</td>
+                                <td className="py-1.5 px-1 text-orange-600 dark:text-orange-400 font-semibold border-r border-border/60 whitespace-nowrap">{r.ctc_lpa || r.ctc || 'Competitive'}</td>
+                                <td className="py-1.5 px-2 text-fg-muted text-left leading-tight break-words">{r.current_status_text || r.status || 'Upcoming drive'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 4. Companies In Progress Table */}
                   {report.included_sections?.in_progress !== false && (
                     <div className="space-y-1.5">
                       {!hasProgress ? (
@@ -2848,7 +3055,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                               <tr className="bg-blue-50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 border-b border-border font-bold text-xs">
                                 <th colSpan={5} className="py-1.5 px-3 text-left">
                                   <span className="flex items-center gap-1.5">
-                                    <Rocket size={13} className="text-blue-600 dark:text-blue-400 shrink-0" /> 3. COMPANIES IN PROGRESS ({colData.in_progress.length})
+                                    <Rocket size={13} className="text-blue-600 dark:text-blue-400 shrink-0" /> 4. COMPANIES IN PROGRESS ({colData.in_progress.length})
                                   </span>
                                 </th>
                               </tr>
@@ -2882,10 +3089,10 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           </div>
         )}
 
-        {/* ── Weekly Placement Report Standard Sections 1-8 ── */}
+        {/* ── Weekly Placement Report Standard Sections 1-9 ── */}
         {(!report.template_type || report.template_type === 'weekly_placement') && !report.is_multi_college && (
           <>
-            {/* 4. Section 1: Companies Completed */}
+            {/* Section 1: Companies Completed */}
             {report.included_sections?.completed_companies && report.sections?.completed_companies && (
           <div className="space-y-2 pt-2">
             <div className="px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/70 dark:bg-emerald-950/40 font-bold text-xs flex items-center text-emerald-800 dark:text-emerald-300 print:hidden">
@@ -2985,17 +3192,17 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           </div>
         )}
 
-        {/* Section 2: Companies In Drive */}
-        {report.included_sections?.companies_in_drive !== false && report.sections?.companies_in_drive && (
+        {/* Section 2: Drive in Progress */}
+        {report.included_sections?.drive_in_progress !== false && report.sections?.drive_in_progress && (
           <div className="space-y-2 pt-2">
             <div className="px-3 py-1.5 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/70 dark:bg-amber-950/40 font-bold text-xs flex items-center text-amber-800 dark:text-amber-300 print:hidden">
               <span className="flex items-center gap-1.5">
-                <Flame size={14} strokeWidth={2.25} className="text-amber-600 dark:text-amber-400" /> 2. COMPANIES IN DRIVE
+                <Zap size={14} strokeWidth={2.25} className="text-amber-600 dark:text-amber-400" /> 2. DRIVE IN PROGRESS
               </span>
             </div>
 
-            {report.sections.companies_in_drive.length === 0 ? (
-              <p className="text-xs text-fg-subtle italic py-2">No active drives conducting recruitment today.</p>
+            {report.sections.drive_in_progress.length === 0 ? (
+              <p className="text-xs text-fg-subtle italic py-2">No active drives in progress today.</p>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-border">
                 <table className="w-full text-xs text-center border-collapse table-fixed">
@@ -3010,7 +3217,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     <tr className="hidden print:table-row bg-amber-50 border-b border-amber-200 text-amber-900">
                       <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-amber-50 text-amber-900">
                         <span className="flex items-center gap-1.5">
-                          <Flame size={13} className="text-amber-600 shrink-0" /> 2. COMPANIES IN DRIVE
+                          <Zap size={13} className="text-amber-600 shrink-0" /> 2. DRIVE IN PROGRESS
                         </span>
                       </th>
                     </tr>
@@ -3019,18 +3226,18 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                       <th className="py-2 px-2.5 w-[27%] text-center whitespace-normal font-semibold">Company Name</th>
                       <th className="py-2 px-2 w-[28%] text-center whitespace-normal">Role</th>
                       <th className="py-2 px-1.5 w-[11.5%] text-center whitespace-nowrap">CTC</th>
-                      <th className="py-2 px-2.5 w-[30%] text-center whitespace-normal">Status / Drive Date</th>
+                      <th className="py-2 px-2.5 w-[30%] text-center whitespace-normal">Status / Drive Progress</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
-                    {report.sections.companies_in_drive.map((r: any, idx: number) => (
+                    {report.sections.drive_in_progress.map((r: any, idx: number) => (
                       <tr key={idx} className="hover:bg-surface-sunken/60">
                         <td className="py-2 px-1 w-10 text-center text-fg-subtle font-mono" style={{ width: '38px' }}>{r.s_no}</td>
                         <td className="py-2 px-2.5 w-[27%] font-semibold text-fg text-center whitespace-normal">
                           <EditableReportCell
                             value={r.company_name}
                             onChange={(val) =>
-                              handleUpdateCell('companies_in_drive', idx, 'company_name', val)
+                              handleUpdateCell('drive_in_progress', idx, 'company_name', val)
                             }
                             className="font-semibold text-fg text-center"
                           />
@@ -3039,7 +3246,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                           <EditableReportCell
                             value={r.job_role || r.role || ''}
                             onChange={(val) =>
-                              handleUpdateCell('companies_in_drive', idx, 'job_role', val)
+                              handleUpdateCell('drive_in_progress', idx, 'job_role', val)
                             }
                             className="text-fg-muted text-center"
                           />
@@ -3048,7 +3255,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                           <EditableReportCell
                             value={r.ctc_lpa || r.ctc || ''}
                             onChange={(val) =>
-                              handleUpdateCell('companies_in_drive', idx, 'ctc_lpa', val)
+                              handleUpdateCell('drive_in_progress', idx, 'ctc_lpa', val)
                             }
                             nowrap={true}
                             className="text-amber-600 dark:text-amber-400 font-medium text-center whitespace-nowrap"
@@ -3058,7 +3265,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                           <EditableReportCell
                             value={r.current_status_text || r.status || ''}
                             onChange={(val) =>
-                              handleUpdateCell('companies_in_drive', idx, 'current_status_text', val)
+                              handleUpdateCell('drive_in_progress', idx, 'current_status_text', val)
                             }
                             className="text-fg-subtle text-center"
                           />
@@ -3072,12 +3279,102 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           </div>
         )}
 
-        {/* 5. Section 3: Companies In Progress */}
+        {/* Section 3: Upcoming Drives */}
+        {(report.included_sections?.upcoming_drives !== false && report.included_sections?.companies_in_drive !== false) && (report.sections?.upcoming_drives || report.sections?.companies_in_drive) && (
+          <div className="space-y-2 pt-2">
+            <div className="px-3 py-1.5 rounded-xl border border-orange-200 dark:border-orange-800/60 bg-orange-50/70 dark:bg-orange-950/40 font-bold text-xs flex items-center text-orange-800 dark:text-orange-300 print:hidden">
+              <span className="flex items-center gap-1.5">
+                <Flame size={14} strokeWidth={2.25} className="text-orange-600 dark:text-orange-400" /> 3. UPCOMING DRIVES
+              </span>
+            </div>
+
+            {((report.sections?.upcoming_drives || report.sections?.companies_in_drive) || []).length === 0 ? (
+              <p className="text-xs text-fg-subtle italic py-2">No upcoming recruitment drives scheduled.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-xl border border-border">
+                <table className="w-full text-xs text-center border-collapse table-fixed">
+                  <colgroup>
+                    <col style={{ width: '38px' }} />
+                    <col style={{ width: '27%' }} />
+                    <col style={{ width: '28%' }} />
+                    <col style={{ width: '11.5%' }} />
+                    <col style={{ width: '30%' }} />
+                  </colgroup>
+                  <thead className="print:table-header-group">
+                    <tr className="hidden print:table-row bg-orange-50 border-b border-orange-200 text-orange-900">
+                      <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-orange-50 text-orange-900">
+                        <span className="flex items-center gap-1.5">
+                          <Flame size={13} className="text-orange-600 shrink-0" /> 3. UPCOMING DRIVES
+                        </span>
+                      </th>
+                    </tr>
+                    <tr className="bg-surface-sunken text-fg-muted font-semibold border-b border-border text-micro">
+                      <th className="py-2 px-1 w-10 text-center font-mono" style={{ width: '38px' }}>#</th>
+                      <th className="py-2 px-2.5 w-[27%] text-center whitespace-normal font-semibold">Company Name</th>
+                      <th className="py-2 px-2 w-[28%] text-center whitespace-normal">Role</th>
+                      <th className="py-2 px-1.5 w-[11.5%] text-center whitespace-nowrap">CTC</th>
+                      <th className="py-2 px-2.5 w-[30%] text-center whitespace-normal">Status / Drive Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60 font-normal bg-surface text-center">
+                    {(report.sections?.upcoming_drives || report.sections?.companies_in_drive).map((r: any, idx: number) => {
+                      const secKey = report.sections?.upcoming_drives ? 'upcoming_drives' : 'companies_in_drive';
+                      return (
+                        <tr key={idx} className="hover:bg-surface-sunken/60">
+                          <td className="py-2 px-1 w-10 text-center text-fg-subtle font-mono" style={{ width: '38px' }}>{r.s_no}</td>
+                          <td className="py-2 px-2.5 w-[27%] font-semibold text-fg text-center whitespace-normal">
+                            <EditableReportCell
+                              value={r.company_name}
+                              onChange={(val) =>
+                                handleUpdateCell(secKey, idx, 'company_name', val)
+                              }
+                              className="font-semibold text-fg text-center"
+                            />
+                          </td>
+                          <td className="py-2 px-2 w-[28%] text-fg-muted text-center whitespace-normal">
+                            <EditableReportCell
+                              value={r.job_role || r.role || ''}
+                              onChange={(val) =>
+                                handleUpdateCell(secKey, idx, 'job_role', val)
+                              }
+                              className="text-fg-muted text-center"
+                            />
+                          </td>
+                          <td className="py-2 px-1.5 w-[11.5%] text-orange-600 dark:text-orange-400 font-medium text-center whitespace-nowrap">
+                            <EditableReportCell
+                              value={r.ctc_lpa || r.ctc || ''}
+                              onChange={(val) =>
+                                handleUpdateCell(secKey, idx, 'ctc_lpa', val)
+                              }
+                              nowrap={true}
+                              className="text-orange-600 dark:text-orange-400 font-medium text-center whitespace-nowrap"
+                            />
+                          </td>
+                          <td className="py-2 px-2.5 w-[30%] text-fg-subtle text-center whitespace-normal leading-snug">
+                            <EditableReportCell
+                              value={r.current_status_text || r.status || ''}
+                              onChange={(val) =>
+                                handleUpdateCell(secKey, idx, 'current_status_text', val)
+                              }
+                              className="text-fg-subtle text-center"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Section 4: Companies In Progress */}
         {report.included_sections?.in_progress && report.sections?.in_progress && (
           <div className="space-y-2 pt-2">
             <div className="px-3 py-1.5 rounded-xl border border-blue-200 dark:border-blue-800/60 bg-blue-50/70 dark:bg-blue-950/40 font-bold text-xs flex items-center text-blue-800 dark:text-blue-300 print:hidden">
               <span className="flex items-center gap-1.5">
-                <Rocket size={14} strokeWidth={2.25} className="text-blue-700 dark:text-blue-400" /> 3. COMPANIES IN PROGRESS
+                <Rocket size={14} strokeWidth={2.25} className="text-blue-700 dark:text-blue-400" /> 4. COMPANIES IN PROGRESS
               </span>
             </div>
 
@@ -3097,7 +3394,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     <tr className="hidden print:table-row bg-blue-50 border-b border-blue-200 text-blue-900">
                       <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-blue-50 text-blue-900">
                         <span className="flex items-center gap-1.5">
-                          <Rocket size={13} className="text-blue-700 shrink-0" /> 3. COMPANIES IN PROGRESS
+                          <Rocket size={13} className="text-blue-700 shrink-0" /> 4. COMPANIES IN PROGRESS
                         </span>
                       </th>
                     </tr>
@@ -3159,12 +3456,12 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           </div>
         )}
 
-        {/* 6. Section 4: Companies in Pipeline */}
+        {/* Section 5: Companies in Pipeline */}
         {report.included_sections?.pipeline && report.sections?.pipeline && (
           <div className="space-y-2 pt-2">
             <div className="px-3 py-1.5 rounded-xl border border-cyan-200 dark:border-cyan-800/60 bg-cyan-50/70 dark:bg-cyan-950/40 font-bold text-xs flex items-center text-cyan-800 dark:text-cyan-300 print:hidden">
               <span className="flex items-center gap-1.5">
-                <Inbox size={14} strokeWidth={2.25} className="text-cyan-700 dark:text-cyan-400" /> 4. COMPANIES IN PIPELINE
+                <Inbox size={14} strokeWidth={2.25} className="text-cyan-700 dark:text-cyan-400" /> 5. COMPANIES IN PIPELINE
               </span>
             </div>
 
@@ -3184,7 +3481,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     <tr className="hidden print:table-row bg-cyan-50 border-b border-cyan-200 text-cyan-900">
                       <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-cyan-50 text-cyan-900">
                         <span className="flex items-center gap-1.5">
-                          <Inbox size={13} className="text-cyan-700 shrink-0" /> 4. COMPANIES IN PIPELINE
+                          <Inbox size={13} className="text-cyan-700 shrink-0" /> 5. COMPANIES IN PIPELINE
                         </span>
                       </th>
                     </tr>
@@ -3246,12 +3543,12 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           </div>
         )}
 
-        {/* 6. Section 5: Top Companies */}
+        {/* Section 6: Top Companies */}
         {report.included_sections?.top_companies && report.sections?.top_companies && (
           <div className="space-y-2 pt-2">
             <div className="px-3 py-1.5 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/70 dark:bg-amber-950/40 font-bold text-xs flex items-center text-amber-800 dark:text-amber-300 print:hidden">
               <span className="flex items-center gap-1.5">
-                <Star size={14} strokeWidth={2.25} className="text-amber-600 dark:text-amber-400" /> 5. TOP COMPANIES
+                <Star size={14} strokeWidth={2.25} className="text-amber-600 dark:text-amber-400" /> 6. TOP COMPANIES
               </span>
             </div>
 
@@ -3271,7 +3568,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     <tr className="hidden print:table-row bg-amber-50 border-b border-amber-200 text-amber-900">
                       <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-amber-50 text-amber-900">
                         <span className="flex items-center gap-1.5">
-                          <Star size={13} className="text-amber-600 shrink-0" /> 5. TOP COMPANIES
+                          <Star size={13} className="text-amber-600 shrink-0" /> 6. TOP COMPANIES
                         </span>
                       </th>
                     </tr>
@@ -3333,12 +3630,12 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           </div>
         )}
 
-        {/* 7. Section 6: Rejected Companies */}
+        {/* Section 7: Rejected Companies */}
         {(report.included_sections?.rejected_companies || report.included_sections?.rejected_by_hr) && (
           <div className="space-y-2 pt-2">
             <div className="px-3 py-1.5 rounded-xl border border-rose-200 dark:border-rose-800/60 bg-rose-50/70 dark:bg-rose-950/40 font-bold text-xs flex items-center text-rose-800 dark:text-rose-300 print:hidden">
               <span className="flex items-center gap-1.5">
-                <XCircle size={14} strokeWidth={2.25} className="text-rose-600 dark:text-rose-400" /> 6. REJECTED COMPANIES
+                <XCircle size={14} strokeWidth={2.25} className="text-rose-600 dark:text-rose-400" /> 7. REJECTED COMPANIES
               </span>
             </div>
 
@@ -3358,7 +3655,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     <tr className="hidden print:table-row bg-rose-50 border-b border-rose-200 text-rose-900">
                       <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-rose-50 text-rose-900">
                         <span className="flex items-center gap-1.5">
-                          <XCircle size={13} className="text-rose-600 shrink-0" /> 6. REJECTED COMPANIES
+                          <XCircle size={13} className="text-rose-600 shrink-0" /> 7. REJECTED COMPANIES
                         </span>
                       </th>
                     </tr>
@@ -3423,12 +3720,12 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           </div>
         )}
 
-        {/* 8. Section 7: Companies On Hold By College */}
+        {/* Section 8: Companies On Hold By College */}
         {(report.included_sections?.on_hold_by_college || report.included_sections?.rejected_by_college) && (
           <div className="space-y-2 pt-2">
             <div className="px-3 py-1.5 rounded-xl border border-orange-200 dark:border-orange-800/60 bg-orange-50/70 dark:bg-orange-950/40 font-bold text-xs flex items-center text-orange-800 dark:text-orange-300 print:hidden">
               <span className="flex items-center gap-1.5">
-                <Clock size={14} strokeWidth={2.25} className="text-orange-600 dark:text-orange-400" /> 7. COMPANIES ON HOLD BY COLLEGE
+                <Clock size={14} strokeWidth={2.25} className="text-orange-600 dark:text-orange-400" /> 8. COMPANIES ON HOLD BY COLLEGE
               </span>
             </div>
 
@@ -3448,7 +3745,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     <tr className="hidden print:table-row bg-orange-50 border-b border-orange-200 text-orange-900">
                       <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-orange-50 text-orange-900">
                         <span className="flex items-center gap-1.5">
-                          <Clock size={13} className="text-orange-600 shrink-0" /> 7. COMPANIES ON HOLD BY COLLEGE
+                          <Clock size={13} className="text-orange-600 shrink-0" /> 8. COMPANIES ON HOLD BY COLLEGE
                         </span>
                       </th>
                     </tr>
@@ -3513,12 +3810,12 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           </div>
         )}
 
-        {/* 9. Section 8: Companies On Hold By HR */}
+        {/* Section 9: Companies On Hold By HR */}
         {report.included_sections?.on_hold_by_hr && (
           <div className="space-y-2 pt-2">
             <div className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100/70 dark:bg-slate-900/40 font-bold text-xs flex items-center text-slate-800 dark:text-slate-300 print:hidden">
               <span className="flex items-center gap-1.5">
-                <Clock size={14} strokeWidth={2.25} className="text-slate-600 dark:text-slate-400" /> 8. COMPANIES ON HOLD BY HR
+                <Clock size={14} strokeWidth={2.25} className="text-slate-600 dark:text-slate-400" /> 9. COMPANIES ON HOLD BY HR
               </span>
             </div>
 
@@ -3538,7 +3835,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     <tr className="hidden print:table-row bg-slate-100 border-b border-slate-300 text-slate-800">
                       <th colSpan={5} className="py-1.5 px-3 text-left font-bold text-[11px] bg-slate-100 text-slate-800">
                         <span className="flex items-center gap-1.5">
-                          <Clock size={13} className="text-slate-600 shrink-0" /> 8. COMPANIES ON HOLD BY HR
+                          <Clock size={13} className="text-slate-600 shrink-0" /> 9. COMPANIES ON HOLD BY HR
                         </span>
                       </th>
                     </tr>

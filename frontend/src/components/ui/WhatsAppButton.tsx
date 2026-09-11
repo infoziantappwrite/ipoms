@@ -27,7 +27,9 @@ const REMEMBER_KEY = 'ipoms_whatsapp_remember';
  * Normalizes Indian and international phone numbers for WhatsApp API
  */
 export function formatWhatsAppNumber(phone: string): string {
-  const digits = phone.replace(/\D/g, '');
+  // If multiple numbers are passed (e.g. "9876543210, 9876543211"), pick the first valid number
+  const primaryNumber = phone.split(/[,;/]+/)[0] || '';
+  const digits = primaryNumber.replace(/\D/g, '');
   if (!digits) return '';
 
   // 10-digit Indian numbers (e.g. 9876123401 -> 919876123401)

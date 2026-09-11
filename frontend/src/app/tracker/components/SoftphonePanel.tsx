@@ -116,7 +116,8 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
 
     triggerHaptic('success');
     // Trigger device native call protocol (Phone Link / MicroSIP / Android)
-    const cleaned = phoneNumber.replace(/[\s\-()]/g, '');
+    const primary = phoneNumber.split(/[,;/]+/)[0] || phoneNumber;
+    const cleaned = primary.replace(/[\s\-()]/g, '');
     window.location.href = `tel:${cleaned}`;
 
     setPanelState('calling');

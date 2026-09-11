@@ -238,7 +238,9 @@ export function ReportBuilderWizard({
     } else {
       s.kpi_summary = false;
       s.completed_companies = true;
+      s.drive_in_progress = true;
       s.companies_in_drive = true;
+      s.upcoming_drives = true;
       s.in_progress = true;
       s.pipeline = true;
       s.top_companies = true;
@@ -272,6 +274,7 @@ export function ReportBuilderWizard({
   // Live Weekly Tracker Companies State (Synced directly with Weekly Tracker DB)
   const [weeklyCompanies, setWeeklyCompanies] = useState<{
     completed: any[];
+    drive_in_progress: any[];
     in_drive: any[];
     in_progress: any[];
     pipeline: any[];
@@ -281,6 +284,7 @@ export function ReportBuilderWizard({
     on_hold_by_hr: any[];
   }>({
     completed: [],
+    drive_in_progress: [],
     in_drive: [],
     in_progress: [],
     pipeline: [],
@@ -350,6 +354,7 @@ export function ReportBuilderWizard({
     if (targetIds.length === 0 || templateType === 'active_leads') {
       setWeeklyCompanies({
         completed: [],
+        drive_in_progress: [],
         in_drive: [],
         in_progress: [],
         pipeline: [],
@@ -390,6 +395,7 @@ export function ReportBuilderWizard({
 
         if (isMounted && res.success && res.data) {
           let completed: any[] = [];
+          let drive_in_progress: any[] = [];
           let in_drive: any[] = [];
           let in_progress: any[] = [];
           let pipeline: any[] = [];
@@ -401,7 +407,8 @@ export function ReportBuilderWizard({
           if (res.data.sections) {
             const sec = res.data.sections;
             completed = sec.completed?.rows || [];
-            in_drive = sec.in_drive?.rows || sec.companies_in_drive?.rows || [];
+            drive_in_progress = sec.drive_in_progress?.rows || [];
+            in_drive = sec.in_drive?.rows || sec.companies_in_drive?.rows || sec.upcoming_drives?.rows || [];
             in_progress = sec.in_progress?.rows || [];
             pipeline = sec.pipeline?.rows || [];
             top_companies = sec.top_companies?.rows || [];
@@ -411,7 +418,8 @@ export function ReportBuilderWizard({
           } else if (Array.isArray(res.data)) {
             const rows = res.data;
             completed = rows.filter((r: any) => r.pipeline_section === 'completed');
-            in_drive = rows.filter((r: any) => r.pipeline_section === 'in_drive' || r.pipeline_section === 'companies_in_drive');
+            drive_in_progress = rows.filter((r: any) => r.pipeline_section === 'drive_in_progress');
+            in_drive = rows.filter((r: any) => r.pipeline_section === 'in_drive' || r.pipeline_section === 'companies_in_drive' || r.pipeline_section === 'upcoming_drives');
             in_progress = rows.filter((r: any) => r.pipeline_section === 'in_progress');
             pipeline = rows.filter((r: any) => r.pipeline_section === 'pipeline');
             top_companies = rows.filter((r: any) => r.pipeline_section === 'top_companies' || r.is_pinned_top);
@@ -422,6 +430,7 @@ export function ReportBuilderWizard({
 
           setWeeklyCompanies({
             completed,
+            drive_in_progress,
             in_drive,
             in_progress,
             pipeline,
@@ -456,10 +465,11 @@ export function ReportBuilderWizard({
   // Dynamic CTC ranges calculation based on actual companies present in the selected college
   const { availableCtcBrackets, unspecifiedCtcCount } = useMemo(() => {
     const allRows = [
+      ...(weeklyCompanies.completed || []),
+      ...(weeklyCompanies.drive_in_progress || []),
+      ...(weeklyCompanies.in_drive || []),
       ...(weeklyCompanies.in_progress || []),
       ...(weeklyCompanies.pipeline || []),
-      ...(weeklyCompanies.in_drive || []),
-      ...(weeklyCompanies.completed || []),
       ...(weeklyCompanies.top_companies || []),
       ...(weeklyCompanies.on_hold_by_college || []),
       ...(weeklyCompanies.on_hold_by_hr || []),
@@ -549,6 +559,7 @@ export function ReportBuilderWizard({
 
     return {
       completed: (weeklyCompanies.completed || []).filter(filterRow),
+      drive_in_progress: (weeklyCompanies.drive_in_progress || []).filter(filterRow),
       in_drive: (weeklyCompanies.in_drive || []).filter(filterRow),
       in_progress: (weeklyCompanies.in_progress || []).filter(filterRow),
       pipeline: (weeklyCompanies.pipeline || []).filter(filterRow),
@@ -586,14 +597,16 @@ export function ReportBuilderWizard({
   }, [filteredWeeklyCompanies, weeklyExcludedIds]);
 
   const previewRows = useMemo(() => {
+    if (weeklyActivePreviewTab === 'completed')
+      return filteredWeeklyCompanies.completed.map((r) => ({ ...r, _sectionKey: 'completed', _sectionLabel: 'Completed' }));
+    if (weeklyActivePreviewTab === 'drive_in_progress')
+      return filteredWeeklyCompanies.drive_in_progress.map((r) => ({ ...r, _sectionKey: 'drive_in_progress', _sectionLabel: 'Drive in Progress' }));
+    if (weeklyActivePreviewTab === 'in_drive')
+      return filteredWeeklyCompanies.in_drive.map((r) => ({ ...r, _sectionKey: 'in_drive', _sectionLabel: 'Upcoming Drives' }));
     if (weeklyActivePreviewTab === 'in_progress')
       return filteredWeeklyCompanies.in_progress.map((r) => ({ ...r, _sectionKey: 'in_progress', _sectionLabel: 'In Progress' }));
     if (weeklyActivePreviewTab === 'pipeline')
       return filteredWeeklyCompanies.pipeline.map((r) => ({ ...r, _sectionKey: 'pipeline', _sectionLabel: 'In Pipeline' }));
-    if (weeklyActivePreviewTab === 'in_drive')
-      return filteredWeeklyCompanies.in_drive.map((r) => ({ ...r, _sectionKey: 'in_drive', _sectionLabel: 'In Drive' }));
-    if (weeklyActivePreviewTab === 'completed')
-      return filteredWeeklyCompanies.completed.map((r) => ({ ...r, _sectionKey: 'completed', _sectionLabel: 'Completed' }));
     if (weeklyActivePreviewTab === 'top_companies')
       return filteredWeeklyCompanies.top_companies.map((r) => ({ ...r, _sectionKey: 'top_companies', _sectionLabel: 'Top Company' }));
     if (weeklyActivePreviewTab === 'on_hold') {
@@ -607,10 +620,11 @@ export function ReportBuilderWizard({
     }
     // 'all'
     return [
+      ...filteredWeeklyCompanies.completed.map((r) => ({ ...r, _sectionKey: 'completed', _sectionLabel: 'Completed' })),
+      ...filteredWeeklyCompanies.drive_in_progress.map((r) => ({ ...r, _sectionKey: 'drive_in_progress', _sectionLabel: 'Drive in Progress' })),
+      ...filteredWeeklyCompanies.in_drive.map((r) => ({ ...r, _sectionKey: 'in_drive', _sectionLabel: 'Upcoming Drives' })),
       ...filteredWeeklyCompanies.in_progress.map((r) => ({ ...r, _sectionKey: 'in_progress', _sectionLabel: 'In Progress' })),
       ...filteredWeeklyCompanies.pipeline.map((r) => ({ ...r, _sectionKey: 'pipeline', _sectionLabel: 'In Pipeline' })),
-      ...filteredWeeklyCompanies.in_drive.map((r) => ({ ...r, _sectionKey: 'in_drive', _sectionLabel: 'In Drive' })),
-      ...filteredWeeklyCompanies.completed.map((r) => ({ ...r, _sectionKey: 'completed', _sectionLabel: 'Completed' })),
       ...filteredWeeklyCompanies.top_companies.map((r) => ({ ...r, _sectionKey: 'top_companies', _sectionLabel: 'Top Company' })),
       ...filteredWeeklyCompanies.on_hold_by_college.map((r) => ({ ...r, _sectionKey: 'on_hold_by_college', _sectionLabel: 'On Hold (College)' })),
       ...filteredWeeklyCompanies.on_hold_by_hr.map((r) => ({ ...r, _sectionKey: 'on_hold_by_hr', _sectionLabel: 'On Hold (HR)' })),
@@ -625,10 +639,11 @@ export function ReportBuilderWizard({
       ).length;
     return {
       all: totalWeeklyFilteredCount,
+      completed: countActive(filteredWeeklyCompanies.completed),
+      drive_in_progress: countActive(filteredWeeklyCompanies.drive_in_progress),
+      in_drive: countActive(filteredWeeklyCompanies.in_drive),
       in_progress: countActive(filteredWeeklyCompanies.in_progress),
       pipeline: countActive(filteredWeeklyCompanies.pipeline),
-      in_drive: countActive(filteredWeeklyCompanies.in_drive),
-      completed: countActive(filteredWeeklyCompanies.completed),
       top_companies: countActive(filteredWeeklyCompanies.top_companies),
       on_hold:
         countActive(filteredWeeklyCompanies.on_hold_by_college) +
@@ -709,6 +724,9 @@ export function ReportBuilderWizard({
         setSections({
           kpi_summary: false,
           completed_companies: true,
+          drive_in_progress: true,
+          companies_in_drive: true,
+          upcoming_drives: true,
           in_progress: true,
           pipeline: true,
           top_companies: true,
@@ -840,7 +858,9 @@ export function ReportBuilderWizard({
       setSections({
         kpi_summary: false,
         completed_companies: true,
+        drive_in_progress: true,
         companies_in_drive: true,
+        upcoming_drives: true,
         in_progress: true,
         pipeline: true,
         top_companies: true,
@@ -919,6 +939,7 @@ export function ReportBuilderWizard({
           );
         customWeeklyCompaniesPayload = {
           completed: filterExcluded(filteredWeeklyCompanies.completed),
+          drive_in_progress: filterExcluded(filteredWeeklyCompanies.drive_in_progress),
           in_drive: filterExcluded(filteredWeeklyCompanies.in_drive),
           in_progress: filterExcluded(filteredWeeklyCompanies.in_progress),
           pipeline: filterExcluded(filteredWeeklyCompanies.pipeline),
@@ -1079,16 +1100,24 @@ export function ReportBuilderWizard({
         badgeColor: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
       },
       {
-        key: 'companies_in_drive',
-        label: '2. Companies in Drive',
-        icon: Rocket,
-        desc: 'Scheduled campus placement drives actively underway or confirmed',
-        companies: filteredWeeklyCompanies.in_drive,
+        key: 'drive_in_progress',
+        label: '2. Drive in Progress',
+        icon: Zap,
+        desc: 'Placement drives currently taking place / evaluation underway',
+        companies: filteredWeeklyCompanies.drive_in_progress,
         badgeColor: 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
       },
       {
+        key: 'companies_in_drive',
+        label: '3. Upcoming Drives',
+        icon: Calendar,
+        desc: 'Scheduled campus placement drives actively upcoming or confirmed',
+        companies: filteredWeeklyCompanies.in_drive,
+        badgeColor: 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
+      },
+      {
         key: 'in_progress',
-        label: '3. Companies In Progress',
+        label: '4. Companies In Progress',
         icon: Clock,
         desc: 'Active ongoing interview evaluation rounds',
         companies: filteredWeeklyCompanies.in_progress,
@@ -1096,7 +1125,7 @@ export function ReportBuilderWizard({
       },
       {
         key: 'pipeline',
-        label: '4. Companies In Pipeline',
+        label: '5. Companies In Pipeline',
         icon: Layers,
         desc: 'Upcoming scheduled drives and confirmed tech partnerships',
         companies: filteredWeeklyCompanies.pipeline,
@@ -1104,7 +1133,7 @@ export function ReportBuilderWizard({
       },
       {
         key: 'top_companies',
-        label: '5. Top Companies',
+        label: '6. Top Companies',
         icon: Sparkles,
         desc: 'Premier high-CTC partner organizations',
         companies: filteredWeeklyCompanies.top_companies || [],
@@ -1112,7 +1141,7 @@ export function ReportBuilderWizard({
       },
       {
         key: 'rejected_companies',
-        label: '6. Rejected Companies',
+        label: '7. Rejected Companies',
         icon: XCircle,
         desc: 'Companies with employer declines or ineligible criteria',
         companies: filteredWeeklyCompanies.rejected_companies || [],
@@ -1120,7 +1149,7 @@ export function ReportBuilderWizard({
       },
       {
         key: 'on_hold_by_college',
-        label: '7. Companies On Hold By College',
+        label: '8. Companies On Hold By College',
         icon: Clock,
         desc: 'Placement drives placed on hold by college management / TPO',
         companies: filteredWeeklyCompanies.on_hold_by_college || [],
@@ -1128,7 +1157,7 @@ export function ReportBuilderWizard({
       },
       {
         key: 'on_hold_by_hr',
-        label: '8. Companies On Hold By HR',
+        label: '9. Companies On Hold By HR',
         icon: Clock,
         desc: 'Placement drives placed on hold by corporate HR partners',
         companies: filteredWeeklyCompanies.on_hold_by_hr || [],
@@ -2366,10 +2395,11 @@ export function ReportBuilderWizard({
                   className="w-full bg-surface border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-lg px-2.5 py-1.5 text-xs text-fg outline-none shadow-2xs font-medium cursor-pointer"
                 >
                   <option value="all">All Placement Drives ({tabCounts.all})</option>
+                  <option value="completed">Completed ({tabCounts.completed})</option>
+                  <option value="drive_in_progress">Drive in Progress ({tabCounts.drive_in_progress})</option>
+                  <option value="in_drive">Upcoming Drives ({tabCounts.in_drive})</option>
                   <option value="in_progress">In Progress ({tabCounts.in_progress})</option>
                   <option value="pipeline">In Pipeline ({tabCounts.pipeline})</option>
-                  <option value="in_drive">In Drive ({tabCounts.in_drive})</option>
-                  <option value="completed">Completed ({tabCounts.completed})</option>
                   <option value="top_companies">Top Companies ({tabCounts.top_companies})</option>
                   <option value="on_hold">On Hold / Decl. ({tabCounts.on_hold + tabCounts.rejected})</option>
                 </select>
@@ -2433,10 +2463,11 @@ export function ReportBuilderWizard({
                   </span>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-primary/10 text-primary border border-primary/20">
                     {weeklyActivePreviewTab === 'all' && `All Matching Drives (${previewRows.length})`}
+                    {weeklyActivePreviewTab === 'completed' && `Completed Drives (${previewRows.length})`}
+                    {weeklyActivePreviewTab === 'drive_in_progress' && `Drive in Progress (${previewRows.length})`}
+                    {weeklyActivePreviewTab === 'in_drive' && `Upcoming Drives (${previewRows.length})`}
                     {weeklyActivePreviewTab === 'in_progress' && `In Progress Drives (${previewRows.length})`}
                     {weeklyActivePreviewTab === 'pipeline' && `Upcoming Pipeline Drives (${previewRows.length})`}
-                    {weeklyActivePreviewTab === 'in_drive' && `In Drive / Scheduled Drives (${previewRows.length})`}
-                    {weeklyActivePreviewTab === 'completed' && `Completed Drives (${previewRows.length})`}
                     {weeklyActivePreviewTab === 'top_companies' && `Top Tier Companies (${previewRows.length})`}
                     {weeklyActivePreviewTab === 'on_hold' && `On Hold & Declined (${previewRows.length})`}
                     {weeklyActivePreviewTab === 'rejected' && `Rejected (${previewRows.length})`}

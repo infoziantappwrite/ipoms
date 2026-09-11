@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Clock,
   Trophy,
@@ -14,18 +14,22 @@ import {
   Trash2,
   X,
   Calendar,
+  Zap,
+  Flame,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { WeeklyTable, WeeklyRow } from './WeeklyTable';
 import { EditCompanyModal } from './EditCompanyModal';
+import { DeleteConfirmModal } from './DeleteConfirmModal';
 
 interface Props {
   sectionKey: string;
   title: string;
   order: number;
-  summaryMetric: string;
+  summaryMetric?: string;
   rows: WeeklyRow[];
   isGlobalDeleteMode?: boolean;
+  selectionMode?: 'move' | 'delete' | null;
   globalSelectedRowIds?: string[];
   onToggleSelectRow?: (rowId: string) => void;
   onToggleSelectSection?: (rowIds: string[]) => void;
@@ -33,6 +37,13 @@ interface Props {
   onMoveSection: (rowId: string, newSection: string) => Promise<void>;
   onTogglePin: (rowId: string) => Promise<void>;
   onDeleteRow: (rowId: string) => Promise<void>;
+  onReorderRows?: (sectionKey: string, newRows: WeeklyRow[]) => Promise<void> | void;
+  onMoveRowCrossSection?: (
+    rowId: string,
+    sourceSectionKey: string,
+    targetSectionKey: string,
+    targetIndex?: number
+  ) => Promise<void> | void;
 }
 
 const SECTION_CONFIGS: Record<string, { Icon: any; headerBg: string; badgeClass: string; iconClass: string }> = {
@@ -48,6 +59,12 @@ const SECTION_CONFIGS: Record<string, { Icon: any; headerBg: string; badgeClass:
     badgeClass: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700/60',
     iconClass: 'text-emerald-600 dark:text-emerald-400',
   },
+  drive_in_progress: {
+    Icon: Zap,
+    headerBg: 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800/60 text-amber-950 dark:text-amber-200',
+    badgeClass: 'bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700/70',
+    iconClass: 'text-amber-600 dark:text-amber-400',
+  },
   in_drive: {
     Icon: Calendar,
     headerBg: 'bg-indigo-50/80 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900/40 text-indigo-900 dark:text-indigo-300',
@@ -55,6 +72,12 @@ const SECTION_CONFIGS: Record<string, { Icon: any; headerBg: string; badgeClass:
     iconClass: 'text-indigo-600 dark:text-indigo-400',
   },
   companies_in_drive: {
+    Icon: Calendar,
+    headerBg: 'bg-indigo-50/80 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900/40 text-indigo-900 dark:text-indigo-300',
+    badgeClass: 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700/60',
+    iconClass: 'text-indigo-600 dark:text-indigo-400',
+  },
+  upcoming_drives: {
     Icon: Calendar,
     headerBg: 'bg-indigo-50/80 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-900/40 text-indigo-900 dark:text-indigo-300',
     badgeClass: 'bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700/60',
@@ -117,6 +140,7 @@ export function WeeklySection({
   summaryMetric,
   rows,
   isGlobalDeleteMode,
+  selectionMode,
   globalSelectedRowIds,
   onToggleSelectRow: onGlobalToggleSelectRow,
   onToggleSelectSection: onGlobalToggleSelectSection,
@@ -124,15 +148,50 @@ export function WeeklySection({
   onMoveSection,
   onTogglePin,
   onDeleteRow,
+  onReorderRows,
+  onMoveRowCrossSection,
 }: Props) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isLocalDeleteMode, setIsLocalDeleteMode] = useState(false);
   const [localSelectedRowIds, setLocalSelectedRowIds] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<WeeklyRow | null>(null);
+  const [isDragOverSection, setIsDragOverSection] = useState(false);
+  const [isJustDropped, setIsJustDropped] = useState(false);
+
+  // Global Drag Reset & Escape Key Handler to prevent sticky drag over highlights
+  useEffect(() => {
+    const handleGlobalDragReset = () => {
+      setIsDragOverSection(false);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleGlobalDragReset();
+        setLocalSelectedRowIds([]);
+        setIsLocalDeleteMode(false);
+        setIsJustDropped(false);
+        (window as any).__ipoms_dragged_weekly_row = null;
+      }
+    };
+
+    window.addEventListener('dragend', handleGlobalDragReset);
+    window.addEventListener('drop', handleGlobalDragReset);
+    window.addEventListener('mouseup', handleGlobalDragReset);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('dragend', handleGlobalDragReset);
+      window.removeEventListener('drop', handleGlobalDragReset);
+      window.removeEventListener('mouseup', handleGlobalDragReset);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   const isDeleteMode = isGlobalDeleteMode !== undefined ? isGlobalDeleteMode : isLocalDeleteMode;
   const selectedRowIds = isGlobalDeleteMode ? (globalSelectedRowIds || []) : localSelectedRowIds;
+  const sectionSelectedCount = rows.filter((r) => selectedRowIds.includes(r._id)).length;
 
   const config = SECTION_CONFIGS[sectionKey] || {
     Icon: Folder,
@@ -165,11 +224,15 @@ export function WeeklySection({
     }
   };
 
-  const handleBatchDelete = async (e: React.MouseEvent) => {
+  const handleBatchDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (selectedRowIds.length === 0) return;
-    if (!confirm(`Move ${selectedRowIds.length} selected row(s) to Recycle Bin?`)) return;
+    setIsDeleteModalOpen(true);
+  };
 
+  const handleConfirmBatchDelete = async () => {
+    if (selectedRowIds.length === 0) return;
+    setIsDeleteModalOpen(false);
     setIsDeleting(true);
     try {
       await apiFetch('/weekly-tracker/batch-delete', {
@@ -188,8 +251,55 @@ export function WeeklySection({
     }
   };
 
+  const handleSectionDragOver = (e: React.DragEvent) => {
+    const globalDragged = (window as any).__ipoms_dragged_weekly_row;
+    if (globalDragged && globalDragged.sourceSectionKey !== sectionKey) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (!isDragOverSection) setIsDragOverSection(true);
+    }
+  };
+
+  const handleSectionDragLeave = (e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragOverSection(false);
+    }
+  };
+
+  const handleSectionDrop = (e: React.DragEvent) => {
+    setIsDragOverSection(false);
+    const globalDragged = (window as any).__ipoms_dragged_weekly_row;
+    let data: any = globalDragged;
+    if (!data) {
+      try {
+        const raw = e.dataTransfer.getData('application/json');
+        if (raw) data = JSON.parse(raw);
+      } catch {}
+    }
+
+    if (data && data.rowId && data.sourceSectionKey !== sectionKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsJustDropped(true);
+      setTimeout(() => setIsJustDropped(false), 1500);
+      onMoveRowCrossSection?.(data.rowId, data.sourceSectionKey, sectionKey, rows.length);
+      (window as any).__ipoms_dragged_weekly_row = null;
+    }
+  };
+
   return (
-    <div className="rounded-xl border border-border overflow-hidden shadow-xs transition-all bg-surface">
+    <div
+      onDragOver={handleSectionDragOver}
+      onDragLeave={handleSectionDragLeave}
+      onDrop={handleSectionDrop}
+      className={`rounded-xl border transition-all duration-300 overflow-hidden shadow-xs bg-surface ${
+        isDragOverSection
+          ? 'border-primary ring-2 ring-primary/60 shadow-lg scale-[1.002]'
+          : isJustDropped
+          ? 'border-primary ring-2 ring-primary/40 bg-primary/[0.02] shadow-md'
+          : 'border-border'
+      }`}
+    >
       {/* Sticky Section Header */}
       <div
         onClick={() => {
@@ -205,15 +315,19 @@ export function WeeklySection({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Summary Metric (Hidden in delete mode) */}
-          {!isDeleteMode && (
-            <span className="text-xs font-medium opacity-80 hidden sm:inline mr-1">
-              {summaryMetric}
+          {/* Global Selection Mode Badge (only shows if items are selected in this specific section) */}
+          {isGlobalDeleteMode && sectionSelectedCount > 0 && (
+            <span className={`text-micro font-bold px-2 py-0.5 rounded-full border ${
+              selectionMode === 'delete'
+                ? 'text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-950/60 border-rose-300 dark:border-rose-800'
+                : 'text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-800'
+            }`}>
+              {sectionSelectedCount} selected
             </span>
           )}
 
-          {/* Delete Selection Mode Controls in Title Bar */}
-          {isDeleteMode ? (
+          {/* Local Delete Mode Controls in Title Bar (only when not in global mode) */}
+          {!isGlobalDeleteMode && isLocalDeleteMode ? (
             <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
               <span className="text-micro font-bold text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 px-2 py-0.5 rounded-full">
                 {selectedRowIds.length} selected
@@ -231,12 +345,8 @@ export function WeeklySection({
               <button
                 type="button"
                 onClick={() => {
-                  if (isGlobalDeleteMode && onGlobalToggleSelectSection) {
-                    onGlobalToggleSelectSection([]);
-                  } else {
-                    setIsLocalDeleteMode(false);
-                    setLocalSelectedRowIds([]);
-                  }
+                  setIsLocalDeleteMode(false);
+                  setLocalSelectedRowIds([]);
                 }}
                 className="p-1 rounded-lg text-fg-subtle hover:text-fg hover:bg-surface-raised transition-colors cursor-pointer"
                 title="Cancel selection"
@@ -269,6 +379,8 @@ export function WeeklySection({
           onMoveSection={onMoveSection}
           onTogglePin={onTogglePin}
           onDeleteRow={onDeleteRow}
+          onReorderRows={(newRows) => onReorderRows && onReorderRows(sectionKey, newRows)}
+          onMoveRowCrossSection={onMoveRowCrossSection}
           onEditRow={(row) => setEditingRow(row)}
         />
       )}
@@ -282,6 +394,15 @@ export function WeeklySection({
           onDeleted={onDeleteRow}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        count={selectedRowIds.length}
+        isOpen={isDeleteModalOpen}
+        isDeleting={isDeleting}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleConfirmBatchDelete}
+      />
     </div>
   );
 }

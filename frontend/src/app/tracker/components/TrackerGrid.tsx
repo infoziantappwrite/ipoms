@@ -205,7 +205,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
       await copyToClipboard(textToCopy);
       triggerHaptic('success');
       setCopiedBoth(true);
-      toast(`Copied ${validRows.length} contact detail${validRows.length > 1 ? 's' : ''}`, 'success');
+      toast(`Copied ${validRows.length} phone & email record${validRows.length > 1 ? 's' : ''}`, 'success');
       setTimeout(() => setCopiedBoth(false), 2000);
     } catch {
       toast('Failed to copy data to clipboard', 'error');
@@ -376,17 +376,16 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
   }, [rows, isReadOnly, toast]);
 
   const handleDeleteSelected = useCallback(async () => {
-    if (selectedRowIds.size === 0) {
-      toast('Please select at least 1 row to delete.', 'warning');
-      return;
-    }
+    if (selectedRowIds.size === 0) return;
     const idsToDelete = Array.from(selectedRowIds);
     if (onDeleteSelected) {
       await onDeleteSelected(idsToDelete);
+      const count = idsToDelete.length;
       setSelectedRowIds(new Set());
       setIsSelectMode(false);
+      setIsDeleteMode(false);
       triggerHaptic('success');
-      toast(`Deleted ${idsToDelete.length} selected row${idsToDelete.length > 1 ? 's' : ''}`, 'success');
+      toast(`${count} ${count === 1 ? 'row' : 'rows'} deleted`, 'success');
     }
   }, [selectedRowIds, onDeleteSelected, toast]);
 
@@ -398,15 +397,10 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
     }
     setIsDeleteMode((prev) => {
       const next = !prev;
-      if (next) {
-        setIsSelectMode(true);
-        toast('Delete mode active. Select rows and click Delete to confirm.', 'info');
-      } else {
-        setIsSelectMode(false);
-      }
+      setIsSelectMode(next);
       return next;
     });
-  }, [selectedRowIds.size, isDeleteMode, toast]);
+  }, [selectedRowIds.size, isDeleteMode]);
 
   // Listen for actions dispatched from top Actions dropdown / Header
   useEffect(() => {
@@ -652,7 +646,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
             <div className="bg-surface-sunken px-2.5 py-2.5 flex items-center whitespace-nowrap">HR Name</div>
 
             {/* Contact Header with Selective Copy Icon */}
-            <div className="bg-surface-sunken px-2.5 py-2 flex items-center justify-between gap-1.5 whitespace-nowrap">
+            <div className="bg-surface-sunken px-2.5 py-2 flex items-center gap-1.5 whitespace-nowrap">
               <span>Contact</span>
               <button
                 type="button"
@@ -673,7 +667,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
             </div>
 
             {/* Email ID Header with Selective Copy Icon */}
-            <div className="bg-surface-sunken px-2.5 py-2 flex items-center justify-between gap-1.5 whitespace-nowrap">
+            <div className="bg-surface-sunken px-2.5 py-2 flex items-center gap-1.5 whitespace-nowrap">
               <span>Email ID</span>
               <button
                 type="button"

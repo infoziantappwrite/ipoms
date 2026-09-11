@@ -13,6 +13,7 @@ import {
   Check,
   ChevronDown,
   Calendar,
+  Zap,
 } from 'lucide-react';
 import { triggerHaptic } from '@/lib/haptics';
 
@@ -33,8 +34,15 @@ export const WEEKLY_PIPELINE_SECTIONS: MoveSectionOption[] = [
     activeBgClass: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-bold',
   },
   {
+    key: 'drive_in_progress',
+    label: 'Drive in Progress',
+    Icon: Zap,
+    colorClass: 'text-amber-600 dark:text-amber-400',
+    activeBgClass: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-bold',
+  },
+  {
     key: 'in_drive',
-    label: 'Companies in Drive',
+    label: 'Upcoming Drives',
     Icon: Calendar,
     colorClass: 'text-indigo-600 dark:text-indigo-400',
     activeBgClass: 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-bold',

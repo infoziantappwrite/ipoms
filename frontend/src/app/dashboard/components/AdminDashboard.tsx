@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Landmark,
@@ -26,6 +26,15 @@ interface Props {
 export function AdminDashboard({ data, onRefresh }: Props) {
   const [collegeSearch, setCollegeSearch] = useState('');
   const [collegeFilter, setCollegeFilter] = useState<'all' | 'with_offers' | 'with_drives' | 'active_pipeline'>('all');
+
+  // Live polling every 15s to keep coordinator presence and telemetry fresh
+  useEffect(() => {
+    if (!onRefresh) return;
+    const interval = setInterval(() => {
+      onRefresh();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [onRefresh]);
 
   if (!data) return null;
 
