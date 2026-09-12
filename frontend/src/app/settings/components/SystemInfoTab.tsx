@@ -7,7 +7,6 @@ import {
   PhoneCall,
   CalendarDays,
   Target,
-  ListTodo,
   Database,
   TrendingUp,
   Settings,
@@ -133,15 +132,6 @@ export function SystemInfoTab({
       href: '/daily-leads',
       badge: 'Lead Registry',
       color: 'border-amber-500/30 text-amber-400 bg-amber-500/10',
-    },
-    {
-      title: 'Pending Task Register',
-      code: 'Module 09',
-      Icon: ListTodo,
-      desc: 'College-wise task tracking board with JD dates, DB shared status, pipeline actions, and scheduled campus drive dates.',
-      href: '/pending-tasks',
-      badge: 'Task Operations',
-      color: 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10',
     },
     {
       title: 'Master Metadata Database',

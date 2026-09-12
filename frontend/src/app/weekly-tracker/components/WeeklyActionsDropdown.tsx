@@ -10,6 +10,7 @@ import {
   FileText,
   Image as ImageIcon,
   ArrowRightLeft,
+  Trash2,
 } from 'lucide-react';
 import { triggerHaptic } from '@/lib/haptics';
 
@@ -23,6 +24,7 @@ interface Props {
   onExportImage?: () => void;
   isExporting?: boolean;
   onOpenBulkMove?: () => void;
+  onStartDeleteMode?: () => void;
 }
 
 export function WeeklyActionsDropdown({
@@ -35,6 +37,7 @@ export function WeeklyActionsDropdown({
   onExportImage,
   isExporting = false,
   onOpenBulkMove,
+  onStartDeleteMode,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -133,9 +136,28 @@ export function WeeklyActionsDropdown({
                   </div>
                   <span>Move Companies</span>
                 </div>
-                <span className="text-[9px] font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1 py-0.2 rounded border border-indigo-200 dark:border-indigo-800">
-                  Move
-                </span>
+                <kbd className="text-[9px] font-mono text-fg-subtle bg-surface-sunken border border-border px-1 py-0.2 rounded">
+                  Shift+M
+                </kbd>
+              </button>
+            )}
+
+            {/* Delete Rows in Bulk */}
+            {onStartDeleteMode && (
+              <button
+                type="button"
+                onClick={() => executeAction(onStartDeleteMode)}
+                className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold rounded-lg text-fg hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400 transition-colors cursor-pointer group"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+                    <Trash2 size={12} strokeWidth={2.2} />
+                  </div>
+                  <span>Delete Rows</span>
+                </div>
+                <kbd className="text-[9px] font-mono text-fg-subtle bg-surface-sunken border border-border px-1 py-0.2 rounded">
+                  Shift+D
+                </kbd>
               </button>
             )}
 

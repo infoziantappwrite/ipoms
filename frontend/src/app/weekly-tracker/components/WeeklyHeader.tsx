@@ -7,7 +7,6 @@ import {
   Search,
   Undo2,
   Redo2,
-  ArrowRightLeft,
 } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { CollegeSelector, College } from '@/components/CollegeSelector';
@@ -188,40 +187,9 @@ export function WeeklyHeader({
             />
           </div>
 
-          {/* 2. Move & Delete Mode Controls */}
-          {selectedCollegeId && (
-            selectionMode === null ? (
-              <div className="flex items-center gap-1.5 shrink-0">
-                {onStartMoveMode && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic('medium');
-                      onStartMoveMode();
-                    }}
-                    className="h-8 px-3 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900/80 shadow-2xs active:scale-[0.95] text-xs font-bold"
-                    title="Open checkboxes to select and move companies"
-                    aria-label="Move Companies"
-                  >
-                    <span>Move</span>
-                  </button>
-                )}
-                {onStartDeleteMode && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic('medium');
-                      onStartDeleteMode();
-                    }}
-                    className="relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/80 shadow-2xs active:scale-[0.95]"
-                    title="Select rows to delete in bulk"
-                    aria-label="Delete Rows"
-                  >
-                    <Trash2 size={15} strokeWidth={2.2} />
-                  </button>
-                )}
-              </div>
-            ) : selectionMode === 'move' ? (
+          {/* 2. Active Mode Controls (Only visible when a mode is active) */}
+          {selectedCollegeId && selectionMode !== null && (
+            selectionMode === 'move' ? (
               <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
                 {/* Move Mode Active: Only Move and Cancel buttons */}
                 <button
@@ -281,7 +249,7 @@ export function WeeklyHeader({
             ) : null
           )}
 
-          {/* 4. Three Dots (Actions Menu) */}
+          {/* 3. Three Dots (Actions Menu) */}
           <WeeklyActionsDropdown
             selectedCollegeId={selectedCollegeId}
             onOpenAddModal={onOpenAddModal}
@@ -292,6 +260,7 @@ export function WeeklyHeader({
             onExportImage={onExportImage}
             isExporting={isExporting}
             onOpenBulkMove={onStartMoveMode || onOpenBulkMove}
+            onStartDeleteMode={onStartDeleteMode}
           />
         </div>
       </div>

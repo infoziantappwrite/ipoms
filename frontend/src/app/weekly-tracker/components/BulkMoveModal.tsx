@@ -13,8 +13,6 @@ import {
   XCircle,
   Clock,
   CheckCircle2,
-  Shuffle,
-  Building2,
 } from 'lucide-react';
 import { WeeklyRow } from './WeeklyTable';
 import { triggerHaptic } from '@/lib/haptics';
@@ -94,17 +92,11 @@ const TARGET_SECTIONS = [
 
 export function BulkMoveModal({
   selectedRows,
-  allAvailableRows = [],
   onClose,
   onConfirmMove,
 }: Props) {
   const [selectedTargetSection, setSelectedTargetSection] = useState<string>('in_drive');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeRowIds, setActiveRowIds] = useState<string[]>(() => selectedRows.map((r) => r._id));
-
-  useEffect(() => {
-    setActiveRowIds(selectedRows.map((r) => r._id));
-  }, [selectedRows]);
 
   // Keyboard shortcut listener for Escape to close
   useEffect(() => {
@@ -117,19 +109,14 @@ export function BulkMoveModal({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  const handleToggleRemoveRow = (id: string) => {
-    triggerHaptic('light');
-    setActiveRowIds((prev) => prev.filter((x) => x !== id));
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (activeRowIds.length === 0 || !selectedTargetSection) return;
+    if (selectedRows.length === 0 || !selectedTargetSection) return;
 
     setIsSubmitting(true);
     triggerHaptic('medium');
     try {
-      await onConfirmMove(selectedTargetSection, activeRowIds);
+      await onConfirmMove(selectedTargetSection, selectedRows.map((r) => r._id));
       onClose();
     } catch (err) {
       console.error('Failed to execute bulk move:', err);
@@ -138,13 +125,9 @@ export function BulkMoveModal({
     }
   };
 
-  const displayedRows = allAvailableRows.length > 0
-    ? allAvailableRows.filter((r) => activeRowIds.includes(r._id))
-    : selectedRows.filter((r) => activeRowIds.includes(r._id));
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-xl bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-raised">
           <div className="flex items-center gap-3">
@@ -154,7 +137,7 @@ export function BulkMoveModal({
             <div>
               <h2 className="text-base font-bold text-fg">Move Companies</h2>
               <p className="text-xs text-fg-subtle">
-                Choose the destination section for {activeRowIds.length} selected company record{activeRowIds.length !== 1 ? 's' : ''}
+                Choose the destination section for {selectedRows.length} selected company record{selectedRows.length !== 1 ? 's' : ''}
               </p>
             </div>
           </div>
@@ -169,7 +152,7 @@ export function BulkMoveModal({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
           {/* Target Section Selection Grid */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-fg-muted mb-2.5">
@@ -206,52 +189,8 @@ export function BulkMoveModal({
             </div>
           </div>
 
-          {/* Selected Companies Chips */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-fg-muted">
-                Selected Companies ({activeRowIds.length})
-              </label>
-              {activeRowIds.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setActiveRowIds([])}
-                  className="text-micro text-rose-600 dark:text-rose-400 hover:underline font-semibold cursor-pointer"
-                >
-                  Clear All
-                </button>
-              )}
-            </div>
-
-            {displayedRows.length === 0 ? (
-              <div className="py-6 text-center border-2 border-dashed border-border rounded-xl text-fg-subtle text-xs">
-                No companies currently selected. Please check the companies you want to move in the tracker table first.
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2.5 bg-surface-sunken border border-border rounded-xl">
-                {displayedRows.map((r) => (
-                  <span
-                    key={r._id}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface border border-border text-fg text-xs font-medium shadow-2xs group"
-                  >
-                    <Building2 size={12} className="text-primary shrink-0" />
-                    <span className="truncate max-w-[180px]">{r.company_name}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleRemoveRow(r._id)}
-                      className="text-fg-subtle hover:text-rose-600 rounded-md p-0.5 transition-colors cursor-pointer"
-                      title="Remove from selection"
-                    >
-                      <X size={11} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
           {/* Modal Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
             <button
               type="button"
               onClick={onClose}
@@ -261,7 +200,7 @@ export function BulkMoveModal({
             </button>
             <button
               type="submit"
-              disabled={activeRowIds.length === 0 || isSubmitting}
+              disabled={selectedRows.length === 0 || isSubmitting}
               className="px-6 py-2 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-40 text-primary-foreground text-xs font-bold shadow-xs flex items-center justify-center transition-all cursor-pointer"
             >
               <span>{isSubmitting ? 'Moving…' : 'Move'}</span>

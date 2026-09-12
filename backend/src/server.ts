@@ -4935,34 +4935,6 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
 
     // ── CASE 1: PENDING TASKS REPORT ───────────────────────────────────────────
     if (template_type === 'pending_tasks') {
-      const ptFilter: any = { is_deleted: { $ne: true } };
-      if (college_id && college_id !== 'all') {
-        const queryIds: any[] = [];
-        if (Types.ObjectId.isValid(String(college_id))) {
-          queryIds.push(new Types.ObjectId(String(college_id)));
-        }
-        if (targetCollege?._id) {
-          queryIds.push(targetCollege._id);
-        }
-        queryIds.push(String(college_id));
-        ptFilter.college_id = { $in: queryIds };
-      }
-
-      const pendingTasks = await PendingTask.find(ptFilter).sort({ serial_no: 1, created_at: -1 });
-
-      const dbSharedCount = pendingTasks.filter(
-        (t) => t.current_status === 'Database Shared' || t.db_shared_status === 'Shared'
-      ).length;
-      const dbPendingCount = pendingTasks.filter(
-        (t) => t.current_status === 'Database Pending' || t.db_shared_status === 'Pending'
-      ).length;
-      const drivesScheduled = pendingTasks.filter(
-        (t) => t.current_status === 'Drive Scheduled' || (t.drive_date && t.current_status !== 'Drive Completed')
-      ).length;
-      const drivesInProgress = pendingTasks.filter((t) => t.current_status === 'Drive in Progress').length;
-      const drivesCompleted = pendingTasks.filter((t) => t.current_status === 'Drive Completed').length;
-      const awaitingTpo = pendingTasks.filter((t) => t.current_status === 'Awaiting TPO Approval').length;
-      const awaitingHr = pendingTasks.filter((t) => t.current_status === 'Awaiting HR Approval').length;
       const highlightedIds = new Set((req.body.highlighted_task_ids || []).map(String));
       const highlightedIndices = new Set((req.body.highlighted_task_indices || []).map(Number));
       const colorMap = req.body.highlight_color_map || {};
@@ -4970,38 +4942,103 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
 
       let pendingTasksData: any[] = [];
       if (Array.isArray(req.body.custom_pending_tasks) && req.body.custom_pending_tasks.length > 0) {
-        pendingTasksData = req.body.custom_pending_tasks.map((t: any, idx: number) => ({
-          _id: t._id || t.id,
-          s_no: t.s_no || t.serial_no || idx + 1,
-          company_name: t.company_name,
-          jd_received_date: t.jd_received_date || '',
-          db_shared_date: t.db_shared_date || '',
-          current_status: t.current_status || 'Database Pending',
-          action_to_be_taken: t.action_to_be_taken || '',
-          drive_date: t.drive_date || '',
-          remarks: t.remarks || '',
-          is_highlighted: Boolean(t.is_highlighted || highlightedIds.has(String(t._id || t.id)) || highlightedIndices.has(idx)),
-          highlight_color: t.highlight_color || colorMap[String(t._id || t.id)] || colorMap[idx] || defaultColor,
-        }));
-      } else {
-        pendingTasksData = pendingTasks.map((t, idx) => {
-          const isHl = highlightedIds.has(String(t._id)) || highlightedIndices.has(idx) || highlightedIndices.has(t.serial_no || idx + 1);
-          const hlColor = colorMap[String(t._id)] || colorMap[idx] || defaultColor;
+        pendingTasksData = req.body.custom_pending_tasks.map((t: any, idx: number) => {
+          const statusVal = (t.status || t.current_status_text || t.current_status || t.action_to_be_taken || t.remarks || 'In Progress').trim();
+          const roleVal = (t.role || t.job_role || '').trim();
+          const ctcVal = (t.ctc || t.ctc_lpa || '').trim();
           return {
-            _id: t._id,
-            s_no: t.serial_no || idx + 1,
+            _id: t._id || t.id,
+            s_no: t.s_no || t.serial_no || idx + 1,
             company_name: t.company_name,
-            jd_received_date: t.jd_received_date ? new Date(t.jd_received_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
-            db_shared_date: t.db_shared_date ? new Date(t.db_shared_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
-            current_status: t.current_status || 'Database Pending',
-            action_to_be_taken: t.action_to_be_taken || '',
-            drive_date: t.drive_date ? new Date(t.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
-            remarks: t.remarks || '',
+            role: roleVal,
+            job_role: roleVal,
+            ctc: ctcVal,
+            ctc_lpa: ctcVal,
+            status: statusVal,
+            current_status: statusVal,
+            action_to_be_taken: statusVal,
+            remarks: t.remarks || statusVal,
+            task_section: t.task_section || 'company_in_progress',
+            is_highlighted: Boolean(t.is_highlighted || highlightedIds.has(String(t._id || t.id)) || highlightedIndices.has(idx)),
+            highlight_color: t.highlight_color || colorMap[String(t._id || t.id)] || colorMap[idx] || defaultColor,
+          };
+        });
+      } else {
+        // Fallback: Query WeeklyTracker collection directly
+        const wtFilter: any = { is_deleted: { $ne: true } };
+        if (college_id && college_id !== 'all') {
+          const queryIds: any[] = [];
+          if (Types.ObjectId.isValid(String(college_id))) {
+            queryIds.push(new Types.ObjectId(String(college_id)));
+          }
+          if (targetCollege?._id) {
+            queryIds.push(targetCollege._id);
+          }
+          queryIds.push(String(college_id));
+          wtFilter.college_id = { $in: queryIds };
+        }
+        if (academic_year && academic_year !== 'all') {
+          wtFilter.academic_year = Number(academic_year) || academic_year;
+        }
+
+        const weeklyRows = await WeeklyTracker.find(wtFilter).sort({ order_index: 1, created_at: -1 });
+        const allowedSections = req.body.included_task_sections || {
+          drive_in_progress: true,
+          companies_in_drive: true,
+          company_in_progress: true,
+        };
+
+        const actionableRows = weeklyRows.filter((r) => {
+          const sec = String(r.pipeline_section || '').toLowerCase();
+          if (sec === 'drive_in_progress') {
+            return allowedSections.drive_in_progress !== false;
+          }
+          if (sec === 'companies_in_drive' || sec === 'in_drive' || sec === 'upcoming_drives') {
+            return allowedSections.companies_in_drive !== false;
+          }
+          if (sec === 'in_progress' || sec === 'pipeline' || sec === 'company_in_progress') {
+            return allowedSections.company_in_progress !== false;
+          }
+          return false;
+        });
+
+        pendingTasksData = actionableRows.map((r, idx) => {
+          const rowAny = r as any;
+          const statusText = (r.current_status_text || rowAny.status || '').trim();
+          const finalStatus = statusText || 'In Progress';
+          const roleVal = (r.job_role || rowAny.role || '').trim();
+          const ctcVal = (r.ctc_lpa || rowAny.ctc || '').trim();
+          const isHl = highlightedIds.has(String(r._id)) || highlightedIndices.has(idx);
+          const hlColor = colorMap[String(r._id)] || colorMap[idx] || defaultColor;
+
+          let mappedSec = 'company_in_progress';
+          const sec = String(r.pipeline_section || '').toLowerCase();
+          if (sec === 'drive_in_progress') mappedSec = 'drive_in_progress';
+          else if (sec === 'companies_in_drive' || sec === 'in_drive' || sec === 'upcoming_drives') mappedSec = 'companies_in_drive';
+          else mappedSec = 'company_in_progress';
+
+          return {
+            _id: String(r._id),
+            s_no: idx + 1,
+            company_name: r.company_name,
+            role: roleVal,
+            job_role: roleVal,
+            ctc: ctcVal,
+            ctc_lpa: ctcVal,
+            status: finalStatus,
+            current_status: finalStatus,
+            action_to_be_taken: finalStatus,
+            remarks: statusText,
+            task_section: mappedSec,
             is_highlighted: isHl,
             highlight_color: isHl ? hlColor : undefined,
           };
         });
       }
+
+      const driveInProgList = pendingTasksData.filter((t) => t.task_section === 'drive_in_progress');
+      const compInDriveList = pendingTasksData.filter((t) => t.task_section === 'companies_in_drive');
+      const compInProgList = pendingTasksData.filter((t) => t.task_section === 'company_in_progress' || (!t.task_section && !driveInProgList.includes(t) && !compInDriveList.includes(t)));
 
       const reportDocument = {
         template_type: 'pending_tasks',
@@ -5024,11 +5061,18 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         },
         sections: {
           pending_tasks: pendingTasksData,
+          drive_in_progress: driveInProgList,
+          companies_in_drive: compInDriveList,
+          company_in_progress: compInProgList,
         },
         remarks: custom_remarks || 'All pending action items are actively tracked with institutions and corporate HRs for prompt closure.',
-        included_sections: included_sections || {
+        included_sections: {
           pending_tasks: true,
+          drive_in_progress: driveInProgList.length > 0,
+          companies_in_drive: compInDriveList.length > 0,
+          company_in_progress: compInProgList.length > 0,
           remarks: true,
+          ...(included_sections || {}),
         },
       };
 
