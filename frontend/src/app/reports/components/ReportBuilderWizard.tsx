@@ -81,12 +81,83 @@ export function getCtcBadgeColor(ctcStr: string | undefined | null): string {
   return 'bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800';
 }
 
+export function extractPendingTasksFromWeeklyTracker(data: any): any[] {
+  if (!data) return [];
+  
+  let allRows: any[] = [];
+  if (data.sections) {
+    const sec = data.sections;
+    const prioritizedKeys = [
+      'drive_in_progress',
+      'in_drive',
+      'upcoming_drives',
+      'companies_in_drive',
+      'in_progress',
+      'pipeline',
+    ];
+    
+    const seenIds = new Set<string>();
+    prioritizedKeys.forEach((key) => {
+      const rows = sec[key]?.rows || [];
+      rows.forEach((r: any) => {
+        const id = String(r._id || r.id || r.company_id || r.company_name);
+        if (!seenIds.has(id)) {
+          seenIds.add(id);
+          allRows.push({ ...r, _sectionKey: key });
+        }
+      });
+    });
+  } else if (Array.isArray(data)) {
+    allRows = data.map((r: any) => ({ ...r, _sectionKey: r.pipeline_section }));
+  }
+
+  // Filter strictly to the 3 sections alone
+  const allowedSectionRows = allRows.filter((r) => {
+    const sec = String(r.pipeline_section || r._sectionKey || '').toLowerCase();
+    if (sec === 'drive_in_progress') return true;
+    if (sec === 'companies_in_drive' || sec === 'in_drive' || sec === 'upcoming_drives') return true;
+    if (sec === 'in_progress' || sec === 'pipeline' || sec === 'company_in_progress') return true;
+    return false;
+  });
+
+  return allowedSectionRows.map((r, idx) => {
+    const sec = String(r.pipeline_section || r._sectionKey || '').toLowerCase();
+    let sectionGroup: 'drive_in_progress' | 'companies_in_drive' | 'company_in_progress' = 'company_in_progress';
+    if (sec === 'drive_in_progress') {
+      sectionGroup = 'drive_in_progress';
+    } else if (sec === 'companies_in_drive' || sec === 'in_drive' || sec === 'upcoming_drives') {
+      sectionGroup = 'companies_in_drive';
+    } else {
+      sectionGroup = 'company_in_progress';
+    }
+
+    const statusText = (r.current_status_text || r.status || '').trim();
+    const finalStatus = statusText || 'In Progress';
+    const role = (r.job_role || r.role || '').trim();
+    const ctc = (r.ctc_lpa || r.ctc || r.package_details || '').trim();
+
+    return {
+      _id: String(r._id || r.id || r.company_id || `task_${idx + 1}`),
+      serial_no: idx + 1,
+      company_name: r.company_name || 'Corporate Partner',
+      role: role,
+      job_role: role,
+      ctc: ctc,
+      ctc_lpa: ctc,
+      status: finalStatus,
+      current_status: finalStatus,
+      action_to_be_taken: finalStatus,
+      remarks: statusText || r.remarks || '',
+      task_section: sectionGroup,
+    };
+  });
+}
+
 interface College {
   _id: string;
   college_name: string;
   college_code: string;
 }
-
 
 const ACTIVE_17_COLLEGE_CODES = [
   'KLU', 'PSNA', 'KIOT', 'DSU', 'SMVEC', 'AIHT', 'ACET', 'NEHRU',
@@ -186,22 +257,90 @@ export function ReportBuilderWizard({
     return readSessionUser()?.full_name || 'Placement Coordinator';
   });
 
-  // Pending Tasks State for row highlighting during report creation
-  const [pendingTasksList, setPendingTasksList] = useState<any[]>([]);
+  // Pending Tasks State for row highlighting, section filtering, and tabbed selection
+  const [rawPendingTasksList, setRawPendingTasksList] = useState<any[]>([]);
+  const [pendingTaskSections, setPendingTaskSections] = useState<{
+    drive_in_progress: boolean;
+    companies_in_drive: boolean;
+    company_in_progress: boolean;
+  }>({
+    drive_in_progress: true,
+    companies_in_drive: true,
+    company_in_progress: true,
+  });
+  const [pendingActiveTab, setPendingActiveTab] = useState<'all' | 'drive_in_progress' | 'companies_in_drive' | 'company_in_progress'>('all');
+  const [pendingSelectedIds, setPendingSelectedIds] = useState<Set<string>>(new Set());
   const [loadingPendingTasks, setLoadingPendingTasks] = useState<boolean>(false);
   const [highlightedTaskIds, setHighlightedTaskIds] = useState<Set<string>>(new Set());
   const [highlightColor, setHighlightColor] = useState<string>('#fef08a'); // Fluorescent Yellow
   const [highlightColorMap, setHighlightColorMap] = useState<Record<string, string>>({});
 
+  // Derived pending tasks list filtered by user-checked sections
+  const pendingTasksList = useMemo(() => {
+    return rawPendingTasksList
+      .filter((t) => {
+        if (t.task_section === 'drive_in_progress' && !pendingTaskSections.drive_in_progress) return false;
+        if (t.task_section === 'companies_in_drive' && !pendingTaskSections.companies_in_drive) return false;
+        if (t.task_section === 'company_in_progress' && !pendingTaskSections.company_in_progress) return false;
+        return true;
+      })
+      .map((t, idx) => ({
+        ...t,
+        serial_no: idx + 1,
+      }));
+  }, [rawPendingTasksList, pendingTaskSections]);
+
+  const displayedPendingTasks = useMemo(() => {
+    if (pendingActiveTab === 'all') return pendingTasksList;
+    return pendingTasksList.filter((t) => t.task_section === pendingActiveTab);
+  }, [pendingTasksList, pendingActiveTab]);
+
+  const countDriveInProgress = useMemo(
+    () => rawPendingTasksList.filter((t) => t.task_section === 'drive_in_progress').length,
+    [rawPendingTasksList]
+  );
+  const countCompaniesInDrive = useMemo(
+    () => rawPendingTasksList.filter((t) => t.task_section === 'companies_in_drive').length,
+    [rawPendingTasksList]
+  );
+  const countCompanyInProgress = useMemo(
+    () => rawPendingTasksList.filter((t) => t.task_section === 'company_in_progress').length,
+    [rawPendingTasksList]
+  );
+
+  const pendingTabCounts = useMemo(() => {
+    const isRowIncluded = (t: any) => pendingSelectedIds.has(t._id);
+    const driveRows = rawPendingTasksList.filter((t) => t.task_section === 'drive_in_progress');
+    const inDriveRows = rawPendingTasksList.filter((t) => t.task_section === 'companies_in_drive');
+    const inProgRows = rawPendingTasksList.filter((t) => t.task_section === 'company_in_progress');
+
+    return {
+      all: {
+        total: pendingTasksList.length,
+        included: pendingTasksList.filter(isRowIncluded).length,
+      },
+      drive_in_progress: {
+        total: driveRows.length,
+        included: driveRows.filter(isRowIncluded).length,
+      },
+      companies_in_drive: {
+        total: inDriveRows.length,
+        included: inDriveRows.filter(isRowIncluded).length,
+      },
+      company_in_progress: {
+        total: inProgRows.length,
+        included: inProgRows.filter(isRowIncluded).length,
+      },
+    };
+  }, [rawPendingTasksList, pendingTasksList, pendingSelectedIds]);
+
   // Selected Month for Month-End reports
   const [selectedMonth, setSelectedMonth] = useState('2026-08');
 
-  // Dynamic Interactive Date Range Calendar Selection
-  const [startDate, setStartDate] = useState('2026-08-21');
-  const [endDate, setEndDate] = useState('2026-08-27');
-  const [weekLabel, setWeekLabel] = useState(
-    () => formatPeriodFromDates('2026-08-21', '2026-08-27') || '21 Aug – 27 Aug 2026'
-  );
+  // Dynamic Interactive Date Range Calendar Selection (Blank by default)
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [weekLabel, setWeekLabel] = useState('');
   const [theme, setTheme] = useState('blue');
   const [customRemarks, setCustomRemarks] = useState(() => {
     if (initialTemplateType === 'pending_tasks') {
@@ -227,7 +366,7 @@ export function ReportBuilderWizard({
       s.active_leads = true;
       s.remarks = true;
     } else if (initialTemplateType === 'month_end') {
-      s.kpi_summary = true;
+      s.kpi_summary = false;
       s.completed_companies = true;
       s.company_conversions = true;
       s.companies_in_drive = true;
@@ -297,7 +436,6 @@ export function ReportBuilderWizard({
 
   // ── Weekly Tracker Filters & Preview State ──
   const [weeklyMinCtc, setWeeklyMinCtc] = useState<number | null>(null);
-  const [weeklyCustomCtcInput, setWeeklyCustomCtcInput] = useState<string>('');
   const [weeklyIncludeCompetitive, setWeeklyIncludeCompetitive] = useState<boolean>(false);
   const [weeklyCompanySearch, setWeeklyCompanySearch] = useState<string>('');
   const [weeklyCompanyType, setWeeklyCompanyType] = useState<string>('all');
@@ -524,8 +662,7 @@ export function ReportBuilderWizard({
   const ctcSelectOptions = useMemo(() => {
     return availableCtcBrackets.map((b) => ({
       value: b.value === null ? 'all' : String(b.value),
-      label: b.value === null ? 'All CTC Packages (Any Range)' : `≥ ${b.value} LPA onwards`,
-      badge: `${b.count} ${b.count === 1 ? 'drive' : 'drives'}`,
+      label: b.value === null ? 'All CTC Packages' : `>= ${b.value} LPA`,
     }));
   }, [availableCtcBrackets]);
 
@@ -683,7 +820,6 @@ export function ReportBuilderWizard({
 
   const handleResetWeeklyFilters = () => {
     setWeeklyMinCtc(null);
-    setWeeklyCustomCtcInput('');
     setWeeklyIncludeCompetitive(false);
     setWeeklyCompanySearch('');
     setWeeklyCompanyType('all');
@@ -710,7 +846,7 @@ export function ReportBuilderWizard({
         setCustomRemarks('Comprehensive active corporate roster curated for campus recruitment engagements.');
       } else if (initialTemplateType === 'month_end') {
         setSections({
-          kpi_summary: true,
+          kpi_summary: false,
           completed_companies: true,
           company_conversions: true,
           companies_in_drive: true,
@@ -743,31 +879,72 @@ export function ReportBuilderWizard({
     }
   }, [initialTemplateType, initialCollegeId]);
 
-  // ── Auto-load Pending Tasks when template is pending_tasks and college is selected ──
+  // ── Auto-load Pending Tasks from Weekly Tracker when template is pending_tasks and college is selected ──
   useEffect(() => {
     if (templateType !== 'pending_tasks') return;
     if (!collegeId || collegeId === 'all') {
-      setPendingTasksList([]);
+      setRawPendingTasksList([]);
       return;
     }
     let isSubscribed = true;
     setLoadingPendingTasks(true);
-    apiFetch(`/pending-tasks?college_id=${collegeId}`)
+    const params = new URLSearchParams();
+    params.set('college_id', collegeId);
+    if (academicYear && academicYear !== 'all') {
+      params.set('academic_year', academicYear);
+    }
+    apiFetch(`/weekly-tracker?${params.toString()}`)
       .then((res) => {
         if (!isSubscribed) return;
         if (res.success && res.data) {
-          const list = (res.data as any).tasks || [];
-          setPendingTasksList(list);
+          const extracted = extractPendingTasksFromWeeklyTracker(res.data);
+          setRawPendingTasksList(extracted);
+          setPendingSelectedIds(new Set()); // By default, nothing ticked
+        } else {
+          setRawPendingTasksList([]);
+          setPendingSelectedIds(new Set());
         }
       })
-      .catch((err) => console.error('[ReportBuilder] Failed to load pending tasks:', err))
+      .catch((err) => {
+        console.error('[ReportBuilder] Failed to load weekly tracker pending tasks:', err);
+        if (isSubscribed) {
+          setRawPendingTasksList([]);
+          setPendingSelectedIds(new Set());
+        }
+      })
       .finally(() => {
         if (isSubscribed) setLoadingPendingTasks(false);
       });
     return () => {
       isSubscribed = false;
     };
-  }, [templateType, collegeId]);
+  }, [templateType, collegeId, academicYear]);
+
+  const handleTogglePendingTaskRow = (taskId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setPendingSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
+
+  const handleSelectAllDisplayedPendingTasks = () => {
+    setPendingSelectedIds((prev) => {
+      const next = new Set(prev);
+      displayedPendingTasks.forEach((t) => next.add(t._id));
+      return next;
+    });
+  };
+
+  const handleDeselectAllDisplayedPendingTasks = () => {
+    setPendingSelectedIds((prev) => {
+      const next = new Set(prev);
+      displayedPendingTasks.forEach((t) => next.delete(t._id));
+      return next;
+    });
+  };
 
   const handleToggleRowHighlight = (taskId: string) => {
     const nextSet = new Set(highlightedTaskIds);
@@ -841,7 +1018,7 @@ export function ReportBuilderWizard({
       setCustomRemarks('Comprehensive active corporate roster curated for campus recruitment engagements.');
     } else if (newType === 'month_end') {
       setSections({
-        kpi_summary: true,
+        kpi_summary: false,
         completed_companies: true,
         company_conversions: true,
         companies_in_drive: true,
@@ -894,12 +1071,7 @@ export function ReportBuilderWizard({
       }
     }
 
-    // 2. Graduating Academic Year (Mandatory for Weekly Reports only, Optional for Active Leads & Month-End)
-    if (templateType === 'weekly_placement') {
-      if (!academicYear || academicYear.trim() === '') {
-        errors.push('Graduating Academic Year must be selected.');
-      }
-    }
+    // 2. Graduating Academic Year (Optional for all report types)
 
     // 2b. Active Leads Stream Selection (At least one stream must be active)
     if (templateType === 'active_leads') {
@@ -930,9 +1102,9 @@ export function ReportBuilderWizard({
       const effectiveWeekLabel = (!startDate || !endDate)
         ? (weekLabel && !weekLabel.toLowerCase().includes('select') && !weekLabel.toLowerCase().includes('cumulative') ? weekLabel : '')
         : (weekLabel && !weekLabel.toLowerCase().includes('cumulative') ? weekLabel : '');
-      // Build custom weekly companies filtered payload if weekly_placement template
+      // Build custom weekly companies filtered payload if multi-college weekly placement template
       let customWeeklyCompaniesPayload: any = undefined;
-      if (templateType === 'weekly_placement') {
+      if (templateType === 'weekly_placement' && isMultiWeekly) {
         const filterExcluded = (arr: any[]) =>
           (arr || []).filter(
             (r: any) => !weeklyExcludedIds.has(String(r._id || r.company_id || r.company_name))
@@ -965,36 +1137,43 @@ export function ReportBuilderWizard({
           active_leads_columns: templateType === 'active_leads' ? activeLeadsColumns : undefined,
           include_prepared_by: includePreparedBy,
           prepared_by: includePreparedBy ? preparedByName.trim() : '',
-          min_ctc: weeklyMinCtc,
-          include_competitive_ctc: weeklyIncludeCompetitive,
-          company_name_filter: weeklyCompanySearch.trim() || undefined,
-          company_type_filter: weeklyCompanyType !== 'all' ? weeklyCompanyType : undefined,
-          status_filter: weeklyStatusFilter.trim() || undefined,
+          min_ctc: isMultiWeekly ? weeklyMinCtc : undefined,
+          include_competitive_ctc: isMultiWeekly ? weeklyIncludeCompetitive : undefined,
+          company_name_filter: isMultiWeekly ? (weeklyCompanySearch.trim() || undefined) : undefined,
+          company_type_filter: isMultiWeekly ? (weeklyCompanyType !== 'all' ? weeklyCompanyType : undefined) : undefined,
+          status_filter: isMultiWeekly ? (weeklyStatusFilter.trim() || undefined) : undefined,
           custom_weekly_companies: customWeeklyCompaniesPayload,
           included_sections: {
             ...sections,
             ...(templateType === 'active_leads' ? { active_leads: true } : {}),
             ...(templateType === 'pending_tasks' ? { pending_tasks: true } : {}),
           },
+          included_task_sections: pendingTaskSections,
           included_kpi_cards: kpiCards,
           kpi_cards: kpiCards,
           custom_remarks: customRemarks,
           highlighted_task_ids: Array.from(highlightedTaskIds),
           highlight_color_map: highlightColorMap,
           default_highlight_color: highlightColor,
-          custom_pending_tasks: templateType === 'pending_tasks' && pendingTasksList.length > 0 ? pendingTasksList.map((t, idx) => ({
-            _id: t._id,
-            s_no: t.serial_no || idx + 1,
-            company_name: t.company_name,
-            jd_received_date: t.jd_received_date ? new Date(t.jd_received_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
-            db_shared_date: t.db_shared_date ? new Date(t.db_shared_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
-            current_status: t.current_status || 'Database Pending',
-            action_to_be_taken: t.action_to_be_taken || '',
-            drive_date: t.drive_date ? new Date(t.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
-            remarks: t.remarks || '',
-            is_highlighted: highlightedTaskIds.has(t._id),
-            highlight_color: highlightColorMap[t._id] || highlightColor,
-          })) : undefined,
+          custom_pending_tasks: templateType === 'pending_tasks' && pendingTasksList.length > 0 ? pendingTasksList
+            .filter((t) => pendingSelectedIds.has(t._id))
+            .map((t, idx) => ({
+              _id: t._id,
+              s_no: idx + 1,
+              serial_no: idx + 1,
+              company_name: t.company_name,
+              role: t.role || t.job_role || '',
+              job_role: t.role || t.job_role || '',
+              ctc: t.ctc || t.ctc_lpa || '',
+              ctc_lpa: t.ctc || t.ctc_lpa || '',
+              status: t.status || t.current_status || t.current_status_text || 'In Progress',
+              current_status: t.current_status || t.status || 'In Progress',
+              action_to_be_taken: t.action_to_be_taken || t.status || '',
+              remarks: t.remarks || '',
+              task_section: t.task_section || 'company_in_progress',
+              is_highlighted: highlightedTaskIds.has(t._id),
+              highlight_color: highlightColorMap[t._id] || highlightColor,
+            })) : undefined,
         }),
       });
       if (res.success && res.data) {
@@ -1013,10 +1192,7 @@ export function ReportBuilderWizard({
   // Section items tailored specifically to the active category with live company details
   const getSectionsConfig = () => {
     if (templateType === 'pending_tasks') {
-      return [
-        { key: 'pending_tasks', label: 'Placement Pending Tasks Table', icon: ListTodo, desc: 'Complete breakdown of pending drives, actions, and remarks' },
-        { key: 'remarks', label: 'Coordinator Remarks & Observations', icon: PenLine, desc: 'Action items summary and leadership notes' },
-      ];
+      return [];
     }
     if (templateType === 'active_leads') {
       return [
@@ -1028,7 +1204,6 @@ export function ReportBuilderWizard({
           isKpiSection: true,
           kpiList: ACTIVE_LEADS_KPIS,
         },
-        { key: 'remarks', label: 'Notes', icon: PenLine, desc: 'Corporate relationship overview and strategic notes' },
       ];
     }
     if (templateType === 'month_end') {
@@ -1081,16 +1256,10 @@ export function ReportBuilderWizard({
           companies: weeklyCompanies.on_hold_by_hr,
           badgeColor: 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
         },
-        {
-          key: 'remarks',
-          label: 'Coordinator Monthly Observations',
-          icon: PenLine,
-          desc: 'Operational summary and placement review notes',
-        },
       ];
     }
 
-    const list: any[] = [
+    return [
       {
         key: 'completed_companies',
         label: '1. Companies Completed',
@@ -1164,15 +1333,6 @@ export function ReportBuilderWizard({
         badgeColor: 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700',
       },
     ];
-
-    list.push({
-      key: 'remarks',
-      label: 'Coordinator Remarks & Observations',
-      icon: PenLine,
-      desc: 'Operational observations and placement overview',
-    });
-
-    return list;
   };
 
   return (
@@ -1250,14 +1410,14 @@ export function ReportBuilderWizard({
             )}
             <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
               {templateType === 'active_leads'
-                ? 'Target Graduating Batch (Optional)'
-                : templateType === 'month_end'
-                ? 'Institutional Scope & Batch'
+                ? 'Select Target Batch'
+                : templateType === 'pending_tasks'
+                ? 'Target Institution Scope'
                 : 'Institutional Scope & Batch'}
             </h2>
           </div>
 
-          <div className={`grid gap-4 ${templateType === 'active_leads' ? 'grid-cols-1 max-w-md' : 'grid-cols-1 md:grid-cols-2'}`}>
+          <div className={`grid gap-4 ${templateType === 'active_leads' ? 'grid-cols-1 max-w-md' : templateType === 'pending_tasks' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
             {/* Target College (For Weekly Placement, Month-End, Pending Tasks) */}
             {templateType !== 'active_leads' && (
               <div className={templateType === 'weekly_placement' && weeklyTargetMode === 'group' ? 'md:col-span-2' : ''}>
@@ -1462,54 +1622,45 @@ export function ReportBuilderWizard({
               </div>
             )}
 
-            {/* Graduating Academic Year / Batch */}
-            <div>
-              <label className="block text-xs font-semibold text-fg mb-1.5">
-                Graduating Academic Batch {templateType === 'month_end' || templateType === 'active_leads' ? <span className="text-fg-subtle text-[11px] font-normal">(Optional)</span> : <span className="text-rose-500 font-bold ml-0.5">*</span>}
-              </label>
-              {(() => {
-                const isMissingBatch =
-                  validationErrors.length > 0 &&
-                  templateType === 'weekly_placement' &&
-                  (!academicYear || academicYear.trim() === '');
+            {/* Graduating Academic Year / Batch (Hidden for Pending Tasks) */}
+            {templateType !== 'pending_tasks' && (
+              <div>
+                <label className="block text-xs font-semibold text-fg mb-1.5">
+                  Graduating Academic Batch
+                </label>
+                {(() => {
+                  const batchOptions = [
+                    { value: 'all', label: 'All Batches' },
+                    { value: '2026', label: '2026' },
+                    { value: '2027', label: '2027' },
+                    { value: '2028', label: '2028' },
+                    { value: '2029', label: '2029' },
+                    { value: '2030', label: '2030' },
+                    { value: '2031', label: '2031' },
+                    { value: '2032', label: '2032' },
+                    { value: '2033', label: '2033' },
+                    { value: '2034', label: '2034' },
+                    { value: '2035', label: '2035' },
+                  ];
 
-                const batchOptions = [
-                  { value: 'all', label: 'All Batches' },
-                  { value: '2026', label: '2026' },
-                  { value: '2027', label: '2027' },
-                  { value: '2028', label: '2028' },
-                  { value: '2029', label: '2029' },
-                  { value: '2030', label: '2030' },
-                  { value: '2031', label: '2031' },
-                  { value: '2032', label: '2032' },
-                  { value: '2033', label: '2033' },
-                  { value: '2034', label: '2034' },
-                  { value: '2035', label: '2035' },
-                ];
-
-                return (
-                  <div>
-                    <SmoothSelect
-                      value={academicYear || 'all'}
-                      onChange={(val) => {
-                        setAcademicYear(val);
-                        setValidationErrors([]);
-                      }}
-                      placeholder={templateType === 'active_leads' ? 'All Batches (Optional)' : 'Select Year'}
-                      icon={GraduationCap}
-                      title="Graduating Academic Batch"
-                      options={batchOptions}
-                      error={isMissingBatch}
-                    />
-                    {isMissingBatch && (
-                      <p className="text-[11px] text-rose-500 font-medium mt-1 animate-fadeIn">
-                        Please select a graduating batch year.
-                      </p>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
+                  return (
+                    <div>
+                      <SmoothSelect
+                        value={academicYear || 'all'}
+                        onChange={(val) => {
+                          setAcademicYear(val);
+                          setValidationErrors([]);
+                        }}
+                        placeholder="All Batches"
+                        icon={GraduationCap}
+                        title="Graduating Academic Batch"
+                        options={batchOptions}
+                      />
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1756,7 +1907,7 @@ export function ReportBuilderWizard({
               <div className="flex items-center gap-2">
                 <Highlighter size={16} className="text-amber-500 shrink-0" />
                 <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
-                  Placement Pending Tasks & Row Highlighting
+                  Placement Pending Tasks & Section Selection
                 </h2>
               </div>
               <div className="flex items-center gap-2">
@@ -1765,26 +1916,96 @@ export function ReportBuilderWizard({
                     <Loader2 size={12} className="animate-spin" /> Loading tasks…
                   </span>
                 )}
-                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full border bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-200">
-                  {highlightedTaskIds.size} of {pendingTasksList.length} Tasks Highlighted
-                </span>
               </div>
             </div>
 
-            {/* Explanatory Info Card */}
-            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-3 shadow-2xs">
-              <span className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0 mt-0.5">
-                <Highlighter size={15} />
-              </span>
-              <div className="flex-1 min-w-0 space-y-1">
-                <p className="font-bold leading-tight">
-                  Selective Row Highlighter for College-Side Pending Items
-                </p>
-                <p className="text-[11px] text-amber-800/90 dark:text-amber-300/90 leading-relaxed font-normal">
-                  If there are totally 5 tasks but only 3 are pending cases from the college side (e.g. <strong className="font-semibold underline">Database Pending</strong>), you can highlight those rows here in your chosen shade. The highlight is preserved across <strong className="font-semibold">Live Preview</strong>, <strong className="font-semibold">Excel</strong>, <strong className="font-semibold">Image</strong>, and <strong className="font-semibold">PDF</strong> exports.
-                </p>
+            {/* Section Filter Pills / Tabs (Same as VK Weekly Report) */}
+            {collegeId && collegeId !== 'all' && (
+              <div className="space-y-3">
+                {/* 4 Interactive Section Filter Tabs */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+                  <button
+                    type="button"
+                    onClick={() => setPendingActiveTab('all')}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer border ${
+                      pendingActiveTab === 'all'
+                        ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                        : 'bg-surface border-border text-fg-muted hover:text-fg hover:bg-surface-raised'
+                    }`}
+                  >
+                    <Layers size={14} />
+                    <span>All Sections</span>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
+                      pendingActiveTab === 'all'
+                        ? 'bg-white/20 text-white font-black'
+                        : 'bg-surface-sunken border border-border text-fg-subtle'
+                    }`}>
+                      {pendingTabCounts.all.included}/{pendingTabCounts.all.total}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPendingActiveTab('drive_in_progress')}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer border ${
+                      pendingActiveTab === 'drive_in_progress'
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                        : 'bg-surface border-border text-fg-muted hover:text-fg hover:bg-surface-raised'
+                    }`}
+                  >
+                    <Zap size={14} className={pendingActiveTab === 'drive_in_progress' ? 'text-white' : 'text-amber-500'} />
+                    <span>Drive in Progress</span>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
+                      pendingActiveTab === 'drive_in_progress'
+                        ? 'bg-white/20 text-white font-black'
+                        : 'bg-surface-sunken border border-border text-fg-subtle'
+                    }`}>
+                      {pendingTabCounts.drive_in_progress.included}/{pendingTabCounts.drive_in_progress.total}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPendingActiveTab('companies_in_drive')}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer border ${
+                      pendingActiveTab === 'companies_in_drive'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                        : 'bg-surface border-border text-fg-muted hover:text-fg hover:bg-surface-raised'
+                    }`}
+                  >
+                    <Calendar size={14} className={pendingActiveTab === 'companies_in_drive' ? 'text-white' : 'text-indigo-500'} />
+                    <span>Companies in Drive</span>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
+                      pendingActiveTab === 'companies_in_drive'
+                        ? 'bg-white/20 text-white font-black'
+                        : 'bg-surface-sunken border border-border text-fg-subtle'
+                    }`}>
+                      {pendingTabCounts.companies_in_drive.included}/{pendingTabCounts.companies_in_drive.total}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPendingActiveTab('company_in_progress')}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer border ${
+                      pendingActiveTab === 'company_in_progress'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                        : 'bg-surface border-border text-fg-muted hover:text-fg hover:bg-surface-raised'
+                    }`}
+                  >
+                    <Clock size={14} className={pendingActiveTab === 'company_in_progress' ? 'text-white' : 'text-blue-500'} />
+                    <span>Company in Progress</span>
+                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
+                      pendingActiveTab === 'company_in_progress'
+                        ? 'bg-white/20 text-white font-black'
+                        : 'bg-surface-sunken border border-border text-fg-subtle'
+                    }`}>
+                      {pendingTabCounts.company_in_progress.included}/{pendingTabCounts.company_in_progress.total}
+                    </span>
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Highlighting Toolbar: Palette Swatches & Quick Actions */}
             <div className="p-3.5 rounded-xl bg-surface-sunken/80 border border-border flex items-center justify-between flex-wrap gap-3">
@@ -1824,21 +2045,11 @@ export function ReportBuilderWizard({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleAutoHighlightCollegePending}
-                  title="Auto-highlight pending tasks from college side (DB Pending, Database Pending, etc.)"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-800 dark:text-amber-200 border border-amber-500/40 transition-all cursor-pointer shadow-2xs active:scale-[0.992]"
-                >
-                  <Sparkles size={13} className="text-amber-600" />
-                  <span>Auto-Highlight DB Pending</span>
-                </button>
-
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={handleHighlightAllTasks}
-                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-fg-subtle hover:text-fg hover:bg-surface border border-border transition-all cursor-pointer"
+                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 border border-amber-500/30 transition-all cursor-pointer"
                 >
                   Highlight All
                 </button>
@@ -1855,110 +2066,233 @@ export function ReportBuilderWizard({
               </div>
             </div>
 
-            {/* Interactive Preview Table in Wizard */}
-            <div className="border border-border rounded-xl bg-surface overflow-hidden shadow-2xs">
-              {loadingPendingTasks ? (
-                <div className="p-8 text-center text-fg-subtle flex items-center justify-center gap-2">
-                  <Loader2 size={16} className="animate-spin text-primary" />
-                  <span className="text-xs font-medium">Fetching pending tasks for selected institution...</span>
-                </div>
-              ) : !collegeId || collegeId === 'all' ? (
-                <div className="p-8 text-center text-fg-subtle">
-                  <Building2 size={24} className="mx-auto mb-2 opacity-50 text-primary" />
-                  <p className="text-xs font-semibold">Please pick a Target Institution above to load and highlight its pending tasks.</p>
-                </div>
-              ) : pendingTasksList.length === 0 ? (
-                <div className="p-8 text-center text-fg-subtle">
-                  <ListTodo size={24} className="mx-auto mb-2 opacity-50 text-fg-subtle" />
-                  <p className="text-xs font-semibold">No active pending tasks recorded for this college.</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto max-h-[380px] overflow-y-auto">
-                  <table className="w-full text-xs text-center border-collapse">
-                    <thead className="sticky top-0 z-10 bg-surface-sunken border-b border-border text-[10.5px] font-bold text-fg-muted uppercase tracking-wider select-none">
-                      <tr>
-                        <th className="py-2.5 px-2 w-10 text-center font-mono">#</th>
-                        <th className="py-2.5 px-3 text-center min-w-[160px]">Company Name</th>
-                        <th className="py-2.5 px-2 min-w-[100px] text-center whitespace-nowrap">JD Received Date</th>
-                        <th className="py-2.5 px-2 min-w-[100px] text-center whitespace-nowrap">DB Shared Date</th>
-                        <th className="py-2.5 px-2 min-w-[130px] text-center">Current Status</th>
-                        <th className="py-2.5 px-3 min-w-[200px] text-center">Remarks / Next Action</th>
-                        <th className="py-2.5 px-2 min-w-[100px] text-center whitespace-nowrap">Drive Date</th>
-                        <th className="py-2.5 px-3 w-28 text-center">Highlight</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/60">
-                      {pendingTasksList.map((t: any, idx: number) => {
-                        const isHl = highlightedTaskIds.has(t._id);
-                        const rowHlColor = highlightColorMap[t._id] || highlightColor;
-                        return (
-                          <tr
-                            key={t._id || idx}
-                            style={isHl ? { backgroundColor: rowHlColor } : undefined}
-                            className={`transition-colors cursor-pointer ${
-                              isHl
-                                ? 'font-semibold text-slate-950 shadow-2xs'
-                                : idx % 2 === 0
-                                ? 'bg-surface hover:bg-surface-sunken/60'
-                                : 'bg-surface-sunken/30 hover:bg-surface-sunken/60'
-                            }`}
-                            onClick={() => handleToggleRowHighlight(t._id)}
-                          >
-                            <td className="py-2 px-2 text-center font-mono font-bold" style={{ backgroundColor: isHl ? rowHlColor : undefined }}>
-                              {t.serial_no || idx + 1}
-                            </td>
-                            <td className="py-2 px-3 text-center font-bold" style={{ backgroundColor: isHl ? rowHlColor : undefined }}>
-                              {t.company_name}
-                            </td>
-                            <td className="py-2 px-2 text-center whitespace-nowrap font-mono text-[11px]" style={{ backgroundColor: isHl ? rowHlColor : undefined }}>
-                              {t.jd_received_date ? new Date(t.jd_received_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                            </td>
-                            <td className="py-2 px-2 text-center whitespace-nowrap font-mono text-[11px]" style={{ backgroundColor: isHl ? rowHlColor : undefined }}>
-                              {t.db_shared_date ? new Date(t.db_shared_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                            </td>
-                            <td className="py-2 px-2 text-center" style={{ backgroundColor: isHl ? rowHlColor : undefined }}>
-                              <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${
-                                isHl
-                                  ? 'bg-black/10 border-black/20 text-slate-900'
-                                  : t.current_status?.toLowerCase().includes('pending')
-                                  ? 'bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300'
-                                  : 'bg-surface border-border text-fg'
-                              }`}>
-                                {t.current_status || 'Database Pending'}
-                              </span>
-                            </td>
-                            <td className="py-2 px-3 text-center leading-snug" style={{ backgroundColor: isHl ? rowHlColor : undefined }}>
-                              <span className="font-semibold block">{t.action_to_be_taken || '—'}</span>
-                              {t.remarks && <span className="text-[10px] opacity-75 italic block mt-0.5">Note: {t.remarks}</span>}
-                            </td>
-                            <td className="py-2 px-2 text-center whitespace-nowrap font-mono text-[11px]" style={{ backgroundColor: isHl ? rowHlColor : undefined }}>
-                              {t.drive_date ? new Date(t.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                            </td>
-                            <td className="py-2 px-3 text-center" style={{ backgroundColor: isHl ? rowHlColor : undefined }}>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleToggleRowHighlight(t._id);
-                                }}
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all shadow-2xs ${
-                                  isHl
-                                    ? 'bg-slate-900 text-white hover:bg-slate-800'
-                                    : 'bg-surface hover:bg-amber-100 hover:text-amber-800 border border-border text-fg-subtle'
-                                }`}
-                              >
-                                <Highlighter size={12} className={isHl ? 'fill-amber-400 text-amber-400' : ''} />
-                                <span>{isHl ? 'Highlighted' : 'Highlight'}</span>
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+            {/* Interactive Preview Tables in Wizard (Section-wise 3 Tables) */}
+            {loadingPendingTasks ? (
+              <div className="border border-border rounded-xl bg-surface p-8 text-center text-fg-subtle flex items-center justify-center gap-2 shadow-2xs">
+                <Loader2 size={16} className="animate-spin text-primary" />
+                <span className="text-xs font-medium">Fetching pending tasks for selected institution...</span>
+              </div>
+            ) : !collegeId || collegeId === 'all' ? (
+              <div className="border border-border rounded-xl bg-surface p-8 text-center text-fg-subtle shadow-2xs">
+                <Building2 size={24} className="mx-auto mb-2 opacity-50 text-primary" />
+                <p className="text-xs font-semibold">Please pick a Target Institution above to load and customize its pending tasks.</p>
+              </div>
+            ) : pendingTasksList.length === 0 ? (
+              <div className="border border-border rounded-xl bg-surface p-8 text-center text-fg-subtle space-y-1 shadow-2xs">
+                <ListTodo size={24} className="mx-auto mb-2 opacity-50 text-fg-subtle" />
+                <p className="text-xs font-semibold">No active pending tasks recorded for this college.</p>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {[
+                  {
+                    key: 'drive_in_progress' as const,
+                    title: 'DRIVE IN PROGRESS',
+                    icon: Zap,
+                    colorClass: 'text-amber-500',
+                    tasks: pendingTasksList.filter((t) => t.task_section === 'drive_in_progress'),
+                  },
+                  {
+                    key: 'companies_in_drive' as const,
+                    title: 'COMPANIES IN DRIVE',
+                    icon: Calendar,
+                    colorClass: 'text-indigo-500',
+                    tasks: pendingTasksList.filter((t) => t.task_section === 'companies_in_drive'),
+                  },
+                  {
+                    key: 'company_in_progress' as const,
+                    title: 'COMPANY IN PROGRESS',
+                    icon: Clock,
+                    colorClass: 'text-blue-500',
+                    tasks: pendingTasksList.filter(
+                      (t) =>
+                        t.task_section === 'company_in_progress' ||
+                        (!t.task_section &&
+                          t.task_section !== 'drive_in_progress' &&
+                          t.task_section !== 'companies_in_drive')
+                    ),
+                  },
+                ]
+                  .filter((sec) => pendingActiveTab === 'all' || pendingActiveTab === sec.key)
+                  .map((sec, secIdx) => {
+                    const secTasks = sec.tasks;
+                    const isAllSecSelected =
+                      secTasks.length > 0 && secTasks.every((t) => pendingSelectedIds.has(t._id));
+                    const isSomeSecSelected =
+                      secTasks.some((t) => pendingSelectedIds.has(t._id)) && !isAllSecSelected;
+                    const includedCount = secTasks.filter((t) => pendingSelectedIds.has(t._id)).length;
+
+                    return (
+                      <div
+                        key={sec.key}
+                        className="border border-border rounded-xl bg-surface overflow-hidden shadow-2xs"
+                      >
+                        {/* Section Header Bar */}
+                        <div className="px-4 py-2.5 bg-surface-sunken/90 border-b border-border flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <sec.icon size={15} className={sec.colorClass} />
+                            <h3 className="text-xs font-bold text-fg tracking-wide uppercase">
+                              {pendingActiveTab === 'all' ? `${secIdx + 1}. ` : ''}
+                              {sec.title}
+                            </h3>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-surface border border-border text-fg-muted font-bold">
+                              {includedCount}/{secTasks.length} included
+                            </span>
+                          </div>
+                        </div>
+
+                        {secTasks.length === 0 ? (
+                          <div className="p-6 text-center text-fg-subtle text-xs">
+                            No companies recorded under {sec.title} for this college.
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs text-center border-collapse">
+                              <thead className="bg-surface-sunken/40 border-b border-border text-[10.5px] font-bold text-fg-muted uppercase tracking-wider select-none">
+                                <tr>
+                                  <th className="py-2.5 px-3 w-12 text-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={isAllSecSelected}
+                                      ref={(el) => {
+                                        if (el) el.indeterminate = isSomeSecSelected;
+                                      }}
+                                      onChange={() => {
+                                        setPendingSelectedIds((prev) => {
+                                          const next = new Set(prev);
+                                          if (isAllSecSelected) {
+                                            secTasks.forEach((t) => next.delete(t._id));
+                                          } else {
+                                            secTasks.forEach((t) => next.add(t._id));
+                                          }
+                                          return next;
+                                        });
+                                      }}
+                                      className="w-4 h-4 rounded border-border text-primary focus:ring-primary accent-primary cursor-pointer"
+                                      title="Toggle select all in this section"
+                                    />
+                                  </th>
+                                  <th className="py-2.5 px-2 w-12 text-center font-mono">#</th>
+                                  <th className="py-2.5 px-3 text-center min-w-[190px]">Company Name</th>
+                                  <th className="py-2.5 px-3 text-center min-w-[150px]">Role</th>
+                                  <th className="py-2.5 px-2 text-center min-w-[110px]">CTC</th>
+                                  <th className="py-2.5 px-3 text-center min-w-[280px]">Status</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border/60">
+                                {secTasks.map((t: any, rowIdx: number) => {
+                                  const isIncluded = pendingSelectedIds.has(t._id);
+                                  const isHl = highlightedTaskIds.has(t._id);
+                                  const rowHlColor = highlightColorMap[t._id] || highlightColor;
+                                  const roleVal = t.role || t.job_role || '—';
+                                  const ctcVal = t.ctc || t.ctc_lpa || t.package_details || '—';
+                                  const statusVal =
+                                    t.status ||
+                                    t.current_status_text ||
+                                    t.current_status ||
+                                    t.action_to_be_taken ||
+                                    t.remarks ||
+                                    '—';
+
+                                  return (
+                                    <tr
+                                      key={t._id || rowIdx}
+                                      style={isHl && isIncluded ? { backgroundColor: rowHlColor } : undefined}
+                                      className={`transition-colors ${
+                                        isHl && isIncluded
+                                          ? 'font-semibold text-slate-950 shadow-2xs'
+                                          : 'bg-surface hover:bg-surface-sunken/40'
+                                      }`}
+                                    >
+                                      {/* Checkbox column */}
+                                      <td
+                                        className="py-2.5 px-3 text-center w-12"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={isIncluded}
+                                          onChange={() => handleTogglePendingTaskRow(t._id)}
+                                          className="w-4 h-4 rounded border-border text-primary focus:ring-primary accent-primary cursor-pointer"
+                                          title={
+                                            isIncluded
+                                              ? 'Click to uncheck/skip this company from report'
+                                              : 'Click to check/include this company in report'
+                                          }
+                                        />
+                                      </td>
+
+                                      {/* S.No column */}
+                                      <td
+                                        className="py-2.5 px-2 text-center font-mono font-bold cursor-pointer text-fg"
+                                        style={{
+                                          backgroundColor: isHl && isIncluded ? rowHlColor : undefined,
+                                        }}
+                                        onClick={() => handleToggleRowHighlight(t._id)}
+                                        title="Click row to toggle highlight"
+                                      >
+                                        <span>{rowIdx + 1}</span>
+                                      </td>
+
+                                      {/* Company Name column */}
+                                      <td
+                                        className="py-2.5 px-3 text-center font-bold cursor-pointer text-fg"
+                                        style={{
+                                          backgroundColor: isHl && isIncluded ? rowHlColor : undefined,
+                                        }}
+                                        onClick={() => handleToggleRowHighlight(t._id)}
+                                        title="Click row to toggle highlight"
+                                      >
+                                        <span>{t.company_name}</span>
+                                      </td>
+
+                                      {/* Role */}
+                                      <td
+                                        className="py-2.5 px-3 text-center text-xs cursor-pointer text-fg-muted"
+                                        style={{
+                                          backgroundColor: isHl && isIncluded ? rowHlColor : undefined,
+                                        }}
+                                        onClick={() => handleToggleRowHighlight(t._id)}
+                                        title="Click row to toggle highlight"
+                                      >
+                                        <span>{roleVal}</span>
+                                      </td>
+
+                                      {/* CTC */}
+                                      <td
+                                        className="py-2.5 px-2 text-center font-mono font-semibold text-xs whitespace-nowrap cursor-pointer text-fg-muted"
+                                        style={{
+                                          backgroundColor: isHl && isIncluded ? rowHlColor : undefined,
+                                        }}
+                                        onClick={() => handleToggleRowHighlight(t._id)}
+                                        title="Click row to toggle highlight"
+                                      >
+                                        <span>{ctcVal}</span>
+                                      </td>
+
+                                      {/* Status */}
+                                      <td
+                                        className="py-2.5 px-3 text-center leading-relaxed text-xs cursor-pointer text-fg-muted"
+                                        style={{
+                                          backgroundColor: isHl && isIncluded ? rowHlColor : undefined,
+                                        }}
+                                        onClick={() => handleToggleRowHighlight(t._id)}
+                                        title="Click row to toggle highlight"
+                                      >
+                                        <span>{statusVal}</span>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
           </div>
         )}
 
@@ -1971,9 +2305,6 @@ export function ReportBuilderWizard({
                 <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
                   Reporting Period & Date Range
                 </h2>
-                <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                  Optional
-                </span>
               </div>
               <span className="text-[11px] text-fg-subtle">
                 Leave empty for all records, or choose dates to filter
@@ -2002,234 +2333,186 @@ export function ReportBuilderWizard({
               </h2>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-              <div>
-                <label className="block text-xs font-semibold text-fg mb-1.5">
-                  Select Reporting Month <span className="text-rose-500 font-bold ml-0.5">*</span>
-                </label>
-                <SmoothSelect
-                  value={selectedMonth}
-                  onChange={(val) => {
-                    setSelectedMonth(val);
-                    const found = MONTH_OPTIONS.find((m) => m.value === val);
-                    if (found) {
-                      setStartDate(found.start);
-                      setEndDate(found.end);
-                      setWeekLabel(`${found.label} (${found.start} – ${found.end})`);
-                      setValidationErrors([]);
-                    }
-                  }}
-                  placeholder="Select Month"
-                  icon={CalendarDays}
-                  title="Month-End Reporting Cycle"
-                  options={MONTH_OPTIONS.map((m) => ({
-                    value: m.value,
-                    label: m.label,
-                    badge: m.badge,
-                    sublabel: m.sublabel,
-                  }))}
-                />
-              </div>
-
-              {(() => {
-                const activeMonth = MONTH_OPTIONS.find((m) => m.value === selectedMonth) || MONTH_OPTIONS[7];
-                return (
-                  <div className="mt-0 md:mt-6 p-3.5 rounded-xl border border-primary/20 bg-primary/5 dark:bg-primary/10 flex flex-col justify-center space-y-1 text-xs">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 font-bold text-fg">
-                        <CheckCircle2 size={15} className="text-primary shrink-0" />
-                        <span>{activeMonth.label}</span>
-                      </div>
-                      <span className="bg-primary text-primary-foreground font-mono text-[10px] font-bold px-2 py-0.5 rounded-md shadow-2xs">
-                        {activeMonth.badge}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-fg-muted pl-6">
-                      Submission Cycle: <strong className="text-fg font-semibold">{activeMonth.start}</strong> to <strong className="text-fg font-semibold">{activeMonth.end}</strong>
-                    </p>
-                  </div>
-                );
-              })()}
+            <div className="max-w-md">
+              <label className="block text-xs font-semibold text-fg mb-1.5">
+                Select Reporting Month <span className="text-rose-500 font-bold ml-0.5">*</span>
+              </label>
+              <SmoothSelect
+                value={selectedMonth}
+                onChange={(val) => {
+                  setSelectedMonth(val);
+                  const found = MONTH_OPTIONS.find((m) => m.value === val);
+                  if (found) {
+                    setStartDate(found.start);
+                    setEndDate(found.end);
+                    setWeekLabel(`${found.label} (${found.start} – ${found.end})`);
+                    setValidationErrors([]);
+                  }
+                }}
+                placeholder="Select Month"
+                icon={CalendarDays}
+                title="Month-End Reporting Cycle"
+                options={MONTH_OPTIONS.map((m) => ({
+                  value: m.value,
+                  label: m.label,
+                  badge: m.badge,
+                  sublabel: m.sublabel,
+                }))}
+              />
             </div>
           </div>
         )}
 
         {/* Section C: Included Report Sections (Live Synced with Weekly Tracker) */}
-        <div className="space-y-4 pt-2">
-          <div className="flex items-center justify-between border-b border-border/80 pb-2 flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <Layers size={16} className="text-primary shrink-0" />
-              <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
-                Sections & Metrics to Include in Report
-              </h2>
-            </div>
-            <div className="flex items-center gap-2">
-              {templateType === 'weekly_placement' && loadingWeekly && (
-                <span className="flex items-center gap-1 text-[11px] text-primary font-bold animate-pulse">
-                  <Loader2 size={12} className="animate-spin" /> Syncing with Weekly Tracker…
-                </span>
-              )}
-              {templateType === 'active_leads' && (
-                <span className="flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-400 font-bold">
-                  <Sparkles size={12} /> Synced with Active Leads Management
-                </span>
-              )}
-              {templateType === 'month_end' && (
-                <span className="flex items-center gap-1.5 text-[11px] text-indigo-600 dark:text-indigo-400 font-bold">
-                  <Award size={12} /> Individual Coordinator Month-End Summary
-                </span>
-              )}
-              <span className="text-micro font-semibold text-fg-subtle">
-                {Object.values(sections).filter(Boolean).length} Selected
-              </span>
-            </div>
-          </div>
-
-          {/* Mandatory Active Leads Table Core Notice */}
-          {templateType === 'active_leads' && (
-            <div className="flex items-center gap-3 p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-300 shadow-2xs">
-              <span className="w-8 h-8 rounded-lg bg-emerald-600/15 dark:bg-emerald-400/15 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shrink-0">
-                <Sparkles size={16} />
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-bold flex items-center gap-2">
-                  <span>Active Corporate Leads Table</span>
-                  <span className="text-[10px] font-mono uppercase bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-md font-bold border border-emerald-300/60 dark:border-emerald-700/60">
-                    Always Included
+        {templateType !== 'pending_tasks' && (
+          <div className="space-y-4 pt-2">
+            <div className="flex items-center justify-between border-b border-border/80 pb-2 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <Layers size={16} className="text-primary shrink-0" />
+                <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
+                  Sections & Metrics to Include in Report
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                {templateType === 'weekly_placement' && loadingWeekly && (
+                  <span className="flex items-center gap-1 text-[11px] text-primary font-bold animate-pulse">
+                    <Loader2 size={12} className="animate-spin" /> Syncing with Weekly Tracker…
                   </span>
-                </div>
-                <p className="text-micro text-emerald-700/80 dark:text-emerald-400/80 font-normal mt-0.5">
-                  Directly synced from the <strong className="font-semibold">Active Leads Management</strong> module ({academicYear || 'Selected Year'} batch) with strictly 4 columns: <strong className="font-semibold">#</strong>, <strong className="font-semibold">Company Name</strong>, <strong className="font-semibold">Role</strong>, <strong className="font-semibold">CTC</strong>.
-                </p>
+                )}
+                {templateType === 'active_leads' && (
+                  <span className="flex items-center gap-1.5 text-[11px] text-emerald-700 dark:text-emerald-400 font-bold">
+                    <Sparkles size={12} /> Synced with Active Leads Management
+                  </span>
+                )}
+                {templateType === 'month_end' && (
+                  <span className="flex items-center gap-1.5 text-[11px] text-indigo-600 dark:text-indigo-400 font-bold">
+                    <Award size={12} /> Individual Coordinator Month-End Summary
+                  </span>
+                )}
+                <span className="text-micro font-semibold text-fg-subtle">
+                  {Object.values(sections).filter(Boolean).length} Selected
+                </span>
               </div>
             </div>
-          )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-            {getSectionsConfig().map((sec: any) => {
-              const Icon = sec.icon;
-              const isChecked = !!sections[sec.key];
-              const hasCompanies = Array.isArray(sec.companies) && sec.companies.length > 0;
-              const isKpi = !!sec.isKpiSection;
-              const isFullWidth = isKpi || sec.key === 'remarks' || getSectionsConfig().length <= 2;
-              const activeKpiCount = isKpi && Array.isArray(sec.kpiList)
-                ? sec.kpiList.filter((k: any) => kpiCards[k.key] !== false).length
-                : 0;
+            {/* Mandatory Active Leads Table Core Notice */}
+            {templateType === 'active_leads' && (
+              <div className="flex items-center gap-3 p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-300 shadow-2xs">
+                <span className="w-8 h-8 rounded-lg bg-emerald-600/15 dark:bg-emerald-400/15 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shrink-0">
+                  <Sparkles size={16} />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold flex items-center gap-2">
+                    <span>Active Corporate Leads Table</span>
+                    <span className="text-[10px] font-mono uppercase bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-md font-bold border border-emerald-300/60 dark:border-emerald-700/60">
+                      Always Included
+                    </span>
+                  </div>
+                  <p className="text-micro text-emerald-700/80 dark:text-emerald-400/80 font-normal mt-0.5">
+                    Directly synced from the <strong className="font-semibold">Active Leads Management</strong> module ({academicYear || 'Selected Year'} batch) with strictly 4 columns: <strong className="font-semibold">#</strong>, <strong className="font-semibold">Company Name</strong>, <strong className="font-semibold">Role</strong>, <strong className="font-semibold">CTC</strong>.
+                  </p>
+                </div>
+              </div>
+            )}
 
-              return (
-                <div
-                  key={sec.key}
-                  className={`flex flex-col p-3.5 rounded-xl border transition-all select-none ${
-                    isFullWidth ? 'col-span-1 md:col-span-2' : ''
-                  } ${
-                    isChecked
-                      ? 'bg-primary/5 border-primary/40 dark:border-primary/50 shadow-xs'
-                      : 'bg-surface-sunken border-border opacity-70 hover:opacity-100 hover:bg-surface-raised'
-                  }`}
-                >
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={(e) => setSections({ ...sections, [sec.key]: e.target.checked })}
-                      className="mt-0.5 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary shrink-0"
-                    />
-                    <div className="flex-1 space-y-0.5 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-bold text-fg flex items-center gap-1.5">
-                          <Icon size={14} className={isChecked ? 'text-primary' : 'text-fg-subtle'} />
-                          <span>{sec.label}</span>
-                        </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+              {getSectionsConfig().map((sec: any) => {
+                const Icon = sec.icon;
+                const isChecked = !!sections[sec.key];
+                const hasCompanies = Array.isArray(sec.companies) && sec.companies.length > 0;
+                const isKpi = !!sec.isKpiSection;
+                const isFullWidth = isKpi || getSectionsConfig().length === 1;
+                const activeKpiCount = isKpi && Array.isArray(sec.kpiList)
+                  ? sec.kpiList.filter((k: any) => kpiCards[k.key] !== false).length
+                  : 0;
 
-                        {isKpi && Array.isArray(sec.kpiList) ? (
-                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border shrink-0 bg-primary/10 border-primary/20 text-primary">
-                            {activeKpiCount}/{sec.kpiList.length} Cards Selected
+                return (
+                  <div
+                    key={sec.key}
+                    className={`flex flex-col p-3 rounded-xl border transition-all select-none ${
+                      isFullWidth ? 'col-span-1 sm:col-span-2 lg:col-span-3' : ''
+                    } ${
+                      isChecked
+                        ? 'bg-primary/5 border-primary/40 dark:border-primary/50 shadow-xs'
+                        : 'bg-surface-sunken border-border opacity-70 hover:opacity-100 hover:bg-surface-raised'
+                    }`}
+                  >
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => setSections({ ...sections, [sec.key]: e.target.checked })}
+                        className="rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-bold text-fg flex items-center gap-1.5 text-xs">
+                            <Icon size={14} className={isChecked ? 'text-primary' : 'text-fg-subtle'} />
+                            <span>{sec.label}</span>
                           </span>
-                        ) : Array.isArray(sec.companies) ? (
-                          <span
-                            className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border shrink-0 ${
-                              hasCompanies
-                                ? sec.badgeColor || 'bg-surface border-border text-fg'
-                                : 'bg-surface border-border text-fg-subtle'
-                            }`}
-                          >
-                            {sec.companies.length} {sec.companies.length === 1 ? 'Company' : 'Companies'}
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="text-micro text-fg-subtle leading-normal">{sec.desc}</p>
-                    </div>
-                  </label>
 
-                  {/* KPI Metric Cards Picker (Shown when KPI Section is checked) */}
-                  {isKpi && isChecked && Array.isArray(sec.kpiList) && (
-                    <div className="mt-3 pt-2.5 border-t border-border/60 space-y-2">
-                      <div className="flex items-center justify-between gap-2 text-micro">
-                        <span className="font-semibold text-fg-subtle">Select KPI metric cards to include in report:</span>
-                        <div className="flex items-center gap-2 font-bold">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              const updated = { ...kpiCards };
-                              sec.kpiList.forEach((k: any) => { updated[k.key] = true; });
-                              setKpiCards(updated);
-                            }}
-                            className="text-[10px] text-primary hover:underline cursor-pointer"
-                          >
-                            Select All
-                          </button>
-                          <span className="text-border">|</span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              const updated = { ...kpiCards };
-                              sec.kpiList.forEach((k: any) => { updated[k.key] = false; });
-                              setKpiCards(updated);
-                            }}
-                            className="text-[10px] text-fg-subtle hover:text-fg hover:underline cursor-pointer"
-                          >
-                            Clear All
-                          </button>
-                        </div>
-                      </div>
-                      <div className={sec.kpiList.length <= 2 ? 'grid grid-cols-1 sm:grid-cols-2 gap-2.5' : 'grid grid-cols-2 sm:grid-cols-4 gap-2'}>
-                        {sec.kpiList.map((kpi: any) => {
-                          const isKpiActive = kpiCards[kpi.key] !== false;
-                          return (
-                            <label
-                              key={kpi.key}
-                              className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
-                                isKpiActive
-                                  ? 'bg-primary/10 border-primary/40 text-primary shadow-2xs font-bold ring-1 ring-primary/20'
-                                  : 'bg-surface border-border text-fg-subtle hover:text-fg'
+                          {isKpi && Array.isArray(sec.kpiList) ? (
+                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border shrink-0 bg-primary/10 border-primary/20 text-primary">
+                              {activeKpiCount}/{sec.kpiList.length} Cards Selected
+                            </span>
+                          ) : Array.isArray(sec.companies) ? (
+                            <span
+                              className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border shrink-0 ${
+                                hasCompanies
+                                  ? sec.badgeColor || 'bg-surface border-border text-fg'
+                                  : 'bg-surface border-border text-fg-subtle'
                               }`}
                             >
-                              <input
-                                type="checkbox"
-                                checked={isKpiActive}
-                                onChange={(e) => setKpiCards({ ...kpiCards, [kpi.key]: e.target.checked })}
-                                className="rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary shrink-0"
-                              />
-                              <div className="flex flex-col min-w-0">
-                                <span className="truncate leading-tight">{kpi.label}</span>
-                                <span className="text-[10px] text-fg-subtle font-normal truncate mt-0.5">{kpi.desc}</span>
-                              </div>
-                            </label>
-                          );
-                        })}
+                              {sec.companies.length} {sec.companies.length === 1 ? 'Company' : 'Companies'}
+                            </span>
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+                    </label>
 
-        {/* Section C.1: Weekly Placement CTC & Column Filters + Live Pipeline Preview */}
-        {templateType === 'weekly_placement' && (
+                    {/* KPI Metric Cards Picker (Shown when KPI Section is checked) */}
+                    {isKpi && isChecked && Array.isArray(sec.kpiList) && (
+                      <div className="mt-3 pt-2.5 border-t border-border/60 space-y-2">
+                        <div className="text-micro">
+                          <span className="font-semibold text-fg-subtle">Select KPI metric cards to include in report:</span>
+                        </div>
+                        <div className={sec.kpiList.length <= 2 ? 'grid grid-cols-1 sm:grid-cols-2 gap-2.5' : 'grid grid-cols-2 sm:grid-cols-4 gap-2'}>
+                          {sec.kpiList.map((kpi: any) => {
+                            const isKpiActive = kpiCards[kpi.key] !== false;
+                            return (
+                              <label
+                                key={kpi.key}
+                                className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
+                                  isKpiActive
+                                    ? 'bg-primary/10 border-primary/40 text-primary shadow-2xs font-bold ring-1 ring-primary/20'
+                                    : 'bg-surface border-border text-fg-subtle hover:text-fg'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isKpiActive}
+                                  onChange={(e) => setKpiCards({ ...kpiCards, [kpi.key]: e.target.checked })}
+                                  className="rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary shrink-0"
+                                />
+                                <div className="flex flex-col min-w-0">
+                                  <span className="truncate leading-tight">{kpi.label}</span>
+                                  <span className="text-[10px] text-fg-subtle font-normal truncate mt-0.5">{kpi.desc}</span>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Section C.1: Weekly Placement CTC & Column Filters (Multi-College / Group Mode Only) */}
+        {templateType === 'weekly_placement' && weeklyTargetMode === 'group' && (
           <div className="space-y-4 pt-2 border border-primary/25 bg-surface-raised/40 dark:bg-primary/5 rounded-2xl p-4 sm:p-5 shadow-xs">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/80 pb-3">
@@ -2240,19 +2523,16 @@ export function ReportBuilderWizard({
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-sm font-bold text-fg">
-                      Company CTC & Selective Sharing Filters
+                      Company CTC & Placement Filters
                     </h2>
-                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-primary/15 text-primary border border-primary/30">
-                      Showing {totalWeeklyFilteredCount} of {totalWeeklyRawCount}
-                    </span>
                   </div>
                   <p className="text-[11px] text-fg-subtle">
-                    Filter placement drives by minimum CTC threshold and selectively include/exclude company rows for the weekly report.
+                    Filter placement drives by minimum CTC threshold, company name, or domain for the multi-college weekly report.
                   </p>
                 </div>
               </div>
 
-              {(weeklyMinCtc !== null || weeklyCompanySearch || weeklyCompanyType !== 'all' || weeklyStatusFilter !== 'all' || weeklyExcludedIds.size > 0 || weeklyIncludeCompetitive || weeklyActivePreviewTab !== 'all') && (
+              {(weeklyMinCtc !== null || weeklyCompanySearch || weeklyCompanyType !== 'all') && (
                 <button
                   type="button"
                   onClick={handleResetWeeklyFilters}
@@ -2264,99 +2544,34 @@ export function ReportBuilderWizard({
               )}
             </div>
 
-            {/* CTC Range Filter Controls (Dropdown List + Custom LPA + Include Competitive) */}
-            <div className="space-y-2.5 bg-surface border border-border/80 rounded-xl p-3 sm:p-3.5 shadow-2xs">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <span className="text-xs font-bold text-fg flex items-center gap-1.5">
-                  <TrendingUp size={14} className="text-emerald-600 dark:text-emerald-400" />
-                  Select Minimum CTC Threshold (Starting Package Onwards):
-                  {weeklyMinCtc !== null && (
-                    <span className="text-primary font-extrabold ml-1">≥ {weeklyMinCtc} LPA</span>
-                  )}
-                </span>
-                <label className="flex items-center gap-1.5 text-[11px] text-fg-subtle cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={weeklyIncludeCompetitive}
-                    onChange={(e) => setWeeklyIncludeCompetitive(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
-                  />
-                  <span>
-                    Include Competitive / Unspecified CTC
-                    {unspecifiedCtcCount > 0 && ` (${unspecifiedCtcCount})`}
-                  </span>
+            {/* Single Row Filter Controls: Minimum CTC | Company Name | Company Type */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-surface border border-border/80 rounded-xl p-3 sm:p-3.5 shadow-2xs">
+              {/* 1. Minimum CTC Dropdown */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1">
+                  <TrendingUp size={11} className="text-emerald-600 dark:text-emerald-400" />
+                  Minimum CTC Threshold
                 </label>
+                <SmoothSelect
+                  value={weeklyMinCtc === null ? 'all' : String(weeklyMinCtc)}
+                  onChange={(val) => {
+                    if (val === 'all') {
+                      setWeeklyMinCtc(null);
+                    } else {
+                      const num = parseFloat(val);
+                      setWeeklyMinCtc(isNaN(num) ? null : num);
+                    }
+                  }}
+                  icon={TrendingUp}
+                  title="Filter by Minimum CTC"
+                  placeholder="All CTC Packages"
+                  searchable={true}
+                  searchPlaceholder="Search CTC (e.g. 6, 8, 10)..."
+                  options={ctcSelectOptions}
+                />
               </div>
 
-              {/* Main Selection Area: Dropdown + Custom LPA */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                {/* 1. Primary Dropdown Selector (Lists every available CTC cutoff onwards) */}
-                <div className="w-full sm:w-80 shrink-0">
-                  <SmoothSelect
-                    value={weeklyMinCtc === null ? 'all' : String(weeklyMinCtc)}
-                    onChange={(val) => {
-                      if (val === 'all') {
-                        setWeeklyMinCtc(null);
-                        setWeeklyCustomCtcInput('');
-                      } else {
-                        const num = parseFloat(val);
-                        setWeeklyMinCtc(isNaN(num) ? null : num);
-                        setWeeklyCustomCtcInput('');
-                      }
-                    }}
-                    icon={TrendingUp}
-                    title="Select Starting CTC (Onwards)"
-                    placeholder="Select CTC threshold..."
-                    searchable={true}
-                    searchPlaceholder="Search CTC package (e.g. 4, 6.5, 10)..."
-                    options={ctcSelectOptions}
-                  />
-                </div>
-
-                {/* 2. Custom numeric LPA input */}
-                <div className="flex items-center gap-2 sm:pl-3 sm:border-l border-border/70">
-                  <span className="text-[11px] font-semibold text-fg-subtle whitespace-nowrap">Or Custom CTC:</span>
-                  <div className="relative w-24">
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="0"
-                      max="100"
-                      value={weeklyCustomCtcInput}
-                      placeholder="e.g. 7"
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setWeeklyCustomCtcInput(val);
-                        const num = parseFloat(val);
-                        if (!isNaN(num) && num >= 0) {
-                          setWeeklyMinCtc(num);
-                        } else if (val === '') {
-                          setWeeklyMinCtc(null);
-                        }
-                      }}
-                      className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-lg px-2.5 py-1.5 text-xs text-fg outline-none font-medium font-mono"
-                    />
-                  </div>
-                  <span className="text-xs font-medium text-fg-subtle">LPA</span>
-                  {weeklyMinCtc !== null && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setWeeklyMinCtc(null);
-                        setWeeklyCustomCtcInput('');
-                      }}
-                      className="text-[11px] font-semibold text-fg-subtle hover:text-red-500 underline ml-1 cursor-pointer"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Column-level filter controls */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
-              {/* 1. Company Name search */}
+              {/* 2. Company Name Search */}
               <div className="space-y-1">
                 <label className="text-[11px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1">
                   <Search size={11} />
@@ -2368,41 +2583,19 @@ export function ReportBuilderWizard({
                     value={weeklyCompanySearch}
                     onChange={(e) => setWeeklyCompanySearch(e.target.value)}
                     placeholder="Search by company name..."
-                    className="w-full bg-surface border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-lg pl-7 pr-7 py-1.5 text-xs text-fg outline-none shadow-2xs font-medium"
+                    className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-lg pl-8 pr-7 py-2 text-xs text-fg outline-none font-medium"
                   />
-                  <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
                   {weeklyCompanySearch && (
                     <button
                       type="button"
                       onClick={() => setWeeklyCompanySearch('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg cursor-pointer p-0.5"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg cursor-pointer p-0.5"
                     >
                       <X size={12} />
                     </button>
                   )}
                 </div>
-              </div>
-
-              {/* 2. Pipeline Section selector */}
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1">
-                  <Layers size={11} />
-                  Pipeline Section
-                </label>
-                <select
-                  value={weeklyActivePreviewTab}
-                  onChange={(e) => setWeeklyActivePreviewTab(e.target.value as any)}
-                  className="w-full bg-surface border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-lg px-2.5 py-1.5 text-xs text-fg outline-none shadow-2xs font-medium cursor-pointer"
-                >
-                  <option value="all">All Placement Drives ({tabCounts.all})</option>
-                  <option value="completed">Completed ({tabCounts.completed})</option>
-                  <option value="drive_in_progress">Drive in Progress ({tabCounts.drive_in_progress})</option>
-                  <option value="in_drive">Upcoming Drives ({tabCounts.in_drive})</option>
-                  <option value="in_progress">In Progress ({tabCounts.in_progress})</option>
-                  <option value="pipeline">In Pipeline ({tabCounts.pipeline})</option>
-                  <option value="top_companies">Top Companies ({tabCounts.top_companies})</option>
-                  <option value="on_hold">On Hold / Decl. ({tabCounts.on_hold + tabCounts.rejected})</option>
-                </select>
               </div>
 
               {/* 3. Company Type filter */}
@@ -2414,7 +2607,7 @@ export function ReportBuilderWizard({
                 <select
                   value={weeklyCompanyType}
                   onChange={(e) => setWeeklyCompanyType(e.target.value)}
-                  className="w-full bg-surface border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-lg px-2.5 py-1.5 text-xs text-fg outline-none shadow-2xs font-medium cursor-pointer"
+                  className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-lg px-3 py-2 text-xs text-fg outline-none font-medium cursor-pointer"
                 >
                   <option value="all">All Company Types</option>
                   <option value="software">Software / IT</option>
@@ -2423,170 +2616,6 @@ export function ReportBuilderWizard({
                   <option value="banking">Banking / FinTech</option>
                   <option value="consulting">Consulting / Analytics</option>
                 </select>
-              </div>
-
-              {/* 4. Status / Remarks filter */}
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-fg-subtle uppercase tracking-wider flex items-center gap-1">
-                  <Clock size={11} />
-                  Status / Remarks
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={weeklyStatusFilter}
-                    onChange={(e) => setWeeklyStatusFilter(e.target.value)}
-                    placeholder="Filter status or remarks..."
-                    className="w-full bg-surface border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-lg pl-7 pr-7 py-1.5 text-xs text-fg outline-none shadow-2xs font-medium"
-                  />
-                  <Filter size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
-                  {weeklyStatusFilter && (
-                    <button
-                      type="button"
-                      onClick={() => setWeeklyStatusFilter('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg cursor-pointer p-0.5"
-                    >
-                      <X size={12} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Preview Section Table Header & Row Selection Actions */}
-            <div className="space-y-2 pt-2 border-t border-border/80">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-surface border border-border/70 rounded-xl px-3.5 py-2 shadow-2xs">
-                {/* Active Section Badge */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-fg-subtle">
-                    Previewing:
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-primary/10 text-primary border border-primary/20">
-                    {weeklyActivePreviewTab === 'all' && `All Matching Drives (${previewRows.length})`}
-                    {weeklyActivePreviewTab === 'completed' && `Completed Drives (${previewRows.length})`}
-                    {weeklyActivePreviewTab === 'drive_in_progress' && `Drive in Progress (${previewRows.length})`}
-                    {weeklyActivePreviewTab === 'in_drive' && `Upcoming Drives (${previewRows.length})`}
-                    {weeklyActivePreviewTab === 'in_progress' && `In Progress Drives (${previewRows.length})`}
-                    {weeklyActivePreviewTab === 'pipeline' && `Upcoming Pipeline Drives (${previewRows.length})`}
-                    {weeklyActivePreviewTab === 'top_companies' && `Top Tier Companies (${previewRows.length})`}
-                    {weeklyActivePreviewTab === 'on_hold' && `On Hold & Declined (${previewRows.length})`}
-                    {weeklyActivePreviewTab === 'rejected' && `Rejected (${previewRows.length})`}
-                  </span>
-                </div>
-
-                {/* Bulk Select/Deselect in current tab */}
-                <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                  <button
-                    type="button"
-                    onClick={handleSelectAllPreview}
-                    className="text-xs font-semibold text-primary hover:underline cursor-pointer"
-                  >
-                    Select All
-                  </button>
-                  <span className="text-border">|</span>
-                  <button
-                    type="button"
-                    onClick={handleDeselectAllPreview}
-                    className="text-xs font-semibold text-fg-subtle hover:text-fg hover:underline cursor-pointer"
-                  >
-                    Deselect All
-                  </button>
-                </div>
-              </div>
-
-              {/* Table of Preview Rows */}
-              <div className="border border-border/80 rounded-xl overflow-hidden bg-surface">
-                {previewRows.length === 0 ? (
-                  <div className="p-8 text-center space-y-2">
-                    <div className="w-10 h-10 mx-auto rounded-full bg-surface-sunken flex items-center justify-center text-fg-subtle">
-                      <Filter size={20} />
-                    </div>
-                    <p className="text-xs font-semibold text-fg">
-                      No companies match the filter criteria
-                    </p>
-                    <p className="text-[11px] text-fg-subtle">
-                      Try adjusting the CTC threshold or clearing the search terms.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="max-h-72 overflow-y-auto overflow-x-auto relative bg-surface">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead className="sticky top-0 z-20 bg-surface-sunken border-b border-border text-[10.5px] font-bold text-fg-muted uppercase tracking-wider select-none shadow-2xs">
-                        <tr className="bg-surface-sunken">
-                          <th className="bg-surface-sunken py-2.5 px-3 w-10 text-center">Inc</th>
-                          <th className="bg-surface-sunken py-2.5 px-2 w-10 text-center font-mono">#</th>
-                          <th className="bg-surface-sunken py-2.5 px-3 min-w-[200px]">Company & Role</th>
-                          <th className="bg-surface-sunken py-2.5 px-3 min-w-[130px]">Type</th>
-                          <th className="bg-surface-sunken py-2.5 px-3 min-w-[100px]">CTC</th>
-                          <th className="bg-surface-sunken py-2.5 px-3 min-w-[200px]">Status / Remarks</th>
-                          <th className="bg-surface-sunken py-2.5 px-3 min-w-[120px]">Section</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/60 font-medium bg-surface">
-                        {previewRows.map((row: any, idx: number) => {
-                          const rowId = String(row._id || row.company_id || row.company_name);
-                          const isIncluded = !weeklyExcludedIds.has(rowId);
-                          const ctc = row.ctc_lpa || row.ctc || 'Competitive';
-                          return (
-                            <tr
-                              key={`${rowId}-${idx}`}
-                              onClick={() => handleToggleExcludeCompany(rowId)}
-                              className={`cursor-pointer transition-colors ${
-                                isIncluded
-                                  ? 'hover:bg-primary/5 bg-surface text-fg'
-                                  : 'opacity-40 bg-surface-sunken/40 line-through text-fg-subtle'
-                              }`}
-                            >
-                              <td className="py-2.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
-                                <input
-                                  type="checkbox"
-                                  checked={isIncluded}
-                                  onChange={() => handleToggleExcludeCompany(rowId)}
-                                  className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
-                                />
-                              </td>
-                              <td className="py-2.5 px-2 text-center text-fg-subtle text-[11px] font-mono">
-                                {idx + 1}
-                              </td>
-                              <td className="py-2.5 px-3">
-                                <div className="font-bold text-fg leading-snug">
-                                  {row.company_name}
-                                </div>
-                                <div className="text-[10px] text-fg-subtle">
-                                  {row.job_role || row.role || 'Campus Hire'}
-                                </div>
-                              </td>
-                              <td className="py-2.5 px-3 text-fg-subtle text-[11px] whitespace-nowrap">
-                                {row.company_type || 'IT / Tech'}
-                              </td>
-                              <td className="py-2.5 px-3 whitespace-nowrap">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border ${getCtcBadgeColor(ctc)}`}>
-                                  {ctc}
-                                </span>
-                              </td>
-                              <td className="py-2.5 px-3 text-fg-subtle text-[11px] max-w-xs truncate">
-                                {row.current_status_text || row.status || row.remarks || '—'}
-                              </td>
-                              <td className="py-2.5 px-3 whitespace-nowrap">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-surface-sunken border border-border text-fg-subtle">
-                                  {row._sectionLabel}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-                <div className="px-3 py-2 bg-surface-sunken border-t border-border flex items-center justify-between text-[11px] text-fg-subtle">
-                  <span>
-                    Tip: Click any row or checkbox to include or exclude individual companies from the generated report.
-                  </span>
-                  <span className="font-semibold text-fg">
-                    {previewRows.filter((r: any) => !weeklyExcludedIds.has(String(r._id || r.company_id || r.company_name))).length} selected in this tab
-                  </span>
-                </div>
               </div>
             </div>
           </div>
@@ -2597,16 +2626,40 @@ export function ReportBuilderWizard({
           <div className="flex items-center gap-2 border-b border-border/80 pb-2">
             <PenLine size={16} className="text-primary shrink-0" />
             <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
-              {templateType === 'active_leads' ? 'Notes' : 'Coordinator Remarks & Notes'}
+              {templateType === 'active_leads' ? 'Notes & Strategic Observations' : 'Coordinator Remarks & Notes'}
             </h2>
           </div>
-          <textarea
-            rows={2}
-            value={customRemarks}
-            onChange={(e) => setCustomRemarks(e.target.value)}
-            className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl p-3 text-xs text-fg outline-none shadow-xs font-medium"
-            placeholder={templateType === 'active_leads' ? 'Add notes or highlights for the batch roster...' : 'Add operational notes, remarks, or instructions for leadership...'}
-          />
+
+          <div className="p-4 rounded-xl bg-surface-sunken/60 border border-border space-y-3">
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={!!sections.remarks}
+                onChange={(e) => setSections({ ...sections, remarks: e.target.checked })}
+                className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary shrink-0"
+              />
+              <div className="flex-1">
+                <span className="text-xs font-bold text-fg flex items-center gap-2">
+                  Include {templateType === 'active_leads' ? 'Notes & Observations' : 'Coordinator Remarks & Observations'} in Report
+                </span>
+                <p className="text-[11px] text-fg-subtle mt-0.5">
+                  When selected, the remarks and observations below will be displayed in the generated document. When unchecked, they will be omitted from the report.
+                </p>
+              </div>
+            </label>
+
+            {sections.remarks && (
+              <div className="pt-2 pl-7">
+                <textarea
+                  rows={2}
+                  value={customRemarks}
+                  onChange={(e) => setCustomRemarks(e.target.value)}
+                  className="w-full bg-surface border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl p-3 text-xs text-fg outline-none shadow-xs font-medium"
+                  placeholder={templateType === 'active_leads' ? 'Add notes or highlights for the batch roster...' : 'Add operational notes, remarks, or instructions for leadership...'}
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Section E: Report Author & Footer Options */}

@@ -73,9 +73,6 @@ export function DeleteConfirmModal({
           <p className="text-xs text-fg leading-relaxed">
             Are you sure you want to delete <strong className="text-fg font-bold">{count}</strong> selected row{count !== 1 ? 's' : ''}?
           </p>
-          <p className="text-micro text-fg-subtle mt-1.5">
-            These records will be moved to the Recycle Bin and can be restored if needed.
-          </p>
         </div>
 
         {/* Footer Buttons: Cancel and OK */}

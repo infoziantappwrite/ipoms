@@ -37,8 +37,10 @@ exports.WeeklyTracker = exports.PIPELINE_SECTIONS = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 exports.PIPELINE_SECTIONS = [
     'completed',
+    'drive_in_progress',
     'in_drive',
     'companies_in_drive',
+    'upcoming_drives',
     'in_progress',
     'pipeline',
     'top_companies',
@@ -94,6 +96,24 @@ const WeeklyTrackerSchema = new mongoose_1.Schema({
         trim: true,
         default: 'Graduate Trainee',
     },
+    contact_number: {
+        type: String,
+        trim: true,
+        default: '',
+    },
+    mobile_numbers: {
+        type: [String],
+        default: [],
+    },
+    email_id: {
+        type: String,
+        trim: true,
+        default: '',
+    },
+    email_ids: {
+        type: [String],
+        default: [],
+    },
     cdc_reference: {
         type: String,
         trim: true,
@@ -138,6 +158,14 @@ const WeeklyTrackerSchema = new mongoose_1.Schema({
         index: true,
     },
     drive_date: {
+        type: Date,
+        default: null,
+    },
+    jd_received_date: {
+        type: Date,
+        default: null,
+    },
+    db_shared_date: {
         type: Date,
         default: null,
     },
@@ -186,6 +214,11 @@ const WeeklyTrackerSchema = new mongoose_1.Schema({
         type: Date,
         default: null,
     },
+    order_index: {
+        type: Number,
+        default: 0,
+        index: true,
+    },
     last_status_updated_at: {
         type: Date,
         default: Date.now,
@@ -197,6 +230,7 @@ const WeeklyTrackerSchema = new mongoose_1.Schema({
 // ─── Compound Indexes for High-Speed Lookups ─────────────────────────────────
 // Primary view: College pipeline by academic year & section
 WeeklyTrackerSchema.index({ college_id: 1, academic_year: 1, pipeline_section: 1, is_deleted: 1 });
+WeeklyTrackerSchema.index({ college_id: 1, pipeline_section: 1, order_index: 1, is_deleted: 1 });
 // Coordinator view
 WeeklyTrackerSchema.index({ coordinator_id: 1, academic_year: 1, is_deleted: 1 });
 // Urgent Follow-ups view (Section 1: Follow-up Due Today)

@@ -726,13 +726,11 @@ export default function WeeklyTrackerPage() {
   const handleStartMoveMode = () => {
     setSelectionMode('move');
     setSelectedRowIds([]);
-    toast('Select companies to move across sections', 'info');
   };
 
   const handleStartDeleteMode = () => {
     setSelectionMode('delete');
     setSelectedRowIds([]);
-    toast('Select rows to delete in bulk', 'info');
   };
 
   const handleCancelSelection = () => {

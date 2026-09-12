@@ -366,18 +366,16 @@ export function WeeklyTable({
     ? Math.max(220, Math.ceil(longestEmailLength * 8) + 76)
     : 0;
 
-  // Compute sticky offsets
+  // Compute sticky offsets (Freeze only S.No, Company Name, Role, CTC)
   const deleteColWidth = 40;
   const sNoWidth = 48;
   const companyWidth = 200;
-  const contactWidth = 160;
+  const roleWidth = 160;
 
   const sNoLeft = isDeleteMode ? deleteColWidth : 0;
   const companyLeft = sNoLeft + sNoWidth;
-  const contactLeft = companyLeft + companyWidth;
-  const emailLeft = contactLeft + contactWidth;
-  const roleLeft = hasContactAndEmail ? emailLeft + dynamicEmailWidth : companyLeft + companyWidth;
-  const ctcLeft = roleLeft + 160;
+  const roleLeft = companyLeft + companyWidth;
+  const ctcLeft = roleLeft + roleWidth;
   const sectionSelectedCount = localRows.filter((r) => selectedRowIds.includes(r._id)).length;
   const isAllSectionSelected = localRows.length > 0 && sectionSelectedCount === localRows.length;
   const isPartiallySectionSelected = sectionSelectedCount > 0 && sectionSelectedCount < localRows.length;
@@ -421,13 +419,29 @@ export function WeeklyTable({
             >
               Company Name <span className="text-rose-500 font-bold">*</span>
             </th>
-            
-            {/* Frozen 3 & 4 (if hasContactAndEmail): Contact & Email with small copy buttons */}
+
+            {/* Frozen 3: Role */}
+            <th
+              style={{ left: roleLeft }}
+              className="sticky z-30 bg-[#F1F5F9] dark:bg-[#0D111C] py-2.5 px-3 w-[160px] min-w-[160px] max-w-[160px] border-b border-border"
+            >
+              Role <span className="text-rose-500 font-bold">*</span>
+            </th>
+
+            {/* Frozen 4: CTC (Last Frozen Column with solid border & shadow) */}
+            <th
+              style={{ left: ctcLeft }}
+              className="sticky z-30 bg-[#F1F5F9] dark:bg-[#0D111C] py-2.5 px-3 w-[95px] min-w-[95px] max-w-[95px] border-b border-border border-r-2 border-border/80 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)] dark:shadow-[4px_0_10px_-2px_rgba(0,0,0,0.45)]"
+            >
+              CTC <span className="text-rose-500 font-bold">*</span>
+            </th>
+
+            {/* ── Scrollable Headers (Placed after CTC) ── */}
+            {/* Scrollable 1 & 2: Contact & Email with small copy buttons */}
             {hasContactAndEmail && (
               <>
                 <th
-                  style={{ left: contactLeft }}
-                  className="sticky z-30 bg-[#F1F5F9] dark:bg-[#0D111C] py-2 px-3 w-[160px] min-w-[160px] max-w-[160px] text-left border-b border-border select-none"
+                  className="py-2 px-3 w-[160px] min-w-[160px] max-w-[160px] text-left border-b border-border select-none bg-[#F1F5F9] dark:bg-[#0D111C]"
                   title="Contact Number"
                 >
                   <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
@@ -452,8 +466,8 @@ export function WeeklyTable({
                   </div>
                 </th>
                 <th
-                  style={{ left: emailLeft, width: dynamicEmailWidth, minWidth: dynamicEmailWidth }}
-                  className="sticky z-30 bg-[#F1F5F9] dark:bg-[#0D111C] py-2 px-3 text-left border-b border-border select-none"
+                  style={{ width: dynamicEmailWidth, minWidth: dynamicEmailWidth }}
+                  className="py-2 px-3 text-left border-b border-border select-none bg-[#F1F5F9] dark:bg-[#0D111C]"
                   title="Email ID"
                 >
                   <div className="flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
@@ -480,23 +494,7 @@ export function WeeklyTable({
               </>
             )}
 
-            {/* Frozen 5: Role */}
-            <th
-              style={{ left: roleLeft }}
-              className="sticky z-30 bg-[#F1F5F9] dark:bg-[#0D111C] py-2.5 px-3 w-[160px] min-w-[160px] max-w-[160px] border-b border-border"
-            >
-              Role <span className="text-rose-500 font-bold">*</span>
-            </th>
-
-            {/* Frozen 6: CTC (Last Frozen Column with solid border & shadow) */}
-            <th
-              style={{ left: ctcLeft }}
-              className="sticky z-30 bg-[#F1F5F9] dark:bg-[#0D111C] py-2.5 px-3 w-[95px] min-w-[95px] max-w-[95px] border-b border-border border-r-2 border-border/80 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)] dark:shadow-[4px_0_10px_-2px_rgba(0,0,0,0.45)]"
-            >
-              CTC <span className="text-rose-500 font-bold">*</span>
-            </th>
-
-            {/* ── Scrollable Headers (z-0 relative) ── */}
+            {/* Scrollable 3: Status */}
             <th className="py-2.5 px-3 min-w-[240px] border-b border-border bg-[#F1F5F9] dark:bg-[#0D111C]">
               <span title="Free-text notes only — to move a company between Pipeline / In Progress / Completed etc., use Edit instead.">
                 Status <span className="text-rose-500 font-bold">*</span>
@@ -560,8 +558,6 @@ export function WeeklyTable({
               dynamicEmailWidth={dynamicEmailWidth}
               sNoLeft={sNoLeft}
               companyLeft={companyLeft}
-              contactLeft={contactLeft}
-              emailLeft={emailLeft}
               roleLeft={roleLeft}
               ctcLeft={ctcLeft}
               isBeingDragged={draggedIndex === idx}
@@ -598,8 +594,6 @@ function TableRow({
   dynamicEmailWidth,
   sNoLeft,
   companyLeft,
-  contactLeft,
-  emailLeft,
   roleLeft,
   ctcLeft,
   isBeingDragged = false,
@@ -628,8 +622,6 @@ function TableRow({
   dynamicEmailWidth: number;
   sNoLeft: number;
   companyLeft: number;
-  contactLeft: number;
-  emailLeft: number;
   roleLeft: number;
   ctcLeft: number;
   isBeingDragged?: boolean;
@@ -807,114 +799,6 @@ function TableRow({
         </div>
       </td>
 
-      {/* 2b. Contact (Frozen - Drive, In Progress, Pipeline) */}
-      {hasContactAndEmail && (
-        <td
-          style={{ left: contactLeft }}
-          className={`sticky z-20 py-2.5 px-3 w-[160px] min-w-[160px] max-w-[160px] text-fg font-mono tabular-nums text-xs whitespace-nowrap border-b border-border/60 ${stickyBg}`}
-        >
-          {editingField === 'contact_number' ? (
-            <input
-              type="text"
-              value={tempValue}
-              onChange={(e) => setTempValue(e.target.value)}
-              onBlur={() => commitEdit('contact_number')}
-              onKeyDown={(e) => handleKeyDown(e, 'contact_number')}
-              placeholder="10-digit mobile"
-              autoFocus
-              className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-28 outline-none shadow-xs font-mono"
-            />
-          ) : (
-            <div className="flex items-center gap-1.5 group/contact whitespace-nowrap">
-              {row.contact_number || (row.mobile_numbers && row.mobile_numbers[0]) ? (
-                <>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <a
-                      href={`tel:${row.contact_number || row.mobile_numbers?.[0]}`}
-                      title={`Call ${row.contact_number || row.mobile_numbers?.[0]}`}
-                      className="w-5 h-5 rounded-md bg-blue-500/15 hover:bg-blue-500/30 border border-blue-500/40 text-blue-600 dark:text-blue-400 flex items-center justify-center transition-all hover:scale-105 active:scale-[0.992] cursor-pointer shrink-0 shadow-2xs"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Phone size={11} strokeWidth={2.5} />
-                    </a>
-                    <WhatsAppButton
-                      mobileNumber={row.contact_number || row.mobile_numbers?.[0] || ''}
-                      companyName={row.company_name}
-                    />
-                  </div>
-                  <span
-                    onClick={() => startEdit('contact_number', row.contact_number || row.mobile_numbers?.[0] || '')}
-                    className="cursor-pointer hover:text-primary transition-colors font-medium select-all whitespace-nowrap inline-block"
-                    title="Click to edit contact number"
-                  >
-                    {row.contact_number || row.mobile_numbers?.[0]}
-                  </span>
-                </>
-              ) : (
-                <span
-                  onClick={() => startEdit('contact_number', '')}
-                  className="cursor-pointer text-fg-disabled hover:text-primary italic text-[11px] transition-colors whitespace-nowrap"
-                  title="Click to add contact number"
-                >
-                  + Add Contact
-                </span>
-              )}
-            </div>
-          )}
-        </td>
-      )}
-
-      {/* 2c. Email ID (Frozen - Drive, In Progress, Pipeline) */}
-      {hasContactAndEmail && (
-        <td
-          style={{ left: emailLeft, width: dynamicEmailWidth, minWidth: dynamicEmailWidth }}
-          className={`sticky z-20 py-2.5 px-3 text-fg text-xs whitespace-nowrap border-b border-border/60 ${stickyBg}`}
-        >
-          {editingField === 'email_id' ? (
-            <input
-              type="text"
-              value={tempValue}
-              onChange={(e) => setTempValue(e.target.value)}
-              onBlur={() => commitEdit('email_id')}
-              onKeyDown={(e) => handleKeyDown(e, 'email_id')}
-              placeholder="e.g. hr@company.com"
-              autoFocus
-              className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-full max-w-[340px] outline-none shadow-xs"
-            />
-          ) : (
-            <div className="flex items-center gap-1.5 group/email whitespace-nowrap">
-              {row.email_id || (row.email_ids && row.email_ids[0]) ? (
-                <>
-                  <a
-                    href={`mailto:${row.email_id || row.email_ids?.[0]}`}
-                    title={`Send email to ${row.email_id || row.email_ids?.[0]}`}
-                    className="w-5 h-5 rounded-md bg-indigo-500/15 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center transition-all hover:scale-105 active:scale-[0.992] cursor-pointer shrink-0 shadow-2xs"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Mail size={11} strokeWidth={2.5} />
-                  </a>
-                  <span
-                    onClick={() => startEdit('email_id', row.email_id || row.email_ids?.[0] || '')}
-                    className="cursor-pointer hover:text-primary transition-colors select-all whitespace-nowrap font-normal text-fg"
-                    title={`Click to edit: ${row.email_id || row.email_ids?.[0]}`}
-                  >
-                    {row.email_id || row.email_ids?.[0]}
-                  </span>
-                </>
-              ) : (
-                <span
-                  onClick={() => startEdit('email_id', '')}
-                  className="cursor-pointer text-fg-disabled hover:text-primary italic text-[11px] transition-colors whitespace-nowrap"
-                  title="Click to add email"
-                >
-                  + Add Email
-                </span>
-              )}
-            </div>
-          )}
-        </td>
-      )}
-
       {/* 3. Role (Frozen) */}
       <td
         style={{ left: roleLeft }}
@@ -971,6 +855,114 @@ function TableRow({
           </span>
         )}
       </td>
+
+      {/* ── Scrollable Body Columns (Placed after CTC) ── */}
+      {/* 5a. Contact (Placed immediately after CTC) */}
+      {hasContactAndEmail && (
+        <td
+          className={`py-2.5 px-3 w-[160px] min-w-[160px] max-w-[160px] text-fg font-mono tabular-nums text-xs whitespace-nowrap border-b border-border/60 relative z-0 ${nonStickyBg}`}
+        >
+          {editingField === 'contact_number' ? (
+            <input
+              type="text"
+              value={tempValue}
+              onChange={(e) => setTempValue(e.target.value)}
+              onBlur={() => commitEdit('contact_number')}
+              onKeyDown={(e) => handleKeyDown(e, 'contact_number')}
+              placeholder="10-digit mobile"
+              autoFocus
+              className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-28 outline-none shadow-xs font-mono"
+            />
+          ) : (
+            <div className="flex items-center gap-1.5 group/contact whitespace-nowrap">
+              {row.contact_number || (row.mobile_numbers && row.mobile_numbers[0]) ? (
+                <>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <a
+                      href={`tel:${row.contact_number || row.mobile_numbers?.[0]}`}
+                      title={`Call ${row.contact_number || row.mobile_numbers?.[0]}`}
+                      className="w-5 h-5 rounded-md bg-blue-500/15 hover:bg-blue-500/30 border border-blue-500/40 text-blue-600 dark:text-blue-400 flex items-center justify-center transition-all hover:scale-105 active:scale-[0.992] cursor-pointer shrink-0 shadow-2xs"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Phone size={11} strokeWidth={2.5} />
+                    </a>
+                    <WhatsAppButton
+                      mobileNumber={row.contact_number || row.mobile_numbers?.[0] || ''}
+                      companyName={row.company_name}
+                    />
+                  </div>
+                  <span
+                    onClick={() => startEdit('contact_number', row.contact_number || row.mobile_numbers?.[0] || '')}
+                    className="cursor-pointer hover:text-primary transition-colors font-medium select-all whitespace-nowrap inline-block"
+                    title="Click to edit contact number"
+                  >
+                    {row.contact_number || row.mobile_numbers?.[0]}
+                  </span>
+                </>
+              ) : (
+                <span
+                  onClick={() => startEdit('contact_number', '')}
+                  className="cursor-pointer text-fg-disabled hover:text-primary italic text-[11px] transition-colors whitespace-nowrap"
+                  title="Click to add contact number"
+                >
+                  + Add Contact
+                </span>
+              )}
+            </div>
+          )}
+        </td>
+      )}
+
+      {/* 5b. Email ID (Placed immediately after Contact) */}
+      {hasContactAndEmail && (
+        <td
+          style={{ width: dynamicEmailWidth, minWidth: dynamicEmailWidth }}
+          className={`py-2.5 px-3 text-fg text-xs whitespace-nowrap border-b border-border/60 relative z-0 ${nonStickyBg}`}
+        >
+          {editingField === 'email_id' ? (
+            <input
+              type="text"
+              value={tempValue}
+              onChange={(e) => setTempValue(e.target.value)}
+              onBlur={() => commitEdit('email_id')}
+              onKeyDown={(e) => handleKeyDown(e, 'email_id')}
+              placeholder="e.g. hr@company.com"
+              autoFocus
+              className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-full max-w-[340px] outline-none shadow-xs"
+            />
+          ) : (
+            <div className="flex items-center gap-1.5 group/email whitespace-nowrap">
+              {row.email_id || (row.email_ids && row.email_ids[0]) ? (
+                <>
+                  <a
+                    href={`mailto:${row.email_id || row.email_ids?.[0]}`}
+                    title={`Send email to ${row.email_id || row.email_ids?.[0]}`}
+                    className="w-5 h-5 rounded-md bg-indigo-500/15 hover:bg-indigo-500/30 border border-indigo-500/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center transition-all hover:scale-105 active:scale-[0.992] cursor-pointer shrink-0 shadow-2xs"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Mail size={11} strokeWidth={2.5} />
+                  </a>
+                  <span
+                    onClick={() => startEdit('email_id', row.email_id || row.email_ids?.[0] || '')}
+                    className="cursor-pointer hover:text-primary transition-colors select-all whitespace-nowrap font-normal text-fg"
+                    title={`Click to edit: ${row.email_id || row.email_ids?.[0]}`}
+                  >
+                    {row.email_id || row.email_ids?.[0]}
+                  </span>
+                </>
+              ) : (
+                <span
+                  onClick={() => startEdit('email_id', '')}
+                  className="cursor-pointer text-fg-disabled hover:text-primary italic text-[11px] transition-colors whitespace-nowrap"
+                  title="Click to add email"
+                >
+                  + Add Email
+                </span>
+              )}
+            </div>
+          )}
+        </td>
+      )}
 
       {/* ── Scrollable Body Columns (z-0 relative) ── */}
       {/* 5. Status */}
