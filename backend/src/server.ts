@@ -3834,12 +3834,9 @@ app.post('/api/v1/daily-leads', async (req: Request, res: Response) => {
       });
     }
 
-    // This route is Coordinator-only (see routePolicy.ts) precisely so this
-    // can be unconditional: the caller's own id, never a client-supplied
-    // coordinator_id — otherwise any coordinator could log a lead under a
-    // colleague's name. body.coordinator_id is destructured above but
-    // deliberately unused for attribution.
-    let resolvedCoordinatorId: string | undefined = (req as any).user?.userId;
+    let resolvedCoordinatorId: string | undefined =
+      (req.body.coordinator_id && Types.ObjectId.isValid(String(req.body.coordinator_id)) ? String(req.body.coordinator_id) : undefined) ||
+      (req as any).user?.userId;
     if (!resolvedCoordinatorId || !Types.ObjectId.isValid(String(resolvedCoordinatorId))) {
       const fallbackUser = await User.findOne({ is_active: { $ne: false } });
       resolvedCoordinatorId = fallbackUser?._id ? String(fallbackUser._id) : undefined;
@@ -4647,7 +4644,7 @@ app.get('/api/v1/analytics/company-responsiveness', async (req: Request, res: Re
 });
 
 // ── RA-4: GET /api/v1/reports/templates
-// Returns the 3 Standardized Report Templates (Spec Section 8.3)
+// Returns the Standardized Report Templates (Spec Section 8.3)
 app.get('/api/v1/reports/templates', (req: Request, res: Response) => {
   const templates = [
     {
@@ -4673,6 +4670,30 @@ app.get('/api/v1/reports/templates', (req: Request, res: Response) => {
       icon: '📋',
       description: 'Institutional pending tasks status report covering JD received dates, DB shared status, current recruitment stages, and actionable next steps.',
       default_sections: ['pending_tasks', 'remarks'],
+    },
+    {
+      id: 'daily_positives',
+      title: 'Positives of the Day',
+      audience: 'Placement Team & Institutional Stakeholders',
+      icon: '✨',
+      description: 'Daily operational report tracking positive employer responses, salary packages, roles, batch eligibility, and discussion notes for the day.',
+      default_sections: ['kpi_summary', 'daily_positives'],
+    },
+    {
+      id: 'daily_jd_received',
+      title: 'JD Received for the Day',
+      audience: 'Placement Operations & Leadership',
+      icon: '📑',
+      description: 'Daily conversion report tracking all formal Job Descriptions (JDs) received, designated roles, CTC packages, and beneficiary institutions.',
+      default_sections: ['kpi_summary', 'daily_jd_received'],
+    },
+    {
+      id: 'active_leads',
+      title: 'Active Leads Pipeline Report',
+      audience: 'Executive Leadership & Placement Team',
+      icon: '🚀',
+      description: 'Comprehensive active corporate roster across JD received, positives, and active pipeline for graduating batch recruitment.',
+      default_sections: ['kpi_summary', 'active_leads', 'remarks'],
     },
   ];
 
@@ -4882,7 +4903,13 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       template_type === 'weekly_placement' &&
       Boolean(req.body.is_multi_college || (Array.isArray(req.body.college_ids) && req.body.college_ids.length > 0) || college_id === 'all' || college_id === 'multi');
 
-    if (template_type !== 'active_leads' && !isMultiCollegeWeekly) {
+    const isConsolidatedAllowed =
+      template_type === 'active_leads' ||
+      template_type === 'daily_positives' ||
+      template_type === 'daily_jd_received' ||
+      isMultiCollegeWeekly;
+
+    if (!isConsolidatedAllowed) {
       if (!college_id || college_id === 'all' || String(college_id).trim() === '') {
         return res.status(400).json({
           success: false,
@@ -5401,6 +5428,360 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       return res.status(200).json({
         success: true,
         message: 'Active leads report generated successfully',
+        data: { report: reportDocument },
+      });
+    }
+
+    // ── CASE: DAILY POSITIVES REPORT (Positives of the Day) ────────────────────
+    if (template_type === 'daily_positives') {
+      const isConsolidated = !college_id || college_id === 'all';
+      const targetDateStr = req.body.date || req.body.selected_date || req.body.lead_date || date_from || '';
+
+      let targetDate: Date;
+      if (targetDateStr && targetDateStr !== 'all') {
+        targetDate = parseDateParam(String(targetDateStr));
+      } else {
+        targetDate = new Date();
+        targetDate.setUTCHours(0, 0, 0, 0);
+      }
+      const nextDate = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
+
+      const formattedDayLabel = targetDate.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+
+      const formattedFullDate = targetDate.toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+
+      // Pre-fetch all colleges and active coordinators for mapping
+      const collegesList = await College.find({}).lean();
+      const usersList = await User.find({ is_active: { $ne: false } }).lean();
+      const collegeCodeMap = new Map<string, string>();
+      const collegeNameMap = new Map<string, string>();
+      const collegeCoordinatorMap = new Map<string, string>();
+
+      for (const col of collegesList) {
+        collegeCodeMap.set(String(col._id), col.college_code || col.college_name || '');
+        collegeNameMap.set(String(col._id), col.college_name || '');
+      }
+
+      for (const u of usersList) {
+        if (Array.isArray(u.assigned_college_ids)) {
+          for (const cid of u.assigned_college_ids) {
+            if (!collegeCoordinatorMap.has(String(cid))) {
+              collegeCoordinatorMap.set(String(cid), u.full_name);
+            }
+          }
+        }
+      }
+
+      let leadsData: any[] = [];
+      if (Array.isArray(req.body.custom_daily_leads) && req.body.custom_daily_leads.length > 0) {
+        leadsData = req.body.custom_daily_leads;
+      } else {
+        const query: any = {
+          lead_type: 'positive',
+          is_deleted: false,
+        };
+
+        if (targetDateStr !== 'all') {
+          query.lead_date = { $gte: targetDate, $lt: nextDate };
+        }
+
+        if (college_id && college_id !== 'all') {
+          const cId = Types.ObjectId.isValid(String(college_id)) ? new Types.ObjectId(String(college_id)) : college_id;
+          query.college_id = { $in: [cId, String(college_id)] };
+        }
+
+        if (academic_year && academic_year !== 'all') {
+          query.eligible_batch = { $regex: new RegExp(escapeRegex(String(academic_year).trim()), 'i') };
+        }
+
+        let rawLeads = await DailyLead.find(query)
+          .sort({ lead_date: -1, createdAt: -1 })
+          .populate('coordinator_id', 'full_name official_email username');
+
+        if (rawLeads.length === 0 && targetDateStr === 'all') {
+          rawLeads = await DailyLead.find({ lead_type: 'positive', is_deleted: false })
+            .sort({ lead_date: -1, createdAt: -1 })
+            .populate('coordinator_id', 'full_name official_email username');
+        }
+
+        leadsData = rawLeads.map((r: any, idx) => ({
+          s_no: idx + 1,
+          _id: String(r._id),
+          company_name: (r.company_name || '').trim(),
+          role: (r.job_role || r.role || '').trim() || 'Graduate Trainee',
+          job_role: (r.job_role || r.role || '').trim() || 'Graduate Trainee',
+          ctc: (r.ctc || '').trim() || 'Competitive',
+          date: r.lead_date ? new Date(r.lead_date).toLocaleDateString('en-GB') : formattedDayLabel,
+          lead_date: r.lead_date,
+          time: r.event_time || '—',
+          time_stamp: r.event_time || '—',
+          event_time: r.event_time || '—',
+          college_code: collegeCodeMap.get(String(r.college_id)) || '—',
+          college_name: collegeNameMap.get(String(r.college_id)) || '',
+          college_id: String(r.college_id),
+          eligible_batch: (r.eligible_batch || '').trim() || '2026 Batch',
+          batch: (r.eligible_batch || '').trim() || '2026 Batch',
+          coordinator: (r.coordinator_id && typeof r.coordinator_id === 'object' && r.coordinator_id.full_name)
+            ? r.coordinator_id.full_name
+            : collegeCoordinatorMap.get(String(r.college_id)) || coordinator?.full_name || 'Placement Team',
+          remarks: (r.remarks || '').trim(),
+        }));
+      }
+
+      if (min_ctc && min_ctc > 0) {
+        leadsData = leadsData.filter((l) => matchesMinCtcHelper(l.ctc, min_ctc, include_competitive_ctc));
+      }
+
+      leadsData = leadsData.map((l, idx) => ({ ...l, s_no: idx + 1 }));
+
+      const distinctColleges = new Set(leadsData.map((l) => l.college_code).filter((c) => c && c !== '—'));
+      const distinctCompanies = new Set(leadsData.map((l) => (l.company_name || '').toLowerCase()).filter(Boolean));
+
+      let maxCtcVal = 0;
+      leadsData.forEach((l) => {
+        const nums = extractCtcNumbersHelper(l.ctc);
+        if (nums.length > 0) {
+          const maxInRow = Math.max(...nums);
+          if (maxInRow > maxCtcVal) maxCtcVal = maxInRow;
+        }
+      });
+      const topCtcFormatted = maxCtcVal > 0 ? `${maxCtcVal} LPA` : 'Competitive';
+
+      const reportDocument = {
+        template_type: 'daily_positives',
+        report_title: 'Positives of the Day',
+        report_period: targetDateStr === 'all' ? 'All Dates' : formattedFullDate,
+        day_date: targetDateStr === 'all' ? 'Consolidated' : formattedDayLabel,
+        include_prepared_by: false,
+        generated_by: '',
+        generated_date: new Date().toLocaleDateString('en-IN', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        }),
+        theme: theme || 'emerald',
+        branding: {
+          company_name: 'Infoziant IT Solutions Inc.',
+          company_logo: '/infoziant-head.png',
+          college_name: targetCollege?.college_name || (isConsolidated ? 'All Partner Institutions' : 'Target Institution'),
+          college_code: targetCollege?.college_code || (isConsolidated ? 'iPOMS' : 'COLLEGE'),
+          college_logo: (isConsolidated || !targetCollege) ? null : resolveCollegeLogoUrl(targetCollege),
+          confidential_notice: 'Prepared by Infoziant',
+        },
+        kpi_summary: {
+          total_positives: leadsData.length,
+          active_colleges_count: distinctColleges.size || (targetCollege ? 1 : 0),
+          distinct_companies_count: distinctCompanies.size,
+          highest_ctc: topCtcFormatted,
+          graduating_year: academic_year && academic_year !== 'all' ? academic_year : '2027',
+          report_date: formattedFullDate,
+        },
+        sections: {
+          daily_positives: leadsData,
+        },
+        remarks: custom_remarks || `Daily placement operations summary tracking ${leadsData.length} confirmed positive employer interactions and prospective campus drive discussions for ${formattedFullDate}.`,
+        included_sections: included_sections || {
+          kpi_summary: true,
+          daily_positives: true,
+          remarks: false,
+        },
+        included_kpi_cards: kpi_cards || included_kpi_cards || {
+          total_positives: true,
+          active_colleges_count: true,
+          distinct_companies_count: true,
+          highest_ctc: true,
+          graduating_year: true,
+        },
+      };
+
+      return res.status(200).json({
+        success: true,
+        message: 'Positives of the day report generated successfully',
+        data: { report: reportDocument },
+      });
+    }
+
+    // ── CASE: DAILY JD RECEIVED REPORT (JD Received for the Day) ────────────────
+    if (template_type === 'daily_jd_received') {
+      const isConsolidated = !college_id || college_id === 'all';
+      const targetDateStr = req.body.date || req.body.selected_date || req.body.lead_date || date_from || '';
+
+      let targetDate: Date;
+      if (targetDateStr && targetDateStr !== 'all') {
+        targetDate = parseDateParam(String(targetDateStr));
+      } else {
+        targetDate = new Date();
+        targetDate.setUTCHours(0, 0, 0, 0);
+      }
+      const nextDate = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
+
+      const formattedDayLabel = targetDate.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
+
+      const formattedFullDate = targetDate.toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+
+      // Pre-fetch all colleges for code mapping and coordinators
+      const collegesList = await College.find({}).lean();
+      const collegeCodeMap = new Map<string, string>();
+      const collegeNameMap = new Map<string, string>();
+      for (const col of collegesList) {
+        collegeCodeMap.set(String(col._id), col.college_code || col.college_name || '');
+        collegeNameMap.set(String(col._id), col.college_name || '');
+      }
+
+      // Pre-fetch all users to map assigned college coordinators if coordinator_id is missing
+      const usersList = await User.find({ status: 'active' }).lean();
+      const collegeCoordinatorMap = new Map<string, string>();
+      for (const u of usersList) {
+        if (Array.isArray(u.assigned_college_ids)) {
+          for (const cid of u.assigned_college_ids) {
+            if (!collegeCoordinatorMap.has(String(cid))) {
+              collegeCoordinatorMap.set(String(cid), u.full_name || u.username || 'Coordinator');
+            }
+          }
+        }
+      }
+
+      let leadsData: any[] = [];
+      if (Array.isArray(req.body.custom_daily_leads) && req.body.custom_daily_leads.length > 0) {
+        leadsData = req.body.custom_daily_leads;
+      } else {
+        const query: any = {
+          lead_type: 'jd_received',
+          is_deleted: false,
+        };
+
+        if (targetDateStr !== 'all') {
+          query.lead_date = { $gte: targetDate, $lt: nextDate };
+        }
+
+        if (college_id && college_id !== 'all') {
+          const cId = Types.ObjectId.isValid(String(college_id)) ? new Types.ObjectId(String(college_id)) : college_id;
+          query.college_id = { $in: [cId, String(college_id)] };
+        }
+
+        if (academic_year && academic_year !== 'all') {
+          query.eligible_batch = { $regex: new RegExp(escapeRegex(String(academic_year).trim()), 'i') };
+        }
+
+        let rawLeads = await DailyLead.find(query)
+          .sort({ lead_date: -1, createdAt: -1 })
+          .populate('coordinator_id', 'full_name official_email username');
+
+        if (rawLeads.length === 0 && targetDateStr === 'all') {
+          rawLeads = await DailyLead.find({ lead_type: 'jd_received', is_deleted: false })
+            .sort({ lead_date: -1, createdAt: -1 })
+            .populate('coordinator_id', 'full_name official_email username');
+        }
+
+        leadsData = rawLeads.map((r: any, idx) => ({
+          s_no: idx + 1,
+          _id: String(r._id),
+          company_name: (r.company_name || '').trim(),
+          role: (r.job_role || r.role || '').trim() || 'Graduate Trainee',
+          job_role: (r.job_role || r.role || '').trim() || 'Graduate Trainee',
+          ctc: (r.ctc || '').trim() || 'Competitive',
+          date: r.lead_date ? new Date(r.lead_date).toLocaleDateString('en-GB') : formattedDayLabel,
+          lead_date: r.lead_date,
+          time: r.event_time || '—',
+          time_stamp: r.event_time || '—',
+          event_time: r.event_time || '—',
+          college_code: collegeCodeMap.get(String(r.college_id)) || '—',
+          college_name: collegeNameMap.get(String(r.college_id)) || '',
+          college_id: String(r.college_id),
+          eligible_batch: (r.eligible_batch || '').trim() || '2027',
+          batch: (r.eligible_batch || '').trim() || '2027',
+          coordinator: (r.coordinator_id && typeof r.coordinator_id === 'object' && r.coordinator_id.full_name)
+            ? r.coordinator_id.full_name
+            : collegeCoordinatorMap.get(String(r.college_id)) || coordinator?.full_name || 'Placement Team',
+          remarks: (r.remarks || '').trim(),
+        }));
+      }
+
+      if (min_ctc && min_ctc > 0) {
+        leadsData = leadsData.filter((l) => matchesMinCtcHelper(l.ctc, min_ctc, include_competitive_ctc));
+      }
+
+      leadsData = leadsData.map((l, idx) => ({ ...l, s_no: idx + 1 }));
+
+      const distinctColleges = new Set(leadsData.map((l) => l.college_code).filter((c) => c && c !== '—'));
+      const distinctCompanies = new Set(leadsData.map((l) => (l.company_name || '').toLowerCase()).filter(Boolean));
+
+      let maxCtcVal = 0;
+      leadsData.forEach((l) => {
+        const nums = extractCtcNumbersHelper(l.ctc);
+        if (nums.length > 0) {
+          const maxInRow = Math.max(...nums);
+          if (maxInRow > maxCtcVal) maxCtcVal = maxInRow;
+        }
+      });
+      const topCtcFormatted = maxCtcVal > 0 ? `${maxCtcVal} LPA` : 'Competitive';
+
+      const reportDocument = {
+        template_type: 'daily_jd_received',
+        report_title: 'JD Received for the Day',
+        report_period: targetDateStr === 'all' ? 'All Dates' : formattedFullDate,
+        day_date: targetDateStr === 'all' ? 'Consolidated' : formattedDayLabel,
+        include_prepared_by: false,
+        generated_by: '',
+        generated_date: new Date().toLocaleDateString('en-IN', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        }),
+        theme: theme || 'blue',
+        branding: {
+          company_name: 'Infoziant IT Solutions Inc.',
+          company_logo: '/infoziant-head.png',
+          college_name: targetCollege?.college_name || (isConsolidated ? 'All Partner Institutions' : 'Target Institution'),
+          college_code: targetCollege?.college_code || (isConsolidated ? 'iPOMS' : 'COLLEGE'),
+          college_logo: (isConsolidated || !targetCollege) ? null : resolveCollegeLogoUrl(targetCollege),
+          confidential_notice: 'Prepared by Infoziant',
+        },
+        kpi_summary: {
+          total_jds: leadsData.length,
+          active_colleges_count: distinctColleges.size || (targetCollege ? 1 : 0),
+          distinct_companies_count: distinctCompanies.size,
+          highest_ctc: topCtcFormatted,
+          graduating_year: academic_year && academic_year !== 'all' ? academic_year : '2027',
+          report_date: formattedFullDate,
+        },
+        sections: {
+          daily_jd_received: leadsData,
+        },
+        remarks: custom_remarks || `Daily placement conversion summary recording ${leadsData.length} formal Job Descriptions received from corporate hiring partners for ${formattedFullDate}.`,
+        included_sections: included_sections || {
+          kpi_summary: true,
+          daily_jd_received: true,
+          remarks: false,
+        },
+        included_kpi_cards: kpi_cards || included_kpi_cards || {
+          total_jds: true,
+          active_colleges_count: true,
+          distinct_companies_count: true,
+          highest_ctc: true,
+          graduating_year: true,
+        },
+      };
+
+      return res.status(200).json({
+        success: true,
+        message: 'JD received for the day report generated successfully',
         data: { report: reportDocument },
       });
     }

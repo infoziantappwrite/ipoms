@@ -131,6 +131,24 @@ export function getReportExportBaseFileName(report: any): string {
     return `${cleanAcronym}- ${detectedMonth} month report`;
   }
 
+  // 3. Check if Daily Leads Report
+  if (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') {
+    const rawDate = report.report_period || report.effective_date || report.date || report.generated_date;
+    let formattedDate = 'Today';
+    if (rawDate) {
+      const d = new Date(rawDate);
+      if (!isNaN(d.getTime())) {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = months[d.getMonth()];
+        const year = d.getFullYear();
+        formattedDate = `${day} ${month} ${year}`;
+      }
+    }
+    const reportLabel = report.template_type === 'daily_positives' ? 'Positives of the day' : 'JD received for the day';
+    return `${cleanAcronym}- ${reportLabel} - ${formattedDate}`;
+  }
+
   // Standard naming for weekly and other reports
   const baseTitle = (report.report_title || 'Weekly_Placement_Report')
     .replace(/[^a-zA-Z0-9_-]/g, '_')
@@ -346,6 +364,26 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             <tr><td colspan="8"></td></tr>
           `;
         }
+      } else if (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') {
+        const isPositives = report.template_type === 'daily_positives';
+        const dailyCards = [
+          { key: isPositives ? 'total_positives' : 'total_jds', label: isPositives ? 'Total Positives' : 'Total JDs Received', val: isPositives ? (report.kpi_summary.total_positives || 0) : (report.kpi_summary.total_jds || 0), color: isPositives ? '#059669' : '#d97706' },
+          { key: 'active_colleges_count', label: isPositives ? 'Colleges Reached' : 'Beneficiary Colleges', val: report.kpi_summary.active_colleges_count || 0, color: '#2563eb' },
+          { key: 'distinct_companies_count', label: 'Distinct Companies', val: report.kpi_summary.distinct_companies_count || 0, color: '#4f46e5' },
+          { key: 'highest_ctc', label: 'Highest Package', val: report.kpi_summary.highest_ctc || '—', color: '#7c3aed' },
+          { key: 'graduating_year', label: 'Graduating Batch', val: report.kpi_summary.graduating_year || '2027', color: '#059669' },
+        ];
+
+        html += `
+          <tr><td colspan="9" class="sec-header">${isPositives ? 'POSITIVES OF THE DAY' : 'JD RECEIVED FOR THE DAY'} KPI SUMMARY</td></tr>
+          <tr>
+            ${dailyCards.map((c) => `<th>${c.label}</th>`).join('')}
+          </tr>
+          <tr>
+            ${dailyCards.map((c) => `<td style="text-align:center; font-weight:bold; font-size:12pt; color:${c.color};">${c.val}</td>`).join('')}
+          </tr>
+          <tr><td colspan="9"></td></tr>
+        `;
       } else if (report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined) {
         const alCards = [
           { key: 'total_leads', label: 'Total Active Leads', val: report.kpi_summary.total_leads || 0, color: '#1e3a8a' },
@@ -994,6 +1032,42 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       html += `<tr><td colspan="5"></td></tr>`;
     }
 
+    // Daily Leads Report Table (daily_positives and daily_jd_received)
+    const dailyLeadsRows = report.sections?.daily_positives || report.sections?.daily_jd_received || report.sections?.daily_leads;
+    if ((report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') && dailyLeadsRows && dailyLeadsRows.length > 0) {
+      const isPos = report.template_type === 'daily_positives';
+      html += `
+        <tr><td colspan="9" class="sec-header">${isPos ? 'POSITIVES OF THE DAY' : 'JD RECEIVED FOR THE DAY'} (${dailyLeadsRows.length} Leads)</td></tr>
+        <tr>
+          <th style="width:38px; text-align:center;">#</th>
+          <th>Company Name</th>
+          <th>Role / Designation</th>
+          <th>CTC</th>
+          <th>Date</th>
+          <th>Time</th>
+          <th>College</th>
+          <th>Batch</th>
+          <th>Coordinator</th>
+        </tr>
+      `;
+      dailyLeadsRows.forEach((r: any) => {
+        html += `
+          <tr>
+            <td style="text-align:center;">${r.s_no}</td>
+            <td style="text-align:center;"><b>${r.company_name}</b></td>
+            <td style="text-align:center;">${r.role || r.job_role || '—'}</td>
+            <td style="text-align:center; color:#059669; font-weight:bold;">${r.ctc || '—'}</td>
+            <td style="text-align:center;">${r.date || r.lead_date || '—'}</td>
+            <td style="text-align:center;">${r.time || r.time_stamp || r.event_time || '—'}</td>
+            <td style="text-align:center; font-weight:bold;">${r.college_code || r.college_name || '—'}</td>
+            <td style="text-align:center;">${r.batch || r.eligible_batch || '—'}</td>
+            <td style="text-align:center;">${r.coordinator || 'Placement Team'}</td>
+          </tr>
+        `;
+      });
+      html += `<tr><td colspan="9"></td></tr>`;
+    }
+
     // Remarks (Only if selected)
     if (report.included_sections?.remarks && report.remarks) {
       html += `
@@ -1064,7 +1138,9 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
     (activeCols.colleges !== undefined
       ? activeCols.colleges
       : ((report.kpi_summary?.selected_streams?.jd_received && !report.kpi_summary?.selected_streams?.positives && !report.kpi_summary?.selected_streams?.weekly_tracker) ||
+         report.kpi_summary?.tier_focus?.includes('JD Received') ||
          report.kpi_summary?.tier_focus?.includes('Hot Leads (JD Received)') ||
+         report.report_title?.includes('JD Received') ||
          report.report_title?.includes('Hot Leads') ||
          (report.sections?.active_leads && report.sections.active_leads.some((r: any) => r.colleges && r.colleges !== '—' && r.source === 'jd_received'))))
   );
@@ -1131,6 +1207,10 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                   ? 'Pending Task Placement Report'
                   : report.template_type === 'active_leads'
                   ? 'Active Leads Pipeline Report'
+                  : report.template_type === 'daily_positives'
+                  ? 'Positives of the day'
+                  : report.template_type === 'daily_jd_received'
+                  ? 'JD received for the day'
                   : 'Weekly Placement Report')
               }
               onChange={(e) => setReport({ ...report, report_title: e.target.value })}
@@ -1174,6 +1254,17 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <div className="flex items-center gap-1.5">
                 <Calendar size={13} className="text-fg-subtle print:text-slate-400 shrink-0" />
                 <span>Generated Date: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_date}</strong></span>
+              </div>
+            </>
+          ) : (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') ? (
+            <>
+              <div className="flex items-center gap-1.5">
+                <Calendar size={13} className="text-primary shrink-0" />
+                <span>Report Date: <strong className="text-fg print:text-slate-900 font-semibold">{report.report_period || report.effective_date || report.date || report.generated_date}</strong></span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Calendar size={13} className="text-fg-subtle print:text-slate-400 shrink-0" />
+                <span>Generated: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_date}</strong></span>
               </div>
             </>
           ) : (
@@ -1231,54 +1322,54 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                 ))}
               </div>
             );
-          } else if (report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined) {
-            const alCards = [
+          } else if (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') {
+            const isPositives = report.template_type === 'daily_positives';
+            const dailyCards = [
               {
-                key: 'total_leads',
-                label: 'Total Active Leads',
-                val: report.kpi_summary.total_leads || 0,
+                key: isPositives ? 'total_positives' : 'total_jds',
+                label: isPositives ? 'Total Positives' : 'Total JDs Received',
+                val: isPositives ? (report.kpi_summary.total_positives || 0) : (report.kpi_summary.total_jds || 0),
+                bgClass: isPositives ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700/80' : 'bg-amber-50 dark:bg-amber-950/60 border-amber-300 dark:border-amber-700/80',
+                labelText: isPositives ? 'text-emerald-800 dark:text-emerald-300 font-bold' : 'text-amber-800 dark:text-amber-300 font-bold',
+                valText: isPositives ? 'text-emerald-700 dark:text-emerald-400 font-extrabold text-xl' : 'text-amber-700 dark:text-amber-400 font-extrabold text-xl',
+              },
+              {
+                key: 'active_colleges_count',
+                label: isPositives ? 'Colleges Reached' : 'Beneficiary Colleges',
+                val: report.kpi_summary.active_colleges_count || 0,
                 bgClass: 'bg-blue-50 dark:bg-blue-950/60 border-blue-300 dark:border-blue-700/80',
                 labelText: 'text-blue-800 dark:text-blue-300 font-bold',
                 valText: 'text-blue-700 dark:text-blue-400 font-extrabold text-xl',
               },
               {
-                key: 'hot_leads_count',
-                label: 'Hot (JD Received)',
-                val: report.kpi_summary.hot_leads_count || 0,
-                bgClass: 'bg-amber-50 dark:bg-amber-950/60 border-amber-300 dark:border-amber-700/80',
-                labelText: 'text-amber-800 dark:text-amber-300 font-bold',
-                valText: 'text-amber-700 dark:text-amber-400 font-extrabold text-xl',
-              },
-              {
-                key: 'warm_leads_count',
-                label: 'Warm (Positives)',
-                val: report.kpi_summary.warm_leads_count || 0,
-                bgClass: 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700/80',
-                labelText: 'text-emerald-800 dark:text-emerald-300 font-bold',
-                valText: 'text-emerald-700 dark:text-emerald-400 font-extrabold text-xl',
-              },
-              {
-                key: 'pipeline_leads_count',
-                label: 'Weekly Pipeline',
-                val: report.kpi_summary.pipeline_leads_count || 0,
+                key: 'distinct_companies_count',
+                label: 'Distinct Companies',
+                val: report.kpi_summary.distinct_companies_count || 0,
                 bgClass: 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-700/80',
                 labelText: 'text-indigo-800 dark:text-indigo-300 font-bold',
                 valText: 'text-indigo-700 dark:text-indigo-400 font-extrabold text-xl',
               },
               {
+                key: 'highest_ctc',
+                label: 'Highest Package',
+                val: report.kpi_summary.highest_ctc || '—',
+                bgClass: 'bg-purple-50 dark:bg-purple-950/60 border-purple-300 dark:border-purple-700/80',
+                labelText: 'text-purple-800 dark:text-purple-300 font-bold',
+                valText: 'text-purple-700 dark:text-purple-400 font-extrabold text-xl',
+              },
+              {
                 key: 'graduating_year',
                 label: 'Graduating Batch',
-                val: report.kpi_summary.graduating_year || 'All Batches',
-                bgClass: 'bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700',
+                val: report.kpi_summary.graduating_year || '2027',
+                bgClass: 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700',
                 labelText: 'text-slate-800 dark:text-slate-300 font-bold',
-                valText: 'text-slate-700 dark:text-slate-400 font-extrabold text-xl',
+                valText: 'text-slate-700 dark:text-slate-300 font-extrabold text-xl',
               },
-            ].filter((c) => activeKpis[c.key] !== false && (c.val !== 0 || c.key === 'total_leads' || c.key === 'graduating_year'));
+            ];
 
-            if (alCards.length === 0) return null;
             return (
               <div className="flex flex-wrap gap-2.5 pt-1">
-                {alCards.map((card) => (
+                {dailyCards.map((card) => (
                   <div key={card.key} className={`flex-1 min-w-[120px] border p-3 rounded-xl text-center shadow-xs ${card.bgClass}`}>
                     <span className={`text-micro uppercase block tracking-wider ${card.labelText}`}>{card.label}</span>
                     <span className={`font-mono tabular-nums ${card.valText}`}>{card.val}</span>
@@ -1286,6 +1377,8 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                 ))}
               </div>
             );
+          } else if (report.template_type === 'active_leads') {
+            return null;
           } else if (report.is_multi_college) {
             const multiCards = [
               { key: 'total_colleges', label: 'Colleges Included', val: report.kpi_summary.total_colleges || report.colleges_data?.length || 0, bgClass: 'bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-200 dark:border-indigo-800', labelText: 'text-indigo-800 dark:text-indigo-300 font-bold', valText: 'text-indigo-700 dark:text-indigo-400 font-bold' },
@@ -2421,9 +2514,14 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         {report.included_sections?.active_leads && report.sections?.active_leads && (
           <div className="space-y-1.5 pt-2">
             <div className="mb-2">
-              <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                <TrendingUp size={14} className="text-[#007791] shrink-0" /> ACTIVE CORPORATE LEADS — {String(report.kpi_summary?.graduating_year || report.academic_year || '2027').toUpperCase()}
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
+                  <TrendingUp size={14} className="text-[#007791] shrink-0" /> ACTIVE CORPORATE LEADS — {String(report.kpi_summary?.graduating_year || report.academic_year || '2027').toUpperCase()}
+                </h3>
+                <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800 shrink-0">
+                  Total Leads: {report.sections?.active_leads?.length || report.kpi_summary?.total_leads || 0}
+                </span>
+              </div>
               <div className="h-[2px] w-full bg-[#007791] mt-1" />
             </div>
 
@@ -2842,6 +2940,240 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                             value={r.status || r.remarks || ''}
                             onChange={(val) => handleUpdateCell('on_hold_by_hr', idx, 'status', val)}
                             className="text-slate-600 dark:text-slate-400 text-center"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Daily Positives Report Table */}
+        {report.template_type === 'daily_positives' && report.included_sections?.daily_positives !== false && report.sections?.daily_positives && (
+          <div className="space-y-1.5 pt-2">
+            <div className="mb-2">
+              <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
+                <TrendingUp size={14} className="text-emerald-600 shrink-0" /> 1. POSITIVES OF THE DAY
+              </h3>
+              <div className="h-[2px] w-full bg-emerald-600 mt-1" />
+            </div>
+
+            {report.sections.daily_positives.length === 0 ? (
+              <p className="text-[11px] text-slate-400 italic py-1 pl-1">No positive leads recorded for this day.</p>
+            ) : (
+              <div className="overflow-x-auto rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                <table className="w-full text-[11px] border-collapse table-fixed bg-white dark:bg-slate-900">
+                  <colgroup>
+                    <col style={{ width: '36px' }} />
+                    <col style={{ width: '22%' }} />
+                    <col style={{ width: '17%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '75px' }} />
+                    <col style={{ width: '70px' }} />
+                    <col style={{ width: '70px' }} />
+                    <col style={{ width: '65px' }} />
+                    <col style={{ width: '15%' }} />
+                  </colgroup>
+                  <thead>
+                    <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
+                      <th className="py-2 px-1 text-center font-bold">#</th>
+                      <th className="py-2 px-2 text-center font-bold">COMPANY NAME</th>
+                      <th className="py-2 px-2 text-center font-bold">ROLE / DESIGNATION</th>
+                      <th className="py-2 px-1 text-center font-bold">CTC</th>
+                      <th className="py-2 px-1.5 text-center font-bold">DATE</th>
+                      <th className="py-2 px-1.5 text-center font-bold">TIME</th>
+                      <th className="py-2 px-1.5 text-center font-bold">COLLEGE</th>
+                      <th className="py-2 px-1 text-center font-bold">BATCH</th>
+                      <th className="py-2 px-2 text-center font-bold">COORDINATOR</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
+                    {report.sections.daily_positives.map((r: any, idx: number) => (
+                      <tr key={idx} className={idx % 2 === 0 ? 'bg-[#f0fdf4]/50 dark:bg-slate-900/40' : 'bg-white dark:bg-slate-950'}>
+                        <td className="py-2 px-1 text-center font-bold text-emerald-700 dark:text-emerald-400">{r.s_no || idx + 1}</td>
+                        <td className="py-2 px-2 text-center font-bold text-[#0a2540] dark:text-slate-100 whitespace-normal break-words leading-snug">
+                          <EditableReportCell
+                            value={r.company_name}
+                            onChange={(val) => handleUpdateCell('daily_positives', idx, 'company_name', val)}
+                            className="font-bold text-[#0a2540] dark:text-slate-100 text-center"
+                          />
+                        </td>
+                        <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300 whitespace-normal break-words leading-snug">
+                          <EditableReportCell
+                            value={r.role || r.job_role || ''}
+                            onChange={(val) => {
+                              handleUpdateCell('daily_positives', idx, 'role', val);
+                              handleUpdateCell('daily_positives', idx, 'job_role', val);
+                            }}
+                            className="text-slate-700 dark:text-slate-300 text-center"
+                          />
+                        </td>
+                        <td className="py-2 px-1 text-center font-bold text-emerald-600 dark:text-emerald-400 whitespace-normal break-words leading-snug">
+                          <EditableReportCell
+                            value={r.ctc || ''}
+                            onChange={(val) => handleUpdateCell('daily_positives', idx, 'ctc', val)}
+                            className="font-bold text-emerald-600 dark:text-emerald-400 text-center"
+                          />
+                        </td>
+                        <td className="py-2 px-1.5 text-center text-slate-600 dark:text-slate-400 whitespace-normal break-words leading-snug font-mono text-[10px]">
+                          <EditableReportCell
+                            value={r.date || '—'}
+                            onChange={(val) => handleUpdateCell('daily_positives', idx, 'date', val)}
+                            className="text-slate-600 dark:text-slate-400 text-center font-mono text-[10px]"
+                          />
+                        </td>
+                        <td className="py-2 px-1.5 text-center text-slate-600 dark:text-slate-400 font-mono text-[10px] whitespace-normal break-words leading-snug">
+                          <EditableReportCell
+                            value={r.time || r.time_stamp || r.event_time || '—'}
+                            onChange={(val) => {
+                              handleUpdateCell('daily_positives', idx, 'time', val);
+                              handleUpdateCell('daily_positives', idx, 'time_stamp', val);
+                            }}
+                            className="text-slate-600 dark:text-slate-400 text-center font-mono text-[10px]"
+                          />
+                        </td>
+                        <td className="py-2 px-1 text-center">
+                          <EditableReportCell
+                            value={r.college_code || '—'}
+                            onChange={(val) => handleUpdateCell('daily_positives', idx, 'college_code', val)}
+                            className="text-center font-bold text-emerald-700 dark:text-emerald-300 text-[10px]"
+                          />
+                        </td>
+                        <td className="py-2 px-1 text-center text-slate-600 dark:text-slate-400 whitespace-normal break-words leading-snug">
+                          <EditableReportCell
+                            value={r.batch || r.eligible_batch || ''}
+                            onChange={(val) => {
+                              handleUpdateCell('daily_positives', idx, 'batch', val);
+                              handleUpdateCell('daily_positives', idx, 'eligible_batch', val);
+                            }}
+                            className="text-slate-600 dark:text-slate-400 text-center"
+                          />
+                        </td>
+                        <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300 whitespace-normal break-words leading-snug">
+                          <EditableReportCell
+                            value={r.coordinator || 'Placement Team'}
+                            onChange={(val) => handleUpdateCell('daily_positives', idx, 'coordinator', val)}
+                            className="text-slate-700 dark:text-slate-300 text-center font-medium"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Daily JD Received Report Table */}
+        {report.template_type === 'daily_jd_received' && report.included_sections?.daily_jd_received !== false && report.sections?.daily_jd_received && (
+          <div className="space-y-1.5 pt-2">
+            <div className="mb-2">
+              <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
+                <Briefcase size={14} className="text-blue-600 shrink-0" /> 1. JD RECEIVED FOR THE DAY
+              </h3>
+              <div className="h-[2px] w-full bg-blue-600 mt-1" />
+            </div>
+
+            {report.sections.daily_jd_received.length === 0 ? (
+              <p className="text-[11px] text-slate-400 italic py-1 pl-1">No JDs received recorded for this day.</p>
+            ) : (
+              <div className="overflow-x-auto rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                <table className="w-full text-[11px] border-collapse table-fixed bg-white dark:bg-slate-900">
+                  <colgroup>
+                    <col style={{ width: '36px' }} />
+                    <col style={{ width: '22%' }} />
+                    <col style={{ width: '17%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '75px' }} />
+                    <col style={{ width: '70px' }} />
+                    <col style={{ width: '70px' }} />
+                    <col style={{ width: '65px' }} />
+                    <col style={{ width: '15%' }} />
+                  </colgroup>
+                  <thead>
+                    <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
+                      <th className="py-2 px-1 text-center font-bold">#</th>
+                      <th className="py-2 px-2 text-center font-bold">COMPANY NAME</th>
+                      <th className="py-2 px-2 text-center font-bold">ROLE / DESIGNATION</th>
+                      <th className="py-2 px-1 text-center font-bold">CTC</th>
+                      <th className="py-2 px-1.5 text-center font-bold">DATE</th>
+                      <th className="py-2 px-1.5 text-center font-bold">TIME</th>
+                      <th className="py-2 px-1.5 text-center font-bold">COLLEGE</th>
+                      <th className="py-2 px-1 text-center font-bold">BATCH</th>
+                      <th className="py-2 px-2 text-center font-bold">COORDINATOR</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
+                    {report.sections.daily_jd_received.map((r: any, idx: number) => (
+                      <tr key={idx} className={idx % 2 === 0 ? 'bg-[#eff6ff]/50 dark:bg-slate-900/40' : 'bg-white dark:bg-slate-950'}>
+                        <td className="py-2 px-1 text-center font-bold text-blue-700 dark:text-blue-400">{r.s_no || idx + 1}</td>
+                        <td className="py-2 px-2 text-center font-bold text-[#0a2540] dark:text-slate-100 whitespace-normal break-words leading-snug">
+                          <EditableReportCell
+                            value={r.company_name}
+                            onChange={(val) => handleUpdateCell('daily_jd_received', idx, 'company_name', val)}
+                            className="font-bold text-[#0a2540] dark:text-slate-100 text-center"
+                          />
+                        </td>
+                        <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300 whitespace-normal break-words leading-snug">
+                          <EditableReportCell
+                            value={r.role || r.job_role || ''}
+                            onChange={(val) => {
+                              handleUpdateCell('daily_jd_received', idx, 'role', val);
+                              handleUpdateCell('daily_jd_received', idx, 'job_role', val);
+                            }}
+                            className="text-slate-700 dark:text-slate-300 text-center"
+                          />
+                        </td>
+                        <td className="py-2 px-1 text-center font-bold text-blue-600 dark:text-blue-400 whitespace-normal break-words leading-snug">
+                          <EditableReportCell
+                            value={r.ctc || ''}
+                            onChange={(val) => handleUpdateCell('daily_jd_received', idx, 'ctc', val)}
+                            className="font-bold text-blue-600 dark:text-blue-400 text-center"
+                          />
+                        </td>
+                        <td className="py-2 px-1.5 text-center text-slate-600 dark:text-slate-400 whitespace-normal break-words leading-snug font-mono text-[10px]">
+                          <EditableReportCell
+                            value={r.date || '—'}
+                            onChange={(val) => handleUpdateCell('daily_jd_received', idx, 'date', val)}
+                            className="text-slate-600 dark:text-slate-400 text-center font-mono text-[10px]"
+                          />
+                        </td>
+                        <td className="py-2 px-1.5 text-center text-slate-600 dark:text-slate-400 font-mono text-[10px] whitespace-normal break-words leading-snug">
+                          <EditableReportCell
+                            value={r.time || r.time_stamp || r.event_time || '—'}
+                            onChange={(val) => {
+                              handleUpdateCell('daily_jd_received', idx, 'time', val);
+                              handleUpdateCell('daily_jd_received', idx, 'time_stamp', val);
+                            }}
+                            className="text-slate-600 dark:text-slate-400 text-center font-mono text-[10px]"
+                          />
+                        </td>
+                        <td className="py-2 px-1 text-center">
+                          <EditableReportCell
+                            value={r.college_code || '—'}
+                            onChange={(val) => handleUpdateCell('daily_jd_received', idx, 'college_code', val)}
+                            className="text-center font-bold text-blue-700 dark:text-blue-300 text-[10px]"
+                          />
+                        </td>
+                        <td className="py-2 px-1 text-center text-slate-600 dark:text-slate-400 whitespace-normal break-words leading-snug">
+                          <EditableReportCell
+                            value={r.batch || r.eligible_batch || ''}
+                            onChange={(val) => {
+                              handleUpdateCell('daily_jd_received', idx, 'batch', val);
+                              handleUpdateCell('daily_jd_received', idx, 'eligible_batch', val);
+                            }}
+                            className="text-slate-600 dark:text-slate-400 text-center"
+                          />
+                        </td>
+                        <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300 whitespace-normal break-words leading-snug">
+                          <EditableReportCell
+                            value={r.coordinator || 'Placement Team'}
+                            onChange={(val) => handleUpdateCell('daily_jd_received', idx, 'coordinator', val)}
+                            className="text-slate-700 dark:text-slate-300 text-center font-medium"
                           />
                         </td>
                       </tr>

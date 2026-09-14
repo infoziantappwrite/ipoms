@@ -37,11 +37,13 @@ import {
   ArrowUpDown,
   RotateCcw,
   Star,
+  ClipboardList,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
 import { getCachedColleges, fetchAllCollegesCached, sortCollegesWithPriority, getCoordinatorSelectedColleges } from '@/lib/collegeSession';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
+import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { DateRangeCalendar, formatPeriodFromDates } from './DateRangeCalendar';
 
 export function extractCtcNumbers(ctcStr: string | undefined | null): number[] {
@@ -166,8 +168,8 @@ const ACTIVE_17_COLLEGE_CODES = [
 
 const ACTIVE_LEADS_KPIS = [
   { key: 'total_leads', label: 'Total Leads', desc: 'Active Corporate Leads' },
-  { key: 'hot_leads_count', label: 'Hot (JD Received)', desc: 'Verified JD Received' },
-  { key: 'warm_leads_count', label: 'Warm (Positives)', desc: 'Confirmed Positives' },
+  { key: 'hot_leads_count', label: 'JD Received', desc: 'Verified JD Received' },
+  { key: 'warm_leads_count', label: 'Positives Received', desc: 'Confirmed Positives' },
   { key: 'pipeline_leads_count', label: 'Weekly Pipeline', desc: 'In-Progress & Pipeline' },
   { key: 'graduating_year', label: 'Graduating Batch', desc: 'Target Batch Year' },
 ];
@@ -198,6 +200,22 @@ const MONTH_END_KPIS = [
   { key: 'total_offers_moved', label: 'Offers Received', desc: 'Total Offers Received' },
 ];
 
+const DAILY_POSITIVES_KPIS = [
+  { key: 'total_positives', label: 'Total Positives', desc: 'Confirmed Positive Discussions' },
+  { key: 'active_colleges_count', label: 'Colleges Reached', desc: 'Active Partner Institutions' },
+  { key: 'distinct_companies_count', label: 'Distinct Companies', desc: 'Engaged Corporate Partners' },
+  { key: 'highest_ctc', label: 'Highest Package', desc: 'Top CTC Offered' },
+  { key: 'graduating_year', label: 'Graduating Batch', desc: 'Target Batch Year' },
+];
+
+const DAILY_JD_KPIS = [
+  { key: 'total_jds', label: 'Total JDs Received', desc: 'Formal JDs Acquired' },
+  { key: 'active_colleges_count', label: 'Beneficiary Colleges', desc: 'Partner Institutions Included' },
+  { key: 'distinct_companies_count', label: 'Distinct Companies', desc: 'Hiring Corporate Partners' },
+  { key: 'highest_ctc', label: 'Highest Package', desc: 'Top CTC Offered' },
+  { key: 'graduating_year', label: 'Graduating Batch', desc: 'Target Batch Year' },
+];
+
 const HIGHLIGHT_PALETTES = [
   { label: 'Fluorescent Yellow', color: '#fef08a', border: '#fde047', badge: 'Yellow' },
   { label: 'Warm Amber', color: '#fed7aa', border: '#fdba74', badge: 'Amber' },
@@ -210,6 +228,7 @@ const HIGHLIGHT_PALETTES = [
 interface Props {
   initialTemplateType: string;
   initialCollegeId: string;
+  initialDate?: string;
   coordinatorId: string;
   onReportGenerated: (reportData: any) => void;
 }
@@ -217,6 +236,7 @@ interface Props {
 export function ReportBuilderWizard({
   initialTemplateType,
   initialCollegeId,
+  initialDate,
   coordinatorId,
   onReportGenerated,
 }: Props) {
@@ -228,6 +248,11 @@ export function ReportBuilderWizard({
   const [weeklyTargetMode, setWeeklyTargetMode] = useState<'single' | 'group'>('single');
   const [selectedGroupCollegeIds, setSelectedGroupCollegeIds] = useState<string[]>([]);
   const [groupSearchQuery, setGroupSearchQuery] = useState<string>('');
+
+  // Daily Leads State (Positives of the Day & JD Received for the Day)
+  const [dailyReportDate, setDailyReportDate] = useState<string>(() => {
+    return initialDate || new Date().toISOString().split('T')[0];
+  });
 
   // Active Leads Stream Filter Selection (JD Received, Positives, Weekly Tracker)
   const [activeLeadStreams, setActiveLeadStreams] = useState<{
@@ -352,6 +377,12 @@ export function ReportBuilderWizard({
     if (initialTemplateType === 'month_end') {
       return 'Comprehensive monthly recruitment progress review covering conversions, scheduled drives, and placement selections.';
     }
+    if (initialTemplateType === 'daily_positives') {
+      return 'Positives of the day tracked across partner institutions for prospective recruitment.';
+    }
+    if (initialTemplateType === 'daily_jd_received') {
+      return 'Formal Job Descriptions received today across corporate partners for campus placement drives.';
+    }
     return 'All campus drives are progressing actively as per schedule. Follow-ups with upcoming tech partners remain on track.';
   });
 
@@ -362,7 +393,7 @@ export function ReportBuilderWizard({
       s.pending_tasks = true;
       s.remarks = true;
     } else if (initialTemplateType === 'active_leads') {
-      s.kpi_summary = true;
+      s.kpi_summary = false;
       s.active_leads = true;
       s.remarks = true;
     } else if (initialTemplateType === 'month_end') {
@@ -373,6 +404,9 @@ export function ReportBuilderWizard({
       s.company_drives_scheduled = true;
       s.on_hold_by_college = true;
       s.on_hold_by_hr = true;
+      s.remarks = false;
+    } else if (initialTemplateType === 'daily_positives' || initialTemplateType === 'daily_jd_received') {
+      s.kpi_summary = false;
       s.remarks = false;
     } else {
       s.kpi_summary = false;
@@ -839,7 +873,7 @@ export function ReportBuilderWizard({
         setCustomRemarks('All pending action items are actively tracked with institutions and corporate HRs for prompt closure.');
       } else if (initialTemplateType === 'active_leads') {
         setSections({
-          kpi_summary: true,
+          kpi_summary: false,
           active_leads: true,
           remarks: true,
         });
@@ -856,6 +890,18 @@ export function ReportBuilderWizard({
           remarks: false,
         });
         setCustomRemarks('Comprehensive monthly recruitment progress review covering conversions, scheduled drives, and placement selections.');
+      } else if (initialTemplateType === 'daily_positives') {
+        setSections({
+          kpi_summary: false,
+          remarks: true,
+        });
+        setCustomRemarks('Positives of the day tracked across partner institutions for prospective recruitment.');
+      } else if (initialTemplateType === 'daily_jd_received') {
+        setSections({
+          kpi_summary: false,
+          remarks: true,
+        });
+        setCustomRemarks('Formal Job Descriptions received today across corporate partners for campus placement drives.');
       } else {
         setSections({
           kpi_summary: false,
@@ -877,7 +923,10 @@ export function ReportBuilderWizard({
     if (initialCollegeId && initialCollegeId !== 'all') {
       setCollegeId(initialCollegeId);
     }
-  }, [initialTemplateType, initialCollegeId]);
+    if (initialDate) {
+      setDailyReportDate(initialDate);
+    }
+  }, [initialTemplateType, initialCollegeId, initialDate]);
 
   // ── Auto-load Pending Tasks from Weekly Tracker when template is pending_tasks and college is selected ──
   useEffect(() => {
@@ -1011,7 +1060,7 @@ export function ReportBuilderWizard({
       setCustomRemarks('All pending action items are actively tracked with institutions and corporate HRs for prompt closure.');
     } else if (newType === 'active_leads') {
       setSections({
-        kpi_summary: true,
+        kpi_summary: false,
         active_leads: true,
         remarks: true,
       });
@@ -1031,6 +1080,18 @@ export function ReportBuilderWizard({
       setEndDate('2026-08-31');
       setWeekLabel('August 2026');
       setCustomRemarks('Comprehensive monthly recruitment progress review covering conversions, scheduled drives, and placement selections.');
+    } else if (newType === 'daily_positives') {
+      setSections({
+        kpi_summary: false,
+        remarks: false,
+      });
+      setCustomRemarks('Positives of the day tracked across partner institutions for prospective recruitment.');
+    } else if (newType === 'daily_jd_received') {
+      setSections({
+        kpi_summary: false,
+        remarks: false,
+      });
+      setCustomRemarks('Formal Job Descriptions received today across corporate partners for campus placement drives.');
     } else {
       setSections({
         kpi_summary: false,
@@ -1128,17 +1189,21 @@ export function ReportBuilderWizard({
           template_type: templateType,
           is_multi_college: isMultiWeekly,
           college_ids: isMultiWeekly ? selectedGroupCollegeIds : undefined,
-          college_id: isMultiWeekly ? 'multi' : (templateType === 'active_leads' ? (collegeId || 'all') : collegeId),
+          college_id: isMultiWeekly ? 'multi' : (templateType === 'active_leads' || templateType === 'daily_positives' || templateType === 'daily_jd_received' ? (collegeId || 'all') : collegeId),
           coordinator_id: coordinatorId || readSessionUser()?._id || readSessionUser()?.id || '',
           academic_year: academicYear,
+          date: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? dailyReportDate : undefined,
+          effective_date: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? dailyReportDate : undefined,
+          lead_type: templateType === 'daily_positives' ? 'positive' : (templateType === 'daily_jd_received' ? 'jd_received' : undefined),
           week_label: effectiveWeekLabel,
           theme,
           lead_sources: templateType === 'active_leads' ? activeLeadStreams : undefined,
           active_leads_columns: templateType === 'active_leads' ? activeLeadsColumns : undefined,
-          include_prepared_by: includePreparedBy,
-          prepared_by: includePreparedBy ? preparedByName.trim() : '',
+          include_prepared_by: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? false : includePreparedBy,
+          prepared_by: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? '' : (includePreparedBy ? preparedByName.trim() : ''),
           min_ctc: isMultiWeekly ? weeklyMinCtc : undefined,
           include_competitive_ctc: isMultiWeekly ? weeklyIncludeCompetitive : undefined,
+          search_filter: undefined,
           company_name_filter: isMultiWeekly ? (weeklyCompanySearch.trim() || undefined) : undefined,
           company_type_filter: isMultiWeekly ? (weeklyCompanyType !== 'all' ? weeklyCompanyType : undefined) : undefined,
           status_filter: isMultiWeekly ? (weeklyStatusFilter.trim() || undefined) : undefined,
@@ -1147,6 +1212,8 @@ export function ReportBuilderWizard({
             ...sections,
             ...(templateType === 'active_leads' ? { active_leads: true } : {}),
             ...(templateType === 'pending_tasks' ? { pending_tasks: true } : {}),
+            ...(templateType === 'daily_positives' ? { daily_positives: true } : {}),
+            ...(templateType === 'daily_jd_received' ? { daily_jd_received: true } : {}),
           },
           included_task_sections: pendingTaskSections,
           included_kpi_cards: kpiCards,
@@ -1191,20 +1258,8 @@ export function ReportBuilderWizard({
 
   // Section items tailored specifically to the active category with live company details
   const getSectionsConfig = () => {
-    if (templateType === 'pending_tasks') {
+    if (templateType === 'pending_tasks' || templateType === 'active_leads') {
       return [];
-    }
-    if (templateType === 'active_leads') {
-      return [
-        {
-          key: 'kpi_summary',
-          label: 'Active Leads KPI Summary',
-          icon: BarChart3,
-          desc: 'Select which KPI metrics appear in the header summary strip',
-          isKpiSection: true,
-          kpiList: ACTIVE_LEADS_KPIS,
-        },
-      ];
     }
     if (templateType === 'month_end') {
       return [
@@ -1338,59 +1393,85 @@ export function ReportBuilderWizard({
   return (
     <div className="space-y-6 text-fg">
 
-      {/* ── Navigation Tabs (Weekly Report, Month-End Report, Pending Tasks, Active Leads) ────────────────── */}
+      {/* ── Navigation Tabs (Weekly Report, Month-End Report, Pending Tasks, Active Leads, Daily Positives, Daily JD Received) ────────────────── */}
       <div className="flex justify-center pt-2 pb-2">
-        <div className="w-full max-w-4xl bg-surface border border-border p-1.5 rounded-2xl shadow-xs grid grid-cols-2 md:grid-cols-4 gap-1.5">
+        <div className="w-full max-w-6xl bg-surface border border-border p-1.5 rounded-2xl shadow-xs grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-1.5">
           <button
             type="button"
             onClick={() => handleCategoryChange('weekly_placement')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'weekly_placement'
                 ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
             }`}
           >
-            <CalendarDays size={15} strokeWidth={2.2} />
+            <CalendarDays size={14} strokeWidth={2.2} className="shrink-0" />
             <span className="whitespace-nowrap">Weekly Report</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleCategoryChange('month_end')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'month_end'
                 ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
             }`}
           >
-            <Award size={15} strokeWidth={2.2} />
-            <span className="whitespace-nowrap">Month-End Report</span>
+            <Award size={14} strokeWidth={2.2} className="shrink-0" />
+            <span className="whitespace-nowrap">Month-End</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleCategoryChange('pending_tasks')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'pending_tasks'
                 ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
             }`}
           >
-            <ListTodo size={15} strokeWidth={2.2} />
+            <ListTodo size={14} strokeWidth={2.2} className="shrink-0" />
             <span className="whitespace-nowrap">Pending Tasks</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleCategoryChange('active_leads')}
-            className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'active_leads'
                 ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
             }`}
           >
-            <Sparkles size={15} strokeWidth={2.2} />
+            <Sparkles size={14} strokeWidth={2.2} className="shrink-0" />
             <span className="whitespace-nowrap">Active Leads</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleCategoryChange('daily_positives')}
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
+              templateType === 'daily_positives'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
+            }`}
+          >
+            <Zap size={14} strokeWidth={2.2} className="shrink-0" />
+            <span className="whitespace-nowrap">Daily Positives</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleCategoryChange('daily_jd_received')}
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
+              templateType === 'daily_jd_received'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
+            }`}
+          >
+            <ClipboardList size={14} strokeWidth={2.2} className="shrink-0" />
+            <span className="whitespace-nowrap">Daily JD Received</span>
           </button>
         </div>
       </div>
@@ -1405,6 +1486,10 @@ export function ReportBuilderWizard({
               <Sparkles size={16} className="text-primary shrink-0" />
             ) : templateType === 'month_end' ? (
               <Award size={16} className="text-indigo-600 shrink-0" />
+            ) : templateType === 'daily_positives' ? (
+              <Zap size={16} className="text-emerald-600 shrink-0" />
+            ) : templateType === 'daily_jd_received' ? (
+              <ClipboardList size={16} className="text-amber-600 shrink-0" />
             ) : (
               <Building2 size={16} className="text-primary shrink-0" />
             )}
@@ -1413,13 +1498,28 @@ export function ReportBuilderWizard({
                 ? 'Select Target Batch'
                 : templateType === 'pending_tasks'
                 ? 'Target Institution Scope'
+                : (templateType === 'daily_positives' || templateType === 'daily_jd_received')
+                ? 'Report Date & Batch'
                 : 'Institutional Scope & Batch'}
             </h2>
           </div>
 
-          <div className={`grid gap-4 ${templateType === 'active_leads' ? 'grid-cols-1 max-w-md' : templateType === 'pending_tasks' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2'}`}>
+          <div className={`grid gap-4 ${templateType === 'active_leads' || templateType === 'pending_tasks' ? 'grid-cols-1 max-w-md' : 'grid-cols-1 md:grid-cols-2'}`}>
+            {/* Report Date Picker for Daily Reports */}
+            {(templateType === 'daily_positives' || templateType === 'daily_jd_received') && (
+              <div>
+                <label className="block text-xs font-semibold text-fg mb-1.5">
+                  Report Date
+                </label>
+                <SmoothDatePicker
+                  value={dailyReportDate}
+                  onChange={(val) => setDailyReportDate(val)}
+                />
+              </div>
+            )}
+
             {/* Target College (For Weekly Placement, Month-End, Pending Tasks) */}
-            {templateType !== 'active_leads' && (
+            {templateType !== 'active_leads' && templateType !== 'daily_positives' && templateType !== 'daily_jd_received' && (
               <div className={templateType === 'weekly_placement' && weeklyTargetMode === 'group' ? 'md:col-span-2' : ''}>
                 <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
                   <label className="block text-xs font-semibold text-fg">
@@ -1474,6 +1574,14 @@ export function ReportBuilderWizard({
                       const isMissingCollege = validationErrors.some(
                         (e) => e.toLowerCase().includes('institution') || e.toLowerCase().includes('college')
                       );
+                      const selectOptions = prioritizedColleges.map((c: any) => ({
+                        value: c._id,
+                        label: c.college_name,
+                        badge: c.college_code,
+                        sublabel: c.location,
+                        isPinned: Boolean(c.isPinned || c.is_selected_by_me),
+                      }));
+
                       return (
                         <div>
                           <SmoothSelect
@@ -1492,13 +1600,7 @@ export function ReportBuilderWizard({
                             searchPlaceholder="Search institution name or code…"
                             icon={Building2}
                             title="Target College / Institution"
-                            options={prioritizedColleges.map((c: any) => ({
-                              value: c._id,
-                              label: c.college_name,
-                              badge: c.college_code,
-                              sublabel: c.location,
-                              isPinned: Boolean(c.isPinned || c.is_selected_by_me),
-                            }))}
+                            options={selectOptions}
                           />
                           {isMissingCollege && (
                             <p className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold mt-1.5 flex items-center gap-1">
@@ -1681,7 +1783,7 @@ export function ReportBuilderWizard({
 
             {/* 3 Unified Interactive Cards with Tick Marks */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-              {/* 1. Hot Leads - JD Received */}
+              {/* 1. JD Received */}
               <div
                 onClick={() =>
                   setActiveLeadStreams((prev) => ({ ...prev, jd_received: !prev.jd_received }))
@@ -1702,11 +1804,8 @@ export function ReportBuilderWizard({
                     <div>
                       <h3 className="text-xs font-bold text-fg flex items-center gap-1.5">
                         <span>JD Received</span>
-                        <span className="text-[9.5px] px-1.5 py-0.2 rounded font-extrabold bg-amber-500/20 text-amber-500 border border-amber-500/30">
-                          HOT LEAD
-                        </span>
                       </h3>
-                      <p className="text-[10px] text-fg-subtle">Top Priority • Confirmed Drives</p>
+                      <p className="text-[10px] text-fg-subtle">Verified Job Descriptions • Drive Ready</p>
                     </div>
                   </div>
                   <div
@@ -1720,11 +1819,11 @@ export function ReportBuilderWizard({
                   </div>
                 </div>
                 <p className="text-[11px] text-fg-muted leading-snug">
-                  Companies with officially confirmed and received Job Descriptions (Hot leads ready for drive scheduling).
+                  Companies with officially confirmed and received Job Descriptions ready for drive scheduling.
                 </p>
               </div>
 
-              {/* 2. Warm Leads - Positive Leads */}
+              {/* 2. Positives Received */}
               <div
                 onClick={() =>
                   setActiveLeadStreams((prev) => ({ ...prev, positives: !prev.positives }))
@@ -1744,12 +1843,9 @@ export function ReportBuilderWizard({
                     </span>
                     <div>
                       <h3 className="text-xs font-bold text-fg flex items-center gap-1.5">
-                        <span>Positive Leads</span>
-                        <span className="text-[9.5px] px-1.5 py-0.2 rounded font-extrabold bg-emerald-500/20 text-emerald-500 border border-emerald-500/30">
-                          WARM LEAD
-                        </span>
+                        <span>Positives Received</span>
                       </h3>
-                      <p className="text-[10px] text-fg-subtle">Medium Priority • In Discussion</p>
+                      <p className="text-[10px] text-fg-subtle">Confirmed Positive Interest • In Discussion</p>
                     </div>
                   </div>
                   <div
@@ -2364,7 +2460,7 @@ export function ReportBuilderWizard({
         )}
 
         {/* Section C: Included Report Sections (Live Synced with Weekly Tracker) */}
-        {templateType !== 'pending_tasks' && (
+        {templateType !== 'pending_tasks' && templateType !== 'active_leads' && templateType !== 'daily_positives' && templateType !== 'daily_jd_received' && (
           <div className="space-y-4 pt-2">
             <div className="flex items-center justify-between border-b border-border/80 pb-2 flex-wrap gap-2">
               <div className="flex items-center gap-2">
@@ -2662,49 +2758,51 @@ export function ReportBuilderWizard({
           </div>
         </div>
 
-        {/* Section E: Report Author & Footer Options */}
-        <div className="space-y-3 pt-2">
-          <div className="flex items-center gap-2 border-b border-border/80 pb-2">
-            <UserCheck size={16} className="text-primary shrink-0" />
-            <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
-              Footer & Sign-off Options
-            </h2>
-          </div>
+        {/* Section E: Report Author & Footer Options (Hidden for Daily Reports) */}
+        {templateType !== 'daily_positives' && templateType !== 'daily_jd_received' && (
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center gap-2 border-b border-border/80 pb-2">
+              <UserCheck size={16} className="text-primary shrink-0" />
+              <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
+                Footer & Sign-off Options
+              </h2>
+            </div>
 
-          <div className="p-4 rounded-xl bg-surface-sunken/60 border border-border space-y-3">
-            <label className="flex items-center gap-3 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={includePreparedBy}
-                onChange={(e) => setIncludePreparedBy(e.target.checked)}
-                className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary shrink-0"
-              />
-              <div className="flex-1">
-                <span className="text-xs font-bold text-fg flex items-center gap-2">
-                  Include &quot;Prepared by&quot; in Report Footer
-                </span>
-                <p className="text-[11px] text-fg-subtle mt-0.5">
-                  When selected, the preferred by person name will be displayed in the document footer area. When unchecked, it will be omitted from the report.
-                </p>
-              </div>
-            </label>
-
-            {includePreparedBy && (
-              <div className="pt-2 pl-7 flex flex-col sm:flex-row sm:items-center gap-3">
-                <label className="text-xs font-semibold text-fg shrink-0">
-                  Prepared by Name:
-                </label>
+            <div className="p-4 rounded-xl bg-surface-sunken/60 border border-border space-y-3">
+              <label className="flex items-center gap-3 cursor-pointer select-none">
                 <input
-                  type="text"
-                  value={preparedByName}
-                  onChange={(e) => setPreparedByName(e.target.value)}
-                  placeholder="e.g. Placement Coordinator / Your Name"
-                  className="flex-1 bg-surface border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg px-3 py-1.5 text-xs text-fg outline-none shadow-xs font-medium"
+                  type="checkbox"
+                  checked={includePreparedBy}
+                  onChange={(e) => setIncludePreparedBy(e.target.checked)}
+                  className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary shrink-0"
                 />
-              </div>
-            )}
+                <div className="flex-1">
+                  <span className="text-xs font-bold text-fg flex items-center gap-2">
+                    Include &quot;Prepared by&quot; in Report Footer
+                  </span>
+                  <p className="text-[11px] text-fg-subtle mt-0.5">
+                    When selected, the preferred by person name will be displayed in the document footer area. When unchecked, it will be omitted from the report.
+                  </p>
+                </div>
+              </label>
+
+              {includePreparedBy && (
+                <div className="pt-2 pl-7 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <label className="text-xs font-semibold text-fg shrink-0">
+                    Prepared by Name:
+                  </label>
+                  <input
+                    type="text"
+                    value={preparedByName}
+                    onChange={(e) => setPreparedByName(e.target.value)}
+                    placeholder="e.g. Placement Coordinator / Your Name"
+                    className="flex-1 bg-surface border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg px-3 py-1.5 text-xs text-fg outline-none shadow-xs font-medium"
+                  />
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Validation Errors Alert */}
         {validationErrors.length > 0 && (

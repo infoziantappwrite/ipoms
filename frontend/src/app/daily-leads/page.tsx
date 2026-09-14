@@ -384,15 +384,17 @@ export default function DailyLeadsPage() {
       return;
     }
 
-    const headers = ['SI.NO', 'Time Stamp', 'Date', 'Company Name', 'Role', 'CTC', 'Eligible Batch', 'Lead Type'];
+    const headers = ['SI.NO', 'Time Stamp', 'Date', 'College', 'Company Name', 'Role', 'CTC', 'Eligible Batch', 'Coordinator', 'Lead Type'];
     const rows = leads.map((r, idx) => [
       idx + 1,
       r.event_time || '',
       r.lead_date ? new Date(r.lead_date).toISOString().split('T')[0] : '',
+      typeof r.college_id === 'object' ? r.college_id?.college_code || r.college_id?.college_name || '' : '',
       r.company_name || '',
       r.job_role || '',
       r.ctc || '',
       r.eligible_batch || '',
+      r.coordinator_id?.full_name || 'Placement Team',
       r.lead_type === 'positive' ? 'Positives' : 'JD Received',
     ]);
 
@@ -406,12 +408,14 @@ export default function DailyLeadsPage() {
   // Trigger direct navigation to Report Builder when clicking PDF or Image from dropdown
   const handleOpenPdfModal = () => {
     const collegeQuery = getActiveCollege()?.id || 'all';
-    router.push(`/reports?template=weekly_placement&collegeId=${encodeURIComponent(collegeQuery)}`);
+    const targetTemplate = activeTab === 'positive' ? 'daily_positives' : 'daily_jd_received';
+    router.push(`/reports?template=${targetTemplate}&date=${selectedDate}&collegeId=${encodeURIComponent(collegeQuery)}&auto=true`);
   };
 
   const handleOpenImageModal = () => {
     const collegeQuery = getActiveCollege()?.id || 'all';
-    router.push(`/reports?template=weekly_placement&collegeId=${encodeURIComponent(collegeQuery)}`);
+    const targetTemplate = activeTab === 'positive' ? 'daily_positives' : 'daily_jd_received';
+    router.push(`/reports?template=${targetTemplate}&date=${selectedDate}&collegeId=${encodeURIComponent(collegeQuery)}&auto=true`);
   };
 
   return (

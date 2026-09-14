@@ -81,10 +81,59 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
   totalH += metaH + 16;
 
   const activeKpis = report.included_kpi_cards || report.included_sections?.kpi_cards || {};
-  const hasKpis = report.template_type !== 'pending_tasks' && report.included_sections?.kpi_summary && report.kpi_summary;
+  const hasKpis = report.template_type !== 'pending_tasks' && report.included_sections?.kpi_summary !== false && report.kpi_summary;
   let kpiCards: Array<{ label: string; val: any; color: string; bg?: string; border?: string; labelColor?: string; key?: string }> = [];
   if (hasKpis) {
-    if (report.template_type === 'month_end') {
+    if (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') {
+      const isPos = report.template_type === 'daily_positives';
+      kpiCards = [
+        {
+          label: isPos ? 'Total Positives' : 'Total JDs Received',
+          val: isPos ? (report.kpi_summary.total_positives || 0) : (report.kpi_summary.total_jds || 0),
+          color: isPos ? '#059669' : '#2563eb',
+          bg: isPos ? '#ecfdf5' : '#eff6ff',
+          border: isPos ? '#6ee7b7' : '#93c5fd',
+          labelColor: isPos ? '#065f46' : '#1e40af',
+          key: isPos ? 'total_positives' : 'total_jds'
+        },
+        {
+          label: isPos ? 'Colleges Reached' : 'Beneficiary Colleges',
+          val: report.kpi_summary.active_colleges_count || 0,
+          color: '#2563eb',
+          bg: '#eff6ff',
+          border: '#bfdbfe',
+          labelColor: '#1e40af',
+          key: 'active_colleges_count'
+        },
+        {
+          label: 'Distinct Companies',
+          val: report.kpi_summary.distinct_companies_count || 0,
+          color: '#4f46e5',
+          bg: '#eef2ff',
+          border: '#c7d2fe',
+          labelColor: '#3730a3',
+          key: 'distinct_companies_count'
+        },
+        {
+          label: 'Highest Package',
+          val: report.kpi_summary.highest_ctc || '—',
+          color: '#7c3aed',
+          bg: '#faf5ff',
+          border: '#d8b4fe',
+          labelColor: '#6b21a8',
+          key: 'highest_ctc'
+        },
+        {
+          label: 'Graduating Batch',
+          val: report.kpi_summary.graduating_year || '2027',
+          color: '#059669',
+          bg: '#ecfdf5',
+          border: '#6ee7b7',
+          labelColor: '#065f46',
+          key: 'graduating_year'
+        },
+      ];
+    } else if (report.template_type === 'month_end') {
       kpiCards = [
         { label: 'Total Conversions', val: report.kpi_summary.total_conversion_count || 0, color: '#059669', bg: '#ecfdf5', border: '#6ee7b7', labelColor: '#065f46', key: 'total_conversion_count' },
         { label: 'Companies Scheduled', val: report.kpi_summary.total_companies_scheduled || 0, color: '#d97706', bg: '#fffbeb', border: '#fcd34d', labelColor: '#92400e', key: 'total_companies_scheduled' },
@@ -93,6 +142,9 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
     } else if (report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined) {
       kpiCards = [
         { label: 'Total Active Leads', val: report.kpi_summary.total_leads || 0, color: '#2563eb', bg: '#eff6ff', border: '#93c5fd', labelColor: '#1e40af', key: 'total_leads' },
+        { label: 'JD Received', val: report.kpi_summary.hot_leads_count || 0, color: '#d97706', bg: '#fffbeb', border: '#fcd34d', labelColor: '#92400e', key: 'hot_leads_count' },
+        { label: 'Positives Received', val: report.kpi_summary.warm_leads_count || 0, color: '#059669', bg: '#ecfdf5', border: '#6ee7b7', labelColor: '#065f46', key: 'warm_leads_count' },
+        { label: 'Weekly Pipeline', val: report.kpi_summary.pipeline_leads_count || 0, color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', labelColor: '#3730a3', key: 'pipeline_leads_count' },
         { label: 'Graduating Batch', val: report.kpi_summary.graduating_year || '2027', color: '#059669', bg: '#ecfdf5', border: '#6ee7b7', labelColor: '#065f46', key: 'graduating_year' },
       ];
     } else if (report.is_multi_college) {
@@ -511,7 +563,7 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
   }
 
   // 3. Single-College Weekly Placement (Sections 1-9)
-  if (!report.is_multi_college && report.template_type !== 'month_end' && report.template_type !== 'active_leads' && report.template_type !== 'pending_tasks') {
+  if (!report.is_multi_college && report.template_type !== 'month_end' && report.template_type !== 'active_leads' && report.template_type !== 'pending_tasks' && report.template_type !== 'daily_positives' && report.template_type !== 'daily_jd_received') {
     // 1. Completed
     if (report.included_sections?.completed_companies && report.sections?.completed_companies) {
       const cRows = report.sections.completed_companies;
@@ -1316,6 +1368,71 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
         measuredRows,
       });
     }
+  }
+
+  // 6. Daily Positives & Daily JD Received Sections
+  if (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') {
+    const isPos = report.template_type === 'daily_positives';
+    const leads = (isPos ? report.sections?.daily_positives : report.sections?.daily_jd_received) || [];
+    const headers = ['#', 'Company Name', 'Role / Designation', 'CTC', 'Date', 'Time', 'College', 'Batch', 'Coordinator'];
+    // Total content width: 800px (34 + 165 + 135 + 72 + 68 + 64 + 62 + 55 + 145 = 800)
+    const colWidths = [34, 165, 135, 72, 68, 64, 62, 55, 145];
+    const rawRows = leads.map((r: any, idx: number) => [
+      String(r.s_no || idx + 1),
+      String(r.company_name || '—'),
+      String(r.role || r.job_role || '—'),
+      String(r.ctc || '—'),
+      String(r.date || '—'),
+      String(r.time || r.time_stamp || r.event_time || '—'),
+      String(r.college_code || '—'),
+      String(r.batch || r.eligible_batch || '—'),
+      String(r.coordinator || 'Placement Team'),
+    ]);
+
+    const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
+      let maxLines = 1;
+      const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
+        const colW = colWidths[cIdx];
+        const maxCellW = colW - 10;
+        const font = cIdx === 1
+          ? 'bold 11.5px system-ui, -apple-system, sans-serif'
+          : (cIdx === 0 || cIdx === 4 || cIdx === 5 || cIdx === 6)
+          ? '600 10.5px monospace'
+          : (cIdx === 3)
+          ? 'bold 11px system-ui, -apple-system, sans-serif'
+          : (cIdx === 8)
+          ? '600 11px system-ui, -apple-system, sans-serif'
+          : '500 11px system-ui, -apple-system, sans-serif';
+        const fillStyle = cIdx === 1
+          ? '#0a2540'
+          : cIdx === 0
+          ? (isPos ? '#059669' : '#2563eb')
+          : (cIdx === 6)
+          ? (isPos ? '#047857' : '#1d4ed8')
+          : (cIdx === 3)
+          ? (isPos ? '#059669' : '#2563eb')
+          : (cIdx === 8)
+          ? '#1e293b'
+          : '#334155';
+
+        const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
+        if (lines.length > maxLines) maxLines = lines.length;
+        return { lines, font, fillStyle };
+      });
+      const height = Math.max(34, maxLines * 15 + 14);
+      return { cells, height };
+    });
+
+    sectionsToDraw.push({
+      title: isPos ? '1. POSITIVES OF THE DAY' : '1. JD RECEIVED FOR THE DAY',
+      badge: `${leads.length} Leads`,
+      accentBg: isPos ? '#ecfdf5' : '#eff6ff',
+      accentBorder: isPos ? '#a7f3d0' : '#bfdbfe',
+      accentText: '#0a2540',
+      headers,
+      colWidths,
+      measuredRows,
+    });
   }
 
   // Calculate total sections height

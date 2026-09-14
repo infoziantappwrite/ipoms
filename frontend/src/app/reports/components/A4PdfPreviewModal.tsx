@@ -29,6 +29,7 @@ import {
   FileText,
   Loader2,
   Sparkles,
+  BarChart3,
 } from 'lucide-react';
 import { COLLEGE_LOGO_MAP, getCollegeLogoUrl } from '@/lib/collegeLogo';
 import {
@@ -212,7 +213,9 @@ export function A4PdfPreviewModal({
         : (report.kpi_summary?.selected_streams?.jd_received &&
             !report.kpi_summary?.selected_streams?.positives &&
             !report.kpi_summary?.selected_streams?.weekly_tracker) ||
+          report.kpi_summary?.tier_focus?.includes('JD Received') ||
           report.kpi_summary?.tier_focus?.includes('Hot Leads (JD Received)') ||
+          report.report_title?.includes('JD Received') ||
           report.report_title?.includes('Hot Leads') ||
           (report.sections?.active_leads &&
             report.sections.active_leads.some(
@@ -330,95 +333,45 @@ export function A4PdfPreviewModal({
                         </div>
                       </div>
 
-                      {/* KPI Summary */}
-                      {report.included_sections?.kpi_summary && report.kpi_summary && (
-                        <div className="flex flex-wrap gap-2 mb-3">
-                          <div className="flex-1 min-w-[90px] border p-2 rounded-xl text-center shadow-xs bg-blue-50 border-blue-300">
-                            <span className="text-[9.5px] font-bold uppercase block tracking-wider text-blue-800">
-                              Total Active Leads
-                            </span>
-                            <span className="text-base font-extrabold font-mono text-blue-700">
-                              {report.kpi_summary.total_leads || allActiveLeads.length}
-                            </span>
-                          </div>
-                          {report.kpi_summary.hot_leads_count !== undefined &&
-                            report.kpi_summary.hot_leads_count > 0 && (
-                              <div className="flex-1 min-w-[90px] border p-2 rounded-xl text-center shadow-xs bg-amber-50 border-amber-300">
-                                <span className="text-[9.5px] font-bold uppercase block tracking-wider text-amber-800">
-                                  Hot (JD Received)
-                                </span>
-                                <span className="text-base font-extrabold font-mono text-amber-700">
-                                  {report.kpi_summary.hot_leads_count}
-                                </span>
-                              </div>
-                            )}
-                          {report.kpi_summary.warm_leads_count !== undefined &&
-                            report.kpi_summary.warm_leads_count > 0 && (
-                              <div className="flex-1 min-w-[90px] border p-2 rounded-xl text-center shadow-xs bg-emerald-50 border-emerald-300">
-                                <span className="text-[9.5px] font-bold uppercase block tracking-wider text-emerald-800">
-                                  Warm (Positives)
-                                </span>
-                                <span className="text-base font-extrabold font-mono text-emerald-700">
-                                  {report.kpi_summary.warm_leads_count}
-                                </span>
-                              </div>
-                            )}
-                          {report.kpi_summary.pipeline_leads_count !== undefined &&
-                            report.kpi_summary.pipeline_leads_count > 0 && (
-                              <div className="flex-1 min-w-[90px] border p-2 rounded-xl text-center shadow-xs bg-indigo-50 border-indigo-300">
-                                <span className="text-[9.5px] font-bold uppercase block tracking-wider text-indigo-800">
-                                  Weekly Pipeline
-                                </span>
-                                <span className="text-base font-extrabold font-mono text-indigo-700">
-                                  {report.kpi_summary.pipeline_leads_count}
-                                </span>
-                              </div>
-                            )}
-                          <div className="flex-1 min-w-[90px] border p-2 rounded-xl text-center shadow-xs bg-slate-50 border-slate-300">
-                            <span className="text-[9.5px] font-bold uppercase block tracking-wider text-slate-700">
-                              Batch
-                            </span>
-                            <span className="text-base font-extrabold font-mono text-slate-800">
-                              {report.kpi_summary.graduating_year ||
-                                report.academic_year ||
-                                'All Batches'}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Section Title */}
+                      {/* Section Title with Single Total Leads Count */}
                       <div className="mb-2">
-                        <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5 uppercase">
-                          <TrendingUp size={14} className="text-[#007791] shrink-0" />
-                          {(() => {
-                            const tier = report.kpi_summary?.tier_focus || '';
-                            const batchSuffix =
-                              report.kpi_summary?.graduating_year &&
-                              report.kpi_summary.graduating_year !== 'All Batches'
-                                ? ` — ${report.kpi_summary.graduating_year}`
-                                : '';
-                            if (
-                              tier.includes('Hot Leads') ||
-                              report.report_title?.includes('Hot Leads')
-                            ) {
-                              return `HOT LEADS (JD RECEIVED)${batchSuffix}`;
-                            }
-                            if (
-                              tier.includes('Positive') ||
-                              report.report_title?.includes('Positive')
-                            ) {
-                              return `POSITIVE LEADS${batchSuffix}`;
-                            }
-                            if (
-                              tier.includes('Weekly Tracker') ||
-                              report.report_title?.includes('Weekly Tracker')
-                            ) {
-                              return `WEEKLY TRACKER PIPELINE${batchSuffix}`;
-                            }
-                            return `ACTIVE CORPORATE LEADS${batchSuffix}`;
-                          })()}
-                        </h3>
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5 uppercase">
+                            <TrendingUp size={14} className="text-[#007791] shrink-0" />
+                            {(() => {
+                              const tier = report.kpi_summary?.tier_focus || '';
+                              const batchSuffix =
+                                report.kpi_summary?.graduating_year &&
+                                report.kpi_summary.graduating_year !== 'All Batches'
+                                  ? ` — ${report.kpi_summary.graduating_year}`
+                                  : '';
+                              if (
+                                tier.includes('JD Received') ||
+                                tier.includes('Hot Leads') ||
+                                report.report_title?.includes('JD Received') ||
+                                report.report_title?.includes('Hot Leads')
+                              ) {
+                                return `JD RECEIVED${batchSuffix}`;
+                              }
+                              if (
+                                tier.includes('Positive') ||
+                                report.report_title?.includes('Positive')
+                              ) {
+                                return `POSITIVES RECEIVED${batchSuffix}`;
+                              }
+                              if (
+                                tier.includes('Weekly Tracker') ||
+                                report.report_title?.includes('Weekly Tracker')
+                              ) {
+                                return `WEEKLY TRACKER PIPELINE${batchSuffix}`;
+                              }
+                              return `ACTIVE CORPORATE LEADS${batchSuffix}`;
+                            })()}
+                          </h3>
+                          <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200 shrink-0">
+                            Total Leads: {allActiveLeads.length || report.kpi_summary?.total_leads || 0}
+                          </span>
+                        </div>
                         <div className="h-[2px] w-full bg-[#007791] mt-1" />
                       </div>
                     </>
@@ -445,16 +398,18 @@ export function A4PdfPreviewModal({
                                   ? ` — ${report.kpi_summary.graduating_year}`
                                   : '';
                               if (
+                                tier.includes('JD Received') ||
                                 tier.includes('Hot Leads') ||
+                                report.report_title?.includes('JD Received') ||
                                 report.report_title?.includes('Hot Leads')
                               ) {
-                                return `HOT LEADS (JD RECEIVED)${batchSuffix}`;
+                                return `JD RECEIVED${batchSuffix}`;
                               }
                               if (
                                 tier.includes('Positive') ||
                                 report.report_title?.includes('Positive')
                               ) {
-                                return `POSITIVE LEADS${batchSuffix}`;
+                                return `POSITIVES RECEIVED${batchSuffix}`;
                               }
                               if (
                                 tier.includes('Weekly Tracker') ||
@@ -717,7 +672,72 @@ export function A4PdfPreviewModal({
             (() => {
               const activeKpis =
                 report.included_kpi_cards || report.included_sections?.kpi_cards || {};
-              if (report.template_type === 'month_end') {
+              if (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') {
+                const isPositives = report.template_type === 'daily_positives';
+                const dailyCards = [
+                  {
+                    key: isPositives ? 'total_positives' : 'total_jds',
+                    label: isPositives ? 'Total Positives' : 'Total JDs Received',
+                    val: isPositives ? (report.kpi_summary.total_positives || 0) : (report.kpi_summary.total_jds || 0),
+                    bg: isPositives ? 'bg-emerald-50 border-emerald-300' : 'bg-blue-50 border-blue-300',
+                    text: isPositives ? 'text-emerald-700' : 'text-blue-700',
+                    labelText: isPositives ? 'text-emerald-800' : 'text-blue-800',
+                  },
+                  {
+                    key: 'active_colleges_count',
+                    label: isPositives ? 'Colleges Reached' : 'Beneficiary Colleges',
+                    val: report.kpi_summary.active_colleges_count || 0,
+                    bg: 'bg-blue-50 border-blue-200',
+                    text: 'text-blue-700',
+                    labelText: 'text-blue-800',
+                  },
+                  {
+                    key: 'distinct_companies_count',
+                    label: 'Distinct Companies',
+                    val: report.kpi_summary.distinct_companies_count || 0,
+                    bg: 'bg-indigo-50 border-indigo-200',
+                    text: 'text-indigo-700',
+                    labelText: 'text-indigo-800',
+                  },
+                  {
+                    key: 'highest_ctc',
+                    label: 'Highest Package',
+                    val: report.kpi_summary.highest_ctc || '—',
+                    bg: 'bg-purple-50 border-purple-200',
+                    text: 'text-purple-700',
+                    labelText: 'text-purple-800',
+                  },
+                  {
+                    key: 'graduating_year',
+                    label: 'Graduating Batch',
+                    val: report.kpi_summary.graduating_year || '2027',
+                    bg: 'bg-emerald-50 border-emerald-200',
+                    text: 'text-emerald-700',
+                    labelText: 'text-emerald-800',
+                  },
+                ].filter((c) => activeKpis[c.key] !== false);
+
+                if (dailyCards.length === 0) return null;
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                    {dailyCards.map((c) => (
+                      <div
+                        key={c.key}
+                        className={`border p-2.5 rounded-xl text-center shadow-xs ${c.bg}`}
+                      >
+                        <span
+                          className={`text-[9.5px] font-bold uppercase block tracking-wider truncate ${c.labelText}`}
+                        >
+                          {c.label}
+                        </span>
+                        <span className={`text-base font-extrabold font-mono ${c.text}`}>
+                          {c.val}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              } else if (report.template_type === 'month_end') {
                 const meCards = [
                   {
                     key: 'total_conversion_count',
@@ -916,6 +936,58 @@ export function A4PdfPreviewModal({
                   </div>
                 );
               }
+            })()}
+
+          {/* Pipeline Overview — compact horizontal-bar visual summary of the
+              section breakdown, so the whole report's story reads in one
+              glance instead of counting rows across up to 9 separate tables. */}
+          {!report.is_multi_college &&
+            report.template_type === 'weekly_placement' &&
+            (() => {
+              const barSections = [
+                { key: 'completed_companies', label: 'Completed', bar: 'bg-emerald-500', text: 'text-emerald-700' },
+                { key: 'drive_in_progress', label: 'Drive in Progress', bar: 'bg-amber-500', text: 'text-amber-700' },
+                { key: 'companies_in_drive', label: 'Upcoming Drives', bar: 'bg-indigo-500', text: 'text-indigo-700' },
+                { key: 'in_progress', label: 'In Progress', bar: 'bg-blue-500', text: 'text-blue-700' },
+                { key: 'pipeline', label: 'Pipeline', bar: 'bg-cyan-500', text: 'text-cyan-700' },
+                { key: 'top_companies', label: 'Top Companies', bar: 'bg-purple-500', text: 'text-purple-700' },
+                { key: 'rejected_companies', label: 'Rejected', bar: 'bg-rose-500', text: 'text-rose-700' },
+                { key: 'on_hold_by_college', label: 'On Hold (College)', bar: 'bg-orange-500', text: 'text-orange-700' },
+                { key: 'on_hold_by_hr', label: 'On Hold (HR)', bar: 'bg-slate-400', text: 'text-slate-700' },
+              ]
+                .filter((s) => report.included_sections?.[s.key] && Array.isArray(report.sections?.[s.key]))
+                .map((s) => ({ ...s, count: report.sections[s.key].length }));
+
+              const total = barSections.reduce((sum, s) => sum + s.count, 0);
+              if (barSections.length === 0 || total === 0) return null;
+              const maxCount = Math.max(...barSections.map((s) => s.count), 1);
+
+              return (
+                <div className="border border-slate-200 rounded-xl p-3.5 bg-slate-50/40 print:break-inside-avoid break-inside-avoid">
+                  <h3 className="text-[12px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5 uppercase mb-2.5">
+                    <BarChart3 size={13} className="text-[#007791] shrink-0" />
+                    Pipeline Overview — {total} {total === 1 ? 'Company' : 'Companies'}
+                  </h3>
+                  <div className="space-y-1.5">
+                    {barSections.map((s) => (
+                      <div key={s.key} className="flex items-center gap-2">
+                        <span className="w-[110px] shrink-0 text-[9.5px] font-semibold text-slate-600 truncate">
+                          {s.label}
+                        </span>
+                        <div className="flex-1 h-3.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${s.bar} rounded-full`}
+                            style={{ width: `${Math.max(3, (s.count / maxCount) * 100)}%` }}
+                          />
+                        </div>
+                        <span className={`w-[24px] shrink-0 text-[10px] font-bold font-mono text-right ${s.text}`}>
+                          {s.count}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
             })()}
 
           {/* Multi-College Sections */}
@@ -2242,6 +2314,164 @@ export function A4PdfPreviewModal({
                 </div>
               )}
             </>
+          )}
+
+          {/* Daily Positives Table */}
+          {report.template_type === 'daily_positives' && report.included_sections?.daily_positives !== false && report.sections?.daily_positives && (
+            <div className="space-y-1.5">
+              <div className="mb-2">
+                <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
+                  <TrendingUp size={14} className="text-emerald-600 shrink-0" /> 1. POSITIVES OF THE DAY
+                </h3>
+                <div className="h-[2px] w-full bg-emerald-600 mt-1" />
+              </div>
+              {report.sections.daily_positives.length === 0 ? (
+                <p className="text-[11px] text-slate-400 italic py-1 pl-1">
+                  No positive leads recorded for this day.
+                </p>
+              ) : (
+                <table className="w-full text-[11px] border-collapse table-fixed bg-white">
+                  <colgroup>
+                    <col style={{ width: '36px' }} />
+                    <col style={{ width: '22%' }} />
+                    <col style={{ width: '17%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '75px' }} />
+                    <col style={{ width: '70px' }} />
+                    <col style={{ width: '70px' }} />
+                    <col style={{ width: '65px' }} />
+                    <col style={{ width: '15%' }} />
+                  </colgroup>
+                  <thead className="print:table-header-group">
+                    <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
+                      <th className="py-2 px-1 text-center font-bold">#</th>
+                      <th className="py-2 px-2 text-center font-bold">COMPANY NAME</th>
+                      <th className="py-2 px-2 text-center font-bold">ROLE / DESIGNATION</th>
+                      <th className="py-2 px-1 text-center font-bold">CTC</th>
+                      <th className="py-2 px-1.5 text-center font-bold">DATE</th>
+                      <th className="py-2 px-1.5 text-center font-bold">TIME</th>
+                      <th className="py-2 px-1.5 text-center font-bold">COLLEGE</th>
+                      <th className="py-2 px-1 text-center font-bold">BATCH</th>
+                      <th className="py-2 px-2 text-center font-bold">COORDINATOR</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200/80">
+                    {report.sections.daily_positives.map((r: any, idx: number) => (
+                      <tr key={idx} className={idx % 2 === 0 ? 'bg-[#f0fdf4]/50' : 'bg-white'}>
+                        <td className="py-2 px-1 text-center font-bold text-emerald-700">
+                          {r.s_no || idx + 1}
+                        </td>
+                        <td className="py-2 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
+                          {r.company_name}
+                        </td>
+                        <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
+                          {r.role || r.job_role || '—'}
+                        </td>
+                        <td className="py-2 px-1 text-center font-bold text-emerald-600 whitespace-normal break-words leading-snug">
+                          {r.ctc || '—'}
+                        </td>
+                        <td className="py-2 px-1.5 text-center text-slate-600 whitespace-normal break-words leading-snug font-mono text-[10px]">
+                          {r.date || '—'}
+                        </td>
+                        <td className="py-2 px-1.5 text-center text-slate-600 font-mono text-[10px] whitespace-normal break-words leading-snug">
+                          {r.time || r.time_stamp || r.event_time || '—'}
+                        </td>
+                        <td className="py-2 px-1 text-center">
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            {r.college_code || '—'}
+                          </span>
+                        </td>
+                        <td className="py-2 px-1 text-center text-slate-600 whitespace-normal break-words leading-snug">
+                          {r.batch || r.eligible_batch || '—'}
+                        </td>
+                        <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
+                          {r.coordinator || 'Placement Team'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
+          {/* Daily JD Received Table */}
+          {report.template_type === 'daily_jd_received' && report.included_sections?.daily_jd_received !== false && report.sections?.daily_jd_received && (
+            <div className="space-y-1.5">
+              <div className="mb-2">
+                <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
+                  <Briefcase size={14} className="text-blue-600 shrink-0" /> 1. JD RECEIVED FOR THE DAY
+                </h3>
+                <div className="h-[2px] w-full bg-blue-600 mt-1" />
+              </div>
+              {report.sections.daily_jd_received.length === 0 ? (
+                <p className="text-[11px] text-slate-400 italic py-1 pl-1">
+                  No JDs received recorded for this day.
+                </p>
+              ) : (
+                <table className="w-full text-[11px] border-collapse table-fixed bg-white">
+                  <colgroup>
+                    <col style={{ width: '36px' }} />
+                    <col style={{ width: '22%' }} />
+                    <col style={{ width: '17%' }} />
+                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '75px' }} />
+                    <col style={{ width: '70px' }} />
+                    <col style={{ width: '70px' }} />
+                    <col style={{ width: '65px' }} />
+                    <col style={{ width: '15%' }} />
+                  </colgroup>
+                  <thead className="print:table-header-group">
+                    <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
+                      <th className="py-2 px-1 text-center font-bold">#</th>
+                      <th className="py-2 px-2 text-center font-bold">COMPANY NAME</th>
+                      <th className="py-2 px-2 text-center font-bold">ROLE / DESIGNATION</th>
+                      <th className="py-2 px-1 text-center font-bold">CTC</th>
+                      <th className="py-2 px-1.5 text-center font-bold">DATE</th>
+                      <th className="py-2 px-1.5 text-center font-bold">TIME</th>
+                      <th className="py-2 px-1.5 text-center font-bold">COLLEGE</th>
+                      <th className="py-2 px-1 text-center font-bold">BATCH</th>
+                      <th className="py-2 px-2 text-center font-bold">COORDINATOR</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200/80">
+                    {report.sections.daily_jd_received.map((r: any, idx: number) => (
+                      <tr key={idx} className={idx % 2 === 0 ? 'bg-[#eff6ff]/50' : 'bg-white'}>
+                        <td className="py-2 px-1 text-center font-bold text-blue-700">
+                          {r.s_no || idx + 1}
+                        </td>
+                        <td className="py-2 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
+                          {r.company_name}
+                        </td>
+                        <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
+                          {r.role || r.job_role || '—'}
+                        </td>
+                        <td className="py-2 px-1 text-center font-bold text-blue-600 whitespace-normal break-words leading-snug">
+                          {r.ctc || '—'}
+                        </td>
+                        <td className="py-2 px-1.5 text-center text-slate-600 whitespace-normal break-words leading-snug font-mono text-[10px]">
+                          {r.date || '—'}
+                        </td>
+                        <td className="py-2 px-1.5 text-center text-slate-600 font-mono text-[10px] whitespace-normal break-words leading-snug">
+                          {r.time || r.time_stamp || r.event_time || '—'}
+                        </td>
+                        <td className="py-2 px-1 text-center">
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
+                            {r.college_code || '—'}
+                          </span>
+                        </td>
+                        <td className="py-2 px-1 text-center text-slate-600 whitespace-normal break-words leading-snug">
+                          {r.batch || r.eligible_batch || '—'}
+                        </td>
+                        <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
+                          {r.coordinator || 'Placement Team'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           )}
 
           {/* Observations & Remarks */}
