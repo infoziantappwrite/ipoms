@@ -9,7 +9,6 @@ import {
   CalendarDays,
   Target,
   Sparkles,
-  ListTodo,
   Database,
   TrendingUp,
   PanelLeftClose,
@@ -60,7 +59,6 @@ const NAV: NavItem[] = [
   { href: '/weekly-tracker', label: 'Weekly Tracker', Icon: CalendarDays, roles: ['coordinator', 'team_leader'] },
   { href: '/daily-leads', label: 'Daily Leads', Icon: Target, roles: ['coordinator', 'team_leader'] },
   { href: '/active-leads', label: 'Active Leads', Icon: Sparkles, roles: ['coordinator', 'team_leader'] },
-  { href: '/pending-tasks', label: 'Pending Task', Icon: ListTodo, roles: ['coordinator', 'team_leader'] },
 
   // Intelligence & Reporting
   { href: '/metadata', label: 'Metadata DB', Icon: Database },

@@ -12,10 +12,12 @@ function ReportsPageContent() {
   const searchParams = useSearchParams();
   const templateQuery = searchParams.get('template') || 'weekly_placement';
   const collegeIdQuery = searchParams.get('collegeId') || '';
+  const dateQuery = searchParams.get('date') || '';
   const autoQuery = searchParams.get('auto') === 'true';
 
   const [selectedCollegeId, setSelectedCollegeId] = useState<string>(collegeIdQuery);
   const [selectedTemplateType, setSelectedTemplateType] = useState<string>(templateQuery);
+  const [selectedDate, setSelectedDate] = useState<string>(dateQuery);
   const [generatedReport, setGeneratedReport] = useState<any>(null);
   const [isEditingReport, setIsEditingReport] = useState<boolean>(false);
   const [coordinatorId, setCoordinatorId] = useState<string>('');
@@ -28,6 +30,7 @@ function ReportsPageContent() {
   useEffect(() => {
     if (templateQuery) setSelectedTemplateType(templateQuery);
     if (collegeIdQuery) setSelectedCollegeId(collegeIdQuery);
+    if (dateQuery) setSelectedDate(dateQuery);
 
     if (autoQuery) {
       const autoGenerate = async () => {
@@ -38,6 +41,7 @@ function ReportsPageContent() {
             body: JSON.stringify({
               template_type: templateQuery,
               college_id: collegeIdQuery,
+              date: dateQuery,
               coordinator_id: readSessionUser()?._id ?? '',
             }),
           });
@@ -53,7 +57,7 @@ function ReportsPageContent() {
       };
       autoGenerate();
     }
-  }, [templateQuery, collegeIdQuery, autoQuery]);
+  }, [templateQuery, collegeIdQuery, dateQuery, autoQuery]);
 
   const handleReportGenerated = (reportData: any) => {
     if (reportData?.template_type) {

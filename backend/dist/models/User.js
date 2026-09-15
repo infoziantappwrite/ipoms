@@ -225,6 +225,45 @@ const UserSchema = new mongoose_1.Schema({
         type: Date,
         default: null,
     },
+    last_active_at: {
+        type: Date,
+        default: null,
+        index: true,
+    },
+    logged_out_at: {
+        type: Date,
+        default: null,
+    },
+    is_online: {
+        type: Boolean,
+        default: false,
+        index: true,
+    },
+    active_college_id: {
+        type: mongoose_1.Schema.Types.ObjectId,
+        ref: 'College',
+        default: null,
+    },
+    active_college_code: {
+        type: String,
+        default: '',
+        trim: true,
+    },
+    active_college_name: {
+        type: String,
+        default: '',
+        trim: true,
+    },
+    active_college_location: {
+        type: String,
+        default: '',
+        trim: true,
+    },
+    current_page: {
+        type: String,
+        default: '',
+        trim: true,
+    },
     last_password_changed_at: {
         type: Date,
         default: null,

@@ -476,6 +476,9 @@ function registerAuthRoutes(app) {
             user.failed_login_attempts = 0;
             user.locked_at = null;
             user.last_login_at = new Date();
+            user.last_active_at = new Date();
+            user.is_online = true;
+            user.logged_out_at = null;
             await user.save();
             await (0, audit_1.writeAudit)({
                 action: 'LOGIN', entityType: 'users', entityId: user._id, performedBy: user._id,
@@ -534,10 +537,29 @@ function registerAuthRoutes(app) {
             return fail(res, 500, 'INTERNAL_SERVER_ERROR', error?.message || 'Unexpected error');
         }
     });
-    /* ── Sign out: clear the remember-me cookie server-side. Access token
-       revocation itself is out of scope (stateless 8h tokens, same as the
-       rest of the app) — this only stops this device from silently refreshing. */
+    /* ── Sign out: clear the remember-me cookie server-side and mark user presence ── */
     app.post('/api/v1/auth/logout', async (req, res) => {
+        try {
+            const authHeader = req.headers.authorization;
+            const bodyUserId = req.body?.user_id;
+            let uid = bodyUserId || null;
+            if (!uid && authHeader && authHeader.startsWith('Bearer ')) {
+                const token = authHeader.split(' ')[1];
+                try {
+                    const decoded = jsonwebtoken_1.default.verify(token, authMiddleware_1.JWT_ACCESS_SECRET);
+                    uid = decoded.userId || decoded.id;
+                }
+                catch { }
+            }
+            if (uid) {
+                await User_1.User.findByIdAndUpdate(uid, {
+                    is_online: false,
+                    logged_out_at: new Date(),
+                    last_active_at: new Date(),
+                });
+            }
+        }
+        catch { }
         clearRefreshCookie(res, req);
         return res.status(200).json({ success: true, message: 'Signed out.' });
     });

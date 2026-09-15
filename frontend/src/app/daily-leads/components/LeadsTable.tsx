@@ -112,7 +112,8 @@ export function LeadsTable({
               <th className="py-3 px-3 min-w-[220px] text-center border-r border-border/80">Company Name</th>
               <th className="py-3 px-3 min-w-[170px] text-center border-r border-border/80">Role</th>
               <th className="py-3 px-3 min-w-[110px] text-center border-r border-border/80">CTC</th>
-              <th className={`py-3 px-3 min-w-[110px] text-center ${activeTab === 'positive' ? 'border-r border-border/80' : ''}`}>Eligible Batch</th>
+              <th className="py-3 px-3 min-w-[110px] text-center border-r border-border/80">Eligible Batch</th>
+              <th className={`py-3 px-3 min-w-[140px] text-center ${activeTab === 'positive' ? 'border-r border-border/80' : ''}`}>Coordinator</th>
               {activeTab === 'positive' && (
                 <th className="py-3 px-2 w-28 text-center">Action</th>
               )}
@@ -412,12 +413,22 @@ function TableRow({
       </td>
 
       {/* Eligible Batch (Multi-select from 2025 onwards) */}
-      <td className={`py-2.5 px-3 text-fg-muted whitespace-nowrap min-w-[110px] text-center ${activeTab === 'positive' ? 'border-r border-border/60' : ''}`}>
+      <td className="py-2.5 px-3 text-fg-muted whitespace-nowrap min-w-[110px] text-center border-r border-border/60">
         <SmoothYearDropdown
           value={row.eligible_batch}
           onChange={(newYear) => onUpdateRow(row._id, { eligible_batch: newYear })}
           placeholder="Batch"
         />
+      </td>
+
+      {/* Coordinator Column */}
+      <td className={`py-2.5 px-3 whitespace-nowrap min-w-[140px] text-center ${activeTab === 'positive' ? 'border-r border-border/60' : ''}`}>
+        <div className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-sunken border border-border/70 text-fg font-medium text-micro shadow-2xs mx-auto">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+          <span className="truncate max-w-[130px] font-semibold" title={row.coordinator_id?.full_name || 'Placement Team'}>
+            {row.coordinator_id?.full_name || 'Placement Team'}
+          </span>
+        </div>
       </td>
 
       {/* Action Column (Only needed for Positives tab to Move to JD; removed for JD Received since all cells are inline editable) */}
