@@ -49,7 +49,10 @@ export async function promoteDailyTrackerRowToWeekly(
   const existing = await WeeklyTracker.findOne({
     college_id: dRow.college_id,
     academic_year: resolvedYear,
-    company_name: { $regex: `^${escapedName}$`, $options: 'i' },
+    $or: [
+      { daily_tracker_id: dRow._id },
+      { company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') } },
+    ],
     is_deleted: false,
   });
 

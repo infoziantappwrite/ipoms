@@ -1,12 +1,22 @@
 'use client';
 
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import { Phone, Check } from 'lucide-react';
 import type { TrackerRow as TrackerRowType, CallOutcome } from '../page';
 import { triggerHaptic } from '@/lib/haptics';
 import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
 import { RowOutcomeDropdown } from './RowOutcomeDropdown';
 import { RowMonthDropdown } from './RowMonthDropdown';
+import {
+  smartParseTime,
+  formatTime,
+  formatDurationMinutesLevel,
+  nowISO,
+} from '@/lib/timeValidation';
+import {
+  validateAndNormalizeIndianContact,
+  validateAndNormalizeEmail,
+} from '@/lib/contactValidation';
 
 const OUTCOMES: { value: CallOutcome; label: string; color: string }[] = [
   { value: 'jd_received', label: 'JD Received', color: 'text-primary' },
@@ -63,82 +73,6 @@ interface Props {
   onToggleSelect?: (rowId: string, index: number, shiftKey: boolean) => void;
 }
 
-// Format a Date (or ISO string) as HH:MM AM/PM per user preference
-function formatTime(d: string | Date | undefined): string {
-  if (!d) return '';
-  const date = typeof d === 'string' ? new Date(d) : d;
-  if (isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-}
-
-// Get current time as ISO string for submission to API
-function nowISO(): string {
-  return new Date().toISOString();
-}
-
-// Smart time parser: predicts AM/PM from system time if omitted, accepts 852, 08:52, 8.52, etc.
-function smartParseTime(input: string): { iso: string; formatted: string } | null {
-  if (!input || !input.trim()) return null;
-  const raw = input.trim();
-
-  // 1. Detect explicit AM / PM or A / P
-  let explicitPeriod: 'AM' | 'PM' | null = null;
-  if (/\b(am|a)\b/i.test(raw) || raw.toUpperCase().endsWith('AM') || raw.toUpperCase().endsWith('A')) {
-    explicitPeriod = 'AM';
-  } else if (/\b(pm|p)\b/i.test(raw) || raw.toUpperCase().endsWith('PM') || raw.toUpperCase().endsWith('P')) {
-    explicitPeriod = 'PM';
-  }
-
-  // 2. Extract digits only for hour & minute
-  const clean = raw.replace(/[a-zA-Z]/g, '').trim();
-  let parts = clean.split(/[:.]/).map(Number);
-
-  if (parts.length === 1 && !isNaN(parts[0])) {
-    const numStr = parts[0].toString();
-    if (numStr.length === 3) {
-      parts = [parseInt(numStr[0], 10), parseInt(numStr.slice(1), 10)];
-    } else if (numStr.length === 4) {
-      parts = [parseInt(numStr.slice(0, 2), 10), parseInt(numStr.slice(2), 10)];
-    }
-  }
-
-  if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) {
-    return null;
-  }
-
-  let h = parts[0];
-  const m = Math.min(59, Math.max(0, parts[1]));
-  const s = parts[2] ? Math.min(59, Math.max(0, parts[2])) : 0;
-
-  // 3. Handle 24-hour inputs (e.g. 14:30 -> 2:30 PM)
-  if (h >= 13 && h <= 23) {
-    explicitPeriod = 'PM';
-    h = h - 12;
-  } else if (h === 0) {
-    explicitPeriod = 'AM';
-    h = 12;
-  }
-
-  // 4. If period was not explicitly typed, predict from system time
-  const now = new Date();
-  const systemPeriod: 'AM' | 'PM' = now.getHours() >= 12 ? 'PM' : 'AM';
-  const period = explicitPeriod || systemPeriod;
-
-  // 5. Convert to 24-hour hour for Date object
-  let hour24 = h;
-  if (period === 'PM' && h < 12) hour24 = h + 12;
-  if (period === 'AM' && h === 12) hour24 = 0;
-
-  const targetDate = new Date();
-  targetDate.setHours(hour24, m, s, 0);
-
-  const formatted = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')} ${period}`;
-  return {
-    iso: targetDate.toISOString(),
-    formatted,
-  };
-}
-
 export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode, selectionTheme = 'blue', isReadOnly, onUpdate, onEdit, onDelete, onCall, onToggleSelect }: Props) {
   const startTimeRef = useRef<HTMLInputElement>(null);
   const companyNameRef = useRef<HTMLInputElement>(null);
@@ -186,19 +120,42 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
     }
   }, [row.company_name, row.hr_name, row.mobile_number, row.email_id, row.call_start_time, row.comments]);
 
-  // ── Start Time blur: smart-parse time, auto-predict AM/PM, format input, persist
+  // ── Start Time blur: strictly smart-parse time, auto-predict AM/PM, format input, revert if invalid
   const handleStartTimeBlur = useCallback(() => {
     const val = startTimeRef.current?.value?.trim();
-    if (!val) return;
+    if (!val) {
+      if (row.call_start_time) {
+        onUpdate({ call_start_time: undefined, duration_seconds: undefined, duration_formatted: undefined });
+      }
+      return;
+    }
 
     const parsed = smartParseTime(val);
     if (parsed) {
       if (startTimeRef.current) {
         startTimeRef.current.value = parsed.formatted;
       }
-      onUpdate({ call_start_time: parsed.iso });
+      const patch: Partial<TrackerRowType> = { call_start_time: parsed.iso };
+
+      // If row already has call_end_time, recompute duration in minutes level
+      if (row.call_end_time) {
+        const start = new Date(parsed.iso).getTime();
+        const end = new Date(row.call_end_time).getTime();
+        if (!isNaN(start) && !isNaN(end) && end >= start) {
+          const durSec = Math.round((end - start) / 1000);
+          patch.duration_seconds = durSec;
+          patch.duration_formatted = formatDurationMinutesLevel(durSec);
+        }
+      }
+
+      onUpdate(patch);
+    } else {
+      // Revert back to the previous valid time so corrupt text (e.g. "83454") never stays in the cell!
+      if (startTimeRef.current) {
+        startTimeRef.current.value = formatTime(row.call_start_time);
+      }
     }
-  }, [onUpdate]);
+  }, [onUpdate, row.call_start_time, row.call_end_time]);
 
   // ── Spacebar handler for Start Time (Spacebar fills Start Time)
   const handleStartTimeKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -214,7 +171,7 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
     if (e.key === 'Delete') {
       e.preventDefault();
       if (startTimeRef.current) startTimeRef.current.value = '';
-      onUpdate({ call_start_time: undefined });
+      onUpdate({ call_start_time: undefined, duration_seconds: undefined, duration_formatted: undefined });
     }
   }, [onUpdate]);
 
@@ -250,23 +207,59 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
     }
   }, [onUpdate, row.hr_name]);
 
-  // ── Mobile Number blur
+  // ── Mobile Number blur: validates 10 digits Indian mobile (starts 6-9) & Indian landline (STD code)
   const handleMobileBlur = useCallback(() => {
     const val = mobileRef.current?.value?.trim() ?? '';
-    if (val !== (row.mobile_number ?? '')) {
-      onUpdate({ mobile_number: val });
+    if (!val) {
+      if (row.mobile_number) {
+        onUpdate({ mobile_number: '' });
+      }
+      return;
+    }
+
+    const validation = validateAndNormalizeIndianContact(val);
+    if (validation.valid) {
+      if (mobileRef.current) {
+        mobileRef.current.value = validation.normalized;
+      }
+      if (validation.normalized !== (row.mobile_number ?? '')) {
+        onUpdate({ mobile_number: validation.normalized });
+      }
+    } else {
+      // Revert to last valid number if invalid format
+      if (mobileRef.current) {
+        mobileRef.current.value = row.mobile_number ?? '';
+      }
     }
   }, [onUpdate, row.mobile_number]);
 
-  // ── Email blur
+  // ── Email blur: enforces @ and valid official domain extensions (.com, .org, .in, etc.)
   const handleEmailBlur = useCallback(() => {
     const val = emailRef.current?.value?.trim() ?? '';
-    if (val !== (row.email_id ?? '')) {
-      onUpdate({ email_id: val });
+    if (!val) {
+      if (row.email_id) {
+        onUpdate({ email_id: '' });
+      }
+      return;
+    }
+
+    const validation = validateAndNormalizeEmail(val);
+    if (validation.valid) {
+      if (emailRef.current) {
+        emailRef.current.value = validation.normalized;
+      }
+      if (validation.normalized !== (row.email_id ?? '')) {
+        onUpdate({ email_id: validation.normalized });
+      }
+    } else {
+      // Revert to last valid email if invalid
+      if (emailRef.current) {
+        emailRef.current.value = row.email_id ?? '';
+      }
     }
   }, [onUpdate, row.email_id]);
 
-  // ── Call Outcome selection: captures End Time automatically & computes Duration
+  // ── Call Outcome selection: captures End Time automatically & computes Duration at minutes level
   const handleOutcomeChange = useCallback((value: string) => {
     if (!value) return;
     triggerHaptic('selection');
@@ -278,16 +271,14 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
       startTimeRef.current.value = formatTime(now);
     }
 
-    // Automatically calculate duration between Start Time and End Time
+    // Automatically calculate duration between Start Time and End Time in minutes level
     let durSec = row.duration_seconds;
     let durFmt = row.duration_formatted;
     const start = new Date(effectiveStart).getTime();
     const end = new Date(now).getTime();
     if (!isNaN(start) && !isNaN(end) && end >= start) {
       durSec = Math.round((end - start) / 1000);
-      const mins = Math.floor(durSec / 60);
-      const secs = durSec % 60;
-      durFmt = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+      durFmt = formatDurationMinutesLevel(durSec);
     }
 
     if (outcome !== 'follow_up') {
@@ -415,7 +406,7 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
             placeholder="Time"
             onKeyDown={(e) => { handleStartTimeKeyDown(e); handleKeyDownEnter(e); }}
             onBlur={handleStartTimeBlur}
-            title="Type 8:52, 08:52, or 8:52 AM • Spacebar fills current time"
+            title="Calling hours: 07:00 AM – 08:00 PM • Type e.g. 9:38, 2:30 • Spacebar fills current time"
             className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg placeholder-fg-subtle transition-colors cursor-text text-xs tabular-nums outline-none"
           />
         )}

@@ -1374,19 +1374,18 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
   if (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') {
     const isPos = report.template_type === 'daily_positives';
     const leads = (isPos ? report.sections?.daily_positives : report.sections?.daily_jd_received) || [];
-    const headers = ['#', 'Company Name', 'Role / Designation', 'CTC', 'Date', 'Time', 'College', 'Batch', 'Coordinator'];
-    // Total content width: 800px (34 + 165 + 135 + 72 + 68 + 64 + 62 + 55 + 145 = 800)
-    const colWidths = [34, 165, 135, 72, 68, 64, 62, 55, 145];
+    const headers = ['#', 'Company Name', 'Role / Designation', 'CTC', 'Time', 'College', 'Coordinator', 'Batch'];
+    // Total content width: 800px (34 + 190 + 155 + 80 + 75 + 75 + 126 + 65 = 800)
+    const colWidths = [34, 190, 155, 80, 75, 75, 126, 65];
     const rawRows = leads.map((r: any, idx: number) => [
       String(r.s_no || idx + 1),
       String(r.company_name || '—'),
       String(r.role || r.job_role || '—'),
       String(r.ctc || '—'),
-      String(r.date || '—'),
       String(r.time || r.time_stamp || r.event_time || '—'),
       String(r.college_code || '—'),
-      String(r.batch || r.eligible_batch || '—'),
       String(r.coordinator || 'Placement Team'),
+      String(r.batch || r.eligible_batch || '—'),
     ]);
 
     const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
@@ -1396,22 +1395,22 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
         const maxCellW = colW - 10;
         const font = cIdx === 1
           ? 'bold 11.5px system-ui, -apple-system, sans-serif'
-          : (cIdx === 0 || cIdx === 4 || cIdx === 5 || cIdx === 6)
+          : (cIdx === 0 || cIdx === 4 || cIdx === 5)
           ? '600 10.5px monospace'
           : (cIdx === 3)
           ? 'bold 11px system-ui, -apple-system, sans-serif'
-          : (cIdx === 8)
+          : (cIdx === 6)
           ? '600 11px system-ui, -apple-system, sans-serif'
           : '500 11px system-ui, -apple-system, sans-serif';
         const fillStyle = cIdx === 1
           ? '#0a2540'
           : cIdx === 0
           ? (isPos ? '#059669' : '#2563eb')
-          : (cIdx === 6)
+          : (cIdx === 5)
           ? (isPos ? '#047857' : '#1d4ed8')
           : (cIdx === 3)
           ? (isPos ? '#059669' : '#2563eb')
-          : (cIdx === 8)
+          : (cIdx === 6)
           ? '#1e293b'
           : '#334155';
 

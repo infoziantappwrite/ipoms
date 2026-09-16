@@ -1189,9 +1189,9 @@ export function ReportBuilderWizard({
           template_type: templateType,
           is_multi_college: isMultiWeekly,
           college_ids: isMultiWeekly ? selectedGroupCollegeIds : undefined,
-          college_id: isMultiWeekly ? 'multi' : (templateType === 'active_leads' || templateType === 'daily_positives' || templateType === 'daily_jd_received' ? (collegeId || 'all') : collegeId),
+          college_id: isMultiWeekly ? 'multi' : (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? 'all' : (templateType === 'active_leads' ? (collegeId || 'all') : collegeId),
           coordinator_id: coordinatorId || readSessionUser()?._id || readSessionUser()?.id || '',
-          academic_year: academicYear,
+          academic_year: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? 'all' : academicYear,
           date: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? dailyReportDate : undefined,
           effective_date: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? dailyReportDate : undefined,
           lead_type: templateType === 'daily_positives' ? 'positive' : (templateType === 'daily_jd_received' ? 'jd_received' : undefined),
@@ -1499,12 +1499,12 @@ export function ReportBuilderWizard({
                 : templateType === 'pending_tasks'
                 ? 'Target Institution Scope'
                 : (templateType === 'daily_positives' || templateType === 'daily_jd_received')
-                ? 'Report Date & Batch'
+                ? 'Report Date'
                 : 'Institutional Scope & Batch'}
             </h2>
           </div>
 
-          <div className={`grid gap-4 ${templateType === 'active_leads' || templateType === 'pending_tasks' ? 'grid-cols-1 max-w-md' : 'grid-cols-1 md:grid-cols-2'}`}>
+          <div className={`grid gap-4 ${(templateType === 'active_leads' || templateType === 'pending_tasks' || templateType === 'daily_positives' || templateType === 'daily_jd_received') ? 'grid-cols-1 max-w-md' : 'grid-cols-1 md:grid-cols-2'}`}>
             {/* Report Date Picker for Daily Reports */}
             {(templateType === 'daily_positives' || templateType === 'daily_jd_received') && (
               <div>
@@ -1724,8 +1724,8 @@ export function ReportBuilderWizard({
               </div>
             )}
 
-            {/* Graduating Academic Year / Batch (Hidden for Pending Tasks) */}
-            {templateType !== 'pending_tasks' && (
+            {/* Graduating Academic Year / Batch (Hidden for Pending Tasks and Daily Reports) */}
+            {templateType !== 'pending_tasks' && templateType !== 'daily_positives' && templateType !== 'daily_jd_received' && (
               <div>
                 <label className="block text-xs font-semibold text-fg mb-1.5">
                   Graduating Academic Batch

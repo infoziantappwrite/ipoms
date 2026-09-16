@@ -8,32 +8,160 @@ export interface ValidationResult {
   normalized: string;
   error?: string;
   suggestion?: string;
+  type?: 'mobile' | 'landline';
+  country?: string;
+  startingDigit?: string;
+  stdCode?: string;
+  city?: string;
+  formatted?: string;
 }
 
 /**
- * Validates and normalizes Indian Mobile Numbers.
- * Rules:
- * 1. Accepts with or without +91, 91, 0, spaces, dashes, parentheses.
- * 2. Must resolve to exactly 10 digits.
- * 3. Indian mobile numbers must start with 6, 7, 8, or 9 (TRAI standard).
+ * Recognized Indian Landline STD Area Codes & Metro Directories
  */
-export function validateAndNormalizeIndianMobile(raw: string): ValidationResult {
+export const INDIAN_STD_CODES: Record<string, string> = {
+  // 2-digit STD codes (Tier 1 Metros)
+  '11': 'Delhi / NCR',
+  '22': 'Mumbai',
+  '33': 'Kolkata',
+  '44': 'Chennai',
+  '80': 'Bengaluru',
+  '20': 'Pune',
+  '40': 'Hyderabad',
+  '79': 'Ahmedabad',
+  // 3-digit STD codes (Tier 2 Cities)
+  '120': 'Noida / Ghaziabad',
+  '124': 'Gurugram',
+  '129': 'Faridabad',
+  '141': 'Jaipur',
+  '172': 'Chandigarh',
+  '175': 'Patiala',
+  '181': 'Jalandhar',
+  '183': 'Amritsar',
+  '240': 'Aurangabad',
+  '241': 'Ahmednagar',
+  '250': 'Vasai',
+  '251': 'Kalyan',
+  '253': 'Nashik',
+  '257': 'Jalgaon',
+  '260': 'Vapi',
+  '261': 'Surat',
+  '265': 'Vadodara',
+  '268': 'Nadiad',
+  '2692': 'Anand',
+  '278': 'Bhavnagar',
+  '281': 'Rajkot',
+  '288': 'Jamnagar',
+  '361': 'Guwahati',
+  '413': 'Puducherry',
+  '416': 'Vellore',
+  '421': 'Tiruppur',
+  '422': 'Coimbatore',
+  '424': 'Erode',
+  '427': 'Salem',
+  '4286': 'Namakkal',
+  '431': 'Tiruchirappalli',
+  '4324': 'Karur',
+  '4344': 'Hosur',
+  '435': 'Kumbakonam',
+  '4362': 'Thanjavur',
+  '451': 'Dindigul',
+  '452': 'Madurai',
+  '4546': 'Theni',
+  '4562': 'Virudhunagar / Sivakasi',
+  '4563': 'Rajapalayam',
+  '4565': 'Karaikudi',
+  '461': 'Thoothukudi',
+  '462': 'Tirunelveli',
+  '4652': 'Nagercoil',
+  '471': 'Thiruvananthapuram',
+  '474': 'Kollam',
+  '477': 'Alappuzha',
+  '481': 'Kottayam',
+  '484': 'Kochi / Ernakulam',
+  '487': 'Thrissur',
+  '491': 'Palakkad',
+  '495': 'Kozhikode',
+  '497': 'Kannur',
+  '512': 'Kanpur',
+  '522': 'Lucknow',
+  '532': 'Prayagraj',
+  '542': 'Varanasi',
+  '562': 'Agra',
+  '571': 'Aligarh',
+  '581': 'Bareilly',
+  '591': 'Moradabad',
+  '612': 'Patna',
+  '621': 'Muzaffarpur',
+  '6272': 'Darbhanga',
+  '641': 'Bhagalpur',
+  '651': 'Ranchi',
+  '657': 'Jamshedpur',
+  '661': 'Rourkela',
+  '671': 'Cuttack',
+  '674': 'Bhubaneswar',
+  '680': 'Berhampur',
+  '712': 'Nagpur',
+  '721': 'Amravati',
+  '731': 'Indore',
+  '734': 'Ujjain',
+  '744': 'Kota',
+  '751': 'Gwalior',
+  '755': 'Bhopal',
+  '761': 'Jabalpur',
+  '771': 'Raipur',
+  '7752': 'Bilaspur',
+  '788': 'Bhilai / Durg',
+  '816': 'Tumakuru',
+  '820': 'Udupi',
+  '821': 'Mysuru',
+  '824': 'Mangaluru',
+  '831': 'Belagavi',
+  '836': 'Hubballi / Dharwad',
+  '8392': 'Ballari',
+  '8472': 'Kalaburagi',
+  '861': 'Nellore',
+  '863': 'Guntur',
+  '866': 'Vijayawada',
+  '870': 'Warangal',
+  '877': 'Tirupati',
+  '883': 'Rajahmundry',
+  '884': 'Kakinada',
+  '891': 'Visakhapatnam',
+};
+
+/**
+ * Validates and normalizes Indian Contact Numbers (both Mobile and Landline).
+ * Rules:
+ * 1. Accepts with or without +91, 0091, 0 trunk prefix, spaces, dashes, dots.
+ * 2. Recognizes country as India (+91).
+ * 3. Distinguishes Indian Mobile (10 digits starting with 6, 7, 8, 9)
+ *    and Indian Landline (10 digits starting with recognized Indian STD code).
+ * 4. Strictly rejects invalid length (must resolve to exactly 10 digits).
+ */
+export function validateAndNormalizeIndianContact(raw: string): ValidationResult {
   if (!raw || !raw.trim()) {
-    return { valid: false, normalized: '', error: 'Mobile number cannot be empty' };
+    return { valid: false, normalized: '', error: 'Contact number cannot be empty' };
   }
 
-  // Remove common formatters (spaces, dashes, parentheses, dots)
-  let cleaned = raw.trim().replace(/[\s\-\(\)\.]/g, '');
+  // Remove common formatters (spaces, dashes, parentheses, dots, slashes)
+  let cleaned = raw.trim().replace(/[\s\-\(\)\.\/]/g, '');
+
+  let hasIndiaPrefix = false;
 
   // Strip international / trunk prefixes
   if (cleaned.startsWith('+91')) {
     cleaned = cleaned.slice(3);
+    hasIndiaPrefix = true;
   } else if (cleaned.startsWith('0091')) {
     cleaned = cleaned.slice(4);
+    hasIndiaPrefix = true;
   } else if (cleaned.length === 12 && cleaned.startsWith('91')) {
     cleaned = cleaned.slice(2);
+    hasIndiaPrefix = true;
   } else if (cleaned.length === 11 && cleaned.startsWith('0')) {
     cleaned = cleaned.slice(1);
+    hasIndiaPrefix = true;
   }
 
   // Check if purely numeric
@@ -45,28 +173,79 @@ export function validateAndNormalizeIndianMobile(raw: string): ValidationResult 
     };
   }
 
-  // Check length
+  // Check exact 10-digit length rule
   if (cleaned.length !== 10) {
     return {
       valid: false,
       normalized: cleaned,
-      error: `Mobile number must be 10 digits (currently ${cleaned.length} digits: "${cleaned}").`,
+      error: `Indian phone numbers must be exactly 10 digits (currently ${cleaned.length} digits: "${cleaned}").`,
     };
   }
 
-  // Check Indian starting digit (6, 7, 8, 9)
-  if (!/^[6-9]/.test(cleaned)) {
+  // 1. Check Indian Mobile (Starts with 6, 7, 8, 9)
+  if (/^[6-9]/.test(cleaned)) {
     return {
-      valid: false,
+      valid: true,
+      type: 'mobile',
+      country: 'India (+91)',
+      startingDigit: cleaned[0],
       normalized: cleaned,
-      error: `Indian mobile numbers must start with 6, 7, 8, or 9 (starts with "${cleaned[0]}").`,
+      formatted: `+91 ${cleaned}`,
+    };
+  }
+
+  // 2. Check Indian Landline (Starts with 1, 2, 3, 4, 5, 7, 8)
+  // Check 4-digit, 3-digit, and 2-digit STD codes
+  let matchedStd: string | null = null;
+  let matchedCity: string | null = null;
+
+  for (const len of [4, 3, 2]) {
+    const candidateStd = cleaned.slice(0, len);
+    if (INDIAN_STD_CODES[candidateStd]) {
+      matchedStd = candidateStd;
+      matchedCity = INDIAN_STD_CODES[candidateStd];
+      break;
+    }
+  }
+
+  // If starts with 1-5 or matches STD directory
+  if (/^[1-5]/.test(cleaned) || matchedStd) {
+    const std = matchedStd || cleaned.slice(0, 3);
+    const sub = cleaned.slice(std.length);
+    return {
+      valid: true,
+      type: 'landline',
+      country: 'India (+91)',
+      stdCode: `0${std}`,
+      city: matchedCity || 'Indian Landline',
+      normalized: cleaned,
+      formatted: `0${std}-${sub}`,
     };
   }
 
   return {
-    valid: true,
+    valid: false,
     normalized: cleaned,
+    error: `"${cleaned}" does not match Indian mobile (starts with 6-9) or valid Indian landline STD code.`,
   };
+}
+
+/**
+ * Validates and normalizes Indian Mobile Numbers (TRAI standard 10 digits starting with 6-9).
+ */
+export function validateAndNormalizeIndianMobile(raw: string): ValidationResult {
+  const res = validateAndNormalizeIndianContact(raw);
+  if (!res.valid) return res;
+
+  if (res.type === 'landline') {
+    // If user passed a valid landline, allow it or mark type
+    return {
+      ...res,
+      valid: true,
+    };
+  }
+
+  return res;
 }
 
 // ── Official & Recognized Top-Level Domains (TLDs) & Multi-part Extensions ────

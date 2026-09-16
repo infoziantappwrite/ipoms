@@ -20,7 +20,7 @@ import { ROW_OUTCOMES } from './RowOutcomeDropdown';
 import { MONTHS } from './TrackerRow';
 import { MultiTagInput } from '@/components/ui/MultiTagInput';
 import {
-  validateAndNormalizeIndianMobile,
+  validateAndNormalizeIndianContact,
   validateAndNormalizeEmail,
 } from '@/lib/contactValidation';
 
@@ -185,9 +185,9 @@ export function EditTrackerRowModal({ row, onClose, onSave, onDelete }: Props) {
               <MultiTagInput
                 values={mobileNumbers}
                 onChange={setMobileNumbers}
-                validator={validateAndNormalizeIndianMobile}
+                validator={validateAndNormalizeIndianContact}
                 icon={<Phone size={14} />}
-                placeholder="e.g. 9876543210 (10 digits starting 6-9, Enter/comma for multiple)"
+                placeholder="e.g. 9876543210 (10 digits starting 6-9 or Indian landline, Enter/comma for multiple)"
               />
             </div>
           </div>

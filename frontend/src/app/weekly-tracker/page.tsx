@@ -103,6 +103,7 @@ export default function WeeklyTrackerPage() {
   const [coordinatorId, setCoordinatorId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [myCollegeIds, setMyCollegeIds] = useState<Set<string>>(new Set());
   const isForeignCollege = myCollegeIds.size > 0 && !!selectedCollegeId && !myCollegeIds.has(selectedCollegeId);
 
@@ -887,9 +888,11 @@ export default function WeeklyTrackerPage() {
     }
   };
 
-  // ── Sync Positives from Daily Tracker
+  // ── Sync Positives from Daily Tracker (with duplicate protection)
   const handleSyncDailyPositives = async () => {
-    if (!selectedCollegeId) return;
+    if (!selectedCollegeId || isSyncing) return;
+    setIsSyncing(true);
+    triggerHaptic('medium');
     try {
       const res = await apiFetch('/weekly-tracker/sync-daily-positives', {
         method: 'POST',
@@ -900,12 +903,17 @@ export default function WeeklyTrackerPage() {
         }),
       });
       if (res.success) {
-        alert(res.message);
+        toast(res.message || 'Daily positives synchronized successfully', 'success');
         await loadWeeklyTracker();
         await loadKpi();
+      } else {
+        toast(res.message || 'Failed to sync daily positives', 'warning');
       }
     } catch (err) {
       console.error('Failed to sync positives:', err);
+      toast('Failed to sync daily positives. Please check your network connection.', 'error');
+    } finally {
+      setIsSyncing(false);
     }
   };
 

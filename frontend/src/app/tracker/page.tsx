@@ -9,7 +9,7 @@ import { SoftphonePanel, SoftphoneCallResult } from './components/SoftphonePanel
 import { SmoothOutcomeDropdown } from '@/components/ui/SmoothOutcomeDropdown';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { AutoSaveBadge } from '@/components/ui/AutoSaveBadge';
-import { AlertTriangle, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Cloud, Loader2, PhoneCall, Plus, Save, Search, Trash2, Upload, Undo2, Redo2 } from 'lucide-react';
+import { AlertTriangle, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Cloud, Loader2, PhoneCall, Plus, Save, Search, Trash2, Upload } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
 import { ManualAddRowModal } from './components/ManualAddRowModal';
@@ -790,41 +790,9 @@ export default function DailyTrackerPage() {
             )}
           </div>
 
-          {/* ── Right Top Corner: Undo / Redo + Delete Bin Button & 3 Vertical Dots (Actions Menu) ── */}
+          {/* ── Right Top Corner: Delete Bin Button & 3 Vertical Dots (Actions Menu) ── */}
           {!isHistoryMode && (
             <div className="ml-auto shrink-0 flex items-center gap-2">
-              {/* Undo & Redo Controls */}
-              {selectedCollegeId && (
-                <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    type="button"
-                    disabled={!canUndo}
-                    onClick={() => {
-                      triggerHaptic('medium');
-                      undo();
-                    }}
-                    className="relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 bg-surface-sunken hover:bg-surface-raised disabled:opacity-30 disabled:cursor-not-allowed border border-border shadow-2xs active:scale-[0.95] text-fg"
-                    title="Undo (Ctrl+Z)"
-                    aria-label="Undo"
-                  >
-                    <Undo2 size={14} strokeWidth={2.2} />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canRedo}
-                    onClick={() => {
-                      triggerHaptic('medium');
-                      redo();
-                    }}
-                    className="relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 bg-surface-sunken hover:bg-surface-raised disabled:opacity-30 disabled:cursor-not-allowed border border-border shadow-2xs active:scale-[0.95] text-fg"
-                    title="Redo (Ctrl+Y)"
-                    aria-label="Redo"
-                  >
-                    <Redo2 size={14} strokeWidth={2.2} />
-                  </button>
-                </div>
-              )}
-
               {/* Standalone Red Dustbin / Trash Icon Button */}
               <button
                 type="button"

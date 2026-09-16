@@ -1037,17 +1037,16 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
     if ((report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') && dailyLeadsRows && dailyLeadsRows.length > 0) {
       const isPos = report.template_type === 'daily_positives';
       html += `
-        <tr><td colspan="9" class="sec-header">${isPos ? 'POSITIVES OF THE DAY' : 'JD RECEIVED FOR THE DAY'} (${dailyLeadsRows.length} Leads)</td></tr>
+        <tr><td colspan="8" class="sec-header">${isPos ? 'POSITIVES OF THE DAY' : 'JD RECEIVED FOR THE DAY'} (${dailyLeadsRows.length} Leads)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
           <th>Role / Designation</th>
           <th>CTC</th>
-          <th>Date</th>
           <th>Time</th>
           <th>College</th>
-          <th>Batch</th>
           <th>Coordinator</th>
+          <th>Batch</th>
         </tr>
       `;
       dailyLeadsRows.forEach((r: any) => {
@@ -1057,15 +1056,14 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             <td style="text-align:center;"><b>${r.company_name}</b></td>
             <td style="text-align:center;">${r.role || r.job_role || '—'}</td>
             <td style="text-align:center; color:#059669; font-weight:bold;">${r.ctc || '—'}</td>
-            <td style="text-align:center;">${r.date || r.lead_date || '—'}</td>
             <td style="text-align:center;">${r.time || r.time_stamp || r.event_time || '—'}</td>
             <td style="text-align:center; font-weight:bold;">${r.college_code || r.college_name || '—'}</td>
-            <td style="text-align:center;">${r.batch || r.eligible_batch || '—'}</td>
             <td style="text-align:center;">${r.coordinator || 'Placement Team'}</td>
+            <td style="text-align:center;">${r.batch || r.eligible_batch || '—'}</td>
           </tr>
         `;
       });
-      html += `<tr><td colspan="9"></td></tr>`;
+      html += `<tr><td colspan="8"></td></tr>`;
     }
 
     // Remarks (Only if selected)
@@ -2968,14 +2966,13 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                 <table className="w-full text-[11px] border-collapse table-fixed bg-white dark:bg-slate-900">
                   <colgroup>
                     <col style={{ width: '36px' }} />
-                    <col style={{ width: '22%' }} />
-                    <col style={{ width: '17%' }} />
-                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '25%' }} />
+                    <col style={{ width: '20%' }} />
+                    <col style={{ width: '12%' }} />
+                    <col style={{ width: '80px' }} />
                     <col style={{ width: '75px' }} />
+                    <col style={{ width: '18%' }} />
                     <col style={{ width: '70px' }} />
-                    <col style={{ width: '70px' }} />
-                    <col style={{ width: '65px' }} />
-                    <col style={{ width: '15%' }} />
                   </colgroup>
                   <thead>
                     <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
@@ -2983,11 +2980,10 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                       <th className="py-2 px-2 text-center font-bold">COMPANY NAME</th>
                       <th className="py-2 px-2 text-center font-bold">ROLE / DESIGNATION</th>
                       <th className="py-2 px-1 text-center font-bold">CTC</th>
-                      <th className="py-2 px-1.5 text-center font-bold">DATE</th>
                       <th className="py-2 px-1.5 text-center font-bold">TIME</th>
                       <th className="py-2 px-1.5 text-center font-bold">COLLEGE</th>
-                      <th className="py-2 px-1 text-center font-bold">BATCH</th>
                       <th className="py-2 px-2 text-center font-bold">COORDINATOR</th>
+                      <th className="py-2 px-1 text-center font-bold">BATCH</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
@@ -3018,13 +3014,6 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                             className="font-bold text-emerald-600 dark:text-emerald-400 text-center"
                           />
                         </td>
-                        <td className="py-2 px-1.5 text-center text-slate-600 dark:text-slate-400 whitespace-normal break-words leading-snug font-mono text-[10px]">
-                          <EditableReportCell
-                            value={r.date || '—'}
-                            onChange={(val) => handleUpdateCell('daily_positives', idx, 'date', val)}
-                            className="text-slate-600 dark:text-slate-400 text-center font-mono text-[10px]"
-                          />
-                        </td>
                         <td className="py-2 px-1.5 text-center text-slate-600 dark:text-slate-400 font-mono text-[10px] whitespace-normal break-words leading-snug">
                           <EditableReportCell
                             value={r.time || r.time_stamp || r.event_time || '—'}
@@ -3042,6 +3031,13 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                             className="text-center font-bold text-emerald-700 dark:text-emerald-300 text-[10px]"
                           />
                         </td>
+                        <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300 whitespace-normal break-words leading-snug">
+                          <EditableReportCell
+                            value={r.coordinator || 'Placement Team'}
+                            onChange={(val) => handleUpdateCell('daily_positives', idx, 'coordinator', val)}
+                            className="text-slate-700 dark:text-slate-300 text-center font-medium"
+                          />
+                        </td>
                         <td className="py-2 px-1 text-center text-slate-600 dark:text-slate-400 whitespace-normal break-words leading-snug">
                           <EditableReportCell
                             value={r.batch || r.eligible_batch || ''}
@@ -3050,13 +3046,6 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                               handleUpdateCell('daily_positives', idx, 'eligible_batch', val);
                             }}
                             className="text-slate-600 dark:text-slate-400 text-center"
-                          />
-                        </td>
-                        <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300 whitespace-normal break-words leading-snug">
-                          <EditableReportCell
-                            value={r.coordinator || 'Placement Team'}
-                            onChange={(val) => handleUpdateCell('daily_positives', idx, 'coordinator', val)}
-                            className="text-slate-700 dark:text-slate-300 text-center font-medium"
                           />
                         </td>
                       </tr>
@@ -3085,14 +3074,13 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                 <table className="w-full text-[11px] border-collapse table-fixed bg-white dark:bg-slate-900">
                   <colgroup>
                     <col style={{ width: '36px' }} />
-                    <col style={{ width: '22%' }} />
-                    <col style={{ width: '17%' }} />
-                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '25%' }} />
+                    <col style={{ width: '20%' }} />
+                    <col style={{ width: '12%' }} />
+                    <col style={{ width: '80px' }} />
                     <col style={{ width: '75px' }} />
+                    <col style={{ width: '18%' }} />
                     <col style={{ width: '70px' }} />
-                    <col style={{ width: '70px' }} />
-                    <col style={{ width: '65px' }} />
-                    <col style={{ width: '15%' }} />
                   </colgroup>
                   <thead>
                     <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
@@ -3100,11 +3088,10 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                       <th className="py-2 px-2 text-center font-bold">COMPANY NAME</th>
                       <th className="py-2 px-2 text-center font-bold">ROLE / DESIGNATION</th>
                       <th className="py-2 px-1 text-center font-bold">CTC</th>
-                      <th className="py-2 px-1.5 text-center font-bold">DATE</th>
                       <th className="py-2 px-1.5 text-center font-bold">TIME</th>
                       <th className="py-2 px-1.5 text-center font-bold">COLLEGE</th>
-                      <th className="py-2 px-1 text-center font-bold">BATCH</th>
                       <th className="py-2 px-2 text-center font-bold">COORDINATOR</th>
+                      <th className="py-2 px-1 text-center font-bold">BATCH</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
@@ -3135,13 +3122,6 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                             className="font-bold text-blue-600 dark:text-blue-400 text-center"
                           />
                         </td>
-                        <td className="py-2 px-1.5 text-center text-slate-600 dark:text-slate-400 whitespace-normal break-words leading-snug font-mono text-[10px]">
-                          <EditableReportCell
-                            value={r.date || '—'}
-                            onChange={(val) => handleUpdateCell('daily_jd_received', idx, 'date', val)}
-                            className="text-slate-600 dark:text-slate-400 text-center font-mono text-[10px]"
-                          />
-                        </td>
                         <td className="py-2 px-1.5 text-center text-slate-600 dark:text-slate-400 font-mono text-[10px] whitespace-normal break-words leading-snug">
                           <EditableReportCell
                             value={r.time || r.time_stamp || r.event_time || '—'}
@@ -3159,6 +3139,13 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                             className="text-center font-bold text-blue-700 dark:text-blue-300 text-[10px]"
                           />
                         </td>
+                        <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300 whitespace-normal break-words leading-snug">
+                          <EditableReportCell
+                            value={r.coordinator || 'Placement Team'}
+                            onChange={(val) => handleUpdateCell('daily_jd_received', idx, 'coordinator', val)}
+                            className="text-slate-700 dark:text-slate-300 text-center font-medium"
+                          />
+                        </td>
                         <td className="py-2 px-1 text-center text-slate-600 dark:text-slate-400 whitespace-normal break-words leading-snug">
                           <EditableReportCell
                             value={r.batch || r.eligible_batch || ''}
@@ -3167,13 +3154,6 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                               handleUpdateCell('daily_jd_received', idx, 'eligible_batch', val);
                             }}
                             className="text-slate-600 dark:text-slate-400 text-center"
-                          />
-                        </td>
-                        <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300 whitespace-normal break-words leading-snug">
-                          <EditableReportCell
-                            value={r.coordinator || 'Placement Team'}
-                            onChange={(val) => handleUpdateCell('daily_jd_received', idx, 'coordinator', val)}
-                            className="text-slate-700 dark:text-slate-300 text-center font-medium"
                           />
                         </td>
                       </tr>
