@@ -13,11 +13,31 @@ interface Toast {
   message: string;
 }
 
-const STYLES: Record<ToastKind, { ring: string; icon: typeof Info; accent: string }> = {
-  success: { ring: 'border-success/30 bg-surface/95 dark:bg-surface/90', icon: CheckCircle2, accent: 'text-success' },
-  warning: { ring: 'border-warning/30 bg-surface/95 dark:bg-surface/90', icon: AlertTriangle, accent: 'text-warning' },
-  error: { ring: 'border-destructive/30 bg-surface/95 dark:bg-surface/90', icon: XCircle, accent: 'text-destructive' },
-  info: { ring: 'border-primary/30 bg-surface/95 dark:bg-surface/90', icon: Info, accent: 'text-primary' },
+const STYLES: Record<ToastKind, { border: string; icon: typeof Info; accent: string; iconBg: string }> = {
+  success: {
+    border: 'border-emerald-200/90 dark:border-emerald-800/80',
+    icon: CheckCircle2,
+    accent: 'text-emerald-600 dark:text-emerald-400',
+    iconBg: 'bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/60 dark:border-emerald-800/50',
+  },
+  warning: {
+    border: 'border-amber-200/90 dark:border-amber-800/80',
+    icon: AlertTriangle,
+    accent: 'text-amber-600 dark:text-amber-400',
+    iconBg: 'bg-amber-50 dark:bg-amber-950/60 border border-amber-200/60 dark:border-amber-800/50',
+  },
+  error: {
+    border: 'border-rose-200/90 dark:border-rose-800/80',
+    icon: XCircle,
+    accent: 'text-rose-600 dark:text-rose-400',
+    iconBg: 'bg-rose-50 dark:bg-rose-950/60 border border-rose-200/60 dark:border-rose-800/50',
+  },
+  info: {
+    border: 'border-blue-200/90 dark:border-blue-800/80',
+    icon: Info,
+    accent: 'text-blue-600 dark:text-blue-400',
+    iconBg: 'bg-blue-50 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/50',
+  },
 };
 
 interface ToastApi {
@@ -26,7 +46,7 @@ interface ToastApi {
 
 const ToastContext = createContext<ToastApi>({ toast: () => {} });
 
-/** `const { toast } = useToast()` — Apple Fluid Motion Toast system */
+/** `const { toast } = useToast()` — Plain, solid notification system */
 export const useToast = () => useContext(ToastContext);
 
 let nextId = 0;
@@ -42,7 +62,6 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
   const itemRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Spring entrance
     requestAnimationFrame(() => setIsMounted(true));
   }, []);
 
@@ -56,7 +75,6 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
   const handlePointerMove = (e: React.PointerEvent) => {
     if (!isDragging) return;
     const diff = e.clientX - startXRef.current;
-    // Allow dragging in either direction
     setOffsetX(diff);
   };
 
@@ -66,21 +84,19 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
 
     const diff = e.clientX - startXRef.current;
     const elapsed = Math.max(1, Date.now() - startTimeRef.current);
-    const velocity = Math.abs(diff) / elapsed; // px per ms
+    const velocity = Math.abs(diff) / elapsed;
 
-    // If moved > 80px or flicked quickly (> 0.45 px/ms)
     if (Math.abs(diff) > 80 || velocity > 0.45) {
       triggerHaptic('light');
       setIsExiting(true);
       setOffsetX(diff > 0 ? 300 : -300);
       setTimeout(onDismiss, 200);
     } else {
-      // Spring back to center
       setOffsetX(0);
     }
   };
 
-  const { ring, icon: Icon, accent } = STYLES[toast.kind];
+  const { border, icon: Icon, accent, iconBg } = STYLES[toast.kind];
   const opacity = 1 - Math.min(0.7, Math.abs(offsetX) / 250);
 
   return (
@@ -92,24 +108,26 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
       onPointerCancel={handlePointerUp}
       style={{
         transform: isMounted
-          ? `translate3d(${offsetX}px, 0, 0) scale(${isExiting ? 0.9 : 1})`
-          : 'translate3d(0, 16px, 0) scale(0.94)',
+          ? `translate3d(${offsetX}px, 0, 0) scale(${isExiting ? 0.92 : 1})`
+          : 'translate3d(0, 14px, 0) scale(0.96)',
         opacity: isMounted ? opacity : 0,
         transition: isDragging
           ? 'none'
-          : 'transform 280ms cubic-bezier(0.16, 1, 0.3, 1), opacity 240ms ease-out',
+          : 'transform 260ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease-out',
       }}
       className={cn(
-        'group relative flex items-center gap-3 rounded-2xl border px-4 py-3',
-        'shadow-3 backdrop-blur-md cursor-grab active:cursor-grabbing select-none',
-        'text-body text-fg',
-        ring,
+        'group relative flex items-center gap-3 rounded-xl border px-3.5 py-3',
+        'bg-white dark:bg-zinc-900 shadow-md shadow-black/8 dark:shadow-black/40 select-none cursor-grab active:cursor-grabbing',
+        'text-zinc-900 dark:text-zinc-100',
+        border,
       )}
     >
-      <div className={cn('p-1 rounded-xl bg-surface-sunken/80 shrink-0 shadow-2xs', accent)}>
-        <Icon size={17} strokeWidth={2.2} aria-hidden />
+      <div className={cn('p-1.5 rounded-lg shrink-0 flex items-center justify-center', iconBg, accent)}>
+        <Icon size={16} strokeWidth={2.2} aria-hidden />
       </div>
-      <p className="flex-1 min-w-0 font-medium text-sm leading-snug tracking-tight">{toast.message}</p>
+      <p className="flex-1 min-w-0 font-medium text-xs sm:text-sm text-zinc-800 dark:text-zinc-200 leading-snug tracking-tight select-text">
+        {toast.message}
+      </p>
       <button
         type="button"
         onClick={(e) => {
@@ -119,7 +137,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
           setTimeout(onDismiss, 180);
         }}
         aria-label="Dismiss notification"
-        className="shrink-0 rounded-lg p-1 text-fg-subtle hover:text-fg hover:bg-surface-sunken transition-colors"
+        className="shrink-0 rounded-lg p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
       >
         <X size={14} strokeWidth={2} aria-hidden />
       </button>
@@ -154,7 +172,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={api}>
       {children}
 
-      {/* iOS Pill / Dynamic Island Notification Stack */}
+      {/* Floating Notification Stack — Plain & Solid, Zero Neon Glow / Zero Glassy Blur */}
       <div
         role="status"
         aria-live="polite"
@@ -170,4 +188,3 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     </ToastContext.Provider>
   );
 }
-

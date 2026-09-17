@@ -1,6 +1,7 @@
 // iPOMS Backend Server - August 2026 Segregation Active
 import express, { Request, Response, NextFunction } from 'express';
 import fs from 'fs';
+import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -50,6 +51,7 @@ import { authenticateJWT, authorizeRoles, AuthUserPayload } from './lib/authMidd
 import { authorizeRoute, scopeToSelf, isSupervisor, refuseForeignOwner, refuseRoleEscalation, assignableRoles, normalizeRole } from './lib/routePolicy';
 import { isPasswordValid, firstPasswordError } from './lib/passwordPolicy';
 import { sendForeignCollegeEditEmail } from './lib/mailer';
+import { syncCollegesFromExcel } from './scripts/syncCollegesFromSharepoint';
 
 dotenv.config();
 
@@ -717,6 +719,150 @@ app.patch('/api/v1/colleges/:id/status', async (req: Request, res: Response) => 
     return res.status(500).json({
       success: false,
       error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to update college status' },
+    });
+  }
+});
+
+// ── GET /api/v1/colleges/:id ────────────────────────────────────────────────
+// Retrieve a single college with full placement dossier profile details
+app.get('/api/v1/colleges/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    let college: any = null;
+    if (Types.ObjectId.isValid(id)) {
+      college = await College.findById(id);
+    } else {
+      college = await College.findOne({
+        $or: [
+          { college_code: id.toUpperCase() },
+          { college_name: new RegExp(id, 'i') },
+        ],
+      });
+    }
+
+    if (!college) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'College not found' },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: { college },
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to retrieve college profile' },
+    });
+  }
+});
+
+// ── PATCH /api/v1/colleges/:id ───────────────────────────────────────────────
+// Update college profile, placement officer details & institutional highlights
+app.patch('/api/v1/colleges/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_ID', message: 'A valid college ObjectId is required' },
+      });
+    }
+
+    const allowedFields = [
+      'college_name',
+      'college_code',
+      'location',
+      'college_website',
+      'logo_url',
+      'tpo_name',
+      'tpo_email',
+      'tpo_contact_mobile',
+      'tpo_designation',
+      'tpo_alternate_mobile',
+      'tpo_alternate_email',
+      'departments',
+      'student_strength',
+      'nirf_ranking',
+      'highest_package_lpa',
+      'average_package_lpa',
+      'lowest_package_lpa',
+      'established_year',
+      'landmarks',
+      'address',
+      'map_location',
+      'accreditations',
+      'placement_notes',
+    ];
+
+    const updatePayload: Record<string, any> = {};
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        if (typeof req.body[field] === 'string') {
+          updatePayload[field] = req.body[field].trim();
+        } else {
+          updatePayload[field] = req.body[field];
+        }
+      }
+    });
+
+    const college = await College.findByIdAndUpdate(
+      id,
+      { $set: updatePayload },
+      { new: true, runValidators: true }
+    );
+
+    if (!college) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'College not found' },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `College profile for ${college.college_code} updated successfully`,
+      data: { college },
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to update college dossier' },
+    });
+  }
+});
+
+// ── POST /api/v1/colleges/sync-sharepoint ────────────────────────────────────
+// Lively synchronize college profiles and TPO contacts from SharePoint Excel
+app.post('/api/v1/colleges/sync-sharepoint', async (_req: Request, res: Response) => {
+  try {
+    const syncResult = await syncCollegesFromExcel();
+    const collegeCount = syncResult.totalColleges ?? syncResult.totalRows ?? (syncResult.updatedCount + syncResult.insertedCount);
+    return res.status(200).json({
+      success: true,
+      message: `Successfully synchronized ${collegeCount} partner colleges from Colleges and Coordinators Excel (${syncResult.updatedCount} updated, ${syncResult.insertedCount} added)`,
+      data: syncResult,
+    });
+  } catch (error: any) {
+    console.error('SharePoint sync error:', error);
+    try {
+      const localFile = path.resolve(__dirname, '../../Colleges_and_Coordinators.xlsx');
+      if (fs.existsSync(localFile)) {
+        const fallbackResult = await syncCollegesFromExcel(localFile);
+        const fallbackCount = fallbackResult.totalColleges ?? fallbackResult.totalRows ?? (fallbackResult.updatedCount + fallbackResult.insertedCount);
+        return res.status(200).json({
+          success: true,
+          message: `Synchronized ${fallbackCount} partner colleges from Colleges and Coordinators Excel`,
+          data: fallbackResult,
+        });
+      }
+    } catch (fallbackErr: any) {}
+
+    return res.status(500).json({
+      success: false,
+      error: { code: 'SYNC_ERROR', message: error.message || 'Failed to sync colleges from SharePoint' },
     });
   }
 });

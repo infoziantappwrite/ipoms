@@ -36,7 +36,7 @@ function ReportsPageContent() {
       const autoGenerate = async () => {
         try {
           setAutoLoading(true);
-          const res = await apiFetch<any>('/api/v1/reports/generate', {
+          const res = await apiFetch<any>('/reports/generate', {
             method: 'POST',
             body: JSON.stringify({
               template_type: templateQuery,

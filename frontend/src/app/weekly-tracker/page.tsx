@@ -9,12 +9,13 @@ import { WeeklySection } from './components/WeeklySection';
 import { AddCompanyModal } from './components/AddCompanyModal';
 import { BulkMoveModal } from './components/BulkMoveModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
+import { CollegeDossierModal } from '@/components/college/CollegeDossierModal';
 import type { WeeklyRow } from './components/WeeklyTable';
 import { apiFetch, apiFetchBlob } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
 import { useToast } from '@/components/ui/Toast';
 import { triggerHaptic } from '@/lib/haptics';
-import { getActiveCollege, resolveDefaultCollege } from '@/lib/collegeSession';
+import { resolveDefaultCollege } from '@/lib/collegeSession';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 
 interface SectionData {
@@ -84,12 +85,13 @@ function normalizeAllSections(raw: any): SectionsResponse {
 export default function WeeklyTrackerPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const [selectedCollegeId, setSelectedCollegeId] = useState<string>(() => {
-    return getActiveCollege().id || '';
-  });
-  const [selectedCollegeName, setSelectedCollegeName] = useState<string>(() => {
-    return getActiveCollege().name || '';
-  });
+  // Deliberately NOT lazy-initialized from getActiveCollege()/localStorage: that
+  // value differs between the server's render (no localStorage) and the
+  // browser's first render (localStorage already available), which is exactly
+  // what triggers a React hydration mismatch. Starting empty on both sides and
+  // filling in via the effect below keeps server and client markup identical.
+  const [selectedCollegeId, setSelectedCollegeId] = useState<string>('');
+  const [selectedCollegeName, setSelectedCollegeName] = useState<string>('');
   const [academicYear, setAcademicYear] = useState<string>('all');
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [sections, setSections] = useState<SectionsResponse | null>(null);
@@ -118,6 +120,7 @@ export default function WeeklyTrackerPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
   const [isDeleteConfirmModalOpen, setIsDeleteConfirmModalOpen] = useState(false);
+  const [isDossierOpen, setIsDossierOpen] = useState(false);
 
   const handleToggleSelectRow = (rowId: string) => {
     setSelectedRowIds((prev) =>
@@ -1103,6 +1106,7 @@ export default function WeeklyTrackerPage() {
         canRedo={canRedo}
         onUndo={undo}
         onRedo={redo}
+        onOpenCollegeDossier={() => setIsDossierOpen(true)}
       />
 
       {/* ── KPI Cards (Slim Single-Row Profile) ──────────────────────────── */}
@@ -1367,6 +1371,15 @@ export default function WeeklyTrackerPage() {
         onClose={() => setIsDeleteConfirmModalOpen(false)}
         onConfirm={handleConfirmBulkDelete}
       />
+
+      {/* ── College Profile / Placement Officer Dossier Modal ──────────── */}
+      {selectedCollegeId && (
+        <CollegeDossierModal
+          isOpen={isDossierOpen}
+          onClose={() => setIsDossierOpen(false)}
+          collegeId={selectedCollegeId}
+        />
+      )}
 
     </div>
   );

@@ -48,6 +48,7 @@ interface Props {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
+  onOpenCollegeDossier?: () => void;
 }
 
 export function WeeklyHeader({
@@ -80,6 +81,7 @@ export function WeeklyHeader({
   canRedo = false,
   onUndo,
   onRedo,
+  onOpenCollegeDossier,
 }: Props) {
   const [selectedCollegeObj, setSelectedCollegeObj] = useState<College | null>(null);
 
@@ -177,7 +179,7 @@ export function WeeklyHeader({
         {/* Right Side: College Selector + Standalone Dustbin + Three Dots Actions Dropdown */}
         <div className="flex items-center gap-2 shrink-0">
           {/* 1. Smart Auto-Shrinking College Selector */}
-          <div className="shrink-0 flex items-center">
+          <div className="shrink-0 flex items-center gap-1.5">
             <CollegeSelector
               selectedCollegeId={selectedCollegeId}
               onSelect={(id, name) => {
@@ -188,6 +190,22 @@ export function WeeklyHeader({
               }}
               align="right"
             />
+
+            {selectedCollegeId && onOpenCollegeDossier && (
+              <button
+                type="button"
+                onClick={onOpenCollegeDossier}
+                title="View & Edit College Profile & Placement Officer Details"
+                className="flex items-center justify-center w-8 h-8 p-1 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200/90 dark:border-zinc-700/80 hover:border-blue-400 dark:hover:border-blue-500 rounded-xl shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0 overflow-hidden group"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/university.gif"
+                  alt="College Profile & Placement Officer Details"
+                  className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal group-hover:scale-110 active:scale-95 transition-transform duration-150"
+                />
+              </button>
+            )}
           </div>
 
           {/* 2. Active Mode Controls (Only visible when a mode is active) */}

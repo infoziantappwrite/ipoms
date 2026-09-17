@@ -18,6 +18,26 @@ export interface College {
   college_code: string;
   location?: string;
   logo_url?: string;
+  college_website?: string;
+  tpo_name?: string;
+  tpo_email?: string;
+  tpo_contact_mobile?: string;
+  tpo_designation?: string;
+  tpo_alternate_mobile?: string;
+  tpo_alternate_email?: string;
+  departments?: string[];
+  student_strength?: number;
+  nirf_ranking?: string;
+  highest_package_lpa?: string;
+  average_package_lpa?: string;
+  lowest_package_lpa?: string;
+  established_year?: string | number;
+  landmarks?: string;
+  address?: string;
+  map_location?: string;
+  accreditations?: string;
+  placement_notes?: string;
+  status?: string;
 }
 
 interface Props {

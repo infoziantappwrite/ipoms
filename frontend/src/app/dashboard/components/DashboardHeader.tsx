@@ -192,7 +192,7 @@ export function DashboardHeader() {
 
   return (
     <header
-      className={`w-full relative overflow-hidden select-none border-b transition-colors duration-700 ${
+      className={`w-full relative overflow-hidden select-none border-b transition-colors duration-700 min-h-[5cm] flex items-center ${
         isNight
           ? 'bg-gradient-to-r from-white via-slate-100/95 via-30% via-slate-300/80 via-60% to-[#0b1329] text-slate-900 dark:from-[#060c1c] dark:via-[#0c1630] dark:to-[#070e24] dark:text-white border-border dark:border-indigo-950/80 shadow-md'
           : 'bg-gradient-to-b from-surface via-surface to-background text-fg border-border shadow-xs'
@@ -201,23 +201,23 @@ export function DashboardHeader() {
       {/* ── Ambient Dynamic Sky Animation (Day: Sun + Clouds + Birds | Night: Full Moon + Twinkling Stars + Cosmic Nebula) ── */}
       <DashboardAmbientScene />
 
-      {/* ── Foreground Content Container ── */}
-      <div className="w-full max-w-7xl mx-auto px-6 py-8 sm:py-10 space-y-8 relative z-10">
-        {/* ── TOP BAR: Greeting Badge + Notifications & Sign Out ── */}
-        <div className="flex items-center justify-between gap-4 flex-wrap">
+      {/* ── Foreground Content Container (Compact 5cm Height) ── */}
+      <div className="w-full max-w-7xl mx-auto px-5 sm:px-6 py-3.5 relative z-10 flex flex-col justify-between min-h-[5cm] gap-2.5">
+        {/* ── TOP BAR: Compact Greeting Badge + Controls ── */}
+        <div className="flex items-center justify-between gap-3">
           {/* Greeting Badge */}
           <div
-            className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full border text-xs sm:text-sm font-bold shadow-2xs transition-colors ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-bold shadow-2xs transition-colors ${
               isNight
                 ? 'bg-white/85 dark:bg-white/10 border-slate-200 dark:border-white/20 text-slate-800 dark:text-amber-300 backdrop-blur-md shadow-xs'
                 : 'bg-surface-sunken border-border text-fg'
             }`}
           >
-            <PeriodIcon size={16} className="text-amber-500 dark:text-amber-400 shrink-0" />
+            <PeriodIcon size={14} className="text-amber-500 dark:text-amber-400 shrink-0" />
             <span>{toTitleCase(greetingData?.greeting ?? `Good ${period}`)}</span>
           </div>
 
-          {/* Top-Right Action Controls (Help & FAQs in new tab + Sign Out) */}
+          {/* Top-Right Action Controls */}
           <div className="flex items-center gap-2">
             <Link
               href="/faq"
@@ -226,13 +226,13 @@ export function DashboardHeader() {
               onClick={() => triggerHaptic('light')}
               title="Frequently Asked Questions & Guides (Opens in a new tab • Press ?)"
               aria-label="Frequently Asked Questions & Guides"
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-200 active:scale-95 cursor-pointer shadow-2xs border select-none group ${
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 active:scale-95 cursor-pointer shadow-2xs border select-none group ${
                 isNight
                   ? 'bg-white/85 dark:bg-white/10 border-slate-200 dark:border-white/20 text-slate-700 dark:text-slate-200 hover:text-primary hover:bg-white dark:hover:bg-white/20 backdrop-blur-md'
                   : 'bg-surface hover:bg-surface-raised border-border text-fg-subtle hover:text-primary'
               }`}
             >
-              <HelpCircle size={18} strokeWidth={2.2} className="group-hover:scale-110 transition-transform duration-200" />
+              <HelpCircle size={15} strokeWidth={2.2} className="group-hover:scale-110 transition-transform duration-200" />
             </Link>
 
             <UserSignOutButton
@@ -245,83 +245,78 @@ export function DashboardHeader() {
           </div>
         </div>
 
-        {/* ── CENTER HERO: Profile Identity Card + Headline & Motivation ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-center">
-          {/* [1/4 Column]: Clean Profile Photo Card */}
-          <div className="lg:col-span-1 flex justify-center lg:justify-start">
-            <Link
-              href="/settings"
-              title="Click to view or edit photo in Settings"
-              className={`relative block w-48 h-48 sm:w-56 sm:h-56 lg:w-60 lg:h-60 rounded-3xl overflow-hidden border shadow-md group transition-all duration-300 cursor-pointer ${
-                isNight
-                  ? 'bg-white/95 dark:bg-[#0e1938] border-slate-200 dark:border-indigo-500/40 shadow-lg dark:shadow-2xl ring-1 ring-slate-900/5 dark:ring-white/10 hover:shadow-primary/20 hover:border-primary/50'
-                  : 'bg-surface border-border hover:shadow-primary/20 hover:border-primary/50'
-              }`}
-            >
-              {user?.profile_photo_url ? (
-                <img
-                  src={user.profile_photo_url}
-                  alt={fullName}
-                  className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
-                />
-              ) : (
-                <div
-                  className={`w-full h-full flex items-center justify-center font-display font-black text-5xl group-hover:scale-105 transition-transform duration-300 ${
-                    isNight
-                      ? 'bg-primary-subtle text-primary dark:bg-gradient-to-br dark:from-[#162752] dark:to-[#0c1630] dark:text-sky-300 dark:drop-shadow-[0_0_25px_rgba(56,189,248,0.4)]'
-                      : 'bg-primary-subtle text-primary'
-                  }`}
-                >
-                  {initials}
-                </div>
-              )}
-            </Link>
-          </div>
+        {/* ── CENTER HERO: Profile Card + Compact Headline, Quote & Actions ── */}
+        <div className="flex items-center gap-4 sm:gap-6 flex-1">
+          {/* Profile Photo Card */}
+          <Link
+            href="/settings"
+            title="Click to view or edit photo in Settings"
+            className={`relative block w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border shadow-sm group shrink-0 transition-all duration-300 cursor-pointer ${
+              isNight
+                ? 'bg-white/95 dark:bg-[#0e1938] border-slate-200 dark:border-indigo-500/40 shadow-md dark:shadow-xl ring-1 ring-slate-900/5 dark:ring-white/10 hover:shadow-primary/20 hover:border-primary/50'
+                : 'bg-surface border-border hover:shadow-primary/20 hover:border-primary/50'
+            }`}
+          >
+            {user?.profile_photo_url ? (
+              <img
+                src={user.profile_photo_url}
+                alt={fullName}
+                className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+              />
+            ) : (
+              <div
+                className={`w-full h-full flex items-center justify-center font-display font-black text-2xl sm:text-3xl group-hover:scale-105 transition-transform duration-300 ${
+                  isNight
+                    ? 'bg-primary-subtle text-primary dark:bg-gradient-to-br dark:from-[#162752] dark:to-[#0c1630] dark:text-sky-300 dark:drop-shadow-[0_0_20px_rgba(56,189,248,0.4)]'
+                    : 'bg-primary-subtle text-primary'
+                }`}
+              >
+                {initials}
+              </div>
+            )}
+          </Link>
 
-          {/* [3/4 Column]: Headline & 30-Second Motivational Sentence */}
-          <div className="lg:col-span-3 space-y-3.5 text-left">
-            {/* Main Headline */}
+          {/* Headline, Quote & Action Row */}
+          <div className="flex-1 min-w-0 space-y-1.5">
             <h1
-              className={`text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight font-display ${
+              className={`text-xl sm:text-2xl lg:text-3xl font-black tracking-tight font-display leading-tight truncate ${
                 isNight
-                  ? 'text-slate-900 dark:text-white dark:drop-shadow-[0_2px_14px_rgba(0,0,0,0.7)]'
+                  ? 'text-slate-900 dark:text-white dark:drop-shadow-[0_2px_10px_rgba(0,0,0,0.7)]'
                   : 'text-fg'
               }`}
             >
               Welcome To iPOMS
             </h1>
 
-            {/* Motivational Line (Smooth 30s Auto-Fade) */}
-            <div className="min-h-[48px] flex items-center">
-              <p
-                className={`text-sm sm:text-base max-w-3xl leading-relaxed font-medium transition-all duration-700 ${
-                  isNight ? 'text-slate-700 dark:text-slate-200' : 'text-fg-muted'
-                } ${isFading ? 'opacity-0 translate-y-1' : 'opacity-100 translate-y-0'}`}
-              >
-                {currentQuote}
-              </p>
-            </div>
+            {/* Motivational Line (Smooth Auto-Fade) */}
+            <p
+              className={`text-xs sm:text-sm max-w-2xl font-medium truncate transition-all duration-700 ${
+                isNight ? 'text-slate-700 dark:text-slate-200' : 'text-fg-muted'
+              } ${isFading ? 'opacity-0 translate-y-0.5' : 'opacity-100 translate-y-0'}`}
+            >
+              {currentQuote}
+            </p>
 
             {/* Action Bar: Date Pill + Launch Tracker Shortcut */}
-            <div className="flex flex-wrap items-center gap-3 pt-2 text-xs sm:text-sm">
+            <div className="flex flex-wrap items-center gap-2.5 pt-0.5 text-xs">
               <div
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl font-bold shadow-2xs transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-semibold shadow-2xs transition-colors text-[11px] sm:text-xs ${
                   isNight
                     ? 'bg-white/85 dark:bg-white/10 border border-slate-200 dark:border-white/15 text-slate-700 dark:text-slate-200 backdrop-blur-md'
                     : 'bg-surface-sunken border border-border text-fg-muted'
                 }`}
               >
-                <Calendar size={14} className={isNight ? 'text-primary dark:text-amber-400' : 'text-primary'} />
+                <Calendar size={13} className={isNight ? 'text-primary dark:text-amber-400' : 'text-primary'} />
                 <span>Today • {todayFormatted}</span>
               </div>
 
               <Link
                 href="/tracker"
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-sm shadow-primary/20 transition-all hover:scale-105 active:scale-[0.992] cursor-pointer ring-1 ring-primary/20"
+                className="flex items-center gap-1.5 px-3.5 py-1 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-[11px] sm:text-xs font-bold shadow-xs transition-all hover:scale-105 active:scale-[0.992] cursor-pointer"
               >
-                <PhoneCall size={14} />
+                <PhoneCall size={12} />
                 <span>Launch Daily Tracker</span>
-                <ArrowRight size={14} />
+                <ArrowRight size={12} />
               </Link>
             </div>
           </div>
