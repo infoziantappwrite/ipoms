@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Download, ChevronDown, FileSpreadsheet, FileText, Image as ImageIcon } from 'lucide-react';
+import { triggerHaptic } from '@/lib/haptics';
 
 interface Props {
   onExportExcel: () => void;
@@ -42,7 +43,7 @@ export function SmoothExportDropdown({
     if (!triggerRef.current) return null;
     const rect = triggerRef.current.getBoundingClientRect();
     const popoverHeight = 160;
-    const popoverWidth = 230;
+    const popoverWidth = 220;
     const spaceBelow = window.innerHeight - rect.bottom;
     const placeAbove = spaceBelow < popoverHeight && rect.top > popoverHeight;
 
@@ -63,6 +64,7 @@ export function SmoothExportDropdown({
 
   const handleToggle = () => {
     if (isExporting) return;
+    triggerHaptic('light');
     if (isOpen) {
       setIsOpen(false);
       setCoords((prev) => ({ ...prev, ready: false }));
@@ -117,8 +119,8 @@ export function SmoothExportDropdown({
         onClick={handleToggle}
         className={
           iconOnly
-            ? `w-9 h-9 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-[0.992] shrink-0 relative ${className}`
-            : `px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-[0.992] whitespace-nowrap shrink-0 ${className}`
+            ? `w-9 h-9 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl flex items-center justify-center transition-all duration-150 shadow-2xs cursor-pointer active:scale-[0.992] shrink-0 relative ${className}`
+            : `px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all duration-150 shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-[0.992] whitespace-nowrap shrink-0 ${className}`
         }
         title={title}
         aria-label={title}
@@ -130,7 +132,7 @@ export function SmoothExportDropdown({
             <ChevronDown
               size={13}
               strokeWidth={2.5}
-              className={`transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180' : ''}`}
+              className={`transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] shrink-0 ${isOpen ? 'rotate-180' : ''}`}
             />
           </>
         )}
@@ -145,26 +147,27 @@ export function SmoothExportDropdown({
               position: 'fixed',
               top: `${coords.top}px`,
               left: `${coords.left}px`,
-              width: '200px',
+              width: '215px',
               zIndex: 99999,
               transform: coords.placement === 'top' ? 'translateY(-100%)' : 'none',
               visibility: coords.ready ? 'visible' : 'hidden',
             }}
-            className="bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden p-1.5 space-y-0.5 select-none animate-in fade-in zoom-in-95 duration-150"
+            className="bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 rounded-xl shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] overflow-hidden p-1.5 space-y-0.5 select-none animate-in fade-in zoom-in-95 duration-150 ease-out text-fg"
           >
             {/* Excel Option */}
             <button
               type="button"
               onClick={() => {
+                triggerHaptic('selection');
                 setIsOpen(false);
                 onExportExcel();
               }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-fg hover:bg-surface-raised hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer"
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-fg hover:bg-surface-raised hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer"
             >
               <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                 <FileSpreadsheet size={15} strokeWidth={2.2} />
               </div>
-              <span className="font-semibold text-xs text-fg">Excel Document</span>
+              <span className="font-semibold text-xs text-fg">Excel Document (.xls)</span>
             </button>
 
             {/* PDF Option */}
@@ -172,15 +175,16 @@ export function SmoothExportDropdown({
               <button
                 type="button"
                 onClick={() => {
+                  triggerHaptic('selection');
                   setIsOpen(false);
                   onExportPdf();
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-fg hover:bg-surface-raised hover:text-rose-600 dark:hover:text-rose-400 transition-colors text-left cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-fg hover:bg-surface-raised hover:text-rose-600 dark:hover:text-rose-400 transition-colors text-left cursor-pointer"
               >
                 <div className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
                   <FileText size={15} strokeWidth={2.2} />
                 </div>
-                <span className="font-semibold text-xs text-fg">PDF Document</span>
+                <span className="font-semibold text-xs text-fg">PDF Document (.pdf)</span>
               </button>
             )}
 
@@ -189,15 +193,16 @@ export function SmoothExportDropdown({
               <button
                 type="button"
                 onClick={() => {
+                  triggerHaptic('selection');
                   setIsOpen(false);
                   onExportImage();
                 }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-fg hover:bg-surface-raised hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-fg hover:bg-surface-raised hover:text-blue-600 dark:hover:text-blue-400 transition-colors text-left cursor-pointer"
               >
                 <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
                   <ImageIcon size={15} strokeWidth={2.2} />
                 </div>
-                <span className="font-semibold text-xs text-fg">Image File</span>
+                <span className="font-semibold text-xs text-fg">Image File (.png)</span>
               </button>
             )}
           </div>,

@@ -100,7 +100,7 @@ export function ManualAddRowModal({
   // Start Time & Tracking
   const [startTime, setStartTime] = useState(() => {
     const now = new Date();
-    return now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return formatTime(now);
   });
   const [startDateObj, setStartDateObj] = useState<Date>(() => new Date());
 
@@ -661,8 +661,8 @@ export function ManualAddRowModal({
 
             {/* Auto-Complete Dropdown Card (Solid Minimal Surface) */}
             {showSuggestions && (
-              <div className="absolute top-full left-0 right-0 mt-1.5 z-50 bg-surface border border-border rounded-xl shadow-xl overflow-hidden max-h-60 overflow-y-auto divide-y divide-border/60 animate-in fade-in zoom-in-95 duration-100 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                <div className="px-3.5 py-2 bg-surface-sunken text-[11px] font-bold text-fg-subtle flex items-center justify-between border-b border-border/80 sticky top-0 z-10">
+              <div className="absolute top-full left-0 right-0 mt-1.5 z-50 bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 rounded-xl shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] overflow-hidden max-h-60 overflow-y-auto divide-y divide-border/60 animate-in fade-in zoom-in-95 duration-100 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                <div className="px-3.5 py-2 bg-slate-50 dark:bg-[#1A2234] text-[11px] font-bold text-fg-subtle flex items-center justify-between border-b border-border/80 sticky top-0 z-10">
                   <span className="flex items-center gap-1.5">
                     <Database size={11} className="text-primary" /> Meta Database Contacts
                   </span>

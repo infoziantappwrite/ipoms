@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Calendar } from 'lucide-react';
+import { triggerHaptic } from '@/lib/haptics';
 
 export const MONTHS_LIST = [
   'January',
@@ -58,8 +59,8 @@ export function SmoothMonthDropdown({
   const calculateCoords = useCallback(() => {
     if (!triggerRef.current) return null;
     const rect = triggerRef.current.getBoundingClientRect();
-    const popoverHeight = 250;
-    const popoverWidth = 192;
+    const popoverHeight = 270;
+    const popoverWidth = Math.max(rect.width, 192);
     const spaceBelow = window.innerHeight - rect.bottom;
     const placeAbove = spaceBelow < popoverHeight && rect.top > popoverHeight;
 
@@ -77,8 +78,10 @@ export function SmoothMonthDropdown({
     };
   }, []);
 
-  const handleToggle = () => {
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (disabled) return;
+    triggerHaptic('light');
     if (isOpen) {
       setIsOpen(false);
       setCoords((prev) => ({ ...prev, ready: false }));
@@ -136,32 +139,34 @@ export function SmoothMonthDropdown({
   const displayLabel = isAll ? allLabel : value || placeholder;
 
   return (
-    <div className={`relative inline-block text-left ${className}`}>
+    <div className={`relative inline-block text-left w-full ${className}`} onClick={(e) => e.stopPropagation()}>
       {/* Trigger Button */}
       <button
         ref={triggerRef}
         type="button"
         onClick={handleToggle}
-        className="inline-flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-surface hover:bg-surface-raised text-fg border border-border transition-all cursor-pointer shadow-2xs active:scale-[0.992] select-none whitespace-nowrap w-full"
+        className="inline-flex items-center justify-between gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-surface hover:bg-surface-raised text-fg border border-border transition-all duration-150 cursor-pointer shadow-2xs active:scale-[0.992] select-none whitespace-nowrap w-full"
       >
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0 truncate">
           <Calendar size={13} className="text-amber-500 shrink-0" />
-          <span className="whitespace-nowrap">{displayLabel}</span>
+          <span className="truncate">{displayLabel}</span>
         </div>
         <ChevronDown
-          size={13}
-          strokeWidth={2.5}
-          className={`ml-1 opacity-70 transition-transform duration-150 shrink-0 ${isOpen ? 'rotate-180' : ''}`}
+          size={14}
+          strokeWidth={2.2}
+          className={`ml-1 text-fg-subtle transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] shrink-0 ${isOpen ? 'rotate-180 text-primary' : ''}`}
         />
       </button>
 
-      {/* Portal Popover (Never clipped by table rows or overflow) */}
+      {/* Portal Popover (100% Solid SaaS Opaque Theme, Never clipped by table rows or overflow) */}
       {isOpen &&
         coords.ready &&
         typeof document !== 'undefined' &&
         createPortal(
           <div
             ref={popoverRef}
+            role="listbox"
+            onClick={(e) => e.stopPropagation()}
             style={{
               position: 'fixed',
               top: coords.placement === 'top' ? 'auto' : `${coords.top}px`,
@@ -173,48 +178,52 @@ export function SmoothMonthDropdown({
               zIndex: 99999,
               width: '192px',
             }}
-            className="rounded-2xl bg-surface border border-border shadow-2xl p-1.5 max-h-60 overflow-y-auto text-fg no-scrollbar animate-in fade-in zoom-in-95 duration-100"
+            className="rounded-xl bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] p-1.5 max-h-[220px] overflow-y-auto text-fg no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden animate-in fade-in zoom-in-95 duration-150 ease-out select-none"
           >
-            <div className="text-[10px] font-bold text-fg-subtle uppercase px-2.5 py-1 tracking-wider sticky top-0 bg-surface/95 backdrop-blur-xs border-b border-border/40 mb-1">
+            <div className="text-[10px] font-bold text-fg-subtle uppercase px-2.5 py-1.5 tracking-wider sticky top-0 bg-slate-50 dark:bg-[#1A2234] border-b border-border/60 rounded-lg mb-1">
               Followup Month
             </div>
 
             {allowAll && (
               <button
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerHaptic('selection');
                   onChange('all');
                   setIsOpen(false);
                 }}
-                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer text-left ${
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-left select-none ${
                   isAll
-                    ? 'bg-primary/10 text-primary font-bold'
-                    : 'text-fg-muted hover:bg-surface-sunken hover:text-fg'
+                    ? 'bg-primary/10 text-primary font-bold shadow-2xs'
+                    : 'text-fg hover:bg-slate-100 dark:hover:bg-slate-800/80'
                 }`}
               >
                 <span>{allLabel}</span>
-                {isAll && <Check size={14} className="text-primary shrink-0 ml-1" />}
+                {isAll && <Check size={14} strokeWidth={2.5} className="text-primary shrink-0 ml-1" />}
               </button>
             )}
 
-            {MONTHS_LIST.map((m) => {
-              const isSelected = value === m;
+            {MONTHS_LIST.map((month) => {
+              const isSelected = value === month;
               return (
                 <button
-                  key={m}
+                  key={month}
                   type="button"
-                  onClick={() => {
-                    onChange(m);
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    triggerHaptic('selection');
+                    onChange(month);
                     setIsOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer text-left ${
+                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-left select-none ${
                     isSelected
-                      ? 'bg-primary/10 text-primary font-bold'
-                      : 'text-fg-muted hover:bg-surface-sunken hover:text-fg'
+                      ? 'bg-primary/10 text-primary font-bold shadow-2xs'
+                      : 'text-fg hover:bg-slate-100 dark:hover:bg-slate-800/80'
                   }`}
                 >
-                  <span>{m}</span>
-                  {isSelected && <Check size={14} className="text-primary shrink-0 ml-1" />}
+                  <span>{month}</span>
+                  {isSelected && <Check size={14} strokeWidth={2.5} className="text-primary shrink-0 ml-1" />}
                 </button>
               );
             })}

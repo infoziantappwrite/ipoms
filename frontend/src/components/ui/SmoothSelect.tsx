@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Search, X, Sparkles } from 'lucide-react';
+import { triggerHaptic } from '@/lib/haptics';
 
 export interface SelectOption {
   value: string;
@@ -63,7 +64,7 @@ export function SmoothSelect({
   const calculateCoords = useCallback(() => {
     if (!triggerRef.current) return null;
     const rect = triggerRef.current.getBoundingClientRect();
-    const popoverHeight = Math.min(options.length * 42 + (searchable ? 50 : 20), 320);
+    const popoverHeight = Math.min(options.length * 36 + (searchable ? 50 : 20), 240);
     const popoverWidth = Math.max(rect.width, 240);
     const spaceBelow = window.innerHeight - rect.bottom;
     const placeAbove = spaceBelow < popoverHeight && rect.top > popoverHeight;
@@ -85,6 +86,7 @@ export function SmoothSelect({
 
   const handleToggle = () => {
     if (disabled) return;
+    triggerHaptic('light');
     if (isOpen) {
       setIsOpen(false);
       setSearchQuery('');
@@ -159,14 +161,14 @@ export function SmoothSelect({
         type="button"
         disabled={disabled}
         onClick={handleToggle}
-        className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-all cursor-pointer select-none ${
+        className={`w-full flex items-center justify-between gap-2 px-3.5 py-2 rounded-xl border text-xs font-semibold transition-all duration-150 cursor-pointer select-none active:scale-[0.992] shadow-2xs ${
           error
             ? isOpen
-              ? 'bg-white dark:bg-slate-950 border-rose-500 ring-2 ring-rose-500/80 text-slate-900 dark:text-slate-100 shadow-xs'
-              : 'bg-rose-50/40 dark:bg-rose-950/20 hover:bg-rose-50/70 dark:hover:bg-rose-950/40 border-rose-500 ring-1 ring-rose-500/60 text-slate-900 dark:text-slate-100'
+              ? 'bg-surface border-rose-500 ring-2 ring-rose-500/20 text-fg shadow-xs'
+              : 'bg-rose-50/50 dark:bg-rose-950/30 hover:bg-rose-50/80 dark:hover:bg-rose-950/50 border-rose-500/60 ring-1 ring-rose-500/40 text-fg'
             : isOpen
-            ? 'bg-white dark:bg-slate-950 border-blue-600 ring-1 ring-blue-600 text-slate-900 dark:text-slate-100'
-            : 'bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900 border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100'
+            ? 'bg-surface border-primary ring-2 ring-primary/20 text-fg shadow-xs'
+            : 'bg-surface hover:bg-surface-raised border-border text-fg'
         } disabled:opacity-50 disabled:cursor-not-allowed`}
       >
         <div className="flex items-center gap-2 truncate">
@@ -176,35 +178,36 @@ export function SmoothSelect({
               className={
                 error
                   ? 'text-rose-500 dark:text-rose-400 shrink-0'
-                  : 'text-blue-600 dark:text-blue-400 shrink-0'
+                  : 'text-primary shrink-0'
               }
             />
           )}
           {selectedOption ? (
-            <span className="truncate text-slate-900 dark:text-slate-100 font-medium flex items-center gap-1.5">
+            <span className="truncate text-fg font-semibold flex items-center gap-1.5">
               {selectedOption.badge && (
-                <span className={`font-mono font-semibold ${error ? 'text-rose-500' : 'text-blue-600 dark:text-blue-400'}`}>
+                <span className={`font-mono font-bold ${error ? 'text-rose-500' : 'text-primary'}`}>
                   [{selectedOption.badge}]
                 </span>
               )}
               <span className="truncate">{selectedOption.label}</span>
             </span>
           ) : (
-            <span className={error ? 'text-rose-600 dark:text-rose-300 font-normal' : 'text-slate-400 dark:text-slate-500 font-normal'}>
+            <span className={error ? 'text-rose-600 dark:text-rose-300 font-normal' : 'text-fg-subtle font-normal'}>
               {placeholder}
             </span>
           )}
         </div>
         <ChevronDown
           size={14}
-          className={`shrink-0 transition-transform duration-150 ${
+          strokeWidth={2.2}
+          className={`shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
             error
               ? isOpen
                 ? 'rotate-180 text-rose-500'
                 : 'text-rose-500 dark:text-rose-400'
               : isOpen
-              ? 'rotate-180 text-blue-600'
-              : 'text-slate-400 dark:text-slate-500'
+              ? 'rotate-180 text-primary'
+              : 'text-fg-subtle'
           }`}
         />
       </button>
@@ -227,32 +230,32 @@ export function SmoothSelect({
               width: `${coords.width}px`,
               zIndex: 99999,
             }}
-            className="rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl p-1 flex flex-col max-h-72 text-slate-900 dark:text-slate-100 animate-in fade-in duration-100"
+            className="rounded-xl bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] p-1.5 flex flex-col text-fg animate-in fade-in zoom-in-95 duration-150 ease-out select-none"
           >
             {title && (
-              <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase px-2 py-1 tracking-wider border-b border-slate-100 dark:border-slate-800 mb-1">
+              <div className="text-[10px] font-bold text-fg-subtle uppercase px-2.5 py-1.5 tracking-wider border-b border-border/60 bg-slate-50 dark:bg-[#1A2234] rounded-lg mb-1">
                 {title}
               </div>
             )}
 
             {/* Optional Search Bar */}
             {searchable && (
-              <div className="p-1 border-b border-slate-100 dark:border-slate-800 mb-1">
+              <div className="p-1 border-b border-border/60 mb-1">
                 <div className="relative flex items-center">
-                  <Search size={13} className="absolute left-2.5 text-slate-400" />
+                  <Search size={13} className="absolute left-2.5 text-fg-subtle" />
                   <input
                     ref={searchInputRef}
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder={searchPlaceholder}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-blue-600 rounded-md pl-8 pr-7 py-1.5 text-xs text-slate-900 dark:text-slate-100 outline-none"
+                    className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary/30 rounded-lg pl-8 pr-7 py-1.5 text-xs text-fg placeholder:text-fg-disabled outline-none font-normal"
                   />
                   {searchQuery && (
                     <button
                       type="button"
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-2 text-slate-400 hover:text-slate-600"
+                      className="absolute right-2 text-fg-subtle hover:text-fg"
                     >
                       <X size={12} />
                     </button>
@@ -262,9 +265,9 @@ export function SmoothSelect({
             )}
 
             {/* Option List */}
-            <div className="overflow-y-auto space-y-0.5 max-h-60 p-0.5">
+            <div className="overflow-y-auto space-y-0.5 max-h-[194px] p-0.5 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {filteredOptions.length === 0 ? (
-                <div className="px-3 py-3 text-center text-xs text-slate-400 italic">
+                <div className="px-3 py-3 text-center text-xs text-fg-disabled italic">
                   No matching options found
                 </div>
               ) : (
@@ -276,45 +279,46 @@ export function SmoothSelect({
                       key={opt.value}
                       type="button"
                       onClick={() => {
+                        triggerHaptic('selection');
                         onChange(opt.value);
                         setIsOpen(false);
                         setSearchQuery('');
                       }}
-                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors cursor-pointer text-left select-none ${
+                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer text-left select-none ${
                         isSelected
-                          ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-semibold'
+                          ? 'bg-primary/10 text-primary font-bold shadow-2xs'
                           : opt.isPinned
-                          ? 'bg-blue-50/40 dark:bg-blue-950/20 text-slate-800 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-900/30'
-                          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          ? 'bg-primary/5 text-fg font-semibold hover:bg-primary/10'
+                          : 'text-fg hover:bg-surface-raised'
                       }`}
                     >
                       <div className="flex items-center gap-2 truncate flex-1 min-w-0">
                         {OptionIcon && (
                           <OptionIcon
                             size={14}
-                            className={isSelected ? 'text-blue-600' : 'text-slate-400'}
+                            className={isSelected ? 'text-primary' : 'text-fg-subtle'}
                           />
                         )}
                         <div className="truncate flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 truncate flex-wrap">
                             {opt.badge && (
-                              <span className="font-mono text-blue-600 dark:text-blue-400 font-semibold">[{opt.badge}]</span>
+                              <span className="font-mono text-primary font-bold">[{opt.badge}]</span>
                             )}
                             <span className="truncate">{opt.label}</span>
                             {opt.isPinned && (
-                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-700 dark:text-blue-300 font-bold text-[9px] tracking-tight shrink-0 border border-blue-500/20">
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-primary/15 text-primary font-bold text-[9px] tracking-tight shrink-0 border border-primary/20">
                                 <Sparkles size={8} className="text-amber-500 shrink-0" /> Focus
                               </span>
                             )}
                           </div>
                           {opt.sublabel && (
-                            <p className="text-[10px] text-slate-400 dark:text-slate-500 font-normal truncate mt-0.5">
+                            <p className="text-[10px] text-fg-subtle font-normal truncate mt-0.5">
                               {opt.sublabel}
                             </p>
                           )}
                         </div>
                       </div>
-                      {isSelected && <Check size={14} className="text-blue-600 dark:text-blue-400 shrink-0 ml-2" />}
+                      {isSelected && <Check size={14} strokeWidth={2.5} className="text-primary shrink-0 ml-2" />}
                     </button>
                   );
                 })

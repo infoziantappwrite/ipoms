@@ -290,7 +290,7 @@ export function CopyToJdModal({
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 text-[11px] text-fg-subtle flex-wrap">
-                        <span>Role: <strong className="text-fg font-medium">{selectedLead?.job_role || 'General'}</strong></span>
+                        <span>Role: <strong className="text-fg font-medium">{selectedLead?.job_role || '—'}</strong></span>
                         <span>•</span>
                         <span>CTC: <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-bold">{selectedLead?.ctc || '—'}</strong></span>
                         <span>•</span>
@@ -374,7 +374,7 @@ export function CopyToJdModal({
                                     )}
                                   </div>
                                   <div className="flex items-center gap-1 text-[11px] text-fg-subtle mt-0.2">
-                                    <span>{c.job_role || 'General'}</span>
+                                    <span>{c.job_role || '—'}</span>
                                     {c.ctc && (
                                       <>
                                         <span>•</span>

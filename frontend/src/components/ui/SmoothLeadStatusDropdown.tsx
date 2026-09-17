@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Briefcase, Mail, Clock, Filter } from 'lucide-react';
+import { triggerHaptic } from '@/lib/haptics';
 
 export type LeadStatus = 'Hiring' | 'Follow Up' | 'Invite Email';
 
@@ -72,7 +73,7 @@ export function SmoothLeadStatusDropdown({
     if (!triggerRef.current) return null;
     const rect = triggerRef.current.getBoundingClientRect();
     const popoverHeight = 180;
-    const popoverWidth = 176;
+    const popoverWidth = Math.max(rect.width, 176);
     const spaceBelow = window.innerHeight - rect.bottom;
     const placeAbove = spaceBelow < popoverHeight && rect.top > popoverHeight;
 
@@ -92,6 +93,7 @@ export function SmoothLeadStatusDropdown({
 
   const handleToggle = () => {
     if (disabled) return;
+    triggerHaptic('light');
     if (isOpen) {
       setIsOpen(false);
       setCoords((prev) => ({ ...prev, ready: false }));
@@ -143,31 +145,31 @@ export function SmoothLeadStatusDropdown({
   const isAll = value === 'all' || (!currentOption && allowAll);
 
   return (
-    <div className={`relative inline-block text-left ${className}`}>
+    <div className={`relative inline-block text-left w-full ${className}`}>
       {/* Trigger Button */}
       <button
         ref={triggerRef}
         type="button"
         disabled={disabled}
         onClick={handleToggle}
-        className={`inline-flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer shadow-2xs active:scale-[0.992] disabled:opacity-50 select-none whitespace-nowrap w-full ${
+        className={`inline-flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all duration-150 cursor-pointer shadow-2xs active:scale-[0.992] disabled:opacity-50 select-none whitespace-nowrap w-full ${
           isAll
             ? 'bg-surface hover:bg-surface-raised text-fg border-border'
             : currentOption?.badgeClass || 'bg-surface text-fg border-border'
         }`}
       >
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0 truncate">
           {isAll ? (
             <Filter size={13} className="text-fg-subtle shrink-0" />
           ) : (
             <span className={`w-2 h-2 rounded-full shrink-0 ${currentOption?.dotClass}`} />
           )}
-          <span className="whitespace-nowrap">{isAll ? allLabel : currentOption?.label}</span>
+          <span className="truncate">{isAll ? allLabel : currentOption?.label}</span>
         </div>
         <ChevronDown
-          size={13}
-          strokeWidth={2.5}
-          className={`ml-1 opacity-70 transition-transform duration-150 shrink-0 ${isOpen ? 'rotate-180' : ''}`}
+          size={14}
+          strokeWidth={2.2}
+          className={`ml-1 text-fg-subtle transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] shrink-0 ${isOpen ? 'rotate-180 text-primary' : ''}`}
         />
       </button>
 
@@ -187,11 +189,11 @@ export function SmoothLeadStatusDropdown({
                   : 'auto',
               left: `${coords.left}px`,
               zIndex: 99999,
-              width: '176px',
+              width: '180px',
             }}
-            className="rounded-2xl bg-surface border border-border shadow-2xl p-1.5 text-fg animate-in fade-in zoom-in-95 duration-100"
+            className="rounded-xl bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] p-1.5 text-fg animate-in fade-in zoom-in-95 duration-150 ease-out select-none"
           >
-            <div className="text-[10px] font-bold text-fg-subtle uppercase px-2.5 py-1 tracking-wider border-b border-border/40 mb-1">
+            <div className="text-[10px] font-bold text-fg-subtle uppercase px-2.5 py-1.5 tracking-wider border-b border-border/60 bg-slate-50 dark:bg-[#1A2234] rounded-lg mb-1">
               Status
             </div>
 
@@ -199,20 +201,21 @@ export function SmoothLeadStatusDropdown({
               <button
                 type="button"
                 onClick={() => {
+                  triggerHaptic('selection');
                   onChange('all');
                   setIsOpen(false);
                 }}
-                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer text-left ${
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-left select-none ${
                   isAll
-                    ? 'bg-primary/10 text-primary font-bold'
-                    : 'text-fg-muted hover:bg-surface-sunken hover:text-fg'
+                    ? 'bg-primary/10 text-primary font-bold shadow-2xs'
+                    : 'text-fg hover:bg-surface-raised'
                 }`}
               >
                 <div className="flex items-center gap-2">
                   <Filter size={13} className="text-fg-subtle" />
                   <span>{allLabel}</span>
                 </div>
-                {isAll && <Check size={14} className="text-primary shrink-0 ml-1" />}
+                {isAll && <Check size={14} strokeWidth={2.5} className="text-primary shrink-0 ml-1" />}
               </button>
             )}
 
@@ -224,20 +227,21 @@ export function SmoothLeadStatusDropdown({
                   key={opt.id}
                   type="button"
                   onClick={() => {
+                    triggerHaptic('selection');
                     onChange(opt.id);
                     setIsOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-colors cursor-pointer text-left ${
+                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-left select-none ${
                     isSelected
-                      ? 'bg-primary/10 text-primary font-bold'
-                      : 'text-fg-muted hover:bg-surface-sunken hover:text-fg'
+                      ? 'bg-primary/10 text-primary font-bold shadow-2xs'
+                      : 'text-fg hover:bg-surface-raised'
                   }`}
                 >
                   <div className="flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full shrink-0 ${opt.dotClass}`} />
                     <span>{opt.label}</span>
                   </div>
-                  {isSelected && <Check size={14} className="text-primary shrink-0 ml-1" />}
+                  {isSelected && <Check size={14} strokeWidth={2.5} className="text-primary shrink-0 ml-1" />}
                 </button>
               );
             })}

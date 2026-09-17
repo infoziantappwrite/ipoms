@@ -177,7 +177,7 @@ export function SnoRangeSelector({
 
       {/* ── Dropdown Popover ───────────────────────────────────────── */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1.5 w-72 bg-surface border border-border rounded-2xl shadow-2xl z-50 p-3.5 space-y-3 animate-in fade-in zoom-in-95 duration-150 text-fg select-none">
+        <div className="absolute top-full left-0 mt-1.5 w-72 bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 rounded-2xl shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] z-50 p-3.5 space-y-3 animate-in fade-in zoom-in-95 duration-150 text-fg select-none">
           {/* Popover Header */}
           <div className="flex items-center justify-between pb-2 border-b border-border/70">
             <div className="flex items-center gap-1.5 text-xs font-bold text-fg">

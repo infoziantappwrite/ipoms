@@ -56,8 +56,8 @@ const NAV: NavItem[] = [
 
   // Operational calling tools (Coordinators & Team Leaders)
   { href: '/tracker', label: 'Daily Tracker', Icon: PhoneCall, roles: ['coordinator', 'team_leader'] },
-  { href: '/weekly-tracker', label: 'Weekly Tracker', Icon: CalendarDays, roles: ['coordinator', 'team_leader'] },
   { href: '/daily-leads', label: 'Daily Leads', Icon: Target, roles: ['coordinator', 'team_leader'] },
+  { href: '/weekly-tracker', label: 'Weekly Tracker', Icon: CalendarDays, roles: ['coordinator', 'team_leader'] },
   { href: '/active-leads', label: 'Active Leads', Icon: Sparkles, roles: ['coordinator', 'team_leader'] },
 
   // Intelligence & Reporting

@@ -132,9 +132,8 @@ const WeeklyTrackerSchema: Schema<IWeeklyTracker> = new Schema(
     },
     job_role: {
       type: String,
-      required: [true, 'Job role is required'],
       trim: true,
-      default: 'Graduate Trainee',
+      default: '',
     },
     contact_number: {
       type: String,
@@ -190,7 +189,7 @@ const WeeklyTrackerSchema: Schema<IWeeklyTracker> = new Schema(
     current_status_text: {
       type: String,
       trim: true,
-      default: 'Invite email sent, awaiting JD',
+      default: 'Invite sent, Awaiting JD',
     },
 
     // Dates

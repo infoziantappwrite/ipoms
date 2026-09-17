@@ -10,6 +10,7 @@ import {
   getCachedColleges,
   fetchAllCollegesCached,
 } from '@/lib/collegeSession';
+import { triggerHaptic } from '@/lib/haptics';
 
 export interface College {
   _id: string;
@@ -150,10 +151,13 @@ export function CollegeSelector({
       <button
         type="button"
         disabled={loading}
-        onClick={() => setIsOpen((prev) => !prev)}
-        className={`flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all shadow-xs cursor-pointer select-none ${
+        onClick={() => {
+          triggerHaptic('light');
+          setIsOpen((prev) => !prev);
+        }}
+        className={`flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-150 shadow-2xs cursor-pointer select-none active:scale-[0.992] ${
           selected
-            ? 'bg-blue-50/90 dark:bg-sky-950/60 border-blue-300 dark:border-sky-500/50 text-blue-900 dark:text-sky-200 hover:bg-blue-100 dark:hover:bg-sky-900/60 font-mono tracking-wide ring-1 ring-blue-400/30 dark:ring-sky-400/30'
+            ? 'bg-primary/10 border-primary/40 text-primary hover:bg-primary/15 font-mono tracking-wide ring-1 ring-primary/20'
             : isAll
             ? 'bg-surface-sunken border-border text-fg hover:bg-surface-raised'
             : 'bg-surface border-border text-fg-muted hover:bg-surface-raised min-w-[160px]'
@@ -168,7 +172,7 @@ export function CollegeSelector({
       >
         <div className="flex items-center gap-1.5 truncate">
           {selected ? (
-            <span className="font-black text-blue-700 dark:text-sky-400 font-mono text-xs tracking-wider">
+            <span className="font-bold text-primary font-mono text-xs tracking-wider">
               [{selected.college_code}]
             </span>
           ) : isAll ? (
@@ -183,7 +187,8 @@ export function CollegeSelector({
         </div>
         <ChevronDown
           size={14}
-          className={`${selected ? 'text-blue-700 dark:text-sky-400' : 'text-fg-subtle'} shrink-0 transition-transform ${
+          strokeWidth={2.2}
+          className={`${selected ? 'text-primary' : 'text-fg-subtle'} shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
             isOpen ? 'rotate-180' : ''
           }`}
         />
@@ -193,15 +198,15 @@ export function CollegeSelector({
       {isOpen && (
         <div
           className={`absolute top-full ${
-            align === 'right' ? 'right-0' : 'left-0'
-          } mt-1.5 w-84 sm:w-96 bg-surface border border-border rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col animate-fadeIn text-fg`}
+            align === 'right' ? 'right-0 origin-top-right' : 'left-0 origin-top-left'
+          } mt-1.5 w-84 sm:w-96 bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 rounded-xl shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150 ease-out text-fg select-none`}
         >
           {/* Search Box */}
-          <div className="p-2.5 border-b border-border bg-surface-sunken">
+          <div className="p-2 border-b border-border/60 bg-slate-50 dark:bg-[#1A2234]">
             <div className="relative flex items-center">
               <Search
                 size={14}
-                className="absolute left-3 text-fg-subtle pointer-events-none"
+                className="absolute left-2.5 text-fg-subtle pointer-events-none"
               />
               <input
                 ref={searchInputRef}
@@ -209,21 +214,24 @@ export function CollegeSelector({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search college code or name…"
-                className="w-full bg-surface border border-border text-xs text-fg pl-9 pr-3 py-1.5 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-fg-disabled font-normal shadow-2xs"
+                className="w-full bg-surface border border-border text-xs text-fg pl-8 pr-3 py-1.5 rounded-lg outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 placeholder:text-fg-disabled font-normal shadow-2xs"
               />
             </div>
           </div>
 
           {/* List of Colleges (Shows Full Name & Acronym) */}
-          <div className="max-h-64 overflow-y-auto p-1.5 space-y-0.5 custom-scrollbar bg-surface divide-y divide-border/40">
+          <div className="max-h-[194px] overflow-y-auto p-1.5 space-y-0.5 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden bg-surface divide-y divide-border/30">
             {/* Optional All Colleges item */}
             {allowAll && (!searchTerm || 'all colleges'.includes(searchTerm.toLowerCase())) && (
               <button
                 type="button"
-                onClick={handleSelectAll}
-                className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer ${
+                onClick={() => {
+                  triggerHaptic('selection');
+                  handleSelectAll();
+                }}
+                className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer select-none ${
                   isAll
-                    ? 'bg-primary/15 text-primary font-bold'
+                    ? 'bg-primary/10 text-primary font-bold shadow-2xs'
                     : 'hover:bg-surface-raised text-fg font-semibold'
                 }`}
               >
@@ -231,12 +239,12 @@ export function CollegeSelector({
                   <Globe size={14} className="text-primary shrink-0" />
                   <span>{allLabel}</span>
                 </div>
-                {isAll && <Check size={14} className="text-primary shrink-0" />}
+                {isAll && <Check size={14} strokeWidth={2.5} className="text-primary shrink-0" />}
               </button>
             )}
 
             {prioritizedColleges.length === 0 ? (
-              <div className="py-6 text-center text-xs text-fg-disabled">
+              <div className="py-6 text-center text-xs text-fg-disabled italic">
                 No matching colleges found
               </div>
             ) : (
@@ -247,10 +255,13 @@ export function CollegeSelector({
                   <button
                     key={college._id}
                     type="button"
-                    onClick={() => handleSelectCollege(college)}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-start justify-between gap-2 transition-colors cursor-pointer ${
+                    onClick={() => {
+                      triggerHaptic('selection');
+                      handleSelectCollege(college);
+                    }}
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-start justify-between gap-2 transition-colors cursor-pointer select-none ${
                       isCurrent
-                        ? 'bg-blue-50/90 dark:bg-sky-950/70 text-blue-950 dark:text-sky-200 font-bold'
+                        ? 'bg-primary/10 text-primary font-bold shadow-2xs'
                         : isPinned
                         ? 'bg-primary/5 hover:bg-primary/10 text-fg'
                         : 'hover:bg-surface-raised text-fg'
@@ -258,13 +269,13 @@ export function CollegeSelector({
                   >
                     <div className="flex flex-col min-w-0 pr-2">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-black text-blue-700 dark:text-sky-400 font-mono text-xs tracking-wider">
+                        <span className="font-bold text-primary font-mono text-xs tracking-wider">
                           [{college.college_code}]
                         </span>
                         <span className="truncate font-medium">{college.college_name}</span>
                         {isPinned && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-primary/15 text-primary text-[10px] font-bold tracking-tight">
-                            <Sparkles size={9} /> Focus
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-primary/15 text-primary text-[9px] font-bold tracking-tight shrink-0 border border-primary/20">
+                            <Sparkles size={8} className="text-amber-500 shrink-0" /> Focus
                           </span>
                         )}
                       </div>
@@ -275,7 +286,7 @@ export function CollegeSelector({
                       )}
                     </div>
                     {isCurrent && (
-                      <Check size={14} className="text-blue-700 dark:text-sky-400 shrink-0 mt-0.5" />
+                      <Check size={14} strokeWidth={2.5} className="text-primary shrink-0 mt-0.5" />
                     )}
                   </button>
                 );

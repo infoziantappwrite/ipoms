@@ -7,6 +7,7 @@ import {
   Search,
   Undo2,
   Redo2,
+  RefreshCw,
 } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { CollegeSelector, College } from '@/components/CollegeSelector';
@@ -26,6 +27,7 @@ interface Props {
   onAcademicYearChange?: (yr: string) => void;
   onOpenAddModal?: () => void;
   onSyncDailyPositives?: () => void;
+  isSyncing?: boolean;
   onSaveProgress?: () => void;
   onExportXlsx?: () => void;
   onExportPdf?: () => void;
@@ -57,6 +59,7 @@ export function WeeklyHeader({
   onAcademicYearChange,
   onOpenAddModal,
   onSyncDailyPositives,
+  isSyncing = false,
   onSaveProgress,
   onExportXlsx,
   onExportPdf,
@@ -290,6 +293,28 @@ export function WeeklyHeader({
               </span>
             )}
           </button>
+
+          {/* 3b. Standalone Quick Sync Daily Positives Button */}
+          {onSyncDailyPositives && (
+            <button
+              type="button"
+              disabled={!selectedCollegeId || isSyncing}
+              onClick={() => {
+                triggerHaptic('selection');
+                onSyncDailyPositives();
+              }}
+              className="relative h-8 px-2.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer select-none shrink-0 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80 shadow-2xs text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]"
+              title="Sync positive leads from Daily Leads into Companies in Pipeline"
+              aria-label="Sync Daily Positives"
+            >
+              <RefreshCw
+                size={13}
+                strokeWidth={2.4}
+                className={isSyncing ? 'animate-spin text-amber-600 dark:text-amber-400' : 'text-amber-600 dark:text-amber-400'}
+              />
+              <span className="hidden sm:inline font-bold">Sync</span>
+            </button>
+          )}
 
           {/* 4. Three Dots (Actions Menu) */}
           <WeeklyActionsDropdown

@@ -19,6 +19,8 @@ import { triggerHaptic } from '@/lib/haptics';
 import { ROW_OUTCOMES } from './RowOutcomeDropdown';
 import { MONTHS } from './TrackerRow';
 import { MultiTagInput } from '@/components/ui/MultiTagInput';
+import { SmoothSelect } from '@/components/ui/SmoothSelect';
+import { SmoothMonthDropdown } from '@/components/ui/SmoothMonthDropdown';
 import {
   validateAndNormalizeIndianContact,
   validateAndNormalizeEmail,
@@ -213,18 +215,15 @@ export function EditTrackerRowModal({ row, onClose, onSave, onDelete }: Props) {
               <label className="block text-[11px] font-bold text-fg uppercase tracking-wider mb-1">
                 Call Outcome Status
               </label>
-              <select
+              <SmoothSelect
                 value={outcomeStatus}
-                onChange={(e) => setOutcomeStatus(e.target.value as CallOutcome)}
-                className="w-full bg-surface-sunken border border-border text-xs text-fg px-3 py-2 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-2xs font-medium cursor-pointer"
-              >
-                <option value="">— Select Call Status —</option>
-                {ROW_OUTCOMES.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(val) => setOutcomeStatus(val as CallOutcome)}
+                options={ROW_OUTCOMES.map((opt) => ({
+                  value: opt.value,
+                  label: opt.label,
+                }))}
+                placeholder="— Select Call Status —"
+              />
             </div>
 
             <div>
@@ -232,19 +231,12 @@ export function EditTrackerRowModal({ row, onClose, onSave, onDelete }: Props) {
                 <span>Follow Up Month</span>
                 {outcomeStatus !== 'follow_up' && <Lock size={10} className="text-fg-disabled" />}
               </label>
-              <select
+              <SmoothMonthDropdown
                 disabled={outcomeStatus !== 'follow_up'}
                 value={followUpMonth}
-                onChange={(e) => setFollowUpMonth(e.target.value)}
-                className="w-full bg-surface-sunken border border-border text-xs text-fg px-3 py-2 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-2xs font-medium disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-              >
-                <option value="">— Select Month —</option>
-                {MONTHS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
+                onChange={(m) => setFollowUpMonth(m)}
+                placeholder="— Select Month —"
+              />
             </div>
           </div>
 

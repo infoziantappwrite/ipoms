@@ -84,9 +84,9 @@ const DailyLeadSchema: Schema<IDailyLead> = new Schema(
     },
     job_role: {
       type: String,
-      required: [true, 'Job role is required'],
+      required: false,
       trim: true,
-      default: 'Graduate Trainee',
+      default: '',
     },
     ctc: {
       type: String,

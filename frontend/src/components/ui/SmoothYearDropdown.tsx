@@ -2,7 +2,8 @@
 
 import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Check, GraduationCap, X } from 'lucide-react';
+import { ChevronDown, Check, GraduationCap } from 'lucide-react';
+import { triggerHaptic } from '@/lib/haptics';
 
 export const YEAR_OPTIONS = [
   '2025',
@@ -31,10 +32,8 @@ interface Props {
 /** Parses raw string into clean array of selected 4-digit years */
 function parseSelectedYears(raw: string): string[] {
   if (!raw || raw === 'all') return [];
-  // Match all 4-digit years like 2025, 2026, 2027
   const matches = raw.match(/\b(20\d{2})\b/g);
   if (!matches) return [];
-  // Deduplicate and sort numerically
   const unique = Array.from(new Set(matches));
   return unique.sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
 }
@@ -68,7 +67,7 @@ export function SmoothYearDropdown({
   const calculateCoords = useCallback(() => {
     if (!triggerRef.current) return null;
     const rect = triggerRef.current.getBoundingClientRect();
-    const popoverHeight = 280;
+    const popoverHeight = 240;
     const popoverWidth = 220;
     const spaceBelow = window.innerHeight - rect.bottom;
     const placeAbove = spaceBelow < popoverHeight && rect.top > popoverHeight;
@@ -89,6 +88,7 @@ export function SmoothYearDropdown({
 
   const handleToggle = () => {
     if (disabled) return;
+    triggerHaptic('light');
     if (isOpen) {
       setIsOpen(false);
       setCoords((prev) => ({ ...prev, ready: false }));
@@ -136,6 +136,7 @@ export function SmoothYearDropdown({
 
   // Toggle year selection for multiple year support
   const handleToggleYear = (year: string) => {
+    triggerHaptic('selection');
     if (allowAll) {
       onChange(year);
       setIsOpen(false);
@@ -168,16 +169,16 @@ export function SmoothYearDropdown({
         disabled={disabled}
         onClick={handleToggle}
         title={selectedYears.length > 0 ? `Batch: ${selectedYears.join(', ')}` : placeholder}
-        className="inline-flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-surface hover:bg-surface-raised text-fg border border-border transition-all cursor-pointer shadow-2xs active:scale-[0.992] disabled:opacity-50 select-none whitespace-nowrap min-w-[100px] max-w-[160px]"
+        className="inline-flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-surface hover:bg-surface-raised text-fg border border-border transition-all duration-150 cursor-pointer shadow-2xs active:scale-[0.992] disabled:opacity-50 select-none whitespace-nowrap min-w-[105px] max-w-[170px]"
       >
         <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
-          <GraduationCap size={13} className="text-primary dark:text-sky-400 shrink-0" />
+          <GraduationCap size={14} className="text-primary shrink-0" />
           <span className="font-mono truncate">{displayLabel}</span>
         </div>
         <ChevronDown
-          size={13}
-          strokeWidth={2.5}
-          className={`ml-1 opacity-70 transition-transform duration-150 shrink-0 ${isOpen ? 'rotate-180' : ''}`}
+          size={14}
+          strokeWidth={2.2}
+          className={`ml-1 text-fg-subtle transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] shrink-0 ${isOpen ? 'rotate-180 text-primary' : ''}`}
         />
       </button>
 
@@ -197,19 +198,22 @@ export function SmoothYearDropdown({
                   : 'auto',
               left: `${coords.left}px`,
               zIndex: 99999,
-              width: '210px',
+              width: '215px',
             }}
-            className="rounded-2xl bg-surface border border-border shadow-2xl p-2 max-h-72 flex flex-col text-fg no-scrollbar animate-in fade-in zoom-in-95 duration-100"
+            className="rounded-xl bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] p-2 flex flex-col text-fg animate-in fade-in zoom-in-95 duration-150 ease-out select-none"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-2 py-1 border-b border-border/60 mb-1.5">
+            <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-border/60 bg-slate-50 dark:bg-[#1A2234] rounded-lg mb-1.5">
               <span className="text-[10px] font-bold text-fg-subtle uppercase tracking-wider">
                 Select Batch Years
               </span>
               {selectedYears.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => onChange('')}
+                  onClick={() => {
+                    triggerHaptic('light');
+                    onChange('');
+                  }}
                   className="text-[10px] text-rose-500 hover:text-rose-600 font-semibold cursor-pointer"
                 >
                   Clear
@@ -218,22 +222,23 @@ export function SmoothYearDropdown({
             </div>
 
             {/* Scrollable Year Options */}
-            <div className="overflow-y-auto max-h-48 space-y-0.5 no-scrollbar pr-0.5">
+            <div className="overflow-y-auto max-h-[194px] space-y-0.5 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pr-0.5">
               {allowAll && (
                 <button
                   type="button"
                   onClick={() => {
+                    triggerHaptic('selection');
                     onChange('all');
                     setIsOpen(false);
                   }}
-                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer text-left ${
+                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer text-left ${
                     value === 'all'
-                      ? 'bg-primary/10 text-primary font-bold'
-                      : 'text-fg-muted hover:bg-surface-sunken hover:text-fg'
+                      ? 'bg-primary/10 text-primary font-bold shadow-2xs'
+                      : 'text-fg hover:bg-surface-raised'
                   }`}
                 >
                   <span>{allLabel}</span>
-                  {value === 'all' && <Check size={14} className="text-primary shrink-0" />}
+                  {value === 'all' && <Check size={14} strokeWidth={2.5} className="text-primary shrink-0" />}
                 </button>
               )}
 
@@ -244,21 +249,21 @@ export function SmoothYearDropdown({
                     key={yr}
                     type="button"
                     onClick={() => handleToggleYear(yr)}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer text-left group ${
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer text-left select-none group ${
                       isSelected
-                        ? 'bg-primary/15 text-primary font-bold shadow-2xs'
-                        : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 hover:text-slate-900 dark:hover:text-white'
+                        ? 'bg-primary/10 text-primary font-bold shadow-2xs'
+                        : 'text-fg hover:bg-surface-raised'
                     }`}
                   >
                     <span className="font-mono text-xs font-semibold">{yr}</span>
                     <div
-                      className={`w-[18px] h-[18px] min-w-[18px] min-h-[18px] rounded-[5px] border-2 flex items-center justify-center transition-all shadow-xs shrink-0 ${
+                      className={`w-[17px] h-[17px] min-w-[17px] min-h-[17px] rounded-md border flex items-center justify-center transition-all shrink-0 ${
                         isSelected
-                          ? 'bg-primary border-primary text-primary-foreground ring-2 ring-primary/25'
-                          : 'border-slate-500 dark:border-slate-400 bg-white dark:bg-slate-900 group-hover:border-primary dark:group-hover:border-primary'
+                          ? 'bg-primary border-primary text-primary-foreground ring-1 ring-primary/30'
+                          : 'border-border bg-surface-sunken group-hover:border-primary/50'
                       }`}
                     >
-                      {isSelected && <Check size={12} strokeWidth={3.5} className="text-white" />}
+                      {isSelected && <Check size={11} strokeWidth={3.5} className="text-primary-foreground" />}
                     </div>
                   </button>
                 );
@@ -270,11 +275,12 @@ export function SmoothYearDropdown({
               <span className="text-[10px] text-fg-subtle font-mono">
                 {selectedYears.length === 0
                   ? 'None selected'
-                  : `${selectedYears.length} year${selectedYears.length > 1 ? 's' : ''}`}
+                  : `${selectedYears.length} batch${selectedYears.length > 1 ? 'es' : ''}`}
               </span>
               <button
                 type="button"
                 onClick={() => {
+                  triggerHaptic('light');
                   setIsOpen(false);
                   setCoords((prev) => ({ ...prev, ready: false }));
                 }}

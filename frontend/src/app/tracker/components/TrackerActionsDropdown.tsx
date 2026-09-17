@@ -128,7 +128,7 @@ export function TrackerActionsDropdown({
 
       {/* ── Compact Solid Dropdown Menu (Anchored to Right Corner) ── */}
       {isOpen && (
-        <div className="absolute right-0 mt-1.5 w-60 rounded-xl bg-surface border border-border shadow-2xl z-50 p-1 animate-in fade-in slide-in-from-top-1 duration-150 divide-y divide-border/60 text-fg">
+        <div className="absolute right-0 mt-1.5 w-60 rounded-xl bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] z-50 p-1 animate-in fade-in zoom-in-95 duration-150 ease-out divide-y divide-border/60 text-fg select-none">
           {/* Section 1: Main Operations */}
           {!isReadOnly && (
             <div className="p-0.5 space-y-0.5">

@@ -8,6 +8,7 @@ import { sortCollegesWithPriority, getCoordinatorSelectedColleges } from '@/lib/
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
 import { SmoothYearDropdown } from '@/components/ui/SmoothYearDropdown';
+import { formatTime } from '@/lib/timeValidation';
 
 const BATCH_YEARS = ['2025', '2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
 
@@ -37,12 +38,12 @@ export function AddLeadModal({
   const [leadType, setLeadType] = useState<'positive' | 'jd_received'>(initialLeadType);
   const [collegeId, setCollegeId] = useState(initialCollegeId !== 'all' ? initialCollegeId : '');
   const [companyName, setCompanyName] = useState('');
-  const [jobRole, setJobRole] = useState('Graduate Trainee');
+  const [jobRole, setJobRole] = useState('');
   const [ctc, setCtc] = useState('');
   const [ctcUnit, setCtcUnit] = useState<'LPA' | '/ Month'>('LPA');
   const [eligibleBatch, setEligibleBatch] = useState('2026');
   const [eventTime, setEventTime] = useState(() =>
-    new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+    formatTime(new Date())
   );
   const [leadDate, setLeadDate] = useState(initialDate);
   const [remarks, setRemarks] = useState('');
@@ -126,7 +127,7 @@ export function AddLeadModal({
         job_role: jobRole.trim(),
         ctc: formattedCtc,
         eligible_batch: eligibleBatch,
-        event_time: eventTime,
+        event_time: eventTime.trim().replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase()),
         lead_date: leadDate,
         remarks: remarks.trim(),
       };

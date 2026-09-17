@@ -1374,9 +1374,9 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
   if (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') {
     const isPos = report.template_type === 'daily_positives';
     const leads = (isPos ? report.sections?.daily_positives : report.sections?.daily_jd_received) || [];
-    const headers = ['#', 'Company Name', 'Role / Designation', 'CTC', 'Time', 'College', 'Coordinator', 'Batch'];
-    // Total content width: 800px (34 + 190 + 155 + 80 + 75 + 75 + 126 + 65 = 800)
-    const colWidths = [34, 190, 155, 80, 75, 75, 126, 65];
+    const headers = ['#', 'Company Name', 'Role / Designation', 'CTC', 'Time', 'College', 'Coordinator'];
+    // Total content width: 800px (34 + 210 + 175 + 85 + 75 + 80 + 141 = 800)
+    const colWidths = [34, 210, 175, 85, 75, 80, 141];
     const rawRows = leads.map((r: any, idx: number) => [
       String(r.s_no || idx + 1),
       String(r.company_name || '—'),
@@ -1385,7 +1385,6 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
       String(r.time || r.time_stamp || r.event_time || '—'),
       String(r.college_code || '—'),
       String(r.coordinator || 'Placement Team'),
-      String(r.batch || r.eligible_batch || '—'),
     ]);
 
     const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
@@ -1423,7 +1422,7 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
     });
 
     sectionsToDraw.push({
-      title: isPos ? '1. POSITIVES OF THE DAY' : '1. JD RECEIVED FOR THE DAY',
+      title: '',
       badge: `${leads.length} Leads`,
       accentBg: isPos ? '#ecfdf5' : '#eff6ff',
       accentBorder: isPos ? '#a7f3d0' : '#bfdbfe',
@@ -1436,7 +1435,9 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
 
   // Calculate total sections height
   sectionsToDraw.forEach((sec) => {
-    totalH += 34; // Section title bar
+    if (sec.title) {
+      totalH += 34; // Section title bar
+    }
     totalH += 34; // Table header
     if (sec.measuredRows.length === 0) {
       totalH += 34; // Empty row
@@ -1542,8 +1543,8 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
   }
 
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#0f172a';
-  ctx.font = 'bold 18.5px system-ui, -apple-system, sans-serif';
+  ctx.fillStyle = '#0a2540';
+  ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
   let rawTitle =
     report.report_title ||
     (report.template_type === 'month_end'
@@ -1552,17 +1553,25 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
       ? 'Pending Task Placement Report'
       : report.template_type === 'active_leads'
       ? 'Active Leads Pipeline Report'
+      : report.template_type === 'daily_positives'
+      ? 'POSITIVES OF THE DAY'
+      : report.template_type === 'daily_jd_received'
+      ? 'JD RECEIVED FOR THE DAY'
       : 'Weekly Placement Report');
   
   if (/pending\s*task/i.test(rawTitle)) {
     rawTitle = 'Pending Task Placement Report';
+  } else if (/positives\s*of\s*the\s*day/i.test(rawTitle)) {
+    rawTitle = 'POSITIVES OF THE DAY';
+  } else if (/jd\s*received\s*for\s*the\s*day/i.test(rawTitle)) {
+    rawTitle = 'JD RECEIVED FOR THE DAY';
   }
   ctx.fillText(rawTitle, W / 2, currentY + 32);
 
   if (collegeName && collegeName !== 'Consolidated Partner Institutions' && report.template_type !== 'active_leads') {
     ctx.fillStyle = '#475569';
     ctx.font = 'bold 13.5px system-ui, -apple-system, sans-serif';
-    ctx.fillText(collegeName, W / 2, currentY + 55);
+    ctx.fillText(collegeName, W / 2, currentY + 56);
   }
 
   if (!report.is_multi_college && !isConsolidated) {
@@ -1630,17 +1639,19 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
 
   // Render Section Tables
   sectionsToDraw.forEach((sec) => {
-    // Title
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#0a2540';
-    ctx.font = 'bold 15px system-ui, -apple-system, sans-serif';
-    ctx.fillText(sec.title, PADDING, currentY + 16);
+    if (sec.title) {
+      // Title
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#0a2540';
+      ctx.font = 'bold 15px system-ui, -apple-system, sans-serif';
+      ctx.fillText(sec.title, PADDING, currentY + 16);
 
-    // Accent line
-    ctx.fillStyle = '#007791';
-    ctx.fillRect(PADDING, currentY + 23, CONTENT_W, 2.5);
+      // Accent line
+      ctx.fillStyle = '#007791';
+      ctx.fillRect(PADDING, currentY + 23, CONTENT_W, 2.5);
 
-    currentY += 34;
+      currentY += 34;
+    }
     const tableTopY = currentY;
     const tableHeaderH = 34;
 
