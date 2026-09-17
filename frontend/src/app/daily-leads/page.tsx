@@ -440,8 +440,8 @@ export default function DailyLeadsPage() {
         isSyncing={isSyncing}
         activeTab={activeTab}
         onTabChange={handleTabChange}
-        positivesCount={summary.positives_count}
-        jdCount={summary.jd_received_count}
+        positivesCount={activeTab === 'positive' && !searchQuery.trim() ? Math.max(summary.positives_count, leads.length) : summary.positives_count}
+        jdCount={activeTab === 'jd_received' && !searchQuery.trim() ? Math.max(summary.jd_received_count, leads.length) : summary.jd_received_count}
         selectedCount={selectedIds.length}
         onBulkDelete={isCoordinator ? handleBulkDelete : undefined}
         onOpenCopyToJdModal={isCoordinator ? () => setIsCopyToJdModalOpen(true) : undefined}

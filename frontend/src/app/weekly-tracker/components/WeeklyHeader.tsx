@@ -219,20 +219,22 @@ export function WeeklyHeader({
               </div>
             ) : selectionMode === 'delete' ? (
               <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-                {/* Delete Mode Active: Only Delete and Cancel buttons */}
-                <button
-                  type="button"
-                  disabled={(selectedCount || 0) === 0 || isDeleting}
-                  onClick={() => {
-                    triggerHaptic('medium');
-                    onExecuteBulkDelete?.();
-                  }}
-                  className="h-8 px-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-xl flex items-center gap-1.5 text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
-                  title="Confirm Delete Selected Rows"
-                >
-                  <Trash2 size={13} strokeWidth={2.4} />
-                  <span>Delete ({selectedCount || 0})</span>
-                </button>
+                {/* Delete Mode Active: Cancel button & Delete Action Pill */}
+                {selectedCount > 0 && (
+                  <button
+                    type="button"
+                    disabled={isDeleting}
+                    onClick={() => {
+                      triggerHaptic('medium');
+                      onExecuteBulkDelete?.();
+                    }}
+                    className="h-8 px-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-xl flex items-center gap-1.5 text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
+                    title="Confirm Delete Selected Rows"
+                  >
+                    <Trash2 size={13} strokeWidth={2.4} />
+                    <span>Delete ({selectedCount})</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -249,7 +251,47 @@ export function WeeklyHeader({
             ) : null
           )}
 
-          {/* 3. Three Dots (Actions Menu) */}
+          {/* 3. Standalone Red Dustbin / Trash Icon Button (Always visible outside) */}
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic('medium');
+              if (selectionMode === 'delete') {
+                if (selectedCount > 0) {
+                  onExecuteBulkDelete?.();
+                } else {
+                  onCancelSelection?.();
+                }
+              } else {
+                onStartDeleteMode?.();
+              }
+            }}
+            disabled={!selectedCollegeId}
+            className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 ${
+              selectionMode === 'delete' && selectedCount > 0
+                ? 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs ring-2 ring-rose-500/30'
+                : selectionMode === 'delete'
+                ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-400 dark:border-rose-700 ring-2 ring-rose-500/20'
+                : 'bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/80 shadow-2xs'
+            } disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]`}
+            title={
+              selectionMode === 'delete' && selectedCount > 0
+                ? `Delete ${selectedCount} selected row${selectedCount > 1 ? 's' : ''}`
+                : selectionMode === 'delete'
+                ? 'Delete mode active — select rows to delete (click to exit)'
+                : 'Delete Rows (Shift+D)'
+            }
+            aria-label="Delete Rows"
+          >
+            <Trash2 size={16} strokeWidth={2.2} />
+            {selectionMode === 'delete' && selectedCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-white dark:bg-zinc-900 text-rose-600 text-[9px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center shadow-xs tabular-nums ring-1 ring-rose-600">
+                {selectedCount}
+              </span>
+            )}
+          </button>
+
+          {/* 4. Three Dots (Actions Menu) */}
           <WeeklyActionsDropdown
             selectedCollegeId={selectedCollegeId}
             onOpenAddModal={onOpenAddModal}

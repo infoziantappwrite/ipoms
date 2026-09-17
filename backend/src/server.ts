@@ -1522,6 +1522,10 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
 
     if (call_start_time) {
       row.call_start_time = new Date(call_start_time);
+      if (row.call_end_time) {
+        const diffMs = row.call_end_time.getTime() - row.call_start_time.getTime();
+        row.duration_seconds = Math.max(0, Math.round(diffMs / 1000));
+      }
     }
 
     if (outcome_status) {
@@ -2339,6 +2343,28 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
       .sort({ follow_up_date: 1, company_name: 1 })
       .populate('coordinator_id', 'full_name official_email');
 
+    // Deduplicate any repeated company rows for the same college & year
+    const uniqueRows: typeof rows = [];
+    const seenRowKeys = new Set<string>();
+    const dupIdsToClean: any[] = [];
+
+    rows.forEach((row) => {
+      const cName = row.company_name ? row.company_name.trim().toLowerCase() : '';
+      const key = `${String(row.college_id)}_${row.academic_year}_${cName}`;
+      if (!seenRowKeys.has(key)) {
+        seenRowKeys.add(key);
+        uniqueRows.push(row);
+      } else {
+        dupIdsToClean.push(row._id);
+      }
+    });
+
+    if (dupIdsToClean.length > 0) {
+      WeeklyTracker.deleteMany({ _id: { $in: dupIdsToClean } }).catch((e) =>
+        console.error('[WT-1] Failed to clean duplicate rows:', e)
+      );
+    }
+
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date();
@@ -2356,7 +2382,7 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
     const onHoldByCollege: any[] = [];
     const onHoldByHr: any[] = [];
 
-    rows.forEach((row) => {
+    uniqueRows.forEach((row) => {
       const r = row.toObject();
 
       // Top Companies override
@@ -2627,7 +2653,15 @@ app.get('/api/v1/weekly-tracker/kpi', async (req: Request, res: Response) => {
       filter.week_start_date = startFriday;
     }
 
-    const rows = await WeeklyTracker.find(filter);
+    const allRows = await WeeklyTracker.find(filter);
+    const seenKpiRowKeys = new Set<string>();
+    const rows = allRows.filter((r) => {
+      const cName = r.company_name ? r.company_name.trim().toLowerCase() : '';
+      const key = `${String(r.college_id)}_${r.academic_year}_${cName}`;
+      if (seenKpiRowKeys.has(key)) return false;
+      seenKpiRowKeys.add(key);
+      return true;
+    });
 
     const todayEnd = new Date();
     todayEnd.setHours(23, 59, 59, 999);
@@ -3614,17 +3648,58 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
       dailyFilter.coordinator_id = new Types.ObjectId(String(coordinator_id));
     }
 
+    // Clean up any existing duplicate records in weekly_tracker for this college/year
+    const existingAll = await WeeklyTracker.find({
+      college_id: { $in: queryCollegeIds },
+      academic_year: targetYear,
+      is_deleted: false,
+    }).sort({ created_at: 1 });
+
+    const seenNames = new Set<string>();
+    const dupIdsToDelete: Types.ObjectId[] = [];
+    for (const row of existingAll) {
+      const key = row.company_name ? row.company_name.trim().toLowerCase() : '';
+      if (key) {
+        if (seenNames.has(key)) {
+          dupIdsToDelete.push(row._id);
+        } else {
+          seenNames.add(key);
+        }
+      }
+    }
+    if (dupIdsToDelete.length > 0) {
+      await WeeklyTracker.deleteMany({ _id: { $in: dupIdsToDelete } });
+    }
+
     const positiveDailyRows = await DailyTracker.find(dailyFilter).sort({ session_date: 1, created_at: 1 });
     const batchYear = await getCurrentGraduatingBatchYear();
 
     let syncedCount = 0;
+    const inBatchSyncedNames = new Set<string>(seenNames);
 
     for (const dRow of positiveDailyRows) {
+      if (!dRow.company_name || !dRow.company_name.trim()) continue;
+      const trimmedName = dRow.company_name.trim();
+      const normalizedKey = trimmedName.toLowerCase();
+
+      // Already present in Weekly Tracker or already processed in this batch
+      if (inBatchSyncedNames.has(normalizedKey)) {
+        if (!dRow.is_promoted_to_weekly) {
+          dRow.is_promoted_to_weekly = true;
+          await dRow.save();
+        }
+        continue;
+      }
+
       // Check if already present in weekly_tracker for this academic year
+      const safeRegex = new RegExp(`^${escapeRegex(trimmedName)}$`, 'i');
       const existing = await WeeklyTracker.findOne({
         college_id: { $in: queryCollegeIds },
         academic_year: targetYear,
-        company_name: { $regex: `^${dRow.company_name.trim()}$`, $options: 'i' },
+        $or: [
+          { daily_tracker_id: dRow._id },
+          { company_name: { $regex: safeRegex } },
+        ],
         is_deleted: false,
       });
 
@@ -3635,7 +3710,7 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
           coordinator_id: dRow.coordinator_id || (coordinator_id ? new Types.ObjectId(String(coordinator_id)) : new Types.ObjectId()),
           company_id: dRow.company_id || new Types.ObjectId(),
           daily_tracker_id: dRow._id,
-          company_name: dRow.company_name.trim(),
+          company_name: trimmedName,
           job_role: 'Graduate Trainee',
           cdc_reference: dRow.hr_name ? `${dRow.hr_name}${dRow.mobile_number ? ` (${dRow.mobile_number})` : ''}` : '',
           company_type: 'Software / IT',
@@ -3654,6 +3729,7 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
           last_status_updated_at: new Date(),
         });
         syncedCount++;
+        inBatchSyncedNames.add(normalizedKey);
       }
 
       // Mark daily row as promoted
@@ -3779,10 +3855,70 @@ app.get('/api/v1/daily-leads', async (req: Request, res: Response) => {
       await seedAugustAllCollegesJdReceived();
     }
 
-    const leads = await DailyLead.find(filter)
+    const leadsRaw = await DailyLead.find(filter)
       .sort({ lead_date: -1, created_at: -1 })
       .populate('college_id', 'college_name college_code')
-      .populate('coordinator_id', 'full_name official_email');
+      .populate('coordinator_id', 'full_name official_email username');
+
+    // Pre-fetch active users and colleges to assign fallback coordinator names for colleges if missing
+    const usersList = await User.find({ account_status: { $nin: ['inactive', 'deactivated', 'blocked'] } }).lean();
+    const collegesList = await College.find({}).lean();
+    const collegeCodeMap = new Map<string, string>();
+    collegesList.forEach((c) => collegeCodeMap.set(String(c._id), (c.college_code || '').toUpperCase()));
+
+    const OFFICIAL_COORDINATOR_COLLEGE_MAP: Record<string, string[]> = {
+      'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
+      'sujitha_s@infoziant.com': ['NEHRU', 'SONA', 'MAREPHRA', 'KPR', 'MKCE', 'KARUNYA', 'AVS', 'AAA', 'KGISL', 'SSEI', 'HITS', 'EGS'],
+      'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
+      'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],
+      'lizenya_r@infoziant.com': ['NPR', 'KIOT', 'ACEW'],
+      'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ'],
+      'seshmitha_tamil@icl.today': ['MCET', 'MEC'],
+    };
+
+    const userByEmail = new Map<string, any>();
+    usersList.forEach((u) => userByEmail.set((u.official_email || '').toLowerCase(), u));
+
+    const collegeCoordinatorMap = new Map<string, string>();
+
+    // Primary: Official mapping
+    for (const [email, codes] of Object.entries(OFFICIAL_COORDINATOR_COLLEGE_MAP)) {
+      const u = userByEmail.get(email.toLowerCase());
+      if (u) {
+        for (const col of collegesList) {
+          if (codes.includes((col.college_code || '').toUpperCase())) {
+            if (!collegeCoordinatorMap.has(String(col._id))) {
+              collegeCoordinatorMap.set(String(col._id), u.full_name || u.username);
+            }
+          }
+        }
+      }
+    }
+
+    // Secondary: assigned_college_ids
+    for (const u of usersList) {
+      if (Array.isArray(u.assigned_college_ids)) {
+        for (const cid of u.assigned_college_ids) {
+          if (!collegeCoordinatorMap.has(String(cid))) {
+            collegeCoordinatorMap.set(String(cid), u.full_name || u.username || 'Coordinator');
+          }
+        }
+      }
+    }
+
+    const leads = leadsRaw.map((l: any) => {
+      const obj = l.toObject ? l.toObject() : l;
+      if (!obj.coordinator_id || typeof obj.coordinator_id !== 'object' || !obj.coordinator_id.full_name) {
+        const cIdStr = typeof obj.college_id === 'object' && obj.college_id?._id ? String(obj.college_id._id) : String(obj.college_id || '');
+        const fallbackName = collegeCoordinatorMap.get(cIdStr) || 'Placement Team';
+        obj.coordinator_id = {
+          _id: (obj.coordinator_id && (obj.coordinator_id._id || String(obj.coordinator_id))) || '',
+          full_name: fallbackName,
+          official_email: '',
+        };
+      }
+      return obj;
+    });
 
     return res.status(200).json({
       success: true,
@@ -4028,11 +4164,10 @@ app.delete('/api/v1/daily-leads/:id', async (req: Request, res: Response) => {
 app.get('/api/v1/daily-leads/summary', async (req: Request, res: Response) => {
   try {
     const { date, college_id } = req.query;
-    // Was unscoped: the frontend never sends coordinator_id at all, so this
-    // silently counted every coordinator's leads while the row list below it
-    // (GET /daily-leads, which does call scopeToSelf) correctly showed only
-    // the caller's own — a badge that quietly disagreed with its own table.
-    const coordinator_id = scopeToSelf(req, req.query.coordinator_id as string | undefined);
+    // Only scope coordinator_id if explicitly requested; if omitted, return team-wide counts matching the table
+    const requestedCoordId = req.query.coordinator_id as string | undefined;
+    const coordinator_id =
+      requestedCoordId && requestedCoordId !== 'all' ? scopeToSelf(req, requestedCoordId) : undefined;
 
     const baseFilter: any = {
       is_deleted: false,
@@ -5460,21 +5595,47 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
 
       // Pre-fetch all colleges and active coordinators for mapping
       const collegesList = await College.find({}).lean();
-      const usersList = await User.find({ is_active: { $ne: false } }).lean();
+      const usersList = await User.find({ account_status: { $nin: ['inactive', 'deactivated', 'blocked'] } }).lean();
       const collegeCodeMap = new Map<string, string>();
       const collegeNameMap = new Map<string, string>();
       const collegeCoordinatorMap = new Map<string, string>();
+
+      const OFFICIAL_COORDINATOR_COLLEGE_MAP: Record<string, string[]> = {
+        'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
+        'sujitha_s@infoziant.com': ['NEHRU', 'SONA', 'MAREPHRA', 'KPR', 'MKCE', 'KARUNYA', 'AVS', 'AAA', 'KGISL', 'SSEI', 'HITS', 'EGS'],
+        'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
+        'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],
+        'lizenya_r@infoziant.com': ['NPR', 'KIOT', 'ACEW'],
+        'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ'],
+        'seshmitha_tamil@icl.today': ['MCET', 'MEC'],
+      };
+
+      const userByEmail = new Map<string, any>();
+      usersList.forEach((u) => userByEmail.set((u.official_email || '').toLowerCase(), u));
 
       for (const col of collegesList) {
         collegeCodeMap.set(String(col._id), col.college_code || col.college_name || '');
         collegeNameMap.set(String(col._id), col.college_name || '');
       }
 
+      for (const [email, codes] of Object.entries(OFFICIAL_COORDINATOR_COLLEGE_MAP)) {
+        const u = userByEmail.get(email.toLowerCase());
+        if (u) {
+          for (const col of collegesList) {
+            if (codes.includes((col.college_code || '').toUpperCase())) {
+              if (!collegeCoordinatorMap.has(String(col._id))) {
+                collegeCoordinatorMap.set(String(col._id), u.full_name || u.username);
+              }
+            }
+          }
+        }
+      }
+
       for (const u of usersList) {
         if (Array.isArray(u.assigned_college_ids)) {
           for (const cid of u.assigned_college_ids) {
             if (!collegeCoordinatorMap.has(String(cid))) {
-              collegeCoordinatorMap.set(String(cid), u.full_name);
+              collegeCoordinatorMap.set(String(cid), u.full_name || u.username || 'Coordinator');
             }
           }
         }
@@ -5645,8 +5806,35 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       }
 
       // Pre-fetch all users to map assigned college coordinators if coordinator_id is missing
-      const usersList = await User.find({ status: 'active' }).lean();
+      const usersList = await User.find({ account_status: { $nin: ['inactive', 'deactivated', 'blocked'] } }).lean();
       const collegeCoordinatorMap = new Map<string, string>();
+
+      const OFFICIAL_COORDINATOR_COLLEGE_MAP: Record<string, string[]> = {
+        'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
+        'sujitha_s@infoziant.com': ['NEHRU', 'SONA', 'MAREPHRA', 'KPR', 'MKCE', 'KARUNYA', 'AVS', 'AAA', 'KGISL', 'SSEI', 'HITS', 'EGS'],
+        'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
+        'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],
+        'lizenya_r@infoziant.com': ['NPR', 'KIOT', 'ACEW'],
+        'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ'],
+        'seshmitha_tamil@icl.today': ['MCET', 'MEC'],
+      };
+
+      const userByEmail = new Map<string, any>();
+      usersList.forEach((u) => userByEmail.set((u.official_email || '').toLowerCase(), u));
+
+      for (const [email, codes] of Object.entries(OFFICIAL_COORDINATOR_COLLEGE_MAP)) {
+        const u = userByEmail.get(email.toLowerCase());
+        if (u) {
+          for (const col of collegesList) {
+            if (codes.includes((col.college_code || '').toUpperCase())) {
+              if (!collegeCoordinatorMap.has(String(col._id))) {
+                collegeCoordinatorMap.set(String(col._id), u.full_name || u.username);
+              }
+            }
+          }
+        }
+      }
+
       for (const u of usersList) {
         if (Array.isArray(u.assigned_college_ids)) {
           for (const cid of u.assigned_college_ids) {

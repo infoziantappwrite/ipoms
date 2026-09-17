@@ -122,9 +122,9 @@ export default function LoadContactsPage() {
   }, []);
 
   // ─── Shift + Click & Ctrl / Cmd Multi-Selection (Google Sheets / Excel Style) ───
-  const handleRowClick = (index: number, id: string, e: React.MouseEvent) => {
-    const isShift = e.shiftKey;
-    const isCtrl = e.ctrlKey || e.metaKey;
+  const handleRowClick = (index: number, id: string, e?: React.MouseEvent | React.SyntheticEvent) => {
+    const isShift = Boolean((e as React.MouseEvent)?.shiftKey);
+    const isCtrl = Boolean((e as React.MouseEvent)?.ctrlKey || (e as React.MouseEvent)?.metaKey);
 
     if (isShift && lastClickedIndex !== null) {
       const start = Math.min(lastClickedIndex, index);
@@ -136,14 +136,6 @@ export default function LoadContactsPage() {
         rangeIds.forEach((item) => next.add(item));
         return next;
       });
-    } else if (isCtrl) {
-      setSelected((prev) => {
-        const next = new Set(prev);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        return next;
-      });
-      setLastClickedIndex(index);
     } else {
       setSelected((prev) => {
         const next = new Set(prev);
@@ -438,14 +430,24 @@ export default function LoadContactsPage() {
                             : 'hover:bg-surface-sunken/80 text-fg'
                         }`}
                       >
-                        <td className="w-12 px-4 py-3 text-center whitespace-nowrap">
+                        <td
+                          className="w-12 px-4 py-3 text-center whitespace-nowrap cursor-pointer"
+                          onClick={(e) => {
+                            if ((e.target as HTMLElement).tagName !== 'INPUT') {
+                              e.stopPropagation();
+                              handleRowClick(index, c._id, e);
+                            }
+                          }}
+                        >
                           <input
                             type="checkbox"
                             checked={isSelected}
-                            onChange={() => {}}
-                            onClick={(e) => {
+                            onChange={(e) => {
                               e.stopPropagation();
                               handleRowClick(index, c._id, e);
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
                             }}
                             className="rounded border-border text-primary focus:ring-primary cursor-pointer w-4 h-4"
                           />

@@ -32,9 +32,14 @@ import { ROW_OUTCOMES, type RowOutcomeOption } from './RowOutcomeDropdown';
 import { MONTHS } from './TrackerRow';
 import { MultiTagInput } from '@/components/ui/MultiTagInput';
 import {
-  validateAndNormalizeIndianMobile,
+  validateAndNormalizeIndianContact,
   validateAndNormalizeEmail,
 } from '@/lib/contactValidation';
+import {
+  smartParseTime,
+  formatTime,
+  formatDurationMinutesLevel,
+} from '@/lib/timeValidation';
 
 interface Props {
   coordinatorId: string;
@@ -42,13 +47,6 @@ interface Props {
   sessionDate?: string;
   onClose: () => void;
   onRowAdded: (newRow: TrackerRow) => void;
-}
-
-// Helper: format duration seconds to "01m 24s"
-function formatDurationSec(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
 }
 
 // Helper: detect if a company record in database is an incomplete placeholder
@@ -83,46 +81,6 @@ function getCompanyMissingDetails(comp: any) {
     hasEmail,
     hasHr,
   };
-}
-
-// Helper: smart parse time string or return current date
-function parseTimeToDate(timeStr: string, baseDate?: Date): Date {
-  const target = baseDate ? new Date(baseDate) : new Date();
-  if (!timeStr || !timeStr.trim()) return target;
-
-  const raw = timeStr.trim();
-  let explicitPeriod: 'AM' | 'PM' | null = null;
-  if (/\b(am|a)\b/i.test(raw) || raw.toUpperCase().endsWith('AM') || raw.toUpperCase().endsWith('A')) {
-    explicitPeriod = 'AM';
-  } else if (/\b(pm|p)\b/i.test(raw) || raw.toUpperCase().endsWith('PM') || raw.toUpperCase().endsWith('P')) {
-    explicitPeriod = 'PM';
-  }
-
-  const clean = raw.replace(/[a-zA-Z]/g, '').trim();
-  const parts = clean.split(/[:.]/).map(Number);
-  if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-    let h = parts[0];
-    const m = Math.min(59, Math.max(0, parts[1]));
-    const s = parts[2] ? Math.min(59, Math.max(0, parts[2])) : 0;
-
-    if (h >= 13 && h <= 23) {
-      explicitPeriod = 'PM';
-      h = h - 12;
-    } else if (h === 0) {
-      explicitPeriod = 'AM';
-      h = 12;
-    }
-
-    const systemPeriod: 'AM' | 'PM' = target.getHours() >= 12 ? 'PM' : 'AM';
-    const period = explicitPeriod || systemPeriod;
-
-    let hour24 = h;
-    if (period === 'PM' && h < 12) hour24 = h + 12;
-    if (period === 'AM' && h === 12) hour24 = 0;
-
-    target.setHours(hour24, m, s, 0);
-  }
-  return target;
 }
 
 export function ManualAddRowModal({
@@ -409,7 +367,7 @@ export function ManualAddRowModal({
   const handleSetCurrentTime = () => {
     triggerHaptic('light');
     const now = new Date();
-    const formatted = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const formatted = formatTime(now);
     setStartTime(formatted);
     setStartDateObj(now);
 
@@ -417,18 +375,34 @@ export function ManualAddRowModal({
     if (endDateObj) {
       const diffSec = Math.max(0, Math.round((endDateObj.getTime() - now.getTime()) / 1000));
       setDurationSec(diffSec);
-      setDurationText(formatDurationSec(diffSec));
+      setDurationText(formatDurationMinutesLevel(diffSec));
     }
   };
 
   const handleStartTimeChange = (val: string) => {
     setStartTime(val);
-    const parsed = parseTimeToDate(val);
-    setStartDateObj(parsed);
-    if (endDateObj) {
-      const diffSec = Math.max(0, Math.round((endDateObj.getTime() - parsed.getTime()) / 1000));
-      setDurationSec(diffSec);
-      setDurationText(formatDurationSec(diffSec));
+  };
+
+  const handleStartTimeBlur = () => {
+    if (!startTime.trim()) {
+      const now = new Date();
+      setStartTime(formatTime(now));
+      setStartDateObj(now);
+      return;
+    }
+    const parsed = smartParseTime(startTime, startDateObj);
+    if (parsed) {
+      setStartTime(parsed.formatted);
+      const parsedDate = new Date(parsed.iso);
+      setStartDateObj(parsedDate);
+      if (endDateObj) {
+        const diffSec = Math.max(0, Math.round((endDateObj.getTime() - parsedDate.getTime()) / 1000));
+        setDurationSec(diffSec);
+        setDurationText(formatDurationMinutesLevel(diffSec));
+      }
+    } else {
+      // Revert if invalid (e.g. 83454)
+      setStartTime(formatTime(startDateObj));
     }
   };
 
@@ -439,12 +413,13 @@ export function ManualAddRowModal({
     setIsOutcomeOpen(false);
 
     const now = new Date();
-    const endFormatted = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const endFormatted = formatTime(now);
     setEndTime(endFormatted);
     setEndDateObj(now);
 
     // Parse current start time date
-    const startObj = parseTimeToDate(startTime, startDateObj);
+    const parsed = smartParseTime(startTime, startDateObj);
+    const startObj = parsed ? new Date(parsed.iso) : startDateObj;
     let diffSec = Math.round((now.getTime() - startObj.getTime()) / 1000);
 
     // If start time was set in the future or equal, provide a realistic minimum 45s call duration
@@ -453,7 +428,7 @@ export function ManualAddRowModal({
     }
 
     setDurationSec(diffSec);
-    setDurationText(formatDurationSec(diffSec));
+    setDurationText(formatDurationMinutesLevel(diffSec));
   };
 
   const handleSelectMonth = (m: string) => {
@@ -467,7 +442,8 @@ export function ManualAddRowModal({
       setSubmitting(true);
       triggerHaptic('medium');
 
-      const startObj = parseTimeToDate(startTime, startDateObj);
+      const parsed = smartParseTime(startTime, startDateObj);
+      const startObj = parsed ? new Date(parsed.iso) : startDateObj;
       const endObj = endDateObj || new Date();
       const computedSec = durationSec ?? Math.max(0, Math.round((endObj.getTime() - startObj.getTime()) / 1000));
 
@@ -827,10 +803,10 @@ export function ManualAddRowModal({
               <MultiTagInput
                 values={mobileNumbers}
                 onChange={setMobileNumbers}
-                validator={validateAndNormalizeIndianMobile}
+                validator={validateAndNormalizeIndianContact}
                 required
                 icon={<Phone size={14} />}
-                placeholder="e.g. 9876543210 (10 digits starting 6-9, Enter/comma for multiple)"
+                placeholder="e.g. 9876543210 (10 digits starting 6-9 or Indian landline, Enter/comma for multiple)"
               />
             </div>
           </div>
@@ -877,7 +853,9 @@ export function ManualAddRowModal({
                   type="text"
                   value={startTime}
                   onChange={(e) => handleStartTimeChange(e.target.value)}
-                  placeholder="07:08 PM"
+                  onBlur={handleStartTimeBlur}
+                  placeholder="09:30 AM"
+                  title="Calling hours: 07:00 AM – 08:00 PM"
                   className="w-full bg-surface-sunken border border-border text-xs text-fg pl-9 pr-2.5 py-2 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-fg-disabled shadow-2xs font-mono font-medium"
                 />
               </div>
