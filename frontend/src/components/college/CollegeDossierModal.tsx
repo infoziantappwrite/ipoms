@@ -342,11 +342,11 @@ export function CollegeDossierModal({
               type="button"
               onClick={handleSyncSharepoint}
               disabled={isSyncingSharepoint}
+              aria-label="Sync from Excel"
               title="Sync latest college & TPO details from Colleges & Coordinators SharePoint Excel"
-              className="flex items-center gap-1.5 h-8 px-2.5 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-semibold shadow-2xs hover:shadow-xs transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center justify-center w-8 h-8 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 rounded-xl shadow-2xs hover:shadow-xs transition-all cursor-pointer disabled:opacity-50"
             >
-              <RefreshCw size={12} className={isSyncingSharepoint ? 'animate-spin' : ''} />
-              <span className="hidden sm:inline">Sync Excel</span>
+              <RefreshCw size={14} className={isSyncingSharepoint ? 'animate-spin' : ''} />
             </button>
 
             {/* Close Cross */}

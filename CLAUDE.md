@@ -1003,13 +1003,25 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     is Daily Tracker → Daily Leads (Sync Positives) → Weekly Tracker (Sync). The 6 AM and
     10 PM jobs still promote Invite Mail rows directly via `weeklyTrackerSync.ts`.
     **(c)** Metadata DB has a working Recycle Bin view and Bulk Paste import.
-    **Open data issue found, not fixed:** 19 of 27 `colleges.location` values are the
-    spreadsheet error string `#VALUE!` (shown next to the college logo in tracker headers);
-    HITS/NGCE/ACEW/EGS/MAREPHRA/MCET/MEC are fine. The boot `syncActiveCollegesRoster()`
-    only sets `status`, so it bumps `updated_at` but did not write these — the source is an
-    earlier import. Correct values exist in `MASTER_PARTNER_COLLEGES` in `server.ts`.
-    **UI copy inconsistency:** the Administrator profile page says admins can recover by
-    6-digit OTP, but `authRoutes.ts` still refuses admin OTP (`ADMIN_OTP_DISABLED`).
+    ~~**Open data issue: 19 of 27 `colleges.location` values were the spreadsheet error
+    string `#VALUE!`.**~~ **FIXED, but not by this session** — a same-day commit
+    (`d063aab`, "college information sync", by someone else concurrently) added a
+    `COLLEGE_DEFAULT_LOCATIONS` fallback map and a real location-import path to whatever
+    script touches `colleges`. Re-verified 18 Sep 2026, both against the raw DB and the
+    live `GET /colleges` response: **0 bad locations remain** across all 27 documents.
+    Caught only because this session re-checked before the demo rather than trusting the
+    17 Sep finding — worth remembering that a "still open" note in this file can go stale
+    within a day when other work is landing in parallel.
+    ~~**UI copy inconsistency: the Administrator profile page said admins can recover by
+    6-digit OTP, but `authRoutes.ts` refuses admin OTP (`ADMIN_OTP_DISABLED`).**~~
+    **FIXED 18 Sep 2026.** `settings/components/UserProfileTab.tsx`'s "Administrator
+    Security & Recovery Note" claimed OTP recovery worked for admins — directly
+    contradicting §2's documented policy and the real backend behavior (item 12). The
+    backend was correct; the copy was wrong, so the copy was changed to state the real,
+    deliberate policy (no admin email-OTP, security-team reset only) instead of silently
+    promising a path that 403s the moment someone tries it. Verified live: logged in as
+    Administrator, loaded `/profile`, confirmed the corrected text renders. `tsc --noEmit`
+    clean.
 
 ## 6. Module map
 ## 6. Module map
