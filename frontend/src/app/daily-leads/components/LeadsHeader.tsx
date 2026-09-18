@@ -4,6 +4,7 @@ import { FileSpreadsheet, Plus, Target, Trash2, RefreshCw, Copy, Search, Sparkle
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { SmoothExportDropdown } from '@/components/ui/SmoothExportDropdown';
+import { triggerHaptic } from '@/lib/haptics';
 
 interface Props {
   selectedDate: string;
@@ -169,31 +170,55 @@ export function LeadsHeader({
 
         {/* Right Action Buttons (Icon-Only Minimal SaaS) */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Delete Action in Delete Mode */}
-          {isDeleteMode && onBulkDelete && selectedCount > 0 && (
+          {/* Active Delete Mode: Cancel button */}
+          {isDeleteMode && onToggleDeleteMode && (
             <button
               type="button"
-              onClick={onBulkDelete}
-              className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer active:scale-[0.992] animate-in fade-in shrink-0"
+              onClick={() => {
+                triggerHaptic('light');
+                onToggleDeleteMode();
+              }}
+              className="h-9 px-2.5 bg-surface-sunken hover:bg-surface-raised border border-border text-fg rounded-xl flex items-center text-xs font-semibold transition-colors cursor-pointer shrink-0"
+              title="Cancel Selection (Esc)"
             >
-              <Trash2 size={13} strokeWidth={2.2} aria-hidden />
-              <span>Delete ({selectedCount})</span>
+              Cancel
             </button>
           )}
 
+          {/* Standalone Single Dustbin / Trash Icon Button */}
           {onToggleDeleteMode && (
             <button
               type="button"
-              onClick={onToggleDeleteMode}
-              className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all shadow-xs cursor-pointer active:scale-[0.992] shrink-0 ${
-                isDeleteMode
-                  ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-200 dark:shadow-none'
-                  : 'bg-surface border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:border-rose-300'
-              }`}
-              title={isDeleteMode ? 'Exit Delete Mode' : 'Select and delete leads'}
-              aria-label={isDeleteMode ? 'Exit Delete Mode' : 'Delete Leads'}
+              onClick={() => {
+                triggerHaptic('medium');
+                if (isDeleteMode && selectedCount > 0 && onBulkDelete) {
+                  onBulkDelete();
+                } else {
+                  onToggleDeleteMode();
+                }
+              }}
+              className={`relative w-9 h-9 flex items-center justify-center rounded-xl transition-all shadow-xs cursor-pointer select-none shrink-0 ${
+                isDeleteMode && selectedCount > 0
+                  ? 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs ring-2 ring-rose-500/30'
+                  : isDeleteMode
+                  ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-400 dark:border-rose-700 ring-2 ring-rose-500/20'
+                  : 'bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/80 shadow-2xs'
+              } active:scale-[0.95]`}
+              title={
+                isDeleteMode && selectedCount > 0
+                  ? `Delete ${selectedCount} selected record${selectedCount > 1 ? 's' : ''}`
+                  : isDeleteMode
+                  ? 'Delete mode active — select rows to delete (click to exit)'
+                  : 'Select and delete leads'
+              }
+              aria-label={isDeleteMode ? 'Delete Selected Leads' : 'Delete Leads'}
             >
               <Trash2 size={16} strokeWidth={2.2} />
+              {isDeleteMode && selectedCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-white dark:bg-zinc-900 text-rose-600 text-[9px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center shadow-xs tabular-nums ring-1 ring-rose-600">
+                  {selectedCount}
+                </span>
+              )}
             </button>
           )}
 

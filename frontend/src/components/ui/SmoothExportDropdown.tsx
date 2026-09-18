@@ -119,13 +119,13 @@ export function SmoothExportDropdown({
         onClick={handleToggle}
         className={
           iconOnly
-            ? `w-9 h-9 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl flex items-center justify-center transition-all duration-150 shadow-2xs cursor-pointer active:scale-[0.992] shrink-0 relative ${className}`
+            ? `w-8 h-8 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl flex items-center justify-center transition-all duration-150 shadow-xs cursor-pointer active:scale-[0.992] shrink-0 relative ${className}`
             : `px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all duration-150 shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-[0.992] whitespace-nowrap shrink-0 ${className}`
         }
         title={title}
         aria-label={title}
       >
-        <Download size={iconOnly ? 16 : 14} strokeWidth={2.2} className="shrink-0" />
+        <Download size={14} strokeWidth={2.2} className="shrink-0" />
         {!iconOnly && (
           <>
             <span>{isExporting ? 'Exporting…' : 'Export'}</span>

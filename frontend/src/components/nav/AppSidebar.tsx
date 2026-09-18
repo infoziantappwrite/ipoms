@@ -65,9 +65,9 @@ const NAV: NavItem[] = [
   { href: '/reports', label: 'Report Builder', Icon: TrendingUp },
 
   // Dedicated Standalone Administrator Governance Modules
-  { href: '/users', label: 'User Management', Icon: Users, roles: ['admin', 'team_leader'] },
+  { href: '/users', label: 'User Management', Icon: Users, roles: ['admin'] },
   { href: '/roles', label: 'Role Permissions Matrix', Icon: Shield, roles: ['admin'] },
-  { href: '/system-settings', label: 'Season & System Settings', Icon: Sliders, roles: ['admin', 'team_leader'] },
+  { href: '/system-settings', label: 'Season & System Settings', Icon: Sliders, roles: ['admin'] },
   { href: '/system-health', label: 'System Health & Modules', Icon: ShieldCheck, roles: ['admin'] },
 ];
 
@@ -210,18 +210,18 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
         className={`hidden lg:flex flex-col bg-surface border-r border-border
           select-none z-50 shrink-0 sticky top-0 h-screen max-h-screen
           ${mounted ? 'transition-[width] duration-500 ease-[cubic-bezier(0.25,1,0.5,1)]' : ''}
-          ${collapsed ? 'w-[72px]' : 'w-64'}`}
+          ${collapsed ? 'w-[58px]' : 'w-64'}`}
       >
         {/* ── Brand Header Strip ── */}
-        <div className="h-16 flex items-center px-2.5 border-b border-border relative shrink-0 justify-between">
+        <div className="h-14 flex items-center px-2.5 border-b border-border relative shrink-0 justify-between">
           {collapsed ? (
             <div className="w-full flex items-center justify-center">
               <Link
                 href="/dashboard"
-                className="w-12 h-12 bg-white rounded-2xl p-1 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0 hover:scale-105 active:scale-[0.992] transition-transform duration-300 cursor-pointer"
+                className="w-[35px] h-[35px] bg-white rounded-lg p-0.5 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0 hover:scale-105 active:scale-[0.992] transition-transform duration-200 cursor-pointer"
                 title="iPOMS Placement Suite"
               >
-                <InfoziantMark size={46} className="w-full h-full object-contain" />
+                <InfoziantMark size={28} className="w-full h-full object-contain" />
               </Link>
             </div>
           ) : (
@@ -230,8 +230,8 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                 href="/dashboard"
                 className="flex items-center gap-3 overflow-hidden focus-visible:outline-hidden"
               >
-                <div className="w-11 h-11 bg-white rounded-xl p-1 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0">
-                  <InfoziantMark size={42} className="w-full h-full object-contain" />
+                <div className="w-9 h-9 bg-white rounded-lg p-1 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0">
+                  <InfoziantMark size={32} className="w-full h-full object-contain" />
                 </div>
                 <div
                   className={`flex flex-col min-w-0
@@ -250,9 +250,9 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
           )}
         </div>
 
-        {/* ── Main Nav Items (Medium 17px Icons, Locked Zero-Scroll) ── */}
-        <nav className="flex-1 overflow-hidden px-2.5 py-3 min-h-0 flex flex-col justify-start">
-          <ul className="space-y-1.5 w-full flex flex-col items-center">
+        {/* ── Main Nav Items (All 7 Navigation Buttons: 35px × 35px, rounded-lg) ── */}
+        <nav className="flex-1 overflow-y-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden px-2 py-3 min-h-0 flex flex-col justify-start">
+          <ul className="space-y-2 w-full flex flex-col items-center">
             {items.map(({ href, label, Icon }) => {
               const currentTab = searchParams?.get('tab');
               const [hrefPath, hrefQuery] = href.split('?');
@@ -297,32 +297,32 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                     onMouseLeave={() => setHovered(null)}
                     onFocus={(e) => showLabel(e.currentTarget, isLocked ? `${label} (Locked)` : label)}
                     onBlur={() => setHovered(null)}
-                    className={`group relative flex items-center rounded-xl cursor-pointer active:scale-[0.992] ${
+                    className={`group relative flex items-center rounded-lg cursor-pointer active:scale-[0.992] ${
                       mounted ? 'transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]' : ''
                     } ${
                       collapsed
-                        ? 'w-9 h-9 justify-center p-0 mx-auto'
+                        ? 'w-[35px] h-[35px] justify-center p-0 mx-auto'
                         : 'w-full h-9 px-3 gap-3 justify-start'
                     } ${
                       isLocked
                         ? 'text-zinc-400 dark:text-zinc-600 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60'
                         : active
-                        ? 'bg-blue-600 text-white font-semibold shadow-xs'
+                        ? 'bg-blue-600 text-white font-semibold shadow-md shadow-blue-500/25'
                         : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 font-medium'
                     }`}
                   >
-                    <span className={`relative shrink-0 grid place-items-center ${collapsed ? 'w-full h-full' : 'w-5.5 h-5.5'}`}>
-                      <Icon size={17} strokeWidth={active ? 2.2 : 1.85} aria-hidden />
+                    <span className={`relative shrink-0 grid place-items-center ${collapsed ? 'w-full h-full' : 'w-5 h-5'}`}>
+                      <Icon size={17} strokeWidth={active ? 2.2 : 1.8} aria-hidden />
                       {isLocked && (
-                        <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                          <Lock size={6.5} strokeWidth={2.5} />
+                        <span className="absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                          <Lock size={6} strokeWidth={2.5} />
                         </span>
                       )}
                     </span>
                     {!collapsed && (
                       <span className="flex-1 flex items-center justify-between min-w-0 pr-1">
                         <span
-                          className={`whitespace-nowrap text-[12.5px] ${
+                          className={`whitespace-nowrap text-[13px] ${
                             active ? 'font-semibold text-white' : 'font-medium text-zinc-800 dark:text-zinc-200'
                           } ${
                             mounted ? 'transition-opacity duration-300 ease-in-out' : ''
@@ -331,7 +331,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                           {label}
                         </span>
                         {isLocked && (
-                          <Lock size={11} className="text-amber-500/70 ml-2 shrink-0" />
+                          <Lock size={12} className="text-amber-500/70 ml-2 shrink-0" />
                         )}
                       </span>
                     )}
@@ -342,13 +342,13 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
           </ul>
         </nav>
 
-        {/* ── Signed-in Profile Identity Avatar & Controls Toggle ───── */}
-        <div className="shrink-0 border-t border-zinc-200 dark:border-zinc-800 px-2.5 py-2.5">
+        {/* ── Signed-in Profile Identity Avatar (35px × 35px) & Controls (35px × 35px) ───── */}
+        <div className="shrink-0 border-t border-zinc-200 dark:border-zinc-800 px-2 py-2.5">
           {collapsed ? (
             <div className="flex flex-col items-center gap-2">
               <Link
                 href="/profile"
-                className="group relative flex items-center justify-center p-0.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                className="group relative flex items-center justify-center p-0.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                 title={`${fullName} (${roleLabel})`}
               >
                 {user?.profile_photo_url ? (
@@ -356,21 +356,21 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                   <img
                     src={user.profile_photo_url}
                     alt={fullName}
-                    className="w-9 h-9 rounded-full object-cover shrink-0 ring-2 ring-zinc-200 dark:ring-zinc-700 shadow-sm group-hover:scale-105 transition-transform"
+                    className="w-[35px] h-[35px] rounded-full object-cover shrink-0 ring-2 ring-zinc-200 dark:ring-zinc-700 shadow-sm group-hover:scale-105 transition-transform"
                   />
                 ) : (
-                  <span className="grid w-9 h-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-[11px] font-bold tracking-normal leading-none shadow-xs ring-2 ring-white dark:ring-zinc-900 group-hover:scale-105 transition-transform">
+                  <span className="grid w-[35px] h-[35px] shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-[11px] font-bold tracking-normal leading-none shadow-sm ring-2 ring-white dark:ring-zinc-900 group-hover:scale-105 transition-transform">
                     {initialsFor(fullName)}
                   </span>
                 )}
               </Link>
               <div className="flex flex-col items-center gap-1.5">
-                <FullScreenToggle className="w-9 h-9 rounded-xl text-xs" />
-                <ThemeToggle className="w-9 h-9 rounded-xl text-xs" />
+                <FullScreenToggle className="w-[35px] h-[35px] rounded-lg" />
+                <ThemeToggle className="w-[35px] h-[35px] rounded-lg" />
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-1.5 p-1.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 shadow-xs">
+            <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700/80 shadow-xs">
               <Link
                 href="/profile"
                 className="flex items-center gap-2.5 min-w-0 flex-1 p-0.5 hover:bg-white dark:hover:bg-zinc-800 rounded-lg transition-colors overflow-hidden"
@@ -380,10 +380,10 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                   <img
                     src={user.profile_photo_url}
                     alt={fullName}
-                    className="w-9 h-9 rounded-full object-cover shrink-0 ring-2 ring-zinc-200 dark:ring-zinc-700 shadow-sm"
+                    className="w-8 h-8 rounded-full object-cover shrink-0 ring-2 ring-zinc-200 dark:ring-zinc-700 shadow-sm"
                   />
                 ) : (
-                  <span className="grid w-9 h-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-[11px] font-bold tracking-normal leading-none shadow-xs ring-2 ring-white dark:ring-zinc-900">
+                  <span className="grid w-8 h-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-[11px] font-bold tracking-normal leading-none shadow-xs ring-2 ring-white dark:ring-zinc-900">
                     {initialsFor(fullName)}
                   </span>
                 )}

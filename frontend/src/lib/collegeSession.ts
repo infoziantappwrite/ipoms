@@ -47,22 +47,47 @@ export function getCurrentWeekMondayKey(d: Date = new Date()): string {
   return `${year}-${month}-${dayStr}`;
 }
 
+export const DEFAULT_OFFICIAL_COLLEGES: CollegeOccupancy[] = [
+  { _id: 'col_karpagam', college_code: 'KARPAGAM', college_name: 'Karpagam College of Engineering', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/karpagam.png' },
+  { _id: 'col_mcet', college_code: 'MCET', college_name: 'Dr. Mahalingam College of Engineering and Technology', location: 'Pollachi, Tamil Nadu', logo_url: '/college-logos/MCET.png' },
+  { _id: 'col_acet', college_code: 'ACET', college_name: 'Achariya College of Engineering Technology', location: 'Puducherry', logo_url: '/college-logos/acet.png' },
+  { _id: 'col_kpr', college_code: 'KPR', college_name: 'KPR Institute of Engineering and Technology', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/kpr.png' },
+  { _id: 'col_aiht', college_code: 'AIHT', college_name: 'Anand Institute of Higher Technology', location: 'Chennai, Tamil Nadu', logo_url: '/college-logos/aiht.png' },
+  { _id: 'col_kamaraj', college_code: 'KAMARAJ', college_name: 'Kamaraj College of Engineering and Technology', location: 'Virudhunagar, Tamil Nadu', logo_url: '/college-logos/kamaraj.png' },
+  { _id: 'col_ngp', college_code: 'NGP', college_name: 'Dr. N.G.P. Institute of Technology', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/ngp.png' },
+  { _id: 'col_mkce', college_code: 'MKCE', college_name: 'M.Kumarasamy College of Engineering', location: 'Karur, Tamil Nadu', logo_url: '/college-logos/mkce.png' },
+  { _id: 'col_acew', college_code: 'ACEW', college_name: 'Arunachala College of Engineering for Women', location: 'Kanyakumari, Tamil Nadu', logo_url: '/college-logos/acew.png' },
+  { _id: 'col_npr', college_code: 'NPR', college_name: 'NPR College of Engineering and Technology', location: 'Natham / Dindigul, Tamil Nadu', logo_url: '/college-logos/npr.png' },
+  { _id: 'col_kiot', college_code: 'KIOT', college_name: 'Knowledge Institute of Technology', location: 'Salem, Tamil Nadu', logo_url: '/college-logos/kiot.jfif' },
+  { _id: 'col_klu', college_code: 'KLU', college_name: 'Kalasalingam Academy of Research and Education', location: 'Virudhunagar, Tamil Nadu', logo_url: '/college-logos/klu.png' },
+  { _id: 'col_smvec', college_code: 'SMVEC', college_name: 'Sri Manakula Vinayagar Engineering College', location: 'Puducherry', logo_url: '/college-logos/smvec.png' },
+  { _id: 'col_dsu', college_code: 'DSU', college_name: 'Dhanalakshmi Srinivasan University', location: 'Perambalur / Trichy, Tamil Nadu', logo_url: '/college-logos/dsu.png' },
+  { _id: 'col_psna', college_code: 'PSNA', college_name: 'PSNA College of Engineering and Technology', location: 'Dindigul, Tamil Nadu', logo_url: '/college-logos/psna.png' },
+  { _id: 'col_sona', college_code: 'SONA', college_name: 'Sona College of Technology', location: 'Salem, Tamil Nadu', logo_url: '/college-logos/sona.png' },
+  { _id: 'col_mec', college_code: 'MEC', college_name: 'Muthayammal Engineering College', location: 'Singlandhapuram, Tamil Nadu', logo_url: '/college-logos/MEC.png' },
+  { _id: 'col_ngce', college_code: 'NGCE', college_name: 'Narayanaguru College of Engineering', location: 'Kanyakumari, Tamil Nadu', logo_url: '/college-logos/ngce.png' },
+  { _id: 'col_hits', college_code: 'HITS', college_name: 'Hindustan Institute of Technology and Science', location: 'Chennai, Tamil Nadu', logo_url: '/college-logos/hits.png' },
+  { _id: 'col_nehru', college_code: 'NEHRU', college_name: 'Nehru Institute of Technology', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/nehru.png' },
+  { _id: 'col_marephra', college_code: 'MAREPHRA', college_name: 'Mar Ephraem College of Engineering and Technology', location: 'Kanyakumari, Tamil Nadu', logo_url: '/college-logos/marephraem.png' },
+];
+
 export function getCachedColleges(): CollegeOccupancy[] {
   if (memoryCachedColleges && memoryCachedColleges.length > 0) {
     return memoryCachedColleges;
   }
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(ALL_COLLEGES_CACHE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        memoryCachedColleges = parsed;
-        return parsed;
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(ALL_COLLEGES_CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          memoryCachedColleges = parsed;
+          return parsed;
+        }
       }
-    }
-  } catch {}
-  return [];
+    } catch {}
+  }
+  return DEFAULT_OFFICIAL_COLLEGES;
 }
 
 export function setCachedColleges(list: CollegeOccupancy[]): void {

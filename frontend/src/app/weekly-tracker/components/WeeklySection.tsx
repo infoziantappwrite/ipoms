@@ -312,9 +312,6 @@ export function WeeklySection({
           <span className="text-xs font-bold tracking-wide uppercase">
             {title}
           </span>
-          <span className={`text-micro font-bold font-mono px-2 py-0.5 rounded-full border shadow-2xs ${config.badgeClass}`}>
-            {rows.length} {rows.length === 1 ? 'company' : 'companies'}
-          </span>
         </div>
 
         <div className="flex items-center gap-2">

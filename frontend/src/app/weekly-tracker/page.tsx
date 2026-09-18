@@ -204,6 +204,46 @@ export default function WeeklyTrackerPage() {
     }
   }, [selectedCollegeId, academicYear, loadWeeklyTracker, loadKpi]);
 
+  // ── Multi-tab & Cross-Module Broadcast Sync ──
+  useEffect(() => {
+    let bcLeads: BroadcastChannel | null = null;
+    let bcTracker: BroadcastChannel | null = null;
+
+    try {
+      bcLeads = new BroadcastChannel('ipoms_daily_leads_sync');
+      bcLeads.onmessage = () => {
+        loadWeeklyTracker();
+        loadKpi();
+      };
+    } catch {}
+
+    try {
+      bcTracker = new BroadcastChannel('ipoms_tracker_sync');
+      bcTracker.onmessage = () => {
+        loadWeeklyTracker();
+        loadKpi();
+      };
+    } catch {}
+
+    return () => {
+      if (bcLeads) bcLeads.close();
+      if (bcTracker) bcTracker.close();
+    };
+  }, [loadWeeklyTracker, loadKpi]);
+
+  const broadcastWeeklyMutation = () => {
+    try {
+      const bc1 = new BroadcastChannel('ipoms_daily_leads_sync');
+      bc1.postMessage({ type: 'WEEKLY_MUTATION', timestamp: Date.now() });
+      bc1.close();
+    } catch {}
+    try {
+      const bc2 = new BroadcastChannel('ipoms_tracker_sync');
+      bc2.postMessage({ type: 'WEEKLY_MUTATION', timestamp: Date.now() });
+      bc2.close();
+    } catch {}
+  };
+
   // ── Auto-reset saved badge status
   useEffect(() => {
     if (saveStatus === 'saved') {
@@ -282,6 +322,7 @@ export default function WeeklyTrackerPage() {
         await loadKpi();
         setSaveStatus('saved');
         setLastSavedAt(new Date());
+        broadcastWeeklyMutation();
       } else {
         setSaveStatus('idle');
       }
@@ -314,6 +355,7 @@ export default function WeeklyTrackerPage() {
         await loadKpi();
         setSaveStatus('saved');
         setLastSavedAt(new Date());
+        broadcastWeeklyMutation();
       } else {
         setSaveStatus('idle');
       }
@@ -396,11 +438,13 @@ export default function WeeklyTrackerPage() {
           await apiFetch(`/weekly-tracker/${rowId}/restore`, { method: 'POST' });
           await loadWeeklyTracker();
           await loadKpi();
+          broadcastWeeklyMutation();
         },
         redo: async () => {
           await apiFetch(`/weekly-tracker/${rowId}`, { method: 'DELETE' });
           await loadWeeklyTracker();
           await loadKpi();
+          broadcastWeeklyMutation();
         },
       });
     }
@@ -428,6 +472,7 @@ export default function WeeklyTrackerPage() {
       if (res.success) {
         await loadWeeklyTracker();
         await loadKpi();
+        broadcastWeeklyMutation();
       }
     } catch (err) {
       console.error('Failed to delete row:', err);
@@ -454,6 +499,7 @@ export default function WeeklyTrackerPage() {
         });
         await loadWeeklyTracker();
         await loadKpi();
+        broadcastWeeklyMutation();
       },
       redo: async () => {
         await apiFetch('/weekly-tracker/batch-delete', {
@@ -462,6 +508,7 @@ export default function WeeklyTrackerPage() {
         });
         await loadWeeklyTracker();
         await loadKpi();
+        broadcastWeeklyMutation();
       },
     });
 
@@ -476,6 +523,7 @@ export default function WeeklyTrackerPage() {
         setSelectionMode(null);
         await loadWeeklyTracker();
         await loadKpi();
+        broadcastWeeklyMutation();
         toast(`Deleted ${idsToDelete.length} company record${idsToDelete.length > 1 ? 's' : ''}`, 'success');
       }
     } catch (err) {
@@ -1069,75 +1117,77 @@ export default function WeeklyTrackerPage() {
   }, [sections, kpi]);
 
   return (
-    <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-primary-foreground">
+    <div className="h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-primary-foreground overflow-hidden">
 
-      {/* ── Top Header ────────────────────────────────────────────────────── */}
-      <WeeklyHeader
-        selectedCollegeId={selectedCollegeId}
-        onSelectCollege={(id, name) => {
-          setSelectedCollegeId(id);
-          setSelectedCollegeName(name);
-        }}
-        saveStatus={saveStatus}
-        lastSavedAt={lastSavedAt}
-        weekOffset={weekOffset}
-        onWeekChange={setWeekOffset}
-        academicYear={academicYear}
-        onAcademicYearChange={setAcademicYear}
-        onOpenAddModal={() => setIsAddModalOpen(true)}
-        onSyncDailyPositives={handleSyncDailyPositives}
-        isSyncing={isSyncing}
-        onSaveProgress={handleSaveAll}
-        onExportXlsx={handleExportXlsx}
-        onExportPdf={handleOpenPdfModal}
-        onExportImage={handleOpenImageModal}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        selectionMode={selectionMode}
-        selectedCount={selectedRowIds.length}
-        onStartMoveMode={handleStartMoveMode}
-        onStartDeleteMode={handleStartDeleteMode}
-        onCancelSelection={handleCancelSelection}
-        onExecuteMove={handleExecuteMove}
-        onExecuteBulkDelete={handleRequestBulkDelete}
-        onOpenBulkMove={handleStartMoveMode}
-        isDeleting={isDeleting}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        onUndo={undo}
-        onRedo={redo}
-        onOpenCollegeDossier={() => setIsDossierOpen(true)}
-      />
+      {/* ── Frozen Header & KPI Bar (Fixed Top Section) ────────────────── */}
+      <header className="shrink-0 z-40 bg-surface border-b border-border shadow-xs text-fg">
+        <WeeklyHeader
+          selectedCollegeId={selectedCollegeId}
+          onSelectCollege={(id, name) => {
+            setSelectedCollegeId(id);
+            setSelectedCollegeName(name);
+          }}
+          saveStatus={saveStatus}
+          lastSavedAt={lastSavedAt}
+          weekOffset={weekOffset}
+          onWeekChange={setWeekOffset}
+          academicYear={academicYear}
+          onAcademicYearChange={setAcademicYear}
+          onOpenAddModal={() => setIsAddModalOpen(true)}
+          onSyncDailyPositives={handleSyncDailyPositives}
+          isSyncing={isSyncing}
+          onSaveProgress={handleSaveAll}
+          onExportXlsx={handleExportXlsx}
+          onExportPdf={handleOpenPdfModal}
+          onExportImage={handleOpenImageModal}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          selectionMode={selectionMode}
+          selectedCount={selectedRowIds.length}
+          onStartMoveMode={handleStartMoveMode}
+          onStartDeleteMode={handleStartDeleteMode}
+          onCancelSelection={handleCancelSelection}
+          onExecuteMove={handleExecuteMove}
+          onExecuteBulkDelete={handleRequestBulkDelete}
+          onOpenBulkMove={handleStartMoveMode}
+          isDeleting={isDeleting}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onUndo={undo}
+          onRedo={redo}
+          onOpenCollegeDossier={() => setIsDossierOpen(true)}
+        />
 
-      {/* ── KPI Cards (Slim Single-Row Profile) ──────────────────────────── */}
-      {selectedCollegeId && (
-        <div className="px-6 py-2">
-          <WeeklyKpiCards
-            kpi={dynamicKpi}
-            activeSectionFilter={activeSectionFilter}
-            onFilterSection={setActiveSectionFilter}
-          />
-        </div>
-      )}
+        {/* ── KPI Cards (Slim Single-Row Profile) ──────────────────────── */}
+        {selectedCollegeId && (
+          <div className="px-6 py-2 border-t border-border/70 bg-surface/50">
+            <WeeklyKpiCards
+              kpi={dynamicKpi}
+              activeSectionFilter={activeSectionFilter}
+              onFilterSection={setActiveSectionFilter}
+            />
+          </div>
+        )}
+      </header>
 
       {/* ── Empty State when no college is selected ──────────────────────── */}
       {!selectedCollegeId && (
         <div className="flex-1 flex flex-col items-center justify-center gap-3 py-24 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-200/80 shadow-xs flex items-center justify-center text-slate-400">
+          <div className="w-16 h-16 rounded-2xl bg-slate-50 dark:bg-zinc-900 border border-slate-200/80 dark:border-zinc-800 shadow-xs flex items-center justify-center text-slate-400 dark:text-zinc-500">
             <CalendarDays size={32} strokeWidth={1.75} className="text-primary" />
           </div>
           <div>
-            <p className="text-base font-bold text-slate-800">Select a College to View Weekly Tracker</p>
-            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
-              Choose a partner institution from the header dropdown to view ongoing recruitment drives across all 7 operational pipeline sections.
+            <p className="text-base font-bold text-slate-800 dark:text-zinc-200">Select a College to View Weekly Tracker</p>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md mx-auto mt-1">
+              Choose a partner institution from the header dropdown to view ongoing recruitment drives across all operational pipeline sections.
             </p>
           </div>
         </div>
       )}
 
-      {/* ── Operational Sections ────────────────────────────────────────── */}
+      {/* ── Operational Sections (Scrollable with Invisible Scroller) ────── */}
       {selectedCollegeId && sections && (
-        <div className="flex-1 px-6 pb-8 space-y-4">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-none no-scrollbar px-6 py-4 pb-16 space-y-4">
           {/* Section 1: Companies Completed */}
           {shouldRenderSection('completed') && (
             <WeeklySection
@@ -1335,7 +1385,7 @@ export default function WeeklyTrackerPage() {
               onMoveRowCrossSection={handleMoveRowCrossSection}
             />
           )}
-        </div>
+        </main>
       )}
 
       {/* ── Add Company Modal ──────────────────────────────────────────────── */}

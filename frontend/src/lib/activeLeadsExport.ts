@@ -35,6 +35,8 @@ export function exportActiveLeadsPdf(leads: ActiveLeadItem[], academicYear: stri
       <td class="col-company">${escapeHtml(lead.company_name || '—')}</td>
       <td class="col-role">${escapeHtml(lead.role || '—')}</td>
       <td class="col-ctc">${escapeHtml(lead.ctc || '—')}</td>
+      <td class="col-status">${escapeHtml(lead.status || 'Hiring')}</td>
+      <td class="col-month">${escapeHtml(lead.status === 'Follow Up' ? (lead.followup_month || '—') : '—')}</td>
     </tr>
   `
     )
@@ -201,10 +203,12 @@ export function exportActiveLeadsPdf(leads: ActiveLeadItem[], academicYear: stri
   <table>
     <thead>
       <tr>
-        <th style="width: 50px; text-align: center;">S.No</th>
+        <th style="width: 45px; text-align: center;">S.No</th>
         <th style="text-align: left;">Company Name</th>
         <th style="text-align: left;">Role</th>
-        <th style="width: 110px; text-align: right;">CTC</th>
+        <th style="width: 100px; text-align: right;">CTC</th>
+        <th style="width: 110px; text-align: center;">Status</th>
+        <th style="width: 120px; text-align: center;">Followup Month</th>
       </tr>
     </thead>
     <tbody>

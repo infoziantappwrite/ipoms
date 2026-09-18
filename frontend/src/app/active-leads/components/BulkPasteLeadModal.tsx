@@ -8,13 +8,13 @@ import { SmoothYearDropdown } from '@/components/ui/SmoothYearDropdown';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onSubmitBulk: (lines: string[], academicYear: string, defaultStatus: LeadStatus) => Promise<boolean>;
+  onSubmitBulk: (lines: string[], academicYear: string, defaultStatus: LeadStatus | '') => Promise<boolean>;
 }
 
 export function BulkPasteLeadModal({ isOpen, onClose, onSubmitBulk }: Props) {
   const [pasteContent, setPasteContent] = useState('');
   const [academicYear, setAcademicYear] = useState('2027');
-  const [defaultStatus, setDefaultStatus] = useState<LeadStatus>('Hiring');
+  const [defaultStatus, setDefaultStatus] = useState<LeadStatus | ''>('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -85,7 +85,7 @@ export function BulkPasteLeadModal({ isOpen, onClose, onSubmitBulk }: Props) {
 
             <div>
               <label className="block text-xs font-bold text-fg mb-1">Default Initial Status</label>
-              <SmoothLeadStatusDropdown value={defaultStatus} onChange={(s) => setDefaultStatus(s as LeadStatus)} />
+              <SmoothLeadStatusDropdown value={defaultStatus} onChange={(s) => setDefaultStatus((s || '') as LeadStatus | '')} />
             </div>
           </div>
 

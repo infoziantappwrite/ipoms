@@ -283,6 +283,19 @@ export default function DailyTrackerPage() {
     }
   }, [saveStatus]);
 
+  const broadcastTrackerMutation = useCallback(() => {
+    try {
+      const bc1 = new BroadcastChannel('ipoms_tracker_sync');
+      bc1.postMessage({ type: 'TRACKER_MUTATION', timestamp: Date.now() });
+      bc1.close();
+    } catch {}
+    try {
+      const bc2 = new BroadcastChannel('ipoms_daily_leads_sync');
+      bc2.postMessage({ type: 'TRACKER_MUTATION', timestamp: Date.now() });
+      bc2.close();
+    } catch {}
+  }, []);
+
   // ── Handle row update (auto-save on each change) with Undo / Redo
   const handleRowUpdate = useCallback(async (rowId: string, patch: Partial<TrackerRow>, isUndoRedo = false) => {
     const existingRow = rows.find((r) => r._id === rowId);
@@ -315,6 +328,7 @@ export default function DailyTrackerPage() {
         await loadKpi();
         setSaveStatus('saved');
         setLastSavedAt(new Date());
+        broadcastTrackerMutation();
 
         // Automatically background sync progress to Weekly Tracker without manual intervention
         if (coordinatorId && selectedCollegeId) {
@@ -333,7 +347,7 @@ export default function DailyTrackerPage() {
       console.error('[DT] Row update failed', e);
       setSaveStatus('error');
     }
-  }, [rows, pushAction, loadKpi, coordinatorId, selectedCollegeId]);
+  }, [rows, pushAction, loadKpi, coordinatorId, selectedCollegeId, broadcastTrackerMutation]);
 
   // ── Handle manual contact row added
   const handleManualRowAdded = useCallback((newRow: TrackerRow) => {
@@ -342,7 +356,8 @@ export default function DailyTrackerPage() {
       return next.map((r, idx) => ({ ...r, serial_no: idx + 1 }));
     });
     loadKpi();
-  }, [loadKpi]);
+    broadcastTrackerMutation();
+  }, [loadKpi, broadcastTrackerMutation]);
 
   // ── Handle Softphone wrap-up save (auto-populates tracker row)
   const handleSoftphoneSave = useCallback(async (result: SoftphoneCallResult) => {
@@ -369,9 +384,10 @@ export default function DailyTrackerPage() {
       if (res.success) {
         setRows((prev) => prev.filter((row) => row._id !== rowId).map((r, idx) => ({ ...r, serial_no: idx + 1 })));
         await loadKpi();
+        broadcastTrackerMutation();
       }
     } catch (e) { console.error('[DT] Delete failed', e); }
-  }, [loadKpi]);
+  }, [loadKpi, broadcastTrackerMutation]);
 
   // ── Handle bulk delete selected rows in active college
   const handleDeleteSelectedRows = useCallback(async (rowIds: string[]) => {
@@ -385,15 +401,17 @@ export default function DailyTrackerPage() {
       if (allSuccess) {
         setRows((prev) => prev.filter((row) => !rowIds.includes(row._id)).map((r, idx) => ({ ...r, serial_no: idx + 1 })));
         await loadKpi();
+        broadcastTrackerMutation();
       } else {
         await loadTodayRows();
         await loadKpi();
+        broadcastTrackerMutation();
       }
     } catch (e) {
       console.error('[DT] Bulk delete selected rows failed', e);
       alert('Error occurred while deleting selected contacts.');
     }
-  }, [selectedCollegeName, loadKpi, loadTodayRows]);
+  }, [selectedCollegeName, loadKpi, loadTodayRows, broadcastTrackerMutation]);
 
   // ── Save Progress (Ctrl+S / Save Button)
   const handleSaveProgress = useCallback(async () => {
@@ -421,6 +439,7 @@ export default function DailyTrackerPage() {
         setSaveStatus('saved');
         setLastSavedAt(new Date());
         triggerHaptic('success');
+        broadcastTrackerMutation();
         const data = res.data as any;
         if (data?.positive_promoted > 0) {
           toast(`Saved! ${data.positive_promoted} positive outcome(s) queued for Weekly Tracker`, 'success');
@@ -436,7 +455,7 @@ export default function DailyTrackerPage() {
       setSaveStatus('error');
       toast('Failed to save progress. Please check your network connection.', 'error');
     }
-  }, [selectedCollegeId, coordinatorId, rows, toast]);
+  }, [selectedCollegeId, coordinatorId, rows, toast, broadcastTrackerMutation]);
 
   // ── Keyboard shortcuts (Ctrl+S to save, Shift+S for summary pop-up, Shift+H for history, Shift+A for manual entry, Escape to close/exit)
   useEffect(() => {

@@ -76,15 +76,15 @@ const ActiveLeadSchema: Schema<IActiveLead> = new Schema(
     },
     ctc: {
       type: String,
-      required: [true, 'CTC is required'],
+      required: false,
       trim: true,
       default: '',
     },
     status: {
       type: String,
-      enum: [...ACTIVE_LEAD_STATUSES, 'Not Hiring'],
-      required: true,
-      default: 'Hiring',
+      enum: [...ACTIVE_LEAD_STATUSES, 'Not Hiring', ''],
+      required: false,
+      default: '',
       index: true,
     },
     followup_month: {

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Users, Plus, Shield } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Users, Plus, Shield, ShieldAlert } from 'lucide-react';
 import { UserManagementTab } from '@/app/settings/components/UserManagementTab';
 import { UserModal } from '@/app/settings/components/UserModal';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
@@ -9,8 +10,16 @@ import { apiFetch } from '@/lib/api';
 import { readSessionUser, roleOf } from '@/lib/session';
 
 export default function UsersPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<'admin' | 'team_leader' | 'coordinator'>('admin');
+
+  useEffect(() => {
+    const session = readSessionUser();
+    const role = roleOf(session);
+    setUserRole(role);
+  }, []);
 
   // Modal State
   const [showUserModal, setShowUserModal] = useState(false);
@@ -87,6 +96,41 @@ export default function UsersPage() {
       console.error('Unlock profile error:', err);
     }
   };
+
+  if (userRole !== 'admin') {
+    return (
+      <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-primary-foreground">
+        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-border px-6 py-4 flex items-center justify-between gap-4 shadow-2xs">
+          <div>
+            <h1 className="text-xl font-bold text-fg tracking-tight flex items-center gap-2">
+              <Users size={18} strokeWidth={2} className="text-primary" aria-hidden />
+              <span>User Management & Staff Directory</span>
+            </h1>
+          </div>
+          <div className="shrink-0 flex items-center gap-3">
+            <UserSignOutButton />
+          </div>
+        </div>
+
+        <div className="p-8 max-w-xl mx-auto my-auto text-center space-y-4">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center border border-amber-500/20 shadow-sm">
+            <ShieldAlert size={28} />
+          </div>
+          <h2 className="text-lg font-bold text-fg">Administrator Access Required</h2>
+          <p className="text-xs text-fg-subtle leading-relaxed">
+            Staff Directory and User Account Provisioning are strictly restricted to <strong>Administrators</strong>.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard')}
+            className="px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary-hover rounded-lg transition shadow-xs cursor-pointer"
+          >
+            Return to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-primary-foreground">
