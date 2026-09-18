@@ -141,7 +141,7 @@ export function RowMonthDropdown({ value, onChange, disabled = false }: Props) {
         <div className="flex items-center gap-2 truncate">
           <Calendar size={12} className={disabled ? 'text-fg-disabled/40 shrink-0' : 'text-warning-strong shrink-0'} />
           <span className="truncate text-xs">
-            {disabled ? '—' : (value || 'Select Month *')}
+            {disabled ? '—' : (value || 'Pick Month *')}
           </span>
         </div>
         <ChevronDown
@@ -172,29 +172,31 @@ export function RowMonthDropdown({ value, onChange, disabled = false }: Props) {
               width: '190px',
               zIndex: 99999,
             }}
-            className="bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 rounded-xl shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] p-1.5 flex flex-col gap-0.5 text-fg select-none max-h-[220px] overflow-y-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden animate-in fade-in zoom-in-95 duration-150 ease-out"
+            className="bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 rounded-xl shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] p-2 flex flex-col text-fg select-none animate-in fade-in zoom-in-95 duration-150 ease-out"
           >
-            <div className="text-[10px] font-bold text-fg-subtle uppercase px-2.5 py-1.5 tracking-wider border-b border-border/60 bg-slate-50 dark:bg-[#1A2234] rounded-lg mb-1">
+            <div className="text-[10px] font-bold text-fg-subtle uppercase px-2.5 py-1.5 tracking-wider border-b border-border/60 bg-slate-50 dark:bg-[#1A2234] rounded-lg mb-1.5 shrink-0">
               Follow Up Month
             </div>
-            {MONTHS.map((m) => {
-              const isSelected = value === m;
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={(e) => handleSelect(m, e)}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between gap-1.5 transition-colors cursor-pointer select-none ${
-                    isSelected
-                      ? 'bg-warning/15 text-warning-strong font-bold shadow-2xs'
-                      : 'hover:bg-slate-100 dark:hover:bg-slate-800/80 text-fg'
-                  }`}
-                >
-                  <span>{m}</span>
-                  {isSelected && <Check size={12} className="text-warning-strong shrink-0" />}
-                </button>
-              );
-            })}
+            <div className="overflow-y-auto max-h-[190px] space-y-0.5 pr-0.5 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              {MONTHS.map((m) => {
+                const isSelected = value === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={(e) => handleSelect(m, e)}
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between gap-1.5 transition-colors cursor-pointer select-none ${
+                      isSelected
+                        ? 'bg-amber-500/10 text-amber-700 dark:text-amber-300 font-bold shadow-2xs'
+                        : 'hover:bg-slate-100 dark:hover:bg-slate-800/80 text-fg'
+                    }`}
+                  >
+                    <span>{m}</span>
+                    {isSelected && <Check size={12} className="text-amber-600 dark:text-amber-400 shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
           </div>,
           document.body
         )}

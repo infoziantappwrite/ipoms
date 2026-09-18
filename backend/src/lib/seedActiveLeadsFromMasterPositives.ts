@@ -89,7 +89,7 @@ export async function seedActiveLeadsFromMasterPositives() {
         company_name: entry.company_name,
         role: entry.role,
         ctc: entry.ctc,
-        status: 'Hiring',
+        status: '',
         followup_month: '',
         academic_year: '2027',
         coordinator_id: coordinatorId,

@@ -15,7 +15,7 @@ interface Props {
     company_name: string;
     role: string;
     ctc: string;
-    status: LeadStatus;
+    status: LeadStatus | '';
     followup_month: string;
     academic_year: string;
   }) => Promise<boolean>;
@@ -26,8 +26,8 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
   const [role, setRole] = useState('Graduate Trainee');
   const [ctcValue, setCtcValue] = useState('');
   const [ctcUnit, setCtcUnit] = useState<CtcUnit>('LPA');
-  const [status, setStatus] = useState<LeadStatus>('Hiring');
-  const [followupMonth, setFollowupMonth] = useState('August');
+  const [status, setStatus] = useState<LeadStatus | ''>('');
+  const [followupMonth, setFollowupMonth] = useState('');
   const [academicYear, setAcademicYear] = useState('2027');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -93,7 +93,8 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
       setRole('Graduate Trainee');
       setCtcValue('');
       setCtcUnit('LPA');
-      setStatus('Hiring');
+      setStatus('');
+      setFollowupMonth('');
       onClose();
     }
   };

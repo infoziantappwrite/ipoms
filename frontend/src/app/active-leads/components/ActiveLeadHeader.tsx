@@ -146,7 +146,7 @@ export function ActiveLeadHeader({
         {/* Left Side: Search & Filter Dropdowns */}
         <div className="flex items-center gap-2 shrink-0">
           {/* Live Search (High Visibility with Crisp Outline & Light Placeholder) */}
-          <div className="relative shrink-0 w-48 sm:w-56">
+          <div className="relative shrink-0 w-44 sm:w-52">
             <Search
               size={13}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-300 pointer-events-none"
@@ -167,7 +167,17 @@ export function ActiveLeadHeader({
             allowAll
             allLabel="Year"
             placeholder="Year"
-            className="shrink-0"
+            className="w-[90px] shrink-0"
+          />
+
+          {/* Smooth Status Filter */}
+          <SmoothLeadStatusDropdown
+            value={selectedStatus}
+            onChange={onStatusChange}
+            allowAll
+            allLabel="Status"
+            placeholder="Status"
+            className="w-[105px] shrink-0"
           />
 
           {/* Smooth Month Filter */}
@@ -175,61 +185,61 @@ export function ActiveLeadHeader({
             value={selectedMonth}
             onChange={onMonthChange}
             allowAll
-            allLabel="Follow Up Month"
-            placeholder="Follow Up Month"
-            className="shrink-0"
+            allLabel="Month"
+            placeholder="Month"
+            className="w-[110px] shrink-0"
           />
         </div>
 
-        {/* Right Side: Action Buttons */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Sync Button */}
+        {/* Right Side: Action Buttons with Clean Divider */}
+        <div className="flex items-center gap-2 shrink-0 ml-auto pl-2 border-l border-border/60">
+          {/* Sync Button (Icon Only with Interactive Tooltip) */}
           <div className="relative group/sync shrink-0">
             <button
               type="button"
               disabled={isSyncing}
               onClick={onSyncTracker}
-              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-[0.992] hover:shadow-indigo-500/20 whitespace-nowrap"
-              title="Datas will be synced from the daily tracker for the status follow, hiring and invite email"
+              className="w-8 h-8 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl transition-all shadow-xs flex items-center justify-center cursor-pointer active:scale-[0.992] hover:shadow-indigo-500/20 shrink-0"
+              title="Sync leads from Daily Tracker (Follow Up, Hiring, Invite Email)"
               aria-label="Sync leads from Daily Tracker"
             >
               <RefreshCw
-                size={13}
+                size={14}
                 strokeWidth={2.2}
                 className={`text-white transition-transform duration-500 shrink-0 ${
                   isSyncing ? 'animate-spin' : 'group-hover/sync:rotate-180'
                 }`}
               />
-              <span>{isSyncing ? 'Syncing…' : 'Sync'}</span>
             </button>
 
             {/* Custom Interactive Tooltip */}
-            <div className="pointer-events-none absolute right-0 top-full mt-2 hidden group-hover/sync:flex flex-col items-center z-50 w-72 animate-in fade-in zoom-in-95 duration-150">
+            <div className="pointer-events-none absolute right-0 top-full mt-2 hidden group-hover/sync:flex flex-col items-center z-50 w-64 animate-in fade-in zoom-in-95 duration-150">
               <div className="w-2.5 h-2.5 bg-slate-900 dark:bg-slate-800 rotate-45 -mb-1 border-t border-l border-slate-700/50" />
               <div className="bg-slate-900/95 dark:bg-slate-800/95 backdrop-blur-md text-white text-[11px] font-medium leading-relaxed px-3 py-2 rounded-xl shadow-2xl border border-slate-700/60 text-center">
-                Datas will be synced from the daily tracker for the status follow, hiring and invite email
+                Sync leads from Daily Tracker (Follow Up, Hiring, Invite Email)
               </div>
             </div>
           </div>
 
-          {/* Solid Export Dropdown Menu (Excel, PDF, Image) using Body Portal */}
+          {/* Solid Export Dropdown Menu (Excel, PDF, Image) using Body Portal (Icon Only) */}
           <SmoothExportDropdown
             onExportExcel={onExportExcel}
             onExportPdf={onExportPdf}
             onExportImage={onExportImage}
             isExporting={isExporting}
+            iconOnly={true}
           />
 
-          {/* Delete Mode Toggle / Delete Selected Actions */}
+          {/* Delete Mode Toggle / Delete Selected Actions (Icon Only) */}
           {!isDeleteMode ? (
             <button
               type="button"
               onClick={onToggleDeleteMode}
-              className="px-3.5 py-1.5 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-500/50 rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-[0.992] ring-1 ring-rose-400/30 dark:ring-rose-400/30 whitespace-nowrap shrink-0"
-              title="Enter Delete mode to select and delete leads"
+              className="w-8 h-8 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-500/50 rounded-xl transition-all shadow-xs flex items-center justify-center cursor-pointer active:scale-[0.992] ring-1 ring-rose-400/30 dark:ring-rose-400/30 shrink-0"
+              title="Delete mode — select and delete leads"
+              aria-label="Delete leads"
             >
-              <Trash2 size={13} strokeWidth={2.2} className="text-rose-600 dark:text-rose-400 shrink-0" />
-              <span>Delete</span>
+              <Trash2 size={14} strokeWidth={2.2} className="text-rose-600 dark:text-rose-400 shrink-0" />
             </button>
           ) : (
             <div className="flex items-center gap-1.5 shrink-0 animate-in fade-in duration-150">
@@ -238,40 +248,40 @@ export function ActiveLeadHeader({
                 type="button"
                 onClick={onDeleteSelected}
                 disabled={selectedCount === 0 || isDeletingSelected}
-                className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-[0.992] whitespace-nowrap shrink-0"
+                className="h-8 px-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-[0.992] whitespace-nowrap shrink-0"
+                title="Confirm delete selected leads"
+                aria-label="Delete selected leads"
               >
                 {isDeletingSelected ? (
                   <Loader2 size={13} className="animate-spin shrink-0" />
                 ) : (
                   <Trash2 size={13} strokeWidth={2.2} className="shrink-0" />
                 )}
-                <span>
-                  {selectedCount > 0
-                    ? `Delete Selected (${selectedCount})`
-                    : 'Delete Selected'}
-                </span>
+                {selectedCount > 0 && <span className="font-mono text-xs font-bold">{selectedCount}</span>}
               </button>
 
               {/* Exit Delete Button */}
               <button
                 type="button"
                 onClick={onToggleDeleteMode}
-                className="px-3 py-1.5 bg-surface-sunken hover:bg-surface border border-border text-fg-subtle hover:text-fg rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1 cursor-pointer active:scale-[0.992] whitespace-nowrap shrink-0"
+                className="w-8 h-8 bg-surface-sunken hover:bg-surface border border-border text-fg-subtle hover:text-fg rounded-xl transition-all shadow-2xs flex items-center justify-center cursor-pointer active:scale-[0.992] shrink-0"
+                title="Exit Delete mode"
+                aria-label="Exit Delete mode"
               >
-                <X size={13} strokeWidth={2.5} className="shrink-0" />
-                <span>Exit Delete</span>
+                <X size={14} strokeWidth={2.5} className="shrink-0" />
               </button>
             </div>
           )}
 
-          {/* Add Button */}
+          {/* Add Button (Icon Only) */}
           <button
             type="button"
             onClick={onOpenAddModal}
-            className="px-4 py-1.5 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-[0.992] whitespace-nowrap shrink-0"
+            className="w-8 h-8 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-xs transition-all flex items-center justify-center cursor-pointer active:scale-[0.992] shrink-0"
+            title="Add Active Lead"
+            aria-label="Add Active Lead"
           >
-            <Plus size={13} strokeWidth={2.5} className="shrink-0" />
-            <span>Add</span>
+            <Plus size={15} strokeWidth={2.5} className="shrink-0" />
           </button>
         </div>
       </div>

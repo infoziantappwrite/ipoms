@@ -100,6 +100,12 @@ export async function syncLeadFromDailyTracker(data: {
 }
 
 export function registerActiveLeadRoutes(app: Express) {
+  // One-time auto-reset: Convert any previously defaulted seed leads to '' so they show 'Select Status' placeholder
+  ActiveLead.updateMany(
+    { status: 'Hiring', daily_tracker_id: { $exists: false } },
+    { $set: { status: '' } }
+  ).catch(() => {});
+
   // ── 1. GET /api/v1/active-leads (List with stats & search) ─────────────────
   app.get('/api/v1/active-leads', authenticateJWT, async (req: Request, res: Response) => {
     try {
@@ -327,14 +333,7 @@ export function registerActiveLeadRoutes(app: Express) {
       if (!company_name || !company_name.trim()) {
         return res.status(400).json({ success: false, error: { message: 'Company Name is required' } });
       }
-      if (!role || !role.trim()) {
-        return res.status(400).json({ success: false, error: { message: 'Role is required' } });
-      }
-      if (!ctc || !ctc.trim()) {
-        return res.status(400).json({ success: false, error: { message: 'CTC is required' } });
-      }
-
-      if (!ACTIVE_LEAD_STATUSES.includes(status)) {
+      if (status && !ACTIVE_LEAD_STATUSES.includes(status)) {
         return res.status(400).json({ success: false, error: { message: 'Invalid status' } });
       }
 
@@ -344,10 +343,10 @@ export function registerActiveLeadRoutes(app: Express) {
       const lead = await ActiveLead.create({
         company_name: company_name.trim(),
         role: role.trim() || 'Graduate Trainee',
-        ctc: ctc.trim(),
-        status,
+        ctc: ctc ? ctc.trim() : '',
+        status: status || '',
         followup_month: status === 'Follow Up' ? followup_month : '',
-        academic_year: academic_year || '2026',
+        academic_year: (req.body.academic_year as any) || '2027',
         coordinator_id: coordinatorId,
         college_id: college_id ? new Types.ObjectId(college_id) : null,
       });
@@ -441,10 +440,10 @@ export function registerActiveLeadRoutes(app: Express) {
       if (role !== undefined) lead.role = role.trim();
       if (ctc !== undefined) lead.ctc = ctc.trim();
       if (status !== undefined) {
-        if (!ACTIVE_LEAD_STATUSES.includes(status)) {
+        if (status && !ACTIVE_LEAD_STATUSES.includes(status)) {
           return res.status(400).json({ success: false, error: { message: 'Invalid status' } });
         }
-        lead.status = status;
+        lead.status = status || '';
         // If status is not Follow Up, clear followup_month
         if (status !== 'Follow Up') {
           lead.followup_month = '';

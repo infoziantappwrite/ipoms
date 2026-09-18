@@ -46,12 +46,12 @@ export function FullScreenToggle({ className = '', variant = 'icon' }: Props) {
       onClick={handleToggle}
       title={isFullscreen ? 'Exit Full Screen (F11 / Esc)' : 'Enter Full Screen Mode (F11)'}
       aria-label={isFullscreen ? 'Exit Full Screen Mode' : 'Enter Full Screen Mode'}
-      className={`group w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all duration-200 active:scale-[0.992] cursor-pointer shadow-2xs border select-none bg-surface hover:bg-surface-raised border-border text-fg-subtle hover:text-fg ${className}`}
+      className={`group flex items-center justify-center transition-all duration-200 active:scale-[0.992] cursor-pointer shadow-2xs border select-none bg-surface hover:bg-surface-raised border-border text-fg-subtle hover:text-fg rounded-lg ${className || 'w-9 h-9'}`}
     >
       {isFullscreen ? (
-        <Minimize2 size={16} strokeWidth={2.2} className="text-primary group-hover:scale-105 transition-transform" />
+        <Minimize2 size={15} strokeWidth={2.2} className="text-primary group-hover:scale-105 transition-transform" />
       ) : (
-        <Maximize2 size={16} strokeWidth={2.2} className="group-hover:text-primary group-hover:scale-105 transition-transform" />
+        <Maximize2 size={15} strokeWidth={2.2} className="group-hover:text-primary group-hover:scale-105 transition-transform" />
       )}
     </button>
   );

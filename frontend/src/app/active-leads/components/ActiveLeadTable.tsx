@@ -16,7 +16,7 @@ export interface ActiveLeadItem {
   company_name: string;
   role: string;
   ctc: string;
-  status: LeadStatus;
+  status: LeadStatus | '';
   followup_month: string;
   academic_year: string;
   created_at?: string;
@@ -287,11 +287,12 @@ export function ActiveLeadTable({
               )}
 
               <th className="py-3 px-3 w-12 text-center border-r border-border/80">S.No</th>
-              <th className="py-3 px-4 min-w-[220px] max-w-[300px] text-center border-r border-border/80">Company Name</th>
-              <th className="py-3 px-4 min-w-[180px] max-w-[240px] text-center border-r border-border/80">Role</th>
-              <th className="py-3 px-3.5 min-w-[150px] text-center border-r border-border/80">CTC</th>
+              <th className="py-3 px-4 min-w-[200px] max-w-[280px] text-center border-r border-border/80">Company Name</th>
+              <th className="py-3 px-4 min-w-[170px] max-w-[220px] text-center border-r border-border/80">Role</th>
+              <th className="py-3 px-3.5 min-w-[140px] text-center border-r border-border/80">CTC</th>
+              <th className="py-3 px-3.5 min-w-[150px] text-center border-r border-border/80">Status</th>
               <th className="py-3 px-3.5 min-w-[160px] text-center border-r border-border/80">Followup Month</th>
-              <th className="py-3 px-3.5 min-w-[150px] text-center">Academic Year</th>
+              <th className="py-3 px-3.5 min-w-[140px] text-center">Academic Year</th>
             </tr>
           </thead>
 
@@ -330,7 +331,7 @@ export function ActiveLeadTable({
                   </td>
 
                   {/* 2. Company Name */}
-                  <td className="py-2 px-3 text-center min-w-[220px] max-w-[300px] border-r border-border/60">
+                  <td className="py-2 px-3 text-center min-w-[200px] max-w-[280px] border-r border-border/60">
                     <AutoWrapCell
                       initialValue={lead.company_name}
                       onSave={(newVal) => handleFieldChange(lead._id, 'company_name', newVal)}
@@ -340,7 +341,7 @@ export function ActiveLeadTable({
                   </td>
 
                   {/* 3. Role */}
-                  <td className="py-2 px-3 text-center min-w-[180px] max-w-[240px] border-r border-border/60">
+                  <td className="py-2 px-3 text-center min-w-[170px] max-w-[220px] border-r border-border/60">
                     <AutoWrapCell
                       initialValue={lead.role}
                       onSave={(newVal) => handleFieldChange(lead._id, 'role', newVal)}
@@ -358,11 +359,28 @@ export function ActiveLeadTable({
                     />
                   </td>
 
-                  {/* 5. Followup Month */}
+                  {/* 5. Status (Only 3 Options: Hiring, Invite Email, Follow Up) */}
+                  <td className="py-2.5 px-3 text-center border-r border-border/60">
+                    <div className="flex justify-center items-center">
+                      <SmoothLeadStatusDropdown
+                        value={lead.status || ''}
+                        placeholder="Select Status"
+                        onChange={(newStatus) => {
+                          handleFieldChange(lead._id, 'status', newStatus);
+                          if (newStatus !== 'Follow Up') {
+                            handleFieldChange(lead._id, 'followup_month', '');
+                          }
+                        }}
+                      />
+                    </div>
+                  </td>
+
+                  {/* 6. Followup Month (Enabled only when Status is 'Follow Up') */}
                   <td className="py-2.5 px-3 text-center border-r border-border/60">
                     <div className="flex justify-center items-center">
                       <SmoothMonthDropdown
-                        value={lead.followup_month || ''}
+                        value={lead.status === 'Follow Up' ? (lead.followup_month || '') : ''}
+                        disabled={lead.status !== 'Follow Up'}
                         onChange={(newMonth) => {
                           handleFieldChange(lead._id, 'followup_month', newMonth);
                         }}

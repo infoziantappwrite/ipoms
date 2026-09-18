@@ -50,9 +50,9 @@ export function ThemeToggle({ className = '' }: Props) {
       onClick={handleToggle}
       title={isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
       aria-label={isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
-      className={`group w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 active:scale-[0.992] cursor-pointer shadow-2xs border select-none bg-surface hover:bg-surface-raised border-border text-fg ${className}`}
+      className={`group flex items-center justify-center transition-all duration-200 active:scale-[0.992] cursor-pointer shadow-2xs border select-none bg-surface hover:bg-surface-raised border-border text-fg rounded-lg ${className || 'w-9 h-9'}`}
     >
-      <AnimatedThemeIcon isDark={isDark} size={18} />
+      <AnimatedThemeIcon isDark={isDark} size={16} />
     </button>
   );
 }

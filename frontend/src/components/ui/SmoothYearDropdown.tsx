@@ -169,7 +169,7 @@ export function SmoothYearDropdown({
         disabled={disabled}
         onClick={handleToggle}
         title={selectedYears.length > 0 ? `Batch: ${selectedYears.join(', ')}` : placeholder}
-        className="inline-flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-surface hover:bg-surface-raised text-fg border border-border transition-all duration-150 cursor-pointer shadow-2xs active:scale-[0.992] disabled:opacity-50 select-none whitespace-nowrap min-w-[105px] max-w-[170px]"
+        className="inline-flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-surface hover:bg-surface-raised text-fg border border-border transition-all duration-150 cursor-pointer shadow-2xs active:scale-[0.992] disabled:opacity-50 select-none whitespace-nowrap w-full min-w-0"
       >
         <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
           <GraduationCap size={14} className="text-primary shrink-0" />

@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import { apiFetch, apiFetchBlob } from '@/lib/api';
 import { useToast } from '@/components/ui/Toast';
+import { Modal } from '@/components/ui/Modal';
 import { ActiveLeadHeader } from './components/ActiveLeadHeader';
 import { ActiveLeadTable, ActiveLeadItem } from './components/ActiveLeadTable';
 import { AddActiveLeadModal } from './components/AddActiveLeadModal';
@@ -33,10 +34,11 @@ export default function ActiveLeadsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Batch Delete State
+  // Batch Delete State & In-App Confirmation
   const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [isDeletingSelected, setIsDeletingSelected] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
 
   // Reset page to 1 when filters or search changes
   useEffect(() => {
@@ -163,7 +165,7 @@ export default function ActiveLeadsPage() {
     company_name: string;
     role: string;
     ctc: string;
-    status: LeadStatus;
+    status: LeadStatus | '';
     followup_month: string;
     academic_year: string;
   }): Promise<boolean> => {
@@ -190,6 +192,7 @@ export default function ActiveLeadsPage() {
   const toggleDeleteMode = () => {
     setIsDeleteMode((prev) => !prev);
     setSelectedLeadIds([]);
+    setShowDeleteConfirmModal(false);
   };
 
   // Toggle individual lead selection
@@ -208,20 +211,31 @@ export default function ActiveLeadsPage() {
     }
   };
 
-  // Delete selected leads
-  const handleDeleteSelected = async () => {
+  // Trigger In-App Confirmation Modal for deleting selected rows
+  const handleRequestDelete = () => {
+    if (selectedLeadIds.length === 0) {
+      toast('Please select at least 1 lead to delete, or click the exit button.', 'info');
+      return;
+    }
+    setShowDeleteConfirmModal(true);
+  };
+
+  // Execute deletion when confirmed by user in modal
+  const handleExecuteDelete = async () => {
     if (selectedLeadIds.length === 0) return;
     try {
       setIsDeletingSelected(true);
+      const count = selectedLeadIds.length;
       const res = await apiFetch('/active-leads/bulk-delete', {
         method: 'POST',
         body: JSON.stringify({ ids: selectedLeadIds }),
       });
 
       if (res.success) {
-        toast(res.message || `${selectedLeadIds.length} lead(s) deleted successfully!`, 'success');
+        toast(res.message || `${count} lead(s) deleted successfully!`, 'success');
         setSelectedLeadIds([]);
         setIsDeleteMode(false);
+        setShowDeleteConfirmModal(false);
         await fetchLeads(false);
         broadcastMutation();
       } else {
@@ -349,7 +363,7 @@ export default function ActiveLeadsPage() {
         isDeleteMode={isDeleteMode}
         onToggleDeleteMode={toggleDeleteMode}
         selectedCount={selectedLeadIds.length}
-        onDeleteSelected={handleDeleteSelected}
+        onDeleteSelected={handleRequestDelete}
         isDeletingSelected={isDeletingSelected}
         page={page}
         totalPages={totalPages}
@@ -410,6 +424,63 @@ export default function ActiveLeadsPage() {
         onClose={() => setShowAddModal(false)}
         onSubmit={handleAddLead}
       />
+
+      {/* In-App Confirmation Modal for Deleting Selected Rows */}
+      <Modal
+        open={showDeleteConfirmModal}
+        onClose={() => {
+          if (!isDeletingSelected) setShowDeleteConfirmModal(false);
+        }}
+        size="sm"
+        title="Confirm Deletion"
+        description="Please confirm if you want to permanently delete the selected active leads."
+        footer={
+          <div className="flex items-center justify-end gap-2.5 w-full">
+            <button
+              type="button"
+              disabled={isDeletingSelected}
+              onClick={() => setShowDeleteConfirmModal(false)}
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-surface hover:bg-surface-raised border border-border text-fg transition-all cursor-pointer shadow-2xs active:scale-[0.992] disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isDeletingSelected}
+              onClick={handleExecuteDelete}
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-[0.992] disabled:opacity-50"
+            >
+              {isDeletingSelected ? (
+                <>
+                  <Loader2 size={13} className="animate-spin" />
+                  <span>Deleting…</span>
+                </>
+              ) : (
+                <>
+                  <Trash2 size={13} strokeWidth={2.2} />
+                  <span>Delete {selectedLeadIds.length > 0 ? `(${selectedLeadIds.length})` : ''}</span>
+                </>
+              )}
+            </button>
+          </div>
+        }
+      >
+        <div className="p-4 sm:p-5 space-y-3.5">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center justify-center shrink-0 shadow-2xs">
+              <Trash2 size={20} strokeWidth={2} />
+            </div>
+            <div className="space-y-1.5">
+              <h4 className="text-sm font-bold text-fg">
+                Delete {selectedLeadIds.length} Selected {selectedLeadIds.length === 1 ? 'Row' : 'Rows'}?
+              </h4>
+              <p className="text-xs text-fg-subtle leading-relaxed">
+                Do you want to delete the <strong className="text-rose-600 dark:text-rose-400 font-bold font-mono">{selectedLeadIds.length} {selectedLeadIds.length === 1 ? 'row' : 'rows'}</strong> you selected? This action cannot be undone and will permanently remove them from the Active Leads Directory.
+              </p>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

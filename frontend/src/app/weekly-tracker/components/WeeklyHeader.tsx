@@ -99,7 +99,7 @@ export function WeeklyHeader({
   }, [selectedCollegeId]);
 
   return (
-    <header className="sticky top-0 z-40 bg-surface/95 backdrop-blur-md border-b border-border px-6 py-4 space-y-3 shadow-xs text-fg">
+    <header className="bg-surface px-6 py-3.5 space-y-2.5 text-fg">
       {/* ── Top Row: Title & Top-Right Sign Out ────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div>
@@ -155,60 +155,60 @@ export function WeeklyHeader({
         </div>
       </div>
 
-      {/* ── Bottom Controls Row: Search on Left, Dustbin + Actions + College on Right ── */}
+      {/* ── Sub-bar: Unified Controls Row (College Selector + Dossier + Search on Left, Actions + Trash on Right) ── */}
       <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t border-border/80 relative z-30">
-        {/* Left Side: Search Bar */}
-        <div className="flex items-center gap-2">
+        {/* Left Side: College Selector + College Dossier Button + Search Bar */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* 1. College Selector */}
+          <CollegeSelector
+            selectedCollegeId={selectedCollegeId}
+            onSelect={(id, name) => {
+              onSelectCollege(id, name);
+            }}
+            onSelectCollege={(col) => {
+              setSelectedCollegeObj(col);
+            }}
+            align="left"
+          />
+
+          {/* 2. College Dossier Button */}
+          {selectedCollegeId && onOpenCollegeDossier && (
+            <button
+              type="button"
+              onClick={onOpenCollegeDossier}
+              title="View & Edit College Profile & Placement Officer Details"
+              className="flex items-center justify-center w-8 h-8 p-1 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200/90 dark:border-zinc-700/80 hover:border-blue-400 dark:hover:border-blue-500 rounded-xl shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0 overflow-hidden group"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/university.gif"
+                alt="College Profile & Placement Officer Details"
+                className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal group-hover:scale-110 active:scale-95 transition-transform duration-150"
+              />
+            </button>
+          )}
+
+          {/* 3. Search Bar */}
           {selectedCollegeId && onSearchChange && (
-            <div className="relative w-72 sm:w-88 shrink-0">
+            <div className="relative w-64 sm:w-72 shrink-0">
               <Search
                 size={14}
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none"
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-300 pointer-events-none"
               />
               <input
                 type="text"
                 placeholder="Start searching..."
                 value={searchQuery || ''}
                 onChange={(e) => onSearchChange(e.target.value)}
-                className="w-full h-8 pl-8 pr-3 bg-surface-sunken dark:bg-zinc-900 border border-border hover:border-zinc-400 dark:hover:border-zinc-500 text-fg text-xs rounded-xl shadow-xs placeholder:text-fg-subtle outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium"
+                className="w-full h-8 pl-8 pr-3 bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-300 dark:border-zinc-700/90 hover:border-zinc-400 dark:hover:border-zinc-500 text-zinc-900 dark:text-zinc-100 text-xs rounded-xl shadow-xs placeholder:text-zinc-500 dark:placeholder:text-zinc-300/80 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium"
               />
             </div>
           )}
         </div>
 
-        {/* Right Side: College Selector + Standalone Dustbin + Three Dots Actions Dropdown */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* 1. Smart Auto-Shrinking College Selector */}
-          <div className="shrink-0 flex items-center gap-1.5">
-            <CollegeSelector
-              selectedCollegeId={selectedCollegeId}
-              onSelect={(id, name) => {
-                onSelectCollege(id, name);
-              }}
-              onSelectCollege={(col) => {
-                setSelectedCollegeObj(col);
-              }}
-              align="right"
-            />
-
-            {selectedCollegeId && onOpenCollegeDossier && (
-              <button
-                type="button"
-                onClick={onOpenCollegeDossier}
-                title="View & Edit College Profile & Placement Officer Details"
-                className="flex items-center justify-center w-8 h-8 p-1 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200/90 dark:border-zinc-700/80 hover:border-blue-400 dark:hover:border-blue-500 rounded-xl shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0 overflow-hidden group"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/university.gif"
-                  alt="College Profile & Placement Officer Details"
-                  className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal group-hover:scale-110 active:scale-95 transition-transform duration-150"
-                />
-              </button>
-            )}
-          </div>
-
-          {/* 2. Active Mode Controls (Only visible when a mode is active) */}
+        {/* Right Side: Active Mode Controls + Red Dustbin + Sync + Three Dots Actions Dropdown */}
+        <div className="ml-auto shrink-0 flex items-center gap-2">
+          {/* Active Selection Mode Controls (Only visible when a mode is active) */}
           {selectedCollegeId && selectionMode !== null && (
             selectionMode === 'move' ? (
               <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
@@ -256,7 +256,7 @@ export function WeeklyHeader({
             ) : null
           )}
 
-          {/* 3. Standalone Red Dustbin / Trash Icon Button (Always visible outside) */}
+          {/* Standalone Red Dustbin / Trash Icon Button */}
           <button
             type="button"
             onClick={() => {
@@ -296,7 +296,7 @@ export function WeeklyHeader({
             )}
           </button>
 
-          {/* 3b. Standalone Quick Sync Daily Positives Button */}
+          {/* Standalone Quick Sync Daily Positives Button */}
           {onSyncDailyPositives && (
             <button
               type="button"
@@ -318,7 +318,7 @@ export function WeeklyHeader({
             </button>
           )}
 
-          {/* 4. Three Dots (Actions Menu) */}
+          {/* Three Dots (Actions Menu) */}
           <WeeklyActionsDropdown
             selectedCollegeId={selectedCollegeId}
             onOpenAddModal={onOpenAddModal}

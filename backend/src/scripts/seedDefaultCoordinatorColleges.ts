@@ -10,7 +10,7 @@ export const DEFAULT_COORDINATOR_COLLEGE_ROSTER: { email: string; name: string; 
   {
     name: 'Sujitha S (Sujitha)',
     email: 'sujitha_s@infoziant.com',
-    collegeCodes: ['NEHRU', 'KPR', 'SONA', 'MAREPHRA'],
+    collegeCodes: ['HITS', 'NEHRU', 'KPR', 'SONA', 'MAREPHRA'],
   },
   {
     name: 'A.Mohanaradha (Mohana)',

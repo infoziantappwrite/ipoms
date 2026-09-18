@@ -215,12 +215,13 @@ export default function DailyLeadsPage() {
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleFocus);
 
-    // 3. Cross-tab BroadcastChannel
-    let bc: BroadcastChannel | null = null;
+    // 3. Cross-tab BroadcastChannels (Daily Leads & Tracker)
+    let bcLeads: BroadcastChannel | null = null;
+    let bcTracker: BroadcastChannel | null = null;
     try {
-      bc = new BroadcastChannel('ipoms_daily_leads_sync');
-      bc.onmessage = (e) => {
-        if (e.data?.type === 'DAILY_LEADS_MUTATION') {
+      bcLeads = new BroadcastChannel('ipoms_daily_leads_sync');
+      bcLeads.onmessage = (e) => {
+        if (e.data?.type === 'DAILY_LEADS_MUTATION' || e.data?.type === 'TRACKER_MUTATION') {
           loadLeads(false);
           loadSummary();
         }
@@ -229,19 +230,54 @@ export default function DailyLeadsPage() {
       // ignore
     }
 
+    try {
+      bcTracker = new BroadcastChannel('ipoms_tracker_sync');
+      bcTracker.onmessage = (e) => {
+        loadLeads(false);
+        loadSummary();
+      };
+    } catch {
+      // ignore
+    }
+
+    // 4. Ctrl+S / Cmd+S save keyboard shortcut
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        // Blur active input element to trigger pending onBlur/onChange handlers
+        if (typeof document !== 'undefined' && document.activeElement && 'blur' in document.activeElement) {
+          (document.activeElement as HTMLElement).blur();
+        }
+        loadLeads(false);
+        loadSummary();
+        broadcastDailyLeadMutation();
+        toast('Changes saved and synchronized successfully', 'success');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleFocus);
-      if (bc) bc.close();
+      window.removeEventListener('keydown', handleKeyDown);
+      if (bcLeads) bcLeads.close();
+      if (bcTracker) bcTracker.close();
     };
-  }, [loadLeads, loadSummary]);
+  }, [loadLeads, loadSummary, toast]);
 
   const broadcastDailyLeadMutation = () => {
     try {
-      const bc = new BroadcastChannel('ipoms_daily_leads_sync');
-      bc.postMessage({ type: 'DAILY_LEADS_MUTATION', timestamp: Date.now() });
-      bc.close();
+      const bc1 = new BroadcastChannel('ipoms_daily_leads_sync');
+      bc1.postMessage({ type: 'DAILY_LEADS_MUTATION', timestamp: Date.now() });
+      bc1.close();
+    } catch {
+      // ignore
+    }
+    try {
+      const bc2 = new BroadcastChannel('ipoms_tracker_sync');
+      bc2.postMessage({ type: 'DAILY_LEADS_MUTATION', timestamp: Date.now() });
+      bc2.close();
     } catch {
       // ignore
     }
@@ -362,16 +398,19 @@ export default function DailyLeadsPage() {
     }
 
     try {
-      await Promise.all(
-        selectedIds.map((id) =>
-          apiFetch(`/daily-leads/${id}`, { method: 'DELETE' })
-        )
-      );
+      const res = await apiFetch('/daily-leads/batch-delete', {
+        method: 'POST',
+        body: JSON.stringify({ ids: selectedIds }),
+      });
+      if (res.success) {
+        toast((res as any)?.message || 'Selected records deleted successfully', 'success');
+      }
       setSelectedIds([]);
       setIsAllSelected(false);
       setIsDeleteMode(false);
       await loadLeads();
       await loadSummary();
+      broadcastDailyLeadMutation();
     } catch (err) {
       console.error('Failed to bulk delete leads:', err);
     }

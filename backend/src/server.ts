@@ -927,8 +927,19 @@ app.get('/api/v1/colleges/focus-matrix', async (req: Request, res: Response) => 
       currentUserId = String(req.query.user_id);
     }
 
-    const [allColleges, activeCoordinators, currentUser] = await Promise.all([
-      College.find({ status: 'active' }).sort({ college_code: 1 }),
+    let allColleges = await College.find({ status: 'active' }).sort({ college_code: 1 });
+    if (allColleges.length === 0) {
+      await syncActiveCollegesRoster();
+      allColleges = await College.find({ status: 'active' }).sort({ college_code: 1 });
+      if (allColleges.length === 0) {
+        allColleges = await College.find({}).sort({ college_code: 1 });
+        if (allColleges.length > 0) {
+          await College.updateMany({}, { $set: { status: 'active' } });
+        }
+      }
+    }
+
+    const [activeCoordinators, currentUser] = await Promise.all([
       User.find({
         role_codes: { $in: ['COORDINATOR', 'PLACEMENT_COORDINATOR', 'TEAM_LEADER'] },
         account_status: 'active',
@@ -1820,6 +1831,132 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
       }).catch((e) => console.error('Auto-lead sync error:', e));
     }
 
+    // ── Cascade Edits / Outcome changes to already connected DailyLead and WeeklyTracker ──
+    (async () => {
+      try {
+        const escapedName = escapeRegex(row.company_name.trim());
+        const isPositiveOutcome = row.outcome_status && ['invite_mail', 'jd_received', 'hiring', 'drive_completed'].includes(row.outcome_status);
+
+        // 1. If outcome changed AWAY from positive outcome, cascade soft-delete to linked DailyLead and WeeklyTracker
+        if (outcome_status !== undefined && !isPositiveOutcome) {
+          await DailyLead.updateMany(
+            {
+              $or: [
+                { daily_tracker_id: row._id },
+                {
+                  college_id: row.college_id,
+                  company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+                },
+              ],
+              is_deleted: false,
+            },
+            {
+              $set: { is_deleted: true, deleted_at: new Date() },
+            }
+          );
+
+          await WeeklyTracker.updateMany(
+            {
+              $or: [
+                { daily_tracker_id: row._id },
+                {
+                  college_id: row.college_id,
+                  company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+                },
+              ],
+              is_deleted: false,
+            },
+            {
+              $set: { is_deleted: true, deleted_at: new Date() },
+            }
+          );
+        }
+
+        // 2. If outcome is positive (invite_mail or jd_received), ensure matching DailyLead is in sync
+        if (isPositiveOutcome) {
+          const leadType = row.outcome_status === 'jd_received' ? 'jd_received' : 'positive';
+          const existingLead = await DailyLead.findOne({
+            $or: [
+              { daily_tracker_id: row._id },
+              {
+                college_id: row.college_id,
+                company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+              },
+            ],
+          });
+
+          if (existingLead) {
+            existingLead.lead_type = leadType;
+            existingLead.company_name = row.company_name.trim();
+            existingLead.daily_tracker_id = row._id;
+            if (row.comments) existingLead.remarks = row.comments;
+            existingLead.is_deleted = false;
+            existingLead.deleted_at = undefined;
+            await existingLead.save();
+          }
+        }
+
+        // 3. Propagate edited company / contact fields to already-synchronized records
+        if (company_name !== undefined || hr_name !== undefined || mobile_number !== undefined || email_id !== undefined || comments !== undefined) {
+          // Update matching DailyLeads
+          await DailyLead.updateMany(
+            {
+              $or: [
+                { daily_tracker_id: row._id },
+                {
+                  college_id: row.college_id,
+                  company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+                },
+              ],
+              is_deleted: false,
+            },
+            {
+              $set: {
+                company_name: row.company_name.trim(),
+                ...(comments !== undefined && comments ? { remarks: comments } : {}),
+              },
+            }
+          );
+
+          // Update matching already-synchronized WeeklyTracker rows
+          const wtRows = await WeeklyTracker.find({
+            $or: [
+              { daily_tracker_id: row._id },
+              {
+                college_id: row.college_id,
+                company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+              },
+            ],
+            is_deleted: false,
+          });
+
+          for (const wt of wtRows) {
+            wt.company_name = row.company_name.trim();
+            if (row.mobile_number) {
+              wt.contact_number = row.mobile_number.trim();
+              if (!wt.mobile_numbers.includes(row.mobile_number.trim())) {
+                wt.mobile_numbers.push(row.mobile_number.trim());
+              }
+            }
+            if (row.email_id) {
+              wt.email_id = row.email_id.trim();
+              if (!wt.email_ids.includes(row.email_id.trim())) {
+                wt.email_ids.push(row.email_id.trim());
+              }
+            }
+            if (row.hr_name) {
+              wt.cdc_reference = `${row.hr_name.trim()}${row.mobile_number ? ` (${row.mobile_number.trim()})` : ''}`;
+            }
+            wt.last_status_updated_at = new Date();
+            wt.updated_at = new Date();
+            await wt.save();
+          }
+        }
+      } catch (cascadeErr) {
+        console.error('Cascade DT update error:', cascadeErr);
+      }
+    })();
+
     return res.status(200).json({
       success: true,
       message: 'Row saved',
@@ -1877,7 +2014,7 @@ app.patch('/api/v1/daily-tracker/:id/skip', async (req: Request, res: Response) 
 });
 
 // ── DT-4B: DELETE /api/v1/daily-tracker/:id
-// Delete a contact row from today's daily tracker
+// Delete a contact row from today's daily tracker with cascading synchronization
 app.delete('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -1899,11 +2036,45 @@ app.delete('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
       });
     }
 
+    // Cascade soft-delete matching DailyLead and WeeklyTracker
+    const escapedName = escapeRegex(row.company_name.trim());
+    await DailyLead.updateMany(
+      {
+        $or: [
+          { daily_tracker_id: row._id },
+          {
+            college_id: row.college_id,
+            company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+          },
+        ],
+        is_deleted: false,
+      },
+      {
+        $set: { is_deleted: true, deleted_at: new Date() },
+      }
+    );
+
+    await WeeklyTracker.updateMany(
+      {
+        $or: [
+          { daily_tracker_id: row._id },
+          {
+            college_id: row.college_id,
+            company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+          },
+        ],
+        is_deleted: false,
+      },
+      {
+        $set: { is_deleted: true, deleted_at: new Date() },
+      }
+    );
+
     await DailyTracker.findByIdAndDelete(id);
 
     return res.status(200).json({
       success: true,
-      message: `${row.company_name} removed from today's calling sheet`,
+      message: `${row.company_name} removed from today's calling sheet and synchronized across trackers`,
     });
   } catch (error: any) {
     return res.status(500).json({
@@ -1914,7 +2085,7 @@ app.delete('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
 });
 
 // ── DT-4C: DELETE /api/v1/daily-tracker/bulk
-// Bulk delete daily tracker rows (today's sheet, all dates for a college, or entire tracker reset)
+// Bulk delete daily tracker rows with cascading synchronization
 app.delete('/api/v1/daily-tracker/bulk', async (req: Request, res: Response) => {
   try {
     const { college_id, scope, session_date } = req.body || {};
@@ -1949,6 +2120,45 @@ app.delete('/api/v1/daily-tracker/bulk', async (req: Request, res: Response) => 
       if (coordinator_id) {
         filter.coordinator_id = new Types.ObjectId(coordinator_id);
       }
+    }
+
+    const rowsToDelete = await DailyTracker.find(filter);
+    const rowIds = rowsToDelete.map((r) => r._id);
+    const rowCompanyNames = rowsToDelete.map((r) => r.company_name.trim()).filter(Boolean);
+    const collegeIds = Array.from(new Set(rowsToDelete.map((r) => r.college_id)));
+
+    if (rowIds.length > 0) {
+      await DailyLead.updateMany(
+        {
+          $or: [
+            { daily_tracker_id: { $in: rowIds } },
+            {
+              college_id: { $in: collegeIds },
+              company_name: { $in: rowCompanyNames },
+            },
+          ],
+          is_deleted: false,
+        },
+        {
+          $set: { is_deleted: true, deleted_at: new Date() },
+        }
+      );
+
+      await WeeklyTracker.updateMany(
+        {
+          $or: [
+            { daily_tracker_id: { $in: rowIds } },
+            {
+              college_id: { $in: collegeIds },
+              company_name: { $in: rowCompanyNames },
+            },
+          ],
+          is_deleted: false,
+        },
+        {
+          $set: { is_deleted: true, deleted_at: new Date() },
+        }
+      );
     }
 
     const result = await DailyTracker.deleteMany(filter);
@@ -3365,6 +3575,57 @@ app.patch('/api/v1/weekly-tracker/:id', async (req: Request, res: Response) => {
 
     notifyForeignCollegeOwners((req as any).user?.userId, row.college_id, row.company_name, 'updated');
 
+    // ── Cascade Edits to already connected DailyLead and DailyTracker ──
+    (async () => {
+      try {
+        const escapedName = escapeRegex(row.company_name.trim());
+        const leadUpdate: any = {};
+        if (patchData.company_name !== undefined) leadUpdate.company_name = row.company_name.trim();
+        if (patchData.job_role !== undefined) leadUpdate.job_role = row.job_role?.trim() || '';
+        if (patchData.ctc_lpa !== undefined) leadUpdate.ctc = row.ctc_lpa?.trim() || '';
+        if (patchData.eligible_batch !== undefined) leadUpdate.eligible_batch = row.eligible_batch?.trim() || '';
+        if (patchData.current_status_text !== undefined || patchData.remarks !== undefined) {
+          leadUpdate.remarks = row.current_status_text?.trim() || (row as any).remarks?.trim() || '';
+        }
+
+        if (Object.keys(leadUpdate).length > 0) {
+          await DailyLead.updateMany(
+            {
+              $or: [
+                ...(row.daily_tracker_id ? [{ daily_tracker_id: row.daily_tracker_id }] : []),
+                {
+                  college_id: row.college_id,
+                  company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+                },
+              ],
+              is_deleted: false,
+            },
+            { $set: leadUpdate }
+          );
+        }
+
+        // Also update linked DailyTracker if present
+        if (row.daily_tracker_id) {
+          const dtUpdate: any = {};
+          if (patchData.company_name !== undefined) dtUpdate.company_name = row.company_name.trim();
+          if (patchData.contact_number !== undefined || (patchData.mobile_numbers && patchData.mobile_numbers.length > 0)) {
+            dtUpdate.mobile_number = row.contact_number || (row.mobile_numbers && row.mobile_numbers[0]) || '';
+          }
+          if (patchData.email_id !== undefined || (patchData.email_ids && patchData.email_ids.length > 0)) {
+            dtUpdate.email_id = row.email_id || (row.email_ids && row.email_ids[0]) || '';
+          }
+          if (Object.keys(dtUpdate).length > 0) {
+            await DailyTracker.updateOne(
+              { _id: row.daily_tracker_id, is_deleted: false },
+              { $set: dtUpdate }
+            );
+          }
+        }
+      } catch (cascadeErr) {
+        console.error('Cascade WT update error:', cascadeErr);
+      }
+    })();
+
     return res.status(200).json({
       success: true,
       message: 'Weekly tracker record updated successfully',
@@ -3562,6 +3823,37 @@ app.delete('/api/v1/weekly-tracker/:id', async (req: Request, res: Response) => 
 
     notifyForeignCollegeOwners((req as any).user?.userId, row.college_id, row.company_name, 'deleted');
 
+    // ── Cascade soft-delete matching DailyLead and DailyTracker ──
+    (async () => {
+      try {
+        const escapedName = escapeRegex(row.company_name.trim());
+        await DailyLead.updateMany(
+          {
+            $or: [
+              ...(row.daily_tracker_id ? [{ daily_tracker_id: row.daily_tracker_id }] : []),
+              {
+                college_id: row.college_id,
+                company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+              },
+            ],
+            is_deleted: false,
+          },
+          {
+            $set: { is_deleted: true, deleted_at: new Date() },
+          }
+        );
+
+        if (row.daily_tracker_id) {
+          await DailyTracker.updateOne(
+            { _id: row.daily_tracker_id, is_deleted: false },
+            { $set: { is_deleted: true, deleted_at: new Date() } }
+          );
+        }
+      } catch (cascadeErr) {
+        console.error('Cascade WT delete error:', cascadeErr);
+      }
+    })();
+
     return res.status(200).json({
       success: true,
       message: `${row.company_name} moved to Recycle Bin`,
@@ -3586,11 +3878,49 @@ app.post('/api/v1/weekly-tracker/batch-delete', async (req: Request, res: Respon
       });
     }
 
-    const objectIds = ids.map((id: string) => new Types.ObjectId(id));
+    const objectIds = ids
+      .filter((id: string) => Types.ObjectId.isValid(id))
+      .map((id: string) => new Types.ObjectId(id));
+
+    const rowsToDelete = await WeeklyTracker.find({ _id: { $in: objectIds } });
+
     await WeeklyTracker.updateMany(
       { _id: { $in: objectIds } },
       { $set: { is_deleted: true, deleted_at: new Date() } }
     );
+
+    // ── Cascade soft-delete matching DailyLead and DailyTracker records ──
+    (async () => {
+      try {
+        for (const r of rowsToDelete) {
+          const escapedName = escapeRegex(r.company_name.trim());
+          await DailyLead.updateMany(
+            {
+              $or: [
+                ...(r.daily_tracker_id ? [{ daily_tracker_id: r.daily_tracker_id }] : []),
+                {
+                  college_id: r.college_id,
+                  company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+                },
+              ],
+              is_deleted: false,
+            },
+            {
+              $set: { is_deleted: true, deleted_at: new Date() },
+            }
+          );
+
+          if (r.daily_tracker_id) {
+            await DailyTracker.updateOne(
+              { _id: r.daily_tracker_id, is_deleted: false },
+              { $set: { is_deleted: true, deleted_at: new Date() } }
+            );
+          }
+        }
+      } catch (cascadeErr) {
+        console.error('Cascade WT batch-delete error:', cascadeErr);
+      }
+    })();
 
     return res.status(200).json({
       success: true,
@@ -4361,6 +4691,52 @@ app.patch('/api/v1/daily-leads/:id', async (req: Request, res: Response) => {
 
     await lead.save();
 
+    // ── Cascade Edits to already connected WeeklyTracker and DailyTracker ──
+    (async () => {
+      try {
+        const escapedName = escapeRegex(lead.company_name.trim());
+        const wtUpdate: any = {};
+        if (patchData.company_name !== undefined) wtUpdate.company_name = lead.company_name.trim();
+        if (patchData.job_role !== undefined) wtUpdate.job_role = lead.job_role?.trim() || '';
+        if (patchData.ctc !== undefined) wtUpdate.ctc_lpa = lead.ctc?.trim() || '';
+        if (patchData.eligible_batch !== undefined) wtUpdate.eligible_batch = lead.eligible_batch?.trim() || '';
+        if (patchData.remarks !== undefined) wtUpdate.current_status_text = lead.remarks?.trim() || '';
+
+        if (Object.keys(wtUpdate).length > 0) {
+          wtUpdate.last_status_updated_at = new Date();
+          wtUpdate.updated_at = new Date();
+          await WeeklyTracker.updateMany(
+            {
+              $or: [
+                ...(lead.daily_tracker_id ? [{ daily_tracker_id: lead.daily_tracker_id }] : []),
+                {
+                  college_id: lead.college_id,
+                  company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+                },
+              ],
+              is_deleted: false,
+            },
+            { $set: wtUpdate }
+          );
+        }
+
+        // Also update linked DailyTracker if exists
+        if (lead.daily_tracker_id && (patchData.company_name !== undefined || patchData.remarks !== undefined)) {
+          await DailyTracker.updateOne(
+            { _id: lead.daily_tracker_id, is_deleted: false },
+            {
+              $set: {
+                ...(patchData.company_name !== undefined ? { company_name: lead.company_name.trim() } : {}),
+                ...(patchData.remarks !== undefined ? { comments: lead.remarks.trim() } : {}),
+              },
+            }
+          );
+        }
+      } catch (cascadeErr) {
+        console.error('Cascade DL update error:', cascadeErr);
+      }
+    })();
+
     const updated = await DailyLead.findById(lead._id)
       .populate('college_id', 'college_name college_code')
       .populate('coordinator_id', 'full_name official_email');
@@ -4436,6 +4812,35 @@ app.delete('/api/v1/daily-leads/:id', async (req: Request, res: Response) => {
     lead.deleted_at = new Date();
     await lead.save();
 
+    // ── Cascade soft-delete matching WeeklyTracker and DailyTracker ──
+    (async () => {
+      try {
+        const escapedName = escapeRegex(lead.company_name.trim());
+        await WeeklyTracker.updateMany(
+          {
+            $or: [
+              ...(lead.daily_tracker_id ? [{ daily_tracker_id: lead.daily_tracker_id }] : []),
+              {
+                college_id: lead.college_id,
+                company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+              },
+            ],
+            is_deleted: false,
+          },
+          { $set: { is_deleted: true, deleted_at: new Date() } }
+        );
+
+        if (lead.daily_tracker_id) {
+          await DailyTracker.updateOne(
+            { _id: lead.daily_tracker_id, is_deleted: false },
+            { $set: { is_deleted: true, deleted_at: new Date() } }
+          );
+        }
+      } catch (cascadeErr) {
+        console.error('Cascade DL delete error:', cascadeErr);
+      }
+    })();
+
     return res.status(200).json({
       success: true,
       message: `${lead.company_name} moved to Recycle Bin`,
@@ -4445,6 +4850,72 @@ app.delete('/api/v1/daily-leads/:id', async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to delete lead' },
+    });
+  }
+});
+
+// ── DL-5B: POST /api/v1/daily-leads/batch-delete
+// Bulk soft-delete lead records with cross-module cascade
+app.post('/api/v1/daily-leads/batch-delete', async (req: Request, res: Response) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'ids array is required' },
+      });
+    }
+
+    const objectIds = ids
+      .filter((id: string) => Types.ObjectId.isValid(id))
+      .map((id: string) => new Types.ObjectId(id));
+
+    const leadsToDelete = await DailyLead.find({ _id: { $in: objectIds } });
+
+    await DailyLead.updateMany(
+      { _id: { $in: objectIds } },
+      { $set: { is_deleted: true, deleted_at: new Date() } }
+    );
+
+    // ── Cascade soft-delete matching WeeklyTracker and DailyTracker records ──
+    (async () => {
+      try {
+        for (const lead of leadsToDelete) {
+          const escapedName = escapeRegex(lead.company_name.trim());
+          await WeeklyTracker.updateMany(
+            {
+              $or: [
+                ...(lead.daily_tracker_id ? [{ daily_tracker_id: lead.daily_tracker_id }] : []),
+                {
+                  college_id: lead.college_id,
+                  company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+                },
+              ],
+              is_deleted: false,
+            },
+            { $set: { is_deleted: true, deleted_at: new Date() } }
+          );
+
+          if (lead.daily_tracker_id) {
+            await DailyTracker.updateOne(
+              { _id: lead.daily_tracker_id, is_deleted: false },
+              { $set: { is_deleted: true, deleted_at: new Date() } }
+            );
+          }
+        }
+      } catch (cascadeErr) {
+        console.error('Cascade DL batch-delete error:', cascadeErr);
+      }
+    })();
+
+    return res.status(200).json({
+      success: true,
+      message: `${objectIds.length} records moved to Recycle Bin`,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to batch delete leads' },
     });
   }
 });
@@ -7653,9 +8124,39 @@ app.post('/api/v1/users/heartbeat', async (req: Request, res: Response) => {
 // Team Leader Dashboard (Spec Section 5.2) — Coordinator Profile Online Activity & Live Performance Matrix
 app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => {
   try {
+    // Ensure Sujitha (Team Leader) has her assigned focus colleges: HITS, NEHRU, KPR, SONA, MAREPHRA
+    const sujithaUser = await User.findOne({
+      $or: [
+        { official_email: 'sujitha_s@infoziant.com' },
+        { username: 'sujitha' },
+        { full_name: /sujitha/i },
+      ],
+      is_deleted: false,
+    });
+    if (sujithaUser) {
+      const sujithaColleges = await College.find({
+        $or: [
+          { college_code: { $in: ['HITS', 'NEHRU', 'KPR', 'SONA', 'MAREPHRA'] } },
+          { college_name: { $in: [/hindustan/i, /nehru/i, /^KPR Institute/i, /^SONA/i, /ephraem/i] } },
+        ],
+        status: 'active',
+      });
+      const targetIds = sujithaColleges.map((c) => c._id);
+      const existingIds = (sujithaUser.assigned_college_ids || []).map((id: any) => String(id));
+      const needsUpdate = targetIds.some((id) => !existingIds.includes(String(id)));
+      if (needsUpdate || !sujithaUser.assigned_college_ids || sujithaUser.assigned_college_ids.length === 0) {
+        sujithaUser.assigned_college_ids = targetIds;
+        await sujithaUser.save();
+      }
+    }
+
     const coordinators = await User.find({
-      role_codes: { $in: ['COORDINATOR', 'PLACEMENT_COORDINATOR'] },
-      account_status: 'active',
+      $or: [
+        { role_codes: { $in: ['COORDINATOR', 'PLACEMENT_COORDINATOR', 'TEAM_LEADER', 'TEAM_LEAD'] } },
+        { official_email: 'sujitha_s@infoziant.com' },
+        { username: 'sujitha' },
+      ],
+      account_status: { $in: ['active', 'on_leave', 'partial_working'] },
       is_deleted: false,
     })
       .populate('assigned_college_ids', 'college_name college_code')
@@ -7743,12 +8244,16 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
             }
           : null;
 
+        const isTeamLeader = c.role_codes?.includes('TEAM_LEADER') || c.role_codes?.includes('TEAM_LEAD') || c.official_email === 'sujitha_s@infoziant.com' || c.username === 'sujitha';
+
         return {
           coordinator_id: c._id,
           name: c.full_name,
           username: c.username,
           email: c.official_email,
           mobile: c.primary_mobile || '',
+          role: isTeamLeader ? 'team_leader' : 'coordinator',
+          role_label: isTeamLeader ? 'Team Leader' : 'Coordinator',
           profile_photo_url: c.profile_photo_url || '',
           account_status: c.account_status,
           presence_status: c.presence_status || 'available',
@@ -11021,10 +11526,10 @@ const ensureDefaultAccounts = async () => {
     }
 
     // 5. Official focus college allocations
-    // Sujitha handles: NEHRU, KPR (partially with Mohanaradha), SONA, MAREPHRA
+    // Sujitha handles: HITS, NEHRU, KPR (partially with Mohanaradha), SONA, MAREPHRA
     // Mohanaradha handles: KARPAGAM, AIHT, ACET, KPR (partially with Sujitha)
     const DEFAULT_COORDINATOR_COLLEGE_MAP: Record<string, string[]> = {
-      'sujitha_s@infoziant.com': ['NEHRU', 'KPR', 'SONA', 'MAREPHRA'],
+      'sujitha_s@infoziant.com': ['HITS', 'NEHRU', 'KPR', 'SONA', 'MAREPHRA'],
       'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
       'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
       'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],

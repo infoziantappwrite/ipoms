@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import {
-  Users, Briefcase, CheckCircle2, Target,
-  ChevronDown, ChevronUp, Radio, PhoneCall, Building2,
-  Sparkles, Mail, Phone, CalendarCheck, TrendingUp, Award
+  Users, CheckCircle2, Target,
+  ChevronDown, ChevronUp, Building2,
+  Sparkles, Mail, Phone, CalendarCheck
 } from 'lucide-react';
 import { CoordinatorCollegeFocusSection } from './CoordinatorCollegeFocusSection';
 import { CoordinatorCollegeKpiCards } from './CoordinatorCollegeKpiCards';
@@ -67,135 +67,8 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
     return true;
   });
 
-  const totalCallsToday = team_matrix.reduce((acc: number, c: any) => acc + (c.calls_today || 0), 0);
-  const totalPositives = team_matrix.reduce((acc: number, c: any) => acc + (c.positive_leads || 0), 0);
-  const totalJds = team_matrix.reduce((acc: number, c: any) => acc + (c.jds_received || 0), 0);
-
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
-
-      {/* ── 1. Team Leader Command Header ── */}
-      <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-5 shadow-sm flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-            <Briefcase size={18} className="text-blue-600 dark:text-blue-400" aria-hidden /> Team Leader Operations & Workforce Hub
-          </h2>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Real-time coordinator monitoring, live institutional deployment, daily call velocity, and active pipeline tracking.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 text-xs font-semibold">
-            <Users size={14} />
-            <span>{team_matrix.length} Team Members</span>
-          </span>
-        </div>
-      </div>
-
-      {/* ── 2. Live Presence & Team Outreach KPI Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* 1. Live Online Telemetry Card */}
-        <div className="bg-white dark:bg-zinc-900 rounded-xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col justify-between hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors">
-          <div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                Currently Online
-              </span>
-              <span className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 grid place-items-center shrink-0">
-                <Radio size={15} className="animate-pulse" />
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2 mt-3">
-              <span className="text-3xl font-black font-mono tracking-tight text-emerald-600 dark:text-emerald-400 tabular-nums">
-                {onlineCount}
-              </span>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">/ {team_matrix.length} Coordinators</span>
-            </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-micro text-emerald-600 dark:text-emerald-400 font-medium">
-            <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
-              Active on portal now
-            </span>
-            <span className="text-[10px] font-bold font-mono bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-300 dark:border-emerald-800">
-              Live Sync (15s)
-            </span>
-          </div>
-        </div>
-
-        {/* 2. Active Workforce Today */}
-        <div className="bg-white dark:bg-zinc-900 rounded-xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col justify-between hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors">
-          <div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                Active Callers Today
-              </span>
-              <span className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 grid place-items-center shrink-0">
-                <PhoneCall size={15} />
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2 mt-3">
-              <span className="text-3xl font-black font-mono tracking-tight text-blue-600 dark:text-blue-400 tabular-nums">
-                {activeTodayCount}
-              </span>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Coordinators</span>
-            </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-micro text-zinc-500 dark:text-zinc-400">
-            <span>Logged calls / leads today</span>
-            <span className="font-semibold text-zinc-700 dark:text-zinc-300">Daily Activity</span>
-          </div>
-        </div>
-
-        {/* 3. Total Calls Made Today */}
-        <div className="bg-white dark:bg-zinc-900 rounded-xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col justify-between hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors">
-          <div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                Team Calls Today
-              </span>
-              <span className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 grid place-items-center shrink-0">
-                <TrendingUp size={15} />
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2 mt-3">
-              <span className="text-3xl font-black font-mono tracking-tight text-indigo-600 dark:text-indigo-400 tabular-nums">
-                {totalCallsToday}
-              </span>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Outreach Calls</span>
-            </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-micro text-zinc-500 dark:text-zinc-400">
-            <span>Corporate outreach calls today</span>
-            <span className="font-semibold text-indigo-600 dark:text-indigo-400">Daily Velocity</span>
-          </div>
-        </div>
-
-        {/* 4. Total Positives & JDs */}
-        <div className="bg-white dark:bg-zinc-900 rounded-xl p-5 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col justify-between hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors">
-          <div>
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                Positive Leads & JDs
-              </span>
-              <span className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 grid place-items-center shrink-0">
-                <Award size={15} />
-              </span>
-            </div>
-            <div className="flex items-baseline gap-2 mt-3">
-              <span className="text-3xl font-black font-mono tracking-tight text-emerald-600 dark:text-emerald-400 tabular-nums">
-                {totalPositives}
-              </span>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Positives ({totalJds} JDs)</span>
-            </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between text-micro text-zinc-500 dark:text-zinc-400">
-            <span>Cumulative positive conversions</span>
-            <span className="font-semibold text-emerald-600 dark:text-emerald-400">Pipeline</span>
-          </div>
-        </div>
-      </div>
 
       {/* ── 3. Live Active Deployment Bar (Quick Glance) ── */}
       {onlineCoordinators.length > 0 && (
@@ -401,8 +274,13 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
                             </div>
 
                             <div className="min-w-0">
-                              <div className="font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                              <div className="font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5 flex-wrap">
                                 <span>{c.name}</span>
+                                {c.role === 'team_leader' && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                    Team Leader
+                                  </span>
+                                )}
                                 {isOnline && (
                                   <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                                     LIVE
@@ -508,16 +386,20 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
                         {/* 4. Assigned Focus Institutions */}
                         <td className="py-3.5 px-4">
                           {c.assigned_colleges && c.assigned_colleges.length > 0 ? (
-                            <div className="flex flex-wrap gap-1 max-w-[200px]">
-                              {c.assigned_colleges.map((col: any, i: number) => (
-                                <span
-                                  key={i}
-                                  className="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-1.5 py-0.5 rounded text-[10px] font-mono border border-zinc-200 dark:border-zinc-700"
-                                  title={col.college_name || col.college_code}
-                                >
-                                  {col.college_code || col.college_name}
-                                </span>
-                              ))}
+                            <div className="flex flex-wrap gap-1 max-w-[220px]">
+                              {c.assigned_colleges.map((col: any, i: number) => {
+                                const isKprEmailOnly = (col.college_code === 'KPR' || col.college_name?.includes('KPR')) && (c.email === 'sujitha_s@infoziant.com' || c.username === 'sujitha');
+                                return (
+                                  <span
+                                    key={i}
+                                    className="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 px-1.5 py-0.5 rounded text-[10px] font-mono border border-zinc-200 dark:border-zinc-700"
+                                    title={isKprEmailOnly ? `${col.college_name || col.college_code} (Emails Alone)` : (col.college_name || col.college_code)}
+                                  >
+                                    {col.college_code || col.college_name}
+                                    {isKprEmailOnly && <span className="text-[9px] text-zinc-400 font-sans ml-0.5">(emails)</span>}
+                                  </span>
+                                );
+                              })}
                             </div>
                           ) : (
                             <span className="text-zinc-400 text-[11px] italic">All Colleges</span>
