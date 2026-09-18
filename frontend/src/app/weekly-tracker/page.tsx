@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalendarDays } from 'lucide-react';
 import { WeeklyHeader } from './components/WeeklyHeader';
@@ -9,12 +9,13 @@ import { WeeklySection } from './components/WeeklySection';
 import { AddCompanyModal } from './components/AddCompanyModal';
 import { BulkMoveModal } from './components/BulkMoveModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
+import { CollegeDossierModal } from '@/components/college/CollegeDossierModal';
 import type { WeeklyRow } from './components/WeeklyTable';
 import { apiFetch, apiFetchBlob } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
 import { useToast } from '@/components/ui/Toast';
 import { triggerHaptic } from '@/lib/haptics';
-import { getActiveCollege, resolveDefaultCollege } from '@/lib/collegeSession';
+import { resolveDefaultCollege } from '@/lib/collegeSession';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 
 interface SectionData {
@@ -84,12 +85,13 @@ function normalizeAllSections(raw: any): SectionsResponse {
 export default function WeeklyTrackerPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const [selectedCollegeId, setSelectedCollegeId] = useState<string>(() => {
-    return getActiveCollege().id || '';
-  });
-  const [selectedCollegeName, setSelectedCollegeName] = useState<string>(() => {
-    return getActiveCollege().name || '';
-  });
+  // Deliberately NOT lazy-initialized from getActiveCollege()/localStorage: that
+  // value differs between the server's render (no localStorage) and the
+  // browser's first render (localStorage already available), which is exactly
+  // what triggers a React hydration mismatch. Starting empty on both sides and
+  // filling in via the effect below keeps server and client markup identical.
+  const [selectedCollegeId, setSelectedCollegeId] = useState<string>('');
+  const [selectedCollegeName, setSelectedCollegeName] = useState<string>('');
   const [academicYear, setAcademicYear] = useState<string>('all');
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [sections, setSections] = useState<SectionsResponse | null>(null);
@@ -118,6 +120,7 @@ export default function WeeklyTrackerPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
   const [isDeleteConfirmModalOpen, setIsDeleteConfirmModalOpen] = useState(false);
+  const [isDossierOpen, setIsDossierOpen] = useState(false);
 
   const handleToggleSelectRow = (rowId: string) => {
     setSelectedRowIds((prev) =>
@@ -1020,6 +1023,51 @@ export default function WeeklyTrackerPage() {
     return activeSectionFilter === key;
   };
 
+  // ── Dynamically compute live KPI counts from active sections state ──
+  // Guarantees all counts (including Pipeline, Completed, Drives, etc.) are 100% reactive to row updates, moves, and deletions
+  const dynamicKpi: WeeklyKpiData = useMemo(() => {
+    const completedRows = sections?.completed?.rows || [];
+    const totalOffers = completedRows.reduce((sum: number, r: any) => sum + (Number(r.selected_count) || 0), 0);
+
+    const completed = sections?.completed?.rows?.length ?? kpi?.completed ?? 0;
+    const drive_in_progress = sections?.drive_in_progress?.rows?.length ?? kpi?.drive_in_progress ?? 0;
+    const upcoming_drives = (
+      sections?.in_drive?.rows?.length ??
+      sections?.upcoming_drives?.rows?.length ??
+      sections?.companies_in_drive?.rows?.length ??
+      kpi?.upcoming_drives ??
+      kpi?.in_drive ??
+      0
+    );
+    const in_progress = sections?.in_progress?.rows?.length ?? kpi?.in_progress ?? 0;
+    const pipeline = (
+      sections?.pipeline?.rows?.length ??
+      (sections as any)?.companies_in_pipeline?.rows?.length ??
+      kpi?.pipeline ??
+      0
+    );
+    const top_companies = sections?.top_companies?.rows?.length ?? kpi?.top_companies ?? 0;
+    const rejected = (
+      (sections?.rejected_companies?.rows?.length ?? 0) +
+      (sections?.on_hold_by_college?.rows?.length ?? 0) +
+      (sections?.rejected_by_hr?.rows?.length ?? 0) +
+      (sections?.rejected_by_college?.rows?.length ?? 0)
+    ) || (kpi?.rejected ?? 0);
+
+    return {
+      completed,
+      drive_in_progress,
+      upcoming_drives,
+      in_drive: upcoming_drives,
+      in_progress,
+      pipeline,
+      top_companies,
+      rejected,
+      total_offers: totalOffers || (kpi?.total_offers ?? 0),
+      follow_ups_due_today: kpi?.follow_ups_due_today ?? 0,
+    };
+  }, [sections, kpi]);
+
   return (
     <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-primary-foreground">
 
@@ -1038,6 +1086,7 @@ export default function WeeklyTrackerPage() {
         onAcademicYearChange={setAcademicYear}
         onOpenAddModal={() => setIsAddModalOpen(true)}
         onSyncDailyPositives={handleSyncDailyPositives}
+        isSyncing={isSyncing}
         onSaveProgress={handleSaveAll}
         onExportXlsx={handleExportXlsx}
         onExportPdf={handleOpenPdfModal}
@@ -1057,13 +1106,14 @@ export default function WeeklyTrackerPage() {
         canRedo={canRedo}
         onUndo={undo}
         onRedo={redo}
+        onOpenCollegeDossier={() => setIsDossierOpen(true)}
       />
 
       {/* ── KPI Cards (Slim Single-Row Profile) ──────────────────────────── */}
-      {selectedCollegeId && kpi && (
+      {selectedCollegeId && (
         <div className="px-6 py-2">
           <WeeklyKpiCards
-            kpi={kpi}
+            kpi={dynamicKpi}
             activeSectionFilter={activeSectionFilter}
             onFilterSection={setActiveSectionFilter}
           />
@@ -1321,6 +1371,15 @@ export default function WeeklyTrackerPage() {
         onClose={() => setIsDeleteConfirmModalOpen(false)}
         onConfirm={handleConfirmBulkDelete}
       />
+
+      {/* ── College Profile / Placement Officer Dossier Modal ──────────── */}
+      {selectedCollegeId && (
+        <CollegeDossierModal
+          isOpen={isDossierOpen}
+          onClose={() => setIsDossierOpen(false)}
+          collegeId={selectedCollegeId}
+        />
+      )}
 
     </div>
   );

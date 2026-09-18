@@ -94,7 +94,7 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
       {/* Themed Modal Card */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-2xl bg-surface border border-border shadow-2xl overflow-hidden flex flex-col text-fg cursor-default"
+        className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] overflow-hidden flex flex-col text-fg cursor-default"
       >
 
         {/* ── Modern Header ─────────────────────────────────────────── */}

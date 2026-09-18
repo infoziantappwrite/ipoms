@@ -535,7 +535,7 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
                 <Info size={13} /> Administrator Security & Recovery Note
               </div>
               <p>
-                As an Administrator, you can update your password whenever required. If you ever forget your password, you can verify via 6-digit OTP dispatched directly to your official Outlook address (<code className="font-mono text-fg font-bold">{effectiveEmail}</code>).
+                As an Administrator, you can update your password whenever required. Email OTP recovery is deliberately <strong>not available</strong> for Administrator accounts — this prevents a compromised inbox from being used to take over the account. If you ever forget your password, a server administrator must reset it directly.
               </p>
             </div>
 

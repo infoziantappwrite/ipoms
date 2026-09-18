@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 
 import { getApiBase } from '@/lib/api';
+import { triggerHaptic } from '@/lib/haptics';
 
 const API = getApiBase();
 
@@ -93,11 +94,14 @@ export function NotificationBellDropdown({ userId = '6a84719afa3bf51271bc1548' }
       {/* Bell Icon Button */}
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-slate-200/80 bg-white/90 hover:bg-white text-slate-700 hover:text-slate-900 transition-all shadow-2xs active:scale-[0.992] cursor-pointer flex items-center justify-center relative"
+        onClick={() => {
+          triggerHaptic('light');
+          setIsOpen(!isOpen);
+        }}
+        className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl border border-border bg-surface hover:bg-surface-raised text-fg transition-all duration-150 shadow-2xs active:scale-[0.992] cursor-pointer flex items-center justify-center relative select-none"
         title="Notifications & Alerts"
       >
-        <Bell size={17} strokeWidth={2} aria-hidden className="text-slate-700" />
+        <Bell size={17} strokeWidth={2} aria-hidden className="text-fg" />
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
             {unreadCount > 99 ? '99+' : unreadCount}
@@ -107,9 +111,9 @@ export function NotificationBellDropdown({ userId = '6a84719afa3bf51271bc1548' }
 
       {/* Top 100 Bell Dropdown Panel (Spec Section 5.2.8.5) */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-surface rounded-panel border border-border shadow-3 z-modal overflow-hidden">
+        <div className="absolute right-0 mt-1.5 w-80 sm:w-96 bg-white dark:bg-[#161D2E] rounded-xl border border-border-strong dark:border-slate-700 shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150 ease-out select-none">
           {/* Header */}
-          <div className="p-3.5 border-b border-border bg-background flex items-center justify-between">
+          <div className="p-3.5 border-b border-border/60 bg-slate-50 dark:bg-[#1A2234] flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-fg">Notifications</span>
               {unreadCount > 0 && (

@@ -425,7 +425,7 @@ export function WeeklyTable({
               style={{ left: roleLeft }}
               className="sticky z-30 bg-[#F1F5F9] dark:bg-[#0D111C] py-2.5 px-3 w-[160px] min-w-[160px] max-w-[160px] border-b border-border"
             >
-              Role <span className="text-rose-500 font-bold">*</span>
+              Role
             </th>
 
             {/* Frozen 4: CTC (Last Frozen Column with solid border & shadow) */}
@@ -433,7 +433,7 @@ export function WeeklyTable({
               style={{ left: ctcLeft }}
               className="sticky z-30 bg-[#F1F5F9] dark:bg-[#0D111C] py-2.5 px-3 w-[95px] min-w-[95px] max-w-[95px] border-b border-border border-r-2 border-border/80 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)] dark:shadow-[4px_0_10px_-2px_rgba(0,0,0,0.45)]"
             >
-              CTC <span className="text-rose-500 font-bold">*</span>
+              CTC
             </th>
 
             {/* ── Scrollable Headers (Placed after CTC) ── */}
@@ -643,13 +643,11 @@ function TableRow({
 
   const commitEdit = (field: string) => {
     if (editingField === field) {
-      if (['company_name', 'job_role', 'ctc_lpa', 'current_status_text'].includes(field)) {
+      if (['company_name', 'current_status_text'].includes(field)) {
         const strVal = String(tempValue ?? '').trim();
         if (!strVal) {
           const fieldLabels: Record<string, string> = {
             company_name: 'Company Name',
-            job_role: 'Role',
-            ctc_lpa: 'CTC',
             current_status_text: 'Status',
           };
           alert(`${fieldLabels[field] || field} is mandatory and cannot be empty.`);
@@ -819,14 +817,18 @@ function TableRow({
             onClick={() => startEdit('job_role', row.job_role)}
             className="cursor-pointer hover:text-primary transition-colors flex flex-wrap gap-1"
           >
-            {row.job_role.split(',').map((r, i) => (
-              <span
-                key={i}
-                className="bg-surface-sunken border border-border text-fg-muted px-1.5 py-0.5 rounded text-micro truncate max-w-[150px]"
-              >
-                {r.trim()}
-              </span>
-            ))}
+            {row.job_role && row.job_role.trim() ? (
+              row.job_role.split(',').map((r, i) => (
+                <span
+                  key={i}
+                  className="bg-surface-sunken border border-border text-fg-muted px-1.5 py-0.5 rounded text-micro truncate max-w-[150px]"
+                >
+                  {r.trim()}
+                </span>
+              ))
+            ) : (
+              <span className="text-fg-disabled italic">—</span>
+            )}
           </div>
         )}
       </td>

@@ -225,6 +225,26 @@ const HIGHLIGHT_PALETTES = [
   { label: 'Lavender', color: '#e9d5ff', border: '#d8b4fe', badge: 'Purple' },
 ];
 
+export const getDefaultGraduatingBatch = (): string => {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  if (currentYear <= 2026) {
+    return '2027';
+  }
+  return String(currentYear + 1);
+};
+
+export const getGraduatingBatchOptions = (includeAll: boolean = true) => {
+  const options: { value: string; label: string }[] = [];
+  if (includeAll) {
+    options.push({ value: 'all', label: 'All Batches' });
+  }
+  for (let y = 2027; y <= 2100; y++) {
+    options.push({ value: String(y), label: `${y} Batch` });
+  }
+  return options;
+};
+
 interface Props {
   initialTemplateType: string;
   initialCollegeId: string;
@@ -244,7 +264,12 @@ export function ReportBuilderWizard({
   const [collegeId, setCollegeId] = useState(
     initialCollegeId && initialCollegeId !== 'all' ? initialCollegeId : ''
   );
-  const [academicYear, setAcademicYear] = useState('all');
+  const [academicYear, setAcademicYear] = useState<string>(() => {
+    if (initialTemplateType === 'daily_positives' || initialTemplateType === 'daily_jd_received') {
+      return getDefaultGraduatingBatch();
+    }
+    return 'all';
+  });
   const [weeklyTargetMode, setWeeklyTargetMode] = useState<'single' | 'group'>('single');
   const [selectedGroupCollegeIds, setSelectedGroupCollegeIds] = useState<string[]>([]);
   const [groupSearchQuery, setGroupSearchQuery] = useState<string>('');
@@ -1078,7 +1103,6 @@ export function ReportBuilderWizard({
       });
       setStartDate('2026-08-01');
       setEndDate('2026-08-31');
-      setWeekLabel('August 2026');
       setCustomRemarks('Comprehensive monthly recruitment progress review covering conversions, scheduled drives, and placement selections.');
     } else if (newType === 'daily_positives') {
       setSections({
@@ -1086,12 +1110,18 @@ export function ReportBuilderWizard({
         remarks: false,
       });
       setCustomRemarks('Positives of the day tracked across partner institutions for prospective recruitment.');
+      if (academicYear === 'all' || !academicYear) {
+        setAcademicYear(getDefaultGraduatingBatch());
+      }
     } else if (newType === 'daily_jd_received') {
       setSections({
         kpi_summary: false,
         remarks: false,
       });
       setCustomRemarks('Formal Job Descriptions received today across corporate partners for campus placement drives.');
+      if (academicYear === 'all' || !academicYear) {
+        setAcademicYear(getDefaultGraduatingBatch());
+      }
     } else {
       setSections({
         kpi_summary: false,
@@ -1191,7 +1221,7 @@ export function ReportBuilderWizard({
           college_ids: isMultiWeekly ? selectedGroupCollegeIds : undefined,
           college_id: isMultiWeekly ? 'multi' : (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? 'all' : (templateType === 'active_leads' ? (collegeId || 'all') : collegeId),
           coordinator_id: coordinatorId || readSessionUser()?._id || readSessionUser()?.id || '',
-          academic_year: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? 'all' : academicYear,
+          academic_year: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? (academicYear && academicYear !== 'all' ? academicYear : getDefaultGraduatingBatch()) : academicYear,
           date: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? dailyReportDate : undefined,
           effective_date: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? dailyReportDate : undefined,
           lead_type: templateType === 'daily_positives' ? 'positive' : (templateType === 'daily_jd_received' ? 'jd_received' : undefined),
@@ -1499,12 +1529,12 @@ export function ReportBuilderWizard({
                 : templateType === 'pending_tasks'
                 ? 'Target Institution Scope'
                 : (templateType === 'daily_positives' || templateType === 'daily_jd_received')
-                ? 'Report Date'
+                ? 'Report Date & Graduating Batch'
                 : 'Institutional Scope & Batch'}
             </h2>
           </div>
 
-          <div className={`grid gap-4 ${(templateType === 'active_leads' || templateType === 'pending_tasks' || templateType === 'daily_positives' || templateType === 'daily_jd_received') ? 'grid-cols-1 max-w-md' : 'grid-cols-1 md:grid-cols-2'}`}>
+          <div className={`grid gap-4 ${(templateType === 'active_leads' || templateType === 'pending_tasks') ? 'grid-cols-1 max-w-md' : 'grid-cols-1 md:grid-cols-2'}`}>
             {/* Report Date Picker for Daily Reports */}
             {(templateType === 'daily_positives' || templateType === 'daily_jd_received') && (
               <div>
@@ -1724,38 +1754,29 @@ export function ReportBuilderWizard({
               </div>
             )}
 
-            {/* Graduating Academic Year / Batch (Hidden for Pending Tasks and Daily Reports) */}
-            {templateType !== 'pending_tasks' && templateType !== 'daily_positives' && templateType !== 'daily_jd_received' && (
+            {/* Graduating Academic Year / Batch (Rendered for all templates except Pending Tasks) */}
+            {templateType !== 'pending_tasks' && (
               <div>
                 <label className="block text-xs font-semibold text-fg mb-1.5">
                   Graduating Academic Batch
                 </label>
                 {(() => {
-                  const batchOptions = [
-                    { value: 'all', label: 'All Batches' },
-                    { value: '2026', label: '2026' },
-                    { value: '2027', label: '2027' },
-                    { value: '2028', label: '2028' },
-                    { value: '2029', label: '2029' },
-                    { value: '2030', label: '2030' },
-                    { value: '2031', label: '2031' },
-                    { value: '2032', label: '2032' },
-                    { value: '2033', label: '2033' },
-                    { value: '2034', label: '2034' },
-                    { value: '2035', label: '2035' },
-                  ];
+                  const isDaily = templateType === 'daily_positives' || templateType === 'daily_jd_received';
+                  const batchOptions = getGraduatingBatchOptions(!isDaily);
 
                   return (
                     <div>
                       <SmoothSelect
-                        value={academicYear || 'all'}
+                        value={academicYear || (isDaily ? getDefaultGraduatingBatch() : 'all')}
                         onChange={(val) => {
                           setAcademicYear(val);
                           setValidationErrors([]);
                         }}
-                        placeholder="All Batches"
+                        placeholder={isDaily ? getDefaultGraduatingBatch() : 'All Batches'}
                         icon={GraduationCap}
                         title="Graduating Academic Batch"
+                        searchable={true}
+                        searchPlaceholder="Search graduating batch (2027–2100)…"
                         options={batchOptions}
                       />
                     </div>
@@ -2513,7 +2534,6 @@ export function ReportBuilderWizard({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
               {getSectionsConfig().map((sec: any) => {
-                const Icon = sec.icon;
                 const isChecked = !!sections[sec.key];
                 const hasCompanies = Array.isArray(sec.companies) && sec.companies.length > 0;
                 const isKpi = !!sec.isKpiSection;
@@ -2542,9 +2562,8 @@ export function ReportBuilderWizard({
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-bold text-fg flex items-center gap-1.5 text-xs">
-                            <Icon size={14} className={isChecked ? 'text-primary' : 'text-fg-subtle'} />
-                            <span>{sec.label}</span>
+                          <span className="font-bold text-fg text-xs">
+                            {sec.label}
                           </span>
 
                           {isKpi && Array.isArray(sec.kpiList) ? (
@@ -2658,7 +2677,6 @@ export function ReportBuilderWizard({
                       setWeeklyMinCtc(isNaN(num) ? null : num);
                     }
                   }}
-                  icon={TrendingUp}
                   title="Filter by Minimum CTC"
                   placeholder="All CTC Packages"
                   searchable={true}
@@ -2700,18 +2718,19 @@ export function ReportBuilderWizard({
                   <Briefcase size={11} />
                   Company Type
                 </label>
-                <select
+                <SmoothSelect
                   value={weeklyCompanyType}
-                  onChange={(e) => setWeeklyCompanyType(e.target.value)}
-                  className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary rounded-lg px-3 py-2 text-xs text-fg outline-none font-medium cursor-pointer"
-                >
-                  <option value="all">All Company Types</option>
-                  <option value="software">Software / IT</option>
-                  <option value="core">Core Engineering</option>
-                  <option value="product">Product Development</option>
-                  <option value="banking">Banking / FinTech</option>
-                  <option value="consulting">Consulting / Analytics</option>
-                </select>
+                  onChange={setWeeklyCompanyType}
+                  options={[
+                    { value: 'all', label: 'All Company Types' },
+                    { value: 'software', label: 'Software / IT' },
+                    { value: 'core', label: 'Core Engineering' },
+                    { value: 'product', label: 'Product Development' },
+                    { value: 'banking', label: 'Banking / FinTech' },
+                    { value: 'consulting', label: 'Consulting / Analytics' },
+                  ]}
+                  className="w-full"
+                />
               </div>
             </div>
           </div>

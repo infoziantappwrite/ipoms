@@ -1,6 +1,7 @@
 // iPOMS Backend Server - August 2026 Segregation Active
 import express, { Request, Response, NextFunction } from 'express';
 import fs from 'fs';
+import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -50,6 +51,7 @@ import { authenticateJWT, authorizeRoles, AuthUserPayload } from './lib/authMidd
 import { authorizeRoute, scopeToSelf, isSupervisor, refuseForeignOwner, refuseRoleEscalation, assignableRoles, normalizeRole } from './lib/routePolicy';
 import { isPasswordValid, firstPasswordError } from './lib/passwordPolicy';
 import { sendForeignCollegeEditEmail } from './lib/mailer';
+import { syncCollegesFromExcel } from './scripts/syncCollegesFromSharepoint';
 
 dotenv.config();
 
@@ -289,6 +291,52 @@ app.get('/api/v1/health/daily-leads-diagnostics', authenticateJWT, authorizeRole
   } catch (err: any) {
     console.error('❌ [Diagnostics Error]:', err);
     return res.status(200).json({ success: false, error: err.stack || err.message });
+  }
+});
+
+// ── WT-8B: POST & GET /api/v1/weekly-tracker/sync-all-past
+// Runs full synchronization of all historical Daily Tracker positive leads across all colleges into Weekly Tracker
+app.all('/api/v1/weekly-tracker/sync-all-past', async (req: Request, res: Response) => {
+  try {
+    const { syncAllPastDailyToWeekly } = await import('./scripts/syncPastDailyToWeekly');
+    await syncAllPastDailyToWeekly();
+    return res.status(200).json({
+      success: true,
+      message: 'Successfully synchronized all past Daily Tracker positive leads into Weekly Tracker with default status "Invite sent, Awaiting JD".',
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to sync all past leads' },
+    });
+  }
+});
+
+// ── WT-8C: GET /api/v1/weekly-tracker/sync-inspection
+app.get('/api/v1/weekly-tracker/sync-inspection', async (req: Request, res: Response) => {
+  try {
+    const totalWeekly = await WeeklyTracker.countDocuments({ is_deleted: false });
+    const pipelineCount = await WeeklyTracker.countDocuments({ pipeline_section: 'pipeline', is_deleted: false });
+    const statusCounts = await WeeklyTracker.aggregate([
+      { $match: { is_deleted: false } },
+      { $group: { _id: '$current_status_text', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]);
+    const dailyPositiveCount = await DailyTracker.countDocuments({ outcome_status: 'invite_mail' });
+    const dailyPromotedCount = await DailyTracker.countDocuments({ outcome_status: 'invite_mail', is_promoted_to_weekly: true });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        totalWeekly,
+        pipelineCount,
+        dailyPositiveCount,
+        dailyPromotedCount,
+        topStatuses: statusCounts.slice(0, 10),
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -671,6 +719,150 @@ app.patch('/api/v1/colleges/:id/status', async (req: Request, res: Response) => 
     return res.status(500).json({
       success: false,
       error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to update college status' },
+    });
+  }
+});
+
+// ── GET /api/v1/colleges/:id ────────────────────────────────────────────────
+// Retrieve a single college with full placement dossier profile details
+app.get('/api/v1/colleges/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    let college: any = null;
+    if (Types.ObjectId.isValid(id)) {
+      college = await College.findById(id);
+    } else {
+      college = await College.findOne({
+        $or: [
+          { college_code: id.toUpperCase() },
+          { college_name: new RegExp(id, 'i') },
+        ],
+      });
+    }
+
+    if (!college) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'College not found' },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: { college },
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to retrieve college profile' },
+    });
+  }
+});
+
+// ── PATCH /api/v1/colleges/:id ───────────────────────────────────────────────
+// Update college profile, placement officer details & institutional highlights
+app.patch('/api/v1/colleges/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_ID', message: 'A valid college ObjectId is required' },
+      });
+    }
+
+    const allowedFields = [
+      'college_name',
+      'college_code',
+      'location',
+      'college_website',
+      'logo_url',
+      'tpo_name',
+      'tpo_email',
+      'tpo_contact_mobile',
+      'tpo_designation',
+      'tpo_alternate_mobile',
+      'tpo_alternate_email',
+      'departments',
+      'student_strength',
+      'nirf_ranking',
+      'highest_package_lpa',
+      'average_package_lpa',
+      'lowest_package_lpa',
+      'established_year',
+      'landmarks',
+      'address',
+      'map_location',
+      'accreditations',
+      'placement_notes',
+    ];
+
+    const updatePayload: Record<string, any> = {};
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        if (typeof req.body[field] === 'string') {
+          updatePayload[field] = req.body[field].trim();
+        } else {
+          updatePayload[field] = req.body[field];
+        }
+      }
+    });
+
+    const college = await College.findByIdAndUpdate(
+      id,
+      { $set: updatePayload },
+      { new: true, runValidators: true }
+    );
+
+    if (!college) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'College not found' },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `College profile for ${college.college_code} updated successfully`,
+      data: { college },
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to update college dossier' },
+    });
+  }
+});
+
+// ── POST /api/v1/colleges/sync-sharepoint ────────────────────────────────────
+// Lively synchronize college profiles and TPO contacts from SharePoint Excel
+app.post('/api/v1/colleges/sync-sharepoint', async (_req: Request, res: Response) => {
+  try {
+    const syncResult = await syncCollegesFromExcel();
+    const collegeCount = syncResult.totalColleges ?? syncResult.totalRows ?? (syncResult.updatedCount + syncResult.insertedCount);
+    return res.status(200).json({
+      success: true,
+      message: `Successfully synchronized ${collegeCount} partner colleges from Colleges and Coordinators Excel (${syncResult.updatedCount} updated, ${syncResult.insertedCount} added)`,
+      data: syncResult,
+    });
+  } catch (error: any) {
+    console.error('SharePoint sync error:', error);
+    try {
+      const localFile = path.resolve(__dirname, '../../Colleges_and_Coordinators.xlsx');
+      if (fs.existsSync(localFile)) {
+        const fallbackResult = await syncCollegesFromExcel(localFile);
+        const fallbackCount = fallbackResult.totalColleges ?? fallbackResult.totalRows ?? (fallbackResult.updatedCount + fallbackResult.insertedCount);
+        return res.status(200).json({
+          success: true,
+          message: `Synchronized ${fallbackCount} partner colleges from Colleges and Coordinators Excel`,
+          data: fallbackResult,
+        });
+      }
+    } catch (fallbackErr: any) {}
+
+    return res.status(500).json({
+      success: false,
+      error: { code: 'SYNC_ERROR', message: error.message || 'Failed to sync colleges from SharePoint' },
     });
   }
 });
@@ -1626,49 +1818,6 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
         college_id: row.college_id,
         daily_tracker_id: row._id,
       }).catch((e) => console.error('Auto-lead sync error:', e));
-
-      // Auto-sync into Weekly Tracker (Companies in Pipeline) — Invite Mail only
-      // (narrowed 6 Sep 2026, see PIPELINE_SYNC_OUTCOME in DailyTracker.ts; this
-      // inline live-save path had been missed by that change and was still
-      // firing on the old 5-outcome list until corrected here).
-      if (row.outcome_status === PIPELINE_SYNC_OUTCOME) {
-        (async () => {
-          try {
-            const { startFriday, endThursday, weekNumber } = getFridayWeekBounds(row.session_date || new Date());
-            const existingWeekly = await WeeklyTracker.findOne({
-              college_id: row.college_id,
-              company_name: { $regex: `^${row.company_name.trim()}$`, $options: 'i' },
-              is_deleted: false,
-            });
-
-            if (!existingWeekly) {
-              const year = await getCurrentAcademicYear();
-              const batchYear = await getCurrentGraduatingBatchYear();
-              await WeeklyTracker.create({
-                academic_year: year,
-                college_id: row.college_id,
-                coordinator_id: row.coordinator_id,
-                company_id: row.company_id,
-                daily_tracker_id: row._id,
-                company_name: row.company_name,
-                job_role: 'Graduate Trainee',
-                cdc_reference: '',
-                company_type: 'Software / IT',
-                ctc_lpa: '',
-                eligible_batch: `${batchYear} Batch`,
-                pipeline_section: 'pipeline',
-                current_status_text: row.comments || `Invite email sent (${(row.outcome_status || 'positive').replace(/_/g, ' ')})`,
-                follow_up_date: row.follow_up_date || null,
-                week_number: weekNumber,
-                week_start_date: startFriday,
-                week_end_date: endThursday,
-              });
-            }
-          } catch (e) {
-            console.error('Auto-sync to WeeklyTracker error:', e);
-          }
-        })();
-      }
     }
 
     return res.status(200).json({
@@ -3529,88 +3678,11 @@ app.get('/api/v1/weekly-tracker/kpi', async (req: Request, res: Response) => {
       });
     }
 
-    const year = Number(academic_year) || (await getCurrentAcademicYear());
-    const baseFilter = {
-      college_id: new Types.ObjectId(String(college_id)),
-      academic_year: year,
-      is_deleted: false,
-    };
-
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
-
-    const [
-      pipelineCount,
-      inProgressCount,
-      completedRows,
-      topCount,
-      rejectedHrCount,
-      rejectedCollegeCount,
-      followUpsDueCount,
-    ] = await Promise.all([
-      WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: 'pipeline' }),
-      WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: 'in_progress' }),
-      WeeklyTracker.find({ ...baseFilter, pipeline_section: 'completed' }).select('selected_count'),
-      WeeklyTracker.countDocuments({ ...baseFilter, $or: [{ pipeline_section: 'top_companies' }, { is_pinned_top: true }] }),
-      WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: 'rejected_by_hr' }),
-      WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: 'rejected_by_college' }),
-      WeeklyTracker.countDocuments({
-        ...baseFilter,
-        follow_up_date: { $ne: null, $lte: todayEnd },
-        pipeline_section: { $nin: ['completed', 'rejected_by_hr', 'rejected_by_college'] },
-      }),
-    ]);
-
-    const totalOffers = completedRows.reduce((sum, r) => sum + (r.selected_count || 0), 0);
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        kpi: {
-          pipeline: pipelineCount,
-          in_progress: inProgressCount,
-          completed: completedRows.length,
-          total_offers: totalOffers,
-          top_companies: topCount,
-          follow_ups_due_today: followUpsDueCount,
-          rejected: rejectedHrCount + rejectedCollegeCount,
-        },
-      },
-    });
-  } catch (error: any) {
-    return res.status(500).json({
-      success: false,
-      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to fetch weekly KPI' },
-    });
-  }
-});
-
-// ── WT-8: POST /api/v1/weekly-tracker/sync-daily-positives
-// Ingest un-promoted positive outcome rows from Daily Tracker into Weekly Tracker Pipeline (Companies in Pipeline)
-app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res: Response) => {
-  try {
-    const { college_id, coordinator_id, academic_year } = req.body;
-
-    if (!college_id) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'college_id is required' },
-      });
-    }
-
-    // Was || 2027 - the frontend's academicYear default was frozen at '2027' (dead
-    // UI plumbing, no control ever changed it) while every real row is 2026, matching
-    // system_settings' "2025-2026" season. Rows created here now stay consistent with
-    // the rest of the dataset instead of silently drifting onto their own year.
-    // Falls through to the live Settings -> System Config -> Academic Year value
-    // (see getCurrentAcademicYear()) rather than a hardcoded literal, so an
-    // Administrator's season change takes effect here immediately.
-    const targetYear = Number(academic_year) || (await getCurrentAcademicYear());
-    const { startFriday, endThursday, weekNumber } = getFridayWeekBounds();
-
-    // Resolve all matching college IDs (aliases/codes) so college references are consistent
     const queryCollegeIds: any[] = [];
-    if (Types.ObjectId.isValid(String(college_id))) {
+    if (college_id === 'all') {
+      const allCols = await College.find({ is_active: { $ne: false } });
+      allCols.forEach((ac) => queryCollegeIds.push(ac._id));
+    } else if (Types.ObjectId.isValid(String(college_id))) {
       queryCollegeIds.push(new Types.ObjectId(String(college_id)));
       const targetCol = await College.findById(college_id);
       if (targetCol) {
@@ -3636,16 +3708,105 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
       foundCols.forEach((fc) => queryCollegeIds.push(fc._id));
     }
 
-    // Daily Tracker filter: Invite Mail is the sole trigger for a Companies-in-Pipeline
-    // row (user decision, 6 Sep 2026 — narrowed from the old jd_received/hiring/
-    // invite_mail/drive_completed set). See PIPELINE_SYNC_OUTCOME in DailyTracker.ts.
-    const dailyFilter: any = {
+    const baseFilter: any = {
       college_id: { $in: queryCollegeIds },
-      outcome_status: PIPELINE_SYNC_OUTCOME,
+      is_deleted: false,
     };
+    if (academic_year && academic_year !== 'all') {
+      baseFilter.academic_year = Number(academic_year) || (await getCurrentAcademicYear());
+    }
 
-    if (coordinator_id && Types.ObjectId.isValid(String(coordinator_id))) {
-      dailyFilter.coordinator_id = new Types.ObjectId(String(coordinator_id));
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const [
+      completedRows,
+      driveInProgressCount,
+      upcomingDrivesCount,
+      inProgressCount,
+      pipelineCount,
+      topCount,
+      rejectedCount,
+      followUpsDueCount,
+    ] = await Promise.all([
+      WeeklyTracker.find({ ...baseFilter, pipeline_section: 'completed' }).select('selected_count'),
+      WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: 'drive_in_progress' }),
+      WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: { $in: ['in_drive', 'companies_in_drive', 'upcoming_drives'] } }),
+      WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: 'in_progress' }),
+      WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: { $in: ['pipeline', 'companies_in_pipeline'] } }),
+      WeeklyTracker.countDocuments({ ...baseFilter, $or: [{ pipeline_section: 'top_companies' }, { is_pinned_top: true }] }),
+      WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: { $in: ['rejected_companies', 'rejected_by_hr', 'rejected_by_college', 'on_hold_by_college', 'on_hold_by_hr'] } }),
+      WeeklyTracker.countDocuments({
+        ...baseFilter,
+        follow_up_date: { $ne: null, $lte: todayEnd },
+        pipeline_section: { $nin: ['completed', 'rejected_companies', 'rejected_by_hr', 'rejected_by_college', 'on_hold_by_college', 'on_hold_by_hr'] },
+      }),
+    ]);
+
+    const totalOffers = completedRows.reduce((sum, r) => sum + (r.selected_count || 0), 0);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        kpi: {
+          completed: completedRows.length,
+          drive_in_progress: driveInProgressCount,
+          upcoming_drives: upcomingDrivesCount,
+          in_drive: upcomingDrivesCount,
+          in_progress: inProgressCount,
+          pipeline: pipelineCount,
+          top_companies: topCount,
+          rejected: rejectedCount,
+          total_offers: totalOffers,
+          follow_ups_due_today: followUpsDueCount,
+        },
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to fetch weekly KPI' },
+    });
+  }
+});
+
+// ── WT-8: POST /api/v1/weekly-tracker/sync-daily-positives
+// Ingest positive leads from Daily Leads (Positives section) into Weekly Tracker Pipeline (Companies in Pipeline)
+app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res: Response) => {
+  try {
+    const { college_id, coordinator_id, academic_year } = req.body;
+    const targetYear = Number(academic_year) || (await getCurrentAcademicYear());
+    const { startFriday, endThursday, weekNumber } = getFridayWeekBounds();
+
+    // Resolve all matching college IDs (aliases/codes) so college references are consistent
+    const queryCollegeIds: any[] = [];
+    if (!college_id || college_id === 'all') {
+      const allCols = await College.find({ is_active: { $ne: false } });
+      allCols.forEach((ac) => queryCollegeIds.push(ac._id));
+    } else if (Types.ObjectId.isValid(String(college_id))) {
+      queryCollegeIds.push(new Types.ObjectId(String(college_id)));
+      const targetCol = await College.findById(college_id);
+      if (targetCol) {
+        const sameCodeCols = await College.find({
+          $or: [
+            { college_code: targetCol.college_code },
+            { college_name: targetCol.college_name },
+          ],
+        });
+        sameCodeCols.forEach((sc) => {
+          if (!queryCollegeIds.some((id) => String(id) === String(sc._id))) {
+            queryCollegeIds.push(sc._id);
+          }
+        });
+      }
+    } else {
+      const foundCols = await College.find({
+        $or: [
+          { college_code: String(college_id).toUpperCase() },
+          { college_name: new RegExp(String(college_id), 'i') },
+        ],
+      });
+      foundCols.forEach((fc) => queryCollegeIds.push(fc._id));
     }
 
     // Clean up any existing duplicate records in weekly_tracker for this college/year
@@ -3671,22 +3832,71 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
       await WeeklyTracker.deleteMany({ _id: { $in: dupIdsToDelete } });
     }
 
-    const positiveDailyRows = await DailyTracker.find(dailyFilter).sort({ session_date: 1, created_at: 1 });
+    // Daily Leads filter: Positive section leads for these college(s)
+    const dailyLeadFilter: any = {
+      college_id: { $in: queryCollegeIds },
+      lead_type: 'positive',
+      is_deleted: false,
+    };
+
+    if (coordinator_id && Types.ObjectId.isValid(String(coordinator_id))) {
+      dailyLeadFilter.coordinator_id = new Types.ObjectId(String(coordinator_id));
+    }
+
+    const positiveDailyLeads = await DailyLead.find(dailyLeadFilter).sort({ lead_date: 1, created_at: 1 });
     const batchYear = await getCurrentGraduatingBatchYear();
+
+    // Find the highest existing order_index in pipeline for sequential continuation
+    const maxPipelineRow = await WeeklyTracker.findOne({
+      college_id: { $in: queryCollegeIds },
+      academic_year: targetYear,
+      pipeline_section: 'pipeline',
+      is_deleted: false,
+    }).sort({ order_index: -1 });
+
+    let nextOrderIndex = maxPipelineRow && typeof maxPipelineRow.order_index === 'number'
+      ? maxPipelineRow.order_index + 1
+      : (await WeeklyTracker.countDocuments({
+          college_id: { $in: queryCollegeIds },
+          academic_year: targetYear,
+          pipeline_section: 'pipeline',
+          is_deleted: false,
+        }));
 
     let syncedCount = 0;
     const inBatchSyncedNames = new Set<string>(seenNames);
 
-    for (const dRow of positiveDailyRows) {
-      if (!dRow.company_name || !dRow.company_name.trim()) continue;
-      const trimmedName = dRow.company_name.trim();
+    for (const lead of positiveDailyLeads) {
+      if (!lead.company_name || !lead.company_name.trim()) continue;
+      const trimmedName = lead.company_name.trim();
       const normalizedKey = trimmedName.toLowerCase();
 
       // Already present in Weekly Tracker or already processed in this batch
       if (inBatchSyncedNames.has(normalizedKey)) {
-        if (!dRow.is_promoted_to_weekly) {
-          dRow.is_promoted_to_weekly = true;
-          await dRow.save();
+        // If existing record has empty role or CTC, but DailyLead now has them, backfill them
+        if (lead.job_role || lead.ctc) {
+          const safeRegex = new RegExp(`^${escapeRegex(trimmedName)}$`, 'i');
+          const existingRow = await WeeklyTracker.findOne({
+            college_id: { $in: queryCollegeIds },
+            academic_year: targetYear,
+            company_name: { $regex: safeRegex },
+            is_deleted: false,
+          });
+          if (existingRow) {
+            let updated = false;
+            if (!existingRow.job_role && lead.job_role) {
+              existingRow.job_role = lead.job_role.trim();
+              updated = true;
+            }
+            if (!existingRow.ctc_lpa && lead.ctc) {
+              existingRow.ctc_lpa = lead.ctc.trim();
+              updated = true;
+            }
+            if (updated) {
+              existingRow.updated_at = new Date();
+              await existingRow.save();
+            }
+          }
         }
         continue;
       }
@@ -3696,31 +3906,61 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
       const existing = await WeeklyTracker.findOne({
         college_id: { $in: queryCollegeIds },
         academic_year: targetYear,
-        $or: [
-          { daily_tracker_id: dRow._id },
-          { company_name: { $regex: safeRegex } },
-        ],
+        company_name: { $regex: safeRegex },
         is_deleted: false,
       });
 
       if (!existing) {
+        // Retrieve full metadata / daily tracker contacts if available
+        let metaContacts: { mobile_numbers?: string[]; email_ids?: string[]; company_type?: string } = {};
+        if (lead.company_id && Types.ObjectId.isValid(String(lead.company_id))) {
+          const meta = await CompanyMetadata.findById(lead.company_id).lean();
+          if (meta) {
+            metaContacts = {
+              mobile_numbers: meta.mobile_numbers,
+              email_ids: meta.email_ids,
+              company_type: meta.company_type || meta.industry_sector,
+            };
+          }
+        }
+
+        let dtContact: any = null;
+        if (lead.daily_tracker_id && Types.ObjectId.isValid(String(lead.daily_tracker_id))) {
+          dtContact = await DailyTracker.findById(lead.daily_tracker_id).lean();
+        }
+
+        const primaryMobile = dtContact?.mobile_number || (metaContacts.mobile_numbers && metaContacts.mobile_numbers[0]) || '';
+        const allMobiles = Array.from(new Set([
+          ...(dtContact?.mobile_number ? [dtContact.mobile_number] : []),
+          ...(metaContacts.mobile_numbers || []),
+        ].filter(Boolean)));
+
+        const primaryEmail = dtContact?.email_id || (metaContacts.email_ids && metaContacts.email_ids[0]) || '';
+        const allEmails = Array.from(new Set([
+          ...(dtContact?.email_id ? [dtContact.email_id] : []),
+          ...(metaContacts.email_ids || []),
+        ].filter(Boolean)));
+
         await WeeklyTracker.create({
           academic_year: targetYear,
-          college_id: dRow.college_id,
-          coordinator_id: dRow.coordinator_id || (coordinator_id ? new Types.ObjectId(String(coordinator_id)) : new Types.ObjectId()),
-          company_id: dRow.company_id || new Types.ObjectId(),
-          daily_tracker_id: dRow._id,
+          college_id: lead.college_id,
+          coordinator_id: lead.coordinator_id || (coordinator_id ? new Types.ObjectId(String(coordinator_id)) : new Types.ObjectId('6a847199fa3bf51271bc14eb')),
+          company_id: lead.company_id || new Types.ObjectId(),
+          daily_tracker_id: lead.daily_tracker_id || null,
           company_name: trimmedName,
-          job_role: 'Graduate Trainee',
-          cdc_reference: dRow.hr_name ? `${dRow.hr_name}${dRow.mobile_number ? ` (${dRow.mobile_number})` : ''}` : '',
-          company_type: 'Software / IT',
-          ctc_lpa: 'To be disclosed',
-          eligible_batch: `${batchYear} Batch`,
+          job_role: lead.job_role?.trim() || '',
+          contact_number: primaryMobile,
+          mobile_numbers: allMobiles,
+          email_id: primaryEmail,
+          email_ids: allEmails,
+          cdc_reference: dtContact?.hr_name ? `${dtContact.hr_name}${dtContact.mobile_number ? ` (${dtContact.mobile_number})` : ''}` : '',
+          company_type: metaContacts.company_type || 'Software / IT',
+          ctc_lpa: lead.ctc?.trim() || '',
+          eligible_batch: lead.eligible_batch?.trim() || `${batchYear} Batch`,
           pipeline_section: 'pipeline',
-          current_status_text: dRow.outcome_status === 'invite_mail'
-            ? 'Invite email sent'
-            : (dRow.outcome_status || 'positive').replace(/_/g, ' '),
-          follow_up_date: dRow.follow_up_date || null,
+          current_status_text: 'Invite sent, Awaiting JD',
+          follow_up_date: null,
+          order_index: nextOrderIndex++,
           week_number: weekNumber,
           week_start_date: startFriday,
           week_end_date: endThursday,
@@ -3731,19 +3971,29 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
         syncedCount++;
         inBatchSyncedNames.add(normalizedKey);
       }
-
-      // Mark daily row as promoted
-      if (!dRow.is_promoted_to_weekly) {
-        dRow.is_promoted_to_weekly = true;
-        await dRow.save();
-      }
     }
+
+    // Modernize any existing records with the legacy status text
+    await WeeklyTracker.updateMany(
+      {
+        college_id: { $in: queryCollegeIds },
+        academic_year: targetYear,
+        current_status_text: 'Invite mail shared awaiting JD',
+        is_deleted: false,
+      },
+      {
+        $set: {
+          current_status_text: 'Invite sent, Awaiting JD',
+          updated_at: new Date(),
+        },
+      }
+    );
 
     return res.status(200).json({
       success: true,
       message: syncedCount > 0
-        ? `${syncedCount} positive company lead(s) synced into Companies in Pipeline.`
-        : 'All positive daily tracker leads are already synchronized into Weekly Tracker.',
+        ? `${syncedCount} positive lead(s) from Daily Leads synced into Companies in Pipeline.`
+        : 'All positive leads from Daily Leads are already synchronized into Weekly Tracker.',
       data: { synced: syncedCount },
     });
   } catch (error: any) {
@@ -3986,7 +4236,7 @@ app.post('/api/v1/daily-leads', async (req: Request, res: Response) => {
     }
 
     const targetDate = lead_date ? parseDateParam(String(lead_date)) : getTodayDate();
-    const timeStr = event_time || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const timeStr = formatLeadUpperTime(event_time);
 
     let resolvedCompanyId = company_id;
     if (!resolvedCompanyId || !Types.ObjectId.isValid(String(resolvedCompanyId))) {
@@ -4003,7 +4253,7 @@ app.post('/api/v1/daily-leads', async (req: Request, res: Response) => {
       company_id: new Types.ObjectId(String(resolvedCompanyId)),
       daily_tracker_id: daily_tracker_id && Types.ObjectId.isValid(String(daily_tracker_id)) ? new Types.ObjectId(String(daily_tracker_id)) : null,
       company_name: company_name.trim(),
-      job_role: job_role?.trim() || 'Graduate Trainee',
+      job_role: job_role?.trim() || '',
       ctc: ctc?.trim() || '',
       eligible_batch: eligible_batch?.trim() || '2026 Batch',
       event_time: timeStr,
@@ -4027,6 +4277,42 @@ app.post('/api/v1/daily-leads', async (req: Request, res: Response) => {
     });
   }
 });
+
+// ── Helper: Format Time with Strict Uppercase AM/PM ──────────────────────────
+function formatLeadUpperTime(timeInput?: string | Date): string {
+  if (!timeInput) {
+    const d = new Date();
+    let hours = d.getHours();
+    const minutes = d.getMinutes();
+    const period = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    if (hours === 0) hours = 12;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`;
+  }
+  if (typeof timeInput === 'string') {
+    if (/(am|pm)/i.test(timeInput)) {
+      return timeInput.replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase()).trim();
+    }
+    const d = new Date(timeInput);
+    if (!isNaN(d.getTime())) {
+      let hours = d.getHours();
+      const minutes = d.getMinutes();
+      const period = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      if (hours === 0) hours = 12;
+      return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`;
+    }
+    return timeInput.trim();
+  }
+  const d = timeInput;
+  if (isNaN(d.getTime())) return '10:00 AM';
+  let hours = d.getHours();
+  const minutes = d.getMinutes();
+  const period = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  if (hours === 0) hours = 12;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`;
+}
 
 // ── DL-3: PATCH /api/v1/daily-leads/:id
 // Inline update of lead fields
@@ -4057,7 +4343,11 @@ app.patch('/api/v1/daily-leads/:id', async (req: Request, res: Response) => {
 
     allowedFields.forEach((f) => {
       if (patchData[f] !== undefined) {
-        (lead as any)[f] = patchData[f];
+        if (f === 'event_time' && patchData[f]) {
+          lead.event_time = formatLeadUpperTime(patchData[f]);
+        } else {
+          (lead as any)[f] = patchData[f];
+        }
       }
     });
 
@@ -4106,7 +4396,7 @@ app.post('/api/v1/daily-leads/:id/move-to-jd', async (req: Request, res: Respons
 
     lead.lead_type = 'jd_received';
     lead.is_moved_to_jd = true;
-    lead.event_time = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    lead.event_time = formatLeadUpperTime();
     await lead.save();
 
     const updated = await DailyLead.findById(lead._id)
@@ -4261,7 +4551,7 @@ app.get('/api/v1/daily-leads/daily-tracker-positives', async (req: Request, res:
 });
 
 // ── DL-8: POST /api/v1/daily-leads/sync-positives
-// Ingest positive calls and pipeline opportunities for the given date into Daily Leads
+// Ingest positive calls (invite_mail and jd_received) from Daily Tracker for the given date into Daily Leads
 app.post('/api/v1/daily-leads/sync-positives', async (req: Request, res: Response) => {
   try {
     const { date, college_id, coordinator_id } = req.body;
@@ -4271,17 +4561,18 @@ app.post('/api/v1/daily-leads/sync-positives', async (req: Request, res: Respons
 
     let syncedCount = 0;
 
-    // 1. Pull from DailyTracker calls for this date — Invite Mail is the sole
-    // trigger for the Positives tab; JD Received fills only when the outcome
-    // is genuinely jd_received for that company/college (user decision,
-    // 6 Sep 2026 — narrowed from also including hiring/drive_completed/
-    // in_connect/follow_up).
+    // Pull from DailyTracker calls for this date — Invite Mail is the sole
+    // trigger for the Positives tab; JD Received fills when outcome is jd_received.
+    // Daily Leads is a cross-college general overview, so when college_id is 'all' (or omitted),
+    // positive calls from all colleges for this date are pulled into Daily Leads.
     const dtFilter: any = {
       $or: [
         { session_date: { $gte: targetDate, $lt: nextDate } },
         { call_start_time: { $gte: targetDate, $lt: nextDate } },
+        { created_at: { $gte: targetDate, $lt: nextDate } },
       ],
       outcome_status: { $in: ['jd_received', PIPELINE_SYNC_OUTCOME] },
+      is_deleted: { $ne: true },
     };
     if (college_id && college_id !== 'all' && Types.ObjectId.isValid(String(college_id))) {
       dtFilter.college_id = new Types.ObjectId(String(college_id));
@@ -4295,21 +4586,21 @@ app.post('/api/v1/daily-leads/sync-positives', async (req: Request, res: Respons
       const escapedCompanyName = call.company_name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
       const existing = await DailyLead.findOne({
-        company_name: { $regex: `^${escapedCompanyName}$`, $options: 'i' },
-        lead_date: { $gte: targetDate, $lt: nextDate },
-        lead_type: leadType,
+        $or: [
+          { daily_tracker_id: call._id },
+          {
+            company_name: { $regex: `^${escapedCompanyName}$`, $options: 'i' },
+            college_id: call.college_id,
+            lead_date: { $gte: targetDate, $lt: nextDate },
+            lead_type: leadType,
+          },
+        ],
         is_deleted: false,
       });
 
       // Extract accurate call start time from Daily Tracker Time column
-      let callTime = '10:00 AM';
       const timeSource = call.call_start_time || call.created_at;
-      if (timeSource) {
-        const d = new Date(timeSource);
-        if (!isNaN(d.getTime())) {
-          callTime = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-        }
-      }
+      const callTime = formatLeadUpperTime(timeSource || '10:00 AM');
 
       if (!existing) {
         await DailyLead.create({
@@ -4319,9 +4610,9 @@ app.post('/api/v1/daily-leads/sync-positives', async (req: Request, res: Respons
           company_id: call.company_id || null,
           daily_tracker_id: call._id,
           company_name: call.company_name.trim(),
-          job_role: 'Graduate Trainee',
+          job_role: '',
           ctc: '',
-          eligible_batch: '2026 Batch',
+          eligible_batch: '2027',
           event_time: callTime,
           lead_date: targetDate,
           remarks: call.comments || `From Daily Tracker: ${(call.outcome_status || '').replace(/_/g, ' ')}`,
@@ -4331,73 +4622,11 @@ app.post('/api/v1/daily-leads/sync-positives', async (req: Request, res: Respons
       }
     }
 
-    // 2. Pull from WeeklyTracker pipeline items that have follow_up_date or drive_date or updated for this date
-    const wtFilter: any = {
-      is_deleted: false,
-      $or: [
-        { follow_up_date: { $gte: targetDate, $lt: nextDate } },
-        { drive_date: { $gte: targetDate, $lt: nextDate } },
-        { created_at: { $gte: targetDate, $lt: nextDate } },
-        { last_status_updated_at: { $gte: targetDate, $lt: nextDate } },
-      ],
-    };
-    if (college_id && college_id !== 'all' && Types.ObjectId.isValid(String(college_id))) {
-      wtFilter.college_id = new Types.ObjectId(String(college_id));
-    }
-
-    const pipelineRows = await WeeklyTracker.find(wtFilter);
-
-    for (const wt of pipelineRows) {
-      if (!wt.company_name || !wt.company_name.trim()) continue;
-      const escapedWtCompany = wt.company_name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const existing = await DailyLead.findOne({
-        company_name: { $regex: `^${escapedWtCompany}$`, $options: 'i' },
-        lead_date: { $gte: targetDate, $lt: nextDate },
-        lead_type: 'positive',
-        is_deleted: false,
-      });
-
-      let wtTime = '10:00 AM';
-      if (wt.daily_tracker_id) {
-        const dtRow = await DailyTracker.findById(wt.daily_tracker_id);
-        const timeRef = dtRow?.call_start_time || dtRow?.created_at;
-        if (timeRef) {
-          const d = new Date(timeRef);
-          if (!isNaN(d.getTime())) {
-            wtTime = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-          }
-        }
-      } else if (wt.created_at) {
-        const d = new Date(wt.created_at);
-        if (!isNaN(d.getTime())) {
-          wtTime = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-        }
-      }
-
-      if (!existing) {
-        await DailyLead.create({
-          lead_type: 'positive',
-          college_id: wt.college_id,
-          coordinator_id: wt.coordinator_id || (coordinator_id && Types.ObjectId.isValid(String(coordinator_id)) ? new Types.ObjectId(String(coordinator_id)) : new Types.ObjectId('6a847199fa3bf51271bc14eb')),
-          company_id: wt.company_id || null,
-          company_name: wt.company_name.trim(),
-          job_role: wt.job_role || 'Graduate Trainee',
-          ctc: wt.ctc_lpa || '',
-          eligible_batch: wt.eligible_batch || '2026 Batch',
-          event_time: wtTime,
-          lead_date: targetDate,
-          remarks: wt.current_status_text || `Pipeline: ${wt.pipeline_section.replace(/_/g, ' ')}`,
-          is_deleted: false,
-        });
-        syncedCount++;
-      }
-    }
-
     return res.status(200).json({
       success: true,
       message: syncedCount > 0
-        ? `Successfully synced ${syncedCount} positive lead(s) for ${date || 'today'}`
-        : `All positive pipeline leads for ${date || 'today'} are already up to date`,
+        ? `Successfully synced ${syncedCount} positive lead(s) from Daily Tracker for ${date || 'today'}`
+        : `All positive leads from Daily Tracker for ${date || 'today'} are already up to date`,
       data: {
         synced_count: syncedCount,
         date: targetDate,
@@ -4437,10 +4666,10 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req: Request, res: Response) =
         });
       }
 
-      const roleToUse = job_role || sourceLead?.job_role || 'Graduate Trainee';
+      const roleToUse = job_role || sourceLead?.job_role || '';
       const ctcToUse = ctc !== undefined ? ctc : (sourceLead?.ctc || '');
       const batchToUse = eligible_batch || sourceLead?.eligible_batch || '2026 Batch';
-      const timeToUse = event_time || sourceLead?.event_time || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const timeToUse = formatLeadUpperTime(event_time || sourceLead?.event_time);
 
       const validCollegeIds = college_ids
         .filter((id: string) => Types.ObjectId.isValid(id))
@@ -4526,10 +4755,10 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req: Request, res: Response) =
           company_id: lead.company_id,
           daily_tracker_id: lead.daily_tracker_id,
           company_name: lead.company_name,
-          job_role: lead.job_role || 'Graduate Trainee',
+          job_role: lead.job_role || '',
           ctc: lead.ctc || '',
           eligible_batch: lead.eligible_batch || '2026 Batch',
-          event_time: lead.event_time || new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+          event_time: formatLeadUpperTime(lead.event_time),
           lead_date: lead.lead_date || targetDate,
           remarks: lead.remarks || 'Copied from Positives',
           is_jd_received: true,
@@ -4808,7 +5037,7 @@ app.get('/api/v1/reports/templates', (req: Request, res: Response) => {
     },
     {
       id: 'daily_positives',
-      title: 'Positives of the Day',
+      title: 'POSITIVES OF THE DAY',
       audience: 'Placement Team & Institutional Stakeholders',
       icon: '✨',
       description: 'Daily operational report tracking positive employer responses, salary packages, roles, batch eligibility, and discussion notes for the day.',
@@ -5667,6 +5896,14 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
           .sort({ lead_date: -1, createdAt: -1 })
           .populate('coordinator_id', 'full_name official_email username');
 
+        if (rawLeads.length === 0 && academic_year && academic_year !== 'all') {
+          const fallbackQuery = { ...query };
+          delete fallbackQuery.eligible_batch;
+          rawLeads = await DailyLead.find(fallbackQuery)
+            .sort({ lead_date: -1, createdAt: -1 })
+            .populate('coordinator_id', 'full_name official_email username');
+        }
+
         if (rawLeads.length === 0 && targetDateStr === 'all') {
           rawLeads = await DailyLead.find({ lead_type: 'positive', is_deleted: false })
             .sort({ lead_date: -1, createdAt: -1 })
@@ -5718,7 +5955,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
 
       const reportDocument = {
         template_type: 'daily_positives',
-        report_title: 'Positives of the Day',
+        report_title: 'POSITIVES OF THE DAY',
         report_period: targetDateStr === 'all' ? 'All Dates' : formattedFullDate,
         day_date: targetDateStr === 'all' ? 'Consolidated' : formattedDayLabel,
         include_prepared_by: false,
@@ -5871,6 +6108,14 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
           .sort({ lead_date: -1, createdAt: -1 })
           .populate('coordinator_id', 'full_name official_email username');
 
+        if (rawLeads.length === 0 && academic_year && academic_year !== 'all') {
+          const fallbackQuery = { ...query };
+          delete fallbackQuery.eligible_batch;
+          rawLeads = await DailyLead.find(fallbackQuery)
+            .sort({ lead_date: -1, createdAt: -1 })
+            .populate('coordinator_id', 'full_name official_email username');
+        }
+
         if (rawLeads.length === 0 && targetDateStr === 'all') {
           rawLeads = await DailyLead.find({ lead_type: 'jd_received', is_deleted: false })
             .sort({ lead_date: -1, createdAt: -1 })
@@ -5922,7 +6167,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
 
       const reportDocument = {
         template_type: 'daily_jd_received',
-        report_title: 'JD Received for the Day',
+        report_title: 'JD RECEIVED FOR THE DAY',
         report_period: targetDateStr === 'all' ? 'All Dates' : formattedFullDate,
         day_date: targetDateStr === 'all' ? 'Consolidated' : formattedDayLabel,
         include_prepared_by: false,

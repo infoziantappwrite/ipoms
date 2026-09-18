@@ -169,6 +169,7 @@ const POLICIES: Policy[] = [
   { method: 'PATCH',  pattern: new RegExp(`^/users/${ID}/unlock-profile/?$`), roles: TL_ADMIN },
   { method: 'DELETE', pattern: new RegExp(`^/users/${ID}/?$`),           roles: ADMIN },
   { method: 'PATCH',  pattern: new RegExp(`^/users/${ID}/?$`),           roles: TL_ADMIN },
+  { method: 'POST',   pattern: /^\/users\/heartbeat\/?$/,                roles: STAFF },
   { method: 'POST',   pattern: /^\/users\/?$/,                           roles: TL_ADMIN },
   // Coordinators must not enumerate other coordinators (Module 08 §18).
   { method: 'GET',    pattern: /^\/users\/?$/,                           roles: TL_ADMIN },

@@ -6,6 +6,7 @@ import type { TrackerRow as TrackerRowType } from '../page';
 import { ClipboardList, Copy, Check, CheckSquare } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 import { triggerHaptic } from '@/lib/haptics';
+import { formatTime } from '@/lib/timeValidation';
 
 interface Props {
   rows: TrackerRowType[];
@@ -243,17 +244,10 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
       drive_completed: 'Drive Completed',
     };
 
-    const formatTimeVal = (d?: string | Date) => {
-      if (!d) return '';
-      const date = typeof d === 'string' ? new Date(d) : d;
-      if (isNaN(date.getTime())) return '';
-      return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-    };
-
     const dataRows = targetRows.map((r, i) => {
       const sNo = (r.serial_no || i + 1).toString();
-      const startTime = formatTimeVal(r.call_start_time);
-      const endTime = formatTimeVal(r.call_end_time);
+      const startTime = formatTime(r.call_start_time);
+      const endTime = formatTime(r.call_end_time);
       const duration = r.duration_formatted || '';
       const company = (r.company_name || '').replace(/[\t\n\r]+/g, ' ').trim();
       const hr = (r.hr_name || '').replace(/[\t\n\r]+/g, ' ').trim();
@@ -323,17 +317,10 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
       drive_completed: 'Drive Completed',
     };
 
-    const formatTimeVal = (d?: string | Date) => {
-      if (!d) return '';
-      const date = typeof d === 'string' ? new Date(d) : d;
-      if (isNaN(date.getTime())) return '';
-      return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-    };
-
     const dataRows = rows.map((r, i) => {
       const sNo = (r.serial_no || i + 1).toString();
-      const startTime = formatTimeVal(r.call_start_time);
-      const endTime = formatTimeVal(r.call_end_time);
+      const startTime = formatTime(r.call_start_time);
+      const endTime = formatTime(r.call_end_time);
       const duration = r.duration_formatted || '';
       const company = (r.company_name || '').replace(/[\t\n\r]+/g, ' ').trim();
       const hr = (r.hr_name || '').replace(/[\t\n\r]+/g, ' ').trim();

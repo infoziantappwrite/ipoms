@@ -220,7 +220,7 @@ export function SmoothCalendar({
   return (
     <div
       role="dialog"
-      className={`select-none bg-surface rounded-2xl p-3.5 shadow-lg border border-border w-[260px] font-sans ${className}`}
+      className={`select-none bg-white dark:bg-[#161D2E] rounded-2xl p-3.5 shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] border border-border-strong dark:border-slate-700 w-[260px] font-sans ${className}`}
     >
       {/* ── Compact Header: Month Year + Arrows ── */}
       <div className="flex items-center justify-between mb-2.5 px-0.5">

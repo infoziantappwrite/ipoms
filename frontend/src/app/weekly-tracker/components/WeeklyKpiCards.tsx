@@ -26,7 +26,7 @@ export function WeeklyKpiCards({ kpi, activeSectionFilter, onFilterSection }: Pr
     {
       key: 'completed',
       label: 'Completed',
-      value: kpi.completed,
+      value: kpi.completed ?? 0,
       textColor: 'text-emerald-700 dark:text-emerald-400',
       bgLight: 'bg-emerald-50 dark:bg-emerald-950/60',
       borderCol: 'border-emerald-200/80 dark:border-emerald-900/50 hover:border-emerald-300',
@@ -56,7 +56,7 @@ export function WeeklyKpiCards({ kpi, activeSectionFilter, onFilterSection }: Pr
     {
       key: 'in_progress',
       label: 'In Progress',
-      value: kpi.in_progress,
+      value: kpi.in_progress ?? 0,
       textColor: 'text-blue-700 dark:text-blue-400',
       bgLight: 'bg-blue-50 dark:bg-blue-950/60',
       borderCol: 'border-blue-200/80 dark:border-blue-900/50 hover:border-blue-300',
@@ -66,7 +66,7 @@ export function WeeklyKpiCards({ kpi, activeSectionFilter, onFilterSection }: Pr
     {
       key: 'pipeline',
       label: 'Pipeline',
-      value: kpi.pipeline,
+      value: kpi.pipeline ?? 0,
       textColor: 'text-cyan-700 dark:text-cyan-400',
       bgLight: 'bg-cyan-50 dark:bg-cyan-950/60',
       borderCol: 'border-cyan-200/80 dark:border-cyan-900/50 hover:border-cyan-300',
@@ -76,7 +76,7 @@ export function WeeklyKpiCards({ kpi, activeSectionFilter, onFilterSection }: Pr
     {
       key: 'top_companies',
       label: 'Top Companies',
-      value: kpi.top_companies,
+      value: kpi.top_companies ?? 0,
       textColor: 'text-purple-700 dark:text-purple-400',
       bgLight: 'bg-purple-50 dark:bg-purple-950/60',
       borderCol: 'border-purple-200/80 dark:border-purple-900/50 hover:border-purple-300',
@@ -86,7 +86,7 @@ export function WeeklyKpiCards({ kpi, activeSectionFilter, onFilterSection }: Pr
     {
       key: 'rejected',
       label: 'Rejected',
-      value: kpi.rejected,
+      value: kpi.rejected ?? 0,
       textColor: 'text-fg-subtle',
       bgLight: 'bg-surface-sunken',
       borderCol: 'border-border hover:border-border-strong',
@@ -117,8 +117,8 @@ export function WeeklyKpiCards({ kpi, activeSectionFilter, onFilterSection }: Pr
                 {c.label}
               </span>
             </div>
-            <span className={`text-xs font-bold font-mono tabular-nums ${c.textColor} shrink-0`}>
-              {c.value}
+            <span className={`text-xs font-bold font-mono tabular-nums px-1.5 py-0.5 rounded-md ${c.bgLight} ${c.textColor} shrink-0`}>
+              {typeof c.value === 'number' && !isNaN(c.value) ? c.value : 0}
             </span>
           </button>
         );

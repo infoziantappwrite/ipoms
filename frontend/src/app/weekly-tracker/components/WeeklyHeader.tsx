@@ -7,6 +7,7 @@ import {
   Search,
   Undo2,
   Redo2,
+  RefreshCw,
 } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { CollegeSelector, College } from '@/components/CollegeSelector';
@@ -26,6 +27,7 @@ interface Props {
   onAcademicYearChange?: (yr: string) => void;
   onOpenAddModal?: () => void;
   onSyncDailyPositives?: () => void;
+  isSyncing?: boolean;
   onSaveProgress?: () => void;
   onExportXlsx?: () => void;
   onExportPdf?: () => void;
@@ -46,6 +48,7 @@ interface Props {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
+  onOpenCollegeDossier?: () => void;
 }
 
 export function WeeklyHeader({
@@ -57,6 +60,7 @@ export function WeeklyHeader({
   onAcademicYearChange,
   onOpenAddModal,
   onSyncDailyPositives,
+  isSyncing = false,
   onSaveProgress,
   onExportXlsx,
   onExportPdf,
@@ -77,6 +81,7 @@ export function WeeklyHeader({
   canRedo = false,
   onUndo,
   onRedo,
+  onOpenCollegeDossier,
 }: Props) {
   const [selectedCollegeObj, setSelectedCollegeObj] = useState<College | null>(null);
 
@@ -174,7 +179,7 @@ export function WeeklyHeader({
         {/* Right Side: College Selector + Standalone Dustbin + Three Dots Actions Dropdown */}
         <div className="flex items-center gap-2 shrink-0">
           {/* 1. Smart Auto-Shrinking College Selector */}
-          <div className="shrink-0 flex items-center">
+          <div className="shrink-0 flex items-center gap-1.5">
             <CollegeSelector
               selectedCollegeId={selectedCollegeId}
               onSelect={(id, name) => {
@@ -185,6 +190,22 @@ export function WeeklyHeader({
               }}
               align="right"
             />
+
+            {selectedCollegeId && onOpenCollegeDossier && (
+              <button
+                type="button"
+                onClick={onOpenCollegeDossier}
+                title="View & Edit College Profile & Placement Officer Details"
+                className="flex items-center justify-center w-8 h-8 p-1 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200/90 dark:border-zinc-700/80 hover:border-blue-400 dark:hover:border-blue-500 rounded-xl shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0 overflow-hidden group"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/university.gif"
+                  alt="College Profile & Placement Officer Details"
+                  className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal group-hover:scale-110 active:scale-95 transition-transform duration-150"
+                />
+              </button>
+            )}
           </div>
 
           {/* 2. Active Mode Controls (Only visible when a mode is active) */}
@@ -219,23 +240,7 @@ export function WeeklyHeader({
               </div>
             ) : selectionMode === 'delete' ? (
               <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-                {/* Delete Mode Active: Cancel button & Delete Action Pill */}
-                {selectedCount > 0 && (
-                  <button
-                    type="button"
-                    disabled={isDeleting}
-                    onClick={() => {
-                      triggerHaptic('medium');
-                      onExecuteBulkDelete?.();
-                    }}
-                    className="h-8 px-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-xl flex items-center gap-1.5 text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
-                    title="Confirm Delete Selected Rows"
-                  >
-                    <Trash2 size={13} strokeWidth={2.4} />
-                    <span>Delete ({selectedCount})</span>
-                  </button>
-                )}
-
+                {/* Delete Mode Active: Cancel button */}
                 <button
                   type="button"
                   onClick={() => {
@@ -266,7 +271,7 @@ export function WeeklyHeader({
                 onStartDeleteMode?.();
               }
             }}
-            disabled={!selectedCollegeId}
+            disabled={!selectedCollegeId || isDeleting}
             className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 ${
               selectionMode === 'delete' && selectedCount > 0
                 ? 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs ring-2 ring-rose-500/30'
@@ -290,6 +295,28 @@ export function WeeklyHeader({
               </span>
             )}
           </button>
+
+          {/* 3b. Standalone Quick Sync Daily Positives Button */}
+          {onSyncDailyPositives && (
+            <button
+              type="button"
+              disabled={!selectedCollegeId || isSyncing}
+              onClick={() => {
+                triggerHaptic('selection');
+                onSyncDailyPositives();
+              }}
+              className="relative h-8 px-2.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer select-none shrink-0 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80 shadow-2xs text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]"
+              title="Sync positive leads from Daily Leads into Companies in Pipeline"
+              aria-label="Sync Daily Positives"
+            >
+              <RefreshCw
+                size={13}
+                strokeWidth={2.4}
+                className={isSyncing ? 'animate-spin text-amber-600 dark:text-amber-400' : 'text-amber-600 dark:text-amber-400'}
+              />
+              <span className="hidden sm:inline font-bold">Sync</span>
+            </button>
+          )}
 
           {/* 4. Three Dots (Actions Menu) */}
           <WeeklyActionsDropdown

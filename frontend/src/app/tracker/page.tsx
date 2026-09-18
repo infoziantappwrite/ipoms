@@ -18,6 +18,7 @@ import { BulkDeleteTrackerModal } from './components/BulkDeleteTrackerModal';
 import { DeleteRowConfirmModal } from './components/DeleteRowConfirmModal';
 import { TrackerActionsDropdown } from './components/TrackerActionsDropdown';
 import { DailySummaryModal } from './components/DailySummaryModal';
+import { CollegeDossierModal } from '@/components/college/CollegeDossierModal';
 import { useToast } from '@/components/ui/Toast';
 import { triggerHaptic } from '@/lib/haptics';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
@@ -71,19 +72,19 @@ export interface KpiData {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-import { getActiveCollege, resolveDefaultCollege } from '@/lib/collegeSession';
+import { resolveDefaultCollege } from '@/lib/collegeSession';
 
 export default function DailyTrackerPage() {
   // ── State
-  const [selectedCollegeId, setSelectedCollegeId] = useState<string>(() => {
-    return getActiveCollege().id || '';
-  });
-  const [selectedCollegeName, setSelectedCollegeName] = useState<string>(() => {
-    return getActiveCollege().name || '';
-  });
-  const [selectedCollegeObj, setSelectedCollegeObj] = useState<College | null>(() => {
-    return getActiveCollege().obj || null;
-  });
+  // Deliberately NOT lazy-initialized from getActiveCollege()/localStorage: that
+  // value differs between the server's render (no localStorage) and the
+  // browser's first render (localStorage already available), which is exactly
+  // what triggers a React hydration mismatch. Starting empty on both sides and
+  // filling in via the resolveDefaultCollege() effect below keeps server and
+  // client markup identical.
+  const [selectedCollegeId, setSelectedCollegeId] = useState<string>('');
+  const [selectedCollegeName, setSelectedCollegeName] = useState<string>('');
+  const [selectedCollegeObj, setSelectedCollegeObj] = useState<College | null>(null);
   const [rows, setRows] = useState<TrackerRow[]>([]);
   const [kpi, setKpi] = useState<KpiData | null>(null);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -105,6 +106,7 @@ export default function DailyTrackerPage() {
   const [selectedRowCount, setSelectedRowCount] = useState<number>(0);
   const [isDeleteMode, setIsDeleteMode] = useState<boolean>(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState<boolean>(false);
+  const [isDossierOpen, setIsDossierOpen] = useState<boolean>(false);
   const { toast } = useToast();
 
   // ── Global Undo / Redo Hook ──
@@ -724,6 +726,22 @@ export default function DailyTrackerPage() {
               }}
             />
 
+            {selectedCollegeId && (
+              <button
+                type="button"
+                onClick={() => setIsDossierOpen(true)}
+                title="View & Edit College Profile & Placement Officer Details"
+                className="flex items-center justify-center w-8 h-8 p-1 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 border border-zinc-200/90 dark:border-zinc-700/80 hover:border-blue-400 dark:hover:border-blue-500 rounded-xl shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0 overflow-hidden group"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/university.gif"
+                  alt="College Profile & Placement Officer Details"
+                  className="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal group-hover:scale-110 active:scale-95 transition-transform duration-150"
+                />
+              </button>
+            )}
+
             {!isHistoryMode ? (
               <>
                 {/* Filter by outcome (Smooth UI Dropdown) */}
@@ -971,6 +989,22 @@ export default function DailyTrackerPage() {
         onSave={handleSoftphoneSave}
         onClose={() => setActiveCallRow(null)}
       />
+
+      {/* ── College Profile / Placement Officer Dossier Modal ──────────── */}
+      {selectedCollegeId && (
+        <CollegeDossierModal
+          isOpen={isDossierOpen}
+          onClose={() => setIsDossierOpen(false)}
+          collegeId={selectedCollegeId}
+          initialCollege={selectedCollegeObj || undefined}
+          onUpdated={(updated: College) => {
+            setSelectedCollegeObj(updated);
+            try {
+              localStorage.setItem('ipoms_daily_tracker_college_obj', JSON.stringify(updated));
+            } catch (e) {}
+          }}
+        />
+      )}
     </div>
   );
 }

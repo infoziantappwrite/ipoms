@@ -26,7 +26,7 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
 
   const [leadType, setLeadType] = useState<'positive' | 'jd_received'>(lead.lead_type);
   const [companyName, setCompanyName] = useState(lead.company_name || '');
-  const [jobRole, setJobRole] = useState(lead.job_role || 'Graduate Trainee');
+  const [jobRole, setJobRole] = useState(lead.job_role || '');
   const [eligibleBatch, setEligibleBatch] = useState(lead.eligible_batch || '2026');
   const [eventTime, setEventTime] = useState(lead.event_time || '');
   const [remarks, setRemarks] = useState(lead.remarks || '');
@@ -92,7 +92,7 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
         job_role: jobRole.trim(),
         ctc: fullCtc,
         eligible_batch: eligibleBatch,
-        event_time: eventTime.trim(),
+        event_time: eventTime.trim().replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase()),
         lead_date: leadDate,
         remarks: remarks.trim(),
       });

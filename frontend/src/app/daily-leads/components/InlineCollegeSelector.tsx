@@ -60,7 +60,7 @@ export function InlineCollegeSelector({
   const calculateCoords = useCallback(() => {
     if (!buttonRef.current) return null;
     const rect = buttonRef.current.getBoundingClientRect();
-    const dropdownHeight = 280;
+    const dropdownHeight = 240;
     const dropdownWidth = 320;
     const spaceBelow = window.innerHeight - rect.bottom;
     const placeAbove = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
@@ -213,7 +213,7 @@ export function InlineCollegeSelector({
               zIndex: 999999,
               width: '320px',
             }}
-            className="rounded-2xl bg-surface border border-border shadow-2xl p-2 max-h-72 flex flex-col text-fg animate-in fade-in zoom-in-95 duration-100 overflow-hidden"
+            className="rounded-2xl bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 shadow-2xl p-2 flex flex-col text-fg animate-in fade-in zoom-in-95 duration-100 overflow-hidden"
           >
             {/* Search Input */}
             <div className="relative mb-2 shrink-0">
@@ -232,7 +232,7 @@ export function InlineCollegeSelector({
             </div>
 
             {/* College List */}
-            <div className="overflow-y-auto max-h-52 space-y-1 pr-1 no-scrollbar flex-1">
+            <div className="overflow-y-auto max-h-[194px] space-y-1 pr-1 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden flex-1">
               {filteredColleges.length === 0 ? (
                 <div className="py-4 text-center text-xs text-fg-disabled">
                   No college found

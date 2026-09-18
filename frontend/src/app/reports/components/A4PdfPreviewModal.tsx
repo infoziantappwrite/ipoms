@@ -593,15 +593,19 @@ export function A4PdfPreviewModal({
           </div>
 
           <div className="flex-1 text-center min-w-0 px-2 flex flex-col items-center justify-center">
-            <h1 className="text-lg font-bold text-blue-900 tracking-tight font-sans text-center">
-              {report.report_title ||
-                (report.template_type === 'month_end'
-                  ? `${report.report_period?.split(' ')[0] || 'August'} Month Placement Operations Report`
-                  : report.template_type === 'pending_tasks'
-                  ? 'Pending Task Placement Report'
-                  : report.template_type === 'active_leads'
-                  ? 'Active Leads Pipeline Report'
-                  : 'Weekly Placement Report')}
+            <h1 className="text-xl sm:text-2xl font-black text-[#0a2540] tracking-tight font-sans text-center uppercase">
+              {report.template_type === 'daily_positives'
+                ? 'POSITIVES OF THE DAY'
+                : report.template_type === 'daily_jd_received'
+                ? 'JD RECEIVED FOR THE DAY'
+                : report.report_title ||
+                  (report.template_type === 'month_end'
+                    ? `${report.report_period?.split(' ')[0] || 'August'} Month Placement Operations Report`
+                    : report.template_type === 'pending_tasks'
+                    ? 'Pending Task Placement Report'
+                    : report.template_type === 'active_leads'
+                    ? 'Active Leads Pipeline Report'
+                    : 'Weekly Placement Report')}
             </h1>
             <p className="text-xs font-semibold text-slate-700 mt-0.5 text-center">{collegeName}</p>
           </div>
@@ -2319,12 +2323,6 @@ export function A4PdfPreviewModal({
           {/* Daily Positives Table */}
           {report.template_type === 'daily_positives' && report.included_sections?.daily_positives !== false && report.sections?.daily_positives && (
             <div className="space-y-1.5">
-              <div className="mb-2">
-                <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                  <TrendingUp size={14} className="text-emerald-600 shrink-0" /> 1. POSITIVES OF THE DAY
-                </h3>
-                <div className="h-[2px] w-full bg-emerald-600 mt-1" />
-              </div>
               {report.sections.daily_positives.length === 0 ? (
                 <p className="text-[11px] text-slate-400 italic py-1 pl-1">
                   No positive leads recorded for this day.
@@ -2333,14 +2331,13 @@ export function A4PdfPreviewModal({
                 <table className="w-full text-[11px] border-collapse table-fixed bg-white">
                   <colgroup>
                     <col style={{ width: '36px' }} />
-                    <col style={{ width: '22%' }} />
-                    <col style={{ width: '17%' }} />
-                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '24%' }} />
+                    <col style={{ width: '19%' }} />
+                    <col style={{ width: '11%' }} />
+                    <col style={{ width: '80px' }} />
                     <col style={{ width: '75px' }} />
-                    <col style={{ width: '70px' }} />
-                    <col style={{ width: '70px' }} />
-                    <col style={{ width: '65px' }} />
-                    <col style={{ width: '15%' }} />
+                    <col style={{ width: '75px' }} />
+                    <col style={{ width: '18%' }} />
                   </colgroup>
                   <thead className="print:table-header-group">
                     <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
@@ -2351,7 +2348,6 @@ export function A4PdfPreviewModal({
                       <th className="py-2 px-1.5 text-center font-bold">DATE</th>
                       <th className="py-2 px-1.5 text-center font-bold">TIME</th>
                       <th className="py-2 px-1.5 text-center font-bold">COLLEGE</th>
-                      <th className="py-2 px-1 text-center font-bold">BATCH</th>
                       <th className="py-2 px-2 text-center font-bold">COORDINATOR</th>
                     </tr>
                   </thead>
@@ -2381,9 +2377,6 @@ export function A4PdfPreviewModal({
                             {r.college_code || '—'}
                           </span>
                         </td>
-                        <td className="py-2 px-1 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                          {r.batch || r.eligible_batch || '—'}
-                        </td>
                         <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
                           {r.coordinator || 'Placement Team'}
                         </td>
@@ -2398,12 +2391,6 @@ export function A4PdfPreviewModal({
           {/* Daily JD Received Table */}
           {report.template_type === 'daily_jd_received' && report.included_sections?.daily_jd_received !== false && report.sections?.daily_jd_received && (
             <div className="space-y-1.5">
-              <div className="mb-2">
-                <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                  <Briefcase size={14} className="text-blue-600 shrink-0" /> 1. JD RECEIVED FOR THE DAY
-                </h3>
-                <div className="h-[2px] w-full bg-blue-600 mt-1" />
-              </div>
               {report.sections.daily_jd_received.length === 0 ? (
                 <p className="text-[11px] text-slate-400 italic py-1 pl-1">
                   No JDs received recorded for this day.
@@ -2412,14 +2399,13 @@ export function A4PdfPreviewModal({
                 <table className="w-full text-[11px] border-collapse table-fixed bg-white">
                   <colgroup>
                     <col style={{ width: '36px' }} />
-                    <col style={{ width: '22%' }} />
-                    <col style={{ width: '17%' }} />
-                    <col style={{ width: '10%' }} />
+                    <col style={{ width: '24%' }} />
+                    <col style={{ width: '19%' }} />
+                    <col style={{ width: '11%' }} />
+                    <col style={{ width: '80px' }} />
                     <col style={{ width: '75px' }} />
-                    <col style={{ width: '70px' }} />
-                    <col style={{ width: '70px' }} />
-                    <col style={{ width: '65px' }} />
-                    <col style={{ width: '15%' }} />
+                    <col style={{ width: '75px' }} />
+                    <col style={{ width: '18%' }} />
                   </colgroup>
                   <thead className="print:table-header-group">
                     <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
@@ -2430,7 +2416,6 @@ export function A4PdfPreviewModal({
                       <th className="py-2 px-1.5 text-center font-bold">DATE</th>
                       <th className="py-2 px-1.5 text-center font-bold">TIME</th>
                       <th className="py-2 px-1.5 text-center font-bold">COLLEGE</th>
-                      <th className="py-2 px-1 text-center font-bold">BATCH</th>
                       <th className="py-2 px-2 text-center font-bold">COORDINATOR</th>
                     </tr>
                   </thead>
@@ -2459,9 +2444,6 @@ export function A4PdfPreviewModal({
                           <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
                             {r.college_code || '—'}
                           </span>
-                        </td>
-                        <td className="py-2 px-1 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                          {r.batch || r.eligible_batch || '—'}
                         </td>
                         <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
                           {r.coordinator || 'Placement Team'}

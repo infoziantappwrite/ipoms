@@ -105,7 +105,7 @@ export function LeadsTable({
                   />
                 </th>
               )}
-              <th className="py-3 px-3 w-14 text-center font-bold border-r border-border/80">SI.NO</th>
+              <th className="py-3 px-2 w-10 text-center font-bold border-r border-border/80">#</th>
               <th className="py-3 px-3 min-w-[100px] text-center border-r border-border/80">Time Stamp</th>
               <th className="py-3 px-3 min-w-[110px] text-center border-r border-border/80">Date</th>
               <th className="py-3 px-3 min-w-[120px] text-center border-r border-border/80">College</th>
@@ -191,7 +191,11 @@ function TableRow({
 
   const commitEdit = (field: string) => {
     if (editingField === field) {
-      onUpdateRow(row._id, { [field]: tempValue });
+      let finalVal = tempValue;
+      if (field === 'event_time' && tempValue) {
+        finalVal = tempValue.replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase()).trim();
+      }
+      onUpdateRow(row._id, { [field]: finalVal });
       setEditingField(null);
     }
   };
@@ -202,6 +206,11 @@ function TableRow({
     } else if (e.key === 'Escape') {
       setEditingField(null);
     }
+  };
+
+  const formatDisplayTime = (t?: string) => {
+    if (!t) return '—';
+    return t.replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase());
   };
 
   const currentCollegeId =
@@ -241,7 +250,7 @@ function TableRow({
       )}
 
       {/* Row Index */}
-      <td className="py-2.5 px-3 text-center text-fg-subtle font-mono text-micro font-bold border-r border-border/60">
+      <td className="py-2.5 px-2 text-center text-fg-subtle font-mono text-micro font-bold border-r border-border/60">
         {index}
       </td>
 
@@ -255,15 +264,15 @@ function TableRow({
             onBlur={() => commitEdit('event_time')}
             onKeyDown={(e) => handleKeyDown(e, 'event_time')}
             autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-20 shadow-xs outline-none text-center mx-auto"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-20 shadow-xs outline-none text-center mx-auto uppercase"
           />
         ) : (
           <span
-            onClick={() => startEdit('event_time', row.event_time)}
+            onClick={() => startEdit('event_time', formatDisplayTime(row.event_time))}
             className="cursor-pointer hover:text-primary transition-colors font-medium"
             title="Click to edit time"
           >
-            {row.event_time || '—'}
+            {formatDisplayTime(row.event_time)}
           </span>
         )}
       </td>
@@ -349,7 +358,7 @@ function TableRow({
             className="cursor-pointer hover:text-primary transition-colors truncate block"
             title="Click to edit role"
           >
-            {row.job_role || 'Graduate Trainee'}
+            {row.job_role || <span className="text-fg-disabled italic font-normal text-xs">—</span>}
           </span>
         )}
       </td>

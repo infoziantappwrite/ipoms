@@ -952,6 +952,77 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     in this session, not evidence against the fix. Confirmed correct only by code trace and
     a clean typecheck — visually re-check next time the preview tool is available.
 
+39. **Coordinator demo deck, 17 Sep 2026** — `iPOMS_Coordinator_Demo_2026.pptx` in the
+    OneDrive `version 1/Presentations/` folder, 8 slides presented by A. Mohanaradha.
+    Source lives as code in the `ipoms-ppt-2026` skill under `demo/` (`capture.js` takes
+    read-only Playwright screenshots with HR phones/emails masked, `prep_assets.js` crops and
+    frames them, `build_demo.js` builds, `animate.ps1` adds fades via PowerPoint COM).
+    Every claim was checked against code first. Two things surfaced while doing that:
+    **(a) no month-over-month coordinator comparison exists anywhere**, and call duration is
+    only stored per row, never aggregated (the Team Leader dashboard shows live presence,
+    calls today, positives and JDs per coordinator). The deck labels monthly comparison as
+    "NEXT". `reports/components/AnalyticsView.tsx` is orphaned (imported nowhere).
+    **(b) Two bugs found this way — both fixed same day, 17 Sep 2026:**
+    ~~Weekly Tracker and Daily Tracker both threw React hydration errors in `next dev`~~ —
+    both pages lazily initialized `selectedCollegeId`/`selectedCollegeName`(/`selectedCollegeObj`
+    on Daily Tracker) straight from `getActiveCollege()` inside `useState(() => ...)`. That
+    reads `localStorage`, which the server-rendered pass never has and the browser's first
+    pass already does, so the two renders disagreed and React discarded the mismatched
+    markup. Both pages already had a `resolveDefaultCollege()` effect that correctly
+    populates the same state after mount — the lazy initializer was pure redundancy that
+    only existed to shave one render's flash of "no college selected," at the cost of a
+    guaranteed hydration error every load. Fixed by starting both states empty (`''`/`null`)
+    and letting the existing effect fill them in; `getActiveCollege` import dropped from both
+    files since nothing else used it. Verified live: a Playwright console probe that reported
+    3 hydration errors on `/weekly-tracker` before the fix reports zero after, on both pages.
+    ~~`reports/page.tsx`'s `?auto=true` path called `apiFetch('/api/v1/reports/generate')`~~ —
+    `apiFetch` already prefixes every call with `API_BASE` (itself ending `/api/v1`), so this
+    request actually hit `/api/v1/api/v1/reports/generate` — a route that doesn't exist — and
+    the caught 404 silently dropped the user into the empty wizard instead of the report they
+    clicked for. This is the path both of Daily Leads' report buttons use
+    (`handleOpenPdfModal`/`handleOpenImageModal` → `/reports?...&auto=true`). Fixed by
+    dropping the redundant `/api/v1` prefix; confirmed via grep this was the only such
+    doubled-prefix call in the frontend. Verified live end-to-end (not just the API call):
+    the exact URL Daily Leads links to (`/reports?template=daily_positives&date=2026-09-03&
+    collegeId=all&auto=true`) now shows the real generated report ("POSITIVES OF THE DAY")
+    on the page, where it previously silently showed the bare "Report Builder" wizard.
+    `tsc --noEmit` clean. Still open, unrelated to either bug: the Pipeline Overview chart
+    (item from 13 Sep) renders only in the A4 preview/PDF path, not the inline editor.
+
+40. **User Guide v1.0, 17 Sep 2026** — `version 1/PDF/iPOMS_User_Guide_v1.0.pdf` (29 pages,
+    Infoziant logo in every page header, www.infoziant.com + ipoms.vercel.app + page number
+    in every footer). Source as code in the `ipoms-ppt-2026` skill under `guide/`
+    (`capture_guide.js` → `prep_images.js` → `build_guide.js`, Playwright HTML→PDF). Written
+    from the code, not from `data/faqData.ts` — **the in-app FAQ is stale**: it says 3 report
+    types (there are 6), 7 Weekly Tracker sections (there are 9), and that Weekly sync pulls
+    Hiring/Follow Up calls. Facts verified while writing, which supersede older notes above:
+    **(a)** the inline "Invite Mail → Weekly Tracker on save" auto-sync from item 37 is **gone**
+    from `PATCH /daily-tracker/:id` (someone's later commit); saving a row now only syncs contact
+    edits to Metadata and outcomes to Active Leads. **(b)** `POST /weekly-tracker/
+    sync-daily-positives` now reads **Daily Leads positives**, not Daily Tracker rows — the flow
+    is Daily Tracker → Daily Leads (Sync Positives) → Weekly Tracker (Sync). The 6 AM and
+    10 PM jobs still promote Invite Mail rows directly via `weeklyTrackerSync.ts`.
+    **(c)** Metadata DB has a working Recycle Bin view and Bulk Paste import.
+    ~~**Open data issue: 19 of 27 `colleges.location` values were the spreadsheet error
+    string `#VALUE!`.**~~ **FIXED, but not by this session** — a same-day commit
+    (`d063aab`, "college information sync", by someone else concurrently) added a
+    `COLLEGE_DEFAULT_LOCATIONS` fallback map and a real location-import path to whatever
+    script touches `colleges`. Re-verified 18 Sep 2026, both against the raw DB and the
+    live `GET /colleges` response: **0 bad locations remain** across all 27 documents.
+    Caught only because this session re-checked before the demo rather than trusting the
+    17 Sep finding — worth remembering that a "still open" note in this file can go stale
+    within a day when other work is landing in parallel.
+    ~~**UI copy inconsistency: the Administrator profile page said admins can recover by
+    6-digit OTP, but `authRoutes.ts` refuses admin OTP (`ADMIN_OTP_DISABLED`).**~~
+    **FIXED 18 Sep 2026.** `settings/components/UserProfileTab.tsx`'s "Administrator
+    Security & Recovery Note" claimed OTP recovery worked for admins — directly
+    contradicting §2's documented policy and the real backend behavior (item 12). The
+    backend was correct; the copy was wrong, so the copy was changed to state the real,
+    deliberate policy (no admin email-OTP, security-team reset only) instead of silently
+    promising a path that 403s the moment someone tries it. Verified live: logged in as
+    Administrator, loaded `/profile`, confirmed the corrected text renders. `tsc --noEmit`
+    clean.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

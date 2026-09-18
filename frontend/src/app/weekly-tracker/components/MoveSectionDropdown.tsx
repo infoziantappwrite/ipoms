@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ArrowUpDown,
   ArrowRightLeft,
@@ -127,7 +128,7 @@ export function MoveSectionDropdown({
 
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
-      const popoverHeight = 310;
+      const popoverHeight = 240;
       const popoverWidth = 230;
       const spaceBelow = window.innerHeight - rect.bottom;
       const placeAbove = spaceBelow < popoverHeight && rect.top > popoverHeight;
@@ -208,65 +209,67 @@ export function MoveSectionDropdown({
         <ArrowUpDown size={13} strokeWidth={2.25} className="shrink-0 text-primary" />
       </button>
 
-      {/* ── Solid Minimal SaaS Popover Menu ────────────────────────────── */}
-      {isOpen && dropdownCoords && (
-        <div
-          ref={menuRef}
-          role="menu"
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            position: 'fixed',
-            top: dropdownCoords.placeAbove ? 'auto' : `${dropdownCoords.top}px`,
-            bottom: dropdownCoords.placeAbove ? `${window.innerHeight - dropdownCoords.top}px` : 'auto',
-            left: `${dropdownCoords.left}px`,
-            width: '230px',
-            zIndex: 9999,
-          }}
-          className="bg-surface border border-border rounded-2xl shadow-2xl p-1.5 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150 text-fg select-none overflow-hidden"
-        >
-          {/* Header ribbon */}
-          <div className="px-3 py-1.5 border-b border-border bg-surface-sunken rounded-xl flex items-center justify-between text-micro font-bold text-fg-subtle uppercase tracking-wider mb-1">
-            <span className="flex items-center gap-1.5">
-              <ArrowRightLeft size={12} className="text-primary" /> Move Company To
-            </span>
-            <span className="text-micro font-mono text-fg-disabled">7 Sections</span>
-          </div>
+      {/* ── Solid Minimal SaaS Popover Menu via Portal ────────────────────────────── */}
+      {isOpen && dropdownCoords && typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed',
+              top: dropdownCoords.placeAbove ? 'auto' : `${dropdownCoords.top}px`,
+              bottom: dropdownCoords.placeAbove ? `${window.innerHeight - dropdownCoords.top}px` : 'auto',
+              left: `${dropdownCoords.left}px`,
+              width: '235px',
+              zIndex: 99999,
+            }}
+            className="bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 rounded-xl shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] p-1.5 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150 ease-out text-fg select-none overflow-hidden"
+          >
+            {/* Header ribbon */}
+            <div className="px-3 py-1.5 border-b border-border/60 bg-slate-50 dark:bg-[#1A2234] rounded-lg flex items-center justify-between text-micro font-bold text-fg-subtle uppercase tracking-wider mb-1">
+              <span className="flex items-center gap-1.5">
+                <ArrowRightLeft size={12} className="text-primary" /> Move Company To
+              </span>
+              <span className="text-micro font-mono text-fg-disabled">7 Sections</span>
+            </div>
 
-          {/* Section options */}
-          <div className="space-y-0.5 max-h-64 overflow-y-auto custom-scrollbar pr-0.5">
-            {WEEKLY_PIPELINE_SECTIONS.map((sec) => {
-              const isCurrent = sec.key === normalizedCurrent;
-              const Icon = sec.Icon;
+            {/* Section options */}
+            <div className="space-y-0.5 max-h-[194px] overflow-y-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pr-0.5">
+              {WEEKLY_PIPELINE_SECTIONS.map((sec) => {
+                const isCurrent = sec.key === normalizedCurrent;
+                const Icon = sec.Icon;
 
-              return (
-                <button
-                  key={sec.key}
-                  type="button"
-                  onClick={(e) => handleSelect(sec.key, e)}
-                  disabled={isMoving}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer ${
-                    isCurrent
-                      ? sec.activeBgClass
-                      : 'hover:bg-surface-sunken text-fg'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Icon size={13} className={`shrink-0 ${sec.colorClass}`} />
-                    <span className="truncate">{sec.label}</span>
-                  </div>
-                  {isCurrent ? (
-                    <span className="text-micro uppercase font-bold text-primary px-1.5 py-0.2 rounded bg-primary/10 border border-primary/20 shrink-0">
-                      Current
-                    </span>
-                  ) : (
-                    <ArrowRightLeft size={11} className="text-fg-disabled shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+                return (
+                  <button
+                    key={sec.key}
+                    type="button"
+                    onClick={(e) => handleSelect(sec.key, e)}
+                    disabled={isMoving}
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer select-none ${
+                      isCurrent
+                        ? sec.activeBgClass
+                        : 'hover:bg-surface-raised text-fg'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Icon size={13} className={`shrink-0 ${sec.colorClass}`} />
+                      <span className="truncate">{sec.label}</span>
+                    </div>
+                    {isCurrent ? (
+                      <span className="text-micro uppercase font-bold text-primary px-1.5 py-0.2 rounded bg-primary/10 border border-primary/20 shrink-0">
+                        Current
+                      </span>
+                    ) : (
+                      <ArrowRightLeft size={11} className="text-fg-disabled shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

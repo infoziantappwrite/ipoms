@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
 import type { CallOutcome } from '../page';
 import { triggerHaptic } from '@/lib/haptics';
@@ -34,50 +35,122 @@ interface Props {
   placement?: 'bottom' | 'top';
 }
 
-export function RowOutcomeDropdown({ value, onChange, disabled = false, placement = 'bottom' }: Props) {
+export function RowOutcomeDropdown({ value, onChange, disabled = false, placement }: Props) {
   const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{
+    top: number;
+    left: number;
+    placement: 'top' | 'bottom';
+    ready: boolean;
+  }>({
+    top: 0,
+    left: 0,
+    placement: 'bottom',
+    ready: false,
+  });
+
+  const calculateCoords = useCallback(() => {
+    if (!triggerRef.current) return null;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const popoverHeight = 200;
+    const popoverWidth = 220;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const placeAbove = placement === 'top' || (spaceBelow < popoverHeight && rect.top > popoverHeight);
+
+    let left = rect.left;
+    if (left + popoverWidth > window.innerWidth - 12) {
+      left = window.innerWidth - popoverWidth - 12;
+    }
+    if (left < 12) left = 12;
+
+    return {
+      top: placeAbove ? rect.top - 6 : rect.bottom + 6,
+      left,
+      placement: placeAbove ? ('top' as const) : ('bottom' as const),
+      ready: true,
+    };
+  }, [placement]);
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (disabled) return;
+    triggerHaptic('light');
+    if (isOpen) {
+      setIsOpen(false);
+      setCoords((prev) => ({ ...prev, ready: false }));
+      return;
+    }
+    const initialCoords = calculateCoords();
+    if (initialCoords) {
+      setCoords(initialCoords);
+    }
+    setIsOpen(true);
+  };
 
   // Close on click outside
   useEffect(() => {
+    if (!isOpen) return;
     function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        triggerRef.current &&
+        !triggerRef.current.contains(target) &&
+        popoverRef.current &&
+        !popoverRef.current.contains(target)
+      ) {
         setIsOpen(false);
+        setCoords((prev) => ({ ...prev, ready: false }));
       }
     }
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+    document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
   // Close on Escape
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setIsOpen(false);
+      if (e.key === 'Escape' && isOpen) {
+        setIsOpen(false);
+        setCoords((prev) => ({ ...prev, ready: false }));
+      }
     }
-    if (isOpen) window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
 
+  // Keep anchored while scrolling or resizing window
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const handleReposition = () => {
+      const newCoords = calculateCoords();
+      if (newCoords) setCoords(newCoords);
+    };
+
+    window.addEventListener('resize', handleReposition);
+    window.addEventListener('scroll', handleReposition, true);
+    return () => {
+      window.removeEventListener('resize', handleReposition);
+      window.removeEventListener('scroll', handleReposition, true);
+    };
+  }, [isOpen, calculateCoords]);
+
   const currentOption = ROW_OUTCOMES.find((o) => o.value === value);
 
-  const handleSelect = (val: string) => {
+  const handleSelect = (val: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     triggerHaptic('selection');
     onChange(val);
     setIsOpen(false);
-  };
-
-  const handleToggle = () => {
-    if (disabled) return;
-    triggerHaptic('light');
-    setIsOpen((prev) => !prev);
+    setCoords((prev) => ({ ...prev, ready: false }));
   };
 
   return (
-    <div className="relative w-full text-left" ref={containerRef}>
+    <div className="relative w-full text-left" onClick={(e) => e.stopPropagation()}>
       {/* ── Trigger Button (Smooth Row Pill) ─────────────────────────── */}
       <button
+        ref={triggerRef}
         type="button"
         disabled={disabled}
         onClick={handleToggle}
@@ -85,7 +158,7 @@ export function RowOutcomeDropdown({ value, onChange, disabled = false, placemen
           currentOption
             ? 'bg-surface border-border-strong text-fg hover:border-primary/40'
             : 'bg-surface/80 border-border text-fg-subtle hover:border-border-strong hover:text-fg'
-        }`}
+        } ${isOpen ? 'ring-2 ring-primary/20 border-primary bg-surface' : ''}`}
       >
         <div className="flex items-center gap-1.5 truncate">
           {currentOption ? (
@@ -109,41 +182,54 @@ export function RowOutcomeDropdown({ value, onChange, disabled = false, placemen
         />
       </button>
 
-      {/* ── Solid Minimal SaaS Dropdown Popover ───────────────────────── */}
-      {isOpen && (
-        <div
-          onClick={(e) => e.stopPropagation()}
-          className={`absolute ${
-            placement === 'top'
-              ? 'left-0 bottom-full mb-1.5 origin-bottom-left'
-              : 'left-0 top-full mt-1.5 origin-top-left'
-          } w-52 bg-surface border border-border rounded-xl shadow-xl z-[100] p-1.5 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-150 ease-[cubic-bezier(0.16,1,0.3,1)] text-fg select-none max-h-64 overflow-y-auto custom-scrollbar`}
-        >
-          {ROW_OUTCOMES.map((opt) => {
-            const isSelected = opt.value === value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => handleSelect(opt.value)}
-                className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer ${
-                  isSelected
-                    ? 'bg-primary/10 text-primary font-bold shadow-2xs'
-                    : 'hover:bg-surface-sunken text-fg'
-                }`}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className={`w-2 h-2 rounded-full shrink-0 ${opt.dotColor}`} />
-                  <span className={`truncate ${opt.textColor}`}>
-                    {opt.label}
-                  </span>
-                </div>
-                {isSelected && <Check size={13} className="text-primary shrink-0 ml-1" />}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {/* ── 100% Solid SaaS Dropdown Popover via Portal (Never Clipped or Covered) ───────────────────────── */}
+      {isOpen &&
+        coords.ready &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={popoverRef}
+            role="listbox"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed',
+              top: coords.placement === 'top' ? 'auto' : `${coords.top}px`,
+              bottom:
+                coords.placement === 'top'
+                  ? `${window.innerHeight - coords.top}px`
+                  : 'auto',
+              left: `${coords.left}px`,
+              width: '220px',
+              zIndex: 99999,
+            }}
+            className="bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 rounded-xl shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] p-1.5 flex flex-col gap-0.5 text-fg select-none max-h-[194px] overflow-y-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden animate-in fade-in zoom-in-95 duration-150 ease-out"
+          >
+            {ROW_OUTCOMES.map((opt) => {
+              const isSelected = opt.value === value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={(e) => handleSelect(opt.value, e)}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer select-none ${
+                    isSelected
+                      ? 'bg-primary/10 text-primary font-bold shadow-2xs'
+                      : 'hover:bg-slate-100 dark:hover:bg-slate-800/80 text-fg'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${opt.dotColor}`} />
+                    <span className={`truncate ${opt.textColor}`}>
+                      {opt.label}
+                    </span>
+                  </div>
+                  {isSelected && <Check size={13} className="text-primary shrink-0 ml-1" />}
+                </button>
+              );
+            })}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
