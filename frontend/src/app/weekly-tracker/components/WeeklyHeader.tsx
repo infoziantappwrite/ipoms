@@ -240,23 +240,7 @@ export function WeeklyHeader({
               </div>
             ) : selectionMode === 'delete' ? (
               <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-                {/* Delete Mode Active: Cancel button & Delete Action Pill */}
-                {selectedCount > 0 && (
-                  <button
-                    type="button"
-                    disabled={isDeleting}
-                    onClick={() => {
-                      triggerHaptic('medium');
-                      onExecuteBulkDelete?.();
-                    }}
-                    className="h-8 px-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-xl flex items-center gap-1.5 text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
-                    title="Confirm Delete Selected Rows"
-                  >
-                    <Trash2 size={13} strokeWidth={2.4} />
-                    <span>Delete ({selectedCount})</span>
-                  </button>
-                )}
-
+                {/* Delete Mode Active: Cancel button */}
                 <button
                   type="button"
                   onClick={() => {
@@ -287,7 +271,7 @@ export function WeeklyHeader({
                 onStartDeleteMode?.();
               }
             }}
-            disabled={!selectedCollegeId}
+            disabled={!selectedCollegeId || isDeleting}
             className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 ${
               selectionMode === 'delete' && selectedCount > 0
                 ? 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs ring-2 ring-rose-500/30'

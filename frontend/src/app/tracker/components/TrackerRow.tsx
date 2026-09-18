@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useCallback, useEffect, useState } from 'react';
-import { Phone, Check } from 'lucide-react';
+import { Phone, Check, Clock } from 'lucide-react';
 import type { TrackerRow as TrackerRowType, CallOutcome } from '../page';
 import { triggerHaptic } from '@/lib/haptics';
 import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
@@ -157,15 +157,34 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
     }
   }, [onUpdate, row.call_start_time, row.call_end_time]);
 
+  // ── Quick clock button handler to stamp current time with 1 click
+  const handleSetCurrentStartTime = useCallback(() => {
+    triggerHaptic('selection');
+    const now = nowISO();
+    if (startTimeRef.current) {
+      startTimeRef.current.value = formatTime(now);
+    }
+    const patch: Partial<TrackerRowType> = { call_start_time: now };
+
+    // If row already has call_end_time, recompute duration in minutes level
+    if (row.call_end_time) {
+      const start = new Date(now).getTime();
+      const end = new Date(row.call_end_time).getTime();
+      if (!isNaN(start) && !isNaN(end) && end >= start) {
+        const durSec = Math.round((end - start) / 1000);
+        patch.duration_seconds = durSec;
+        patch.duration_formatted = formatDurationMinutesLevel(durSec);
+      }
+    }
+
+    onUpdate(patch);
+  }, [onUpdate, row.call_end_time]);
+
   // ── Spacebar handler for Start Time (Spacebar fills Start Time)
   const handleStartTimeKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === ' ') {
       e.preventDefault();
-      const now = nowISO();
-      if (startTimeRef.current) {
-        startTimeRef.current.value = formatTime(now);
-      }
-      onUpdate({ call_start_time: now });
+      handleSetCurrentStartTime();
     }
     // Delete key clears the field
     if (e.key === 'Delete') {
@@ -173,7 +192,7 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
       if (startTimeRef.current) startTimeRef.current.value = '';
       onUpdate({ call_start_time: undefined, duration_seconds: undefined, duration_formatted: undefined });
     }
-  }, [onUpdate]);
+  }, [handleSetCurrentStartTime, onUpdate]);
 
   // ── Enter key: save row and move focus
   const handleKeyDownEnter = useCallback((e: React.KeyboardEvent) => {
@@ -393,22 +412,43 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
         </span>
       </div>
 
-      {/* Start Time (Frozen Col 2 - Editable) */}
-      <div className={`sticky left-[56px] z-10 ${rowBg} px-2 py-1 flex items-center transition-colors`}>
+      {/* Start Time (Frozen Col 2 - 1-Click Clock Stamp & Editable) */}
+      <div className={`sticky left-[56px] z-10 ${rowBg} px-1.5 py-1 flex items-center transition-colors`}>
         {isReadOnly ? (
-          <span className="text-fg-muted text-xs tabular-nums">{formatTime(row.call_start_time)}</span>
+          <span className="text-fg-muted text-xs tabular-nums px-1">{formatTime(row.call_start_time) || '—'}</span>
+        ) : !row.call_start_time ? (
+          <button
+            type="button"
+            data-field="start_time_btn"
+            onClick={handleSetCurrentStartTime}
+            title="Click clock to set current start time (or press Spacebar)"
+            className="flex items-center justify-center gap-1.5 w-full h-7 px-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 hover:border-primary/40 rounded-md text-[11px] font-semibold transition-all cursor-pointer shadow-2xs hover:shadow-xs group/clock"
+          >
+            <Clock size={12} className="shrink-0 text-primary group-hover/clock:scale-110 transition-transform" />
+            <span className="truncate">Set Time</span>
+          </button>
         ) : (
-          <input
-            ref={startTimeRef}
-            data-field="start_time"
-            type="text"
-            defaultValue={formatTime(row.call_start_time)}
-            placeholder="Time"
-            onKeyDown={(e) => { handleStartTimeKeyDown(e); handleKeyDownEnter(e); }}
-            onBlur={handleStartTimeBlur}
-            title="Calling hours: 07:00 AM – 08:00 PM • Type e.g. 9:38, 2:30 • Spacebar fills current time"
-            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg placeholder-fg-subtle transition-colors cursor-text text-xs tabular-nums outline-none"
-          />
+          <div className="flex items-center gap-0.5 w-full group/time">
+            <input
+              ref={startTimeRef}
+              data-field="start_time"
+              type="text"
+              defaultValue={formatTime(row.call_start_time)}
+              placeholder="Time"
+              onKeyDown={(e) => { handleStartTimeKeyDown(e); handleKeyDownEnter(e); }}
+              onBlur={handleStartTimeBlur}
+              title="Start time set • Click to edit or click clock icon to re-stamp current time"
+              className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1 py-0.5 rounded text-fg font-medium transition-colors cursor-text text-xs tabular-nums outline-none min-w-0"
+            />
+            <button
+              type="button"
+              onClick={handleSetCurrentStartTime}
+              title="Re-stamp current time now"
+              className="p-1 rounded hover:bg-surface-raised text-fg-subtle hover:text-primary transition-colors cursor-pointer shrink-0 opacity-40 hover:opacity-100 group-hover/time:opacity-80"
+            >
+              <Clock size={11} />
+            </button>
+          </div>
         )}
       </div>
 
