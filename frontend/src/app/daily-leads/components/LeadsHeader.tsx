@@ -222,14 +222,14 @@ export function LeadsHeader({
             </button>
           )}
 
-          {/* Copy to JD (Visible on Positives Tab) */}
+          {/* Move to JD (Visible on Positives Tab) */}
           {activeTab === 'positive' && onOpenCopyToJdModal && (
             <button
               type="button"
               onClick={onOpenCopyToJdModal}
               className="w-9 h-9 flex items-center justify-center bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-xl transition-all shadow-xs cursor-pointer active:scale-[0.992] hover:shadow-amber-500/20 shrink-0"
-              title="Copy positive leads to JD Received section for selected colleges"
-              aria-label="Copy to JD"
+              title="Move positive leads to JD Received section for selected colleges"
+              aria-label="Move to JD"
             >
               <Copy size={16} strokeWidth={2.2} />
             </button>

@@ -155,8 +155,14 @@
      Dark mode cannot carry the light theme's wide surface separation
      without going milky, so the ladder stays tight on purpose — the
      border and the rim highlight below do most of the boundary work. */
-  --background:        9  13  22;  /* #090D16  deep pitch midnight canvas    */
-  --surface:          22  29  46;  /* #161D2E  cards — 1.16:1 vs page        */
+  --background:        6   9  15;  /* #06090F  deeper pitch canvas — 18 Sep 2026:
+                                       pulled from #090D16 so cards have real
+                                       air under them instead of sitting flush
+                                       with the page; card fill unchanged, so
+                                       page↔card separation nearly doubles
+                                       (was 1.16:1, now ~1.35:1) with zero
+                                       other tokens touched.                  */
+  --surface:          22  29  46;  /* #161D2E  cards — ~1.35:1 vs page       */
   --surface-raised:   33  43  64;  /* #212B40  dropdowns — 1.19:1 vs card    */
   --surface-sunken:   13  17  28;  /* #0D111C  toolbars — 1.12:1 below card  */
   --overlay:           2   4   8;  /* #020408  modal backdrop                */
@@ -195,6 +201,13 @@
   --primary-foreground: 9  13  22;  /* dark label on the bright fill — 5.34:1   */
   --accent:          138 166 242;  /* #8AA6F2  hue 224 — 7.1:1 on card          */
   --accent-foreground: 9  13  22;  /* dark label on the bright accent — 8.2:1   */
+
+  /* Signature glow, 18 Sep 2026 — same --primary hue, used ONLY as a soft
+     box-shadow bloom behind solid primary buttons and the focus ring, never
+     as a fill or text color. This is the "someone designed this" touch the
+     flat rim-light model was missing; light mode gets none of this, it
+     keeps its cast-shadow language unchanged. */
+  --primary-glow:     85 128 245;  /* same value as --primary, named for intent */
 
   --success:          52 211 153;  /* #34D399 */
   --success-subtle:    6  78  59;  /* #064E3B */
@@ -261,21 +274,25 @@
   --neu-light: 255 255 255;   /* rim highlight — the light source itself   */
   --neu-dark:    0   0   0;   /* ambient anchor, not the depth cue         */
 
+  /* Strengthened 18 Sep 2026 (rim + ambient both bumped ~15-20%) — the
+     original values were tuned to just clear "shadow exists at all" after
+     the 30 Aug rebuild; on the deeper background above they read as barely
+     there again. Same model, same direction, just more of it. */
   --elevation-1:
-    inset 0 1px 0 0 rgb(var(--neu-light) / 0.045),
-    0 1px 2px 0 rgb(var(--neu-dark) / 0.50);
+    inset 0 1px 0 0 rgb(var(--neu-light) / 0.05),
+    0 1px 3px 0 rgb(var(--neu-dark) / 0.55);
   --elevation-2:
-    inset 0 1px 0 0 rgb(var(--neu-light) / 0.055),
-    0 2px 6px -1px rgb(var(--neu-dark) / 0.55),
-    0 6px 16px -4px rgb(var(--neu-dark) / 0.40);
+    inset 0 1px 0 0 rgb(var(--neu-light) / 0.065),
+    0 2px 7px -1px rgb(var(--neu-dark) / 0.62),
+    0 7px 18px -4px rgb(var(--neu-dark) / 0.46);
   --elevation-3:
-    inset 0 1px 0 0 rgb(var(--neu-light) / 0.07),
-    0 4px 12px -2px rgb(var(--neu-dark) / 0.60),
-    0 12px 28px -8px rgb(var(--neu-dark) / 0.50);
+    inset 0 1px 0 0 rgb(var(--neu-light) / 0.08),
+    0 4px 14px -2px rgb(var(--neu-dark) / 0.68),
+    0 14px 32px -8px rgb(var(--neu-dark) / 0.56);
   --elevation-4:
-    inset 0 1px 0 0 rgb(var(--neu-light) / 0.09),
-    0 8px 20px -4px rgb(var(--neu-dark) / 0.65),
-    0 20px 48px -12px rgb(var(--neu-dark) / 0.55);
+    inset 0 1px 0 0 rgb(var(--neu-light) / 0.105),
+    0 8px 22px -4px rgb(var(--neu-dark) / 0.72),
+    0 22px 52px -12px rgb(var(--neu-dark) / 0.62);
 
   /* Debossed / pressed. The rim moves to the BOTTOM edge — light catching
      the lower lip of a carved recess is the inverse of it catching the top
@@ -889,6 +906,43 @@ button.bg-green-600:not(:disabled):hover {
 
 button.bg-surface:not(:disabled):hover {
   box-shadow: 0 3px 10px -2px rgba(0, 0, 0, 0.06), 0 1px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DARK MODE SIGNATURE GLOW — 18 Sep 2026
+   ───────────────────────────────────────────────────────────────────────────
+   One deliberate flourish, scoped to .dark only: a soft bloom of --primary
+   behind solid primary buttons and the keyboard focus ring, on top of the
+   stronger elevation shadows above. Light mode is untouched — it keeps its
+   cast-shadow neumorphic language exactly as before. Nothing here changes
+   any fill or text color, so it carries no contrast risk.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.dark button.bg-primary:not(:disabled):hover,
+.dark .btn-primary:not(:disabled):hover,
+.dark a[role="button"].bg-primary:not(:disabled):hover {
+  box-shadow: 0 0 0 1px rgb(var(--primary-glow) / 0.35),
+              0 8px 24px -6px rgb(var(--primary-glow) / 0.55),
+              0 2px 10px -2px rgb(var(--primary-glow) / 0.35);
+}
+
+.dark button.bg-primary:not(:disabled):focus-visible,
+.dark .btn-primary:not(:disabled):focus-visible {
+  box-shadow: 0 0 0 1px rgb(var(--primary-glow) / 0.4),
+              0 0 0 4px rgb(var(--primary-glow) / 0.18),
+              0 8px 24px -6px rgb(var(--primary-glow) / 0.5);
+}
+
+/* Keyboard focus ring gets the same bloom in dark mode so tab-navigating
+   the app feels like it's lighting up rather than just outlining. */
+.dark :focus-visible,
+.dark a:focus-visible,
+.dark button:focus-visible,
+.dark input:focus-visible,
+.dark select:focus-visible,
+.dark textarea:focus-visible,
+.dark [tabindex]:focus-visible {
+  box-shadow: 0 0 0 4px rgb(var(--ring) / 0.22);
 }
 
 

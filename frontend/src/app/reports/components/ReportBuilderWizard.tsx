@@ -524,8 +524,10 @@ export function ReportBuilderWizard({
   // Prioritize active focus colleges first, followed by all remaining colleges in alphabetical order
   const prioritizedColleges = useMemo(() => {
     const coordinatorSelectedIds = getCoordinatorSelectedColleges();
-    const focusedIdsFromColleges = (colleges as any[]).filter((c) => c.is_selected_by_me).map((c) => c._id);
-    const activeFocusIds = Array.from(new Set([...coordinatorSelectedIds, ...focusedIdsFromColleges]));
+    const activeFocusIds =
+      coordinatorSelectedIds.length > 0
+        ? coordinatorSelectedIds
+        : (colleges as any[]).filter((c) => c.is_selected_by_me).map((c) => c._id);
     return sortCollegesWithPriority(colleges as any[], activeFocusIds);
   }, [colleges]);
 
@@ -1606,9 +1608,7 @@ export function ReportBuilderWizard({
                       );
                       const selectOptions = prioritizedColleges.map((c: any) => ({
                         value: c._id,
-                        label: c.college_name,
                         badge: c.college_code,
-                        sublabel: c.location,
                         isPinned: Boolean(c.isPinned || c.is_selected_by_me),
                       }));
 

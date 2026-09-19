@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { X, CheckCircle2, Pencil, Trash2, Building2, Sparkles, ClipboardList, GraduationCap } from 'lucide-react';
+import { X, Pencil, Trash2, Building2, Sparkles, ClipboardList, GraduationCap } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 import { sortCollegesWithPriority, getCoordinatorSelectedColleges } from '@/lib/collegeSession';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
 import { SmoothYearDropdown } from '@/components/ui/SmoothYearDropdown';
+import { SmoothTimeInput } from '@/components/ui/SmoothTimeInput';
 import type { DailyLeadRow, CollegeOption } from './LeadsTable';
 
 const BATCH_YEARS = ['2025', '2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
@@ -55,8 +56,10 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
 
   const prioritizedColleges = useMemo(() => {
     const coordinatorSelectedIds = getCoordinatorSelectedColleges();
-    const focusedIdsFromColleges = (colleges as any[]).filter((c) => c.is_selected_by_me).map((c) => c._id);
-    const activeFocusIds = Array.from(new Set([...coordinatorSelectedIds, ...focusedIdsFromColleges]));
+    const activeFocusIds =
+      coordinatorSelectedIds.length > 0
+        ? coordinatorSelectedIds
+        : (colleges as any[]).filter((c) => c.is_selected_by_me).map((c) => c._id);
     return sortCollegesWithPriority(colleges as any[], activeFocusIds);
   }, [colleges]);
 
@@ -106,9 +109,14 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
     }
   };
 
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   const handleDelete = async () => {
     if (!onDelete) return;
-    if (!window.confirm(`Are you sure you want to delete "${lead.company_name}"?`)) return;
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
 
     try {
       setDeleting(true);
@@ -119,6 +127,7 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
       toast(err?.message || 'Failed to delete lead', 'error');
     } finally {
       setDeleting(false);
+      setConfirmDelete(false);
     }
   };
 
@@ -217,9 +226,7 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
                   { value: '', label: '— No Specific College —' },
                   ...prioritizedColleges.map((c: any) => ({
                     value: c._id,
-                    label: c.college_name,
                     badge: c.college_code,
-                    sublabel: c.location,
                     isPinned: Boolean(c.isPinned || c.is_selected_by_me),
                   })),
                 ]}
@@ -292,12 +299,10 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
 
             <div>
               <label className="block text-fg font-semibold mb-1">Time Stamp</label>
-              <input
-                type="text"
+              <SmoothTimeInput
                 value={eventTime}
-                onChange={(e) => setEventTime(e.target.value)}
-                placeholder="e.g. 10:30 am"
-                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-xl px-3 py-2 text-fg placeholder:text-fg-disabled text-xs transition-all outline-none font-mono"
+                onChange={setEventTime}
+                placeholder="e.g. 10:30 AM"
               />
             </div>
           </div>
@@ -318,15 +323,30 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
         {/* ── Sticky Footer (Compact & Smooth) ───────────────────────── */}
         <div className="flex items-center justify-between px-6 py-3.5 border-t border-border bg-surface-sunken/60 shrink-0">
           {onDelete ? (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleting || loading}
-              className="flex items-center gap-1.5 px-3 py-2 text-rose-600 hover:text-rose-700 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-[0.992]"
-            >
-              <Trash2 size={13} />
-              <span>{deleting ? 'Deleting…' : 'Delete'}</span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting || loading}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-[0.992] ${
+                  confirmDelete
+                    ? 'bg-rose-600 text-white hover:bg-rose-700 shadow-xs'
+                    : 'text-rose-600 hover:text-rose-700 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20'
+                }`}
+              >
+                <Trash2 size={13} />
+                <span>{deleting ? 'Deleting…' : confirmDelete ? 'Click to Confirm Delete' : 'Delete'}</span>
+              </button>
+              {confirmDelete && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  className="px-2 py-1 text-fg-subtle hover:text-fg text-xs font-medium cursor-pointer"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
           ) : (
             <div />
           )}
@@ -335,10 +355,9 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
             type="submit"
             form="edit-lead-form"
             disabled={loading || deleting}
-            className="px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-md shadow-primary/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.992]"
+            className="px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-md shadow-primary/20 transition-all flex items-center justify-center cursor-pointer active:scale-[0.992]"
           >
-            <CheckCircle2 size={14} />
-            <span>{loading ? 'Saving…' : 'Save Changes'}</span>
+            {loading ? 'Saving…' : 'Save'}
           </button>
         </div>
       </div>

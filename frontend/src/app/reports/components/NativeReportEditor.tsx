@@ -1248,25 +1248,25 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               </div>
               <div className="flex items-center gap-1.5">
                 <Calendar size={13} className="text-fg-subtle print:text-slate-400 shrink-0" />
-                <span>Generated Date: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_date}</strong></span>
+                <span>Generated On: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_date}</strong></span>
               </div>
             </>
           ) : (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') ? (
             <>
               <div className="flex items-center gap-1.5">
                 <Calendar size={13} className="text-primary shrink-0" />
-                <span>Report Date: <strong className="text-fg print:text-slate-900 font-semibold">{report.report_period || report.effective_date || report.date || report.generated_date}</strong></span>
+                <span>Report Date: <strong className="text-fg print:text-slate-900 font-semibold">{report.report_period || (report as any).day_date || report.kpi_summary?.report_date || report.effective_date || report.date || report.generated_date}</strong></span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Calendar size={13} className="text-fg-subtle print:text-slate-400 shrink-0" />
-                <span>Generated: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_date}</strong></span>
+                <span>Generated On: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_date}</strong></span>
               </div>
             </>
           ) : (
             <div className="w-full flex items-center justify-center">
               <div className="flex items-center gap-1.5">
                 <Calendar size={13} className="text-fg-subtle print:text-slate-500 shrink-0" />
-                <span>Generated Date: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_date}</strong></span>
+                <span>Generated On: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_date}</strong></span>
               </div>
             </div>
           )}

@@ -29,7 +29,6 @@ import {
   FileText,
   Loader2,
   Sparkles,
-  BarChart3,
 } from 'lucide-react';
 import { COLLEGE_LOGO_MAP, getCollegeLogoUrl } from '@/lib/collegeLogo';
 import {
@@ -645,7 +644,28 @@ export function A4PdfPreviewModal({
               <div className="flex items-center gap-1.5">
                 <Calendar size={13} className="text-slate-400 shrink-0" />
                 <span>
-                  Generated Date:{' '}
+                  Generated On:{' '}
+                  <strong className="text-slate-900 font-semibold">
+                    {report.generated_date}
+                  </strong>
+                </span>
+              </div>
+            </>
+          ) : (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') ? (
+            <>
+              <div className="flex items-center gap-1.5">
+                <Calendar size={13} className="text-emerald-700 shrink-0" />
+                <span>
+                  Report Date:{' '}
+                  <strong className="text-slate-900 font-semibold">
+                    {report.report_period || (report as any).day_date || report.kpi_summary?.report_date || report.generated_date}
+                  </strong>
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Calendar size={13} className="text-slate-400 shrink-0" />
+                <span>
+                  Generated On:{' '}
                   <strong className="text-slate-900 font-semibold">
                     {report.generated_date}
                   </strong>
@@ -657,7 +677,7 @@ export function A4PdfPreviewModal({
               <div className="flex items-center gap-1.5">
                 <Calendar size={13} className="text-slate-500 shrink-0" />
                 <span>
-                  Generated Date:{' '}
+                  Generated On:{' '}
                   <strong className="text-slate-900 font-semibold">
                     {report.generated_date}
                   </strong>
@@ -940,58 +960,6 @@ export function A4PdfPreviewModal({
                   </div>
                 );
               }
-            })()}
-
-          {/* Pipeline Overview — compact horizontal-bar visual summary of the
-              section breakdown, so the whole report's story reads in one
-              glance instead of counting rows across up to 9 separate tables. */}
-          {!report.is_multi_college &&
-            report.template_type === 'weekly_placement' &&
-            (() => {
-              const barSections = [
-                { key: 'completed_companies', label: 'Completed', bar: 'bg-emerald-500', text: 'text-emerald-700' },
-                { key: 'drive_in_progress', label: 'Drive in Progress', bar: 'bg-amber-500', text: 'text-amber-700' },
-                { key: 'companies_in_drive', label: 'Upcoming Drives', bar: 'bg-indigo-500', text: 'text-indigo-700' },
-                { key: 'in_progress', label: 'In Progress', bar: 'bg-blue-500', text: 'text-blue-700' },
-                { key: 'pipeline', label: 'Pipeline', bar: 'bg-cyan-500', text: 'text-cyan-700' },
-                { key: 'top_companies', label: 'Top Companies', bar: 'bg-purple-500', text: 'text-purple-700' },
-                { key: 'rejected_companies', label: 'Rejected', bar: 'bg-rose-500', text: 'text-rose-700' },
-                { key: 'on_hold_by_college', label: 'On Hold (College)', bar: 'bg-orange-500', text: 'text-orange-700' },
-                { key: 'on_hold_by_hr', label: 'On Hold (HR)', bar: 'bg-slate-400', text: 'text-slate-700' },
-              ]
-                .filter((s) => report.included_sections?.[s.key] && Array.isArray(report.sections?.[s.key]))
-                .map((s) => ({ ...s, count: report.sections[s.key].length }));
-
-              const total = barSections.reduce((sum, s) => sum + s.count, 0);
-              if (barSections.length === 0 || total === 0) return null;
-              const maxCount = Math.max(...barSections.map((s) => s.count), 1);
-
-              return (
-                <div className="border border-slate-200 rounded-xl p-3.5 bg-slate-50/40 print:break-inside-avoid break-inside-avoid">
-                  <h3 className="text-[12px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5 uppercase mb-2.5">
-                    <BarChart3 size={13} className="text-[#007791] shrink-0" />
-                    Pipeline Overview — {total} {total === 1 ? 'Company' : 'Companies'}
-                  </h3>
-                  <div className="space-y-1.5">
-                    {barSections.map((s) => (
-                      <div key={s.key} className="flex items-center gap-2">
-                        <span className="w-[110px] shrink-0 text-[9.5px] font-semibold text-slate-600 truncate">
-                          {s.label}
-                        </span>
-                        <div className="flex-1 h-3.5 bg-slate-100 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full ${s.bar} rounded-full`}
-                            style={{ width: `${Math.max(3, (s.count / maxCount) * 100)}%` }}
-                          />
-                        </div>
-                        <span className={`w-[24px] shrink-0 text-[10px] font-bold font-mono text-right ${s.text}`}>
-                          {s.count}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
             })()}
 
           {/* Multi-College Sections */}
@@ -2331,13 +2299,12 @@ export function A4PdfPreviewModal({
                 <table className="w-full text-[11px] border-collapse table-fixed bg-white">
                   <colgroup>
                     <col style={{ width: '36px' }} />
-                    <col style={{ width: '24%' }} />
-                    <col style={{ width: '19%' }} />
-                    <col style={{ width: '11%' }} />
+                    <col style={{ width: '27%' }} />
+                    <col style={{ width: '22%' }} />
+                    <col style={{ width: '12%' }} />
+                    <col style={{ width: '85px' }} />
                     <col style={{ width: '80px' }} />
-                    <col style={{ width: '75px' }} />
-                    <col style={{ width: '75px' }} />
-                    <col style={{ width: '18%' }} />
+                    <col style={{ width: '20%' }} />
                   </colgroup>
                   <thead className="print:table-header-group">
                     <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
@@ -2345,7 +2312,6 @@ export function A4PdfPreviewModal({
                       <th className="py-2 px-2 text-center font-bold">COMPANY NAME</th>
                       <th className="py-2 px-2 text-center font-bold">ROLE / DESIGNATION</th>
                       <th className="py-2 px-1 text-center font-bold">CTC</th>
-                      <th className="py-2 px-1.5 text-center font-bold">DATE</th>
                       <th className="py-2 px-1.5 text-center font-bold">TIME</th>
                       <th className="py-2 px-1.5 text-center font-bold">COLLEGE</th>
                       <th className="py-2 px-2 text-center font-bold">COORDINATOR</th>
@@ -2365,9 +2331,6 @@ export function A4PdfPreviewModal({
                         </td>
                         <td className="py-2 px-1 text-center font-bold text-emerald-600 whitespace-normal break-words leading-snug">
                           {r.ctc || '—'}
-                        </td>
-                        <td className="py-2 px-1.5 text-center text-slate-600 whitespace-normal break-words leading-snug font-mono text-[10px]">
-                          {r.date || '—'}
                         </td>
                         <td className="py-2 px-1.5 text-center text-slate-600 font-mono text-[10px] whitespace-normal break-words leading-snug">
                           {r.time || r.time_stamp || r.event_time || '—'}
@@ -2399,13 +2362,12 @@ export function A4PdfPreviewModal({
                 <table className="w-full text-[11px] border-collapse table-fixed bg-white">
                   <colgroup>
                     <col style={{ width: '36px' }} />
-                    <col style={{ width: '24%' }} />
-                    <col style={{ width: '19%' }} />
-                    <col style={{ width: '11%' }} />
+                    <col style={{ width: '27%' }} />
+                    <col style={{ width: '22%' }} />
+                    <col style={{ width: '12%' }} />
+                    <col style={{ width: '85px' }} />
                     <col style={{ width: '80px' }} />
-                    <col style={{ width: '75px' }} />
-                    <col style={{ width: '75px' }} />
-                    <col style={{ width: '18%' }} />
+                    <col style={{ width: '20%' }} />
                   </colgroup>
                   <thead className="print:table-header-group">
                     <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
@@ -2413,7 +2375,6 @@ export function A4PdfPreviewModal({
                       <th className="py-2 px-2 text-center font-bold">COMPANY NAME</th>
                       <th className="py-2 px-2 text-center font-bold">ROLE / DESIGNATION</th>
                       <th className="py-2 px-1 text-center font-bold">CTC</th>
-                      <th className="py-2 px-1.5 text-center font-bold">DATE</th>
                       <th className="py-2 px-1.5 text-center font-bold">TIME</th>
                       <th className="py-2 px-1.5 text-center font-bold">COLLEGE</th>
                       <th className="py-2 px-2 text-center font-bold">COORDINATOR</th>
@@ -2433,9 +2394,6 @@ export function A4PdfPreviewModal({
                         </td>
                         <td className="py-2 px-1 text-center font-bold text-blue-600 whitespace-normal break-words leading-snug">
                           {r.ctc || '—'}
-                        </td>
-                        <td className="py-2 px-1.5 text-center text-slate-600 whitespace-normal break-words leading-snug font-mono text-[10px]">
-                          {r.date || '—'}
                         </td>
                         <td className="py-2 px-1.5 text-center text-slate-600 font-mono text-[10px] whitespace-normal break-words leading-snug">
                           {r.time || r.time_stamp || r.event_time || '—'}
@@ -2646,102 +2604,74 @@ export function A4PdfPreviewModal({
           <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 dark:divide-slate-800 h-full min-h-0 overflow-hidden">
             {/* ── Left Pane: Preview Image ── */}
             <div className="flex flex-col h-full min-h-0 bg-slate-100/50 dark:bg-slate-950/70 overflow-hidden">
-              {/* Left Pane Sub-Header (Tool Box) */}
-              <div className="bg-white/95 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800/80 px-4 py-2 flex items-center justify-between text-xs shrink-0">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-md bg-sky-50 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold">
-                    <ImageIcon size={13} />
-                  </div>
-                  <div>
-                    <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">Preview Image</span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 ml-2 hidden sm:inline">
-                      (Ultra-HD Mobile & WhatsApp Format)
-                    </span>
-                  </div>
-                </div>
-
-                {/* Left Pane Zoom Bar Only */}
-                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-lg px-1.5 py-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setZoomImage((z) => Math.max(z - 10, 40))}
-                    className="w-5 h-5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded flex items-center justify-center cursor-pointer"
-                    title="Zoom Out Image"
-                  >
-                    <ZoomOut size={12} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setZoomImage(85)}
-                    className="px-1 text-[11px] font-mono font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
-                    title="Reset Image Zoom"
-                  >
-                    {zoomImage}%
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setZoomImage((z) => Math.min(z + 10, 150))}
-                    className="w-5 h-5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded flex items-center justify-center cursor-pointer"
-                    title="Zoom In Image"
-                  >
-                    <ZoomIn size={12} />
-                  </button>
-                </div>
-              </div>
-
               {/* Left Pane Scrollable Body */}
               <div className="flex-1 overflow-auto p-4 sm:p-6 flex flex-col items-center bg-slate-200/50 dark:bg-slate-950 no-scrollbar">
+                {/* Compact Zoom Controls directly above Image */}
+                <div className="flex items-center justify-center mb-3 shrink-0">
+                  <div className="flex items-center gap-1 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full px-2.5 py-1 shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => setZoomImage((z) => Math.max(z - 10, 40))}
+                      className="w-5 h-5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-full flex items-center justify-center cursor-pointer transition-colors"
+                      title="Zoom Out Image (-)"
+                    >
+                      <ZoomOut size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setZoomImage(85)}
+                      className="px-1.5 text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+                      title="Reset Image Zoom (85%)"
+                    >
+                      {zoomImage}%
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setZoomImage((z) => Math.min(z + 10, 150))}
+                      className="w-5 h-5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-full flex items-center justify-center cursor-pointer transition-colors"
+                      title="Zoom In Image (+)"
+                    >
+                      <ZoomIn size={12} />
+                    </button>
+                  </div>
+                </div>
                 {renderImagePreview()}
               </div>
             </div>
 
             {/* ── Right Pane: Preview PDF ── */}
             <div className="flex flex-col h-full min-h-0 bg-slate-100/50 dark:bg-slate-900/60 overflow-hidden">
-              {/* Right Pane Sub-Header (Tool Box) */}
-              <div className="bg-white/95 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800/80 px-4 py-2 flex items-center justify-between text-xs shrink-0">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-md bg-blue-50 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
-                    <FileText size={13} />
-                  </div>
-                  <div>
-                    <span className="font-bold text-slate-800 dark:text-slate-200 text-xs">Preview PDF</span>
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 ml-2 hidden sm:inline">
-                      (A4 Institutional Printout 210mm × 297mm)
-                    </span>
-                  </div>
-                </div>
-
-                {/* Right Pane Zoom Bar Only */}
-                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-lg px-1.5 py-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setZoomPdf((z) => Math.max(z - 10, 40))}
-                    className="w-5 h-5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded flex items-center justify-center cursor-pointer"
-                    title="Zoom Out PDF"
-                  >
-                    <ZoomOut size={12} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setZoomPdf(85)}
-                    className="px-1 text-[11px] font-mono font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
-                    title="Reset PDF Zoom"
-                  >
-                    {zoomPdf}%
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setZoomPdf((z) => Math.min(z + 10, 150))}
-                    className="w-5 h-5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded flex items-center justify-center cursor-pointer"
-                    title="Zoom In PDF"
-                  >
-                    <ZoomIn size={12} />
-                  </button>
-                </div>
-              </div>
-
               {/* Right Pane Scrollable Body */}
               <div className="flex-1 overflow-auto p-4 sm:p-6 flex flex-col items-center bg-slate-200/50 dark:bg-slate-900/80 no-scrollbar gap-8">
+                {/* Compact Zoom Controls directly above PDF Title Card */}
+                <div className="flex items-center justify-center mb-1 shrink-0 print:hidden">
+                  <div className="flex items-center gap-1 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full px-2.5 py-1 shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => setZoomPdf((z) => Math.max(z - 10, 40))}
+                      className="w-5 h-5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-full flex items-center justify-center cursor-pointer transition-colors"
+                      title="Zoom Out PDF (-)"
+                    >
+                      <ZoomOut size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setZoomPdf(85)}
+                      className="px-1.5 text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+                      title="Reset PDF Zoom (85%)"
+                    >
+                      {zoomPdf}%
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setZoomPdf((z) => Math.min(z + 10, 150))}
+                      className="w-5 h-5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-full flex items-center justify-center cursor-pointer transition-colors"
+                      title="Zoom In PDF (+)"
+                    >
+                      <ZoomIn size={12} />
+                    </button>
+                  </div>
+                </div>
                 {renderPdfDocument()}
               </div>
             </div>
@@ -2749,92 +2679,76 @@ export function A4PdfPreviewModal({
         ) : mode === 'image' ? (
           /* Single Image Mode Full Screen */
           <div className="flex flex-col h-full min-h-0 bg-slate-100/50 dark:bg-slate-950 overflow-hidden">
-            {/* Top Toolbar */}
-            <div className="bg-white/95 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 px-6 py-2 flex items-center justify-between text-xs shrink-0">
-              <div className="flex items-center gap-2">
-                <ImageIcon size={14} className="text-sky-600 dark:text-sky-400" />
-                <span className="font-bold text-slate-800 dark:text-slate-200">High-Resolution Image Preview</span>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                  (860px Portrait Layout • High-DPI Output)
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2 py-1">
-                <button
-                  type="button"
-                  onClick={() => setZoomImage((z) => Math.max(z - 10, 40))}
-                  className="w-6 h-6 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded flex items-center justify-center cursor-pointer"
-                  title="Zoom Out"
-                >
-                  <ZoomOut size={13} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setZoomImage(100)}
-                  className="px-2 text-xs font-mono font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
-                  title="Reset Zoom"
-                >
-                  {zoomImage}%
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setZoomImage((z) => Math.min(z + 10, 160))}
-                  className="w-6 h-6 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded flex items-center justify-center cursor-pointer"
-                  title="Zoom In"
-                >
-                  <ZoomIn size={13} />
-                </button>
-              </div>
-            </div>
-
             {/* Scrollable Viewport */}
-            <div className="flex-1 overflow-auto p-6 sm:p-10 flex flex-col items-center bg-slate-200/50 dark:bg-slate-950 no-scrollbar">
+            <div className="flex-1 overflow-auto p-4 sm:p-8 flex flex-col items-center bg-slate-200/50 dark:bg-slate-950 no-scrollbar">
+              {/* Compact Zoom Pill directly above Image */}
+              <div className="flex items-center justify-center mb-3 shrink-0">
+                <div className="flex items-center gap-1.5 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full px-3 py-1 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setZoomImage((z) => Math.max(z - 10, 40))}
+                    className="w-6 h-6 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-full flex items-center justify-center cursor-pointer transition-colors"
+                    title="Zoom Out (-)"
+                  >
+                    <ZoomOut size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setZoomImage(100)}
+                    className="px-2 text-xs font-mono font-bold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+                    title="Reset Zoom (100%)"
+                  >
+                    {zoomImage}%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setZoomImage((z) => Math.min(z + 10, 160))}
+                    className="w-6 h-6 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-full flex items-center justify-center cursor-pointer transition-colors"
+                    title="Zoom In (+)"
+                  >
+                    <ZoomIn size={13} />
+                  </button>
+                </div>
+              </div>
+
               {renderImagePreview()}
             </div>
           </div>
         ) : (
           /* Single PDF Mode Full Screen */
           <div className="flex flex-col h-full min-h-0 bg-slate-100/50 dark:bg-slate-900 overflow-hidden">
-            {/* Top Toolbar */}
-            <div className="bg-white/95 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 px-6 py-2 flex items-center justify-between text-xs shrink-0">
-              <div className="flex items-center gap-2">
-                <FileText size={14} className="text-blue-600 dark:text-blue-400" />
-                <span className="font-bold text-slate-800 dark:text-slate-200">A4 PDF Document Print Preview</span>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                  (210mm × 297mm Institutional Paper)
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-2 py-1">
-                <button
-                  type="button"
-                  onClick={() => setZoomPdf((z) => Math.max(z - 10, 40))}
-                  className="w-6 h-6 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded flex items-center justify-center cursor-pointer"
-                  title="Zoom Out"
-                >
-                  <ZoomOut size={13} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setZoomPdf(100)}
-                  className="px-2 text-xs font-mono font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
-                  title="Reset Zoom"
-                >
-                  {zoomPdf}%
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setZoomPdf((z) => Math.min(z + 10, 160))}
-                  className="w-6 h-6 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded flex items-center justify-center cursor-pointer"
-                  title="Zoom In"
-                >
-                  <ZoomIn size={13} />
-                </button>
-              </div>
-            </div>
-
             {/* Scrollable Viewport */}
-            <div className="flex-1 overflow-auto p-6 sm:p-10 flex flex-col items-center bg-slate-200/50 dark:bg-slate-900/80 no-scrollbar gap-8">
+            <div className="flex-1 overflow-auto p-4 sm:p-8 flex flex-col items-center bg-slate-200/50 dark:bg-slate-900/80 no-scrollbar">
+              {/* Compact Zoom Pill directly above the Title Card / Document Preview */}
+              <div className="flex items-center justify-center mb-3 shrink-0 print:hidden">
+                <div className="flex items-center gap-1.5 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full px-3 py-1 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setZoomPdf((z) => Math.max(z - 10, 40))}
+                    className="w-6 h-6 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-full flex items-center justify-center cursor-pointer transition-colors"
+                    title="Zoom Out (-)"
+                  >
+                    <ZoomOut size={13} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setZoomPdf(100)}
+                    className="px-2 text-xs font-mono font-bold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+                    title="Reset Zoom (100%)"
+                  >
+                    {zoomPdf}%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setZoomPdf((z) => Math.min(z + 10, 160))}
+                    className="w-6 h-6 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-full flex items-center justify-center cursor-pointer transition-colors"
+                    title="Zoom In (+)"
+                  >
+                    <ZoomIn size={13} />
+                  </button>
+                </div>
+              </div>
+
               {renderPdfDocument()}
             </div>
           </div>

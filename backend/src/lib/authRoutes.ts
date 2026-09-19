@@ -97,13 +97,6 @@ function clearRefreshCookie(res: Response, req?: Request) {
   res.clearCookie(REFRESH_TOKEN_COOKIE, refreshCookieOptions(req));
 }
 
-/**
- * The only role self-registration is permitted to create (Module 08 §12/§16:
- * "Role selection at signup... corrected for security — users should never
- * see those options. The signup page now shows only Placement Coordinator").
- */
-const SELF_SIGNUP_ROLE = 'PLACEMENT_COORDINATOR';
-
 const isAdmin = (roles: string[] = []) => roles.includes('ADMINISTRATOR') || roles.includes('ADMIN');
 
 /**
@@ -164,300 +157,33 @@ function publicUser(user: any) {
   };
 }
 
-interface PendingSignup {
-  full_name: string;
-  username: string;
-  official_email: string;
-  primary_mobile: string;
-  password_hash: string;
-  otp_hash: string;
-  expires_at: Date;
-  attempts: number;
-}
-const pendingSignups = new Map<string, PendingSignup>();
-
 export function registerAuthRoutes(app: Express) {
-  /* ── Staff Self-Registration Step 1: Request Outlook Email OTP ────────── */
+  /* ── Public Self-Registration is Disabled (Admin-Only Provisioning Model) ── */
   app.post('/api/v1/auth/signup/request-otp', async (req: Request, res: Response) => {
-    try {
-      const {
-        full_name = '',
-        username = '',
-        official_email = '',
-        primary_mobile = '',
-        password = '',
-      } = req.body;
-
-      const email = String(official_email).trim().toLowerCase();
-      const uname = String(username).trim().toLowerCase();
-      const name = String(full_name).trim();
-
-      if (!name || !uname || !email || !password) {
-        return fail(res, 400, 'FIELDS_REQUIRED', 'Please complete all required fields.');
-      }
-
-      if (!isStaffDomain(email)) {
-        return fail(res, 400, 'INVALID_DOMAIN', `Only @${STAFF_DOMAINS.join(' or @')} email addresses are permitted.`);
-      }
-
-      if (String(primary_mobile).trim() && !isValidMobile(primary_mobile)) {
-        return fail(res, 400, 'INVALID_MOBILE', 'Enter a valid 10-digit mobile number.');
-      }
-
-      if (!isPasswordValid(password)) {
-        return fail(res, 400, 'PASSWORD_POLICY', firstPasswordError(password) || 'Password does not meet the policy.');
-      }
-
-      // Check if this email or username already exists in the database
-      const existingUser = await User.findOne({
-        $or: [
-          { official_email: email },
-          { username: uname },
-        ],
-      });
-
-      if (existingUser) {
-        const isSameEmail = existingUser.official_email.toLowerCase() === email;
-        return fail(
-          res,
-          409,
-          'ACCOUNT_ALREADY_EXISTS',
-          isSameEmail
-            ? `An account with ${email} already exists. Please sign in or reset your password.`
-            : `The username "${uname}" is already taken. Please choose a different username.`
-        );
-      }
-
-      const salt = await bcrypt.genSalt(12);
-      const password_hash = await bcrypt.hash(password, salt);
-
-      const code = generateOtp();
-      const otp_hash = await bcrypt.hash(code, 10);
-      const expires_at = new Date(Date.now() + OTP_TTL_MINUTES * 60_000);
-
-      pendingSignups.set(email, {
-        full_name: name,
-        username: uname,
-        official_email: email,
-        primary_mobile: String(primary_mobile).trim(),
-        password_hash,
-        otp_hash,
-        expires_at,
-        attempts: 0,
-      });
-
-      const delivery = await sendOtpEmail(email, name, code, OTP_TTL_MINUTES);
-
-      await writeAudit({
-        action: 'OTP_ISSUED',
-        result: delivery.delivered ? 'SUCCESS' : 'FAILED',
-        entityType: 'users',
-        entityId: null,
-        performedBy: null,
-        performedByRole: 'COORDINATOR',
-        performedByEmail: email,
-        module: 'Security & Audit',
-        severity: 'info',
-        summary: delivery.delivered
-          ? `Signup verification code emailed to Outlook inbox ${email}`
-          : `Signup verification code delivery failed for ${email} (${delivery.reason})`,
-        req,
-      });
-
-      if (!delivery.delivered && delivery.reason === 'SMTP is not configured on the server') {
-        return res.status(200).json({
-          success: true,
-          message: `Verification code generated: ${code}`,
-          data: { expiresInMinutes: OTP_TTL_MINUTES, devMode: true, devCode: code },
-        });
-      }
-
-      return res.status(200).json({
-        success: true,
-        message: `A 6-digit verification code has been sent to your official Outlook inbox (${email}). Enter the code to activate your Coordinator account.`,
-        data: { expiresInMinutes: OTP_TTL_MINUTES },
-      });
-    } catch (error: any) {
-      return fail(res, 500, 'INTERNAL_SERVER_ERROR', error?.message || 'Unexpected error');
-    }
+    return fail(
+      res,
+      403,
+      'SELF_REGISTRATION_DISABLED',
+      'Self-registration is disabled. Please contact your system administrator to provision your account with designated college allocations.'
+    );
   });
 
-  /* ── Staff Self-Registration Step 2: Verify OTP & Create Account ──────── */
   app.post('/api/v1/auth/signup/verify-otp', async (req: Request, res: Response) => {
-    try {
-      const email = String(req.body?.official_email || req.body?.email || '').trim().toLowerCase();
-      const otp = String(req.body?.otp ?? '').trim();
-
-      if (!email || !otp) {
-        return fail(res, 400, 'FIELDS_REQUIRED', 'Email and verification code are required.');
-      }
-
-      const pending = pendingSignups.get(email);
-      if (!pending) {
-        return fail(res, 400, 'NO_SIGNUP_PENDING', 'No pending registration found for this email. Please submit the sign-up form again.');
-      }
-
-      if (pending.expires_at.getTime() < Date.now()) {
-        pendingSignups.delete(email);
-        return fail(res, 400, 'OTP_EXPIRED', 'Verification code has expired. Please request a new code.');
-      }
-
-      // Was increment-then-check (>), which let a 6th guess through evaluation
-      // right after the "0 attempt(s) remaining" message on the 5th wrong
-      // one — check-then-increment (matching the forgot-password OTP flow
-      // below, which never had this bug) so "0 remaining" is actually true.
-      if (pending.attempts >= OTP_MAX_ATTEMPTS) {
-        pendingSignups.delete(email);
-        return fail(res, 400, 'OTP_MAX_ATTEMPTS', 'Too many invalid attempts. Please sign up again.');
-      }
-
-      const match = await bcrypt.compare(otp, pending.otp_hash);
-      if (!match) {
-        pending.attempts += 1;
-        const remaining = Math.max(0, OTP_MAX_ATTEMPTS - pending.attempts);
-        return fail(res, 400, 'INVALID_OTP', `Invalid verification code. ${remaining} attempt(s) remaining.`);
-      }
-
-      // Check once more if user already exists
-      const existingUser = await User.findOne({
-        $or: [{ official_email: email }, { username: pending.username }],
-      });
-      if (existingUser) {
-        pendingSignups.delete(email);
-        return fail(res, 409, 'ACCOUNT_ALREADY_EXISTS', 'Account already exists. Please sign in.');
-      }
-
-      const { Role } = await import('../models/Role');
-      const roles = await Role.find({ role_code: { $in: [SELF_SIGNUP_ROLE] } });
-      const roleIds = roles.map((r) => r._id);
-
-      const user = await User.create({
-        full_name: pending.full_name,
-        username: pending.username,
-        official_email: pending.official_email,
-        password_hash: pending.password_hash,
-        role_codes: [SELF_SIGNUP_ROLE],
-        role_ids: roleIds,
-        primary_mobile: pending.primary_mobile,
-        // Self-registration verifies the account belongs to a real
-        // @infoziant.com/@icl.today inbox, but that is identity, not
-        // authorization — 'pending' until a Team Leader or Administrator
-        // reviews and activates it (Settings → User Management), so a
-        // verified email can no longer walk straight into a working
-        // Coordinator account with zero human review.
-        account_status: 'pending',
-        presence_status: 'available',
-        is_deleted: false,
-      });
-
-      pendingSignups.delete(email);
-
-      await writeAudit({
-        action: 'CREATE',
-        result: 'SUCCESS',
-        entityType: 'users',
-        entityId: user._id,
-        performedBy: user._id,
-        performedByRole: SELF_SIGNUP_ROLE,
-        performedByEmail: email,
-        module: 'Security & Audit',
-        severity: 'info',
-        summary: `Self-registered Placement Coordinator account for ${user.full_name} (${email}) verified via Outlook OTP — awaiting Team Leader/Administrator approval`,
-        req,
-      });
-
-      return res.status(201).json({
-        success: true,
-        message: `Your email is verified, ${user.full_name}. Your account is now pending review — a Team Leader or Administrator will activate it shortly, and you'll be able to sign in once approved.`,
-        data: {
-          user: publicUser(user),
-        },
-      });
-    } catch (error: any) {
-      return fail(res, 500, 'INTERNAL_SERVER_ERROR', error?.message || 'Unexpected error');
-    }
+    return fail(
+      res,
+      403,
+      'SELF_REGISTRATION_DISABLED',
+      'Self-registration is disabled. Please contact your system administrator to provision your account with designated college allocations.'
+    );
   });
 
-  /* ── Legacy / Combined Sign Up endpoint (routes to request-otp or verify-otp) ── */
   app.post('/api/v1/auth/signup', async (req: Request, res: Response) => {
-    if (req.body?.otp) {
-      return (app as any)._router.handle({ ...req, url: '/api/v1/auth/signup/verify-otp' }, res);
-    }
-    // Otherwise route to request-otp
-    try {
-      const {
-        full_name = '',
-        username = '',
-        official_email = '',
-        primary_mobile = '',
-        password = '',
-      } = req.body;
-
-      const email = String(official_email).trim().toLowerCase();
-      const uname = String(username).trim().toLowerCase();
-      const name = String(full_name).trim();
-
-      if (!name || !uname || !email || !password) {
-        return fail(res, 400, 'FIELDS_REQUIRED', 'Please complete all required fields.');
-      }
-
-      if (!isStaffDomain(email)) {
-        return fail(res, 400, 'INVALID_DOMAIN', `Only @${STAFF_DOMAINS.join(' or @')} email addresses are permitted.`);
-      }
-
-      if (String(primary_mobile).trim() && !isValidMobile(primary_mobile)) {
-        return fail(res, 400, 'INVALID_MOBILE', 'Enter a valid 10-digit mobile number.');
-      }
-
-      if (!isPasswordValid(password)) {
-        return fail(res, 400, 'PASSWORD_POLICY', firstPasswordError(password) || 'Password does not meet the policy.');
-      }
-
-      const existingUser = await User.findOne({
-        $or: [{ official_email: email }, { username: uname }],
-      });
-
-      if (existingUser) {
-        const isSameEmail = existingUser.official_email.toLowerCase() === email;
-        return fail(
-          res,
-          409,
-          'ACCOUNT_ALREADY_EXISTS',
-          isSameEmail
-            ? `An account with ${email} already exists. Please sign in or reset your password.`
-            : `The username "${uname}" is already taken. Please choose a different username.`
-        );
-      }
-
-      const salt = await bcrypt.genSalt(12);
-      const password_hash = await bcrypt.hash(password, salt);
-
-      const code = generateOtp();
-      const otp_hash = await bcrypt.hash(code, 10);
-      const expires_at = new Date(Date.now() + OTP_TTL_MINUTES * 60_000);
-
-      pendingSignups.set(email, {
-        full_name: name,
-        username: uname,
-        official_email: email,
-        primary_mobile: String(primary_mobile).trim(),
-        password_hash,
-        otp_hash,
-        expires_at,
-        attempts: 0,
-      });
-
-      const delivery = await sendOtpEmail(email, name, code, OTP_TTL_MINUTES);
-
-      return res.status(200).json({
-        success: true,
-        requiresOtp: true,
-        message: `A 6-digit verification code has been sent to your Outlook inbox (${email}). Please verify to complete account creation.`,
-        data: { expiresInMinutes: OTP_TTL_MINUTES },
-      });
-    } catch (error: any) {
-      return fail(res, 500, 'INTERNAL_SERVER_ERROR', error?.message || 'Unexpected error');
-    }
+    return fail(
+      res,
+      403,
+      'SELF_REGISTRATION_DISABLED',
+      'Self-registration is disabled. Please contact your system administrator to provision your account with designated college allocations.'
+    );
   });
 
   /* ── Sign in ──────────────────────────────────────────────────────────── */

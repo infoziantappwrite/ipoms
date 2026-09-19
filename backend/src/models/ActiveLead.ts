@@ -42,9 +42,9 @@ export interface IActiveLead extends Document {
   company_name: string;
   role: string;
   ctc: string;
-  status: ActiveLeadStatus;
-  followup_month: FollowupMonth;
-  academic_year: string;
+  status?: ActiveLeadStatus | string;
+  followup_month?: FollowupMonth | string;
+  academic_year?: string;
 
   // Ownership & References
   coordinator_id?: Types.ObjectId;
