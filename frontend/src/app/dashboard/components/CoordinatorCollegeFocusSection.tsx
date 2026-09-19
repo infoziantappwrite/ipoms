@@ -29,6 +29,7 @@ import {
   isFocusLockedToday,
   CollegeOccupancy,
 } from '@/lib/collegeSession';
+import { readSessionUser } from '@/lib/session';
 import { useToast } from '@/components/ui/Toast';
 
 interface Props {
@@ -45,6 +46,45 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  // Helper to extract clean occupancy info without attributing the current user as a foreign handler
+  const getCleanOccupancy = (college: CollegeOccupancy) => {
+    const sessionUser = readSessionUser();
+    const currentUserName = (sessionUser?.full_name || '').toLowerCase().trim();
+    const currentUserEmail = (sessionUser?.official_email || '').toLowerCase().trim();
+
+    if (!college.occupied_by) {
+      return {
+        occupiedName: '',
+        isOccupiedByOther: false,
+        isSharedWithOther: false,
+      };
+    }
+
+    const rawNames = (college.occupied_by.name || '').split(/&|,/).map((s) => s.trim()).filter(Boolean);
+    const rawEmails = (college.occupied_by.email || '').split(/&|,/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+
+    // Filter out current user
+    const otherNames = rawNames.filter((name) => {
+      const nLower = name.toLowerCase();
+      if (currentUserName && (nLower.includes(currentUserName) || currentUserName.includes(nLower))) return false;
+      return true;
+    });
+
+    const otherEmails = rawEmails.filter((em) => {
+      if (currentUserEmail && em === currentUserEmail) return false;
+      return true;
+    });
+
+    const otherCount = Math.max(otherNames.length, otherEmails.length);
+    const cleanName = otherNames.join(' & ');
+
+    return {
+      occupiedName: cleanName,
+      isOccupiedByOther: otherCount >= 2,
+      isSharedWithOther: otherCount === 1,
+    };
+  };
 
   // Load Matrix Data from Backend API
   const loadData = async (isInitial = false) => {
@@ -99,24 +139,24 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
       return;
     }
 
+    const { occupiedName, isOccupiedByOther, isSharedWithOther } = getCleanOccupancy(college);
+
     // Rule: At most 2 coordinators or team leader allowed per college
-    if (college.is_occupied) {
-      const handlerName = college.occupied_by?.name || 'other coordinators';
+    if (isOccupiedByOther) {
       toast(
-        `[${college.college_code}] already has the maximum of 2 handlers (${handlerName}). A maximum of 2 coordinators or team leader can handle a college.`,
+        `[${college.college_code}] already has the maximum of 2 handlers (${occupiedName || 'other coordinators'}). A maximum of 2 coordinators or team leader can handle a college.`,
         'warning'
       );
       return;
     }
 
     // Rule: At a time, maximum 1 college only is allowed to be co-handled with another coordinator or team leader
-    const isThisShared = Boolean(college.is_shared_slot || (college.occupied_by?.name && !college.is_occupied));
-    if (isThisShared) {
-      const alreadyHasShared = colleges.some(
-        (c) =>
-          selectedIds.includes(c._id) &&
-          (c.is_shared_slot || (c.occupied_by?.name && !c.is_occupied))
-      );
+    if (isSharedWithOther) {
+      const alreadyHasShared = colleges.some((c) => {
+        if (!selectedIds.includes(c._id)) return false;
+        const occ = getCleanOccupancy(c);
+        return occ.isSharedWithOther;
+      });
       if (alreadyHasShared) {
         toast(
           'At a time, maximum 1 college only is allowed to be co-handled by 2 coordinators or team leader. You already have a co-handled college selected.',
@@ -292,8 +332,9 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {filteredColleges.map((college) => {
               const isChecked = selectedIds.includes(college._id);
-              const isOccupiedByOther = Boolean(college.is_occupied && !isChecked);
-              const isSharedSlot = Boolean(college.is_shared_slot && !isChecked);
+              const { occupiedName, isOccupiedByOther: cleanOccupiedByOther, isSharedWithOther } = getCleanOccupancy(college);
+              const isOccupiedByOther = Boolean(cleanOccupiedByOther && !isChecked);
+              const isSharedSlot = Boolean(isSharedWithOther && !isChecked);
               const isRemainingLocked = Boolean(isLocked && !isChecked);
 
               return (
@@ -371,23 +412,23 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
                       {isChecked ? (
                         <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-blue-600 dark:text-sky-400">
                           <Sparkles size={10} /> Focus
-                          {college.occupied_by?.name && (
+                          {occupiedName && (
                             <span className="font-normal text-fg-subtle text-[9px] ml-0.5">
-                              (Shared with {college.occupied_by.name})
+                              (Shared with {occupiedName})
                             </span>
                           )}
                         </span>
                       ) : isRemainingLocked ? (
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-fg-subtle bg-surface px-1.5 py-0.2 rounded border border-border">
-                          <Lock size={9} /> Locked {college.occupied_by?.name ? `(${college.occupied_by.name})` : ''}
+                          <Lock size={9} /> Locked {occupiedName ? `(${occupiedName})` : ''}
                         </span>
-                      ) : isOccupiedByOther && college.occupied_by?.name ? (
+                      ) : isOccupiedByOther && occupiedName ? (
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/20">
-                          <Lock size={9} /> {college.occupied_by.name} (Full)
+                          <Lock size={9} /> {occupiedName} (Full)
                         </span>
-                      ) : isSharedSlot && college.occupied_by?.name ? (
+                      ) : isSharedSlot && occupiedName ? (
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
-                          <Users size={9} /> 1/2 with {college.occupied_by.name}
+                          <Users size={9} /> 1/2 with {occupiedName}
                         </span>
                       ) : null}
                     </div>

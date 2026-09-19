@@ -18,7 +18,7 @@ import {
   Flame,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { WeeklyTable, WeeklyRow } from './WeeklyTable';
+import { WeeklyTable, WeeklyRow, getFollowUpStatus } from './WeeklyTable';
 import { EditCompanyModal } from './EditCompanyModal';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 
@@ -287,6 +287,9 @@ export function WeeklySection({
     }
   };
 
+  const dueTodayCount = rows.filter((r) => getFollowUpStatus(r.follow_up_date) === 'today').length;
+  const overdueCount = rows.filter((r) => getFollowUpStatus(r.follow_up_date) === 'overdue').length;
+
   return (
     <div
       onDragOver={handleSectionDragOver}
@@ -307,11 +310,26 @@ export function WeeklySection({
         }}
         className={`sticky top-0 z-20 flex items-center justify-between px-4 py-2.5 border-b cursor-pointer select-none transition-colors ${config.headerBg}`}
       >
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 flex-wrap">
           <IconComponent size={15} strokeWidth={2} className={config.iconClass} />
           <span className="text-xs font-bold tracking-wide uppercase">
             {title}
           </span>
+          <span className={`text-micro font-bold px-2 py-0.5 rounded-full border ${config.badgeClass}`}>
+            {rows.length} {rows.length === 1 ? 'company' : 'companies'}
+          </span>
+          {dueTodayCount > 0 && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500 text-white shadow-2xs animate-pulse">
+              <Flame size={11} strokeWidth={2.5} />
+              {dueTodayCount} Due Today
+            </span>
+          )}
+          {overdueCount > 0 && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-500 text-white shadow-2xs">
+              <AlertTriangle size={11} strokeWidth={2.5} />
+              {overdueCount} Overdue
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">

@@ -546,14 +546,14 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
   }
 
   const gridTemplate = isReadOnly
-    ? 'grid-cols-[56px_100px_90px_90px_260px_200px_220px_250px_150px_180px_150px_minmax(260px,1fr)]'
-    : 'grid-cols-[56px_100px_90px_90px_260px_200px_220px_250px_180px_150px_minmax(260px,1fr)]';
+    ? 'grid-cols-[56px_100px_90px_90px_260px_200px_240px_270px_150px_180px_150px_minmax(260px,1fr)]'
+    : 'grid-cols-[56px_100px_90px_90px_260px_200px_240px_270px_180px_150px_minmax(260px,1fr)]';
 
   return (
     <div className="flex-1 relative flex flex-col min-h-0">
       {/* Grid Container */}
       <div className="flex-1 overflow-auto rounded-xl border border-border bg-surface">
-        <div className={isReadOnly ? 'min-w-[2016px]' : 'min-w-[1866px]'}>
+        <div className={isReadOnly ? 'min-w-[2060px]' : 'min-w-[1910px]'}>
           {/* Sticky Column Headers (Exact Sheet-grade CSS Grid) */}
           <div className={`sticky top-0 z-20 grid ${gridTemplate} divide-x divide-border bg-surface-sunken border-b border-border text-xs font-semibold text-fg-subtle uppercase tracking-wider shadow-2xs whitespace-nowrap select-none`}>
             {/* S.No / Select Toggle Button & Master Checkbox (Frozen Col 1) */}

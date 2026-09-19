@@ -6,6 +6,7 @@ import { apiFetch } from '@/lib/api';
 import { InlineCollegeSelector } from './InlineCollegeSelector';
 import { EditLeadModal } from './EditLeadModal';
 import { SmoothYearDropdown } from '@/components/ui/SmoothYearDropdown';
+import { formatTimeAutoMask, smartParseTime } from '@/lib/timeValidation';
 
 export interface CollegeOption {
   _id: string;
@@ -193,7 +194,8 @@ function TableRow({
     if (editingField === field) {
       let finalVal = tempValue;
       if (field === 'event_time' && tempValue) {
-        finalVal = tempValue.replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase()).trim();
+        const parsed = smartParseTime(tempValue);
+        finalVal = parsed ? parsed.formatted : tempValue.replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase()).trim();
       }
       onUpdateRow(row._id, { [field]: finalVal });
       setEditingField(null);
@@ -201,6 +203,18 @@ function TableRow({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, field: string) => {
+    if (field === 'event_time' && tempValue && tempValue.length >= 4) {
+      if (e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        setTempValue(tempValue.replace(/\s*[APMamp]*$/i, '').trim() + ' AM');
+        return;
+      }
+      if (e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        setTempValue(tempValue.replace(/\s*[APMamp]*$/i, '').trim() + ' PM');
+        return;
+      }
+    }
     if (e.key === 'Enter') {
       commitEdit(field);
     } else if (e.key === 'Escape') {
@@ -260,11 +274,11 @@ function TableRow({
           <input
             type="text"
             value={tempValue}
-            onChange={(e) => setTempValue(e.target.value)}
+            onChange={(e) => setTempValue(formatTimeAutoMask(e.target.value, tempValue))}
             onBlur={() => commitEdit('event_time')}
             onKeyDown={(e) => handleKeyDown(e, 'event_time')}
             autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-20 shadow-xs outline-none text-center mx-auto uppercase"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-24 shadow-xs outline-none text-center mx-auto uppercase font-mono font-medium"
           />
         ) : (
           <span
@@ -341,7 +355,7 @@ function TableRow({
       </td>
 
       {/* Role */}
-      <td className="py-2.5 px-3 text-fg-subtle whitespace-nowrap min-w-[160px] text-center border-r border-border/60">
+      <td className="py-2 px-3 text-fg-subtle min-w-[160px] max-w-[260px] text-center border-r border-border/60">
         {editingField === 'job_role' ? (
           <input
             type="text"
@@ -353,13 +367,28 @@ function TableRow({
             className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-full shadow-xs outline-none text-center"
           />
         ) : (
-          <span
+          <div
             onClick={() => startEdit('job_role', row.job_role)}
-            className="cursor-pointer hover:text-primary transition-colors truncate block"
+            className="cursor-pointer hover:text-primary transition-colors flex flex-col items-center justify-center gap-1 py-0.5 w-full"
             title="Click to edit role"
           >
-            {row.job_role || <span className="text-fg-disabled italic font-normal text-xs">—</span>}
-          </span>
+            {row.job_role && row.job_role.trim() ? (
+              row.job_role
+                .split(/[,/\\;]+/)
+                .map((r) => r.trim())
+                .filter(Boolean)
+                .map((r, i) => (
+                  <span
+                    key={i}
+                    className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/90 dark:border-slate-700/80 shadow-2xs hover:border-primary/50 transition-colors text-center max-w-full break-words leading-tight"
+                  >
+                    {r}
+                  </span>
+                ))
+            ) : (
+              <span className="text-fg-disabled italic font-normal text-xs">—</span>
+            )}
+          </div>
         )}
       </td>
 

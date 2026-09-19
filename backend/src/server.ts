@@ -912,19 +912,25 @@ app.get('/api/v1/colleges/focus-matrix', async (req: Request, res: Response) => 
     const currentWeekMonday = getWeekMondayKey();
 
     // Identify current user if authenticated
-    let currentUserId: string | null = (req as any).user?.userId || (req as any).user?._id || null;
-    if (!currentUserId) {
+    let currentUserId: string | null = (req as any).user?.userId || (req as any).user?._id || (req as any).user?.id || null;
+    let currentUserEmail: string | null = (req as any).user?.email || (req as any).user?.official_email || null;
+
+    if (!currentUserId || !currentUserEmail) {
       const authHeader = req.headers.authorization;
       if (authHeader && authHeader.startsWith('Bearer ')) {
         try {
           const token = authHeader.split(' ')[1];
           const decoded: any = jwt.verify(token, process.env.JWT_ACCESS_SECRET || 'ipoms_secure_jwt_secret_key_2026');
-          currentUserId = decoded.userId || decoded._id || decoded.id || null;
+          if (!currentUserId) currentUserId = decoded.userId || decoded._id || decoded.id || null;
+          if (!currentUserEmail) currentUserEmail = decoded.email || decoded.official_email || null;
         } catch {}
       }
     }
     if (!currentUserId && req.query.user_id) {
       currentUserId = String(req.query.user_id);
+    }
+    if (!currentUserEmail && req.query.email) {
+      currentUserEmail = String(req.query.email).toLowerCase().trim();
     }
 
     let allColleges = await College.find({ status: 'active' }).sort({ college_code: 1 });
@@ -939,22 +945,39 @@ app.get('/api/v1/colleges/focus-matrix', async (req: Request, res: Response) => 
       }
     }
 
-    const [activeCoordinators, currentUser] = await Promise.all([
-      User.find({
-        role_codes: { $in: ['COORDINATOR', 'PLACEMENT_COORDINATOR', 'TEAM_LEADER'] },
-        account_status: 'active',
-        is_deleted: false,
-      }).select('_id full_name official_email assigned_college_ids weekly_focus_locked weekly_focus_week_key weekly_focus_locked_at'),
-      currentUserId ? User.findById(currentUserId) : null,
-    ]);
+    // Resolve current user by ID or email
+    let currentUser = null;
+    if (currentUserId && Types.ObjectId.isValid(currentUserId)) {
+      currentUser = await User.findById(currentUserId);
+    }
+    if (!currentUser && currentUserEmail) {
+      currentUser = await User.findOne({ official_email: currentUserEmail.toLowerCase(), is_deleted: false });
+      if (currentUser) {
+        currentUserId = String(currentUser._id);
+      }
+    }
+
+    const activeCoordinators = await User.find({
+      role_codes: { $in: ['COORDINATOR', 'PLACEMENT_COORDINATOR', 'TEAM_LEADER'] },
+      account_status: 'active',
+      is_deleted: false,
+    }).select('_id full_name official_email assigned_college_ids weekly_focus_locked weekly_focus_week_key weekly_focus_locked_at');
+
+    const normalizedCurrentEmail = (currentUser?.official_email || currentUserEmail || '').toLowerCase().trim();
+    const normalizedCurrentId = currentUserId ? String(currentUserId) : '';
 
     // Build map of college_id -> array of handlers (other coordinators/TLs who have locked focus)
     const collegeHandlersMap = new Map<string, Array<{ user_id: string; name: string; email: string }>>();
 
     for (const coord of activeCoordinators) {
       const coordIdStr = String(coord._id);
-      // Skip current user (their colleges are "selected by me", not occupied by others)
-      if (currentUserId && coordIdStr === String(currentUserId)) {
+      const coordEmail = (coord.official_email || '').toLowerCase().trim();
+
+      // Skip current user (their colleges are "selected by me", NEVER occupied by others)
+      if (
+        (normalizedCurrentId && coordIdStr === normalizedCurrentId) ||
+        (normalizedCurrentEmail && coordEmail === normalizedCurrentEmail)
+      ) {
         continue;
       }
 
@@ -979,14 +1002,20 @@ app.get('/api/v1/colleges/focus-matrix', async (req: Request, res: Response) => 
     }
 
     // Determine current user's selected college IDs and lock status
-    const myAssignedCollegeIds = (currentUser?.assigned_college_ids || []).map((id: any) => String(id));
+    let myAssignedCollegeIds = (currentUser?.assigned_college_ids || []).map((id: any) => String(id));
     const isMyFocusLocked = Boolean(
       currentUser?.weekly_focus_locked && currentUser?.weekly_focus_week_key === currentWeekMonday
     );
 
     const collegesWithOccupancy = allColleges.map((c) => {
       const cIdStr = String(c._id);
-      const otherHandlers = collegeHandlersMap.get(cIdStr) || [];
+      const rawOtherHandlers = collegeHandlersMap.get(cIdStr) || [];
+      // Safety filter: Ensure current user is never listed as an "otherHandler"
+      const otherHandlers = rawOtherHandlers.filter(
+        (h) =>
+          (!normalizedCurrentId || h.user_id !== normalizedCurrentId) &&
+          (!normalizedCurrentEmail || h.email?.toLowerCase().trim() !== normalizedCurrentEmail)
+      );
       const otherCount = otherHandlers.length;
       const isSelectedByMe = myAssignedCollegeIds.includes(cIdStr);
 
@@ -1050,19 +1079,29 @@ app.post('/api/v1/colleges/lock-focus', async (req: Request, res: Response) => {
     const currentWeekMonday = getWeekMondayKey();
 
     // Identify user
-    let currentUserId: string | null = (req as any).user?.userId || (req as any).user?._id || null;
-    if (!currentUserId) {
+    let currentUserId: string | null = (req as any).user?.userId || (req as any).user?._id || (req as any).user?.id || null;
+    let currentUserEmail: string | null = (req as any).user?.email || (req as any).user?.official_email || null;
+
+    if (!currentUserId || !currentUserEmail) {
       const authHeader = req.headers.authorization;
       if (authHeader && authHeader.startsWith('Bearer ')) {
         try {
           const token = authHeader.split(' ')[1];
           const decoded: any = jwt.verify(token, process.env.JWT_ACCESS_SECRET || 'ipoms_secure_jwt_secret_key_2026');
-          currentUserId = decoded.userId || decoded._id || decoded.id || null;
+          if (!currentUserId) currentUserId = decoded.userId || decoded._id || decoded.id || null;
+          if (!currentUserEmail) currentUserEmail = decoded.email || decoded.official_email || null;
         } catch {}
       }
     }
     if (!currentUserId && req.body.user_id) {
       currentUserId = String(req.body.user_id);
+    }
+    if (!currentUserEmail && req.body.email) {
+      currentUserEmail = String(req.body.email).toLowerCase().trim();
+    }
+    if (!currentUserId && currentUserEmail) {
+      const foundUser = await User.findOne({ official_email: currentUserEmail.toLowerCase(), is_deleted: false });
+      if (foundUser) currentUserId = String(foundUser._id);
     }
 
     if (!currentUserId) {
@@ -1219,19 +1258,29 @@ app.post('/api/v1/colleges/lock-focus', async (req: Request, res: Response) => {
 // Unlocks focus for the coordinator so they can modify their selections
 app.post('/api/v1/colleges/unlock-focus', async (req: Request, res: Response) => {
   try {
-    let currentUserId: string | null = (req as any).user?.userId || (req as any).user?._id || null;
-    if (!currentUserId) {
+    let currentUserId: string | null = (req as any).user?.userId || (req as any).user?._id || (req as any).user?.id || null;
+    let currentUserEmail: string | null = (req as any).user?.email || (req as any).user?.official_email || null;
+
+    if (!currentUserId || !currentUserEmail) {
       const authHeader = req.headers.authorization;
       if (authHeader && authHeader.startsWith('Bearer ')) {
         try {
           const token = authHeader.split(' ')[1];
           const decoded: any = jwt.verify(token, process.env.JWT_ACCESS_SECRET || 'ipoms_secure_jwt_secret_key_2026');
-          currentUserId = decoded.userId || decoded._id || decoded.id || null;
+          if (!currentUserId) currentUserId = decoded.userId || decoded._id || decoded.id || null;
+          if (!currentUserEmail) currentUserEmail = decoded.email || decoded.official_email || null;
         } catch {}
       }
     }
     if (!currentUserId && req.body.user_id) {
       currentUserId = String(req.body.user_id);
+    }
+    if (!currentUserEmail && req.body.email) {
+      currentUserEmail = String(req.body.email).toLowerCase().trim();
+    }
+    if (!currentUserId && currentUserEmail) {
+      const foundUser = await User.findOne({ official_email: currentUserEmail.toLowerCase(), is_deleted: false });
+      if (foundUser) currentUserId = String(foundUser._id);
     }
 
     if (!currentUserId) {
@@ -1934,12 +1983,14 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
             wt.company_name = row.company_name.trim();
             if (row.mobile_number) {
               wt.contact_number = row.mobile_number.trim();
+              if (!wt.mobile_numbers) wt.mobile_numbers = [];
               if (!wt.mobile_numbers.includes(row.mobile_number.trim())) {
                 wt.mobile_numbers.push(row.mobile_number.trim());
               }
             }
             if (row.email_id) {
               wt.email_id = row.email_id.trim();
+              if (!wt.email_ids) wt.email_ids = [];
               if (!wt.email_ids.includes(row.email_id.trim())) {
                 wt.email_ids.push(row.email_id.trim());
               }
@@ -2709,7 +2760,8 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
 
     rows.forEach((row) => {
       const cName = row.company_name ? row.company_name.trim().toLowerCase() : '';
-      const key = `${String(row.college_id)}_${row.academic_year}_${cName}`;
+      const rRole = row.job_role ? row.job_role.trim().toLowerCase() : '';
+      const key = `${String(row.college_id)}_${row.academic_year}_${cName}_${rRole}_${row.pipeline_section}`;
       if (!seenRowKeys.has(key)) {
         seenRowKeys.add(key);
         uniqueRows.push(row);
@@ -4424,17 +4476,6 @@ app.get('/api/v1/daily-leads', async (req: Request, res: Response) => {
     // repair is still available, opt-in, via
     // GET /health/daily-leads-diagnostics?resync=true (administrator only).
 
-    // Ensure master positives across all colleges are seeded
-    const totalPositivesCount = await DailyLead.countDocuments({ lead_type: 'positive', is_deleted: false });
-    if (totalPositivesCount === 0) {
-      await seedMasterDailyLeads();
-    }
-
-    const totalAugustJdCount = await DailyLead.countDocuments({ lead_type: 'jd_received', is_deleted: false });
-    if (totalAugustJdCount === 0) {
-      await seedAugustAllCollegesJdReceived();
-    }
-
     const leadsRaw = await DailyLead.find(filter)
       .sort({ lead_date: -1, created_at: -1 })
       .populate('college_id', 'college_name college_code')
@@ -4946,11 +4987,6 @@ app.get('/api/v1/daily-leads/summary', async (req: Request, res: Response) => {
 
     if (coordinator_id && coordinator_id !== 'all') {
       baseFilter.coordinator_id = new Types.ObjectId(String(coordinator_id));
-    }
-
-    const totalPositivesCount = await DailyLead.countDocuments({ lead_type: 'positive', is_deleted: false });
-    if (totalPositivesCount === 0) {
-      await seedMasterDailyLeads();
     }
 
     const [positivesCount, jdCount, activeColleges] = await Promise.all([

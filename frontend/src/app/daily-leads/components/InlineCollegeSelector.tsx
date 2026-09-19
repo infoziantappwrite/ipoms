@@ -176,7 +176,7 @@ export function InlineCollegeSelector({
         onClick={handleToggle}
         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold font-mono transition-all cursor-pointer shadow-2xs border select-none group active:scale-[0.992] ${
           selectedCollege
-            ? 'bg-blue-50/90 dark:bg-blue-950/40 text-primary dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-100/80 dark:hover:bg-blue-950/70 hover:border-blue-300'
+            ? 'bg-primary/10 dark:bg-sky-400/15 text-primary dark:text-sky-300 border-primary/40 dark:border-sky-400/35 hover:bg-primary/15 dark:hover:bg-sky-400/20 ring-1 ring-primary/20 dark:ring-sky-400/20'
             : 'bg-surface-sunken hover:bg-surface text-fg-disabled border-border hover:border-border-strong font-sans'
         }`}
         title={
@@ -189,9 +189,9 @@ export function InlineCollegeSelector({
         <ChevronDown
           size={12}
           strokeWidth={2.5}
-          className={`transition-transform duration-200 opacity-70 group-hover:opacity-100 ${
-            isOpen ? 'rotate-180 text-primary' : ''
-          }`}
+          className={`transition-transform duration-200 ${
+            selectedCollege ? 'text-primary dark:text-sky-300' : 'opacity-70 group-hover:opacity-100'
+          } ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
 
@@ -213,7 +213,7 @@ export function InlineCollegeSelector({
               zIndex: 999999,
               width: '320px',
             }}
-            className="rounded-2xl bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 shadow-2xl p-2 flex flex-col text-fg animate-in fade-in zoom-in-95 duration-100 overflow-hidden"
+            className="rounded-2xl bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 shadow-2xl p-2 flex flex-col text-fg animate-in fade-in zoom-in-95 duration-100 overflow-hidden select-none"
           >
             {/* Search Input */}
             <div className="relative mb-2 shrink-0">
@@ -227,14 +227,14 @@ export function InlineCollegeSelector({
                 placeholder="Search college or code..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs bg-surface-sunken border border-border text-fg placeholder:text-fg-disabled outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all font-sans"
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs bg-surface-sunken border border-border text-fg placeholder:text-fg-disabled outline-none focus:border-primary dark:focus:border-sky-400 focus:ring-1 focus:ring-primary/20 dark:focus:ring-sky-400/30 transition-all font-sans"
               />
             </div>
 
-            {/* College List */}
-            <div className="overflow-y-auto max-h-[194px] space-y-1 pr-1 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden flex-1">
+            {/* College List (Shows 4 to 5 colleges with invisible smooth scroller) */}
+            <div className="overflow-y-auto overscroll-contain max-h-[175px] space-y-1 pr-1 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden flex-1">
               {filteredColleges.length === 0 ? (
-                <div className="py-4 text-center text-xs text-fg-disabled">
+                <div className="py-4 text-center text-xs text-fg-disabled italic">
                   No college found
                 </div>
               ) : (
@@ -245,22 +245,21 @@ export function InlineCollegeSelector({
                       key={c._id}
                       type="button"
                       onClick={() => handleSelectCollege(c._id)}
-                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-left transition-all cursor-pointer ${
+                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-left transition-all cursor-pointer select-none ${
                         isSelected
-                          ? 'bg-primary/10 text-primary font-bold border border-primary/20'
+                          ? 'bg-primary/10 dark:bg-sky-400/15 text-fg dark:text-white font-bold border border-primary/25 dark:border-sky-400/35 shadow-2xs'
                           : 'hover:bg-surface-sunken text-fg-muted hover:text-fg'
                       }`}
                     >
-                      <div className="flex flex-col min-w-0 pr-2">
-                        <span className="text-xs font-semibold truncate leading-tight font-sans">
-                          {c.college_name}
-                        </span>
-                        <span className="text-[10px] font-mono text-fg-subtle">
-                          {c.college_code}
+                      <div className="flex items-center min-w-0 pr-2">
+                        <span className={`text-xs font-mono font-bold tracking-wider ${
+                          isSelected ? 'text-primary dark:text-sky-300' : 'text-primary dark:text-sky-400'
+                        }`}>
+                          [{c.college_code}]
                         </span>
                       </div>
                       {isSelected && (
-                        <Check size={14} strokeWidth={3} className="text-primary shrink-0 ml-1.5" />
+                        <Check size={14} strokeWidth={2.5} className="text-primary dark:text-sky-300 shrink-0 ml-1.5" />
                       )}
                     </button>
                   );

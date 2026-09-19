@@ -70,16 +70,17 @@ export function CollegeSelector({
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setCoordinatorSelectedIds(getCoordinatorSelectedColleges());
-    const handleCollegesChange = (e: any) => {
-      if (e.detail?.selectedIds) {
-        setCoordinatorSelectedIds(e.detail.selectedIds);
-      } else {
-        setCoordinatorSelectedIds(getCoordinatorSelectedColleges());
-      }
+    const syncFocus = (e?: any) => {
+      const ids = e?.detail?.selectedIds || getCoordinatorSelectedColleges();
+      setCoordinatorSelectedIds(ids);
     };
-    window.addEventListener('ipoms_coordinator_colleges_changed', handleCollegesChange);
-    return () => window.removeEventListener('ipoms_coordinator_colleges_changed', handleCollegesChange);
+    syncFocus();
+    window.addEventListener('ipoms_coordinator_colleges_changed', syncFocus);
+    window.addEventListener('ipoms_focus_updated', syncFocus);
+    return () => {
+      window.removeEventListener('ipoms_coordinator_colleges_changed', syncFocus);
+      window.removeEventListener('ipoms_focus_updated', syncFocus);
+    };
   }, []);
 
   // Listen to global colleges cache updates
@@ -93,6 +94,18 @@ export function CollegeSelector({
     window.addEventListener('ipoms_colleges_loaded', handleCollegesLoaded);
     return () => window.removeEventListener('ipoms_colleges_loaded', handleCollegesLoaded);
   }, []);
+
+  // Listen to active college change
+  useEffect(() => {
+    const handleActiveCollegeChange = (e: any) => {
+      if (e.detail?.id && e.detail.id !== selectedCollegeId) {
+        onSelect(e.detail.id, e.detail.name || '');
+        if (onSelectCollege) onSelectCollege(e.detail.obj || null);
+      }
+    };
+    window.addEventListener('ipoms_college_change', handleActiveCollegeChange);
+    return () => window.removeEventListener('ipoms_college_change', handleActiveCollegeChange);
+  }, [selectedCollegeId, onSelect, onSelectCollege]);
 
   useEffect(() => {
     fetchAllCollegesCached()
@@ -177,7 +190,7 @@ export function CollegeSelector({
         }}
         className={`flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-150 shadow-2xs cursor-pointer select-none active:scale-[0.992] ${
           selected
-            ? 'bg-primary/10 border-primary/40 text-primary hover:bg-primary/15 font-mono tracking-wide ring-1 ring-primary/20'
+            ? 'bg-primary/10 dark:bg-sky-400/15 border-primary/40 dark:border-sky-400/35 text-primary dark:text-sky-300 hover:bg-primary/15 dark:hover:bg-sky-400/20 font-mono tracking-wide ring-1 ring-primary/20 dark:ring-sky-400/20'
             : isAll
             ? 'bg-surface-sunken border-border text-fg hover:bg-surface-raised'
             : 'bg-surface border-border text-fg-muted hover:bg-surface-raised min-w-[160px]'
@@ -192,8 +205,8 @@ export function CollegeSelector({
       >
         <div className="flex items-center gap-1.5 truncate">
           {selected ? (
-            <span className="font-bold text-primary font-mono text-xs tracking-wider">
-              [{selected.college_code}]
+            <span className="font-bold text-primary dark:text-sky-300 font-mono text-xs tracking-wider">
+              {selected.college_code}
             </span>
           ) : isAll ? (
             <span className="font-semibold text-fg text-xs">
@@ -208,7 +221,7 @@ export function CollegeSelector({
         <ChevronDown
           size={14}
           strokeWidth={2.2}
-          className={`${selected ? 'text-primary' : 'text-fg-subtle'} shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+          className={`${selected ? 'text-primary dark:text-sky-300' : 'text-fg-subtle'} shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
             isOpen ? 'rotate-180' : ''
           }`}
         />
@@ -219,7 +232,7 @@ export function CollegeSelector({
         <div
           className={`absolute top-full ${
             align === 'right' ? 'right-0 origin-top-right' : 'left-0 origin-top-left'
-          } mt-1.5 w-84 sm:w-96 bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 rounded-xl shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150 ease-out text-fg select-none`}
+          } mt-1.5 w-52 sm:w-60 bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 rounded-xl shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150 ease-out text-fg select-none`}
         >
           {/* Search Box */}
           <div className="p-2 border-b border-border/60 bg-slate-50 dark:bg-[#1A2234]">
@@ -233,14 +246,14 @@ export function CollegeSelector({
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search college code or name…"
-                className="w-full bg-surface border border-border text-xs text-fg pl-8 pr-3 py-1.5 rounded-lg outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 placeholder:text-fg-disabled font-normal shadow-2xs"
+                placeholder="Search college…"
+                className="w-full bg-surface border border-border text-xs text-fg pl-8 pr-3 py-1.5 rounded-lg outline-none focus:border-primary dark:focus:border-sky-400 focus:ring-1 focus:ring-primary/30 dark:focus:ring-sky-400/30 placeholder:text-fg-disabled font-normal shadow-2xs"
               />
             </div>
           </div>
 
-          {/* List of Colleges (Shows Full Name & Acronym) */}
-          <div className="max-h-[194px] overflow-y-auto p-1.5 space-y-0.5 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden bg-surface divide-y divide-border/30">
+          {/* List of Colleges (Shows 4 to 5 colleges with invisible smooth scroller) */}
+          <div className="max-h-[175px] overflow-y-auto overscroll-contain p-1.5 space-y-0.5 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden bg-surface divide-y divide-border/30">
             {/* Optional All Colleges item */}
             {allowAll && (!searchTerm || 'all colleges'.includes(searchTerm.toLowerCase())) && (
               <button
@@ -251,15 +264,15 @@ export function CollegeSelector({
                 }}
                 className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer select-none ${
                   isAll
-                    ? 'bg-primary/10 text-primary font-bold shadow-2xs'
+                    ? 'bg-primary/10 dark:bg-sky-400/15 text-primary dark:text-sky-300 font-bold shadow-2xs border border-primary/20 dark:border-sky-400/30'
                     : 'hover:bg-surface-raised text-fg font-semibold'
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <Globe size={14} className="text-primary shrink-0" />
+                  <Globe size={14} className="text-primary dark:text-sky-400 shrink-0" />
                   <span>{allLabel}</span>
                 </div>
-                {isAll && <Check size={14} strokeWidth={2.5} className="text-primary shrink-0" />}
+                {isAll && <Check size={14} strokeWidth={2.5} className="text-primary dark:text-sky-300 shrink-0" />}
               </button>
             )}
 
@@ -275,38 +288,36 @@ export function CollegeSelector({
                   <button
                     key={college._id}
                     type="button"
+                    aria-label={`Select ${college.college_name}, code ${college.college_code}${isPinned ? ', Assigned Focus Institution' : ''}${isCurrent ? ', currently active' : ''}`}
                     onClick={() => {
                       triggerHaptic('selection');
                       handleSelectCollege(college);
                     }}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-start justify-between gap-2 transition-colors cursor-pointer select-none ${
+                    className={`w-full text-left px-2.5 py-2 rounded-lg text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer select-none ${
                       isCurrent
-                        ? 'bg-primary/10 text-primary font-bold shadow-2xs'
+                        ? 'bg-primary/10 dark:bg-sky-400/15 border border-primary/25 dark:border-sky-400/35 text-fg dark:text-white font-bold shadow-2xs'
                         : isPinned
-                        ? 'bg-primary/5 hover:bg-primary/10 text-fg'
+                        ? 'bg-primary/5 dark:bg-sky-400/5 hover:bg-primary/10 dark:hover:bg-sky-400/10 text-fg'
                         : 'hover:bg-surface-raised text-fg'
                     }`}
                   >
-                    <div className="flex flex-col min-w-0 pr-2">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-bold text-primary font-mono text-xs tracking-wider">
-                          [{college.college_code}]
-                        </span>
-                        <span className="truncate font-medium">{college.college_name}</span>
-                        {isPinned && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-primary/15 text-primary text-[9px] font-bold tracking-tight shrink-0 border border-primary/20">
-                            <Sparkles size={8} className="text-amber-500 shrink-0" /> Focus
-                          </span>
-                        )}
-                      </div>
-                      {college.location && (
-                        <span className="text-micro text-fg-subtle mt-0.5">
-                          {college.location}
+                    <div className="flex items-center gap-1.5 flex-wrap min-w-0 pr-2">
+                      <span className={`font-bold font-mono text-xs tracking-wider ${
+                        isCurrent
+                          ? 'text-primary dark:text-sky-300'
+                          : 'text-primary dark:text-sky-400'
+                      }`}>
+                        {college.college_code}
+                      </span>
+                      {isPinned && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-amber-500/15 dark:bg-amber-400/15 text-amber-600 dark:text-amber-300 text-[9px] font-bold tracking-tight shrink-0 border border-amber-500/20 dark:border-amber-400/30" title="Assigned focus institution for your account">
+                          <Sparkles size={8} className="text-amber-500 dark:text-amber-400 shrink-0" aria-hidden="true" /> Focus
+                          <span className="sr-only">(Assigned focus institution)</span>
                         </span>
                       )}
                     </div>
                     {isCurrent && (
-                      <Check size={14} strokeWidth={2.5} className="text-primary shrink-0 mt-0.5" />
+                      <Check size={14} strokeWidth={2.5} className="text-primary dark:text-sky-300 shrink-0" aria-hidden="true" />
                     )}
                   </button>
                 );

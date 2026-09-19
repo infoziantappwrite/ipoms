@@ -236,14 +236,16 @@ export function UserManagementTab({
                       </td>
 
                       {/* Assigned Colleges */}
-                      <td className="py-3.5 px-4 text-micro">
+                      <td className="py-3.5 px-4 text-micro" aria-label={`Assigned colleges for ${u.full_name}: ${u.assigned_college_ids?.map((c: any) => c.college_name || c.college_code).join(', ') || 'All Institutions'}`}>
                         {u.assigned_college_ids && u.assigned_college_ids.length > 0 ? (
                           <div className="flex flex-wrap gap-1 max-w-[280px]">
+                            <span className="sr-only">Assigned institutions for {u.full_name}: </span>
                             {u.assigned_college_ids.map((c: any, i: number) => (
                               <span
                                 key={i}
                                 className="bg-surface text-primary px-1.5 py-0.5 rounded text-micro font-mono border border-border-strong shrink-0"
                                 title={c.college_name || c.college_code}
+                                aria-label={`${c.college_code}: ${c.college_name || c.college_code}`}
                               >
                                 {c.college_code || c.college_name || 'College'}
                               </span>

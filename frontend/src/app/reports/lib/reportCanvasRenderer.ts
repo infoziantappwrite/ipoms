@@ -1607,9 +1607,12 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
   let metaText = '';
   const cleanPeriod = getCleanPeriod(report.report_period);
   if (report.template_type === 'weekly_placement' && cleanPeriod) {
-    metaText = `Period: ${cleanPeriod}         Generated Date: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
+    metaText = `Period: ${cleanPeriod}         Generated On: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
+  } else if (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') {
+    const reportDate = report.report_period || (report as any).day_date || report.kpi_summary?.report_date || report.generated_date;
+    metaText = `Report Date: ${reportDate}         Generated On: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
   } else {
-    metaText = `Generated Date: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
+    metaText = `Generated On: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
   }
   ctx.fillText(metaText, W / 2, currentY + 21);
 
