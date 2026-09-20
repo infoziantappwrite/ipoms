@@ -387,8 +387,9 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       } else if (report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined) {
         const alCards = [
           { key: 'total_leads', label: 'Total Active Leads', val: report.kpi_summary.total_leads || 0, color: '#1e3a8a' },
-          { key: 'graduating_year', label: 'Graduating Batch', val: report.kpi_summary.graduating_year || '2027', color: '#059669' },
-          { key: 'active_companies_count', label: 'Corporate Partners', val: report.kpi_summary.active_companies_count || 0, color: '#d97706' },
+          { key: 'hot_leads_count', label: 'JD Received Companies', val: report.kpi_summary.hot_leads_count ?? report.kpi_summary.jd_received_count ?? 0, color: '#d97706' },
+          { key: 'pipeline_leads_count', label: 'Companies in Pipeline', val: report.kpi_summary.pipeline_leads_count ?? report.kpi_summary.pipeline_count ?? 0, color: '#2563eb' },
+          { key: 'graduating_year', label: 'Graduating Batch', val: report.kpi_summary.graduating_year || 'All Batches', color: '#059669' },
         ].filter((c) => activeKpis[c.key] !== false);
 
         if (alCards.length > 0) {
@@ -1197,7 +1198,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               value={
                 report.report_title ||
                 (report.template_type === 'month_end'
-                  ? `${report.report_period?.split(' ')[0] || 'August'} Month Placement Operations Report`
+                  ? `${report.report_period?.split(' ')[0] || 'August'} Month Placement Report`
                   : report.template_type === 'pending_tasks'
                   ? 'Pending Task Placement Report'
                   : report.template_type === 'active_leads'
@@ -1373,7 +1374,24 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               </div>
             );
           } else if (report.template_type === 'active_leads') {
-            return null;
+            const alVisualCards = [
+              { key: 'total_leads', label: 'Total Active Leads', val: report.kpi_summary?.total_leads || 0, bgClass: 'bg-blue-50/80 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800', labelText: 'text-blue-800 dark:text-blue-300 font-bold', valText: 'text-blue-700 dark:text-blue-400 font-bold' },
+              { key: 'hot_leads_count', label: 'JD Received Companies', val: report.kpi_summary?.hot_leads_count ?? report.kpi_summary?.jd_received_count ?? 0, bgClass: 'bg-amber-50/80 dark:bg-amber-950/50 border-amber-200 dark:border-amber-800', labelText: 'text-amber-800 dark:text-amber-300 font-bold', valText: 'text-amber-700 dark:text-amber-400 font-bold' },
+              { key: 'pipeline_leads_count', label: 'Companies in Pipeline', val: report.kpi_summary?.pipeline_leads_count ?? report.kpi_summary?.pipeline_count ?? 0, bgClass: 'bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-200 dark:border-indigo-800', labelText: 'text-indigo-800 dark:text-indigo-300 font-bold', valText: 'text-indigo-700 dark:text-indigo-400 font-bold' },
+              { key: 'graduating_year', label: 'Graduating Batch', val: report.kpi_summary?.graduating_year || 'All Batches', bgClass: 'bg-emerald-50/80 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800', labelText: 'text-emerald-800 dark:text-emerald-300 font-bold', valText: 'text-emerald-700 dark:text-emerald-400 font-bold' },
+            ].filter((c) => activeKpis[c.key] !== false);
+
+            if (alVisualCards.length === 0) return null;
+            return (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {alVisualCards.map((card) => (
+                  <div key={card.key} className={`flex-1 min-w-[90px] border p-2 rounded-xl text-center shadow-xs ${card.bgClass}`}>
+                    <span className={`text-micro uppercase block truncate ${card.labelText}`}>{card.label}</span>
+                    <span className={`text-sm font-mono tabular-nums ${card.valText}`}>{card.val}</span>
+                  </div>
+                ))}
+              </div>
+            );
           } else if (report.is_multi_college) {
             const multiCards = [
               { key: 'total_colleges', label: 'Colleges Included', val: report.kpi_summary.total_colleges || report.colleges_data?.length || 0, bgClass: 'bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-200 dark:border-indigo-800', labelText: 'text-indigo-800 dark:text-indigo-300 font-bold', valText: 'text-indigo-700 dark:text-indigo-400 font-bold' },

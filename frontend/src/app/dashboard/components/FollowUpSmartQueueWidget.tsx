@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import {
   Flame,
   Clock,
@@ -100,20 +101,40 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
   const [dropdownSearch, setDropdownSearch] = useState('');
   const [isSectionCollapsed, setIsSectionCollapsed] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [portalPos, setPortalPos] = useState<{ top: number; right: number } | null>(null);
 
-  // Close dropdown on outside click
+  // Close dropdown on outside click (skip the trigger button — its onClick handles toggle)
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-      }
+      const target = event.target as Node;
+      if (triggerRef.current && triggerRef.current.contains(target)) return;
+      if (dropdownRef.current && dropdownRef.current.contains(target)) return;
+      setIsDropdownOpen(false);
     }
     if (isDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       setTimeout(() => searchInputRef.current?.focus(), 50);
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isDropdownOpen]);
+
+  // Update portal position whenever dropdown opens or window scrolls/resizes
+  useEffect(() => {
+    if (!isDropdownOpen) return;
+    const update = () => {
+      if (!triggerRef.current) return;
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPortalPos({ top: rect.bottom + 6, right: window.innerWidth - rect.right });
+    };
+    update();
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
   }, [isDropdownOpen]);
 
   // Handle escape key
@@ -247,11 +268,15 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   })();
 
-  // Helper to render the floating popover dropdown
+  // Helper to render the floating popover dropdown via portal (escapes overflow:hidden parents)
   const renderDropdownPopover = () => {
-    if (!isDropdownOpen) return null;
-    return (
-      <div className="absolute right-0 top-full mt-1.5 w-72 sm:w-80 bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 rounded-xl shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150 ease-out text-fg select-none">
+    if (!isDropdownOpen || !portalPos) return null;
+    const popover = (
+      <div
+        ref={dropdownRef}
+        style={{ position: 'fixed', top: portalPos.top, right: portalPos.right, zIndex: 9999 }}
+        className="w-56 bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 rounded-xl shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150 ease-out origin-top-right text-fg select-none"
+      >
         {/* Search Box */}
         {colleges.length > 3 && (
           <div className="p-2 border-b border-border/60 bg-slate-50 dark:bg-[#1A2234]">
@@ -312,12 +337,9 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
                       : 'hover:bg-surface-raised text-fg font-medium'
                   }`}
                 >
-                  <div className="flex items-center gap-2 truncate min-w-0">
-                    <span className="font-mono text-micro font-bold px-1.5 py-0.5 rounded bg-surface border border-border text-fg shadow-2xs shrink-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-xs font-bold px-1.5 py-0.5 rounded bg-surface border border-border text-fg shadow-2xs shrink-0">
                       {c.college_code || 'COLLEGE'}
-                    </span>
-                    <span className="truncate text-xs">
-                      {c.college_name}
                     </span>
                   </div>
 
@@ -362,6 +384,8 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
         </div>
       </div>
     );
+    if (typeof document === 'undefined') return null;
+    return ReactDOM.createPortal(popover, document.body);
   };
 
   // ── State 1: When no college is selected, render ONLY the animated attention banner ──
@@ -431,7 +455,7 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
             </button>
 
             {/* Pulsing Action Call-to-Action with Red & Orange Gradient and Arrow Head Chevron */}
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 via-orange-500 to-amber-500 text-white text-xs font-bold shadow-md shadow-orange-500/25 group-hover:from-rose-500 group-hover:via-orange-500 group-hover:to-amber-400 group-hover:shadow-lg group-hover:shadow-orange-500/35 group-hover:scale-105 transition-all shrink-0 border border-white/20">
+            <div ref={triggerRef} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 via-orange-500 to-amber-500 text-white text-xs font-bold shadow-md shadow-orange-500/25 group-hover:from-rose-500 group-hover:via-orange-500 group-hover:to-amber-400 group-hover:shadow-lg group-hover:shadow-orange-500/35 group-hover:scale-105 transition-all shrink-0 border border-white/20">
               <span>Select College</span>
               <ChevronDown size={16} strokeWidth={2.5} className={`transition-transform duration-200 ease-out ${isDropdownOpen ? 'rotate-180' : ''}`} />
             </div>
@@ -473,8 +497,9 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
         {/* Right Side: Themed College Selector Dropdown, Filter Pills & Refresh */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* ── Themed College Selector Popover Dropdown ── */}
-          <div className="relative" ref={dropdownRef}>
+          <div className="relative">
             <button
+              ref={triggerRef as React.RefObject<HTMLButtonElement>}
               type="button"
               onClick={() => {
                 triggerHaptic('light');
@@ -565,22 +590,21 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
             <span className="hidden sm:inline">Sync</span>
           </button>
 
-          {/* Shutter Pull-up / Pull-down Arrow Toggle Button */}
+          {/* Close / Go-back-to-Select-College Arrow Button */}
           <button
             type="button"
             onClick={() => {
               triggerHaptic('light');
-              setIsSectionCollapsed((prev) => !prev);
+              setSelectedCollegeId('');
+              setIsSectionCollapsed(false);
             }}
             className="h-8 w-8 rounded-xl bg-surface hover:bg-surface-raised border border-border text-fg-subtle hover:text-fg flex items-center justify-center transition-all cursor-pointer shadow-xs"
-            title={isSectionCollapsed ? "Pull down / Open Follow-up section" : "Pull up / Close Follow-up section"}
+            title="Back to college selection"
           >
             <ChevronDown
               size={15}
               strokeWidth={2.4}
-              className={`transition-transform duration-300 ease-out ${
-                isSectionCollapsed ? 'rotate-0 text-fg-subtle' : 'rotate-180 text-primary dark:text-sky-300'
-              }`}
+              className="rotate-0 text-fg-subtle"
             />
           </button>
         </div>

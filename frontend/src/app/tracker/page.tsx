@@ -602,6 +602,72 @@ export default function DailyTrackerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCollegeId]);
 
+  // ── Copy selected historical rows into current workspace
+  const handleCopyFromHistory = useCallback(async (selectedRows: TrackerRow[]) => {
+    if (!selectedCollegeId || !coordinatorId) {
+      toast('Please select a college first', 'warning');
+      return;
+    }
+    if (!selectedRows || selectedRows.length === 0) {
+      toast('No rows selected to copy', 'warning');
+      return;
+    }
+
+    try {
+      triggerHaptic('selection');
+      const res = await apiFetch('/daily-tracker/copy-from-history', {
+        method: 'POST',
+        body: JSON.stringify({
+          coordinator_id: coordinatorId,
+          college_id: selectedCollegeId,
+          rows: selectedRows.map((r) => ({
+            _id: r._id,
+            company_id: (r as any).company_id,
+            company_name: r.company_name,
+            hr_name: r.hr_name,
+            mobile_number: r.mobile_number,
+            email_id: r.email_id,
+            comments: r.comments,
+          })),
+        }),
+      });
+
+      if (res.success) {
+        triggerHaptic('success');
+        const data = res.data as any;
+        const copiedCount = data?.copied_count ?? 0;
+        const skippedCount = data?.skipped_duplicates_count ?? 0;
+
+        // Immediately refresh today's workspace and KPI in the background
+        await loadTodayRows();
+        await loadKpi();
+        broadcastTrackerMutation();
+
+        if (copiedCount > 0 && skippedCount > 0) {
+          toast(
+            `Copied ${copiedCount} company record(s) to today's workspace! (${skippedCount} already existed)`,
+            'success'
+          );
+        } else if (copiedCount > 0) {
+          toast(
+            `Successfully copied ${copiedCount} company record(s) to today's workspace!`,
+            'success'
+          );
+        } else if (skippedCount > 0) {
+          toast(
+            `All ${skippedCount} selected company record(s) are already loaded in today's workspace.`,
+            'info'
+          );
+        }
+      } else {
+        toast(res.error?.message || 'Failed to copy records to workspace', 'error');
+      }
+    } catch (e: any) {
+      console.error('[DT] Copy from history failed', e);
+      toast(e.message || 'Failed to copy records to workspace', 'error');
+    }
+  }, [selectedCollegeId, coordinatorId, loadTodayRows, loadKpi, broadcastTrackerMutation, toast]);
+
   // ── Filtered rows for display
   const activeRows = isHistoryMode ? historyRows : rows;
   const displayRows = activeRows.filter((row) => {
@@ -920,6 +986,7 @@ export default function DailyTrackerPage() {
             onDelete={handleDeleteRow}
             onDeleteSelected={handleDeleteSelectedRows}
             onCall={(row) => setActiveCallRow(row)}
+            onCopyFromHistory={handleCopyFromHistory}
           />
         </div>
       )}

@@ -36,12 +36,15 @@ export const ACADEMIC_YEARS = [
 ] as const;
 export type AcademicYear = (typeof ACADEMIC_YEARS)[number];
 
-// ─── Interface ───────────────────────────────────────────────────────────────
+export type ActiveLeadType = 'pipeline' | 'jd_received';
+export const ACTIVE_LEAD_TYPES: ActiveLeadType[] = ['pipeline', 'jd_received'];
 
 export interface IActiveLead extends Document {
   company_name: string;
   role: string;
   ctc: string;
+  lead_type: ActiveLeadType;
+  pipeline_section?: string;
   status?: ActiveLeadStatus | string;
   followup_month?: FollowupMonth | string;
   academic_year?: string;
@@ -79,6 +82,19 @@ const ActiveLeadSchema: Schema<IActiveLead> = new Schema(
       required: false,
       trim: true,
       default: '',
+    },
+    lead_type: {
+      type: String,
+      enum: ACTIVE_LEAD_TYPES,
+      default: 'pipeline',
+      index: true,
+    },
+    pipeline_section: {
+      type: String,
+      required: false,
+      trim: true,
+      default: 'pipeline',
+      index: true,
     },
     status: {
       type: String,
@@ -128,6 +144,9 @@ const ActiveLeadSchema: Schema<IActiveLead> = new Schema(
 );
 
 ActiveLeadSchema.index({ company_name: 1, academic_year: 1, is_deleted: 1 });
+ActiveLeadSchema.index({ lead_type: 1, academic_year: 1, is_deleted: 1 });
+ActiveLeadSchema.index({ lead_type: 1, status: 1, is_deleted: 1 });
 
 export const ActiveLead: Model<IActiveLead> =
   mongoose.models.ActiveLead || mongoose.model<IActiveLead>('ActiveLead', ActiveLeadSchema);
+

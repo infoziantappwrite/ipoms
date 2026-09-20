@@ -2,35 +2,87 @@
 
 import React, { useState } from 'react';
 import { X, Plus, Building2, Briefcase, IndianRupee, Sparkles } from 'lucide-react';
-import { SmoothLeadStatusDropdown, LeadStatus } from '@/components/ui/SmoothLeadStatusDropdown';
 import { SmoothMonthDropdown } from '@/components/ui/SmoothMonthDropdown';
 import { SmoothYearDropdown } from '@/components/ui/SmoothYearDropdown';
 
 type CtcUnit = 'LPA' | 'Month' | 'Both';
 
+export type JdStageKey = 'in_progress' | 'upcoming_drive' | 'drive_in_progress' | 'completed';
+
+const JD_SECTIONS: {
+  key: JdStageKey;
+  label: string;
+  activeClass: string;
+  dotClass: string;
+}[] = [
+  {
+    key: 'in_progress',
+    label: 'Companies in Progress',
+    activeClass: 'bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-500/20',
+    dotClass: 'bg-blue-500',
+  },
+  {
+    key: 'upcoming_drive',
+    label: 'Upcoming Drives',
+    activeClass: 'bg-purple-600 text-white border-purple-600 shadow-xs ring-2 ring-purple-500/20',
+    dotClass: 'bg-purple-500',
+  },
+  {
+    key: 'drive_in_progress',
+    label: 'Drive in Progress',
+    activeClass: 'bg-amber-600 text-white border-amber-600 shadow-xs ring-2 ring-amber-500/20',
+    dotClass: 'bg-amber-500',
+  },
+  {
+    key: 'completed',
+    label: 'Companies Completed',
+    activeClass: 'bg-emerald-600 text-white border-emerald-600 shadow-xs ring-2 ring-emerald-500/20',
+    dotClass: 'bg-emerald-500',
+  },
+];
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  defaultLeadType?: 'pipeline' | 'jd_received';
+  defaultSection?: string;
   onSubmit: (leadData: {
     company_name: string;
     role: string;
     ctc: string;
-    status: LeadStatus | '';
+    lead_type: 'pipeline' | 'jd_received';
+    pipeline_section?: string;
+    status: '' | string;
     followup_month: string;
     academic_year: string;
   }) => Promise<boolean>;
 }
 
-export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
+export function AddActiveLeadModal({ isOpen, onClose, defaultLeadType = 'pipeline', defaultSection = 'in_progress', onSubmit }: Props) {
   const [companyName, setCompanyName] = useState('');
   const [role, setRole] = useState('Graduate Trainee');
   const [ctcValue, setCtcValue] = useState('');
   const [ctcUnit, setCtcUnit] = useState<CtcUnit>('LPA');
-  const [status, setStatus] = useState<LeadStatus | ''>('');
+  const [leadType, setLeadType] = useState<'pipeline' | 'jd_received'>(defaultLeadType);
+  const [jdSection, setJdSection] = useState<JdStageKey>(
+    defaultSection && ['in_progress', 'upcoming_drive', 'drive_in_progress', 'completed'].includes(defaultSection)
+      ? (defaultSection as JdStageKey)
+      : 'in_progress'
+  );
   const [followupMonth, setFollowupMonth] = useState('');
   const [academicYear, setAcademicYear] = useState('2027');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Sync state when modal reopens or props change
+  React.useEffect(() => {
+    if (isOpen) {
+      setLeadType(defaultLeadType);
+      if (defaultSection && ['in_progress', 'upcoming_drive', 'drive_in_progress', 'completed'].includes(defaultSection)) {
+        setJdSection(defaultSection as JdStageKey);
+      }
+    }
+  }, [isOpen, defaultLeadType, defaultSection]);
 
   if (!isOpen) return null;
 
@@ -82,8 +134,10 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
       company_name: companyName.trim(),
       role: role.trim() || 'Graduate Trainee',
       ctc: formattedCtc,
-      status,
-      followup_month: status === 'Follow Up' ? followupMonth : '',
+      lead_type: leadType,
+      pipeline_section: leadType === 'jd_received' ? jdSection : 'pipeline',
+      status: '',
+      followup_month: leadType === 'pipeline' ? followupMonth : '',
       academic_year: academicYear,
     });
     setSubmitting(false);
@@ -93,7 +147,6 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
       setRole('Graduate Trainee');
       setCtcValue('');
       setCtcUnit('LPA');
-      setStatus('');
       setFollowupMonth('');
       onClose();
     }
@@ -108,26 +161,93 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
             <span className="w-8 h-8 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center">
               <Sparkles size={16} />
             </span>
-            <h2 className="text-base font-bold text-fg">Add Active Lead</h2>
+            <div>
+              <h3 className="text-sm font-bold text-fg leading-tight">Add Active Corporate Lead</h3>
+              <p className="text-[11px] text-fg-subtle">
+                Add a new campus placement lead to your active directory
+              </p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-surface-sunken hover:bg-surface-raised text-fg-subtle hover:text-fg flex items-center justify-center border border-border transition-colors cursor-pointer"
+            className="w-7 h-7 rounded-lg hover:bg-surface-sunken flex items-center justify-center text-fg-subtle hover:text-fg transition-all"
           >
-            <X size={16} />
+            <X size={15} />
           </button>
         </div>
 
-        {/* Error Message */}
+        {/* Error Banner */}
         {error && (
-          <div className="p-3 bg-danger/10 border border-danger/20 rounded-xl text-xs text-danger font-semibold">
+          <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold text-center">
             {error}
           </div>
         )}
 
         {/* Form Fields */}
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Section Category Selector */}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-bold text-fg mb-1">
+                Active Lead Section <span className="text-rose-500 font-bold">*</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setLeadType('pipeline')}
+                  className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    leadType === 'pipeline'
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                      : 'bg-surface-sunken border-border text-fg-subtle hover:text-fg'
+                  }`}
+                >
+                  <span>Pipeline</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLeadType('jd_received')}
+                  className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    leadType === 'jd_received'
+                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                      : 'bg-surface-sunken border-border text-fg-subtle hover:text-fg'
+                  }`}
+                >
+                  <span>JD</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 4 JD Sub-section Options (Visible when JD is selected) */}
+            {leadType === 'jd_received' && (
+              <div className="p-3 bg-surface-sunken/60 border border-border/80 rounded-2xl space-y-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                <label className="block text-xs font-bold text-fg">
+                  Placement Stage <span className="text-rose-500 font-bold">*</span>
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {JD_SECTIONS.map((sec) => {
+                    const isSelected = jdSection === sec.key;
+                    return (
+                      <button
+                        key={sec.key}
+                        type="button"
+                        onClick={() => setJdSection(sec.key)}
+                        className={`py-2 px-2 rounded-xl border text-[11px] font-bold transition-all flex flex-col items-center justify-center text-center gap-1 cursor-pointer select-none ${
+                          isSelected
+                            ? sec.activeClass
+                            : 'bg-surface border-border text-fg-subtle hover:text-fg hover:border-border-strong'
+                        }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-white' : sec.dotClass}`} />
+                        <span className="leading-tight">{sec.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* 1. Company Name */}
           <div>
             <label className="block text-xs font-bold text-fg mb-1">
@@ -243,26 +363,22 @@ export function AddActiveLeadModal({ isOpen, onClose, onSubmit }: Props) {
             </div>
           </div>
 
-          {/* 3. Status, Followup Month, Academic Year Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1 items-start">
-            {/* Status Dropdown */}
-            <div>
-              <label className="block text-xs font-bold text-fg mb-1.5">Status</label>
-              <SmoothLeadStatusDropdown value={status} onChange={(s) => setStatus(s as LeadStatus)} className="w-full" />
-            </div>
-
-            {/* Followup Month Dropdown */}
-            <div>
-              <label className="block text-xs font-bold text-fg mb-1.5">
-                Followup Month {status === 'Follow Up' ? <span className="text-amber-500">*</span> : ''}
-              </label>
-              <SmoothMonthDropdown
-                value={followupMonth}
-                onChange={setFollowupMonth}
-                disabled={status !== 'Follow Up'}
-                className="w-full"
-              />
-            </div>
+          {/* 3. Followup Month (Pipeline only) & Academic Year Grid */}
+          <div className={`grid grid-cols-1 ${leadType === 'pipeline' ? 'sm:grid-cols-2' : 'sm:grid-cols-1'} gap-3.5 pt-1 items-start`}>
+            {/* Followup Month Dropdown (Only for Pipeline) */}
+            {leadType === 'pipeline' && (
+              <div>
+                <label className="block text-xs font-bold text-fg mb-1.5">
+                  Followup Month <span className="text-fg-subtle text-[11px] font-normal">(Optional)</span>
+                </label>
+                <SmoothMonthDropdown
+                  value={followupMonth}
+                  onChange={setFollowupMonth}
+                  className="w-full"
+                  placeholder="Pick Month"
+                />
+              </div>
+            )}
 
             {/* Academic Year Dropdown */}
             <div>

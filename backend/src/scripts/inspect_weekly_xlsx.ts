@@ -16,8 +16,8 @@ if (!sheet) {
 const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
 console.log(`\n--- Sheet "${sheetName}" has ${rawData.length} rows ---`);
-rawData.forEach((row, i) => {
-  const rowStr = row.filter(c => c !== '').map(String).join(' | ');
+rawData.forEach((row: any[], i: number) => {
+  const rowStr = row.filter((c: any) => c !== '').map(String).join(' | ');
   if (rowStr.trim()) {
     console.log(`Row ${i + 1}: ${rowStr}`);
   }

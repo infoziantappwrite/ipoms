@@ -2,18 +2,30 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Trash2, Loader2, AlertTriangle } from 'lucide-react';
+import { Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import { apiFetch, apiFetchBlob } from '@/lib/api';
 import { useToast } from '@/components/ui/Toast';
 import { Modal } from '@/components/ui/Modal';
 import { ActiveLeadHeader } from './components/ActiveLeadHeader';
 import { ActiveLeadTable, ActiveLeadItem } from './components/ActiveLeadTable';
 import { AddActiveLeadModal } from './components/AddActiveLeadModal';
-import { LeadStatus } from '@/components/ui/SmoothLeadStatusDropdown';
 
 export default function ActiveLeadsPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<'pipeline' | 'jd_received'>('pipeline');
+  const [selectedSection, setSelectedSection] = useState<'all' | 'in_progress' | 'upcoming_drive' | 'drive_in_progress' | 'completed'>('all');
+  const [tabCounts, setTabCounts] = useState({
+    pipeline: 0,
+    jd_received: 0,
+  });
+  const [jdSectionCounts, setJdSectionCounts] = useState({
+    all: 0,
+    in_progress: 0,
+    upcoming_drive: 0,
+    drive_in_progress: 0,
+    completed: 0,
+  });
   const [leads, setLeads] = useState<ActiveLeadItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -21,7 +33,7 @@ export default function ActiveLeadsPage() {
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [page, setPage] = useState(1);
-  const limit = 50;
+  const limit = 100;
 
   const [stats, setStats] = useState({
     total: 0,
@@ -40,16 +52,20 @@ export default function ActiveLeadsPage() {
   const [isDeletingSelected, setIsDeletingSelected] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
 
-  // Reset page to 1 when filters or search changes
+  // Reset page to 1 when filters, search, section or active tab changes
   useEffect(() => {
     setPage(1);
-  }, [selectedYear, selectedStatus, selectedMonth, searchQuery]);
+  }, [activeTab, selectedSection, selectedYear, selectedStatus, selectedMonth, searchQuery]);
 
-  // Fetch leads with active filters
+  // Fetch leads with active tab, section and filters
   const fetchLeads = useCallback(async (showSpinner = true) => {
     try {
       if (showSpinner) setLoading(true);
       const params = new URLSearchParams();
+      params.append('lead_type', activeTab);
+      if (activeTab === 'jd_received' && selectedSection !== 'all') {
+        params.append('pipeline_section', selectedSection);
+      }
       if (selectedYear !== 'all') params.append('academic_year', selectedYear);
       if (selectedStatus !== 'all') params.append('status', selectedStatus);
       if (selectedMonth !== 'all') params.append('followup_month', selectedMonth);
@@ -61,13 +77,22 @@ export default function ActiveLeadsPage() {
         if (res.data.stats) {
           setStats(res.data.stats);
         }
+        if (res.data.tab_counts) {
+          setTabCounts({
+            pipeline: res.data.tab_counts.pipeline || 0,
+            jd_received: res.data.tab_counts.jd_received || 0,
+          });
+        }
+        if (res.data.jd_section_counts) {
+          setJdSectionCounts(res.data.jd_section_counts);
+        }
       }
     } catch (err) {
       console.error('Failed to load active leads:', err);
     } finally {
       if (showSpinner) setLoading(false);
     }
-  }, [selectedYear, selectedStatus, selectedMonth, searchQuery]);
+  }, [activeTab, selectedSection, selectedYear, selectedStatus, selectedMonth, searchQuery]);
 
   // Initial load on filter change
   useEffect(() => {
@@ -165,14 +190,26 @@ export default function ActiveLeadsPage() {
     company_name: string;
     role: string;
     ctc: string;
-    status: LeadStatus | '';
+    lead_type?: 'pipeline' | 'jd_received';
+    pipeline_section?: string;
+    status?: string;
     followup_month: string;
     academic_year: string;
   }): Promise<boolean> => {
     try {
       const res = await apiFetch('/active-leads', {
         method: 'POST',
-        body: JSON.stringify(leadData),
+        body: JSON.stringify({
+          ...leadData,
+          lead_type: leadData.lead_type || activeTab,
+          pipeline_section:
+            leadData.pipeline_section ||
+            (leadData.lead_type === 'jd_received'
+              ? selectedSection !== 'all'
+                ? selectedSection
+                : 'in_progress'
+              : 'pipeline'),
+        }),
       });
 
       if (res.success) {
@@ -194,6 +231,31 @@ export default function ActiveLeadsPage() {
     setSelectedLeadIds([]);
     setShowDeleteConfirmModal(false);
   };
+
+  // ── Keyboard shortcut: Escape key exits delete mode or closes open modals ──
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showDeleteConfirmModal) {
+          setShowDeleteConfirmModal(false);
+          return;
+        }
+        if (isDeleteMode) {
+          setIsDeleteMode(false);
+          setSelectedLeadIds([]);
+          setShowDeleteConfirmModal(false);
+          return;
+        }
+        if (showAddModal) {
+          setShowAddModal(false);
+          return;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isDeleteMode, showDeleteConfirmModal, showAddModal]);
 
   // Toggle individual lead selection
   const handleToggleSelectLead = (id: string) => {
@@ -344,6 +406,19 @@ export default function ActiveLeadsPage() {
     <div className="min-h-screen bg-background text-fg selection:bg-primary selection:text-primary-foreground flex flex-col">
       {/* Header (Sticky / Frozen at Top) */}
       <ActiveLeadHeader
+        activeTab={activeTab}
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+          setSelectedSection('all');
+          setPage(1);
+        }}
+        selectedSection={selectedSection}
+        onSectionChange={(sec) => {
+          setSelectedSection(sec);
+          setPage(1);
+        }}
+        tabCounts={tabCounts}
+        jdSectionCounts={jdSectionCounts}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         selectedYear={selectedYear}
@@ -374,6 +449,7 @@ export default function ActiveLeadsPage() {
       {/* Main Content Body */}
       <main className="flex-1 p-6 space-y-4 max-w-7xl w-full mx-auto">
         <ActiveLeadTable
+          activeTab={activeTab}
           leads={paginatedLeads}
           loading={loading}
           onUpdateLead={handleUpdateLead}
@@ -384,44 +460,14 @@ export default function ActiveLeadsPage() {
           page={page}
           limit={limit}
         />
-
-        {/* Bottom Pagination Bar */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-2 pt-2 text-xs text-fg-subtle">
-            <span>
-              Showing <strong>{(page - 1) * limit + 1}</strong>–<strong>{Math.min(page * limit, leads.length)}</strong> of <strong>{leads.length.toLocaleString()}</strong> active leads (Page {page} of {totalPages})
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
-                title="Previous Page"
-                className="w-8 h-8 rounded-xl bg-surface border border-border hover:bg-surface-raised active:scale-[0.992] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
-              >
-                <ChevronLeft size={16} strokeWidth={2.25} />
-              </button>
-              <span className="text-xs font-mono font-bold text-fg px-2.5 py-1 bg-surface border border-border rounded-lg shadow-2xs">
-                {page} / {totalPages}
-              </span>
-              <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => setPage(page + 1)}
-                title="Next Page"
-                className="w-8 h-8 rounded-xl bg-surface border border-border hover:bg-surface-raised active:scale-[0.992] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
-              >
-                <ChevronRight size={16} strokeWidth={2.25} />
-              </button>
-            </div>
-          </div>
-        )}
       </main>
 
       {/* Modals */}
       <AddActiveLeadModal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
+        defaultLeadType={activeTab}
+        defaultSection={selectedSection !== 'all' ? selectedSection : 'in_progress'}
         onSubmit={handleAddLead}
       />
 

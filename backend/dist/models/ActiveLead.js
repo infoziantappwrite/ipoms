@@ -80,15 +80,15 @@ const ActiveLeadSchema = new mongoose_1.Schema({
     },
     ctc: {
         type: String,
-        required: [true, 'CTC is required'],
+        required: false,
         trim: true,
         default: '',
     },
     status: {
         type: String,
-        enum: [...exports.ACTIVE_LEAD_STATUSES, 'Not Hiring'],
-        required: true,
-        default: 'Hiring',
+        enum: [...exports.ACTIVE_LEAD_STATUSES, 'Not Hiring', ''],
+        required: false,
+        default: '',
         index: true,
     },
     followup_month: {

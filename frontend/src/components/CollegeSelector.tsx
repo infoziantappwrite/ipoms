@@ -67,6 +67,7 @@ export function CollegeSelector({
   const [searchTerm, setSearchTerm] = useState('');
   const [coordinatorSelectedIds, setCoordinatorSelectedIds] = useState<string[]>(getCoordinatorSelectedColleges);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -117,10 +118,13 @@ export function CollegeSelector({
       .finally(() => setLoading(false));
   }, []);
 
-  // Close when clicking outside
+  // Close when clicking outside (skip the trigger button — its own onClick handles toggle)
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      // If click is inside the trigger button, let onClick handle open/close
+      if (triggerRef.current && triggerRef.current.contains(target)) return;
+      if (containerRef.current && !containerRef.current.contains(target)) {
         setIsOpen(false);
       }
     }
@@ -182,6 +186,7 @@ export function CollegeSelector({
 
       {/* ── Trigger Button (Shrinks to Acronym when selected) ─────────── */}
       <button
+        ref={triggerRef}
         type="button"
         disabled={loading}
         onClick={() => {

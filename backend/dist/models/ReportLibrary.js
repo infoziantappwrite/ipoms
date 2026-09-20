@@ -39,6 +39,10 @@ exports.REPORT_TEMPLATE_TYPES = [
     'weekly_placement',
     'monthly_placement',
     'pending_tasks',
+    'active_leads',
+    'month_end',
+    'daily_positives',
+    'daily_jd_received',
     'college_performance',
     'coordinator_performance',
 ];

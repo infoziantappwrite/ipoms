@@ -345,26 +345,18 @@ export function A4PdfPreviewModal({
                                   ? ` — ${report.kpi_summary.graduating_year}`
                                   : '';
                               if (
-                                tier.includes('JD Received') ||
-                                tier.includes('Hot Leads') ||
-                                report.report_title?.includes('JD Received') ||
-                                report.report_title?.includes('Hot Leads')
+                                (tier.includes('JD Received') && !tier.includes('Pipeline')) ||
+                                report.report_title?.includes('JD Received')
                               ) {
-                                return `JD RECEIVED${batchSuffix}`;
+                                return `JD RECEIVED COMPANIES${batchSuffix}`;
                               }
                               if (
-                                tier.includes('Positive') ||
-                                report.report_title?.includes('Positive')
+                                (tier.includes('Pipeline') && !tier.includes('JD Received')) ||
+                                report.report_title?.includes('Companies in Pipeline')
                               ) {
-                                return `POSITIVES RECEIVED${batchSuffix}`;
+                                return `COMPANIES IN PIPELINE${batchSuffix}`;
                               }
-                              if (
-                                tier.includes('Weekly Tracker') ||
-                                report.report_title?.includes('Weekly Tracker')
-                              ) {
-                                return `WEEKLY TRACKER PIPELINE${batchSuffix}`;
-                              }
-                              return `ACTIVE CORPORATE LEADS${batchSuffix}`;
+                              return `ACTIVE CORPORATE LEADS & PIPELINE${batchSuffix}`;
                             })()}
                           </h3>
                           <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200 shrink-0">
@@ -599,7 +591,7 @@ export function A4PdfPreviewModal({
                 ? 'JD RECEIVED FOR THE DAY'
                 : report.report_title ||
                   (report.template_type === 'month_end'
-                    ? `${report.report_period?.split(' ')[0] || 'August'} Month Placement Operations Report`
+                    ? `${report.report_period?.split(' ')[0] || 'August'} Month Placement Report`
                     : report.template_type === 'pending_tasks'
                     ? 'Pending Task Placement Report'
                     : report.template_type === 'active_leads'
@@ -823,9 +815,25 @@ export function A4PdfPreviewModal({
                     labelText: 'text-blue-800',
                   },
                   {
+                    key: 'hot_leads_count',
+                    label: 'JD Received Companies',
+                    val: report.kpi_summary.hot_leads_count ?? report.kpi_summary.jd_received_count ?? 0,
+                    bg: 'bg-amber-50 border-amber-300',
+                    text: 'text-amber-700',
+                    labelText: 'text-amber-800',
+                  },
+                  {
+                    key: 'pipeline_leads_count',
+                    label: 'Companies in Pipeline',
+                    val: report.kpi_summary.pipeline_leads_count ?? report.kpi_summary.pipeline_count ?? 0,
+                    bg: 'bg-indigo-50 border-indigo-300',
+                    text: 'text-indigo-700',
+                    labelText: 'text-indigo-800',
+                  },
+                  {
                     key: 'graduating_year',
                     label: 'Graduating Batch',
-                    val: report.kpi_summary.graduating_year || '2027',
+                    val: report.kpi_summary.graduating_year || 'All Batches',
                     bg: 'bg-emerald-50 border-emerald-300',
                     text: 'text-emerald-700',
                     labelText: 'text-emerald-800',

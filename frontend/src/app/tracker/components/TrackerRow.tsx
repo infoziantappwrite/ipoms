@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useCallback, useEffect, useState } from 'react';
-import { Phone, Check, Clock } from 'lucide-react';
+import { Phone, Check, Clock, CopyPlus } from 'lucide-react';
 import type { TrackerRow as TrackerRowType, CallOutcome } from '../page';
 import { triggerHaptic } from '@/lib/haptics';
 import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
@@ -72,9 +72,10 @@ interface Props {
   onDelete: () => void;
   onCall?: (row: TrackerRowType) => void;
   onToggleSelect?: (rowId: string, index: number, shiftKey: boolean) => void;
+  onCopySingle?: (row: TrackerRowType) => void;
 }
 
-export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode, selectionTheme = 'blue', isReadOnly, onUpdate, onEdit, onDelete, onCall, onToggleSelect }: Props) {
+export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode, selectionTheme = 'blue', isReadOnly, onUpdate, onEdit, onDelete, onCall, onToggleSelect, onCopySingle }: Props) {
   const startTimeRef = useRef<HTMLInputElement>(null);
   const prevStartTimeRef = useRef<string>(formatTime(row.call_start_time));
   const companyNameRef = useRef<HTMLInputElement>(null);
@@ -372,8 +373,8 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
   }, [onUpdate]);
 
   const gridTemplate = isReadOnly
-    ? 'grid-cols-[56px_100px_90px_90px_260px_200px_220px_250px_150px_180px_150px_minmax(260px,1fr)]'
-    : 'grid-cols-[56px_100px_90px_90px_260px_200px_220px_250px_180px_150px_minmax(260px,1fr)]';
+    ? 'grid-cols-[56px_100px_90px_90px_260px_200px_240px_270px_150px_180px_150px_minmax(260px,1fr)]'
+    : 'grid-cols-[56px_100px_90px_90px_260px_200px_240px_270px_180px_150px_minmax(260px,1fr)]';
 
   return (
     <div
@@ -498,7 +499,23 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
       {/* Company Name (Frozen Col 5 - Editable & Solid Right Divider) */}
       <div className={`sticky left-[336px] z-10 ${rowBg} px-2 py-1 flex items-center border-r-2 border-border-strong shadow-[6px_0_12px_-3px_rgba(0,0,0,0.12)] dark:shadow-[6px_0_12px_-3px_rgba(0,0,0,0.6)] transition-colors`} title={row.company_name}>
         {isReadOnly ? (
-          <span className="text-fg font-semibold break-words leading-snug select-text truncate">{row.company_name}</span>
+          <div className="flex items-center justify-between w-full min-w-0 gap-1.5">
+            <span className="text-fg font-semibold break-words leading-snug select-text truncate">{row.company_name}</span>
+            {onCopySingle && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCopySingle(row);
+                }}
+                title={`Copy "${row.company_name}" to today's daily tracker workspace`}
+                className="opacity-0 group-hover:opacity-100 hover:opacity-100 px-2 py-0.5 rounded-md bg-primary/10 hover:bg-primary text-primary hover:text-white border border-primary/25 hover:border-primary transition-all cursor-pointer shadow-2xs shrink-0 flex items-center gap-1 text-[10.5px] font-semibold active:scale-95"
+              >
+                <CopyPlus size={11} strokeWidth={2.4} />
+                <span className="hidden sm:inline">Copy to Today</span>
+              </button>
+            )}
+          </div>
         ) : (
           <input
             ref={companyNameRef}

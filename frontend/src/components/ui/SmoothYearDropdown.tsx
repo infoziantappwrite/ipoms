@@ -43,8 +43,8 @@ export function SmoothYearDropdown({
   onChange,
   disabled = false,
   allowAll = false,
-  allLabel = 'Year',
-  placeholder = 'Batch',
+  allLabel = 'All Years',
+  placeholder = 'Academic Year',
   className = '',
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
@@ -152,13 +152,15 @@ export function SmoothYearDropdown({
     onChange(formatted);
   };
 
-  // Format trigger display: Just clean year numbers
-  const displayLabel =
-    value === 'all'
-      ? allLabel
-      : selectedYears.length > 0
-      ? selectedYears.join(', ')
-      : placeholder;
+  const isAll = value === 'all' || (!value && allowAll);
+  const isSelected = Boolean(selectedYears.length > 0 && !isAll);
+
+  // Format trigger display: Clean year numbers or clear naming conventions
+  const displayLabel = isAll
+    ? (allLabel || 'All Years')
+    : selectedYears.length > 0
+    ? selectedYears.join(', ')
+    : placeholder || 'Academic Year';
 
   return (
     <div className={`relative inline-block text-left ${className}`}>
@@ -168,17 +170,34 @@ export function SmoothYearDropdown({
         type="button"
         disabled={disabled}
         onClick={handleToggle}
-        title={selectedYears.length > 0 ? `Batch: ${selectedYears.join(', ')}` : placeholder}
-        className="inline-flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-surface hover:bg-surface-raised text-fg border border-border transition-all duration-150 cursor-pointer shadow-2xs active:scale-[0.992] disabled:opacity-50 select-none whitespace-nowrap w-full min-w-0"
+        title={selectedYears.length > 0 ? `Batch: ${selectedYears.join(', ')}` : displayLabel}
+        className={`inline-flex items-center justify-between gap-1.5 px-3 py-1.5 rounded-xl text-xs border transition-all duration-150 cursor-pointer shadow-2xs active:scale-[0.992] disabled:opacity-50 select-none whitespace-nowrap w-full min-w-0 ${
+          isSelected
+            ? 'bg-blue-500/10 border-blue-500/40 text-blue-700 dark:text-blue-300 font-bold hover:bg-blue-500/15'
+            : 'bg-surface hover:bg-surface-raised text-fg border-border'
+        } ${isOpen ? 'ring-2 ring-blue-500/20 border-blue-500/50' : ''}`}
       >
-        <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
-          <GraduationCap size={14} className="text-primary shrink-0" />
-          <span className="font-mono truncate">{displayLabel}</span>
+        <div className="flex items-center gap-1.5 min-w-0 truncate">
+          <GraduationCap
+            size={13.5}
+            className={`shrink-0 ${
+              isSelected ? 'text-blue-600 dark:text-blue-400' : 'text-primary'
+            }`}
+          />
+          <span
+            className={`truncate ${
+              isSelected ? 'font-mono font-bold' : 'font-medium'
+            }`}
+          >
+            {displayLabel}
+          </span>
         </div>
         <ChevronDown
-          size={14}
+          size={13}
           strokeWidth={2.2}
-          className={`ml-1 text-fg-subtle transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] shrink-0 ${isOpen ? 'rotate-180 text-primary' : ''}`}
+          className={`ml-0.5 text-fg-subtle transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] shrink-0 ${
+            isOpen ? 'rotate-180 text-blue-500' : ''
+          }`}
         />
       </button>
 

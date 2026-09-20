@@ -90,6 +90,8 @@ async function syncLeadFromDailyTracker(data) {
     }
 }
 function registerActiveLeadRoutes(app) {
+    // One-time auto-reset: Convert any previously defaulted seed leads to '' so they show 'Select Status' placeholder
+    ActiveLead_1.ActiveLead.updateMany({ status: 'Hiring', daily_tracker_id: { $exists: false } }, { $set: { status: '' } }).catch(() => { });
     // ── 1. GET /api/v1/active-leads (List with stats & search) ─────────────────
     app.get('/api/v1/active-leads', authMiddleware_1.authenticateJWT, async (req, res) => {
         try {
@@ -284,13 +286,7 @@ function registerActiveLeadRoutes(app) {
             if (!company_name || !company_name.trim()) {
                 return res.status(400).json({ success: false, error: { message: 'Company Name is required' } });
             }
-            if (!role || !role.trim()) {
-                return res.status(400).json({ success: false, error: { message: 'Role is required' } });
-            }
-            if (!ctc || !ctc.trim()) {
-                return res.status(400).json({ success: false, error: { message: 'CTC is required' } });
-            }
-            if (!ActiveLead_1.ACTIVE_LEAD_STATUSES.includes(status)) {
+            if (status && !ActiveLead_1.ACTIVE_LEAD_STATUSES.includes(status)) {
                 return res.status(400).json({ success: false, error: { message: 'Invalid status' } });
             }
             const authUser = req.user;
@@ -298,10 +294,10 @@ function registerActiveLeadRoutes(app) {
             const lead = await ActiveLead_1.ActiveLead.create({
                 company_name: company_name.trim(),
                 role: role.trim() || 'Graduate Trainee',
-                ctc: ctc.trim(),
-                status,
+                ctc: ctc ? ctc.trim() : '',
+                status: status || '',
                 followup_month: status === 'Follow Up' ? followup_month : '',
-                academic_year: academic_year || '2026',
+                academic_year: req.body.academic_year || '2027',
                 coordinator_id: coordinatorId,
                 college_id: college_id ? new mongoose_1.Types.ObjectId(college_id) : null,
             });
@@ -386,10 +382,10 @@ function registerActiveLeadRoutes(app) {
             if (ctc !== undefined)
                 lead.ctc = ctc.trim();
             if (status !== undefined) {
-                if (!ActiveLead_1.ACTIVE_LEAD_STATUSES.includes(status)) {
+                if (status && !ActiveLead_1.ACTIVE_LEAD_STATUSES.includes(status)) {
                     return res.status(400).json({ success: false, error: { message: 'Invalid status' } });
                 }
-                lead.status = status;
+                lead.status = status || '';
                 // If status is not Follow Up, clear followup_month
                 if (status !== 'Follow Up') {
                     lead.followup_month = '';
