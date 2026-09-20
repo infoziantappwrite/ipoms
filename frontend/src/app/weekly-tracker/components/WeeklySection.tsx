@@ -16,6 +16,7 @@ import {
   Calendar,
   Zap,
   Flame,
+  AlertTriangle,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { WeeklyTable, WeeklyRow, getFollowUpStatus } from './WeeklyTable';
