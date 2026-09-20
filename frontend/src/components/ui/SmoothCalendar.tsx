@@ -34,6 +34,32 @@ function formatDateKey(year: number, monthIndex: number, day: number): string {
   return `${year}-${pad(monthIndex + 1)}-${pad(day)}`;
 }
 
+// Clamps a target display month into the [minDate, maxDate] month range.
+// Without this, opening the picker on an existing OVERDUE date (e.g. a past
+// follow-up date) shows that date's month, which minDate then disables in
+// full — including the "Previous month" arrow, since going further back is
+// correctly blocked. With no visible path forward, it reads as "future dates
+// can't be selected" even though selecting one works fine once you're on a
+// valid month. Clamping means the picker always opens somewhere selectable.
+function clampMonthToRange(date: Date, minDate?: string, maxDate?: string): Date {
+  let result = date;
+  if (minDate) {
+    const [minY, minM] = minDate.split('-').map(Number);
+    if (!isNaN(minY) && !isNaN(minM)) {
+      const minMonthStart = new Date(minY, minM - 1, 1);
+      if (result < minMonthStart) result = minMonthStart;
+    }
+  }
+  if (maxDate) {
+    const [maxY, maxM] = maxDate.split('-').map(Number);
+    if (!isNaN(maxY) && !isNaN(maxM)) {
+      const maxMonthStart = new Date(maxY, maxM - 1, 1);
+      if (result > maxMonthStart) result = maxMonthStart;
+    }
+  }
+  return result;
+}
+
 export function SmoothCalendar({
   mode = 'single',
   value,
@@ -51,13 +77,14 @@ export function SmoothCalendar({
   const initialDate = useMemo(() => {
     if (mode === 'single' && value && value !== 'all') {
       const [y, m] = value.split('-').map(Number);
-      if (!isNaN(y) && !isNaN(m)) return new Date(y, m - 1, 1);
+      if (!isNaN(y) && !isNaN(m)) return clampMonthToRange(new Date(y, m - 1, 1), minDate, maxDate);
     }
     if (mode === 'range' && startDate) {
       const [y, m] = startDate.split('-').map(Number);
-      if (!isNaN(y) && !isNaN(m)) return new Date(y, m - 1, 1);
+      if (!isNaN(y) && !isNaN(m)) return clampMonthToRange(new Date(y, m - 1, 1), minDate, maxDate);
     }
-    return new Date();
+    return clampMonthToRange(new Date(), minDate, maxDate);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, value, startDate]);
 
   const [currentMonth, setCurrentMonth] = useState<Date>(initialDate);
@@ -67,14 +94,15 @@ export function SmoothCalendar({
     if (mode === 'single' && value && value !== 'all') {
       const [y, m] = value.split('-').map(Number);
       if (!isNaN(y) && !isNaN(m)) {
-        setCurrentMonth(new Date(y, m - 1, 1));
+        setCurrentMonth(clampMonthToRange(new Date(y, m - 1, 1), minDate, maxDate));
       }
     } else if (mode === 'range' && startDate) {
       const [y, m] = startDate.split('-').map(Number);
       if (!isNaN(y) && !isNaN(m)) {
-        setCurrentMonth(new Date(y, m - 1, 1));
+        setCurrentMonth(clampMonthToRange(new Date(y, m - 1, 1), minDate, maxDate));
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, startDate, mode]);
 
   const year = currentMonth.getFullYear();
@@ -341,9 +369,10 @@ export function SmoothCalendar({
                 type="button"
                 disabled={isDisabled}
                 onClick={() => !isDisabled && handleDayClick(dateStr)}
+                title={isDisabled ? (isPastMin ? 'Past dates cannot be selected' : 'Date out of selectable range') : undefined}
                 className={`relative z-10 w-7 h-7 flex flex-col items-center justify-center rounded-full text-[11px] transition-all duration-150 ${
                   isDisabled
-                    ? 'opacity-20 cursor-not-allowed text-fg-disabled pointer-events-none select-none'
+                    ? 'opacity-25 line-through cursor-not-allowed text-fg-disabled pointer-events-none select-none'
                     : isSingleSelected || isRangeSelectedEndpoint
                     ? `${themeStyles.selectedCircle} cursor-pointer`
                     : isWithinRange
@@ -366,6 +395,17 @@ export function SmoothCalendar({
           );
         })}
       </div>
+
+      {/* Helper footer when minDate is specified (e.g. Follow-up dates restricted to today / future) */}
+      {minDate && (
+        <div className="mt-2.5 pt-2 border-t border-border/60 flex items-center justify-between text-[10px]">
+          <span className="font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
+            Today &amp; upcoming only
+          </span>
+          <span className="text-[9px] text-fg-muted">Past dates disabled</span>
+        </div>
+      )}
     </div>
   );
 }

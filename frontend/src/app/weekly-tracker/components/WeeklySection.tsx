@@ -19,7 +19,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { WeeklyTable, WeeklyRow, getFollowUpStatus } from './WeeklyTable';
+import { WeeklyTable, WeeklyRow, getFollowUpStatus, FOLLOWUP_SECTIONS } from './WeeklyTable';
 import { EditCompanyModal } from './EditCompanyModal';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 
@@ -288,8 +288,12 @@ export function WeeklySection({
     }
   };
 
-  const dueTodayCount = rows.filter((r) => getFollowUpStatus(r.follow_up_date) === 'today').length;
-  const overdueCount = rows.filter((r) => getFollowUpStatus(r.follow_up_date) === 'overdue').length;
+  // Scoped to Companies in Pipeline / Companies in Progress only (user
+  // decision, 20 Sep 2026) — must match WeeklyTable.tsx's hasFollowUpColumn
+  // exactly, hence the shared FOLLOWUP_SECTIONS constant.
+  const isFollowUpSection = FOLLOWUP_SECTIONS.includes(sectionKey);
+  const dueTodayCount = isFollowUpSection ? rows.filter((r) => getFollowUpStatus(r.follow_up_date) === 'today').length : 0;
+  const overdueCount = isFollowUpSection ? rows.filter((r) => getFollowUpStatus(r.follow_up_date) === 'overdue').length : 0;
 
   return (
     <div

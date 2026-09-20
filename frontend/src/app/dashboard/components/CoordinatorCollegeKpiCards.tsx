@@ -12,7 +12,7 @@ import {
   Target,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { getCoordinatorSelectedColleges, setActiveCollege } from '@/lib/collegeSession';
+import { getCoordinatorSelectedColleges, setActiveCollege, getCollegeAcronym } from '@/lib/collegeSession';
 
 interface CollegeKpiItem {
   college_id: string;
@@ -157,12 +157,18 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
       {/* ── Dynamic Per-College KPI Cards Grid ────────────────────────── */}
       <div className={`grid ${gridColsClass} gap-3`}>
         {kpiData.map((item) => {
+          const acronym = getCollegeAcronym({
+            college_code: item.college_code,
+            college_name: item.college_name,
+            college_id: item.college_id,
+          });
+
           return (
             <div
               key={item.college_id}
               className="rounded-xl border border-border/80 bg-surface shadow-2xs hover:border-border-strong hover:shadow-xs transition-all duration-200 overflow-hidden flex flex-col justify-between"
             >
-              {/* Card Header: College Name Link */}
+              {/* Card Header: College Acronym & Name Link */}
               <div className="px-3.5 py-2.5 border-b border-border/60 bg-surface">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1 flex items-center gap-2">
@@ -171,10 +177,15 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
                       onClick={() => {
                         setActiveCollege(item.college_id, item.college_name);
                       }}
-                      title={`${item.college_name} (Click to open tracker)`}
+                      title={`${item.college_name} (${acronym || ''}) - Click to open tracker`}
                       className="min-w-0 flex items-center gap-1.5 text-xs sm:text-sm font-bold text-fg hover:text-primary transition-colors group truncate"
                     >
                       <Building2 size={13} className="text-primary shrink-0 opacity-80 group-hover:opacity-100" />
+                      {acronym && (
+                        <span className="font-mono text-[10.5px] font-bold px-1.5 py-0.5 rounded-md bg-primary/10 text-primary dark:text-sky-300 border border-primary/25 shrink-0 tracking-wider">
+                          [{acronym}]
+                        </span>
+                      )}
                       <span className="truncate group-hover:underline">{item.college_name}</span>
                     </Link>
                   </div>

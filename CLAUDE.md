@@ -146,6 +146,10 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
    sends, per Module 08 §12/§16 ("users should never see \[role] options... signup page
    shows only Placement Coordinator"). If anyone ever reports an unexplained admin
    account, this is the first thing to suspect had been exploited before the fix.
+   **Kept as history after self-registration was removed entirely (20 Sep 2026, see item 41)**
+   — the endpoint this describes no longer exists at all (`403` unconditionally), so this is
+   fully moot operationally. Left in deliberately: it's the sharpest illustration in this file
+   of what trusting client-supplied `role_codes` costs, and that lesson outlives the feature.
 0b. ~~**Unauthenticated destructive endpoints + Team Leader → Administrator escalation.**~~
    **FIXED 25 Aug 2026.** Two separate holes, both now closed and verified with live requests:
    (a) `isPublic()` — in **both** `server.ts` and `routePolicy.ts`, which must stay in step —
@@ -443,25 +447,6 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     Verified live: Team Leader's POST now gets `403`; a coordinator's spoofed
     `coordinator_id` in the request body is silently ignored and the record is correctly
     attributed to the real caller instead.
-16. ~~**Self-signup produced a fully-working Coordinator account with zero human review.**~~
-    **FIXED 3 Sep 2026.** A verified `@infoziant.com`/`@icl.today` inbox was the *only* gate —
-    OTP success immediately created an `active` account and auto-logged the user in. Added a
-    `pending` `account_status`: the account is created as `pending` (not auto-logged-in) after
-    OTP verification, and login refuses `pending` with `403 ACCOUNT_PENDING_APPROVAL` pointing
-    at Team Leader/Administrator review. **No new approval UI was needed** — `PATCH /users/:id`
-    (already TL/Admin-accessible) accepts `account_status`, and `UserModal.tsx`'s status dropdown
-    now includes "Pending Approval (Self-Registered)" so an existing Team Leader/Admin can spot
-    and activate one through the User Management screen they already have. Frontend signup flow
-    updated to show the pending message instead of "Welcome" + dashboard redirect when no token
-    comes back. Verified live end-to-end: a `pending` account's login attempt is refused; Team
-    Leader's `PATCH .../users/:id {"account_status":"active"}` flips it; the same account then
-    logs in successfully.
-    **Undocumented finding from the same testing pass:** signup's domain check accepts
-    `@icl.today` in addition to `@infoziant.com` — surfaced in the error copy itself, not
-    documented anywhere. **Confirmed genuinely in use** (not a stray config entry): the live
-    `users` collection already has a real seeded account on `@icl.today` (Seshmitha Tamilselvi
-    R). Still not documented anywhere outside the code itself — worth a proper mention here
-    once confirmed with the user, but functionally safe as-is.
 17. ~~**Weekly Tracker and Daily Leads search crashed (500) on regex special characters.**~~
     **FIXED 3 Sep 2026.** Both endpoints passed the raw `search` query straight into
     `$regex` with no escaping — a bare `(`, ordinary in real company names ("ABC (India) Pvt
@@ -471,14 +456,6 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     all three unescaped call sites (`GET /weekly-tracker`, `GET /weekly-tracker/export-xlsx`,
     `GET /daily-leads`). Verified live: `?search=(` now returns `200` on all three instead
     of `500`.
-18. ~~**Signup's Primary Mobile field accepted non-numeric input with zero validation.**~~
-    **FIXED 3 Sep 2026.** `abc123xyz` passed straight through, client and server, and would
-    have been stored as a coordinator's "phone number." Added `isValidMobile()`
-    (10-13 digits after stripping spaces/hyphens/a leading `+`) to both backend signup
-    handlers and a matching frontend check — but only when a mobile *is* supplied, since the
-    field has no `required` attribute in the UI and was already legitimately optional; the
-    fix targets the garbage-data bug, not scope-creeps the field into mandatory. Verified
-    live: `abc123xyz` → `400 INVALID_MOBILE`; a real 10-digit number → proceeds normally.
 19. ~~**Daily Leads summary badge counted every coordinator, not just the caller.**~~
     **FIXED 3 Sep 2026.** `GET /daily-leads/summary` never called `scopeToSelf()` — a
     coordinator's Positives/JD badge silently showed the org-wide total while the row list
@@ -504,19 +481,6 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     chat module are each their own project, not a bug fix** — deliberately not started
     without a scoping conversation first. See release gate items 2 and 5, and the "chat
     module" finding in the QA report.
-22. ~~**Signup OTP's "0 attempt(s) remaining" was off by one — a 6th guess still got
-    evaluated.**~~ **FIXED 3 Sep 2026.** The signup verify-OTP handler incremented the
-    attempt counter *then* checked the cap (`attempts > 5`), so the 5th wrong guess showed
-    "0 remaining" while the block only actually fired on a 6th call. The forgot-password OTP
-    flow already did this correctly (check `>=` cap *before* incrementing) and never had the
-    bug — signup's handler was rewritten to match that same order. Verified live: 5 wrong
-    attempts show 4→3→2→1→0 remaining exactly as before, but the 6th call is now a flat
-    `400 OTP_MAX_ATTEMPTS` with no code evaluated, instead of silently taking one more guess.
-23. **`@icl.today` alongside `@infoziant.com` in signup's allowed domains is real and in
-    active use** — not a stray config entry. Confirmed live: an existing seeded account
-    (Seshmitha Tamilselvi R) already has an `@icl.today` address. Still worth a one-line
-    mention in whatever onboarding doc explains the staff email domain, since nothing outside
-    the code currently says two domains are valid.
 24. ~~**System Info's growth percentages were hardcoded constants, never computed.**~~
     **FIXED 3 Sep 2026.** `4.8` / `6.2` / `12.5` were literal numbers returned on every load
     regardless of real data. There's no historical-snapshot table to diff a real trend
@@ -1023,6 +987,19 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     Administrator, loaded `/profile`, confirmed the corrected text renders. `tsc --noEmit`
     clean.
 
+41. **Self-registration removed entirely, 20 Sep 2026 (user decision).** `POST /auth/signup`,
+    `/auth/signup/request-otp`, and `/auth/signup/verify-otp` (`authRoutes.ts`) now all return
+    a flat `403 SELF_REGISTRATION_DISABLED` — no OTP is issued, no account is created, no
+    email is sent. Every account, including Coordinators, is now provisioned directly by an
+    Administrator through User Management; there is no self-service path at all. This retires
+    the `pending` `account_status` approval workflow (item 16, removed from this file — it
+    described a feature that no longer exists) and everything downstream of it: the signup
+    mobile-format validation (item 18, removed), the signup OTP attempt-counter off-by-one fix
+    (item 22, removed), and the `@icl.today`/`@infoziant.com` dual-domain allowlist note
+    (item 23, removed) — all of those were fixes or notes about code paths that are now dead.
+    Item 0 (the `role_codes` privilege-escalation history) is kept deliberately — see its own
+    note. §6's module map row for User & Access updated to match.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map
@@ -1031,7 +1008,7 @@ Data flow: `company_metadata → assigned_work → daily_tracker → weekly_trac
 
 | # | Module | Route | Essence |
 |---|---|---|---|
-| 01/08 | User & Access | `/login`, `/signup`, `/settings` | Email login, 3-strike lockout, OTP reset. Coordinators self-register; TL/Director/CEO created by admin. |
+| 01/08 | User & Access | `/login`, `/settings` | Email login, 3-strike lockout, OTP reset. Self-registration removed 20 Sep 2026 — every account, including Coordinators, is created and activated directly by an Administrator. |
 | 02 | Master Company DB | `/metadata` | Not a CRM — an Excel-like repository. Identity is **company name only**. One company → unlimited HR contacts. Duplicate = same Company+HR+Mobile+Email (blocked); differing only by email → allowed after confirm. |
 | 03 | Daily Tracker | `/tracker` | The heartbeat. ~50–70 calls/day. Read-only contact picker (never free-text search). Start Time manual (Spacebar), End Time + Duration automatic and locked. Auto-save + `Save Progress`; auto-finalize 23:59:59. **Soft validation — warn, never block.** |
 | 04 | Weekly Tracker | `/weekly-tracker` | Placement lifecycle. One master dataset, sections derived from status — nobody moves rows by hand. Status is **free text**, not a dropdown (deliberate). Follow-up colour: green >7d, yellow ≤3d, red today/overdue. Friday–Friday weeks. |

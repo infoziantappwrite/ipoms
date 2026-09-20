@@ -90,6 +90,56 @@ export function getCachedColleges(): CollegeOccupancy[] {
   return DEFAULT_OFFICIAL_COLLEGES;
 }
 
+export function getCollegeAcronym(college?: { college_code?: string; college_name?: string; _id?: string; id?: string; college_id?: string } | string | null): string {
+  if (!college) return '';
+  if (typeof college === 'string') {
+    const raw = college.trim();
+    if (raw.length <= 8 && !raw.includes(' ') && raw === raw.toUpperCase()) return raw;
+    const allKnown = getCachedColleges();
+    const match = allKnown.find((c) =>
+      c._id === raw ||
+      c.college_code.toUpperCase() === raw.toUpperCase() ||
+      c.college_name.toLowerCase() === raw.toLowerCase() ||
+      raw.toLowerCase().includes(c.college_name.toLowerCase()) ||
+      c.college_name.toLowerCase().includes(raw.toLowerCase())
+    );
+    if (match?.college_code) return match.college_code.toUpperCase();
+    const words = raw.split(/\s+/).filter((w) => !['of', 'and', '&', 'for', 'in', 'the'].includes(w.toLowerCase()));
+    if (words.length > 0) {
+      return words.map((w) => w[0]?.toUpperCase() || '').join('').slice(0, 6);
+    }
+    return raw;
+  }
+
+  if (college.college_code && college.college_code.trim()) {
+    return college.college_code.toUpperCase().trim();
+  }
+
+  const idToMatch = college._id || college.id || (college as any).college_id;
+  const nameToMatch = (college.college_name || '').toLowerCase().trim();
+
+  const allKnown = getCachedColleges();
+  const match = allKnown.find((c) => {
+    if (idToMatch && (c._id === idToMatch || String(c._id) === String(idToMatch))) return true;
+    if (nameToMatch && c.college_name.toLowerCase().trim() === nameToMatch) return true;
+    if (nameToMatch && (c.college_name.toLowerCase().includes(nameToMatch) || nameToMatch.includes(c.college_name.toLowerCase()))) return true;
+    return false;
+  });
+
+  if (match && match.college_code) {
+    return match.college_code.toUpperCase();
+  }
+
+  if (college.college_name) {
+    const words = college.college_name.split(/\s+/).filter((w) => !['of', 'and', '&', 'for', 'in', 'the'].includes(w.toLowerCase()));
+    if (words.length > 0) {
+      return words.map((w) => w[0]?.toUpperCase() || '').join('').slice(0, 6);
+    }
+  }
+
+  return '';
+}
+
 export function setCachedColleges(list: CollegeOccupancy[]): void {
   if (!Array.isArray(list) || list.length === 0) return;
   memoryCachedColleges = list;

@@ -123,6 +123,15 @@ export function AddCompanyModal({
       normalizedEmail = res.normalized;
     }
 
+    if (followUpDate) {
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      if (followUpDate < todayStr) {
+        toast('Follow-up date cannot be in the past. Please select today or an upcoming date.', 'warning');
+        return;
+      }
+    }
+
     if (isForeignCollege && !bypassForeignCheck) {
       setShowForeignWarning(true);
       return;

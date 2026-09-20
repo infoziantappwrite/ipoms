@@ -12,7 +12,12 @@ import { triggerHaptic } from '@/lib/haptics';
 
 export type FollowUpStatus = 'today' | 'overdue' | 'upcoming' | 'none';
 
-export function getFollowUpStatus(followUpDate?: string): FollowUpStatus {
+// Follow-up tracking is deliberately scoped to just these two sections (user
+// decision, 20 Sep 2026) — shared with WeeklySection.tsx so the section-title
+// "N Overdue" pill and the in-table column/highlighting never drift apart.
+export const FOLLOWUP_SECTIONS = ['in_progress', 'pipeline'];
+
+export function getFollowUpStatus(followUpDate?: string | null): FollowUpStatus {
   if (!followUpDate) return 'none';
   try {
     const d = new Date(followUpDate);
@@ -56,8 +61,8 @@ export interface WeeklyRow {
   pipeline_section: string;
   is_pinned_top: boolean;
   current_status_text: string;
-  follow_up_date?: string;
-  drive_date?: string;
+  follow_up_date?: string | null;
+  drive_date?: string | null;
   registered_count?: number;
   shortlisted_count?: number;
   selected_count?: number;
@@ -166,7 +171,7 @@ export function WeeklyTable({
   const [copiedEmail, setCopiedEmail] = useState(false);
 
   const isCompletedSection = sectionKey === 'completed';
-  const hasFollowUpColumn = ['drive_in_progress', 'in_drive', 'companies_in_drive', 'upcoming_drives', 'in_progress', 'pipeline', 'follow_ups_due_today'].includes(sectionKey);
+  const hasFollowUpColumn = FOLLOWUP_SECTIONS.includes(sectionKey);
   const hasContactAndEmail = ['drive_in_progress', 'in_drive', 'companies_in_drive', 'upcoming_drives', 'in_progress', 'pipeline'].includes(sectionKey);
   const hasJdDbDates = ['drive_in_progress', 'in_drive', 'companies_in_drive', 'upcoming_drives', 'in_progress'].includes(sectionKey);
 
@@ -779,32 +784,33 @@ function TableRow({
 
   const followUpStatus = hasFollowUpColumn ? getFollowUpStatus(row.follow_up_date) : 'none';
 
+  // Row backgrounds are deliberately plain white/card everywhere now (user
+  // decision, 20 Sep 2026) — a fully-tinted row for every overdue/today/pinned
+  // company read as noisy across a long list ("every row a shade of red").
+  // The section title's "N Overdue"/"N Due Today" pill (WeeklySection.tsx)
+  // carries the aggregate signal now; a per-row cue still exists but is a
+  // small icon + a thin accent border on the frozen S.No cell only (below),
+  // never a full-row wash. Selection (checkbox mode) is the one state that
+  // still gets a background, since it's transient and needs to stay obvious.
   // 100% Solid opaque backgrounds with zero transparency so scrolled content never bleeds through
   const stickyBg = isSelected
     ? 'bg-indigo-50 dark:bg-indigo-950/60 group-hover/row:bg-indigo-100/90 dark:group-hover/row:bg-indigo-900/70'
-    : followUpStatus === 'today'
-    ? 'bg-[#FEF3C7] dark:bg-[#2D2109] group-hover/row:bg-[#FDE68A] dark:group-hover/row:bg-[#3D2C0D]'
-    : followUpStatus === 'overdue'
-    ? 'bg-[#FFE4E6] dark:bg-[#301317] group-hover/row:bg-[#FECDD3] dark:group-hover/row:bg-[#40191E]'
-    : row.is_pinned_top
-    ? 'bg-[#EFF6FF] dark:bg-[#1E293B] group-hover/row:bg-[#DBEAFE] dark:group-hover/row:bg-[#253349]'
     : 'bg-white dark:bg-[#161D2E] group-hover/row:bg-[#F8FAFC] dark:group-hover/row:bg-[#1E2738]';
 
   const nonStickyBg = isSelected
     ? 'bg-indigo-50 dark:bg-indigo-950/60 group-hover/row:bg-indigo-100/90 dark:group-hover/row:bg-indigo-900/70'
-    : followUpStatus === 'today'
-    ? 'bg-[#FFFBEB] dark:bg-[#221805] group-hover/row:bg-[#FEF3C7] dark:group-hover/row:bg-[#2D2109]'
-    : followUpStatus === 'overdue'
-    ? 'bg-[#FFF1F2] dark:bg-[#240D10] group-hover/row:bg-[#FFE4E6] dark:group-hover/row:bg-[#301317]'
-    : row.is_pinned_top
-    ? 'bg-[#EFF6FF] dark:bg-[#1E293B] group-hover/row:bg-[#DBEAFE] dark:group-hover/row:bg-[#253349]'
     : 'bg-white dark:bg-[#161D2E] group-hover/row:bg-[#F8FAFC] dark:group-hover/row:bg-[#1E2738]';
 
-  const rowHighlightClass = followUpStatus === 'today'
-    ? 'border-l-[4px] border-l-amber-500 dark:border-l-amber-400 shadow-[inset_0_1px_0_0_rgba(245,158,11,0.25),inset_0_-1px_0_0_rgba(245,158,11,0.25)]'
+  // Accent for the frozen S.No cell's left edge — applied to a <td>, not the
+  // <tr>, since a border set directly on a table row renders unreliably (a
+  // real bug found and reproduced live: two rows with the identical
+  // "border-l-rose-500" class computed different colors). A <td>'s own
+  // border always paints, per spec.
+  const snoAccentClass = followUpStatus === 'today'
+    ? 'border-l-[3px] border-l-amber-500 dark:border-l-amber-400'
     : followUpStatus === 'overdue'
-    ? 'border-l-[4px] border-l-rose-500 dark:border-l-rose-400 shadow-[inset_0_1px_0_0_rgba(244,63,94,0.2),inset_0_-1px_0_0_rgba(244,63,94,0.2)]'
-    : '';
+    ? 'border-l-[3px] border-l-rose-500 dark:border-l-rose-400'
+    : 'border-l-[3px] border-l-transparent';
 
   return (
     <tr
@@ -813,7 +819,7 @@ function TableRow({
       onDragOver={onDragOver}
       onDrop={onDrop}
       onDragEnd={onDragEnd}
-      className={`group/row transition-all duration-150 relative ${rowHighlightClass} ${
+      className={`group/row transition-all duration-150 relative ${
         isSelected ? 'font-medium' : row.is_pinned_top ? 'font-medium' : ''
       } ${
         isBeingDragged
@@ -852,8 +858,12 @@ function TableRow({
       {/* 1. S.No & Excel-like Drag Grip Handle (Frozen) */}
       <td
         style={{ left: sNoLeft }}
-        className={`sticky z-20 py-2.5 px-1.5 w-12 min-w-[48px] max-w-[48px] text-center text-fg-subtle font-mono text-micro font-medium border-b border-border/60 select-none cursor-grab active:cursor-grabbing group/sno ${stickyBg}`}
-        title="Hold or drag to swap row position (Excel-like row reordering)"
+        className={`sticky z-20 py-2.5 px-1.5 w-12 min-w-[48px] max-w-[48px] text-center text-fg-subtle font-mono text-micro font-medium border-b border-border/60 select-none cursor-grab active:cursor-grabbing group/sno ${stickyBg} ${snoAccentClass}`}
+        title={
+          followUpStatus === 'today' ? 'Follow-up due today'
+          : followUpStatus === 'overdue' ? 'Follow-up overdue'
+          : 'Hold or drag to swap row position (Excel-like row reordering)'
+        }
       >
         <div className="flex items-center justify-center gap-0.5 w-full">
           <GripVertical
@@ -870,7 +880,14 @@ function TableRow({
         style={{ left: companyLeft }}
         className={`sticky z-20 py-2.5 px-3 w-[200px] min-w-[200px] max-w-[200px] font-semibold text-fg border-b border-border/60 ${stickyBg}`}
       >
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex items-start gap-1.5">
+          {/* Icon-only marker shown from the start of the company name (Overdue / Today) */}
+          {followUpStatus === 'today' && (
+            <Flame size={13} strokeWidth={2.5} className="text-amber-500 shrink-0 mt-0.5" aria-label="Follow-up due today" />
+          )}
+          {followUpStatus === 'overdue' && (
+            <AlertTriangle size={13} strokeWidth={2.5} className="text-rose-500 shrink-0 mt-0.5" aria-label="Follow-up overdue" />
+          )}
           {editingField === 'company_name' ? (
             <input
               type="text"
@@ -882,27 +899,13 @@ function TableRow({
               className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-full outline-none shadow-xs font-bold"
             />
           ) : (
-            <>
-              <span
-                onClick={() => startEdit('company_name', row.company_name)}
-                className="cursor-pointer hover:text-primary transition-colors font-bold whitespace-normal break-words leading-snug"
-                title={row.company_name}
-              >
-                {row.company_name}
-              </span>
-              {followUpStatus === 'today' && (
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-500 text-white shadow-2xs animate-pulse shrink-0">
-                  <Flame size={10} strokeWidth={2.5} />
-                  TODAY
-                </span>
-              )}
-              {followUpStatus === 'overdue' && (
-                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-rose-500 text-white shadow-2xs shrink-0">
-                  <AlertTriangle size={10} strokeWidth={2.5} />
-                  OVERDUE
-                </span>
-              )}
-            </>
+            <span
+              onClick={() => startEdit('company_name', row.company_name)}
+              className="cursor-pointer hover:text-primary transition-colors font-bold whitespace-normal break-words leading-snug flex-1"
+              title={row.company_name}
+            >
+              {row.company_name}
+            </span>
           )}
         </div>
       </td>
@@ -1121,7 +1124,7 @@ function TableRow({
                 }
               })()}
               onChange={(newDate) => {
-                onUpdateRow(row._id, { follow_up_date: newDate || undefined });
+                onUpdateRow(row._id, { follow_up_date: newDate || null });
               }}
               minDate={(() => {
                 const now = new Date();

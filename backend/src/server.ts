@@ -723,6 +723,173 @@ app.patch('/api/v1/colleges/:id/status', async (req: Request, res: Response) => 
   }
 });
 
+// ── GET /api/v1/colleges/focus-matrix ──────────────────────────────────────────
+// Returns all active colleges with real-time occupancy metadata (who currently handles what),
+// guaranteeing zero duplication across coordinators.
+app.get('/api/v1/colleges/focus-matrix', async (req: Request, res: Response) => {
+  try {
+    const currentWeekMonday = getWeekMondayKey();
+
+    // Identify current user if authenticated
+    let currentUserId: string | null = (req as any).user?.userId || (req as any).user?._id || (req as any).user?.id || null;
+    let currentUserEmail: string | null = (req as any).user?.email || (req as any).user?.official_email || null;
+
+    if (!currentUserId || !currentUserEmail) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        try {
+          const token = authHeader.split(' ')[1];
+          const decoded: any = jwt.verify(token, process.env.JWT_ACCESS_SECRET || 'ipoms_secure_jwt_secret_key_2026');
+          if (!currentUserId) currentUserId = decoded.userId || decoded._id || decoded.id || null;
+          if (!currentUserEmail) currentUserEmail = decoded.email || decoded.official_email || null;
+        } catch {}
+      }
+    }
+    if (!currentUserId && req.query.user_id) {
+      currentUserId = String(req.query.user_id);
+    }
+    if (!currentUserEmail && req.query.email) {
+      currentUserEmail = String(req.query.email).toLowerCase().trim();
+    }
+
+    let allColleges = await College.find({ status: 'active' }).sort({ college_code: 1 });
+    if (allColleges.length === 0) {
+      await syncActiveCollegesRoster();
+      allColleges = await College.find({ status: 'active' }).sort({ college_code: 1 });
+      if (allColleges.length === 0) {
+        allColleges = await College.find({}).sort({ college_code: 1 });
+        if (allColleges.length > 0) {
+          await College.updateMany({}, { $set: { status: 'active' } });
+        }
+      }
+    }
+
+    // Resolve current user by ID or email
+    let currentUser = null;
+    if (currentUserId && Types.ObjectId.isValid(currentUserId)) {
+      currentUser = await User.findById(currentUserId);
+    }
+    if (!currentUser && currentUserEmail) {
+      currentUser = await User.findOne({ official_email: currentUserEmail.toLowerCase(), is_deleted: false });
+      if (currentUser) {
+        currentUserId = String(currentUser._id);
+      }
+    }
+
+    const activeCoordinators = await User.find({
+      role_codes: { $in: ['COORDINATOR', 'PLACEMENT_COORDINATOR', 'TEAM_LEADER'] },
+      account_status: 'active',
+      is_deleted: false,
+    }).select('_id full_name official_email assigned_college_ids weekly_focus_locked weekly_focus_week_key weekly_focus_locked_at');
+
+    const normalizedCurrentEmail = (currentUser?.official_email || currentUserEmail || '').toLowerCase().trim();
+    const normalizedCurrentId = currentUserId ? String(currentUserId) : '';
+
+    // Build map of college_id -> array of handlers (other coordinators/TLs who have locked focus)
+    const collegeHandlersMap = new Map<string, Array<{ user_id: string; name: string; email: string }>>();
+
+    for (const coord of activeCoordinators) {
+      const coordIdStr = String(coord._id);
+      const coordEmail = (coord.official_email || '').toLowerCase().trim();
+
+      // Skip current user (their colleges are "selected by me", NEVER occupied by others)
+      if (
+        (normalizedCurrentId && coordIdStr === normalizedCurrentId) ||
+        (normalizedCurrentEmail && coordEmail === normalizedCurrentEmail)
+      ) {
+        continue;
+      }
+
+      // Check if this coordinator has locked focus for current week
+      const isLockedForWeek = Boolean(coord.weekly_focus_locked && coord.weekly_focus_week_key === currentWeekMonday);
+      const assignedIds = Array.isArray(coord.assigned_college_ids) ? coord.assigned_college_ids : [];
+
+      if (isLockedForWeek && assignedIds.length > 0) {
+        for (const cid of assignedIds) {
+          const cIdStr = String(cid);
+          const list = collegeHandlersMap.get(cIdStr) || [];
+          if (!list.some((h) => h.user_id === coordIdStr)) {
+            list.push({
+              user_id: coordIdStr,
+              name: coord.full_name,
+              email: coord.official_email,
+            });
+            collegeHandlersMap.set(cIdStr, list);
+          }
+        }
+      }
+    }
+
+    // Determine current user's selected college IDs and lock status
+    let myAssignedCollegeIds = (currentUser?.assigned_college_ids || []).map((id: any) => String(id));
+    const isMyFocusLocked = Boolean(
+      currentUser?.weekly_focus_locked && currentUser?.weekly_focus_week_key === currentWeekMonday
+    );
+
+    const collegesWithOccupancy = allColleges.map((c) => {
+      const cIdStr = String(c._id);
+      const rawOtherHandlers = collegeHandlersMap.get(cIdStr) || [];
+      // Safety filter: Ensure current user is never listed as an "otherHandler"
+      const otherHandlers = rawOtherHandlers.filter(
+        (h) =>
+          (!normalizedCurrentId || h.user_id !== normalizedCurrentId) &&
+          (!normalizedCurrentEmail || h.email?.toLowerCase().trim() !== normalizedCurrentEmail)
+      );
+      const otherCount = otherHandlers.length;
+      const isSelectedByMe = myAssignedCollegeIds.includes(cIdStr);
+
+      // Rule: At most 2 coordinators/team leaders can handle a college.
+      // If 2 or more other coordinators already handle it, it is fully occupied.
+      const isFullyOccupied = otherCount >= 2;
+
+      // If exactly 1 other coordinator handles it, it is a co-handled slot available for 1 more person
+      const isSharedSlot = otherCount === 1;
+
+      const occupierName = otherHandlers.map((h) => h.name).join(' & ');
+
+      return {
+        _id: c._id,
+        college_name: c.college_name,
+        college_code: c.college_code,
+        location: c.location || '',
+        logo_url: c.logo_url || '',
+        other_handlers_count: otherCount,
+        is_occupied: isFullyOccupied && !isSelectedByMe,
+        is_shared_slot: isSharedSlot,
+        occupied_by: otherCount > 0 ? {
+          user_id: otherHandlers.map((h) => h.user_id).join(','),
+          name: occupierName,
+          email: otherHandlers.map((h) => h.email).join(', '),
+        } : null,
+        is_selected_by_me: isSelectedByMe,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        week_key: currentWeekMonday,
+        total_colleges: collegesWithOccupancy.length,
+        colleges: collegesWithOccupancy,
+        current_user_focus: {
+          user_id: currentUserId,
+          selected_college_ids: myAssignedCollegeIds,
+          is_locked: isMyFocusLocked,
+          week_key: currentUser?.weekly_focus_week_key || currentWeekMonday,
+          locked_at: currentUser?.weekly_focus_locked_at || null,
+        },
+        active_coordinators_count: activeCoordinators.length,
+      },
+    });
+  } catch (error: any) {
+    console.error('❌ [Focus Matrix Error]:', error);
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to fetch college focus matrix' },
+    });
+  }
+});
+
 // ── GET /api/v1/colleges/:id ────────────────────────────────────────────────
 // Retrieve a single college with full placement dossier profile details
 app.get('/api/v1/colleges/:id', async (req: Request, res: Response) => {
@@ -904,172 +1071,6 @@ function getWeekMondayKey(d: Date = new Date()): string {
   return `${year}-${month}-${dayStr}`;
 }
 
-// ── GET /api/v1/colleges/focus-matrix ──────────────────────────────────────────
-// Returns all active colleges with real-time occupancy metadata (who currently handles what),
-// guaranteeing zero duplication across coordinators.
-app.get('/api/v1/colleges/focus-matrix', async (req: Request, res: Response) => {
-  try {
-    const currentWeekMonday = getWeekMondayKey();
-
-    // Identify current user if authenticated
-    let currentUserId: string | null = (req as any).user?.userId || (req as any).user?._id || (req as any).user?.id || null;
-    let currentUserEmail: string | null = (req as any).user?.email || (req as any).user?.official_email || null;
-
-    if (!currentUserId || !currentUserEmail) {
-      const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        try {
-          const token = authHeader.split(' ')[1];
-          const decoded: any = jwt.verify(token, process.env.JWT_ACCESS_SECRET || 'ipoms_secure_jwt_secret_key_2026');
-          if (!currentUserId) currentUserId = decoded.userId || decoded._id || decoded.id || null;
-          if (!currentUserEmail) currentUserEmail = decoded.email || decoded.official_email || null;
-        } catch {}
-      }
-    }
-    if (!currentUserId && req.query.user_id) {
-      currentUserId = String(req.query.user_id);
-    }
-    if (!currentUserEmail && req.query.email) {
-      currentUserEmail = String(req.query.email).toLowerCase().trim();
-    }
-
-    let allColleges = await College.find({ status: 'active' }).sort({ college_code: 1 });
-    if (allColleges.length === 0) {
-      await syncActiveCollegesRoster();
-      allColleges = await College.find({ status: 'active' }).sort({ college_code: 1 });
-      if (allColleges.length === 0) {
-        allColleges = await College.find({}).sort({ college_code: 1 });
-        if (allColleges.length > 0) {
-          await College.updateMany({}, { $set: { status: 'active' } });
-        }
-      }
-    }
-
-    // Resolve current user by ID or email
-    let currentUser = null;
-    if (currentUserId && Types.ObjectId.isValid(currentUserId)) {
-      currentUser = await User.findById(currentUserId);
-    }
-    if (!currentUser && currentUserEmail) {
-      currentUser = await User.findOne({ official_email: currentUserEmail.toLowerCase(), is_deleted: false });
-      if (currentUser) {
-        currentUserId = String(currentUser._id);
-      }
-    }
-
-    const activeCoordinators = await User.find({
-      role_codes: { $in: ['COORDINATOR', 'PLACEMENT_COORDINATOR', 'TEAM_LEADER'] },
-      account_status: 'active',
-      is_deleted: false,
-    }).select('_id full_name official_email assigned_college_ids weekly_focus_locked weekly_focus_week_key weekly_focus_locked_at');
-
-    const normalizedCurrentEmail = (currentUser?.official_email || currentUserEmail || '').toLowerCase().trim();
-    const normalizedCurrentId = currentUserId ? String(currentUserId) : '';
-
-    // Build map of college_id -> array of handlers (other coordinators/TLs who have locked focus)
-    const collegeHandlersMap = new Map<string, Array<{ user_id: string; name: string; email: string }>>();
-
-    for (const coord of activeCoordinators) {
-      const coordIdStr = String(coord._id);
-      const coordEmail = (coord.official_email || '').toLowerCase().trim();
-
-      // Skip current user (their colleges are "selected by me", NEVER occupied by others)
-      if (
-        (normalizedCurrentId && coordIdStr === normalizedCurrentId) ||
-        (normalizedCurrentEmail && coordEmail === normalizedCurrentEmail)
-      ) {
-        continue;
-      }
-
-      // Check if this coordinator has locked focus for current week
-      const isLockedForWeek = Boolean(coord.weekly_focus_locked && coord.weekly_focus_week_key === currentWeekMonday);
-      const assignedIds = Array.isArray(coord.assigned_college_ids) ? coord.assigned_college_ids : [];
-
-      if (isLockedForWeek && assignedIds.length > 0) {
-        for (const cid of assignedIds) {
-          const cIdStr = String(cid);
-          const list = collegeHandlersMap.get(cIdStr) || [];
-          if (!list.some((h) => h.user_id === coordIdStr)) {
-            list.push({
-              user_id: coordIdStr,
-              name: coord.full_name,
-              email: coord.official_email,
-            });
-            collegeHandlersMap.set(cIdStr, list);
-          }
-        }
-      }
-    }
-
-    // Determine current user's selected college IDs and lock status
-    let myAssignedCollegeIds = (currentUser?.assigned_college_ids || []).map((id: any) => String(id));
-    const isMyFocusLocked = Boolean(
-      currentUser?.weekly_focus_locked && currentUser?.weekly_focus_week_key === currentWeekMonday
-    );
-
-    const collegesWithOccupancy = allColleges.map((c) => {
-      const cIdStr = String(c._id);
-      const rawOtherHandlers = collegeHandlersMap.get(cIdStr) || [];
-      // Safety filter: Ensure current user is never listed as an "otherHandler"
-      const otherHandlers = rawOtherHandlers.filter(
-        (h) =>
-          (!normalizedCurrentId || h.user_id !== normalizedCurrentId) &&
-          (!normalizedCurrentEmail || h.email?.toLowerCase().trim() !== normalizedCurrentEmail)
-      );
-      const otherCount = otherHandlers.length;
-      const isSelectedByMe = myAssignedCollegeIds.includes(cIdStr);
-
-      // Rule: At most 2 coordinators/team leaders can handle a college.
-      // If 2 or more other coordinators already handle it, it is fully occupied.
-      const isFullyOccupied = otherCount >= 2;
-
-      // If exactly 1 other coordinator handles it, it is a co-handled slot available for 1 more person
-      const isSharedSlot = otherCount === 1;
-
-      const occupierName = otherHandlers.map((h) => h.name).join(' & ');
-
-      return {
-        _id: c._id,
-        college_name: c.college_name,
-        college_code: c.college_code,
-        location: c.location || '',
-        logo_url: c.logo_url || '',
-        other_handlers_count: otherCount,
-        is_occupied: isFullyOccupied && !isSelectedByMe,
-        is_shared_slot: isSharedSlot,
-        occupied_by: otherCount > 0 ? {
-          user_id: otherHandlers.map((h) => h.user_id).join(','),
-          name: occupierName,
-          email: otherHandlers.map((h) => h.email).join(', '),
-        } : null,
-        is_selected_by_me: isSelectedByMe,
-      };
-    });
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        week_key: currentWeekMonday,
-        total_colleges: collegesWithOccupancy.length,
-        colleges: collegesWithOccupancy,
-        current_user_focus: {
-          user_id: currentUserId,
-          selected_college_ids: myAssignedCollegeIds,
-          is_locked: isMyFocusLocked,
-          week_key: currentUser?.weekly_focus_week_key || currentWeekMonday,
-          locked_at: currentUser?.weekly_focus_locked_at || null,
-        },
-        active_coordinators_count: activeCoordinators.length,
-      },
-    });
-  } catch (error: any) {
-    console.error('❌ [Focus Matrix Error]:', error);
-    return res.status(500).json({
-      success: false,
-      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to fetch college focus matrix' },
-    });
-  }
-});
 
 // ── POST /api/v1/colleges/lock-focus ──────────────────────────────────────────
 // Atomically validates and locks 1-4 colleges for the current coordinator,
@@ -2501,77 +2502,102 @@ app.get('/api/v1/daily-tracker/calendar-activity', async (req: Request, res: Res
   }
 });
 
-// ── DT-9: GET /api/v1/daily-tracker/pending-followups
-// Fetch all scheduled follow-ups across focused colleges, time-categorized by month
-app.get('/api/v1/daily-tracker/pending-followups', async (req: Request, res: Response) => {
+// ── DT-9: GET /api/v1/daily-tracker/pending-followups & /api/v1/weekly-tracker/pending-followups
+// Fetch all scheduled follow-ups from Weekly Tracker (Companies in Progress & Pipeline)
+// for the respective user handling their colleges
+const handlePendingFollowups = async (req: Request, res: Response) => {
   try {
-    const coordinatorId = scopeToSelf(req, req.query.coordinator_id as string | undefined);
+    const userId = (req as any).user?.userId;
+    const requestedCoordId = req.query.coordinator_id as string | undefined;
     const collegeIdsParam = req.query.college_ids as string | undefined;
     const collegeIdParam = req.query.college_id as string | undefined;
 
-    const filter: any = {
-      outcome_status: 'follow_up',
-      is_deleted: { $ne: true },
-    };
-
-    if (coordinatorId) {
-      filter.coordinator_id = coordinatorId;
-    }
+    let targetCollegeIds: any[] = [];
 
     if (collegeIdsParam) {
-      const ids = collegeIdsParam.split(',').map((id) => id.trim()).filter(Boolean);
-      if (ids.length > 0) {
-        filter.college_id = { $in: ids };
+      const splitIds = collegeIdsParam.split(',').map((id) => id.trim()).filter(Boolean);
+      if (splitIds.length > 0) {
+        targetCollegeIds = splitIds;
       }
     } else if (collegeIdParam) {
-      filter.college_id = collegeIdParam;
+      targetCollegeIds = [collegeIdParam.trim()];
     }
 
-    const rows = await DailyTracker.find(filter)
-      .populate('company_id', 'company_name hr_name phone_number email_id location domain')
+    // If no explicit college filter provided in query, scope to user's assigned colleges
+    if (targetCollegeIds.length === 0 && userId) {
+      const userDoc = await User.findById(userId).select('assigned_college_ids role_codes').lean();
+      if (userDoc && Array.isArray(userDoc.assigned_college_ids) && userDoc.assigned_college_ids.length > 0) {
+        // Coordinators and non-admins only see their assigned colleges
+        targetCollegeIds = userDoc.assigned_college_ids.map((id: any) => String(id));
+      }
+    }
+
+    const wtFilter: any = {
+      is_deleted: { $ne: true },
+      pipeline_section: { $in: ['in_progress', 'pipeline', 'companies_in_progress', 'companies_in_pipeline', 'drive_in_progress'] },
+      follow_up_date: { $exists: true, $ne: null },
+    };
+
+    if (targetCollegeIds.length > 0) {
+      wtFilter.college_id = { $in: targetCollegeIds.map((id: string) => new Types.ObjectId(id)) };
+    }
+
+    if (requestedCoordId && requestedCoordId !== 'all') {
+      wtFilter.coordinator_id = new Types.ObjectId(requestedCoordId);
+    }
+
+    const rows = await WeeklyTracker.find(wtFilter)
       .populate('college_id', 'college_name college_code logo_url')
-      .sort({ updatedAt: -1 })
+      .populate('coordinator_id', 'full_name official_email')
+      .sort({ follow_up_date: 1, company_name: 1 })
       .lean();
 
-    const monthNames = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-
-    const currentMonthIdx = new Date().getMonth(); // 0 to 11
-    const currentMonthName = monthNames[currentMonthIdx];
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     const categorized = rows.map((r: any) => {
-      const monthStr = r.follow_up_month ? String(r.follow_up_month).trim() : '';
-      const targetMonthIdx = monthNames.findIndex((m) => m.toLowerCase() === monthStr.toLowerCase());
-
+      let dateStr = '';
       let urgency: 'due_now' | 'overdue' | 'upcoming' = 'upcoming';
-      if (targetMonthIdx !== -1) {
-        if (targetMonthIdx === currentMonthIdx) {
-          urgency = 'due_now';
-        } else if (targetMonthIdx < currentMonthIdx) {
-          urgency = 'overdue';
-        } else {
-          urgency = 'upcoming';
+
+      if (r.follow_up_date) {
+        const d = new Date(r.follow_up_date);
+        if (!isNaN(d.getTime())) {
+          dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          if (dateStr === todayStr) {
+            urgency = 'due_now';
+          } else if (dateStr < todayStr) {
+            urgency = 'overdue';
+          } else {
+            urgency = 'upcoming';
+          }
         }
-      } else if (monthStr) {
-        urgency = 'due_now';
       }
 
+      const isProgress = r.pipeline_section === 'in_progress' || r.pipeline_section === 'companies_in_progress' || r.pipeline_section === 'drive_in_progress';
+      const sectionLabel = isProgress ? 'Companies in Progress' : 'Companies in Pipeline';
+      const primaryContact = r.contact_number || (r.mobile_numbers && r.mobile_numbers[0]) || '';
+      const primaryEmail = r.email_id || (r.email_ids && r.email_ids[0]) || '';
+
       return {
-        _id: r._id,
-        company_name: r.company_id?.company_name || r.company_name || 'Unknown Company',
-        hr_name: r.company_id?.hr_name || r.hr_name || '',
-        phone_number: r.company_id?.phone_number || r.phone_number || '',
-        email_id: r.company_id?.email_id || r.email_id || '',
-        college_id: r.college_id?._id || r.college_id,
+        _id: String(r._id),
+        company_name: r.company_name || 'Unknown Company',
+        job_role: r.job_role || '',
+        ctc_lpa: r.ctc_lpa || '',
+        company_type: r.company_type || '',
+        phone_number: primaryContact,
+        mobile_numbers: Array.isArray(r.mobile_numbers) && r.mobile_numbers.length > 0 ? r.mobile_numbers : (primaryContact ? [primaryContact] : []),
+        email_id: primaryEmail,
+        email_ids: Array.isArray(r.email_ids) && r.email_ids.length > 0 ? r.email_ids : (primaryEmail ? [primaryEmail] : []),
+        college_id: String(r.college_id?._id || r.college_id || ''),
         college_name: r.college_id?.college_name || '',
         college_code: r.college_id?.college_code || '',
         college_logo: r.college_id?.logo_url || '',
-        follow_up_month: monthStr || currentMonthName,
-        comments: r.comments || '',
-        session_date: r.session_date,
-        last_called_at: r.call_start_time || r.updatedAt,
+        pipeline_section: r.pipeline_section,
+        pipeline_section_label: sectionLabel,
+        follow_up_date: dateStr,
+        follow_up_date_raw: r.follow_up_date,
+        comments: r.current_status_text || '',
+        coordinator_name: r.coordinator_id?.full_name || '',
         urgency,
       };
     });
@@ -2580,14 +2606,66 @@ app.get('/api/v1/daily-tracker/pending-followups', async (req: Request, res: Res
     const overdue = categorized.filter((c) => c.urgency === 'overdue');
     const upcoming = categorized.filter((c) => c.urgency === 'upcoming');
 
+    // Aggregate summary per college
+    const collegesMap = new Map<string, { college_id: string; college_name: string; college_code: string; logo_url?: string; due_now_count: number; overdue_count: number; total_count: number }>();
+
+    for (const item of categorized) {
+      if (!item.college_id) continue;
+      if (!collegesMap.has(item.college_id)) {
+        collegesMap.set(item.college_id, {
+          college_id: item.college_id,
+          college_name: item.college_name,
+          college_code: item.college_code,
+          logo_url: item.college_logo,
+          due_now_count: 0,
+          overdue_count: 0,
+          total_count: 0,
+        });
+      }
+      const c = collegesMap.get(item.college_id)!;
+      c.total_count += 1;
+      if (item.urgency === 'due_now') c.due_now_count += 1;
+      if (item.urgency === 'overdue') c.overdue_count += 1;
+    }
+
+    if (targetCollegeIds.length > 0) {
+      const allTargetColleges = await College.find({
+        _id: { $in: targetCollegeIds.map((id: string) => new Types.ObjectId(id)) },
+        is_deleted: { $ne: true },
+      }).select('_id college_name college_code logo_url').lean();
+
+      for (const col of allTargetColleges) {
+        const idStr = String(col._id);
+        if (!collegesMap.has(idStr)) {
+          collegesMap.set(idStr, {
+            college_id: idStr,
+            college_name: col.college_name,
+            college_code: col.college_code,
+            logo_url: col.logo_url,
+            due_now_count: 0,
+            overdue_count: 0,
+            total_count: 0,
+          });
+        }
+      }
+    }
+
+    const availableColleges = Array.from(collegesMap.values()).sort((a, b) => {
+      const scoreA = a.due_now_count * 2 + a.overdue_count;
+      const scoreB = b.due_now_count * 2 + b.overdue_count;
+      if (scoreA !== scoreB) return scoreB - scoreA;
+      return (a.college_code || '').localeCompare(b.college_code || '');
+    });
+
     return res.status(200).json({
       success: true,
       data: {
-        current_month: currentMonthName,
+        today_date: todayStr,
         total_pending: categorized.length,
         due_now_count: dueNow.length,
         overdue_count: overdue.length,
         upcoming_count: upcoming.length,
+        available_colleges: availableColleges,
         follow_ups: [...dueNow, ...overdue, ...upcoming],
       },
     });
@@ -2597,7 +2675,10 @@ app.get('/api/v1/daily-tracker/pending-followups', async (req: Request, res: Res
       error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to fetch pending follow-ups' },
     });
   }
-});
+};
+
+app.get('/api/v1/daily-tracker/pending-followups', handlePendingFollowups);
+app.get('/api/v1/weekly-tracker/pending-followups', handlePendingFollowups);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MODULE 04 — WEEKLY TRACKER ENDPOINTS
@@ -3479,6 +3560,22 @@ app.post('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
       }
     }
 
+    if (follow_up_date) {
+      const parsedFollowUp = new Date(follow_up_date);
+      if (!isNaN(parsedFollowUp.getTime())) {
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const followUpDay = new Date(parsedFollowUp);
+        followUpDay.setHours(23, 59, 59, 999);
+        if (followUpDay < startOfToday) {
+          return res.status(400).json({
+            success: false,
+            error: 'Follow-up date cannot be in the past. Please select today or an upcoming date.',
+          });
+        }
+      }
+    }
+
     const effectiveSection = pipeline_section === 'follow_ups_due_today' ? 'in_progress' : (pipeline_section || 'pipeline');
     const effectiveFollowUp = pipeline_section === 'follow_ups_due_today' && !follow_up_date ? new Date() : (follow_up_date ? new Date(follow_up_date) : null);
     const { startFriday, endThursday, weekNumber } = getFridayWeekBounds();
@@ -3601,6 +3698,23 @@ app.patch('/api/v1/weekly-tracker/:id', async (req: Request, res: Response) => {
       'pipeline_section',
       'is_pinned_top',
     ];
+
+    // Validate follow_up_date strictly: Cannot be a past date (must be today or future) unless performing an undo operation
+    if (patchData.follow_up_date && !patchData.is_undo) {
+      const parsedFollowUp = new Date(patchData.follow_up_date);
+      if (!isNaN(parsedFollowUp.getTime())) {
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const followUpDay = new Date(parsedFollowUp);
+        followUpDay.setHours(23, 59, 59, 999);
+        if (followUpDay < startOfToday) {
+          return res.status(400).json({
+            success: false,
+            error: 'Follow-up date cannot be in the past. Please select today or an upcoming date.',
+          });
+        }
+      }
+    }
 
     allowedFields.forEach((field) => {
       if (patchData[field] !== undefined) {
@@ -8001,9 +8115,11 @@ app.get('/api/v1/dashboard/college-kpis', async (req: Request, res: Response) =>
           college = await College.findById(cIdStr);
         }
         if (!college) {
+          const strippedCode = cIdStr.replace(/^col_/, '');
           college = await College.findOne({
             $or: [
               { college_code: new RegExp(`^${escapeRegex(cIdStr)}$`, 'i') },
+              { college_code: new RegExp(`^${escapeRegex(strippedCode)}$`, 'i') },
               { college_name: new RegExp(`^${escapeRegex(cIdStr)}$`, 'i') },
             ],
           });
@@ -11637,11 +11753,16 @@ const ensureCompanyMetadataSerialNumbers = async () => {
       let currentSerial = highestDoc?.serial_number || 0;
       const unnumberedDocs = await CompanyMetadata.find({
         $or: [{ serial_number: { $exists: false } }, { serial_number: null }, { serial_number: 0 }],
-      }).sort({ created_at: 1, _id: 1 });
+      }).sort({ created_at: 1, _id: 1 }).select('_id');
       for (const doc of unnumberedDocs) {
         currentSerial += 1;
-        doc.serial_number = currentSerial;
-        await doc.save();
+        // updateOne (not doc.save()) so this only ever touches serial_number.
+        // save() re-validates the WHOLE document, so a record with a pre-existing
+        // bad value on an unrelated field (e.g. company_type imported from Weekly
+        // Tracker's free-text field, which isn't in this schema's enum) aborted
+        // this entire loop on the first bad doc — every doc after it silently
+        // never got numbered. A targeted $set can't trip on fields it never reads.
+        await CompanyMetadata.updateOne({ _id: doc._id }, { $set: { serial_number: currentSerial } });
       }
       console.log(`✅ [iPOMS] Successfully assigned serial numbers up to #${currentSerial}.`);
     }

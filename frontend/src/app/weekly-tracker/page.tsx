@@ -16,7 +16,7 @@ import { apiFetch, apiFetchBlob } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
 import { useToast } from '@/components/ui/Toast';
 import { triggerHaptic } from '@/lib/haptics';
-import { resolveDefaultCollege } from '@/lib/collegeSession';
+import { resolveDefaultCollege, setActiveCollege, getCachedColleges } from '@/lib/collegeSession';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 
 interface SectionData {
@@ -150,12 +150,38 @@ export default function WeeklyTrackerPage() {
       }).catch((err) => console.error('Failed to load assigned colleges:', err));
     }
 
-    resolveDefaultCollege().then((col) => {
-      if (col.id) {
-        setSelectedCollegeId(col.id);
-        setSelectedCollegeName(col.name);
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const urlCollegeId = urlParams?.get('college_id');
+    const urlSection = urlParams?.get('section');
+
+    if (urlSection) {
+      setActiveSectionFilter(urlSection);
+    }
+
+    if (urlCollegeId) {
+      const cached = getCachedColleges();
+      const matched = cached.find((c) => c._id === urlCollegeId || c.college_code === urlCollegeId);
+      const colName = matched?.college_name || '';
+      setSelectedCollegeId(urlCollegeId);
+      setSelectedCollegeName(colName);
+      setActiveCollege(urlCollegeId, colName, matched || undefined);
+    } else {
+      resolveDefaultCollege().then((col) => {
+        if (col.id) {
+          setSelectedCollegeId(col.id);
+          setSelectedCollegeName(col.name);
+        }
+      });
+    }
+
+    const handleCollegeChange = (e: any) => {
+      if (e.detail?.id) {
+        setSelectedCollegeId(e.detail.id);
+        setSelectedCollegeName(e.detail.name || '');
       }
-    });
+    };
+    window.addEventListener('ipoms_college_change', handleCollegeChange);
+    return () => window.removeEventListener('ipoms_college_change', handleCollegeChange);
   }, []);
 
   // ── Load Weekly Tracker Sections
@@ -335,7 +361,10 @@ export default function WeeklyTrackerPage() {
     try {
       const res = await apiFetch(`/weekly-tracker/${rowId}`, {
         method: 'PATCH',
-        body: JSON.stringify(patch),
+        body: JSON.stringify({
+          ...patch,
+          is_undo: isUndoRedo,
+        }),
       });
       if (res.success) {
         await loadWeeklyTracker();

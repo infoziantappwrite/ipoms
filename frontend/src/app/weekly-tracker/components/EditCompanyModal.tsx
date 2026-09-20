@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Pencil, X, Building2, Trash2, CheckCircle2, Briefcase, Layers, GraduationCap, Phone, Mail, Calendar } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { triggerHaptic } from '@/lib/haptics';
@@ -132,6 +132,15 @@ export function EditCompanyModal({
         return;
       }
       normalizedEmail = res.normalized;
+    }
+
+    if (followUpDate) {
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      if (followUpDate < todayStr) {
+        alert('Follow-up date cannot be in the past. Please select today or an upcoming date.');
+        return;
+      }
     }
 
     const formattedCtc = ctcValue.includes('LPA') || ctcValue.toLowerCase().includes('month')
