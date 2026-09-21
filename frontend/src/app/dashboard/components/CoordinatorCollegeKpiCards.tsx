@@ -5,7 +5,6 @@ import Link from 'next/link';
 import {
   PhoneCall,
   CheckCircle2,
-  XCircle,
   Ban,
   Building2,
   Target,
@@ -39,43 +38,31 @@ interface Props {
 const COLLEGE_PALETTES = [
   {
     name: 'indigo',
-    primary: '#6366f1',
     badge: 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
-    barGroupBg: 'bg-indigo-500/5 dark:bg-indigo-950/20 border-indigo-200/60 dark:border-indigo-800/40',
   },
   {
     name: 'cyan',
-    primary: '#06b6d4',
     badge: 'bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800',
-    barGroupBg: 'bg-cyan-500/5 dark:bg-cyan-950/20 border-cyan-200/60 dark:border-cyan-800/40',
   },
   {
     name: 'emerald',
-    primary: '#10b981',
     badge: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
-    barGroupBg: 'bg-emerald-500/5 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-800/40',
   },
   {
     name: 'amber',
-    primary: '#f59e0b',
     badge: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
-    barGroupBg: 'bg-amber-500/5 dark:bg-amber-950/20 border-amber-200/60 dark:border-amber-800/40',
   },
   {
     name: 'purple',
-    primary: '#8b5cf6',
     badge: 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
-    barGroupBg: 'bg-purple-500/5 dark:bg-purple-950/20 border-purple-200/60 dark:border-purple-800/40',
   },
   {
     name: 'rose',
-    primary: '#f43f5e',
     badge: 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
-    barGroupBg: 'bg-rose-500/5 dark:bg-rose-950/20 border-rose-200/60 dark:border-rose-800/40',
   },
 ];
 
-type MetricFilter = 'all' | 'calls' | 'positives' | 'negatives' | 'not_hiring';
+type MetricFilter = 'all' | 'calls' | 'positives' | 'not_hiring';
 type ViewMode = 'chart' | 'cards' | 'split';
 
 export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
@@ -157,7 +144,6 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
         const itemMax = Math.max(
           item.total_calls || 0,
           item.total_positives || 0,
-          item.total_negatives || 0,
           item.total_not_hiring || 0
         );
         if (itemMax > maxVal) maxVal = itemMax;
@@ -165,13 +151,11 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
         if ((item.total_calls || 0) > maxVal) maxVal = item.total_calls;
       } else if (metricFilter === 'positives') {
         if ((item.total_positives || 0) > maxVal) maxVal = item.total_positives;
-      } else if (metricFilter === 'negatives') {
-        if ((item.total_negatives || 0) > maxVal) maxVal = item.total_negatives;
       } else if (metricFilter === 'not_hiring') {
         if ((item.total_not_hiring || 0) > maxVal) maxVal = item.total_not_hiring;
       }
     });
-    // Set a comfortable ceiling
+    // Set a comfortable round ceiling
     if (maxVal <= 5) return 10;
     if (maxVal <= 15) return 20;
     if (maxVal <= 30) return 40;
@@ -274,13 +258,13 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
         </div>
       </div>
 
-      {/* ── 1. Full-Width Interactive Colourful Graph ────────────────── */}
+      {/* ── 1. Full-Width Interactive Graph Paper Chart ──────────────── */}
       {(viewMode === 'chart' || viewMode === 'split') && (
         <div className="rounded-2xl border border-border bg-surface shadow-sm overflow-hidden p-5 sm:p-7 space-y-6 w-full">
           
-          {/* Top Filter Bar: Metric Selector Pills (Lighter Theme Style) */}
+          {/* Top Filter Bar: Only All Metrics, Calls Made, Positives, Not Hiring */}
           <div className="flex items-center justify-between gap-4 border-b border-border/80 pb-4 flex-wrap">
-            <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[11px] font-bold uppercase tracking-wider text-fg-subtle mr-1">
                 Filter Metric:
               </span>
@@ -288,14 +272,13 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
                 { id: 'all', label: 'All Metrics', color: 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800' },
                 { id: 'calls', label: 'Calls Made', color: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800' },
                 { id: 'positives', label: 'Positives', color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
-                { id: 'negatives', label: 'Negatives', color: 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-800' },
                 { id: 'not_hiring', label: 'Not Hiring', color: 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
               ].map((m) => (
                 <button
                   key={m.id}
                   type="button"
                   onClick={() => setMetricFilter(m.id as MetricFilter)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
                     metricFilter === m.id
                       ? `${m.color} ring-2 ring-blue-500/20 font-black shadow-xs`
                       : 'bg-surface-sunken/60 border-border text-fg-subtle hover:text-fg hover:bg-surface-sunken'
@@ -306,33 +289,32 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
               ))}
             </div>
 
-            {/* Quick Chart Info */}
             <div className="text-xs text-fg-subtle font-medium hidden sm:block">
-              Comparing outreach for <strong className="text-fg font-mono">{kpiData.length}</strong> colleges
+              Comparing outreach across <strong className="text-fg font-mono">{kpiData.length}</strong> partner colleges
             </div>
           </div>
 
-          {/* ── Full Width Large Interactive Chart ── */}
+          {/* ── Full Width Graph Paper Styled Chart ── */}
           <div className="w-full space-y-4">
             
-            {/* Chart Canvas with Guide Lines */}
-            <div className="h-80 sm:h-96 w-full flex items-end justify-between gap-4 sm:gap-8 pt-8 pb-3 px-4 sm:px-6 border-b border-border relative bg-gradient-to-b from-surface-sunken/20 to-transparent rounded-xl">
+            {/* Chart Area with Mild Grey Graph Paper Texture */}
+            <div className="h-80 sm:h-96 w-full flex items-end justify-between gap-4 sm:gap-8 pt-8 pb-3 px-6 sm:px-10 border border-zinc-200 dark:border-zinc-800 relative rounded-2xl overflow-hidden ipoms-graph-paper">
               
-              {/* Background Horizontal Scale Lines */}
-              <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-40 px-4 pt-6 pb-3">
-                <div className="border-b border-dashed border-border w-full flex items-center justify-between text-[10px] text-fg-subtle font-mono">
+              {/* Background Horizontal Guide Scale with Dark Numbers */}
+              <div className="absolute inset-0 flex flex-col justify-between pointer-events-none px-4 pt-6 pb-3">
+                <div className="border-b border-zinc-300/80 dark:border-zinc-700/80 w-full flex items-center justify-between text-xs font-mono font-black text-zinc-900 dark:text-zinc-100">
                   <span>{maxMetricValue}</span>
                 </div>
-                <div className="border-b border-dashed border-border w-full flex items-center justify-between text-[10px] text-fg-subtle font-mono">
+                <div className="border-b border-dashed border-zinc-300/60 dark:border-zinc-700/60 w-full flex items-center justify-between text-xs font-mono font-black text-zinc-800 dark:text-zinc-200">
                   <span>{Math.round(maxMetricValue * 0.75)}</span>
                 </div>
-                <div className="border-b border-dashed border-border w-full flex items-center justify-between text-[10px] text-fg-subtle font-mono">
+                <div className="border-b border-dashed border-zinc-300/60 dark:border-zinc-700/60 w-full flex items-center justify-between text-xs font-mono font-black text-zinc-800 dark:text-zinc-200">
                   <span>{Math.round(maxMetricValue * 0.5)}</span>
                 </div>
-                <div className="border-b border-dashed border-border w-full flex items-center justify-between text-[10px] text-fg-subtle font-mono">
+                <div className="border-b border-dashed border-zinc-300/60 dark:border-zinc-700/60 w-full flex items-center justify-between text-xs font-mono font-black text-zinc-800 dark:text-zinc-200">
                   <span>{Math.round(maxMetricValue * 0.25)}</span>
                 </div>
-                <div className="border-b border-border w-full flex items-center justify-between text-[10px] text-fg-subtle font-mono">
+                <div className="border-b-2 border-zinc-400 dark:border-zinc-600 w-full flex items-center justify-between text-xs font-mono font-black text-zinc-900 dark:text-zinc-100">
                   <span>0</span>
                 </div>
               </div>
@@ -340,18 +322,20 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
               {/* College Bar Columns */}
               {kpiData.map((item, idx) => {
                 const isHovered = hoveredCollegeId === item.college_id;
-                const palette = COLLEGE_PALETTES[idx % COLLEGE_PALETTES.length];
+                const acronym = getCollegeAcronym({
+                  college_code: item.college_code,
+                  college_name: item.college_name,
+                  college_id: item.college_id,
+                }) || item.college_code || `C${idx + 1}`;
 
-                // Calculate heights as clean percentages of maxMetricValue
-                const getPct = (val: number) => {
-                  if (!val || val === 0) return 4; // subtle baseline pill
-                  return Math.min(100, Math.max(8, (val / maxMetricValue) * 100));
+                // Height calculation:
+                // 1 cm = 38px height for 0 value.
+                // For positive values, scale from 38px (1cm) up to 100% of chart height.
+                const getBarHeight = (val: number) => {
+                  if (!val || val === 0) return '38px'; // 1 cm baseline height
+                  const pct = Math.min(100, Math.max(14, (val / maxMetricValue) * 100));
+                  return `max(38px, ${pct}%)`;
                 };
-
-                const callsPct = getPct(item.total_calls);
-                const positivesPct = getPct(item.total_positives);
-                const negativesPct = getPct(item.total_negatives);
-                const notHiringPct = getPct(item.total_not_hiring);
 
                 return (
                   <div
@@ -365,113 +349,85 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
                     {/* Floating Hover Card with Clean Light Background */}
                     {isHovered && (
                       <div className="absolute -top-12 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-xs font-mono font-bold px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-xl pointer-events-none z-30 whitespace-nowrap animate-in fade-in zoom-in-95 duration-150 flex items-center gap-2">
-                        <span className="text-blue-600 dark:text-blue-400 font-sans">
-                          {item.college_name.split(' ')[0]}:
+                        <span className="text-blue-600 dark:text-blue-400 font-sans font-bold">
+                          {acronym}:
                         </span>
                         <span>{item.total_calls} Calls</span>
                         <span className="text-zinc-300 dark:text-zinc-600">•</span>
                         <span className="text-emerald-600 dark:text-emerald-400">{item.total_positives} Positives</span>
+                        <span className="text-zinc-300 dark:text-zinc-600">•</span>
+                        <span className="text-amber-600 dark:text-amber-400">{item.total_not_hiring} Not Hiring</span>
                       </div>
                     )}
 
-                    {/* Grouped Bars Container */}
-                    <div className="w-full flex items-end justify-center gap-1.5 sm:gap-2.5 h-full z-10 px-1">
+                    {/* Grouped 3 Bars: Calls Made, Positives, Not Hiring */}
+                    <div className="w-full flex items-end justify-center gap-2 sm:gap-3 h-full z-10 px-1">
                       {metricFilter === 'all' ? (
                         <>
-                          {/* 1. Calls Made Bar */}
-                          <div className="flex-1 max-w-[28px] sm:max-w-[36px] flex flex-col items-center justify-end h-full">
-                            {item.total_calls > 0 && (
-                              <span className="text-[10px] font-mono font-black text-blue-600 dark:text-blue-400 mb-1">
-                                {item.total_calls}
-                              </span>
-                            )}
+                          {/* 1. Calls Made Bar (1cm height for 0) */}
+                          <div className="flex-1 max-w-[32px] sm:max-w-[42px] flex flex-col items-center justify-end h-full">
+                            <span className="text-xs font-mono font-black text-blue-600 dark:text-blue-400 mb-1">
+                              {item.total_calls}
+                            </span>
                             <div
-                              className="w-full rounded-t-lg bg-gradient-to-t from-blue-600 to-indigo-500 shadow-sm group-hover:from-blue-500 group-hover:to-indigo-400 transition-all duration-500"
-                              style={{ height: `${callsPct}%` }}
+                              className="w-full rounded-t-xl bg-gradient-to-t from-blue-600 to-indigo-500 shadow-sm group-hover:from-blue-500 group-hover:to-indigo-400 transition-all duration-500 border-t border-x border-blue-400/40"
+                              style={{ height: getBarHeight(item.total_calls) }}
                               title={`Calls Made: ${item.total_calls}`}
                             />
                           </div>
 
-                          {/* 2. Positives Bar */}
-                          <div className="flex-1 max-w-[28px] sm:max-w-[36px] flex flex-col items-center justify-end h-full">
-                            {item.total_positives > 0 && (
-                              <span className="text-[10px] font-mono font-black text-emerald-600 dark:text-emerald-400 mb-1">
-                                {item.total_positives}
-                              </span>
-                            )}
+                          {/* 2. Positives Bar (1cm height for 0) */}
+                          <div className="flex-1 max-w-[32px] sm:max-w-[42px] flex flex-col items-center justify-end h-full">
+                            <span className="text-xs font-mono font-black text-emerald-600 dark:text-emerald-400 mb-1">
+                              {item.total_positives}
+                            </span>
                             <div
-                              className="w-full rounded-t-lg bg-gradient-to-t from-emerald-600 to-teal-400 shadow-sm group-hover:from-emerald-500 group-hover:to-teal-300 transition-all duration-500"
-                              style={{ height: `${positivesPct}%` }}
+                              className="w-full rounded-t-xl bg-gradient-to-t from-emerald-600 to-teal-400 shadow-sm group-hover:from-emerald-500 group-hover:to-teal-300 transition-all duration-500 border-t border-x border-emerald-400/40"
+                              style={{ height: getBarHeight(item.total_positives) }}
                               title={`Positives: ${item.total_positives}`}
                             />
                           </div>
 
-                          {/* 3. Negatives Bar */}
-                          <div className="flex-1 max-w-[28px] sm:max-w-[36px] flex flex-col items-center justify-end h-full">
-                            {item.total_negatives > 0 && (
-                              <span className="text-[10px] font-mono font-black text-rose-600 dark:text-rose-400 mb-1">
-                                {item.total_negatives}
-                              </span>
-                            )}
+                          {/* 3. Not Hiring Bar (1cm height for 0) */}
+                          <div className="flex-1 max-w-[32px] sm:max-w-[42px] flex flex-col items-center justify-end h-full">
+                            <span className="text-xs font-mono font-black text-amber-600 dark:text-amber-400 mb-1">
+                              {item.total_not_hiring}
+                            </span>
                             <div
-                              className="w-full rounded-t-lg bg-gradient-to-t from-rose-600 to-rose-400 shadow-sm group-hover:from-rose-500 group-hover:to-rose-300 transition-all duration-500"
-                              style={{ height: `${negativesPct}%` }}
-                              title={`Negatives: ${item.total_negatives}`}
-                            />
-                          </div>
-
-                          {/* 4. Not Hiring Bar */}
-                          <div className="flex-1 max-w-[28px] sm:max-w-[36px] flex flex-col items-center justify-end h-full">
-                            {item.total_not_hiring > 0 && (
-                              <span className="text-[10px] font-mono font-black text-amber-600 dark:text-amber-400 mb-1">
-                                {item.total_not_hiring}
-                              </span>
-                            )}
-                            <div
-                              className="w-full rounded-t-lg bg-gradient-to-t from-amber-600 to-amber-400 shadow-sm group-hover:from-amber-500 group-hover:to-amber-300 transition-all duration-500"
-                              style={{ height: `${notHiringPct}%` }}
+                              className="w-full rounded-t-xl bg-gradient-to-t from-amber-600 to-amber-400 shadow-sm group-hover:from-amber-500 group-hover:to-amber-300 transition-all duration-500 border-t border-x border-amber-400/40"
+                              style={{ height: getBarHeight(item.total_not_hiring) }}
                               title={`Not Hiring: ${item.total_not_hiring}`}
                             />
                           </div>
                         </>
                       ) : metricFilter === 'calls' ? (
-                        <div className="w-full max-w-[64px] flex flex-col items-center justify-end h-full">
-                          <span className="text-xs font-mono font-black text-blue-600 dark:text-blue-400 mb-1">
+                        <div className="w-full max-w-[72px] flex flex-col items-center justify-end h-full">
+                          <span className="text-sm font-mono font-black text-blue-600 dark:text-blue-400 mb-1">
                             {item.total_calls}
                           </span>
                           <div
-                            className="w-full rounded-t-xl bg-gradient-to-t from-blue-600 to-indigo-500 shadow-md transition-all duration-500"
-                            style={{ height: `${callsPct}%` }}
+                            className="w-full rounded-t-2xl bg-gradient-to-t from-blue-600 to-indigo-500 shadow-md transition-all duration-500 border-t border-x border-blue-400/40"
+                            style={{ height: getBarHeight(item.total_calls) }}
                           />
                         </div>
                       ) : metricFilter === 'positives' ? (
-                        <div className="w-full max-w-[64px] flex flex-col items-center justify-end h-full">
-                          <span className="text-xs font-mono font-black text-emerald-600 dark:text-emerald-400 mb-1">
+                        <div className="w-full max-w-[72px] flex flex-col items-center justify-end h-full">
+                          <span className="text-sm font-mono font-black text-emerald-600 dark:text-emerald-400 mb-1">
                             {item.total_positives}
                           </span>
                           <div
-                            className="w-full rounded-t-xl bg-gradient-to-t from-emerald-600 to-teal-400 shadow-md transition-all duration-500"
-                            style={{ height: `${positivesPct}%` }}
-                          />
-                        </div>
-                      ) : metricFilter === 'negatives' ? (
-                        <div className="w-full max-w-[64px] flex flex-col items-center justify-end h-full">
-                          <span className="text-xs font-mono font-black text-rose-600 dark:text-rose-400 mb-1">
-                            {item.total_negatives}
-                          </span>
-                          <div
-                            className="w-full rounded-t-xl bg-gradient-to-t from-rose-600 to-rose-400 shadow-md transition-all duration-500"
-                            style={{ height: `${negativesPct}%` }}
+                            className="w-full rounded-t-2xl bg-gradient-to-t from-emerald-600 to-teal-400 shadow-md transition-all duration-500 border-t border-x border-emerald-400/40"
+                            style={{ height: getBarHeight(item.total_positives) }}
                           />
                         </div>
                       ) : (
-                        <div className="w-full max-w-[64px] flex flex-col items-center justify-end h-full">
-                          <span className="text-xs font-mono font-black text-amber-600 dark:text-amber-400 mb-1">
+                        <div className="w-full max-w-[72px] flex flex-col items-center justify-end h-full">
+                          <span className="text-sm font-mono font-black text-amber-600 dark:text-amber-400 mb-1">
                             {item.total_not_hiring}
                           </span>
                           <div
-                            className="w-full rounded-t-xl bg-gradient-to-t from-amber-600 to-amber-400 shadow-md transition-all duration-500"
-                            style={{ height: `${notHiringPct}%` }}
+                            className="w-full rounded-t-2xl bg-gradient-to-t from-amber-600 to-amber-400 shadow-md transition-all duration-500 border-t border-x border-amber-400/40"
+                            style={{ height: getBarHeight(item.total_not_hiring) }}
                           />
                         </div>
                       )}
@@ -481,8 +437,8 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
               })}
             </div>
 
-            {/* ── X-Axis Full-Width College Cards & Light Theme "Open Tracker" Actions ── */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 pt-2">
+            {/* ── X-Axis Clean College Labels (No Boxed Cards) ── */}
+            <div className="flex items-center justify-between gap-4 sm:gap-8 px-6 sm:px-10 pt-2">
               {kpiData.map((item, idx) => {
                 const acronym = getCollegeAcronym({
                   college_code: item.college_code,
@@ -494,61 +450,45 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
                 const isHovered = hoveredCollegeId === item.college_id;
 
                 return (
-                  <div
+                  <Link
                     key={item.college_id}
+                    href="/tracker"
+                    onClick={() => {
+                      setActiveCollege(item.college_id, item.college_name);
+                    }}
                     onMouseEnter={() => setHoveredCollegeId(item.college_id)}
                     onMouseLeave={() => setHoveredCollegeId(null)}
-                    className={`rounded-xl p-3 border transition-all flex flex-col justify-between gap-2.5 ${
+                    title={`${item.college_name} - Click to open Daily Tracker`}
+                    className={`flex-1 text-center py-2 px-2 rounded-xl transition-all group flex flex-col items-center cursor-pointer ${
                       isHovered
-                        ? 'bg-blue-50/40 dark:bg-blue-950/30 border-blue-300 dark:border-blue-700 shadow-xs'
-                        : 'bg-surface border-border/80 hover:border-border-strong'
+                        ? 'bg-blue-50 dark:bg-blue-950/60 border border-blue-300 dark:border-blue-700 shadow-xs scale-105'
+                        : 'hover:bg-zinc-100/80 dark:hover:bg-zinc-800/60'
                     }`}
                   >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className={`font-mono text-xs font-extrabold px-1.5 py-0.5 rounded-md ${palette.badge} shrink-0`}>
-                          [{acronym}]
-                        </span>
-                      </div>
-                      <span className="text-xs font-bold text-fg truncate block" title={item.college_name}>
-                        {item.college_name}
-                      </span>
-                    </div>
-
-                    {/* Light-Themed "Open Tracker" Button */}
-                    <Link
-                      href="/tracker"
-                      onClick={() => {
-                        setActiveCollege(item.college_id, item.college_name);
-                      }}
-                      className="w-full py-1.5 px-2.5 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/70 dark:hover:bg-blue-900/80 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs transition-colors cursor-pointer"
-                      title={`Open Daily Tracker for ${acronym}`}
-                    >
-                      <span>Open Tracker</span>
-                      <ArrowUpRight size={12} className="shrink-0 text-blue-600 dark:text-blue-400" />
-                    </Link>
-                  </div>
+                    <span className={`font-mono text-xs font-black px-2 py-0.5 rounded-md ${palette.badge} shadow-2xs group-hover:scale-105 transition-transform`}>
+                      [{acronym}]
+                    </span>
+                    <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate max-w-[120px] block mt-1">
+                      {item.college_name}
+                    </span>
+                  </Link>
                 );
               })}
             </div>
 
             {/* Bottom Color Legend */}
-            <div className="flex items-center justify-center gap-6 flex-wrap pt-3 text-xs font-medium text-fg-subtle border-t border-border/60">
+            <div className="flex items-center justify-center gap-8 flex-wrap pt-4 text-xs font-medium text-fg-subtle border-t border-border/60">
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-md bg-gradient-to-t from-blue-600 to-indigo-500 shadow-xs" />
-                <span className="font-semibold text-fg">Calls Made</span>
+                <span className="w-3.5 h-3.5 rounded-md bg-gradient-to-t from-blue-600 to-indigo-500 shadow-xs" />
+                <span className="font-bold text-zinc-900 dark:text-zinc-100">Calls Made</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-md bg-gradient-to-t from-emerald-600 to-teal-400 shadow-xs" />
-                <span className="font-semibold text-fg">Positives</span>
+                <span className="w-3.5 h-3.5 rounded-md bg-gradient-to-t from-emerald-600 to-teal-400 shadow-xs" />
+                <span className="font-bold text-zinc-900 dark:text-zinc-100">Positives</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-md bg-gradient-to-t from-rose-600 to-rose-400 shadow-xs" />
-                <span className="font-semibold text-fg">Negatives</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-md bg-gradient-to-t from-amber-600 to-amber-400 shadow-xs" />
-                <span className="font-semibold text-fg">Not Hiring</span>
+                <span className="w-3.5 h-3.5 rounded-md bg-gradient-to-t from-amber-600 to-amber-400 shadow-xs" />
+                <span className="font-bold text-zinc-900 dark:text-zinc-100">Not Hiring</span>
               </div>
             </div>
           </div>
@@ -607,9 +547,9 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
                   </div>
                 </div>
 
-                {/* Minimal 4 KPI Metrics Grid */}
+                {/* Minimal 3 KPI Metrics Grid */}
                 <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between">
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="grid grid-cols-3 gap-1.5">
                     {/* 1. Total Calls Made */}
                     <div className="p-2 rounded-lg bg-surface-sunken/60 border border-border/60 flex items-center justify-between gap-2">
                       <div className="space-y-0.5 min-w-0">
@@ -636,20 +576,7 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
                       <CheckCircle2 size={12} className="text-emerald-600 dark:text-emerald-400 shrink-0 opacity-80" />
                     </div>
 
-                    {/* 3. Total Negatives Received */}
-                    <div className="p-2 rounded-lg bg-surface-sunken/60 border border-border/60 flex items-center justify-between gap-2">
-                      <div className="space-y-0.5 min-w-0">
-                        <span className="text-[9.5px] font-semibold uppercase tracking-wider text-fg-subtle block truncate">
-                          Negatives
-                        </span>
-                        <span className="text-sm sm:text-base font-bold font-mono tracking-tight text-fg block">
-                          {item.total_negatives}
-                        </span>
-                      </div>
-                      <XCircle size={12} className="text-rose-500 shrink-0 opacity-70" />
-                    </div>
-
-                    {/* 4. Total Not Hiring Received */}
+                    {/* 3. Total Not Hiring Received */}
                     <div className="p-2 rounded-lg bg-amber-500/5 dark:bg-amber-950/20 border border-amber-500/20 flex items-center justify-between gap-2">
                       <div className="space-y-0.5 min-w-0">
                         <span className="text-[9.5px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400 block truncate">
@@ -668,6 +595,24 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
           })}
         </div>
       )}
+
+      {/* Scoped Graph Paper Pattern Styling */}
+      <style jsx>{`
+        .ipoms-graph-paper {
+          background-color: #f8fafc;
+          background-image: 
+            linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+          background-size: 24px 24px;
+        }
+        :global(.dark) .ipoms-graph-paper {
+          background-color: #0f172a;
+          background-image: 
+            linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+          background-size: 24px 24px;
+        }
+      `}</style>
     </div>
   );
 }
