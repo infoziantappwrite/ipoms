@@ -463,7 +463,7 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
               Select Colleges to Start Operational Outreach
             </h4>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-md leading-relaxed">
-              Choose 1 to 4 partner colleges above to activate live college KPIs, pipeline tracker velocity, and follow-up queues.
+              Choose 1 to 5 partner colleges above to activate live college KPIs, pipeline tracker velocity, and follow-up queues.
             </p>
           </div>
         ) : (

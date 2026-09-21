@@ -193,7 +193,7 @@ export function CopyToJdModal({
         job_role: selectedLead.job_role,
         ctc: selectedLead.ctc,
         eligible_batch: selectedLead.eligible_batch,
-        event_time: selectedLead.event_time,
+        event_time: '',
       };
 
       const res = await apiFetch('/daily-leads/copy-to-jd', {

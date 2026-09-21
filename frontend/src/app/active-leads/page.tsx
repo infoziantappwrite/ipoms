@@ -77,10 +77,10 @@ export default function ActiveLeadsPage() {
         if (res.data.stats) {
           setStats(res.data.stats);
         }
-        if (res.data.tab_counts) {
+        if (res.data.tab_counts || res.data.pipeline_stats || res.data.jd_received_stats) {
           setTabCounts({
-            pipeline: res.data.tab_counts.pipeline || 0,
-            jd_received: res.data.tab_counts.jd_received || 0,
+            pipeline: res.data.tab_counts?.pipeline ?? res.data.pipeline_stats?.total ?? 0,
+            jd_received: res.data.tab_counts?.jd_received ?? res.data.jd_received_stats?.total ?? 0,
           });
         }
         if (res.data.jd_section_counts) {
@@ -168,10 +168,7 @@ export default function ActiveLeadsPage() {
       });
 
       if (res.success) {
-        const statsRes = await apiFetch('/active-leads?academic_year=' + selectedYear);
-        if (statsRes.success && statsRes.data?.stats) {
-          setStats(statsRes.data.stats);
-        }
+        await fetchLeads(false);
         broadcastMutation();
         return true;
       }
@@ -213,7 +210,7 @@ export default function ActiveLeadsPage() {
       });
 
       if (res.success) {
-        fetchLeads();
+        await fetchLeads(false);
         broadcastMutation();
         toast('Lead added successfully!', 'success');
         return true;

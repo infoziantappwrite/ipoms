@@ -136,6 +136,9 @@ function publicUser(user: any) {
     username: user.username,
     official_email: user.official_email,
     role_codes: user.role_codes,
+    assigned_college_ids: user.assigned_college_ids || [],
+    weekly_focus_locked: Boolean(user.weekly_focus_locked),
+    weekly_focus_week_key: user.weekly_focus_week_key || '',
     profile_photo_url: user.profile_photo_url || '',
     designation: user.designation || (user.role_codes?.includes('ADMIN') || user.role_codes?.includes('ADMINISTRATOR') ? 'Administrator' : user.role_codes?.includes('TEAM_LEADER') ? 'Team Leader' : 'Placement Operations Coordinator'),
     employee_id: user.employee_id || '',
@@ -189,33 +192,45 @@ export function registerAuthRoutes(app: Express) {
   /* ── Sign in ──────────────────────────────────────────────────────────── */
   app.post('/api/v1/auth/login', async (req: Request, res: Response) => {
     try {
-      const rawEmail = String(req.body?.email ?? req.body?.official_email ?? '').trim().toLowerCase();
+      const rawInput = String(req.body?.email ?? req.body?.official_email ?? req.body?.username ?? '').trim();
       const password = String(req.body?.password ?? '');
       const rememberMe = Boolean(req.body?.remember_me);
 
-      if (!rawEmail) return fail(res, 400, 'EMAIL_REQUIRED', 'Enter your official email address.');
+      if (!rawInput) return fail(res, 400, 'IDENTIFIER_REQUIRED', 'Enter your official email address or username.');
       if (!password) return fail(res, 400, 'PASSWORD_REQUIRED', 'Enter your password.');
 
-      // Distinguish the three ways an email can be wrong, so the form can point
-      // at the actual problem instead of saying "invalid" to all of them.
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) {
-        return fail(res, 400, 'EMAIL_MALFORMED', 'That is not a valid email address. Example: name@infoziant.com or name@icl.today');
-      }
-      if (!isStaffDomain(rawEmail)) {
-        return fail(res, 400, 'EMAIL_WRONG_DOMAIN', `Use your official organization address — it must end in @${STAFF_DOMAINS.join(' or @')}.`);
-      }
+      const isEmail = rawInput.includes('@');
+      let user = null;
 
-      const user = await User.findOne({ official_email: rawEmail, is_deleted: false });
+      if (isEmail) {
+        const rawEmail = rawInput.toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) {
+          return fail(res, 400, 'EMAIL_MALFORMED', 'That is not a valid email address. Example: name@infoziant.com or name@icl.today');
+        }
+        if (!isStaffDomain(rawEmail)) {
+          return fail(res, 400, 'EMAIL_WRONG_DOMAIN', `Use your official organization address — it must end in @${STAFF_DOMAINS.join(' or @')}.`);
+        }
+        user = await User.findOne({ official_email: rawEmail, is_deleted: false });
+      } else {
+        const rawUsername = rawInput.toLowerCase();
+        user = await User.findOne({
+          $or: [
+            { username: rawUsername },
+            { official_email: rawUsername },
+          ],
+          is_deleted: false,
+        });
+      }
 
       if (!user) {
         await writeAudit({
           action: 'FAILED_LOGIN', result: 'FAILED', entityType: 'users',
-          performedByEmail: rawEmail, module: 'Security & Audit', severity: 'warning',
-          summary: `Sign-in attempted for unknown address ${rawEmail}`, req,
+          performedByEmail: rawInput, module: 'Security & Audit', severity: 'warning',
+          summary: `Sign-in attempted for unknown account ${rawInput}`, req,
         });
         // Dummy hash compare to normalize response timing and prevent timing attacks
         await bcrypt.compare(password, '$2a$12$e8m.4U4pX4Z0U8NfQ12VKeVzQz/t9F2L1vK6H0j9x7L1s0r1w2e3u');
-        return fail(res, 401, 'INVALID_CREDENTIALS', 'Invalid email or password.');
+        return fail(res, 401, 'INVALID_CREDENTIALS', 'Invalid email/username or password.');
       }
 
       // Already locked — send them straight to recovery.

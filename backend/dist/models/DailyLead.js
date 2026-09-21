@@ -115,6 +115,11 @@ const DailyLeadSchema = new mongoose_1.Schema({
         default: false,
         index: true,
     },
+    is_jd_received: {
+        type: Boolean,
+        default: false,
+        index: true,
+    },
     is_finalized: {
         type: Boolean,
         default: false,

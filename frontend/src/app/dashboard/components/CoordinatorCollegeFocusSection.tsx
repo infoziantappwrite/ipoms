@@ -50,9 +50,29 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
   const [loading, setLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
+  const sessionUser = readSessionUser();
+  const isLeadership = Boolean(
+    sessionUser?.official_email?.toLowerCase().includes('sujitha') ||
+    sessionUser?.role_codes?.includes('TEAM_LEADER') ||
+    sessionUser?.role_codes?.includes('ADMIN') ||
+    sessionUser?.role_codes?.includes('ADMINISTRATOR')
+  );
+  const maxAllowedColleges = isLeadership ? 5 : 4;
+
+  // Helper to check if a college matches current selectedIds across MongoDB _id, code, or col_* prefix
+  const isCollegeSelected = (college: CollegeOccupancy, ids: string[]) => {
+    if (!college || !ids || ids.length === 0) return false;
+    return ids.some(
+      (id) =>
+        id === college._id ||
+        String(id) === String(college._id) ||
+        (college.college_code && id.toUpperCase() === college.college_code.toUpperCase()) ||
+        (college.college_code && id.toLowerCase() === `col_${college.college_code.toLowerCase()}`)
+    );
+  };
+
   // Helper to extract clean occupancy info without attributing the current user as a foreign handler
   const getCleanOccupancy = (college: CollegeOccupancy) => {
-    const sessionUser = readSessionUser();
     const currentUserName = (sessionUser?.full_name || '').toLowerCase().trim();
     const currentUserEmail = (sessionUser?.official_email || '').toLowerCase().trim();
 
@@ -121,25 +141,30 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
       return;
     }
 
-    const collegeId = college._id;
-    const isAlreadySelected = selectedIds.includes(collegeId);
+    const isAlreadySelected = isCollegeSelected(college, selectedIds);
 
     if (isAlreadySelected) {
       // Rule: Minimum 1 college must remain selected
       if (selectedIds.length <= 1) {
-        toast('At least 1 college must be selected (Minimum 1, Maximum 4).', 'warning');
+        toast(`At least 1 college must be selected (Minimum 1, Maximum ${maxAllowedColleges}).`, 'warning');
         return;
       }
-      const updated = selectedIds.filter((id) => id !== collegeId);
+      const updated = selectedIds.filter(
+        (id) =>
+          id !== college._id &&
+          String(id) !== String(college._id) &&
+          (college.college_code ? id.toUpperCase() !== college.college_code.toUpperCase() : true) &&
+          (college.college_code ? id.toLowerCase() !== `col_${college.college_code.toLowerCase()}` : true)
+      );
       setSelectedIds(updated);
       setCoordinatorSelectedColleges(updated);
       if (onSelectionChange) onSelectionChange(updated, false);
       return;
     }
 
-    // Rule: Maximum 4 colleges allowed
-    if (selectedIds.length >= 4) {
-      toast('Maximum 4 colleges allowed. Uncheck an existing college to choose another.', 'warning');
+    // Rule: Maximum allowed colleges
+    if (selectedIds.length >= maxAllowedColleges) {
+      toast(`Maximum ${maxAllowedColleges} colleges allowed. Uncheck an existing college to choose another.`, 'warning');
       return;
     }
 
@@ -157,7 +182,7 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
     // Rule: At a time, maximum 1 college only is allowed to be co-handled with another coordinator or team leader
     if (isSharedWithOther) {
       const alreadyHasShared = colleges.some((c) => {
-        if (!selectedIds.includes(c._id)) return false;
+        if (!isCollegeSelected(c, selectedIds)) return false;
         const occ = getCleanOccupancy(c);
         return occ.isSharedWithOther;
       });
@@ -170,7 +195,7 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
       }
     }
 
-    const updated = [...selectedIds, collegeId];
+    const updated = [...selectedIds, college._id];
     setSelectedIds(updated);
     setCoordinatorSelectedColleges(updated);
     if (onSelectionChange) onSelectionChange(updated, false);
@@ -178,11 +203,11 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
 
   const handleSaveAndLock = async () => {
     if (selectedIds.length === 0) {
-      toast('Please select at least 1 college (Minimum 1, Maximum 4) to activate your dashboard.', 'warning');
+      toast(`Please select at least 1 college (Minimum 1, Maximum ${maxAllowedColleges}) to activate your dashboard.`, 'warning');
       return;
     }
-    if (selectedIds.length > 4) {
-      toast('Maximum 4 colleges allowed. Please select between 1 and 4.', 'error');
+    if (selectedIds.length > maxAllowedColleges) {
+      toast(`Maximum ${maxAllowedColleges} colleges allowed. Please select between 1 and ${maxAllowedColleges}.`, 'error');
       return;
     }
 
@@ -218,7 +243,7 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
       const res = await unlockDailyFocusApi();
       setIsLocked(false);
       setIsCollapsed(false);
-      toast(res.message || 'Editing mode active. Adjust your focus colleges (1 to 4) whenever required.', 'info');
+      toast(res.message || `Editing mode active. Adjust your focus colleges (1 to ${maxAllowedColleges}) whenever required.`, 'info');
       if (onSelectionChange) onSelectionChange(selectedIds, false);
       await loadData(false);
     } catch (err: any) {
@@ -239,8 +264,8 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
     );
   });
 
-  const selectedColleges = colleges.filter((c) => selectedIds.includes(c._id));
-  const totalOccupiedByOthers = colleges.filter((c) => c.is_occupied && !selectedIds.includes(c._id)).length;
+  const selectedColleges = colleges.filter((c) => isCollegeSelected(c, selectedIds));
+  const totalOccupiedByOthers = colleges.filter((c) => c.is_occupied && !isCollegeSelected(c, selectedIds)).length;
 
   return (
     <section className="w-full rounded-2xl border border-border bg-surface shadow-xs overflow-hidden transition-all duration-300">
@@ -268,13 +293,13 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
                     : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25'
                 }`}
               >
-                {selectedIds.length} / 4 Selected {isLocked && '• Saved & Locked for Week'}
+                {selectedIds.length} / {maxAllowedColleges} Selected {isLocked && '• Saved & Locked for Week'}
               </span>
             </div>
             <p className="text-xs text-fg-subtle mt-1 leading-relaxed">
               {isLocked
                 ? 'Your active institutions are saved and locked for the week. Click "Change Selection" anytime to adjust.'
-                : 'Select 1 to 4 partner institutions (at most 1 co-handled by 2 people). Click Save to confirm and lock.'}
+                : `Select 1 to ${maxAllowedColleges} partner institutions (at most 1 co-handled by 2 people). Click Save to confirm and lock.`}
             </p>
           </div>
         </div>
@@ -308,7 +333,7 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
               ) : (
                 <CheckCircle2 size={15} className="text-white" />
               )}
-              <span>Save & Lock Focus ({selectedIds.length}/4)</span>
+              <span>Save & Lock Focus ({selectedIds.length}/{maxAllowedColleges})</span>
             </button>
           ) : (
             <button
@@ -378,7 +403,7 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {filteredColleges.map((college) => {
-                const isChecked = selectedIds.includes(college._id);
+                const isChecked = isCollegeSelected(college, selectedIds);
                 const { occupiedName, isOccupiedByOther: cleanOccupiedByOther, isSharedWithOther } = getCleanOccupancy(college);
                 const isOccupiedByOther = Boolean(cleanOccupiedByOther && !isChecked);
                 const isSharedSlot = Boolean(isSharedWithOther && !isChecked);
@@ -522,7 +547,7 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
 
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-blue-500" />
-            <span>Rule: Minimum 1, Maximum 4 colleges per coordinator (Zero duplication).</span>
+            <span>Rule: Minimum 1, Maximum {maxAllowedColleges} colleges per coordinator ({isLeadership ? '5 for Team Leader' : 'up to 1 co-handled'}).</span>
           </div>
         </div>
       </div>

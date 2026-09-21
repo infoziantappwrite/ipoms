@@ -293,7 +293,7 @@ export function ActiveLeadHeader({
                   : 'text-fg-subtle hover:text-fg hover:bg-surface'
               }`}
             >
-              <span>Pipeline</span>
+              <span>Pipeline (Positives)</span>
               <span
                 className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
                   activeTab === 'pipeline'
@@ -314,7 +314,7 @@ export function ActiveLeadHeader({
                   : 'text-fg-subtle hover:text-fg hover:bg-surface'
               }`}
             >
-              <span>JD</span>
+              <span>JD Received</span>
               <span
                 className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
                   activeTab === 'jd_received'

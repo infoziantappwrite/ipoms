@@ -71,6 +71,80 @@ export const DEFAULT_OFFICIAL_COLLEGES: CollegeOccupancy[] = [
   { _id: 'col_marephra', college_code: 'MAREPHRA', college_name: 'Mar Ephraem College of Engineering and Technology', location: 'Kanyakumari, Tamil Nadu', logo_url: '/college-logos/marephraem.png' },
 ];
 
+/**
+ * Official Default Weekly Pre-Selected Allocations for Coordinators and Team Leader.
+ * Every Monday / Weekly Reset, these colleges are automatically selected by default for each person.
+ */
+export const DEFAULT_OFFICIAL_ALLOCATIONS: Record<string, string[]> = {
+  // Mohana: KARPAGAM, AIHT, ACHARIYA (ACET), KPR
+  'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
+  'mohana': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
+  'mohanaradha': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
+
+  // Thirisha: PSNA, DSU, SMVEC
+  'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
+  'thirisha': ['PSNA', 'DSU', 'SMVEC'],
+
+  // Malvika: KLU, NGCE
+  'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],
+  'malavika': ['KLU', 'NGCE'],
+  'malvika': ['KLU', 'NGCE'],
+
+  // Lizenya: NPR, KIOT, ACEW
+  'lizenya_r@infoziant.com': ['NPR', 'KIOT', 'ACEW'],
+  'lizenya': ['NPR', 'KIOT', 'ACEW'],
+
+  // Megala: NGP, KAMARAJ
+  'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ'],
+  'megala': ['NGP', 'KAMARAJ'],
+  'megaladevi': ['NGP', 'KAMARAJ'],
+
+  // Tamil: MCET, MEC
+  'seshmitha_tamil@icl.today': ['MCET', 'MEC'],
+  'tamil': ['MCET', 'MEC'],
+  'seshmitha': ['MCET', 'MEC'],
+
+  // Sujitha (Team Leader): NEHRU, MAREPHRA, KPR, HITS, SONA
+  'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
+  'sujitha': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
+};
+
+/** Resolves default official college IDs for the current user */
+export function getDefaultOfficialCollegeIdsForUser(user?: any): string[] {
+  const sessionUser = user || readSessionUser();
+  if (!sessionUser) return [];
+
+  const email = (sessionUser.official_email || sessionUser.email || '').toLowerCase().trim();
+  const username = (sessionUser.username || '').toLowerCase().trim();
+
+  let codes = DEFAULT_OFFICIAL_ALLOCATIONS[email] || DEFAULT_OFFICIAL_ALLOCATIONS[username];
+  if (!codes) {
+    for (const [key, val] of Object.entries(DEFAULT_OFFICIAL_ALLOCATIONS)) {
+      if ((email && email.includes(key)) || (username && username.includes(key))) {
+        codes = val;
+        break;
+      }
+    }
+  }
+
+  if (!codes || codes.length === 0) return [];
+
+  const allKnown = getCachedColleges();
+  const matchedIds: string[] = [];
+  for (const code of codes) {
+    const found = allKnown.find(
+      (c) =>
+        c.college_code?.toUpperCase() === code.toUpperCase() ||
+        c._id === code ||
+        c._id === `col_${code.toLowerCase()}`
+    );
+    if (found) {
+      matchedIds.push(found._id);
+    }
+  }
+  return matchedIds;
+}
+
 export function getCachedColleges(): CollegeOccupancy[] {
   if (memoryCachedColleges && memoryCachedColleges.length > 0) {
     return memoryCachedColleges;
@@ -215,7 +289,12 @@ export async function fetchCollegeFocusMatrix(): Promise<{
       const focusData = (res.data as any).current_user_focus || {};
       const weekKey = (res.data as any).week_key || getCurrentWeekMondayKey();
       const isLocked = Boolean(focusData.is_locked);
-      const selectedIds = Array.isArray(focusData.selected_college_ids) ? focusData.selected_college_ids : [];
+      let selectedIds = Array.isArray(focusData.selected_college_ids) ? focusData.selected_college_ids : [];
+
+      // If no selection on backend yet, fallback to default official allocations for current user
+      if (selectedIds.length === 0) {
+        selectedIds = getDefaultOfficialCollegeIdsForUser(user);
+      }
 
       if (liveList.length > 0) {
         setCachedColleges(liveList);
@@ -252,9 +331,20 @@ export async function fetchCollegeFocusMatrix(): Promise<{
  * Locks focus on the backend and synchronizes local storage & events
  */
 export async function lockDailyFocusApi(ids: string[]): Promise<{ success: boolean; message?: string }> {
-  const sanitized = Array.from(new Set(ids.filter(Boolean))).slice(0, 4);
-  if (sanitized.length === 0 || sanitized.length > 4) {
-    return { success: false, message: 'Please select between 1 and 4 partner colleges.' };
+  const allKnown = getCachedColleges();
+  const resolvedInputIds = ids.map((id) => {
+    const match = allKnown.find(
+      (c) =>
+        c._id === id ||
+        (c.college_code && c.college_code.toUpperCase() === id.toUpperCase()) ||
+        (c.college_code && c.college_code.toUpperCase() === id.replace(/^col_/i, '').toUpperCase())
+    );
+    return match ? match._id : id;
+  });
+
+  const sanitized = Array.from(new Set(resolvedInputIds.filter(Boolean))).slice(0, 5);
+  if (sanitized.length === 0 || sanitized.length > 5) {
+    return { success: false, message: 'Please select between 1 and 5 partner colleges.' };
   }
 
   try {
@@ -274,18 +364,27 @@ export async function lockDailyFocusApi(ids: string[]): Promise<{ success: boole
       return { success: false, message: errMsg };
     }
 
+    const returnedIds: string[] =
+      Array.isArray((res.data as any)?.selected_college_ids) && (res.data as any).selected_college_ids.length > 0
+        ? (res.data as any).selected_college_ids
+        : sanitized;
     const weekKey = (res.data as any)?.week_key || getCurrentWeekMondayKey();
     const today = getTodayKey();
 
     if (typeof window !== 'undefined') {
-      localStorage.setItem(COORDINATOR_SELECTED_COLLEGES_KEY, JSON.stringify(sanitized));
+      localStorage.setItem(COORDINATOR_SELECTED_COLLEGES_KEY, JSON.stringify(returnedIds));
       localStorage.setItem(COORDINATOR_FOCUS_DATE_KEY, today);
       localStorage.setItem(COORDINATOR_FOCUS_WEEK_KEY, weekKey);
       localStorage.setItem(COORDINATOR_FOCUS_LOCKED_KEY, 'true');
 
       // Update cached colleges is_selected_by_me flags to match exact locked selection
       const updatedCache = getCachedColleges().map((c) => {
-        const isSelected = sanitized.includes(String(c._id)) || sanitized.includes(String(c.college_code));
+        const isSelected = returnedIds.some(
+          (sid) =>
+            sid === String(c._id) ||
+            (c.college_code && sid.toUpperCase() === c.college_code.toUpperCase()) ||
+            (c.college_code && sid.toLowerCase() === `col_${c.college_code.toLowerCase()}`)
+        );
         return {
           ...c,
           is_selected_by_me: isSelected,
@@ -296,12 +395,18 @@ export async function lockDailyFocusApi(ids: string[]): Promise<{ success: boole
 
       // Auto-set first selected college as active session if current active is not in focus
       const currentActive = getActiveCollege();
-      const isCurrentInFocus = sanitized.some(
-        (id) => id === currentActive.id || (currentActive.obj && (id === currentActive.obj.college_code || id === currentActive.obj._id))
+      const isCurrentInFocus = returnedIds.some(
+        (id) =>
+          id === currentActive.id ||
+          (currentActive.obj && (id === currentActive.obj.college_code || id === currentActive.obj._id))
       );
       if (!isCurrentInFocus || !currentActive.id) {
-        const firstCol = updatedCache.find(
-          (c) => sanitized.includes(String(c._id)) || sanitized.includes(String(c.college_code))
+        const firstCol = updatedCache.find((c) =>
+          returnedIds.some(
+            (sid) =>
+              sid === String(c._id) ||
+              (c.college_code && sid.toUpperCase() === c.college_code.toUpperCase())
+          )
         );
         if (firstCol) {
           setActiveCollege(firstCol._id, firstCol.college_name, firstCol);
@@ -310,12 +415,12 @@ export async function lockDailyFocusApi(ids: string[]): Promise<{ success: boole
 
       window.dispatchEvent(
         new CustomEvent('ipoms_focus_updated', {
-          detail: { selectedIds: sanitized, isLocked: true, date: today, weekKey },
+          detail: { selectedIds: returnedIds, isLocked: true, date: today, weekKey },
         })
       );
       window.dispatchEvent(
         new CustomEvent('ipoms_coordinator_colleges_changed', {
-          detail: { selectedIds: sanitized },
+          detail: { selectedIds: returnedIds },
         })
       );
       window.dispatchEvent(
@@ -390,7 +495,7 @@ export function isFocusLockedToday(): boolean {
     // If locked for current week Monday-Sunday
     if (weekKey === currentWeekMonday) {
       const selected = getCoordinatorSelectedColleges();
-      return selected.length >= 1 && selected.length <= 4;
+      return selected.length >= 1 && selected.length <= 5;
     }
 
     // Check legacy single-day date: if it fell in the current week, upgrade it
@@ -399,7 +504,7 @@ export function isFocusLockedToday(): boolean {
       if (legacyMonday === currentWeekMonday) {
         localStorage.setItem(COORDINATOR_FOCUS_WEEK_KEY, currentWeekMonday);
         const selected = getCoordinatorSelectedColleges();
-        return selected.length >= 1 && selected.length <= 4;
+        return selected.length >= 1 && selected.length <= 5;
       }
     }
 
@@ -415,11 +520,11 @@ export function hasActiveDailyFocus(): boolean {
   return isFocusLockedToday();
 }
 
-/** Locks focus for 1 to 4 colleges for the entire week (Monday through Sunday) */
+/** Locks focus for 1 to 5 colleges for the entire week (Monday through Sunday) */
 export function lockDailyFocus(ids: string[]): boolean {
   if (typeof window === 'undefined') return false;
-  const sanitized = Array.from(new Set(ids.filter(Boolean))).slice(0, 4);
-  if (sanitized.length === 0 || sanitized.length > 4) {
+  const sanitized = Array.from(new Set(ids.filter(Boolean))).slice(0, 5);
+  if (sanitized.length === 0 || sanitized.length > 5) {
     return false;
   }
 
@@ -489,17 +594,25 @@ export function getCoordinatorSelectedColleges(): string[] {
     const raw = localStorage.getItem(COORDINATOR_SELECTED_COLLEGES_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        return parsed.slice(0, 4);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.slice(0, 5);
       }
     }
   } catch {}
+  // Default fallback to official allocation for current user if not yet stored
+  const defaults = getDefaultOfficialCollegeIdsForUser();
+  if (defaults.length > 0) {
+    try {
+      localStorage.setItem(COORDINATOR_SELECTED_COLLEGES_KEY, JSON.stringify(defaults));
+    } catch {}
+    return defaults;
+  }
   return [];
 }
 
 export function setCoordinatorSelectedColleges(ids: string[]): string[] {
   if (typeof window === 'undefined') return ids;
-  const sanitized = Array.from(new Set(ids.filter(Boolean))).slice(0, 4);
+  const sanitized = Array.from(new Set(ids.filter(Boolean))).slice(0, 5);
   try {
     if (sanitized.length > 0) {
       localStorage.setItem(COORDINATOR_SELECTED_COLLEGES_KEY, JSON.stringify(sanitized));

@@ -36,9 +36,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ACTIVE_COLLEGE_CODES = void 0;
+exports.ACTIVE_COLLEGE_CODES = exports.OFFICIAL_COLLEGE_DEFINITIONS = void 0;
 exports.syncActiveCollegesRoster = syncActiveCollegesRoster;
-// iPOMS Backend Server - August 2026 Segregation Active
+// iPOMS Backend Server - August 2026 Segregation Active - Reloaded Audit
 const express_1 = __importDefault(require("express"));
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
@@ -225,6 +225,172 @@ app.get('/api/v1/health', (req, res) => {
         timestamp: new Date().toISOString(),
     });
 });
+// 1b. Duplicate Company Audit across Active Leads & Master Sources
+app.get('/health/duplicate-audit', async (req, res) => {
+    try {
+        const leads = await ActiveLead_1.ActiveLead.find({ is_deleted: false }).lean();
+        const weeklyTrackers = await WeeklyTracker_1.WeeklyTracker.find({ is_deleted: false }).select('company_name job_role ctc_lpa pipeline_section academic_year').lean();
+        const masterPositives = seedMasterDailyLeads_1.MASTER_POSITIVES_DATA || [];
+        const cleanName = (s) => {
+            return (s || '')
+                .toLowerCase()
+                .replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        };
+        const stripCorporateSuffixes = (s) => {
+            let n = cleanName(s);
+            const suffixes = [
+                'private limited', 'pvt ltd', 'pvt limited', 'private ltd', 'pvtltd',
+                'limited', 'ltd', 'inc', 'corporation', 'corp', 'llc', 'llp',
+                'technologies', 'technology', 'tech', 'solutions', 'solution',
+                'infotech', 'services', 'service', 'systems', 'system',
+                'enterprises', 'enterprise', 'studios', 'studio', 'group',
+                'consultancy', 'consulting', 'consultants', 'software', 'soft',
+                'digital', 'global', 'international', 'india', 'labs', 'lab'
+            ];
+            let changed = true;
+            while (changed) {
+                changed = false;
+                for (const suf of suffixes) {
+                    const regex = new RegExp(`\\b${suf}\\b`, 'gi');
+                    const before = n;
+                    n = n.replace(regex, ' ').replace(/\s+/g, ' ').trim();
+                    if (n !== before)
+                        changed = true;
+                }
+            }
+            return n || cleanName(s);
+        };
+        const levenshtein = (a, b) => {
+            const matrix = [];
+            for (let i = 0; i <= b.length; i++)
+                matrix[i] = [i];
+            for (let j = 0; j <= a.length; j++)
+                matrix[0][j] = j;
+            for (let i = 1; i <= b.length; i++) {
+                for (let j = 1; j <= a.length; j++) {
+                    if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    }
+                    else {
+                        matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j] + 1);
+                    }
+                }
+            }
+            return matrix[b.length][a.length];
+        };
+        // Helper to analyze any company item list
+        const analyzeCompanyList = (items) => {
+            const exactGroups = new Map();
+            for (const item of items) {
+                if (!item.name || !item.name.trim())
+                    continue;
+                const key = cleanName(item.name);
+                if (!exactGroups.has(key))
+                    exactGroups.set(key, []);
+                exactGroups.get(key).push(item);
+            }
+            const exactDuplicates = [];
+            for (const [key, group] of exactGroups.entries()) {
+                if (group.length > 1) {
+                    exactDuplicates.push({
+                        normalized_key: key,
+                        count: group.length,
+                        unique_name_casings: Array.from(new Set(group.map(i => i.name))),
+                        roles: Array.from(new Set(group.map(i => i.role || '—'))),
+                        ctcs: Array.from(new Set(group.map(i => i.ctc || '—'))),
+                        instances: group,
+                    });
+                }
+            }
+            const strippedGroups = new Map();
+            for (const item of items) {
+                if (!item.name || !item.name.trim())
+                    continue;
+                const key = stripCorporateSuffixes(item.name);
+                if (!strippedGroups.has(key))
+                    strippedGroups.set(key, []);
+                strippedGroups.get(key).push(item);
+            }
+            const suffixDuplicates = [];
+            for (const [key, group] of strippedGroups.entries()) {
+                const distinctCleanNames = new Set(group.map(i => cleanName(i.name)));
+                if (distinctCleanNames.size > 1) {
+                    suffixDuplicates.push({
+                        stripped_core_name: key,
+                        total_count: group.length,
+                        distinct_variants: Array.from(new Set(group.map(i => i.name))),
+                        roles: Array.from(new Set(group.map(i => i.role || '—'))),
+                        ctcs: Array.from(new Set(group.map(i => i.ctc || '—'))),
+                    });
+                }
+            }
+            const allDistinctEntries = Array.from(exactGroups.entries()).map(([cleanKey, group]) => ({
+                cleanKey,
+                coreKey: stripCorporateSuffixes(cleanKey),
+                sampleName: group[0].name,
+                count: group.length,
+                items: group,
+            }));
+            const fuzzyMatches = [];
+            const pairedKeys = new Set();
+            for (let i = 0; i < allDistinctEntries.length; i++) {
+                for (let j = i + 1; j < allDistinctEntries.length; j++) {
+                    const e1 = allDistinctEntries[i];
+                    const e2 = allDistinctEntries[j];
+                    if (e1.coreKey === e2.coreKey)
+                        continue;
+                    const tokens1 = new Set(e1.cleanKey.split(' ').filter(Boolean));
+                    const tokens2 = new Set(e2.cleanKey.split(' ').filter(Boolean));
+                    const isSubset = Array.from(tokens1).every(t => tokens2.has(t)) || Array.from(tokens2).every(t => tokens1.has(t));
+                    const distClean = levenshtein(e1.cleanKey, e2.cleanKey);
+                    const distCore = levenshtein(e1.coreKey, e2.coreKey);
+                    const minLen = Math.min(e1.cleanKey.length, e2.cleanKey.length);
+                    const minCoreLen = Math.min(e1.coreKey.length, e2.coreKey.length);
+                    const isTypoMatch = (minLen > 4 && distClean <= 2) || (minCoreLen > 3 && distCore <= 1);
+                    if (isSubset || isTypoMatch) {
+                        const pairKey = [e1.cleanKey, e2.cleanKey].sort().join(' <--> ');
+                        if (!pairedKeys.has(pairKey)) {
+                            pairedKeys.add(pairKey);
+                            fuzzyMatches.push({
+                                type: isSubset ? 'Token Subset / Acronym / Permutation' : `Typo / Character Variation (Edit Distance: ${Math.min(distClean, distCore)})`,
+                                company_a: e1.sampleName,
+                                company_b: e2.sampleName,
+                                count_a: e1.count,
+                                count_b: e2.count,
+                                roles_a: Array.from(new Set(e1.items.map(l => l.role))),
+                                roles_b: Array.from(new Set(e2.items.map(l => l.role))),
+                                ctcs_a: Array.from(new Set(e1.items.map(l => l.ctc))),
+                                ctcs_b: Array.from(new Set(e2.items.map(l => l.ctc))),
+                            });
+                        }
+                    }
+                }
+            }
+            return {
+                total_items: items.length,
+                total_unique_normalized: exactGroups.size,
+                exact_duplicate_groups: exactDuplicates,
+                corporate_suffix_duplicates: suffixDuplicates,
+                fuzzy_and_spelling_matches: fuzzyMatches,
+            };
+        };
+        const activeLeadsAudit = analyzeCompanyList(leads.map(l => ({ name: l.company_name, role: l.role, ctc: l.ctc, extra: l.academic_year })));
+        const masterPositivesAudit = analyzeCompanyList(masterPositives.map(m => ({ name: m.company, role: m.role, ctc: m.ctc, extra: m.collegeCode + ' ' + m.date })));
+        const weeklyTrackersAudit = analyzeCompanyList(weeklyTrackers.map(w => ({ name: w.company_name, role: w.job_role, ctc: w.ctc_lpa, extra: w.pipeline_section })));
+        return res.status(200).json({
+            success: true,
+            active_leads: activeLeadsAudit,
+            master_positives_source_400_plus: masterPositivesAudit,
+            weekly_tracker: weeklyTrackersAudit,
+        });
+    }
+    catch (err) {
+        console.error('duplicate-audit error:', err);
+        return res.status(500).json({ success: false, error: err.message });
+    }
+});
 // One-off data-repair tooling, not a health probe despite the name. It is
 // registered here, ABOVE the `app.use('/api/v1', authenticateJWT)` mount below,
 // so the global gate never sees it — hence the explicit per-route middleware.
@@ -350,14 +516,15 @@ app.get('/api/v1/weekly-tracker/sync-inspection', async (req, res) => {
 // 2. Authentication Login Endpoint & Rate Limiting (AUD-C-03)
 const authLimiter = (0, express_rate_limit_1.default)({
     windowMs: 15 * 60 * 1000, // 15 minutes window
-    max: 60, // Limit each IP to 60 authentication attempts per window
+    max: 500, // Generous allowance for concurrent coordinator logins across shared office IPs
+    skipSuccessfulRequests: true, // Do not count successful sign-ins against rate limits
     standardHeaders: true,
     legacyHeaders: false,
     message: {
         success: false,
         error: {
             code: 'TOO_MANY_REQUESTS',
-            message: 'Too many authentication attempts from this IP. Please wait a few minutes and try again.',
+            message: 'Too many authentication attempts from this IP. Please wait a few moments and try again.',
         },
     },
 });
@@ -610,18 +777,62 @@ app.get('/api/v1/colleges', async (req, res) => {
         });
     }
 });
-// List of official active partner college codes (21 active colleges)
-exports.ACTIVE_COLLEGE_CODES = [
-    'KARPAGAM', 'MCET', 'ACET', 'KPR', 'AIHT', 'KAMARAJ', 'NGP', 'MKCE',
-    'ACEW', 'NPR', 'KIOT', 'KLU', 'SMVEC', 'DSU', 'PSNA', 'SONA',
-    'MEC', 'NGCE', 'HITS', 'NEHRU', 'MAREPHRA'
+// List of official active partner college definitions (21 active colleges)
+exports.OFFICIAL_COLLEGE_DEFINITIONS = [
+    { college_code: 'KARPAGAM', college_name: 'Karpagam College of Engineering', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/karpagam.png' },
+    { college_code: 'MCET', college_name: 'Dr. Mahalingam College of Engineering and Technology', location: 'Pollachi, Tamil Nadu', logo_url: '/college-logos/MCET.png' },
+    { college_code: 'ACET', college_name: 'Achariya College of Engineering Technology', location: 'Puducherry', logo_url: '/college-logos/acet.png' },
+    { college_code: 'KPR', college_name: 'KPR Institute of Engineering and Technology', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/kpr.png' },
+    { college_code: 'AIHT', college_name: 'Anand Institute of Higher Technology', location: 'Chennai, Tamil Nadu', logo_url: '/college-logos/aiht.png' },
+    { college_code: 'KAMARAJ', college_name: 'Kamaraj College of Engineering and Technology', location: 'Virudhunagar, Tamil Nadu', logo_url: '/college-logos/kamaraj.png' },
+    { college_code: 'NGP', college_name: 'Dr. N.G.P. Institute of Technology', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/ngp.png' },
+    { college_code: 'MKCE', college_name: 'M.Kumarasamy College of Engineering', location: 'Karur, Tamil Nadu', logo_url: '/college-logos/mkce.png' },
+    { college_code: 'ACEW', college_name: 'Arunachala College of Engineering for Women', location: 'Kanyakumari, Tamil Nadu', logo_url: '/college-logos/acew.png' },
+    { college_code: 'NPR', college_name: 'NPR College of Engineering and Technology', location: 'Natham / Dindigul, Tamil Nadu', logo_url: '/college-logos/npr.png' },
+    { college_code: 'KIOT', college_name: 'Knowledge Institute of Technology', location: 'Salem, Tamil Nadu', logo_url: '/college-logos/kiot.jfif' },
+    { college_code: 'KLU', college_name: 'Kalasalingam Academy of Research and Education', location: 'Virudhunagar, Tamil Nadu', logo_url: '/college-logos/klu.png' },
+    { college_code: 'SMVEC', college_name: 'Sri Manakula Vinayagar Engineering College', location: 'Puducherry', logo_url: '/college-logos/smvec.png' },
+    { college_code: 'DSU', college_name: 'Dhanalakshmi Srinivasan University', location: 'Perambalur / Trichy, Tamil Nadu', logo_url: '/college-logos/dsu.png' },
+    { college_code: 'PSNA', college_name: 'PSNA College of Engineering and Technology', location: 'Dindigul, Tamil Nadu', logo_url: '/college-logos/psna.png' },
+    { college_code: 'SONA', college_name: 'Sona College of Technology', location: 'Salem, Tamil Nadu', logo_url: '/college-logos/sona.png' },
+    { college_code: 'MEC', college_name: 'Muthayammal Engineering College', location: 'Singlandhapuram, Tamil Nadu', logo_url: '/college-logos/MEC.png' },
+    { college_code: 'NGCE', college_name: 'Narayanaguru College of Engineering', location: 'Kanyakumari, Tamil Nadu', logo_url: '/college-logos/ngce.png' },
+    { college_code: 'HITS', college_name: 'Hindustan Institute of Technology and Science', location: 'Chennai, Tamil Nadu', logo_url: '/college-logos/hits.png' },
+    { college_code: 'NEHRU', college_name: 'Nehru Institute of Technology', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/nehru.png' },
+    { college_code: 'MAREPHRA', college_name: 'Mar Ephraem College of Engineering and Technology', location: 'Kanyakumari, Tamil Nadu', logo_url: '/college-logos/marephraem.png' },
 ];
+exports.ACTIVE_COLLEGE_CODES = exports.OFFICIAL_COLLEGE_DEFINITIONS.map(c => c.college_code);
 // Helper to initialize/sync active roster on startup or demand
 async function syncActiveCollegesRoster() {
     try {
-        const activeRes = await College_1.College.updateMany({ college_code: { $in: exports.ACTIVE_COLLEGE_CODES } }, { $set: { status: 'active' } });
-        const inactiveRes = await College_1.College.updateMany({ college_code: { $nin: exports.ACTIVE_COLLEGE_CODES } }, { $set: { status: 'inactive' } });
-        console.log(`🏛️ [Colleges] Roster synchronized: active (${exports.ACTIVE_COLLEGE_CODES.length} colleges), inactive updated.`);
+        for (const def of exports.OFFICIAL_COLLEGE_DEFINITIONS) {
+            let existing = await College_1.College.findOne({
+                $or: [
+                    { college_code: def.college_code },
+                    { college_name: new RegExp('^' + def.college_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') },
+                ],
+            });
+            if (existing) {
+                existing.status = 'active';
+                if (!existing.location)
+                    existing.location = def.location;
+                if (!existing.logo_url)
+                    existing.logo_url = def.logo_url;
+                await existing.save();
+            }
+            else {
+                await College_1.College.create({
+                    college_name: def.college_name,
+                    college_code: def.college_code,
+                    location: def.location,
+                    logo_url: def.logo_url,
+                    status: 'active',
+                    assigned_coordinator_ids: [],
+                });
+            }
+        }
+        await College_1.College.updateMany({ college_code: { $nin: exports.ACTIVE_COLLEGE_CODES } }, { $set: { status: 'inactive' } });
+        console.log(`🏛️ [Colleges] Roster fully synchronized: 21 official colleges active.`);
     }
     catch (err) {
         console.error('Failed to sync active college roster:', err);
@@ -776,6 +987,36 @@ app.get('/api/v1/colleges/focus-matrix', async (req, res) => {
         // Determine current user's selected college IDs and lock status
         let myAssignedCollegeIds = (currentUser?.assigned_college_ids || []).map((id) => String(id));
         const isMyFocusLocked = Boolean(currentUser?.weekly_focus_locked && currentUser?.weekly_focus_week_key === currentWeekMonday);
+        // Official focus college allocations mapping for default weekly pre-selection
+        const DEFAULT_COORDINATOR_COLLEGE_MAP = {
+            'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
+            'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
+            'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
+            'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],
+            'lizenya_r@infoziant.com': ['NPR', 'KIOT', 'ACEW'],
+            'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ'],
+            'seshmitha_tamil@icl.today': ['MCET', 'MEC'],
+        };
+        // If current user does not have colleges locked or assigned for the current week, pre-populate their official default colleges
+        if (myAssignedCollegeIds.length === 0 && currentUser) {
+            const email = (currentUser.official_email || '').toLowerCase().trim();
+            const uname = (currentUser.username || '').toLowerCase().trim();
+            let defaultCodes = DEFAULT_COORDINATOR_COLLEGE_MAP[email];
+            if (!defaultCodes) {
+                for (const [key, val] of Object.entries(DEFAULT_COORDINATOR_COLLEGE_MAP)) {
+                    const keyPrefix = key.split('@')[0];
+                    if (email.includes(keyPrefix) || uname.includes(keyPrefix) || keyPrefix.includes(uname)) {
+                        defaultCodes = val;
+                        break;
+                    }
+                }
+            }
+            if (defaultCodes && defaultCodes.length > 0) {
+                myAssignedCollegeIds = allColleges
+                    .filter((c) => defaultCodes.some((code) => code.toUpperCase() === c.college_code?.toUpperCase()))
+                    .map((c) => String(c._id));
+            }
+        }
         const collegesWithOccupancy = allColleges.map((c) => {
             const cIdStr = String(c._id);
             const rawOtherHandlers = collegeHandlersMap.get(cIdStr) || [];
@@ -1004,8 +1245,8 @@ function getWeekMondayKey(d = new Date()) {
     return `${year}-${month}-${dayStr}`;
 }
 // ── POST /api/v1/colleges/lock-focus ──────────────────────────────────────────
-// Atomically validates and locks 1-4 colleges for the current coordinator,
-// ensuring strict mutual exclusion (NO DUPLICATE COLLEGES ACROSS COORDINATORS).
+// Atomically validates and locks 1-5 colleges for the current coordinator,
+// ensuring strict mutual exclusion and co-handling rules.
 app.post('/api/v1/colleges/lock-focus', async (req, res) => {
     try {
         const currentWeekMonday = getWeekMondayKey();
@@ -1047,32 +1288,81 @@ app.post('/api/v1/colleges/lock-focus', async (req, res) => {
         if (!Array.isArray(college_ids) || college_ids.length === 0) {
             return res.status(400).json({
                 success: false,
-                error: { code: 'VALIDATION_ERROR', message: 'Please select at least 1 partner college (Minimum 1, Maximum 4).' },
+                error: { code: 'VALIDATION_ERROR', message: 'Please select at least 1 partner college (Minimum 1, Maximum 5).' },
             });
         }
-        if (college_ids.length > 4) {
+        if (college_ids.length > 5) {
             return res.status(400).json({
                 success: false,
-                error: { code: 'VALIDATION_ERROR', message: 'Maximum 4 colleges allowed per coordinator.' },
+                error: { code: 'VALIDATION_ERROR', message: 'Maximum 5 colleges allowed.' },
             });
         }
-        const sanitizedIds = Array.from(new Set(college_ids.map(String))).filter((id) => mongoose_1.Types.ObjectId.isValid(id));
-        if (sanitizedIds.length === 0) {
+        // Ensure all 21 official colleges are present & active
+        let allActiveColleges = await College_1.College.find({ status: 'active' });
+        if (allActiveColleges.length === 0) {
+            await syncActiveCollegesRoster();
+            allActiveColleges = await College_1.College.find({ status: 'active' });
+        }
+        const resolvedCollegeDocs = [];
+        const resolvedObjectIds = [];
+        for (const rawItem of college_ids) {
+            const itemStr = String(rawItem).trim();
+            if (!itemStr)
+                continue;
+            let foundDoc = null;
+            // 1. Try match by ObjectId
+            if (mongoose_1.Types.ObjectId.isValid(itemStr)) {
+                foundDoc = allActiveColleges.find((c) => String(c._id) === itemStr);
+                if (!foundDoc) {
+                    foundDoc = await College_1.College.findById(itemStr);
+                }
+            }
+            // 2. Try match by college_code (direct, stripped col_ prefix, or case-insensitive)
+            if (!foundDoc) {
+                const cleanedCode = itemStr.replace(/^col_/i, '').toUpperCase();
+                foundDoc = allActiveColleges.find((c) => c.college_code?.toUpperCase() === cleanedCode);
+                if (!foundDoc) {
+                    foundDoc = await College_1.College.findOne({ college_code: cleanedCode });
+                }
+            }
+            // 3. Try match by college_name
+            if (!foundDoc) {
+                const nameClean = itemStr.toLowerCase();
+                foundDoc = allActiveColleges.find((c) => c.college_name?.toLowerCase() === nameClean ||
+                    c.college_name?.toLowerCase().includes(nameClean) ||
+                    nameClean.includes(c.college_name?.toLowerCase()));
+                if (!foundDoc) {
+                    foundDoc = await College_1.College.findOne({
+                        college_name: new RegExp('^' + itemStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i'),
+                    });
+                }
+            }
+            if (foundDoc) {
+                // Ensure status is active
+                if (foundDoc.status !== 'active') {
+                    foundDoc.status = 'active';
+                    await foundDoc.save();
+                }
+                if (!resolvedCollegeDocs.some((d) => String(d._id) === String(foundDoc._id))) {
+                    resolvedCollegeDocs.push(foundDoc);
+                    resolvedObjectIds.push(foundDoc._id);
+                }
+            }
+        }
+        if (resolvedCollegeDocs.length === 0) {
             return res.status(400).json({
                 success: false,
                 error: { code: 'VALIDATION_ERROR', message: 'Invalid college IDs provided.' },
             });
         }
-        // Verify all selected colleges exist
-        const selectedColleges = await College_1.College.find({ _id: { $in: sanitizedIds.map((id) => new mongoose_1.Types.ObjectId(id)) }, status: 'active' });
-        if (selectedColleges.length !== sanitizedIds.length) {
+        if (resolvedCollegeDocs.length > 5) {
             return res.status(400).json({
                 success: false,
-                error: { code: 'INVALID_COLLEGES', message: 'One or more selected colleges are invalid or inactive.' },
+                error: { code: 'VALIDATION_ERROR', message: 'Maximum 5 colleges allowed.' },
             });
         }
-        // ── STRICT MUTUAL EXCLUSION CHECK ──
-        // Find if ANY other active coordinator has locked ANY of these requested colleges for this week
+        const sanitizedIds = resolvedCollegeDocs.map((c) => String(c._id));
+        const selectedColleges = resolvedCollegeDocs;
         // ── CO-HANDLING & MUTUAL EXCLUSION CHECK ──
         // Rule 1: A minimum of 1 college must be selected, and a maximum of 4 are allowed (checked above).
         // Rule 2: At most 2 coordinators or team leaders can handle any single college.
@@ -1088,7 +1378,7 @@ app.post('/api/v1/colleges/lock-focus', async (req, res) => {
         let sharedCollegesCount = 0;
         const sharedCollegeNames = [];
         for (const reqId of sanitizedIds) {
-            const otherHandlersForCollege = otherCoordinators.filter((oc) => oc.assigned_college_ids.some((c) => String(c._id) === String(reqId)));
+            const otherHandlersForCollege = otherCoordinators.filter((oc) => oc.assigned_college_ids.some((c) => String(c?._id || c) === String(reqId)));
             const targetColDoc = selectedColleges.find((c) => String(c._id) === String(reqId));
             const colLabel = targetColDoc ? `[${targetColDoc.college_code}] ${targetColDoc.college_name}` : 'Selected institution';
             // Rule: At most 2 coordinators or team leader allowed per college
@@ -1126,13 +1416,16 @@ app.post('/api/v1/colleges/lock-focus', async (req, res) => {
                 error: { code: 'USER_NOT_FOUND', message: 'User not found.' },
             });
         }
-        user.assigned_college_ids = sanitizedIds.map((id) => new mongoose_1.Types.ObjectId(id));
+        user.assigned_college_ids = resolvedObjectIds;
         user.weekly_focus_locked = true;
         user.weekly_focus_week_key = currentWeekMonday;
         user.weekly_focus_locked_at = new Date();
         await user.save();
         // Bidirectional sync on College model
-        await College_1.College.updateMany({ _id: { $in: sanitizedIds.map((id) => new mongoose_1.Types.ObjectId(id)) } }, { $addToSet: { assigned_coordinator_ids: user._id } });
+        // Remove coordinator from unselected colleges
+        await College_1.College.updateMany({ assigned_coordinator_ids: user._id, _id: { $nin: resolvedObjectIds } }, { $pull: { assigned_coordinator_ids: user._id } });
+        // Add coordinator to newly selected colleges
+        await College_1.College.updateMany({ _id: { $in: resolvedObjectIds } }, { $addToSet: { assigned_coordinator_ids: user._id } });
         await (0, audit_1.writeAudit)({
             action: 'UPDATE',
             result: 'SUCCESS',
@@ -1152,6 +1445,13 @@ app.post('/api/v1/colleges/lock-focus', async (req, res) => {
             data: {
                 user_id: user._id,
                 selected_college_ids: sanitizedIds,
+                selected_colleges: selectedColleges.map((c) => ({
+                    _id: c._id,
+                    college_code: c.college_code,
+                    college_name: c.college_name,
+                    location: c.location,
+                    logo_url: c.logo_url,
+                })),
                 is_locked: true,
                 week_key: currentWeekMonday,
                 locked_at: user.weekly_focus_locked_at,
@@ -1570,6 +1870,126 @@ app.post('/api/v1/daily-tracker/manual-row', async (req, res) => {
         return res.status(500).json({
             success: false,
             error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to add manual contact row' },
+        });
+    }
+});
+// ── DT-COPY-HISTORY: POST /api/v1/daily-tracker/copy-from-history
+// Copy single, multiple, or random selection of historical rows into the current working workspace
+app.post('/api/v1/daily-tracker/copy-from-history', async (req, res) => {
+    try {
+        const { college_id, rows: inputRows, row_ids } = req.body;
+        const coordinator_id = (0, routePolicy_1.scopeToSelf)(req, req.body.coordinator_id);
+        if (!coordinator_id || !college_id) {
+            return res.status(400).json({
+                success: false,
+                error: { code: 'VALIDATION_ERROR', message: 'coordinator_id and college_id are required' },
+            });
+        }
+        let sourceRows = [];
+        if (Array.isArray(inputRows) && inputRows.length > 0) {
+            sourceRows = inputRows;
+        }
+        else if (Array.isArray(row_ids) && row_ids.length > 0) {
+            sourceRows = await DailyTracker_1.DailyTracker.find({
+                _id: { $in: row_ids.map((id) => new mongoose_1.Types.ObjectId(id)) },
+            }).lean();
+        }
+        if (sourceRows.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: { code: 'VALIDATION_ERROR', message: 'No rows provided to copy' },
+            });
+        }
+        const today = buildSessionDate();
+        const year = today.getUTCFullYear();
+        const month = today.getUTCMonth() + 1;
+        const day = today.getUTCDate();
+        // Fetch existing rows for today to avoid duplicate entries in the same session
+        const existingRows = await DailyTracker_1.DailyTracker.find({
+            coordinator_id: new mongoose_1.Types.ObjectId(coordinator_id),
+            college_id: new mongoose_1.Types.ObjectId(college_id),
+            session_date: today,
+        }).select('company_name mobile_number email_id');
+        const existingKeys = new Set(existingRows.map((r) => `${(r.company_name || '').trim().toLowerCase()}_${(r.mobile_number || '').trim()}`));
+        const toInsert = [];
+        const skippedDuplicates = [];
+        for (const src of sourceRows) {
+            const compName = (src.company_name || '').trim();
+            const mob = (src.mobile_number || '').trim();
+            if (!compName && !mob)
+                continue;
+            const dedupeKey = `${compName.toLowerCase()}_${mob}`;
+            if (existingKeys.has(dedupeKey)) {
+                skippedDuplicates.push(compName || mob);
+                continue;
+            }
+            existingKeys.add(dedupeKey);
+            let companyId = src.company_id && mongoose_1.Types.ObjectId.isValid(src.company_id) ? new mongoose_1.Types.ObjectId(src.company_id) : undefined;
+            if (!companyId) {
+                let comp = await CompanyMetadata_1.CompanyMetadata.findOne({
+                    company_name: { $regex: new RegExp(`^${escapeRegex(compName)}$`, 'i') },
+                    is_deleted: false,
+                });
+                if (!comp) {
+                    const highestDoc = await CompanyMetadata_1.CompanyMetadata.findOne({ serial_number: { $gt: 0 } })
+                        .sort({ serial_number: -1 })
+                        .select('serial_number');
+                    const nextSerial = (highestDoc?.serial_number || 0) + 1;
+                    const mobList = mob ? mob.split(/[,;/]+/).map((s) => s.trim()).filter(Boolean) : [];
+                    const emailList = src.email_id ? src.email_id.split(/[,;/]+/).map((s) => s.trim().toLowerCase()).filter(Boolean) : [];
+                    comp = await CompanyMetadata_1.CompanyMetadata.create({
+                        serial_number: nextSerial,
+                        company_name: compName,
+                        hr_name: (src.hr_name || '').trim() || 'HR Contact',
+                        primary_mobile: mobList[0] || '',
+                        mobile_numbers: mobList,
+                        primary_email: emailList[0] || '',
+                        email_ids: emailList,
+                        notes: `Created via History Copy on ${new Date().toLocaleDateString('en-IN')}`,
+                    });
+                }
+                companyId = comp._id;
+            }
+            toInsert.push({
+                coordinator_id: new mongoose_1.Types.ObjectId(coordinator_id),
+                college_id: new mongoose_1.Types.ObjectId(college_id),
+                company_id: companyId,
+                company_name: compName,
+                hr_name: (src.hr_name || '').trim() || 'HR Contact',
+                mobile_number: mob,
+                email_id: (src.email_id || '').trim().toLowerCase(),
+                year,
+                month,
+                day,
+                session_date: today,
+                comments: src.comments ? String(src.comments).trim() : '',
+                is_skipped: false,
+                is_promoted_to_weekly: false,
+                is_finalized: false,
+                save_count: 0,
+                duplicate_acknowledged: false,
+            });
+        }
+        let inserted = [];
+        if (toInsert.length > 0) {
+            inserted = await DailyTracker_1.DailyTracker.insertMany(toInsert, { ordered: false });
+        }
+        return res.status(201).json({
+            success: true,
+            message: `Successfully copied ${inserted.length} row(s) to today's workspace`,
+            data: {
+                copied_count: inserted.length,
+                skipped_duplicates_count: skippedDuplicates.length,
+                skipped_duplicates: skippedDuplicates,
+                rows: inserted,
+            },
+        });
+    }
+    catch (error) {
+        console.error('POST /daily-tracker/copy-from-history error:', error);
+        return res.status(500).json({
+            success: false,
+            error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to copy rows from history' },
         });
     }
 });
@@ -4271,39 +4691,38 @@ app.post('/api/v1/daily-leads', async (req, res) => {
         });
     }
 });
-// ── Helper: Format Time with Strict Uppercase AM/PM ──────────────────────────
+// ── Helper: Format Time with Strict Uppercase AM/PM & Exact IST Conversion ──
 function formatLeadUpperTime(timeInput) {
-    if (!timeInput) {
-        const d = new Date();
-        let hours = d.getHours();
-        const minutes = d.getMinutes();
-        const period = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12;
-        if (hours === 0)
-            hours = 12;
-        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`;
-    }
+    if (!timeInput)
+        return '';
     if (typeof timeInput === 'string') {
-        if (/(am|pm)/i.test(timeInput)) {
-            return timeInput.replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase()).trim();
+        const trimmed = timeInput.trim();
+        if (!trimmed || trimmed === '—' || trimmed === '-')
+            return '';
+        if (/(am|pm)/i.test(trimmed)) {
+            return trimmed.replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase()).trim();
         }
-        const d = new Date(timeInput);
+        const d = new Date(trimmed);
         if (!isNaN(d.getTime())) {
-            let hours = d.getHours();
-            const minutes = d.getMinutes();
+            const istOffsetMs = (5 * 60 + 30) * 60 * 1000;
+            const istDate = new Date(d.getTime() + istOffsetMs);
+            let hours = istDate.getUTCHours();
+            const minutes = istDate.getUTCMinutes();
             const period = hours >= 12 ? 'PM' : 'AM';
             hours = hours % 12;
             if (hours === 0)
                 hours = 12;
             return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`;
         }
-        return timeInput.trim();
+        return trimmed;
     }
     const d = timeInput;
     if (isNaN(d.getTime()))
-        return '10:00 AM';
-    let hours = d.getHours();
-    const minutes = d.getMinutes();
+        return '';
+    const istOffsetMs = (5 * 60 + 30) * 60 * 1000;
+    const istDate = new Date(d.getTime() + istOffsetMs);
+    let hours = istDate.getUTCHours();
+    const minutes = istDate.getUTCMinutes();
     const period = hours >= 12 ? 'PM' : 'AM';
     hours = hours % 12;
     if (hours === 0)
@@ -4411,10 +4830,11 @@ app.patch('/api/v1/daily-leads/:id', async (req, res) => {
     }
 });
 // ── DL-4: POST /api/v1/daily-leads/:id/move-to-jd
-// 1-Click Move from Positives tab to JD Received tab (Spec Section 6.3 & 11)
+// Move from Positives tab to JD Received tab
 app.post('/api/v1/daily-leads/:id/move-to-jd', async (req, res) => {
     try {
         const { id } = req.params;
+        const { target_date } = req.body || {};
         const lead = await DailyLead_1.DailyLead.findById(id);
         if (!lead || lead.is_deleted) {
             return res.status(404).json({
@@ -4424,18 +4844,70 @@ app.post('/api/v1/daily-leads/:id/move-to-jd', async (req, res) => {
         }
         if ((0, routePolicy_1.refuseForeignOwner)(req, res, String(lead.coordinator_id), 'You can only move your own leads to JD Received.'))
             return;
-        lead.lead_type = 'jd_received';
-        lead.is_moved_to_jd = true;
-        lead.event_time = formatLeadUpperTime();
-        await lead.save();
-        const updated = await DailyLead_1.DailyLead.findById(lead._id)
-            .populate('college_id', 'college_name college_code')
-            .populate('coordinator_id', 'full_name official_email');
-        return res.status(200).json({
-            success: true,
-            message: `${lead.company_name} successfully moved to JD Received tab`,
-            data: updated,
-        });
+        const leadDate = lead.lead_date ? new Date(lead.lead_date) : getTodayDate();
+        const leadDateStr = leadDate.toISOString().split('T')[0];
+        const effectiveTargetDate = target_date ? parseDateParam(String(target_date)) : getTodayDate();
+        const targetDateStr = effectiveTargetDate.toISOString().split('T')[0];
+        if (leadDateStr === targetDateStr) {
+            // ── SAME DAY MOVE ──
+            // Received JD on the same day: Move to JD Received and remove from Positives on this date.
+            // Initial time is left empty as coordinator manually inputs the new time.
+            lead.lead_type = 'jd_received';
+            lead.is_moved_to_jd = true;
+            lead.is_jd_received = true;
+            lead.event_time = ''; // Initially empty as requested
+            lead.lead_date = effectiveTargetDate;
+            await lead.save();
+            const updated = await DailyLead_1.DailyLead.findById(lead._id)
+                .populate('college_id', 'college_name college_code')
+                .populate('coordinator_id', 'full_name official_email');
+            return res.status(200).json({
+                success: true,
+                message: `${lead.company_name} successfully moved to JD Received tab (removed from Positives)`,
+                data: updated,
+            });
+        }
+        else {
+            // ── DIFFERENT DAY / FUTURE DATE ──
+            // Positive gained earlier (e.g. today), but JD received after 2 days (future date):
+            // Retain company details in BOTH Positives (original date) and JD Received (target date).
+            lead.is_moved_to_jd = true;
+            await lead.save();
+            const existingJd = await DailyLead_1.DailyLead.findOne({
+                lead_type: 'jd_received',
+                college_id: lead.college_id,
+                company_name: { $regex: `^${escapeRegex(lead.company_name.trim())}$`, $options: 'i' },
+                lead_date: { $gte: effectiveTargetDate, $lt: new Date(effectiveTargetDate.getTime() + 24 * 60 * 60 * 1000) },
+                is_deleted: false,
+            });
+            let jdLead = existingJd;
+            if (!jdLead) {
+                jdLead = await DailyLead_1.DailyLead.create({
+                    lead_type: 'jd_received',
+                    college_id: lead.college_id,
+                    coordinator_id: lead.coordinator_id,
+                    company_id: lead.company_id || null,
+                    daily_tracker_id: lead.daily_tracker_id || null,
+                    company_name: lead.company_name.trim(),
+                    job_role: lead.job_role || '',
+                    ctc: lead.ctc || '',
+                    eligible_batch: lead.eligible_batch || '2027',
+                    event_time: '', // Initially empty as requested
+                    lead_date: effectiveTargetDate,
+                    remarks: lead.remarks || 'JD Received from earlier Positive',
+                    is_jd_received: true,
+                    is_deleted: false,
+                });
+            }
+            const populated = await DailyLead_1.DailyLead.findById(jdLead._id)
+                .populate('college_id', 'college_name college_code')
+                .populate('coordinator_id', 'full_name official_email');
+            return res.status(200).json({
+                success: true,
+                message: `${lead.company_name} recorded in JD Received for ${targetDateStr} (retained in historical Positives)`,
+                data: populated,
+            });
+        }
     }
     catch (error) {
         return res.status(500).json({
@@ -4659,7 +5131,20 @@ app.post('/api/v1/daily-leads/sync-positives', async (req, res) => {
             if (!call.company_name || !call.company_name.trim())
                 continue;
             const leadType = call.outcome_status === 'jd_received' ? 'jd_received' : 'positive';
-            const escapedCompanyName = call.company_name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const escapedCompanyName = escapeRegex(call.company_name.trim());
+            // If this positive was already moved to JD Received on this same date, do not resurrect it in Positives
+            if (leadType === 'positive') {
+                const alreadyMovedToJd = await DailyLead_1.DailyLead.findOne({
+                    company_name: { $regex: `^${escapedCompanyName}$`, $options: 'i' },
+                    college_id: call.college_id,
+                    lead_date: { $gte: targetDate, $lt: nextDate },
+                    lead_type: 'jd_received',
+                    is_deleted: { $ne: true },
+                });
+                if (alreadyMovedToJd) {
+                    continue;
+                }
+            }
             const existing = await DailyLead_1.DailyLead.findOne({
                 $or: [
                     { daily_tracker_id: call._id },
@@ -4670,11 +5155,11 @@ app.post('/api/v1/daily-leads/sync-positives', async (req, res) => {
                         lead_type: leadType,
                     },
                 ],
-                is_deleted: false,
+                is_deleted: { $ne: true },
             });
-            // Extract accurate call start time from Daily Tracker Time column
+            // Extract accurate call start time directly from Daily Tracker without random defaults
             const timeSource = call.call_start_time || call.created_at;
-            const callTime = formatLeadUpperTime(timeSource || '10:00 AM');
+            const callTime = formatLeadUpperTime(timeSource);
             if (!existing) {
                 await DailyLead_1.DailyLead.create({
                     lead_type: leadType,
@@ -4692,6 +5177,10 @@ app.post('/api/v1/daily-leads/sync-positives', async (req, res) => {
                     is_deleted: false,
                 });
                 syncedCount++;
+            }
+            else if (callTime && (!existing.event_time || existing.event_time === '10:00 AM')) {
+                existing.event_time = callTime;
+                await existing.save();
             }
         }
         return res.status(200).json({
@@ -4713,15 +5202,16 @@ app.post('/api/v1/daily-leads/sync-positives', async (req, res) => {
     }
 });
 // ── DL-9: POST /api/v1/daily-leads/copy-to-jd
-// Copies a selected positive company (or positive leads) across all selected target colleges into JD Received
+// Move or copy a selected positive company across selected target colleges into JD Received
 app.post('/api/v1/daily-leads/copy-to-jd', async (req, res) => {
     try {
-        const { date, company_name, college_ids, lead_id, job_role, ctc, eligible_batch, event_time } = req.body;
+        const { date, company_name, college_ids, lead_id, job_role, ctc, eligible_batch } = req.body;
         const targetDate = date ? parseDateParam(String(date)) : getTodayDate();
         const nextDate = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
-        // 1. Single Company Multi-College Copying Flow
+        const targetDateStr = targetDate.toISOString().split('T')[0];
+        // 1. Single Company Multi-College / Focused College Flow
         if (company_name && Array.isArray(college_ids) && college_ids.length > 0) {
-            const escapedCompanyName = company_name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const escapedCompanyName = escapeRegex(company_name.trim());
             // Find source positive lead for metadata reference
             let sourceLead = null;
             if (lead_id && mongoose_1.Types.ObjectId.isValid(lead_id)) {
@@ -4731,26 +5221,26 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req, res) => {
                 sourceLead = await DailyLead_1.DailyLead.findOne({
                     company_name: { $regex: `^${escapedCompanyName}$`, $options: 'i' },
                     lead_type: 'positive',
-                    lead_date: { $gte: targetDate, $lt: nextDate },
-                    is_deleted: false,
-                });
+                    is_deleted: { $ne: true },
+                }).sort({ lead_date: -1 });
             }
             const roleToUse = job_role || sourceLead?.job_role || '';
             const ctcToUse = ctc !== undefined ? ctc : (sourceLead?.ctc || '');
-            const batchToUse = eligible_batch || sourceLead?.eligible_batch || '2026 Batch';
-            const timeToUse = formatLeadUpperTime(event_time || sourceLead?.event_time);
+            const batchToUse = eligible_batch || sourceLead?.eligible_batch || '2027';
+            // User directive: "when I move from positive to JD received tab the time need to be empty initially because I will manually put the new time"
+            const timeToUse = '';
             const validCollegeIds = college_ids
                 .filter((id) => mongoose_1.Types.ObjectId.isValid(id))
                 .map((id) => new mongoose_1.Types.ObjectId(id));
             let copiedCount = 0;
             for (const targetCollegeId of validCollegeIds) {
-                // Check if already present in JD Received for this college & date
-                const existing = await DailyLead_1.DailyLead.findOne({
+                // Check if already present in JD Received for this college & target date
+                let existing = await DailyLead_1.DailyLead.findOne({
                     lead_type: 'jd_received',
                     college_id: targetCollegeId,
                     company_name: { $regex: `^${escapedCompanyName}$`, $options: 'i' },
                     lead_date: { $gte: targetDate, $lt: nextDate },
-                    is_deleted: false,
+                    is_deleted: { $ne: true },
                 });
                 if (!existing) {
                     await DailyLead_1.DailyLead.create({
@@ -4765,18 +5255,39 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req, res) => {
                         eligible_batch: batchToUse,
                         event_time: timeToUse,
                         lead_date: targetDate,
-                        remarks: 'JD Received copied from Positives',
+                        remarks: 'JD Received from Positives',
                         is_jd_received: true,
                         is_deleted: false,
                     });
                     copiedCount++;
                 }
             }
+            // ── Check Same-Day vs Different-Day for Source Positive Lead ──
+            if (sourceLead && !sourceLead.is_deleted) {
+                const sourceLeadDate = sourceLead.lead_date ? new Date(sourceLead.lead_date) : getTodayDate();
+                const sourceLeadDateStr = sourceLeadDate.toISOString().split('T')[0];
+                const sourceCollegeIdStr = String(sourceLead.college_id?._id || sourceLead.college_id);
+                const includesSourceCollege = validCollegeIds.some((cid) => String(cid) === sourceCollegeIdStr);
+                if (sourceLeadDateStr === targetDateStr && includesSourceCollege) {
+                    // SAME DAY MOVE for this college:
+                    // Remove from Positives on this date because it is now in JD Received
+                    sourceLead.is_deleted = true;
+                    sourceLead.deleted_at = new Date();
+                    sourceLead.is_moved_to_jd = true;
+                    await sourceLead.save();
+                }
+                else {
+                    // DIFFERENT DAY / FUTURE DATE:
+                    // Keep historical positive intact on its original date
+                    sourceLead.is_moved_to_jd = true;
+                    await sourceLead.save();
+                }
+            }
             return res.status(200).json({
                 success: true,
                 message: copiedCount > 0
-                    ? `Successfully copied "${company_name}" to ${copiedCount} college(s) in JD Received`
-                    : `"${company_name}" is already present in JD Received for all selected colleges`,
+                    ? `Successfully transferred "${company_name}" to JD Received`
+                    : `"${company_name}" is already present in JD Received for selected college(s)`,
                 data: {
                     copied_count: copiedCount,
                     total_colleges_selected: validCollegeIds.length,
@@ -4788,7 +5299,7 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req, res) => {
         const filter = {
             lead_type: 'positive',
             lead_date: { $gte: targetDate, $lt: nextDate },
-            is_deleted: false,
+            is_deleted: { $ne: true },
         };
         if (Array.isArray(college_ids) && college_ids.length > 0 && !college_ids.includes('all')) {
             const validCollegeIds = college_ids
@@ -4801,13 +5312,13 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req, res) => {
         const positiveLeads = await DailyLead_1.DailyLead.find(filter);
         let copiedCount = 0;
         for (const lead of positiveLeads) {
-            const escapedLeadName = lead.company_name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const escapedLeadName = escapeRegex(lead.company_name.trim());
             const existing = await DailyLead_1.DailyLead.findOne({
                 lead_type: 'jd_received',
                 college_id: lead.college_id,
                 company_name: { $regex: `^${escapedLeadName}$`, $options: 'i' },
                 lead_date: { $gte: targetDate, $lt: nextDate },
-                is_deleted: false,
+                is_deleted: { $ne: true },
             });
             if (!existing) {
                 await DailyLead_1.DailyLead.create({
@@ -4819,23 +5330,26 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req, res) => {
                     company_name: lead.company_name,
                     job_role: lead.job_role || '',
                     ctc: lead.ctc || '',
-                    eligible_batch: lead.eligible_batch || '2026 Batch',
-                    event_time: formatLeadUpperTime(lead.event_time),
-                    lead_date: lead.lead_date || targetDate,
-                    remarks: lead.remarks || 'Copied from Positives',
+                    eligible_batch: lead.eligible_batch || '2027',
+                    event_time: '',
+                    lead_date: targetDate,
+                    remarks: lead.remarks || 'JD Received from Positives',
                     is_jd_received: true,
                     is_deleted: false,
                 });
                 copiedCount++;
             }
+            // Mark moved and soft-delete on same day
+            lead.is_deleted = true;
+            lead.deleted_at = new Date();
+            lead.is_moved_to_jd = true;
+            await lead.save();
         }
         return res.status(200).json({
             success: true,
             message: copiedCount > 0
-                ? `Successfully copied ${copiedCount} lead(s) to JD Received`
-                : positiveLeads.length === 0
-                    ? `No positive leads found on ${date || 'today'}`
-                    : `Selected positive leads are already present in JD Received`,
+                ? `Successfully transferred ${copiedCount} positive lead(s) to JD Received`
+                : 'All selected positive leads are already in JD Received',
             data: {
                 copied_count: copiedCount,
                 total_positives_found: positiveLeads.length,
@@ -5088,7 +5602,7 @@ app.get('/api/v1/reports/templates', (req, res) => {
             audience: 'Executive Leadership & Placement Team',
             icon: '🚀',
             description: 'Comprehensive active corporate roster across JD received, positives, and active pipeline for graduating batch recruitment.',
-            default_sections: ['kpi_summary', 'active_leads', 'remarks'],
+            default_sections: ['kpi_summary', 'active_leads'],
         },
     ];
     return res.status(200).json({
@@ -5505,11 +6019,10 @@ app.post('/api/v1/reports/generate', async (req, res) => {
             const isConsolidated = !college_id || college_id === 'all';
             const hasSpecificBatch = academic_year && academic_year !== 'all' && String(academic_year).trim() !== '';
             const selectedBatch = hasSpecificBatch ? String(academic_year).trim() : '';
-            // Stream selection options: jd_received (Hot), positives (Warm), weekly_tracker (Pipeline/In Progress)
-            const leadSources = req.body.lead_sources || {
-                jd_received: true,
-                positives: true,
-                weekly_tracker: true,
+            // Stream selection: 2 KPIs (JD Received Companies and Companies in Pipeline)
+            const leadSources = {
+                jd_received: req.body.lead_sources?.jd_received ?? req.body.lead_sources?.companies_received_jd ?? true,
+                pipeline: req.body.lead_sources?.pipeline ?? req.body.lead_sources?.companies_in_pipeline ?? req.body.lead_sources?.weekly_tracker ?? true,
             };
             const normalizeCompanyName = (name) => {
                 return (name || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -5538,205 +6051,202 @@ app.post('/api/v1/reports/generate', async (req, res) => {
                     companyCollegesMap.get(norm).add(code);
                 }
             };
-            // 1. Populate colleges from all DailyLead (both jd_received and positive)
-            const allDailyLeadsForColleges = await DailyLead_1.DailyLead.find({ is_deleted: false }).select('company_name college_id lead_type').lean();
-            for (const dl of allDailyLeadsForColleges) {
-                addCompanyCollege(dl.company_name, dl.college_id);
+            // 1. Fetch WeeklyTracker rows across all partner colleges
+            const wtFilter = {
+                pipeline_section: {
+                    $in: [
+                        'in_progress',
+                        'drive_in_progress',
+                        'in_drive',
+                        'companies_in_drive',
+                        'upcoming_drives',
+                        'completed',
+                        'pipeline',
+                    ],
+                },
+                is_deleted: false,
+            };
+            if (hasSpecificBatch) {
+                wtFilter.academic_year = { $in: [selectedBatch, Number(selectedBatch)] };
             }
-            // 2. Also populate colleges from WeeklyTracker
-            const allWeeklyTrackersForColleges = await WeeklyTracker_1.WeeklyTracker.find({ is_deleted: false }).select('company_name college_id pipeline_section').lean();
-            for (const wt of allWeeklyTrackersForColleges) {
+            if (college_id && college_id !== 'all') {
+                const cId = mongoose_1.Types.ObjectId.isValid(String(college_id)) ? new mongoose_1.Types.ObjectId(String(college_id)) : college_id;
+                wtFilter.college_id = { $in: [cId, String(college_id)] };
+            }
+            else {
+                wtFilter.college_id = { $in: activeCollegeObjectIds };
+            }
+            let wtRows = await WeeklyTracker_1.WeeklyTracker.find(wtFilter).sort({ createdAt: -1 }).lean();
+            if (wtRows.length === 0 && college_id && college_id !== 'all') {
+                delete wtFilter.college_id;
+                wtFilter.college_id = { $in: activeCollegeObjectIds };
+                wtRows = await WeeklyTracker_1.WeeklyTracker.find(wtFilter).sort({ createdAt: -1 }).lean();
+            }
+            // Also populate colleges from all weekly trackers
+            for (const wt of wtRows) {
                 addCompanyCollege(wt.company_name, wt.college_id);
             }
+            // Also fetch DailyLead rows (for colleges & supplemental leads)
+            const dlFilter = { is_deleted: false };
+            if (hasSpecificBatch) {
+                dlFilter.eligible_batch = { $regex: new RegExp(escapeRegex(selectedBatch), 'i') };
+            }
+            if (college_id && college_id !== 'all') {
+                const cId = mongoose_1.Types.ObjectId.isValid(String(college_id)) ? new mongoose_1.Types.ObjectId(String(college_id)) : college_id;
+                dlFilter.college_id = { $in: [cId, String(college_id)] };
+            }
+            else {
+                dlFilter.college_id = { $in: activeCollegeObjectIds };
+            }
+            const dlRows = await DailyLead_1.DailyLead.find(dlFilter).sort({ createdAt: -1 }).lean();
+            for (const dl of dlRows) {
+                addCompanyCollege(dl.company_name, dl.college_id);
+            }
+            // Categorize companies into either 'jd_received' or 'pipeline'
+            // JD Received covers: in_progress, in_drive, companies_in_drive, upcoming_drives, drive_in_progress, completed (and daily lead jd_received)
+            // Pipeline covers: pipeline (and daily lead positive)
             const companyMap = new Map();
-            // Pre-fetch all companies that have reached JD Received stage in active colleges
-            const allJdLeads = await DailyLead_1.DailyLead.find({
-                lead_type: 'jd_received',
-                is_deleted: false,
-                college_id: { $in: activeCollegeObjectIds },
-            });
-            const allJdCompanyKeys = new Set(allJdLeads.map((j) => normalizeCompanyName(j.company_name)).filter(Boolean));
-            // 1. Hot Leads: JD Received (Highest Priority — Final Box of Hot Leads)
-            if (leadSources.jd_received) {
-                const jdFilter = { lead_type: 'jd_received', is_deleted: false };
-                if (college_id && college_id !== 'all') {
-                    const cId = mongoose_1.Types.ObjectId.isValid(String(college_id)) ? new mongoose_1.Types.ObjectId(String(college_id)) : college_id;
-                    jdFilter.college_id = { $in: [cId, String(college_id)] };
+            const jdSections = new Set([
+                'in_progress',
+                'drive_in_progress',
+                'in_drive',
+                'companies_in_drive',
+                'upcoming_drives',
+                'completed',
+            ]);
+            for (const r of wtRows) {
+                const raw = (r.company_name || '').trim();
+                if (!raw)
+                    continue;
+                const key = normalizeCompanyName(raw);
+                const isJd = jdSections.has(r.pipeline_section);
+                const roleStr = (r.job_role || r.role || '').trim();
+                const ctcStr = (r.ctc_lpa || r.salary_package || r.ctc || '').trim();
+                if (!companyMap.has(key)) {
+                    companyMap.set(key, {
+                        company_name: raw,
+                        colleges: '',
+                        role: roleStr || 'Graduate Trainee',
+                        ctc: ctcStr || 'Competitive',
+                        source: isJd ? 'jd_received' : 'pipeline',
+                        tier: isJd ? 'JD Received Companies' : 'Companies in Pipeline',
+                        tier_badge: isJd ? '🔥 JD Received' : '📋 Pipeline',
+                    });
                 }
                 else {
-                    jdFilter.college_id = { $in: activeCollegeObjectIds };
-                }
-                if (hasSpecificBatch) {
-                    jdFilter.eligible_batch = { $regex: new RegExp(escapeRegex(selectedBatch), 'i') };
-                }
-                let jdRows = await DailyLead_1.DailyLead.find(jdFilter).sort({ createdAt: -1 });
-                if (jdRows.length === 0 && college_id && college_id !== 'all') {
-                    delete jdFilter.college_id;
-                    jdFilter.college_id = { $in: activeCollegeObjectIds };
-                    jdRows = await DailyLead_1.DailyLead.find(jdFilter).sort({ createdAt: -1 });
-                }
-                for (const r of jdRows) {
-                    const raw = (r.company_name || '').trim();
-                    if (!raw)
-                        continue;
-                    const key = normalizeCompanyName(raw);
-                    const collegesSet = companyCollegesMap.get(key);
-                    const collegesStr = collegesSet && collegesSet.size > 0 ? Array.from(collegesSet).sort().join(', ') : '—';
-                    if (!companyMap.has(key)) {
-                        companyMap.set(key, {
-                            company_name: raw,
-                            colleges: collegesStr,
-                            role: (r.job_role || '').trim() || 'Graduate Trainee',
-                            ctc: (r.ctc || '').trim() || 'Competitive',
-                            source: 'jd_received',
-                            tier: 'Hot Lead (JD Received)',
-                            tier_badge: '🔥 Hot (JD)',
-                        });
+                    const existing = companyMap.get(key);
+                    // If existing was in pipeline but this row reached JD Received section, upgrade to JD Received
+                    if (existing.source === 'pipeline' && isJd) {
+                        existing.source = 'jd_received';
+                        existing.tier = 'JD Received Companies';
+                        existing.tier_badge = '🔥 JD Received';
+                    }
+                    if ((!existing.role || existing.role === 'Graduate Trainee') && roleStr) {
+                        existing.role = roleStr;
+                    }
+                    if ((!existing.ctc || existing.ctc === 'Competitive') && ctcStr) {
+                        existing.ctc = ctcStr;
                     }
                 }
             }
-            // 2. Warm Leads: Positives (Subtract any company that has already given a JD)
-            if (leadSources.positives) {
-                const posFilter = { lead_type: 'positive', is_deleted: false };
-                if (college_id && college_id !== 'all') {
-                    const cId = mongoose_1.Types.ObjectId.isValid(String(college_id)) ? new mongoose_1.Types.ObjectId(String(college_id)) : college_id;
-                    posFilter.college_id = { $in: [cId, String(college_id)] };
+            // Also ingest from DailyLead
+            for (const dl of dlRows) {
+                const raw = (dl.company_name || '').trim();
+                if (!raw)
+                    continue;
+                const key = normalizeCompanyName(raw);
+                const isJd = dl.lead_type === 'jd_received';
+                const roleStr = (dl.job_role || dl.role || '').trim();
+                const ctcStr = (dl.ctc || '').trim();
+                if (!companyMap.has(key)) {
+                    companyMap.set(key, {
+                        company_name: raw,
+                        colleges: '',
+                        role: roleStr || 'Graduate Trainee',
+                        ctc: ctcStr || 'Competitive',
+                        source: isJd ? 'jd_received' : 'pipeline',
+                        tier: isJd ? 'JD Received Companies' : 'Companies in Pipeline',
+                        tier_badge: isJd ? '🔥 JD Received' : '📋 Pipeline',
+                    });
                 }
                 else {
-                    posFilter.college_id = { $in: activeCollegeObjectIds };
-                }
-                if (hasSpecificBatch) {
-                    posFilter.eligible_batch = { $regex: new RegExp(escapeRegex(selectedBatch), 'i') };
-                }
-                let posRows = await DailyLead_1.DailyLead.find(posFilter).sort({ createdAt: -1 });
-                if (posRows.length === 0 && college_id && college_id !== 'all') {
-                    delete posFilter.college_id;
-                    posFilter.college_id = { $in: activeCollegeObjectIds };
-                    posRows = await DailyLead_1.DailyLead.find(posFilter).sort({ createdAt: -1 });
-                }
-                for (const r of posRows) {
-                    const raw = (r.company_name || '').trim();
-                    if (!raw)
-                        continue;
-                    const key = normalizeCompanyName(raw);
-                    // Rule: If company is in the JD Received final box, minus it from Positives
-                    if (allJdCompanyKeys.has(key))
-                        continue;
-                    const collegesSet = companyCollegesMap.get(key);
-                    const collegesStr = collegesSet && collegesSet.size > 0 ? Array.from(collegesSet).sort().join(', ') : '—';
-                    if (!companyMap.has(key)) {
-                        companyMap.set(key, {
-                            company_name: raw,
-                            colleges: collegesStr,
-                            role: (r.job_role || '').trim() || 'Graduate Trainee',
-                            ctc: (r.ctc || '').trim() || 'Competitive',
-                            source: 'positives',
-                            tier: 'Warm Lead (Positive)',
-                            tier_badge: '⚡ Positive',
-                        });
+                    const existing = companyMap.get(key);
+                    if (existing.source === 'pipeline' && isJd) {
+                        existing.source = 'jd_received';
+                        existing.tier = 'JD Received Companies';
+                        existing.tier_badge = '🔥 JD Received';
+                    }
+                    if ((!existing.role || existing.role === 'Graduate Trainee') && roleStr) {
+                        existing.role = roleStr;
+                    }
+                    if ((!existing.ctc || existing.ctc === 'Competitive') && ctcStr) {
+                        existing.ctc = ctcStr;
                     }
                 }
             }
-            // 3. Operational Leads: Weekly Tracker (In-Progress & Pipeline)
-            if (leadSources.weekly_tracker) {
-                const wtFilter = {
-                    pipeline_section: { $in: ['in_progress', 'pipeline'] },
-                    is_deleted: false,
-                };
-                if (college_id && college_id !== 'all') {
-                    const cId = mongoose_1.Types.ObjectId.isValid(String(college_id)) ? new mongoose_1.Types.ObjectId(String(college_id)) : college_id;
-                    wtFilter.college_id = { $in: [cId, String(college_id)] };
-                }
-                else {
-                    wtFilter.college_id = { $in: activeCollegeObjectIds };
-                }
-                if (hasSpecificBatch) {
-                    wtFilter.academic_year = { $in: [selectedBatch, Number(selectedBatch)] };
-                }
-                let wtRows = await WeeklyTracker_1.WeeklyTracker.find(wtFilter).sort({ createdAt: -1 });
-                if (wtRows.length === 0 && college_id && college_id !== 'all') {
-                    delete wtFilter.college_id;
-                    wtFilter.college_id = { $in: activeCollegeObjectIds };
-                    wtRows = await WeeklyTracker_1.WeeklyTracker.find(wtFilter).sort({ createdAt: -1 });
-                }
-                for (const r of wtRows) {
-                    const raw = (r.company_name || '').trim();
-                    if (!raw)
-                        continue;
-                    const key = normalizeCompanyName(raw);
-                    const collegesSet = companyCollegesMap.get(key);
-                    const collegesStr = collegesSet && collegesSet.size > 0 ? Array.from(collegesSet).sort().join(', ') : '—';
-                    if (!companyMap.has(key)) {
-                        companyMap.set(key, {
-                            company_name: raw,
-                            colleges: collegesStr,
-                            role: (r.job_role || '').trim() || 'Graduate Trainee',
-                            ctc: (r.ctc_lpa || r.salary_package || '').trim() || 'Competitive',
-                            source: 'weekly_tracker',
-                            tier: r.pipeline_section === 'in_progress' ? 'In-Progress' : 'Pipeline',
-                            tier_badge: r.pipeline_section === 'in_progress' ? '📌 In Progress' : '📋 Pipeline',
-                        });
-                    }
-                }
-            }
-            // Fallback: If companyMap is still empty, fall back to ActiveLead collection
+            // Fallback: If companyMap is empty, fetch from ActiveLead collection
             if (companyMap.size === 0) {
                 const alFilter = { is_deleted: { $ne: true } };
                 if (hasSpecificBatch) {
                     alFilter.academic_year = { $in: [selectedBatch, Number(selectedBatch)] };
                 }
-                const fallbackLeads = await ActiveLead_1.ActiveLead.find(alFilter).sort({ company_name: 1 });
+                const fallbackLeads = await ActiveLead_1.ActiveLead.find(alFilter).sort({ company_name: 1 }).lean();
                 for (const al of fallbackLeads) {
                     const raw = (al.company_name || '').trim();
                     if (!raw)
                         continue;
                     const key = normalizeCompanyName(raw);
-                    const collegesSet = companyCollegesMap.get(key);
-                    const collegesStr = collegesSet && collegesSet.size > 0 ? Array.from(collegesSet).sort().join(', ') : '—';
                     if (!companyMap.has(key)) {
                         companyMap.set(key, {
                             company_name: raw,
-                            colleges: collegesStr,
+                            colleges: '',
                             role: (al.role || '').trim() || 'Graduate Trainee',
                             ctc: (al.ctc || '').trim() || 'Competitive',
-                            source: 'positives',
-                            tier: 'Active Corporate Lead',
-                            tier_badge: '⚡ Active',
+                            source: 'pipeline',
+                            tier: 'Companies in Pipeline',
+                            tier_badge: '📋 Pipeline',
                         });
                     }
                 }
             }
-            // Determine titles and labels based on selected streams
-            const isOnlyJd = leadSources.jd_received && !leadSources.positives && !leadSources.weekly_tracker;
-            const isOnlyPos = !leadSources.jd_received && leadSources.positives && !leadSources.weekly_tracker;
-            const isOnlyWt = !leadSources.jd_received && !leadSources.positives && leadSources.weekly_tracker;
+            // Attach formatted colleges list for each company
+            for (const [key, item] of companyMap.entries()) {
+                const collegesSet = companyCollegesMap.get(key);
+                item.colleges = collegesSet && collegesSet.size > 0 ? Array.from(collegesSet).sort().join(', ') : '—';
+            }
+            // Filter by selected KPIs / streams
+            const includeJd = !!leadSources.jd_received;
+            const includePipeline = !!leadSources.pipeline;
+            let allCategorizedCompanies = Array.from(companyMap.values());
+            let activeLeadsList = allCategorizedCompanies.filter((c) => {
+                if (c.source === 'jd_received' && includeJd)
+                    return true;
+                if (c.source === 'pipeline' && includePipeline)
+                    return true;
+                return false;
+            });
+            // Sort alphabetically by company name
+            activeLeadsList.sort((a, b) => a.company_name.localeCompare(b.company_name));
+            const countJd = activeLeadsList.filter((l) => l.source === 'jd_received').length;
+            const countPipeline = activeLeadsList.filter((l) => l.source === 'pipeline').length;
+            // Dynamic Title & Focus description
             let dynamicTitle = 'Active Leads Pipeline Report';
-            let tierFocusLabel = 'Consolidated (JD Received • Positives • Weekly Pipeline)';
-            if (isOnlyJd) {
+            let tierFocusLabel = 'Consolidated (JD Received & Pipeline)';
+            if (includeJd && !includePipeline) {
                 dynamicTitle = hasSpecificBatch
-                    ? `Hot Leads (JD Received) — ${selectedBatch}`
-                    : `Hot Leads (JD Received)`;
-                tierFocusLabel = 'Hot Leads (JD Received)';
+                    ? `JD Received Companies — ${selectedBatch}`
+                    : `JD Received Companies`;
+                tierFocusLabel = 'JD Received Companies (In-Progress • In Drive • Completed)';
             }
-            else if (isOnlyPos) {
+            else if (!includeJd && includePipeline) {
                 dynamicTitle = hasSpecificBatch
-                    ? `Positive Leads — ${selectedBatch}`
-                    : `Positive Leads`;
-                tierFocusLabel = 'Positive Leads';
-            }
-            else if (isOnlyWt) {
-                dynamicTitle = hasSpecificBatch
-                    ? `Weekly Tracker Pipeline — ${selectedBatch}`
-                    : `Weekly Tracker Pipeline`;
-                tierFocusLabel = 'Weekly Tracker Pipeline';
+                    ? `Companies in Pipeline — ${selectedBatch}`
+                    : `Companies in Pipeline`;
+                tierFocusLabel = 'Companies in Pipeline';
             }
             else if (hasSpecificBatch) {
                 dynamicTitle = `Active Leads Pipeline Report — ${selectedBatch}`;
             }
-            const activeLeadsList = Array.from(companyMap.values()).sort((a, b) => a.company_name.localeCompare(b.company_name));
-            const countJd = activeLeadsList.filter(l => l.source === 'jd_received').length;
-            const countPos = activeLeadsList.filter(l => l.source === 'positives').length;
-            const countWt = activeLeadsList.filter(l => l.source === 'weekly_tracker').length;
             const reportDocument = {
                 template_type: 'active_leads',
                 report_title: dynamicTitle,
@@ -5762,13 +6272,13 @@ app.post('/api/v1/reports/generate', async (req, res) => {
                     total_leads: activeLeadsList.length,
                     graduating_year: hasSpecificBatch ? selectedBatch : 'All Batches',
                     hot_leads_count: countJd,
-                    warm_leads_count: countPos,
-                    pipeline_leads_count: countWt,
+                    jd_received_count: countJd,
+                    pipeline_leads_count: countPipeline,
+                    pipeline_count: countPipeline,
                     tier_focus: tierFocusLabel,
                     selected_streams: {
-                        jd_received: !!leadSources.jd_received,
-                        positives: !!leadSources.positives,
-                        weekly_tracker: !!leadSources.weekly_tracker,
+                        jd_received: includeJd,
+                        pipeline: includePipeline,
                     },
                 },
                 sections: {
@@ -5787,12 +6297,11 @@ app.post('/api/v1/reports/generate', async (req, res) => {
                 included_sections: included_sections || {
                     kpi_summary: true,
                     active_leads: true,
-                    remarks: true,
+                    remarks: false,
                 },
                 included_kpi_cards: kpi_cards || included_kpi_cards || {
                     total_leads: true,
                     hot_leads_count: true,
-                    warm_leads_count: true,
                     pipeline_leads_count: true,
                     graduating_year: true,
                 },
@@ -10511,7 +11020,7 @@ const ensureDefaultAccounts = async () => {
         // Sujitha handles: HITS, NEHRU, KPR (partially with Mohanaradha), SONA, MAREPHRA
         // Mohanaradha handles: KARPAGAM, AIHT, ACET, KPR (partially with Sujitha)
         const DEFAULT_COORDINATOR_COLLEGE_MAP = {
-            'sujitha_s@infoziant.com': ['HITS', 'NEHRU', 'KPR', 'SONA', 'MAREPHRA'],
+            'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
             'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
             'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
             'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],
@@ -10537,8 +11046,10 @@ const ensureDefaultAccounts = async () => {
         for (const [email, codes] of Object.entries(DEFAULT_COORDINATOR_COLLEGE_MAP)) {
             const coordUser = await User_1.User.findOne({ official_email: email.toLowerCase(), is_deleted: false });
             if (coordUser) {
-                const mappedIds = codes.map((c) => codeMap.get(c.toUpperCase())).filter(Boolean);
-                if (!coordUser.assigned_college_ids || coordUser.assigned_college_ids.length === 0 || coordUser.assigned_college_ids.length > 4) {
+                const isTL = coordUser.role_codes?.includes('TEAM_LEADER') || coordUser.official_email === 'sujitha_s@infoziant.com';
+                const maxLimit = isTL ? 5 : 4;
+                const mappedIds = codes.map((c) => codeMap.get(c.toUpperCase())).filter(Boolean).slice(0, maxLimit);
+                if (!coordUser.assigned_college_ids || coordUser.assigned_college_ids.length === 0 || coordUser.assigned_college_ids.length > maxLimit) {
                     coordUser.assigned_college_ids = mappedIds;
                     coordUser.weekly_focus_locked = true;
                     coordUser.weekly_focus_week_key = currentWeekMonday;
@@ -10621,6 +11132,30 @@ const startServer = async () => {
     await ensureDefaultAccounts();
     await ensureCompanyMetadataSerialNumbers();
     await syncActiveCollegesRoster();
+    // ── Reconcile same-day moved positive leads ──
+    try {
+        const jdLeads = await DailyLead_1.DailyLead.find({ lead_type: 'jd_received', is_deleted: { $ne: true } });
+        for (const jd of jdLeads) {
+            if (!jd.lead_date || !jd.company_name)
+                continue;
+            const startDay = new Date(jd.lead_date);
+            startDay.setUTCHours(0, 0, 0, 0);
+            const endDay = new Date(startDay.getTime() + 24 * 60 * 60 * 1000);
+            await DailyLead_1.DailyLead.updateMany({
+                _id: { $ne: jd._id },
+                company_name: { $regex: `^${escapeRegex(jd.company_name.trim())}$`, $options: 'i' },
+                college_id: jd.college_id,
+                lead_type: 'positive',
+                lead_date: { $gte: startDay, $lt: endDay },
+                is_deleted: { $ne: true },
+            }, {
+                $set: { is_deleted: true, deleted_at: new Date(), is_moved_to_jd: true },
+            });
+        }
+    }
+    catch (err) {
+        console.error('Reconcile same-day moved leads error:', err);
+    }
     app.listen(PORT, () => {
         console.log(`🚀 [iPOMS API] Server running on http://localhost:${PORT}`);
         console.log(`📡 [iPOMS API] Health probe: http://localhost:${PORT}/api/v1/health`);

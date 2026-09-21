@@ -52,21 +52,21 @@ async function audit() {
       companyEntries.push({
         company_name: al.company_name.trim(),
         source: 'ActiveLead DB',
-        ctc: al.ctc_range || 'N/A',
-        college: al.preferred_colleges?.join(', ') || 'N/A',
-        section: al.current_status || 'N/A'
+        ctc: al.ctc || 'N/A',
+        college: al.college_id ? String(al.college_id) : 'N/A',
+        section: (al.status as string) || al.pipeline_section || 'N/A'
       });
     }
   }
 
   for (const mp of MASTER_POSITIVES_DATA) {
-    if (mp.company_name) {
+    if (mp.company) {
       companyEntries.push({
-        company_name: mp.company_name.trim(),
+        company_name: mp.company.trim(),
         source: 'Master Positives',
         ctc: mp.ctc || 'N/A',
-        college: mp.college || 'N/A',
-        section: mp.outcome_type || 'N/A'
+        college: mp.collegeCode || 'N/A',
+        section: mp.role || 'N/A'
       });
     }
   }

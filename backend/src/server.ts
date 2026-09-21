@@ -530,14 +530,15 @@ app.get('/api/v1/weekly-tracker/sync-inspection', async (req: Request, res: Resp
 // 2. Authentication Login Endpoint & Rate Limiting (AUD-C-03)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes window
-  max: 60, // Limit each IP to 60 authentication attempts per window
+  max: 500, // Generous allowance for concurrent coordinator logins across shared office IPs
+  skipSuccessfulRequests: true, // Do not count successful sign-ins against rate limits
   standardHeaders: true,
   legacyHeaders: false,
   message: {
     success: false,
     error: {
       code: 'TOO_MANY_REQUESTS',
-      message: 'Too many authentication attempts from this IP. Please wait a few minutes and try again.',
+      message: 'Too many authentication attempts from this IP. Please wait a few moments and try again.',
     },
   },
 });
@@ -815,25 +816,64 @@ app.get('/api/v1/colleges', async (req: Request, res: Response) => {
   }
 });
 
-// List of official active partner college codes (21 active colleges)
-export const ACTIVE_COLLEGE_CODES = [
-  'KARPAGAM', 'MCET', 'ACET', 'KPR', 'AIHT', 'KAMARAJ', 'NGP', 'MKCE',
-  'ACEW', 'NPR', 'KIOT', 'KLU', 'SMVEC', 'DSU', 'PSNA', 'SONA',
-  'MEC', 'NGCE', 'HITS', 'NEHRU', 'MAREPHRA'
+// List of official active partner college definitions (21 active colleges)
+export const OFFICIAL_COLLEGE_DEFINITIONS = [
+  { college_code: 'KARPAGAM', college_name: 'Karpagam College of Engineering', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/karpagam.png' },
+  { college_code: 'MCET', college_name: 'Dr. Mahalingam College of Engineering and Technology', location: 'Pollachi, Tamil Nadu', logo_url: '/college-logos/MCET.png' },
+  { college_code: 'ACET', college_name: 'Achariya College of Engineering Technology', location: 'Puducherry', logo_url: '/college-logos/acet.png' },
+  { college_code: 'KPR', college_name: 'KPR Institute of Engineering and Technology', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/kpr.png' },
+  { college_code: 'AIHT', college_name: 'Anand Institute of Higher Technology', location: 'Chennai, Tamil Nadu', logo_url: '/college-logos/aiht.png' },
+  { college_code: 'KAMARAJ', college_name: 'Kamaraj College of Engineering and Technology', location: 'Virudhunagar, Tamil Nadu', logo_url: '/college-logos/kamaraj.png' },
+  { college_code: 'NGP', college_name: 'Dr. N.G.P. Institute of Technology', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/ngp.png' },
+  { college_code: 'MKCE', college_name: 'M.Kumarasamy College of Engineering', location: 'Karur, Tamil Nadu', logo_url: '/college-logos/mkce.png' },
+  { college_code: 'ACEW', college_name: 'Arunachala College of Engineering for Women', location: 'Kanyakumari, Tamil Nadu', logo_url: '/college-logos/acew.png' },
+  { college_code: 'NPR', college_name: 'NPR College of Engineering and Technology', location: 'Natham / Dindigul, Tamil Nadu', logo_url: '/college-logos/npr.png' },
+  { college_code: 'KIOT', college_name: 'Knowledge Institute of Technology', location: 'Salem, Tamil Nadu', logo_url: '/college-logos/kiot.jfif' },
+  { college_code: 'KLU', college_name: 'Kalasalingam Academy of Research and Education', location: 'Virudhunagar, Tamil Nadu', logo_url: '/college-logos/klu.png' },
+  { college_code: 'SMVEC', college_name: 'Sri Manakula Vinayagar Engineering College', location: 'Puducherry', logo_url: '/college-logos/smvec.png' },
+  { college_code: 'DSU', college_name: 'Dhanalakshmi Srinivasan University', location: 'Perambalur / Trichy, Tamil Nadu', logo_url: '/college-logos/dsu.png' },
+  { college_code: 'PSNA', college_name: 'PSNA College of Engineering and Technology', location: 'Dindigul, Tamil Nadu', logo_url: '/college-logos/psna.png' },
+  { college_code: 'SONA', college_name: 'Sona College of Technology', location: 'Salem, Tamil Nadu', logo_url: '/college-logos/sona.png' },
+  { college_code: 'MEC', college_name: 'Muthayammal Engineering College', location: 'Singlandhapuram, Tamil Nadu', logo_url: '/college-logos/MEC.png' },
+  { college_code: 'NGCE', college_name: 'Narayanaguru College of Engineering', location: 'Kanyakumari, Tamil Nadu', logo_url: '/college-logos/ngce.png' },
+  { college_code: 'HITS', college_name: 'Hindustan Institute of Technology and Science', location: 'Chennai, Tamil Nadu', logo_url: '/college-logos/hits.png' },
+  { college_code: 'NEHRU', college_name: 'Nehru Institute of Technology', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/nehru.png' },
+  { college_code: 'MAREPHRA', college_name: 'Mar Ephraem College of Engineering and Technology', location: 'Kanyakumari, Tamil Nadu', logo_url: '/college-logos/marephraem.png' },
 ];
+
+export const ACTIVE_COLLEGE_CODES = OFFICIAL_COLLEGE_DEFINITIONS.map(c => c.college_code);
 
 // Helper to initialize/sync active roster on startup or demand
 export async function syncActiveCollegesRoster() {
   try {
-    const activeRes = await College.updateMany(
-      { college_code: { $in: ACTIVE_COLLEGE_CODES } },
-      { $set: { status: 'active' } }
-    );
-    const inactiveRes = await College.updateMany(
+    for (const def of OFFICIAL_COLLEGE_DEFINITIONS) {
+      let existing = await College.findOne({
+        $or: [
+          { college_code: def.college_code },
+          { college_name: new RegExp('^' + def.college_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') },
+        ],
+      });
+      if (existing) {
+        existing.status = 'active';
+        if (!existing.location) existing.location = def.location;
+        if (!existing.logo_url) existing.logo_url = def.logo_url;
+        await existing.save();
+      } else {
+        await College.create({
+          college_name: def.college_name,
+          college_code: def.college_code,
+          location: def.location,
+          logo_url: def.logo_url,
+          status: 'active',
+          assigned_coordinator_ids: [],
+        });
+      }
+    }
+    await College.updateMany(
       { college_code: { $nin: ACTIVE_COLLEGE_CODES } },
       { $set: { status: 'inactive' } }
     );
-    console.log(`🏛️ [Colleges] Roster synchronized: active (${ACTIVE_COLLEGE_CODES.length} colleges), inactive updated.`);
+    console.log(`🏛️ [Colleges] Roster fully synchronized: 21 official colleges active.`);
   } catch (err) {
     console.error('Failed to sync active college roster:', err);
   }
@@ -1012,6 +1052,38 @@ app.get('/api/v1/colleges/focus-matrix', async (req: Request, res: Response) => 
     const isMyFocusLocked = Boolean(
       currentUser?.weekly_focus_locked && currentUser?.weekly_focus_week_key === currentWeekMonday
     );
+
+    // Official focus college allocations mapping for default weekly pre-selection
+    const DEFAULT_COORDINATOR_COLLEGE_MAP: Record<string, string[]> = {
+      'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
+      'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
+      'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
+      'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],
+      'lizenya_r@infoziant.com': ['NPR', 'KIOT', 'ACEW'],
+      'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ'],
+      'seshmitha_tamil@icl.today': ['MCET', 'MEC'],
+    };
+
+    // If current user does not have colleges locked or assigned for the current week, pre-populate their official default colleges
+    if (myAssignedCollegeIds.length === 0 && currentUser) {
+      const email = (currentUser.official_email || '').toLowerCase().trim();
+      const uname = (currentUser.username || '').toLowerCase().trim();
+      let defaultCodes = DEFAULT_COORDINATOR_COLLEGE_MAP[email];
+      if (!defaultCodes) {
+        for (const [key, val] of Object.entries(DEFAULT_COORDINATOR_COLLEGE_MAP)) {
+          const keyPrefix = key.split('@')[0];
+          if (email.includes(keyPrefix) || uname.includes(keyPrefix) || keyPrefix.includes(uname)) {
+            defaultCodes = val;
+            break;
+          }
+        }
+      }
+      if (defaultCodes && defaultCodes.length > 0) {
+        myAssignedCollegeIds = allColleges
+          .filter((c) => defaultCodes.some((code) => code.toUpperCase() === c.college_code?.toUpperCase()))
+          .map((c) => String(c._id));
+      }
+    }
 
     const collegesWithOccupancy = allColleges.map((c) => {
       const cIdStr = String(c._id);
@@ -1260,8 +1332,8 @@ function getWeekMondayKey(d: Date = new Date()): string {
 
 
 // ── POST /api/v1/colleges/lock-focus ──────────────────────────────────────────
-// Atomically validates and locks 1-4 colleges for the current coordinator,
-// ensuring strict mutual exclusion (NO DUPLICATE COLLEGES ACROSS COORDINATORS).
+// Atomically validates and locks 1-5 colleges for the current coordinator,
+// ensuring strict mutual exclusion and co-handling rules.
 app.post('/api/v1/colleges/lock-focus', async (req: Request, res: Response) => {
   try {
     const currentWeekMonday = getWeekMondayKey();
@@ -1303,36 +1375,96 @@ app.post('/api/v1/colleges/lock-focus', async (req: Request, res: Response) => {
     if (!Array.isArray(college_ids) || college_ids.length === 0) {
       return res.status(400).json({
         success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'Please select at least 1 partner college (Minimum 1, Maximum 4).' },
+        error: { code: 'VALIDATION_ERROR', message: 'Please select at least 1 partner college (Minimum 1, Maximum 5).' },
       });
     }
 
-    if (college_ids.length > 4) {
+    if (college_ids.length > 5) {
       return res.status(400).json({
         success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'Maximum 4 colleges allowed per coordinator.' },
+        error: { code: 'VALIDATION_ERROR', message: 'Maximum 5 colleges allowed.' },
       });
     }
 
-    const sanitizedIds = Array.from(new Set(college_ids.map(String))).filter((id) => Types.ObjectId.isValid(id));
-    if (sanitizedIds.length === 0) {
+    // Ensure all 21 official colleges are present & active
+    let allActiveColleges = await College.find({ status: 'active' });
+    if (allActiveColleges.length === 0) {
+      await syncActiveCollegesRoster();
+      allActiveColleges = await College.find({ status: 'active' });
+    }
+
+    const resolvedCollegeDocs: any[] = [];
+    const resolvedObjectIds: Types.ObjectId[] = [];
+
+    for (const rawItem of college_ids) {
+      const itemStr = String(rawItem).trim();
+      if (!itemStr) continue;
+
+      let foundDoc: any = null;
+
+      // 1. Try match by ObjectId
+      if (Types.ObjectId.isValid(itemStr)) {
+        foundDoc = allActiveColleges.find((c) => String(c._id) === itemStr);
+        if (!foundDoc) {
+          foundDoc = await College.findById(itemStr);
+        }
+      }
+
+      // 2. Try match by college_code (direct, stripped col_ prefix, or case-insensitive)
+      if (!foundDoc) {
+        const cleanedCode = itemStr.replace(/^col_/i, '').toUpperCase();
+        foundDoc = allActiveColleges.find((c) => c.college_code?.toUpperCase() === cleanedCode);
+        if (!foundDoc) {
+          foundDoc = await College.findOne({ college_code: cleanedCode });
+        }
+      }
+
+      // 3. Try match by college_name
+      if (!foundDoc) {
+        const nameClean = itemStr.toLowerCase();
+        foundDoc = allActiveColleges.find(
+          (c) =>
+            c.college_name?.toLowerCase() === nameClean ||
+            c.college_name?.toLowerCase().includes(nameClean) ||
+            nameClean.includes(c.college_name?.toLowerCase())
+        );
+        if (!foundDoc) {
+          foundDoc = await College.findOne({
+            college_name: new RegExp('^' + itemStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i'),
+          });
+        }
+      }
+
+      if (foundDoc) {
+        // Ensure status is active
+        if (foundDoc.status !== 'active') {
+          foundDoc.status = 'active';
+          await foundDoc.save();
+        }
+        if (!resolvedCollegeDocs.some((d) => String(d._id) === String(foundDoc._id))) {
+          resolvedCollegeDocs.push(foundDoc);
+          resolvedObjectIds.push(foundDoc._id);
+        }
+      }
+    }
+
+    if (resolvedCollegeDocs.length === 0) {
       return res.status(400).json({
         success: false,
         error: { code: 'VALIDATION_ERROR', message: 'Invalid college IDs provided.' },
       });
     }
 
-    // Verify all selected colleges exist
-    const selectedColleges = await College.find({ _id: { $in: sanitizedIds.map((id) => new Types.ObjectId(id)) }, status: 'active' });
-    if (selectedColleges.length !== sanitizedIds.length) {
+    if (resolvedCollegeDocs.length > 5) {
       return res.status(400).json({
         success: false,
-        error: { code: 'INVALID_COLLEGES', message: 'One or more selected colleges are invalid or inactive.' },
+        error: { code: 'VALIDATION_ERROR', message: 'Maximum 5 colleges allowed.' },
       });
     }
 
-    // ── STRICT MUTUAL EXCLUSION CHECK ──
-    // Find if ANY other active coordinator has locked ANY of these requested colleges for this week
+    const sanitizedIds = resolvedCollegeDocs.map((c) => String(c._id));
+    const selectedColleges = resolvedCollegeDocs;
+
     // ── CO-HANDLING & MUTUAL EXCLUSION CHECK ──
     // Rule 1: A minimum of 1 college must be selected, and a maximum of 4 are allowed (checked above).
     // Rule 2: At most 2 coordinators or team leaders can handle any single college.
@@ -1351,7 +1483,7 @@ app.post('/api/v1/colleges/lock-focus', async (req: Request, res: Response) => {
 
     for (const reqId of sanitizedIds) {
       const otherHandlersForCollege = otherCoordinators.filter((oc) =>
-        (oc.assigned_college_ids as any[]).some((c: any) => String(c._id) === String(reqId))
+        (oc.assigned_college_ids as any[]).some((c: any) => String(c?._id || c) === String(reqId))
       );
 
       const targetColDoc = selectedColleges.find((c) => String(c._id) === String(reqId));
@@ -1396,15 +1528,21 @@ app.post('/api/v1/colleges/lock-focus', async (req: Request, res: Response) => {
       });
     }
 
-    user.assigned_college_ids = sanitizedIds.map((id) => new Types.ObjectId(id));
+    user.assigned_college_ids = resolvedObjectIds;
     user.weekly_focus_locked = true;
     user.weekly_focus_week_key = currentWeekMonday;
     user.weekly_focus_locked_at = new Date();
     await user.save();
 
     // Bidirectional sync on College model
+    // Remove coordinator from unselected colleges
     await College.updateMany(
-      { _id: { $in: sanitizedIds.map((id) => new Types.ObjectId(id)) } },
+      { assigned_coordinator_ids: user._id, _id: { $nin: resolvedObjectIds } },
+      { $pull: { assigned_coordinator_ids: user._id } }
+    );
+    // Add coordinator to newly selected colleges
+    await College.updateMany(
+      { _id: { $in: resolvedObjectIds } },
       { $addToSet: { assigned_coordinator_ids: user._id } }
     );
 
@@ -1428,6 +1566,13 @@ app.post('/api/v1/colleges/lock-focus', async (req: Request, res: Response) => {
       data: {
         user_id: user._id,
         selected_college_ids: sanitizedIds,
+        selected_colleges: selectedColleges.map((c) => ({
+          _id: c._id,
+          college_code: c.college_code,
+          college_name: c.college_name,
+          location: c.location,
+          logo_url: c.logo_url,
+        })),
         is_locked: true,
         week_key: currentWeekMonday,
         locked_at: user.weekly_focus_locked_at,
@@ -5085,36 +5230,34 @@ app.post('/api/v1/daily-leads', async (req: Request, res: Response) => {
   }
 });
 
-// ── Helper: Format Time with Strict Uppercase AM/PM ──────────────────────────
-function formatLeadUpperTime(timeInput?: string | Date): string {
-  if (!timeInput) {
-    const d = new Date();
-    let hours = d.getHours();
-    const minutes = d.getMinutes();
-    const period = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12;
-    if (hours === 0) hours = 12;
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`;
-  }
+// ── Helper: Format Time with Strict Uppercase AM/PM & Exact IST Conversion ──
+function formatLeadUpperTime(timeInput?: string | Date | null): string {
+  if (!timeInput) return '';
   if (typeof timeInput === 'string') {
-    if (/(am|pm)/i.test(timeInput)) {
-      return timeInput.replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase()).trim();
+    const trimmed = timeInput.trim();
+    if (!trimmed || trimmed === '—' || trimmed === '-') return '';
+    if (/(am|pm)/i.test(trimmed)) {
+      return trimmed.replace(/\b(am|pm)\b/gi, (m) => m.toUpperCase()).trim();
     }
-    const d = new Date(timeInput);
+    const d = new Date(trimmed);
     if (!isNaN(d.getTime())) {
-      let hours = d.getHours();
-      const minutes = d.getMinutes();
+      const istOffsetMs = (5 * 60 + 30) * 60 * 1000;
+      const istDate = new Date(d.getTime() + istOffsetMs);
+      let hours = istDate.getUTCHours();
+      const minutes = istDate.getUTCMinutes();
       const period = hours >= 12 ? 'PM' : 'AM';
       hours = hours % 12;
       if (hours === 0) hours = 12;
       return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`;
     }
-    return timeInput.trim();
+    return trimmed;
   }
   const d = timeInput;
-  if (isNaN(d.getTime())) return '10:00 AM';
-  let hours = d.getHours();
-  const minutes = d.getMinutes();
+  if (isNaN(d.getTime())) return '';
+  const istOffsetMs = (5 * 60 + 30) * 60 * 1000;
+  const istDate = new Date(d.getTime() + istOffsetMs);
+  let hours = istDate.getUTCHours();
+  const minutes = istDate.getUTCMinutes();
   const period = hours >= 12 ? 'PM' : 'AM';
   hours = hours % 12;
   if (hours === 0) hours = 12;
@@ -5232,10 +5375,11 @@ app.patch('/api/v1/daily-leads/:id', async (req: Request, res: Response) => {
 });
 
 // ── DL-4: POST /api/v1/daily-leads/:id/move-to-jd
-// 1-Click Move from Positives tab to JD Received tab (Spec Section 6.3 & 11)
+// Move from Positives tab to JD Received tab
 app.post('/api/v1/daily-leads/:id/move-to-jd', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const { target_date } = req.body || {};
     const lead = await DailyLead.findById(id);
 
     if (!lead || lead.is_deleted) {
@@ -5247,20 +5391,76 @@ app.post('/api/v1/daily-leads/:id/move-to-jd', async (req: Request, res: Respons
 
     if (refuseForeignOwner(req, res, String(lead.coordinator_id), 'You can only move your own leads to JD Received.')) return;
 
-    lead.lead_type = 'jd_received';
-    lead.is_moved_to_jd = true;
-    lead.event_time = formatLeadUpperTime();
-    await lead.save();
+    const leadDate = lead.lead_date ? new Date(lead.lead_date) : getTodayDate();
+    const leadDateStr = leadDate.toISOString().split('T')[0];
+    const effectiveTargetDate = target_date ? parseDateParam(String(target_date)) : getTodayDate();
+    const targetDateStr = effectiveTargetDate.toISOString().split('T')[0];
 
-    const updated = await DailyLead.findById(lead._id)
-      .populate('college_id', 'college_name college_code')
-      .populate('coordinator_id', 'full_name official_email');
+    if (leadDateStr === targetDateStr) {
+      // ── SAME DAY MOVE ──
+      // Received JD on the same day: Move to JD Received and remove from Positives on this date.
+      // Initial time is left empty as coordinator manually inputs the new time.
+      lead.lead_type = 'jd_received';
+      lead.is_moved_to_jd = true;
+      lead.is_jd_received = true;
+      lead.event_time = ''; // Initially empty as requested
+      lead.lead_date = effectiveTargetDate;
+      await lead.save();
 
-    return res.status(200).json({
-      success: true,
-      message: `${lead.company_name} successfully moved to JD Received tab`,
-      data: updated,
-    });
+      const updated = await DailyLead.findById(lead._id)
+        .populate('college_id', 'college_name college_code')
+        .populate('coordinator_id', 'full_name official_email');
+
+      return res.status(200).json({
+        success: true,
+        message: `${lead.company_name} successfully moved to JD Received tab (removed from Positives)`,
+        data: updated,
+      });
+    } else {
+      // ── DIFFERENT DAY / FUTURE DATE ──
+      // Positive gained earlier (e.g. today), but JD received after 2 days (future date):
+      // Retain company details in BOTH Positives (original date) and JD Received (target date).
+      lead.is_moved_to_jd = true;
+      await lead.save();
+
+      const existingJd = await DailyLead.findOne({
+        lead_type: 'jd_received',
+        college_id: lead.college_id,
+        company_name: { $regex: `^${escapeRegex(lead.company_name.trim())}$`, $options: 'i' },
+        lead_date: { $gte: effectiveTargetDate, $lt: new Date(effectiveTargetDate.getTime() + 24 * 60 * 60 * 1000) },
+        is_deleted: false,
+      });
+
+      let jdLead = existingJd;
+      if (!jdLead) {
+        jdLead = await DailyLead.create({
+          lead_type: 'jd_received',
+          college_id: lead.college_id,
+          coordinator_id: lead.coordinator_id,
+          company_id: lead.company_id || null,
+          daily_tracker_id: lead.daily_tracker_id || null,
+          company_name: lead.company_name.trim(),
+          job_role: lead.job_role || '',
+          ctc: lead.ctc || '',
+          eligible_batch: lead.eligible_batch || '2027',
+          event_time: '', // Initially empty as requested
+          lead_date: effectiveTargetDate,
+          remarks: lead.remarks || 'JD Received from earlier Positive',
+          is_jd_received: true,
+          is_deleted: false,
+        });
+      }
+
+      const populated = await DailyLead.findById(jdLead._id)
+        .populate('college_id', 'college_name college_code')
+        .populate('coordinator_id', 'full_name official_email');
+
+      return res.status(200).json({
+        success: true,
+        message: `${lead.company_name} recorded in JD Received for ${targetDateStr} (retained in historical Positives)`,
+        data: populated,
+      });
+    }
   } catch (error: any) {
     return res.status(500).json({
       success: false,
@@ -5526,7 +5726,22 @@ app.post('/api/v1/daily-leads/sync-positives', async (req: Request, res: Respons
     for (const call of positiveCalls) {
       if (!call.company_name || !call.company_name.trim()) continue;
       const leadType = call.outcome_status === 'jd_received' ? 'jd_received' : 'positive';
-      const escapedCompanyName = call.company_name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const escapedCompanyName = escapeRegex(call.company_name.trim());
+
+      // If this positive was already moved to JD Received on this same date, do not resurrect it in Positives
+      if (leadType === 'positive') {
+        const alreadyMovedToJd = await DailyLead.findOne({
+          company_name: { $regex: `^${escapedCompanyName}$`, $options: 'i' },
+          college_id: call.college_id,
+          lead_date: { $gte: targetDate, $lt: nextDate },
+          lead_type: 'jd_received',
+          is_deleted: { $ne: true },
+        });
+
+        if (alreadyMovedToJd) {
+          continue;
+        }
+      }
 
       const existing = await DailyLead.findOne({
         $or: [
@@ -5538,12 +5753,12 @@ app.post('/api/v1/daily-leads/sync-positives', async (req: Request, res: Respons
             lead_type: leadType,
           },
         ],
-        is_deleted: false,
+        is_deleted: { $ne: true },
       });
 
-      // Extract accurate call start time from Daily Tracker Time column
+      // Extract accurate call start time directly from Daily Tracker without random defaults
       const timeSource = call.call_start_time || call.created_at;
-      const callTime = formatLeadUpperTime(timeSource || '10:00 AM');
+      const callTime = formatLeadUpperTime(timeSource);
 
       if (!existing) {
         await DailyLead.create({
@@ -5562,6 +5777,9 @@ app.post('/api/v1/daily-leads/sync-positives', async (req: Request, res: Respons
           is_deleted: false,
         });
         syncedCount++;
+      } else if (callTime && (!existing.event_time || existing.event_time === '10:00 AM')) {
+        existing.event_time = callTime;
+        await existing.save();
       }
     }
 
@@ -5584,16 +5802,17 @@ app.post('/api/v1/daily-leads/sync-positives', async (req: Request, res: Respons
 });
 
 // ── DL-9: POST /api/v1/daily-leads/copy-to-jd
-// Copies a selected positive company (or positive leads) across all selected target colleges into JD Received
+// Move or copy a selected positive company across selected target colleges into JD Received
 app.post('/api/v1/daily-leads/copy-to-jd', async (req: Request, res: Response) => {
   try {
-    const { date, company_name, college_ids, lead_id, job_role, ctc, eligible_batch, event_time } = req.body;
+    const { date, company_name, college_ids, lead_id, job_role, ctc, eligible_batch } = req.body;
     const targetDate = date ? parseDateParam(String(date)) : getTodayDate();
     const nextDate = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
+    const targetDateStr = targetDate.toISOString().split('T')[0];
 
-    // 1. Single Company Multi-College Copying Flow
+    // 1. Single Company Multi-College / Focused College Flow
     if (company_name && Array.isArray(college_ids) && college_ids.length > 0) {
-      const escapedCompanyName = company_name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const escapedCompanyName = escapeRegex(company_name.trim());
 
       // Find source positive lead for metadata reference
       let sourceLead: any = null;
@@ -5604,15 +5823,15 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req: Request, res: Response) =
         sourceLead = await DailyLead.findOne({
           company_name: { $regex: `^${escapedCompanyName}$`, $options: 'i' },
           lead_type: 'positive',
-          lead_date: { $gte: targetDate, $lt: nextDate },
-          is_deleted: false,
-        });
+          is_deleted: { $ne: true },
+        }).sort({ lead_date: -1 });
       }
 
       const roleToUse = job_role || sourceLead?.job_role || '';
       const ctcToUse = ctc !== undefined ? ctc : (sourceLead?.ctc || '');
-      const batchToUse = eligible_batch || sourceLead?.eligible_batch || '2026 Batch';
-      const timeToUse = formatLeadUpperTime(event_time || sourceLead?.event_time);
+      const batchToUse = eligible_batch || sourceLead?.eligible_batch || '2027';
+      // User directive: "when I move from positive to JD received tab the time need to be empty initially because I will manually put the new time"
+      const timeToUse = '';
 
       const validCollegeIds = college_ids
         .filter((id: string) => Types.ObjectId.isValid(id))
@@ -5620,13 +5839,13 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req: Request, res: Response) =
 
       let copiedCount = 0;
       for (const targetCollegeId of validCollegeIds) {
-        // Check if already present in JD Received for this college & date
-        const existing = await DailyLead.findOne({
+        // Check if already present in JD Received for this college & target date
+        let existing = await DailyLead.findOne({
           lead_type: 'jd_received',
           college_id: targetCollegeId,
           company_name: { $regex: `^${escapedCompanyName}$`, $options: 'i' },
           lead_date: { $gte: targetDate, $lt: nextDate },
-          is_deleted: false,
+          is_deleted: { $ne: true },
         });
 
         if (!existing) {
@@ -5642,7 +5861,7 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req: Request, res: Response) =
             eligible_batch: batchToUse,
             event_time: timeToUse,
             lead_date: targetDate,
-            remarks: 'JD Received copied from Positives',
+            remarks: 'JD Received from Positives',
             is_jd_received: true,
             is_deleted: false,
           });
@@ -5650,11 +5869,34 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req: Request, res: Response) =
         }
       }
 
+      // ── Check Same-Day vs Different-Day for Source Positive Lead ──
+      if (sourceLead && !sourceLead.is_deleted) {
+        const sourceLeadDate = sourceLead.lead_date ? new Date(sourceLead.lead_date) : getTodayDate();
+        const sourceLeadDateStr = sourceLeadDate.toISOString().split('T')[0];
+        const sourceCollegeIdStr = String(sourceLead.college_id?._id || sourceLead.college_id);
+
+        const includesSourceCollege = validCollegeIds.some((cid) => String(cid) === sourceCollegeIdStr);
+
+        if (sourceLeadDateStr === targetDateStr && includesSourceCollege) {
+          // SAME DAY MOVE for this college:
+          // Remove from Positives on this date because it is now in JD Received
+          sourceLead.is_deleted = true;
+          sourceLead.deleted_at = new Date();
+          sourceLead.is_moved_to_jd = true;
+          await sourceLead.save();
+        } else {
+          // DIFFERENT DAY / FUTURE DATE:
+          // Keep historical positive intact on its original date
+          sourceLead.is_moved_to_jd = true;
+          await sourceLead.save();
+        }
+      }
+
       return res.status(200).json({
         success: true,
         message: copiedCount > 0
-          ? `Successfully copied "${company_name}" to ${copiedCount} college(s) in JD Received`
-          : `"${company_name}" is already present in JD Received for all selected colleges`,
+          ? `Successfully transferred "${company_name}" to JD Received`
+          : `"${company_name}" is already present in JD Received for selected college(s)`,
         data: {
           copied_count: copiedCount,
           total_colleges_selected: validCollegeIds.length,
@@ -5667,7 +5909,7 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req: Request, res: Response) =
     const filter: any = {
       lead_type: 'positive',
       lead_date: { $gte: targetDate, $lt: nextDate },
-      is_deleted: false,
+      is_deleted: { $ne: true },
     };
     if (Array.isArray(college_ids) && college_ids.length > 0 && !college_ids.includes('all')) {
       const validCollegeIds = college_ids
@@ -5681,13 +5923,13 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req: Request, res: Response) =
     const positiveLeads = await DailyLead.find(filter);
     let copiedCount = 0;
     for (const lead of positiveLeads) {
-      const escapedLeadName = lead.company_name.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const escapedLeadName = escapeRegex(lead.company_name.trim());
       const existing = await DailyLead.findOne({
         lead_type: 'jd_received',
         college_id: lead.college_id,
         company_name: { $regex: `^${escapedLeadName}$`, $options: 'i' },
         lead_date: { $gte: targetDate, $lt: nextDate },
-        is_deleted: false,
+        is_deleted: { $ne: true },
       });
 
       if (!existing) {
@@ -5700,24 +5942,28 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req: Request, res: Response) =
           company_name: lead.company_name,
           job_role: lead.job_role || '',
           ctc: lead.ctc || '',
-          eligible_batch: lead.eligible_batch || '2026 Batch',
-          event_time: formatLeadUpperTime(lead.event_time),
-          lead_date: lead.lead_date || targetDate,
-          remarks: lead.remarks || 'Copied from Positives',
+          eligible_batch: lead.eligible_batch || '2027',
+          event_time: '',
+          lead_date: targetDate,
+          remarks: lead.remarks || 'JD Received from Positives',
           is_jd_received: true,
           is_deleted: false,
         });
         copiedCount++;
       }
+
+      // Mark moved and soft-delete on same day
+      lead.is_deleted = true;
+      lead.deleted_at = new Date();
+      lead.is_moved_to_jd = true;
+      await lead.save();
     }
 
     return res.status(200).json({
       success: true,
       message: copiedCount > 0
-        ? `Successfully copied ${copiedCount} lead(s) to JD Received`
-        : positiveLeads.length === 0
-        ? `No positive leads found on ${date || 'today'}`
-        : `Selected positive leads are already present in JD Received`,
+        ? `Successfully transferred ${copiedCount} positive lead(s) to JD Received`
+        : 'All selected positive leads are already in JD Received',
       data: {
         copied_count: copiedCount,
         total_positives_found: positiveLeads.length,
@@ -6574,7 +6820,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         if (!raw) continue;
         const key = normalizeCompanyName(raw);
         const isJd = dl.lead_type === 'jd_received';
-        const roleStr = (dl.job_role || dl.role || '').trim();
+        const roleStr = (dl.job_role || (dl as any).role || '').trim();
         const ctcStr = (dl.ctc || '').trim();
 
         if (!companyMap.has(key)) {
@@ -11999,7 +12245,7 @@ const ensureDefaultAccounts = async () => {
     // Sujitha handles: HITS, NEHRU, KPR (partially with Mohanaradha), SONA, MAREPHRA
     // Mohanaradha handles: KARPAGAM, AIHT, ACET, KPR (partially with Sujitha)
     const DEFAULT_COORDINATOR_COLLEGE_MAP: Record<string, string[]> = {
-      'sujitha_s@infoziant.com': ['HITS', 'NEHRU', 'KPR', 'SONA', 'MAREPHRA'],
+      'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
       'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
       'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
       'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],
@@ -12035,8 +12281,10 @@ const ensureDefaultAccounts = async () => {
     for (const [email, codes] of Object.entries(DEFAULT_COORDINATOR_COLLEGE_MAP)) {
       const coordUser = await User.findOne({ official_email: email.toLowerCase(), is_deleted: false });
       if (coordUser) {
-        const mappedIds = codes.map((c) => codeMap.get(c.toUpperCase())).filter(Boolean);
-        if (!coordUser.assigned_college_ids || coordUser.assigned_college_ids.length === 0 || coordUser.assigned_college_ids.length > 4) {
+        const isTL = coordUser.role_codes?.includes('TEAM_LEADER') || coordUser.official_email === 'sujitha_s@infoziant.com';
+        const maxLimit = isTL ? 5 : 4;
+        const mappedIds = codes.map((c) => codeMap.get(c.toUpperCase())).filter(Boolean).slice(0, maxLimit);
+        if (!coordUser.assigned_college_ids || coordUser.assigned_college_ids.length === 0 || coordUser.assigned_college_ids.length > maxLimit) {
           coordUser.assigned_college_ids = mappedIds;
           coordUser.weekly_focus_locked = true;
           coordUser.weekly_focus_week_key = currentWeekMonday;
@@ -12124,6 +12372,33 @@ const startServer = async () => {
   await ensureDefaultAccounts();
   await ensureCompanyMetadataSerialNumbers();
   await syncActiveCollegesRoster();
+
+  // ── Reconcile same-day moved positive leads ──
+  try {
+    const jdLeads = await DailyLead.find({ lead_type: 'jd_received', is_deleted: { $ne: true } });
+    for (const jd of jdLeads) {
+      if (!jd.lead_date || !jd.company_name) continue;
+      const startDay = new Date(jd.lead_date);
+      startDay.setUTCHours(0, 0, 0, 0);
+      const endDay = new Date(startDay.getTime() + 24 * 60 * 60 * 1000);
+
+      await DailyLead.updateMany(
+        {
+          _id: { $ne: jd._id },
+          company_name: { $regex: `^${escapeRegex(jd.company_name.trim())}$`, $options: 'i' },
+          college_id: jd.college_id,
+          lead_type: 'positive',
+          lead_date: { $gte: startDay, $lt: endDay },
+          is_deleted: { $ne: true },
+        },
+        {
+          $set: { is_deleted: true, deleted_at: new Date(), is_moved_to_jd: true },
+        }
+      );
+    }
+  } catch (err) {
+    console.error('Reconcile same-day moved leads error:', err);
+  }
 
   app.listen(PORT, () => {
     console.log(`🚀 [iPOMS API] Server running on http://localhost:${PORT}`);

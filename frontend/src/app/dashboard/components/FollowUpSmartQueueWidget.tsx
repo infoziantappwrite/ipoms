@@ -101,7 +101,7 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
   const [dropdownSearch, setDropdownSearch] = useState('');
   const [isSectionCollapsed, setIsSectionCollapsed] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [portalPos, setPortalPos] = useState<{ top: number; right: number } | null>(null);
 
@@ -185,13 +185,6 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
   useEffect(() => {
     loadFollowUps();
   }, [loadFollowUps]);
-
-  // If user selected specific colleges externally in multi-focus, pre-select if only 1 is chosen
-  useEffect(() => {
-    if (selectedCollegeIds && selectedCollegeIds.length === 1) {
-      setSelectedCollegeId(selectedCollegeIds[0]);
-    }
-  }, [selectedCollegeIds]);
 
   // ── Undo / Redo for follow-up date changes ──
   const { pushAction } = useUndoRedo({
@@ -445,11 +438,12 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
               onClick={(e) => {
                 e.stopPropagation();
                 triggerHaptic('light');
+                setSelectedCollegeId('');
                 loadFollowUps();
                 toast('Syncing follow-up leads from Weekly Tracker…', 'info');
               }}
               title="Sync with Weekly Tracker"
-              className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-gradient-to-r from-rose-600 via-orange-500 to-amber-500 text-white flex items-center justify-center shadow-md shadow-orange-500/25 hover:from-rose-500 hover:via-orange-500 hover:to-amber-400 hover:shadow-lg hover:shadow-orange-500/35 hover:scale-105 transition-all cursor-pointer border border-white/20 active:scale-95"
+              className="h-9 w-9 rounded-full bg-gradient-to-r from-rose-600 via-orange-500 to-amber-500 text-white flex items-center justify-center shadow-md shadow-orange-500/25 hover:from-rose-500 hover:via-orange-500 hover:to-amber-400 hover:shadow-lg hover:shadow-orange-500/35 hover:scale-105 transition-all cursor-pointer border border-white/20 active:scale-95"
             >
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             </button>
@@ -499,7 +493,7 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
           {/* ── Themed College Selector Popover Dropdown ── */}
           <div className="relative">
             <button
-              ref={triggerRef as React.RefObject<HTMLButtonElement>}
+              ref={triggerRef as any}
               type="button"
               onClick={() => {
                 triggerHaptic('light');
@@ -580,14 +574,15 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
           <button
             onClick={() => {
               triggerHaptic('light');
+              setSelectedCollegeId('');
               loadFollowUps();
               toast('Syncing follow-up leads from Weekly Tracker…', 'info');
             }}
             title="Sync with Weekly Tracker"
-            className="h-8 px-2.5 rounded-xl bg-gradient-to-r from-rose-600 via-orange-500 to-amber-500 text-white flex items-center gap-1.5 text-xs font-bold shadow-md shadow-orange-500/25 hover:from-rose-500 hover:via-orange-500 hover:to-amber-400 hover:shadow-lg hover:shadow-orange-500/35 hover:scale-105 transition-all cursor-pointer border border-white/20 active:scale-95"
+            className="h-8 px-3 rounded-full bg-gradient-to-r from-rose-600 via-orange-500 to-amber-500 text-white flex items-center gap-1.5 text-xs font-bold shadow-md shadow-orange-500/25 hover:from-rose-500 hover:via-orange-500 hover:to-amber-400 hover:shadow-lg hover:shadow-orange-500/35 hover:scale-105 transition-all cursor-pointer border border-white/20 active:scale-95"
           >
             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-            <span className="hidden sm:inline">Sync</span>
+            <span>Sync</span>
           </button>
 
           {/* Close / Go-back-to-Select-College Arrow Button */}
@@ -598,7 +593,7 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
               setSelectedCollegeId('');
               setIsSectionCollapsed(false);
             }}
-            className="h-8 w-8 rounded-xl bg-surface hover:bg-surface-raised border border-border text-fg-subtle hover:text-fg flex items-center justify-center transition-all cursor-pointer shadow-xs"
+            className="h-8 w-8 rounded-full bg-surface hover:bg-surface-raised border border-border text-fg-subtle hover:text-fg flex items-center justify-center transition-all cursor-pointer shadow-xs"
             title="Back to college selection"
           >
             <ChevronDown

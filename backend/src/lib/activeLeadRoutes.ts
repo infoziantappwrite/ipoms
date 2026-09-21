@@ -154,10 +154,22 @@ export function registerActiveLeadRoutes(app: Express) {
         sort = 'desc',
       } = req.query;
 
-      const filter: Record<string, any> = { is_deleted: false };
+      const filter: Record<string, any> = { is_deleted: { $ne: true } };
 
       if (lead_type && lead_type !== 'all') {
-        filter.lead_type = String(lead_type);
+        const lt = String(lead_type).toLowerCase().trim();
+        if (lt === 'pipeline' || lt === 'positive' || lt === 'positives') {
+          filter.$or = [
+            { lead_type: { $in: ['pipeline', 'positive', 'positives', 'Pipeline', 'Positive', 'Positives'] } },
+            { lead_type: { $exists: false } },
+            { lead_type: null },
+            { lead_type: '' },
+          ];
+        } else if (lt === 'jd_received' || lt === 'jd' || lt === 'jd_Received' || lt === 'jd received') {
+          filter.lead_type = { $in: ['jd_received', 'jd', 'JD_RECEIVED', 'JD', 'jd_Received', 'JD Received', 'jd received'] };
+        } else {
+          filter.lead_type = String(lead_type);
+        }
       }
       if (pipeline_section && pipeline_section !== 'all') {
         if (pipeline_section === 'in_drive' || pipeline_section === 'upcoming_drive') {
@@ -186,11 +198,14 @@ export function registerActiveLeadRoutes(app: Express) {
       }
       if (search && typeof search === 'string' && search.trim()) {
         const q = escapeRegex(search.trim());
-        filter.$or = [
-          { company_name: { $regex: q, $options: 'i' } },
-          { role: { $regex: q, $options: 'i' } },
-          { ctc: { $regex: q, $options: 'i' } },
-        ];
+        filter.$and = filter.$and || [];
+        filter.$and.push({
+          $or: [
+            { company_name: { $regex: q, $options: 'i' } },
+            { role: { $regex: q, $options: 'i' } },
+            { ctc: { $regex: q, $options: 'i' } },
+          ],
+        });
       }
 
       const leads = await ActiveLead.find(filter)
@@ -199,11 +214,28 @@ export function registerActiveLeadRoutes(app: Express) {
         .populate('college_id', 'college_name college_code')
         .lean();
 
-      // Compute statistics across the entire unfiltered dataset (or year-scoped)
-      const baseFilter: Record<string, any> = { is_deleted: false };
+      // Compute statistics across the entire dataset (scoped by academic_year if selected)
+      const baseFilter: Record<string, any> = { is_deleted: { $ne: true } };
       if (academic_year && academic_year !== 'all') {
         baseFilter.academic_year = { $regex: escapeRegex(String(academic_year)), $options: 'i' };
       }
+
+      const [pipelineTotal, jdReceivedTotal, overallTotal] = await Promise.all([
+        ActiveLead.countDocuments({
+          ...baseFilter,
+          $or: [
+            { lead_type: { $in: ['pipeline', 'positive', 'positives', 'Pipeline', 'Positive', 'Positives'] } },
+            { lead_type: { $exists: false } },
+            { lead_type: null },
+            { lead_type: '' },
+          ],
+        }),
+        ActiveLead.countDocuments({
+          ...baseFilter,
+          lead_type: { $in: ['jd_received', 'jd', 'JD_RECEIVED', 'JD', 'jd_Received', 'JD Received', 'jd received'] },
+        }),
+        ActiveLead.countDocuments(baseFilter),
+      ]);
 
       const allStats = await ActiveLead.aggregate([
         { $match: baseFilter },
@@ -217,7 +249,12 @@ export function registerActiveLeadRoutes(app: Express) {
 
       // Calculate 4 JD Received stage counts
       const jdSectionAgg = await ActiveLead.aggregate([
-        { $match: { ...baseFilter, lead_type: 'jd_received' } },
+        {
+          $match: {
+            ...baseFilter,
+            lead_type: { $in: ['jd_received', 'jd', 'JD_RECEIVED', 'JD', 'jd_Received', 'JD Received', 'jd received'] },
+          },
+        },
         {
           $group: {
             _id: '$pipeline_section',
@@ -251,30 +288,28 @@ export function registerActiveLeadRoutes(app: Express) {
         }
       });
 
-      const pipeline_stats = { total: 0, hiring: 0, invite_email: 0, follow_up: 0 };
-      const jd_received_stats = { total: 0, hiring: 0, invite_email: 0, follow_up: 0 };
-      const overall_stats = { total: 0, hiring: 0, invite_email: 0, follow_up: 0 };
+      const pipeline_stats = { total: pipelineTotal, hiring: 0, invite_email: 0, follow_up: 0 };
+      const jd_received_stats = { total: jdReceivedTotal, hiring: 0, invite_email: 0, follow_up: 0 };
+      const overall_stats = { total: overallTotal, hiring: 0, invite_email: 0, follow_up: 0 };
 
       allStats.forEach((item) => {
-        const type = item._id.lead_type || 'pipeline';
-        const st = item._id.status || '';
+        const rawType = String(item._id?.lead_type || '').toLowerCase().trim();
+        const type = (rawType === 'jd_received' || rawType === 'jd') ? 'jd_received' : 'pipeline';
+        const st = String(item._id?.status || '').trim();
         const count = item.count;
 
-        overall_stats.total += count;
-        if (st === 'Hiring') overall_stats.hiring += count;
-        if (st === 'Invite Email' || st === 'Not Hiring') overall_stats.invite_email += count;
-        if (st === 'Follow Up') overall_stats.follow_up += count;
+        if (st.toLowerCase() === 'hiring') overall_stats.hiring += count;
+        if (st.toLowerCase().includes('invite') || st.toLowerCase() === 'not hiring') overall_stats.invite_email += count;
+        if (st.toLowerCase().includes('follow')) overall_stats.follow_up += count;
 
         if (type === 'pipeline') {
-          pipeline_stats.total += count;
-          if (st === 'Hiring') pipeline_stats.hiring += count;
-          if (st === 'Invite Email' || st === 'Not Hiring') pipeline_stats.invite_email += count;
-          if (st === 'Follow Up') pipeline_stats.follow_up += count;
+          if (st.toLowerCase() === 'hiring') pipeline_stats.hiring += count;
+          if (st.toLowerCase().includes('invite') || st.toLowerCase() === 'not hiring') pipeline_stats.invite_email += count;
+          if (st.toLowerCase().includes('follow')) pipeline_stats.follow_up += count;
         } else if (type === 'jd_received') {
-          jd_received_stats.total += count;
-          if (st === 'Hiring') jd_received_stats.hiring += count;
-          if (st === 'Invite Email' || st === 'Not Hiring') jd_received_stats.invite_email += count;
-          if (st === 'Follow Up') jd_received_stats.follow_up += count;
+          if (st.toLowerCase() === 'hiring') jd_received_stats.hiring += count;
+          if (st.toLowerCase().includes('invite') || st.toLowerCase() === 'not hiring') jd_received_stats.invite_email += count;
+          if (st.toLowerCase().includes('follow')) jd_received_stats.follow_up += count;
         }
       });
 
@@ -296,9 +331,9 @@ export function registerActiveLeadRoutes(app: Express) {
           jd_section_counts,
           overall_stats,
           tab_counts: {
-            pipeline: pipeline_stats.total,
-            jd_received: jd_received_stats.total,
-            all: overall_stats.total,
+            pipeline: pipelineTotal,
+            jd_received: jdReceivedTotal,
+            all: overallTotal,
           },
           total_count: leads.length,
         },

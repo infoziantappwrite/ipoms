@@ -89,26 +89,30 @@ export default function LoginPage() {
     setLocked(false);
     setLoading(true);
 
-    const addr = completeEmail(email);
-    setEmail(addr);
+    const rawIdentifier = email.trim();
+    if (!rawIdentifier) {
+      setErrorMsg('Enter your official email or username.');
+      setLoading(false);
+      return;
+    }
 
     try {
       const res = await fetch(`${API}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email: addr, password, remember_me: rememberMe }),
+        body: JSON.stringify({ email: rawIdentifier, username: rawIdentifier, password, remember_me: rememberMe }),
       });
       const data = await res.json();
 
       if (!data.success) {
         const code = data.error?.code;
-        const msg = data.error?.message || 'Invalid email or password.';
+        const msg = data.error?.message || 'Invalid email/username or password.';
 
         if (code === 'ACCOUNT_LOCKED' || code === 'PASSWORD_LIMIT_EXCEEDED') {
           setLocked(true);
           setErrorMsg(msg);
-          const sent = await requestOtp(addr);
+          const sent = await requestOtp(rawIdentifier);
           if (sent) {
             setMode('verify_otp');
           }
@@ -134,6 +138,14 @@ export default function LoginPage() {
           const raw = JSON.stringify(user);
           localStorage.setItem('ipoms_user', raw);
           sessionStorage.setItem('ipoms_user', raw);
+
+          if (user.weekly_focus_locked && user.weekly_focus_week_key) {
+            localStorage.setItem('ipoms_coordinator_focus_locked', 'true');
+            localStorage.setItem('ipoms_coordinator_focus_week', user.weekly_focus_week_key);
+            if (Array.isArray(user.assigned_college_ids) && user.assigned_college_ids.length > 0) {
+              localStorage.setItem('ipoms_coordinator_selected_colleges', JSON.stringify(user.assigned_college_ids));
+            }
+          }
         } catch {}
       }
 
@@ -327,17 +339,15 @@ export default function LoginPage() {
           {mode === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4 text-xs animate-form-in">
               <div>
-                <label className="block text-slate-700 font-bold mb-1">Official Email Address</label>
+                <label className="block text-slate-700 font-bold mb-1">Official Email or Username</label>
                 <input
                   type="text"
-                  inputMode="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  onBlur={(e) => setEmail(completeEmail(e.target.value))}
-                  placeholder="name@infoziant.com or name@icl.today"
+                  placeholder="Official email or username (e.g. sujitha or name@infoziant.com)"
                   autoComplete="username"
                   required
-                  className={`${inputClass} font-mono`}
+                  className={inputClass}
                 />
                 <p className="mt-1 text-micro text-slate-500">
                   Supports @infoziant.com and @icl.today domains.

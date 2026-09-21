@@ -305,6 +305,7 @@ export default function DailyLeadsPage() {
     try {
       const res = await apiFetch(`/daily-leads/${rowId}/move-to-jd`, {
         method: 'POST',
+        body: JSON.stringify({ target_date: selectedDate }),
       });
       if (res.success) {
         toast((res as any)?.message || 'Lead moved to JD Received successfully', 'success');

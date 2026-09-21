@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ActiveLead = exports.ACADEMIC_YEARS = exports.FOLLOWUP_MONTHS = exports.ACTIVE_LEAD_STATUSES = void 0;
+exports.ActiveLead = exports.ACTIVE_LEAD_TYPES = exports.ACADEMIC_YEARS = exports.FOLLOWUP_MONTHS = exports.ACTIVE_LEAD_STATUSES = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 exports.ACTIVE_LEAD_STATUSES = ['Hiring', 'Invite Email', 'Follow Up'];
 // ─── Followup Months (12 Calendar Months) ────────────────────────────────────
@@ -64,6 +64,7 @@ exports.ACADEMIC_YEARS = [
     '2034',
     '2035',
 ];
+exports.ACTIVE_LEAD_TYPES = ['pipeline', 'jd_received'];
 // ─── Schema ──────────────────────────────────────────────────────────────────
 const ActiveLeadSchema = new mongoose_1.Schema({
     company_name: {
@@ -83,6 +84,19 @@ const ActiveLeadSchema = new mongoose_1.Schema({
         required: false,
         trim: true,
         default: '',
+    },
+    lead_type: {
+        type: String,
+        enum: exports.ACTIVE_LEAD_TYPES,
+        default: 'pipeline',
+        index: true,
+    },
+    pipeline_section: {
+        type: String,
+        required: false,
+        trim: true,
+        default: 'pipeline',
+        index: true,
     },
     status: {
         type: String,
@@ -129,4 +143,6 @@ const ActiveLeadSchema = new mongoose_1.Schema({
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
 });
 ActiveLeadSchema.index({ company_name: 1, academic_year: 1, is_deleted: 1 });
+ActiveLeadSchema.index({ lead_type: 1, academic_year: 1, is_deleted: 1 });
+ActiveLeadSchema.index({ lead_type: 1, status: 1, is_deleted: 1 });
 exports.ActiveLead = mongoose_1.default.models.ActiveLead || mongoose_1.default.model('ActiveLead', ActiveLeadSchema);
