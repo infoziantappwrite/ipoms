@@ -1,618 +1,505 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import Link from 'next/link';
-import {
-  PhoneCall,
-  CheckCircle2,
-  Ban,
-  Building2,
-  Target,
-  BarChart3,
-  LayoutGrid,
-  ArrowUpRight,
-  Layers
-} from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { LineChart } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { getCoordinatorSelectedColleges, setActiveCollege, getCollegeAcronym } from '@/lib/collegeSession';
+import { getCoordinatorSelectedColleges } from '@/lib/collegeSession';
 
-interface CollegeKpiItem {
+/**
+ * Monthly Call Trend + campus outcomes, one card (21 Sep 2026).
+ *
+ * Left: a heat strip — one row per campus, one square per day of the month,
+ * darker = more calls (or minutes). Right: that campus's Positive / Not Hiring /
+ * Negative / Follow Up counts for the selected day (today by default) or the
+ * whole month. Clicking a day selects it. This replaced a separate "Campus
+ * Outcome Mix — Today" card, so the dashboard shows both in half the space.
+ *
+ * Outcome buckets are decided server-side (OUTCOME_BUCKET in server.ts).
+ * Other Progress and calls with no outcome yet are counted in Calls but have
+ * no column of their own (user decision).
+ */
+
+type ShownBucket = 'positive' | 'not_hiring' | 'negative' | 'follow_up';
+
+interface MonthlySeries {
   college_id: string;
-  college_name: string;
   college_code: string;
-  location?: string;
-  logo_url?: string;
-  total_calls: number;
-  total_positives: number;
-  total_negatives: number;
-  total_not_hiring: number;
-  active_leads: number;
-  weekly_pipeline: number;
-  positive_rate: number;
+  daily: number[];
+  daily_duration?: number[];
+  daily_outcomes?: Record<ShownBucket, number[]>;
+  total: number;
+  total_duration_minutes?: number;
+}
+
+interface MonthlyData {
+  month: string;
+  days_in_month: number;
+  is_current_month: boolean;
+  today_day: number | null;
+  is_last_day_of_month: boolean;
+  series: MonthlySeries[];
 }
 
 interface Props {
   selectedCollegeIds?: string[];
 }
 
-const COLLEGE_PALETTES = [
-  {
-    name: 'indigo',
-    badge: 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
-  },
-  {
-    name: 'cyan',
-    badge: 'bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800',
-  },
-  {
-    name: 'emerald',
-    badge: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
-  },
-  {
-    name: 'amber',
-    badge: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
-  },
-  {
-    name: 'purple',
-    badge: 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
-  },
-  {
-    name: 'rose',
-    badge: 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
-  },
+const OUTCOMES: { key: ShownBucket; label: string; detail: string }[] = [
+  { key: 'positive', label: 'Positive', detail: 'Invite Mail' },
+  { key: 'not_hiring', label: 'Not Hiring', detail: 'Not Hiring, Hiring Freezed' },
+  { key: 'negative', label: 'Negative', detail: 'No Response, Invalid, In Connect, Hiring Completed' },
+  { key: 'follow_up', label: 'Follow Up', detail: 'Follow Up, Call Back' },
 ];
 
-type MetricFilter = 'all' | 'calls' | 'positives' | 'not_hiring';
-type ViewMode = 'chart' | 'cards' | 'split';
+const HEAT_STEPS = ['--ipoms-hm-1', '--ipoms-hm-2', '--ipoms-hm-3', '--ipoms-hm-4', '--ipoms-hm-5'];
+
+interface Tip {
+  x: number;
+  top: number;
+  bottom: number;
+  lines: string[];
+}
+
+function fmtMins(m: number): string {
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  return r ? `${h}h ${r}m` : `${h}h`;
+}
+
+const sum = (a: number[] = [], upTo?: number) => a.slice(0, upTo ?? a.length).reduce((x, y) => x + (y || 0), 0);
 
 export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
-  const [kpiData, setKpiData] = useState<CollegeKpiItem[]>([]);
+  const [monthly, setMonthly] = useState<MonthlyData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>('chart');
-  const [metricFilter, setMetricFilter] = useState<MetricFilter>('all');
-  const [hoveredCollegeId, setHoveredCollegeId] = useState<string | null>(null);
+  const [tip, setTip] = useState<Tip | null>(null);
 
-  const fetchKpis = async (ids?: string[]) => {
+  const resolveIds = useCallback(
+    (ids?: string[]) => (ids !== undefined ? ids : getCoordinatorSelectedColleges()),
+    []
+  );
+
+  const fetchAll = useCallback(async (ids?: string[]) => {
+    const targetIds = resolveIds(ids);
+    if (!targetIds || targetIds.length === 0) {
+      setMonthly(null);
+      setLoading(false);
+      return;
+    }
     try {
-      setLoading(true);
-      const targetIds = ids !== undefined ? ids : getCoordinatorSelectedColleges();
-      if (!targetIds || targetIds.length === 0) {
-        setKpiData([]);
-        setLoading(false);
-        return;
-      }
-      const queryParam = `?college_ids=${encodeURIComponent(targetIds.join(','))}`;
-      const res = await apiFetch(`/dashboard/college-kpis${queryParam}`);
-      if (res.success && Array.isArray((res.data as any)?.colleges)) {
-        setKpiData((res.data as any).colleges);
-      }
+      const res = await apiFetch(`/dashboard/monthly-calls?college_ids=${encodeURIComponent(targetIds.join(','))}`);
+      if (res.success && res.data) setMonthly(res.data as MonthlyData);
     } catch (err) {
-      console.error('Failed to fetch college KPIs', err);
+      console.error('Failed to fetch monthly call trend', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [resolveIds]);
 
   useEffect(() => {
-    fetchKpis(selectedCollegeIds);
-  }, [selectedCollegeIds]);
+    fetchAll(selectedCollegeIds);
+  }, [selectedCollegeIds, fetchAll]);
 
-  // Auto-refresh daily at midnight and on tab visibility
+  // Re-read on the same real events as the calling-time widget: a Daily Tracker
+  // save (its own broadcast), returning to the tab, and the coordinator changing
+  // their focus colleges.
   useEffect(() => {
-    const now = new Date();
-    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
-    const msUntilMidnight = Math.max(1000, tomorrow.getTime() - now.getTime());
-
-    const midnightTimer = setTimeout(() => {
-      fetchKpis(selectedCollegeIds);
-      const dailyInterval = setInterval(() => {
-        fetchKpis(selectedCollegeIds);
-      }, 24 * 60 * 60 * 1000);
-      return () => clearInterval(dailyInterval);
-    }, msUntilMidnight);
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fetchKpis(selectedCollegeIds);
-      }
+    const refresh = () => {
+      const currentHour = new Date().getHours();
+      if (currentHour < 6 || currentHour >= 19) return;
+      fetchAll(selectedCollegeIds);
     };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('ipoms_tracker_sync');
+      channel.onmessage = refresh;
+    } catch {
+      // unsupported — visibility refresh still covers the common flow
+    }
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    const onCollegesChange = (e: any) => fetchAll(e.detail?.selectedIds);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('ipoms_coordinator_colleges_changed', onCollegesChange);
     return () => {
-      clearTimeout(midnightTimer);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      try { channel?.close(); } catch { /* closed */ }
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('ipoms_coordinator_colleges_changed', onCollegesChange);
     };
-  }, [selectedCollegeIds]);
+  }, [selectedCollegeIds, fetchAll]);
 
-  useEffect(() => {
-    const handleCollegesChange = (e: any) => {
-      if (e.detail?.selectedIds) {
-        fetchKpis(e.detail.selectedIds);
-      } else {
-        fetchKpis();
-      }
-    };
-    window.addEventListener('ipoms_coordinator_colleges_changed', handleCollegesChange);
-    return () => window.removeEventListener('ipoms_coordinator_colleges_changed', handleCollegesChange);
-  }, []);
+  const showTip = (e: React.MouseEvent | React.FocusEvent, lines: string[]) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const mx = 'clientX' in e ? e.clientX : r.left + r.width / 2;
+    setTip({ x: mx, top: r.top, bottom: r.bottom, lines });
+  };
+  const hideTip = () => setTip(null);
 
-  // Compute maximum metric value across all displayed colleges for proper chart scale
-  const maxMetricValue = useMemo(() => {
-    let maxVal = 1;
-    kpiData.forEach((item) => {
-      if (metricFilter === 'all') {
-        const itemMax = Math.max(
-          item.total_calls || 0,
-          item.total_positives || 0,
-          item.total_not_hiring || 0
-        );
-        if (itemMax > maxVal) maxVal = itemMax;
-      } else if (metricFilter === 'calls') {
-        if ((item.total_calls || 0) > maxVal) maxVal = item.total_calls;
-      } else if (metricFilter === 'positives') {
-        if ((item.total_positives || 0) > maxVal) maxVal = item.total_positives;
-      } else if (metricFilter === 'not_hiring') {
-        if ((item.total_not_hiring || 0) > maxVal) maxVal = item.total_not_hiring;
-      }
-    });
-    // Set a comfortable round ceiling
-    if (maxVal <= 5) return 10;
-    if (maxVal <= 15) return 20;
-    if (maxVal <= 30) return 40;
-    if (maxVal <= 60) return 80;
-    return Math.ceil(maxVal * 1.25);
-  }, [kpiData, metricFilter]);
+  const monthLabel = useMemo(() => {
+    if (!monthly) return '';
+    const [y, m] = monthly.month.split('-').map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  }, [monthly]);
 
-  if (loading && kpiData.length === 0) {
+  if (loading && !monthly) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="h-6 w-48 bg-surface-sunken animate-pulse rounded-lg" />
-        </div>
-        <div className="h-96 rounded-2xl bg-surface-sunken animate-pulse border border-border" />
+      <div className="bg-surface border border-border rounded-2xl p-6 text-xs text-fg-subtle">
+        Loading monthly call trend…
       </div>
     );
   }
 
-  if (kpiData.length === 0) {
-    return null;
-  }
-
-  const gridColsClass =
-    kpiData.length === 1
-      ? 'grid-cols-1 max-w-xl'
-      : kpiData.length === 2
-      ? 'grid-cols-1 md:grid-cols-2'
-      : kpiData.length === 3
-      ? 'grid-cols-1 md:grid-cols-3'
-      : kpiData.length === 4
-      ? 'grid-cols-1 md:grid-cols-2'
-      : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
-
   return (
-    <div className="space-y-4 select-none">
-      {/* ── Section Title & Interactive Controls Bar ─────────────────── */}
-      <div className="flex items-center justify-between gap-3 flex-wrap bg-surface border border-border/80 rounded-2xl p-4 shadow-2xs">
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-400">
-            <Target size={18} strokeWidth={2.2} />
-          </div>
+    <div>
+      <section className="bg-surface border border-border rounded-2xl p-5 sm:p-6 shadow-xs">
+        <div className="flex items-center gap-3">
+          <span className="w-9 h-9 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center">
+            <LineChart size={17} strokeWidth={2.2} />
+          </span>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold tracking-tight text-fg">
-                Campus Outreach &amp; Conversion Analytics
-              </h2>
-              <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 font-mono">
-                {kpiData.length} {kpiData.length === 1 ? 'Campus' : 'Campuses'}
-              </span>
-            </div>
+            <h3 className="text-sm font-bold text-fg">Monthly Call Trend — {monthLabel || 'This Month'}</h3>
             <p className="text-[11px] text-fg-subtle mt-0.5">
-              Multi-institutional live comparative telemetry across partner colleges
+              Calls per day, per campus · click any day to see its details
             </p>
           </div>
         </div>
 
-        {/* View Mode Segmented Switcher */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="bg-surface-sunken p-0.5 rounded-xl border border-border flex items-center text-xs">
-            <button
-              type="button"
-              onClick={() => setViewMode('chart')}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                viewMode === 'chart'
-                  ? 'bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-xs border border-zinc-200 dark:border-zinc-700'
-                  : 'text-fg-subtle hover:text-fg'
-              }`}
-              title="Full-width interactive comparative graph view"
-            >
-              <BarChart3 size={13} />
-              <span>Interactive Graph</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('split')}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                viewMode === 'split'
-                  ? 'bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-xs border border-zinc-200 dark:border-zinc-700'
-                  : 'text-fg-subtle hover:text-fg'
-              }`}
-              title="Combined Graph & Cards View"
-            >
-              <Layers size={13} />
-              <span>Combined</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('cards')}
-              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                viewMode === 'cards'
-                  ? 'bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-xs border border-zinc-200 dark:border-zinc-700'
-                  : 'text-fg-subtle hover:text-fg'
-              }`}
-              title="Individual Campus KPI Cards"
-            >
-              <LayoutGrid size={13} />
-              <span>Cards</span>
-            </button>
+        {monthly && monthly.series.length > 0 ? (
+          <MonthChart data={monthly} onTip={showTip} onHideTip={hideTip} />
+        ) : (
+          <p className="text-xs text-fg-subtle pt-4">No focus campuses selected.</p>
+        )}
+      </section>
+
+      {tip && (() => {
+        const winHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+        const winWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+        // If the element's bottom is within 110px of window bottom, flip tooltip above
+        const isNearBottom = tip.bottom + 110 > winHeight;
+        const leftPos = Math.min(Math.max(12, tip.x - 20), winWidth - 250);
+        const topPos = isNearBottom ? Math.max(10, tip.top - 8) : tip.bottom + 8;
+        return (
+          <div
+            role="tooltip"
+            className="ipoms-tip"
+            style={{
+              left: leftPos,
+              top: topPos,
+              transform: isNearBottom ? 'translateY(-100%)' : undefined,
+            }}
+          >
+            <b>{tip.lines[0]}</b>
+            {tip.lines.slice(1).map((l, i) => (
+              <span key={i}>{l}</span>
+            ))}
+          </div>
+        );
+      })()}
+
+      <style jsx>{`
+        /* Validated palettes (light / dark). Declared :global because the chart
+           and tooltip markup live in a child component, outside this scope. */
+        :global(:root) {
+          --ipoms-oc-positive: #059669;
+          --ipoms-oc-not_hiring: #f59e0b;
+          --ipoms-oc-negative: #e11d48;
+          --ipoms-oc-follow_up: #2563eb;
+          --ipoms-hm-1: #e6f1fb;
+          --ipoms-hm-2: #b5d4f4;
+          --ipoms-hm-3: #85b7eb;
+          --ipoms-hm-4: #378add;
+          --ipoms-hm-5: #185fa5;
+          --ipoms-hm-zero: #f1efe8;
+          --ipoms-hm-stripe: #e1e0d9;
+          --ipoms-hm-today: #0b0b0b;
+        }
+        :global(.dark) {
+          --ipoms-oc-positive: #0ea271;
+          --ipoms-oc-not_hiring: #bf8508;
+          --ipoms-oc-negative: #e04e8a;
+          --ipoms-oc-follow_up: #5b8def;
+          --ipoms-hm-1: #1a2a40;
+          --ipoms-hm-2: #1f4a80;
+          --ipoms-hm-3: #2d6fc0;
+          --ipoms-hm-4: #3987e5;
+          --ipoms-hm-5: #8cbaf5;
+          --ipoms-hm-zero: #2c2c2a;
+          --ipoms-hm-stripe: #383835;
+          --ipoms-hm-today: #f0efec;
+        }
+        :global(.ipoms-sw) {
+          display: inline-block;
+          width: 10px;
+          height: 10px;
+          border-radius: 3px;
+          flex: none;
+        }
+        :global(.ipoms-hm-cell) {
+          display: block;
+          width: 100%;
+          height: 24px;
+          border-radius: 4px;
+          padding: 0;
+          border: 0;
+          cursor: pointer;
+          box-sizing: border-box;
+          transition: transform 0.12s ease;
+        }
+        :global(.ipoms-hm-key) {
+          width: 12px;
+          height: 12px;
+          border-radius: 3px;
+          cursor: default;
+        }
+        :global(.ipoms-hm-zero) {
+          background: var(--ipoms-hm-zero);
+        }
+        :global(.ipoms-hm-future) {
+          background: repeating-linear-gradient(45deg, transparent 0 3px, var(--ipoms-hm-stripe) 3px 4px);
+          cursor: default;
+        }
+        :global(.ipoms-hm-today) {
+          box-shadow: inset 0 0 0 2px var(--ipoms-hm-today);
+          position: relative;
+          z-index: 1;
+        }
+        :global(.ipoms-hm-hot) {
+          transform: scale(1.08);
+          box-shadow: 0 0 0 1.5px rgb(var(--surface)), 0 0 0 2.5px rgb(var(--primary));
+          z-index: 10;
+        }
+        :global(.ipoms-hm-col-sel) {
+          background: rgb(var(--primary) / 0.08);
+          border-radius: 6px;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          :global(.ipoms-hm-cell) {
+            transition: none;
+          }
+        }
+        :global(.ipoms-tip) {
+          position: fixed;
+          z-index: 9999;
+          pointer-events: none;
+          display: flex;
+          flex-direction: column;
+          gap: 2.5px;
+          min-width: 160px;
+          max-width: 250px;
+          padding: 8px 12px;
+          border-radius: 8px;
+          font-size: 11.5px;
+          line-height: 1.4;
+          background: #0f172a;
+          color: #f8fafc;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+        }
+        :global(.dark) :global(.ipoms-tip) {
+          background: #1e293b;
+          color: #f1f5f9;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.15);
+        }
+        :global(.ipoms-tip b) {
+          font-weight: 700;
+        }
+      `}</style>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+function MonthChart({
+  data,
+  onTip,
+  onHideTip,
+}: {
+  data: MonthlyData;
+  onTip: (e: React.MouseEvent | React.FocusEvent, lines: string[]) => void;
+  onHideTip: () => void;
+}) {
+  // Calls first: every logged row has a call, but only timed rows carry a duration.
+  const [metric, setMetric] = useState<'calls' | 'duration'>('calls');
+  const days = data.days_in_month || 30;
+  const todayDay = data.is_current_month && data.today_day ? data.today_day : null;
+  const lastDay = todayDay ?? days;
+  // Outcome columns follow this: a day number, or 'month' for the whole month.
+  const [scope, setScope] = useState<number | 'month'>(todayDay ?? 'month');
+  const [hover, setHover] = useState<{ row: number; day: number } | null>(null);
+  const yy = Number(data.month.slice(0, 4));
+  const mm = Number(data.month.slice(5));
+
+  const valuesOf = (s: MonthlySeries): number[] =>
+    metric === 'duration' ? s.daily_duration ?? new Array(days).fill(0) : s.daily;
+
+  const peak = Math.max(1, ...data.series.flatMap((s) => valuesOf(s).slice(0, lastDay)));
+  const step = (v: number) => Math.max(0, Math.min(4, Math.ceil((v / peak) * 5) - 1));
+
+  const dayMeta = Array.from({ length: days }, (_, i) => {
+    const d = new Date(yy, mm - 1, i + 1);
+    return {
+      day: i + 1,
+      sunday: d.getDay() === 0,
+      label: d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }),
+    };
+  });
+
+  const plural = (n: number) => `${n} call${n === 1 ? '' : 's'}`;
+  const outcomeAt = (s: MonthlySeries, key: ShownBucket, day: number | 'month') => {
+    const arr = s.daily_outcomes?.[key] ?? [];
+    return day === 'month' ? sum(arr, lastDay) : arr[day - 1] || 0;
+  };
+  const callsAt = (s: MonthlySeries, day: number | 'month') =>
+    day === 'month' ? sum(s.daily, lastDay) : s.daily[day - 1] || 0;
+
+  const scopeLabel =
+    scope === 'month'
+      ? `${new Date(yy, mm - 1, 1).toLocaleDateString('en-IN', { month: 'long' })} total`
+      : scope === todayDay
+      ? `Today · ${dayMeta[scope - 1].label}`
+      : dayMeta[scope - 1].label;
+
+  const selectDay = (d: number) => {
+    if (d > lastDay) return;
+    setScope((cur) => (cur === d ? 'month' : d));
+  };
+
+  // 52px campus · days 1..30/31
+  const cols = `52px repeat(${days}, minmax(0, 1fr))`;
+
+  return (
+    <div className="mt-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-fg-subtle">
+          <span>Fewer</span>
+          <span className="inline-flex gap-[3px]">
+            <i className="ipoms-hm-cell ipoms-hm-key ipoms-hm-zero" />
+            {HEAT_STEPS.map((v) => (
+              <i key={v} className="ipoms-hm-cell ipoms-hm-key" style={{ background: `var(${v})` }} />
+            ))}
+          </span>
+          <span>More</span>
+          <span className="inline-flex items-center gap-1.5 ml-2">
+            <i className="ipoms-hm-cell ipoms-hm-key ipoms-hm-future" /> Not yet
+          </span>
+          {todayDay && (
+            <span className="inline-flex items-center gap-1.5">
+              <i className="ipoms-hm-cell ipoms-hm-key ipoms-hm-zero ipoms-hm-today" /> Today
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex p-0.5 bg-surface-sunken border border-border rounded-xl text-[11px] font-bold">
+            {(['calls', 'duration'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={metric === m}
+                onClick={() => setMetric(m)}
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  metric === m ? 'bg-primary text-white shadow-2xs' : 'text-fg-subtle hover:text-fg'
+                }`}
+              >
+                {m === 'duration' ? 'Duration' : 'Calls Count'}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* ── 1. Full-Width Interactive Graph Paper Chart ──────────────── */}
-      {(viewMode === 'chart' || viewMode === 'split') && (
-        <div className="rounded-2xl border border-border bg-surface shadow-sm overflow-hidden p-5 sm:p-7 space-y-6 w-full">
-          
-          {/* Top Filter Bar: Only All Metrics, Calls Made, Positives, Not Hiring */}
-          <div className="flex items-center justify-between gap-4 border-b border-border/80 pb-4 flex-wrap">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-fg-subtle mr-1">
-                Filter Metric:
-              </span>
-              {[
-                { id: 'all', label: 'All Metrics', color: 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800' },
-                { id: 'calls', label: 'Calls Made', color: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800' },
-                { id: 'positives', label: 'Positives', color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
-                { id: 'not_hiring', label: 'Not Hiring', color: 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
-              ].map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => setMetricFilter(m.id as MetricFilter)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
-                    metricFilter === m.id
-                      ? `${m.color} ring-2 ring-blue-500/20 font-black shadow-xs`
-                      : 'bg-surface-sunken/60 border-border text-fg-subtle hover:text-fg hover:bg-surface-sunken'
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
+      <div className="overflow-x-auto pb-1">
+        <div
+          role="grid"
+          aria-label={`${metric === 'duration' ? 'Minutes logged' : 'Calls'} per day, per campus`}
+          className="min-w-[720px] grid gap-x-[6px] gap-y-[6px] items-center"
+          style={{ gridTemplateColumns: cols }}
+          onMouseLeave={() => {
+            setHover(null);
+            onHideTip();
+          }}
+        >
+          {/* Day numbers */}
+          <span />
+          {dayMeta.map((m) => (
+            <button
+              key={m.day}
+              type="button"
+              disabled={m.day > lastDay}
+              onClick={() => selectDay(m.day)}
+              title={m.day > lastDay ? undefined : `Show details for ${m.label}`}
+              className={`text-center text-[10px] font-mono tabular-nums py-0.5 rounded disabled:cursor-default ${
+                scope === m.day ? 'ipoms-hm-col-sel text-primary font-extrabold' : ''
+              } ${
+                m.day === todayDay
+                  ? 'text-fg font-extrabold'
+                  : hover?.day === m.day
+                  ? 'text-primary font-bold'
+                  : m.sunday
+                  ? 'text-fg-subtle/50'
+                  : 'text-fg-subtle'
+              }`}
+            >
+              {m.day}
+            </button>
+          ))}
 
-            <div className="text-xs text-fg-subtle font-medium hidden sm:block">
-              Comparing outreach across <strong className="text-fg font-mono">{kpiData.length}</strong> partner colleges
-            </div>
-          </div>
-
-          {/* ── Full Width Graph Paper Styled Chart ── */}
-          <div className="w-full space-y-4">
-            
-            {/* Chart Area with Mild Grey Graph Paper Texture */}
-            <div className="h-80 sm:h-96 w-full flex items-end justify-between gap-4 sm:gap-8 pt-8 pb-3 px-6 sm:px-10 border border-zinc-200 dark:border-zinc-800 relative rounded-2xl overflow-hidden ipoms-graph-paper">
-              
-              {/* Background Horizontal Guide Scale with Dark Numbers */}
-              <div className="absolute inset-0 flex flex-col justify-between pointer-events-none px-4 pt-6 pb-3">
-                <div className="border-b border-zinc-300/80 dark:border-zinc-700/80 w-full flex items-center justify-between text-xs font-mono font-black text-zinc-900 dark:text-zinc-100">
-                  <span>{maxMetricValue}</span>
-                </div>
-                <div className="border-b border-dashed border-zinc-300/60 dark:border-zinc-700/60 w-full flex items-center justify-between text-xs font-mono font-black text-zinc-800 dark:text-zinc-200">
-                  <span>{Math.round(maxMetricValue * 0.75)}</span>
-                </div>
-                <div className="border-b border-dashed border-zinc-300/60 dark:border-zinc-700/60 w-full flex items-center justify-between text-xs font-mono font-black text-zinc-800 dark:text-zinc-200">
-                  <span>{Math.round(maxMetricValue * 0.5)}</span>
-                </div>
-                <div className="border-b border-dashed border-zinc-300/60 dark:border-zinc-700/60 w-full flex items-center justify-between text-xs font-mono font-black text-zinc-800 dark:text-zinc-200">
-                  <span>{Math.round(maxMetricValue * 0.25)}</span>
-                </div>
-                <div className="border-b-2 border-zinc-400 dark:border-zinc-600 w-full flex items-center justify-between text-xs font-mono font-black text-zinc-900 dark:text-zinc-100">
-                  <span>0</span>
-                </div>
-              </div>
-
-              {/* College Bar Columns */}
-              {kpiData.map((item, idx) => {
-                const isHovered = hoveredCollegeId === item.college_id;
-                const acronym = getCollegeAcronym({
-                  college_code: item.college_code,
-                  college_name: item.college_name,
-                  college_id: item.college_id,
-                }) || item.college_code || `C${idx + 1}`;
-
-                // Height calculation:
-                // 1 cm = 38px height for 0 value.
-                // For positive values, scale from 38px (1cm) up to 100% of chart height.
-                const getBarHeight = (val: number) => {
-                  if (!val || val === 0) return '38px'; // 1 cm baseline height
-                  const pct = Math.min(100, Math.max(14, (val / maxMetricValue) * 100));
-                  return `max(38px, ${pct}%)`;
-                };
-
-                return (
-                  <div
-                    key={item.college_id}
-                    onMouseEnter={() => setHoveredCollegeId(item.college_id)}
-                    onMouseLeave={() => setHoveredCollegeId(null)}
-                    className={`flex-1 flex flex-col items-center justify-end h-full relative cursor-pointer group transition-all duration-200 ${
-                      isHovered ? 'scale-[1.02]' : ''
-                    }`}
-                  >
-                    {/* Floating Hover Card with Clean Light Background */}
-                    {isHovered && (
-                      <div className="absolute -top-12 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-xs font-mono font-bold px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-xl pointer-events-none z-30 whitespace-nowrap animate-in fade-in zoom-in-95 duration-150 flex items-center gap-2">
-                        <span className="text-blue-600 dark:text-blue-400 font-sans font-bold">
-                          {acronym}:
-                        </span>
-                        <span>{item.total_calls} Calls</span>
-                        <span className="text-zinc-300 dark:text-zinc-600">•</span>
-                        <span className="text-emerald-600 dark:text-emerald-400">{item.total_positives} Positives</span>
-                        <span className="text-zinc-300 dark:text-zinc-600">•</span>
-                        <span className="text-amber-600 dark:text-amber-400">{item.total_not_hiring} Not Hiring</span>
-                      </div>
-                    )}
-
-                    {/* Grouped 3 Bars: Calls Made, Positives, Not Hiring */}
-                    <div className="w-full flex items-end justify-center gap-2 sm:gap-3 h-full z-10 px-1">
-                      {metricFilter === 'all' ? (
-                        <>
-                          {/* 1. Calls Made Bar (1cm height for 0) */}
-                          <div className="flex-1 max-w-[32px] sm:max-w-[42px] flex flex-col items-center justify-end h-full">
-                            <span className="text-xs font-mono font-black text-blue-600 dark:text-blue-400 mb-1">
-                              {item.total_calls}
-                            </span>
-                            <div
-                              className="w-full rounded-t-xl bg-gradient-to-t from-blue-600 to-indigo-500 shadow-sm group-hover:from-blue-500 group-hover:to-indigo-400 transition-all duration-500 border-t border-x border-blue-400/40"
-                              style={{ height: getBarHeight(item.total_calls) }}
-                              title={`Calls Made: ${item.total_calls}`}
-                            />
-                          </div>
-
-                          {/* 2. Positives Bar (1cm height for 0) */}
-                          <div className="flex-1 max-w-[32px] sm:max-w-[42px] flex flex-col items-center justify-end h-full">
-                            <span className="text-xs font-mono font-black text-emerald-600 dark:text-emerald-400 mb-1">
-                              {item.total_positives}
-                            </span>
-                            <div
-                              className="w-full rounded-t-xl bg-gradient-to-t from-emerald-600 to-teal-400 shadow-sm group-hover:from-emerald-500 group-hover:to-teal-300 transition-all duration-500 border-t border-x border-emerald-400/40"
-                              style={{ height: getBarHeight(item.total_positives) }}
-                              title={`Positives: ${item.total_positives}`}
-                            />
-                          </div>
-
-                          {/* 3. Not Hiring Bar (1cm height for 0) */}
-                          <div className="flex-1 max-w-[32px] sm:max-w-[42px] flex flex-col items-center justify-end h-full">
-                            <span className="text-xs font-mono font-black text-amber-600 dark:text-amber-400 mb-1">
-                              {item.total_not_hiring}
-                            </span>
-                            <div
-                              className="w-full rounded-t-xl bg-gradient-to-t from-amber-600 to-amber-400 shadow-sm group-hover:from-amber-500 group-hover:to-amber-300 transition-all duration-500 border-t border-x border-amber-400/40"
-                              style={{ height: getBarHeight(item.total_not_hiring) }}
-                              title={`Not Hiring: ${item.total_not_hiring}`}
-                            />
-                          </div>
-                        </>
-                      ) : metricFilter === 'calls' ? (
-                        <div className="w-full max-w-[72px] flex flex-col items-center justify-end h-full">
-                          <span className="text-sm font-mono font-black text-blue-600 dark:text-blue-400 mb-1">
-                            {item.total_calls}
-                          </span>
-                          <div
-                            className="w-full rounded-t-2xl bg-gradient-to-t from-blue-600 to-indigo-500 shadow-md transition-all duration-500 border-t border-x border-blue-400/40"
-                            style={{ height: getBarHeight(item.total_calls) }}
-                          />
-                        </div>
-                      ) : metricFilter === 'positives' ? (
-                        <div className="w-full max-w-[72px] flex flex-col items-center justify-end h-full">
-                          <span className="text-sm font-mono font-black text-emerald-600 dark:text-emerald-400 mb-1">
-                            {item.total_positives}
-                          </span>
-                          <div
-                            className="w-full rounded-t-2xl bg-gradient-to-t from-emerald-600 to-teal-400 shadow-md transition-all duration-500 border-t border-x border-emerald-400/40"
-                            style={{ height: getBarHeight(item.total_positives) }}
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-full max-w-[72px] flex flex-col items-center justify-end h-full">
-                          <span className="text-sm font-mono font-black text-amber-600 dark:text-amber-400 mb-1">
-                            {item.total_not_hiring}
-                          </span>
-                          <div
-                            className="w-full rounded-t-2xl bg-gradient-to-t from-amber-600 to-amber-400 shadow-md transition-all duration-500 border-t border-x border-amber-400/40"
-                            style={{ height: getBarHeight(item.total_not_hiring) }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* ── X-Axis Clean College Labels (No Boxed Cards) ── */}
-            <div className="flex items-center justify-between gap-4 sm:gap-8 px-6 sm:px-10 pt-2">
-              {kpiData.map((item, idx) => {
-                const acronym = getCollegeAcronym({
-                  college_code: item.college_code,
-                  college_name: item.college_name,
-                  college_id: item.college_id,
-                }) || item.college_code || `C${idx + 1}`;
-
-                const palette = COLLEGE_PALETTES[idx % COLLEGE_PALETTES.length];
-                const isHovered = hoveredCollegeId === item.college_id;
-
-                return (
-                  <Link
-                    key={item.college_id}
-                    href="/tracker"
-                    onClick={() => {
-                      setActiveCollege(item.college_id, item.college_name);
-                    }}
-                    onMouseEnter={() => setHoveredCollegeId(item.college_id)}
-                    onMouseLeave={() => setHoveredCollegeId(null)}
-                    title={`${item.college_name} - Click to open Daily Tracker`}
-                    className={`flex-1 text-center py-2 px-2 rounded-xl transition-all group flex flex-col items-center cursor-pointer ${
-                      isHovered
-                        ? 'bg-blue-50 dark:bg-blue-950/60 border border-blue-300 dark:border-blue-700 shadow-xs scale-105'
-                        : 'hover:bg-zinc-100/80 dark:hover:bg-zinc-800/60'
-                    }`}
-                  >
-                    <span className={`font-mono text-xs font-black px-2 py-0.5 rounded-md ${palette.badge} shadow-2xs group-hover:scale-105 transition-transform`}>
-                      [{acronym}]
-                    </span>
-                    <span className="text-[11px] font-bold text-zinc-700 dark:text-zinc-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 truncate max-w-[120px] block mt-1">
-                      {item.college_name}
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-
-            {/* Bottom Color Legend */}
-            <div className="flex items-center justify-center gap-8 flex-wrap pt-4 text-xs font-medium text-fg-subtle border-t border-border/60">
-              <div className="flex items-center gap-2">
-                <span className="w-3.5 h-3.5 rounded-md bg-gradient-to-t from-blue-600 to-indigo-500 shadow-xs" />
-                <span className="font-bold text-zinc-900 dark:text-zinc-100">Calls Made</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3.5 h-3.5 rounded-md bg-gradient-to-t from-emerald-600 to-teal-400 shadow-xs" />
-                <span className="font-bold text-zinc-900 dark:text-zinc-100">Positives</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3.5 h-3.5 rounded-md bg-gradient-to-t from-amber-600 to-amber-400 shadow-xs" />
-                <span className="font-bold text-zinc-900 dark:text-zinc-100">Not Hiring</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── 2. Detailed Per-College KPI Cards Grid ────────────────────── */}
-      {(viewMode === 'cards' || viewMode === 'split') && (
-        <div className={`grid ${gridColsClass} gap-3`}>
-          {kpiData.map((item, idx) => {
-            const acronym = getCollegeAcronym({
-              college_code: item.college_code,
-              college_name: item.college_name,
-              college_id: item.college_id,
-            });
-            const palette = COLLEGE_PALETTES[idx % COLLEGE_PALETTES.length];
-
+          {data.series.map((s, row) => {
+            const vals = valuesOf(s);
             return (
-              <div
-                key={item.college_id}
-                className="rounded-xl border border-border/80 bg-surface shadow-2xs hover:border-border-strong hover:shadow-xs transition-all duration-200 overflow-hidden flex flex-col justify-between"
-              >
-                {/* Card Header: College Acronym & Name Link */}
-                <div className="px-3.5 py-2.5 border-b border-border/60 bg-surface">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0 flex-1 flex items-center gap-2">
-                      <Link
-                        href="/tracker"
-                        onClick={() => {
-                          setActiveCollege(item.college_id, item.college_name);
-                        }}
-                        title={`${item.college_name} (${acronym || ''}) - Click to open tracker`}
-                        className="min-w-0 flex items-center gap-1.5 text-xs sm:text-sm font-bold text-fg hover:text-blue-600 transition-colors group truncate"
-                      >
-                        <Building2 size={13} className="text-blue-600 shrink-0 opacity-80 group-hover:opacity-100" />
-                        {acronym && (
-                          <span className={`font-mono text-[10.5px] font-bold px-1.5 py-0.5 rounded-md ${palette.badge} shrink-0 tracking-wider`}>
-                            [{acronym}]
-                          </span>
-                        )}
-                        <span className="truncate group-hover:underline">{item.college_name}</span>
-                      </Link>
-                    </div>
-
-                    {/* Light Theme Quick Action Link */}
-                    <Link
-                      href="/tracker"
-                      onClick={() => {
-                        setActiveCollege(item.college_id, item.college_name);
+              <React.Fragment key={s.college_id}>
+                <b
+                  className={`font-mono text-xs truncate ${hover?.row === row ? 'text-primary' : 'text-fg'}`}
+                  title={s.college_code}
+                >
+                  {s.college_code}
+                </b>
+                {dayMeta.map((m, i) => {
+                  const future = m.day > lastDay;
+                  const v = vals[i] || 0;
+                  const cls = [
+                    'ipoms-hm-cell',
+                    future ? 'ipoms-hm-future' : v === 0 ? 'ipoms-hm-zero' : '',
+                    m.day === todayDay ? 'ipoms-hm-today' : '',
+                    (hover && hover.row === row && hover.day === m.day) || scope === m.day ? 'ipoms-hm-hot' : '',
+                  ].join(' ');
+                  const dCalls = s.daily[i] || 0;
+                  const mins = s.daily_duration?.[i] || 0;
+                  const tipLines = future
+                    ? [`${s.college_code} · ${m.label}`, 'Not yet']
+                    : [
+                        `${s.college_code} · ${m.label}`,
+                        `${plural(dCalls)} · ${fmtMins(mins)} logged`,
+                        `Positive ${outcomeAt(s, 'positive', m.day)} · Not Hiring ${outcomeAt(s, 'not_hiring', m.day)}`,
+                        `Negative ${outcomeAt(s, 'negative', m.day)} · Follow Up ${outcomeAt(s, 'follow_up', m.day)}`,
+                      ];
+                  return (
+                    <button
+                      key={m.day}
+                      type="button"
+                      role="gridcell"
+                      disabled={future}
+                      aria-label={`${s.college_code}, ${m.label}: ${
+                        future ? 'not yet' : `${plural(dCalls)}, ${fmtMins(mins)} logged`
+                      }`}
+                      className={cls}
+                      style={!future && v > 0 ? { background: `var(${HEAT_STEPS[step(v)]})` } : undefined}
+                      onClick={() => selectDay(m.day)}
+                      onMouseEnter={(e) => {
+                        setHover({ row, day: m.day });
+                        onTip(e, tipLines);
                       }}
-                      className="px-2 py-0.5 rounded-md bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/80 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 text-[10.5px] font-bold flex items-center gap-0.5 transition-colors"
-                    >
-                      <span>Tracker</span>
-                      <ArrowUpRight size={10} />
-                    </Link>
-                  </div>
-                </div>
-
-                {/* Minimal 3 KPI Metrics Grid */}
-                <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between">
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {/* 1. Total Calls Made */}
-                    <div className="p-2 rounded-lg bg-surface-sunken/60 border border-border/60 flex items-center justify-between gap-2">
-                      <div className="space-y-0.5 min-w-0">
-                        <span className="text-[9.5px] font-semibold uppercase tracking-wider text-fg-subtle block truncate">
-                          Calls Made
-                        </span>
-                        <span className="text-sm sm:text-base font-bold font-mono tracking-tight text-fg block">
-                          {item.total_calls}
-                        </span>
-                      </div>
-                      <PhoneCall size={12} className="text-blue-500 shrink-0 opacity-70" />
-                    </div>
-
-                    {/* 2. Total Positives Received */}
-                    <div className="p-2 rounded-lg bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/20 flex items-center justify-between gap-2">
-                      <div className="space-y-0.5 min-w-0">
-                        <span className="text-[9.5px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block truncate">
-                          Positives
-                        </span>
-                        <span className="text-sm sm:text-base font-bold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 block">
-                          {item.total_positives}
-                        </span>
-                      </div>
-                      <CheckCircle2 size={12} className="text-emerald-600 dark:text-emerald-400 shrink-0 opacity-80" />
-                    </div>
-
-                    {/* 3. Total Not Hiring Received */}
-                    <div className="p-2 rounded-lg bg-amber-500/5 dark:bg-amber-950/20 border border-amber-500/20 flex items-center justify-between gap-2">
-                      <div className="space-y-0.5 min-w-0">
-                        <span className="text-[9.5px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400 block truncate">
-                          Not Hiring
-                        </span>
-                        <span className="text-sm sm:text-base font-bold font-mono tracking-tight text-amber-600 dark:text-amber-400 block">
-                          {item.total_not_hiring}
-                        </span>
-                      </div>
-                      <Ban size={12} className="text-amber-600 dark:text-amber-400 shrink-0 opacity-80" />
-                    </div>
-                  </div>
-                </div>
-              </div>
+                      onFocus={(e) => onTip(e, tipLines)}
+                      onBlur={onHideTip}
+                    />
+                  );
+                })}
+              </React.Fragment>
             );
           })}
         </div>
-      )}
-
-      {/* Scoped Graph Paper Pattern Styling */}
-      <style jsx>{`
-        .ipoms-graph-paper {
-          background-color: #f8fafc;
-          background-image: 
-            linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
-          background-size: 24px 24px;
-        }
-        :global(.dark) .ipoms-graph-paper {
-          background-color: #0f172a;
-          background-image: 
-            linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-          background-size: 24px 24px;
-        }
-      `}</style>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { ChevronDown, Search, Check, Building2, Globe, Sparkles } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import {
@@ -43,7 +43,8 @@ export interface College {
 interface Props {
   selectedCollegeId: string;
   onSelect: (id: string, name: string) => void;
-  onSelectCollege?: (col: College | null) => void;
+  onSelectCollege?: (college: College | null) => void;
+  availableColleges?: College[];
   allowAll?: boolean;
   allLabel?: string;
   label?: string;
@@ -55,6 +56,7 @@ export function CollegeSelector({
   selectedCollegeId,
   onSelect,
   onSelectCollege,
+  availableColleges,
   allowAll = false,
   allLabel = 'All Colleges',
   label = 'College:',
@@ -99,6 +101,7 @@ export function CollegeSelector({
   // Listen to active college change
   useEffect(() => {
     const handleActiveCollegeChange = (e: any) => {
+      if (availableColleges && availableColleges.length > 0) return;
       if (e.detail?.id && e.detail.id !== selectedCollegeId) {
         onSelect(e.detail.id, e.detail.name || '');
         if (onSelectCollege) onSelectCollege(e.detail.obj || null);
@@ -106,7 +109,7 @@ export function CollegeSelector({
     };
     window.addEventListener('ipoms_college_change', handleActiveCollegeChange);
     return () => window.removeEventListener('ipoms_college_change', handleActiveCollegeChange);
-  }, [selectedCollegeId, onSelect, onSelectCollege]);
+  }, [selectedCollegeId, onSelect, onSelectCollege, availableColleges]);
 
   useEffect(() => {
     fetchAllCollegesCached()
@@ -122,7 +125,6 @@ export function CollegeSelector({
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as Node;
-      // If click is inside the trigger button, let onClick handle open/close
       if (triggerRef.current && triggerRef.current.contains(target)) return;
       if (containerRef.current && !containerRef.current.contains(target)) {
         setIsOpen(false);
@@ -144,11 +146,7 @@ export function CollegeSelector({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
 
-  const isAll = allowAll && selectedCollegeId === 'all';
-  const selected = colleges.find(
-    (c) => c._id === selectedCollegeId || c.college_code === selectedCollegeId || c.college_name === selectedCollegeId
-  );
-
+  // ── Compute prioritized list: user's focus colleges on top, remaining colleges below ──
   const rawFiltered = colleges.filter((c) => {
     const q = searchTerm.toLowerCase().trim();
     if (!q) return true;
@@ -159,10 +157,39 @@ export function CollegeSelector({
     );
   });
 
-  const prioritizedColleges = sortCollegesWithPriority(rawFiltered, coordinatorSelectedIds);
+  const prioritizedColleges = useMemo(() => {
+    const selectedSet = new Set(coordinatorSelectedIds.map((s) => String(s).toLowerCase().trim()));
+    const focusList: (College & { isPinned?: boolean })[] = [];
+    const otherList: (College & { isPinned?: boolean })[] = [];
+
+    for (const c of rawFiltered) {
+      const isFocus =
+        selectedSet.has(String(c._id).toLowerCase().trim()) ||
+        (c.college_code && selectedSet.has(String(c.college_code).toLowerCase().trim())) ||
+        (c.college_code && selectedSet.has(`col_${c.college_code.toLowerCase().trim()}`));
+
+      if (isFocus) {
+        focusList.push({ ...c, isPinned: true });
+      } else {
+        otherList.push({ ...c, isPinned: false });
+      }
+    }
+
+    focusList.sort((a, b) => a.college_name.localeCompare(b.college_name));
+    otherList.sort((a, b) => a.college_name.localeCompare(b.college_name));
+
+    return [...focusList, ...otherList];
+  }, [rawFiltered, coordinatorSelectedIds]);
+
+  const isAll = allowAll && selectedCollegeId === 'all';
+  const selected = colleges.find(
+    (c) => c._id === selectedCollegeId || c.college_code === selectedCollegeId || c.college_name === selectedCollegeId
+  );
 
   const handleSelectCollege = (college: College) => {
-    setActiveCollege(college._id, college.college_name, college);
+    if (!availableColleges || availableColleges.length === 0) {
+      setActiveCollege(college._id, college.college_name, college);
+    }
     onSelect(college._id, college.college_name);
     if (onSelectCollege) onSelectCollege(college);
     setIsOpen(false);
@@ -240,7 +267,7 @@ export function CollegeSelector({
           } mt-1.5 w-52 sm:w-60 bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 rounded-xl shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150 ease-out text-fg select-none`}
         >
           {/* Search Box */}
-          <div className="p-2 border-b border-border/60 bg-slate-50 dark:bg-[#1A2234]">
+          <div className="p-2 border-b border-border/60 bg-slate-50 dark:bg-[#1A2234] rounded-t-xl">
             <div className="relative flex items-center">
               <Search
                 size={14}
@@ -257,8 +284,8 @@ export function CollegeSelector({
             </div>
           </div>
 
-          {/* List of Colleges (Shows 4 to 5 colleges with invisible smooth scroller) */}
-          <div className="max-h-[175px] overflow-y-auto overscroll-contain p-1.5 space-y-0.5 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden bg-surface divide-y divide-border/30">
+          {/* List of Colleges (Shows focus colleges with badge, and all other colleges below) */}
+          <div className="max-h-[220px] overflow-y-auto overscroll-contain p-1.5 space-y-0.5 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden bg-surface divide-y divide-border/30">
             {/* Optional All Colleges item */}
             {allowAll && (!searchTerm || 'all colleges'.includes(searchTerm.toLowerCase())) && (
               <button

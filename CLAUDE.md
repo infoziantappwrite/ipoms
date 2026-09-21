@@ -1046,6 +1046,67 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     mode), with the populated case driven by read-only Playwright response interception —
     nothing was written to the database to stage the screenshot. `tsc --noEmit` clean both
     sides.
+    **"Ongoing process" polish, same day (user-requested).** Motion was added *around* the
+    number, never *to* it: a gradient arc travelling round the card border, a periodic light
+    sweep, a radar ping on the Live dot, a "synced h:mm" timestamp that updates on every
+    real refetch, a brief indigo glow on the odometer only when the total genuinely changes,
+    a **"now" marker** on the rhythm rail at the real wall-clock position (a time-axis
+    position, not a quantity, so it may move freely; hidden outside the bar window rather
+    than pinned to an edge), and on an empty day a brightness-only wave along the flat rail
+    (deliberately never height, so it can't read as call volume). Gotcha worth keeping: a
+    `text-shadow` glow on the digits is clipped by each digit's `overflow:hidden` window and
+    renders as faint boxes — the glow is a `drop-shadow` filter on the container instead.
+    Testing note: faking the browser clock (Playwright `clock.install`) trips React hydration
+    errors from the time-of-day greeting banner, because the server renders at real time — an
+    artifact of the test, not the widget; un-faked runs are clean.
+    **Hourly Rhythm window moved to 10am–7pm, 21 Sep 2026 (user decision)** — still widens
+    for calls outside it rather than dropping them.
+
+43. **Campus Outcome Mix + Monthly Call Trend, 21 Sep 2026 (user-requested)** — replaced the
+    grouped bar chart in `CoordinatorCollegeKpiCards.tsx` (also rendered on the Team Leader
+    dashboard). That chart drew every **zero** as a ~35px bar and showed parts-of-calls as
+    rival bars. Now: one row per campus (acronym only), a stacked bar of that campus's calls,
+    and positive rate; plus a table view. **Buckets (user-chosen, server-side
+    `OUTCOME_BUCKET` in `server.ts`)**: Positive = `invite_mail` only (matches
+    `POSITIVE_OUTCOMES`); Not Hiring = `not_hiring`, `hiring_freezed`; Negative =
+    `no_response`, `invalid`, `in_connect`, `hiring_completed`; Follow Up = `follow_up`,
+    `call_back`; Other Progress = `jd_received`, `hiring`, `drive_completed`; no outcome yet =
+    `pending`. All 12 outcomes map, so segments always sum to calls — verified on real data
+    (NGP 209, KAMARAJ 203, MCET 128, KLU 107, every campus `sum === calls`). Returned as a new
+    `outcome_mix` field; the older `total_negatives` etc. are left unchanged (they use a
+    *different* negative definition — don't mix them). **New endpoint**
+    `GET /dashboard/monthly-calls?month=YYYY-MM&college_ids=…` — calls per day per campus,
+    `scopeToSelf`-scoped, returns `is_last_day_of_month` computed in IST; policy entry added
+    (`verify:policy` 100/100). The chart auto-opens on the last day of the month, otherwise
+    behind a "View Month Graph" button; lines stop at today (a future day is "not yet", not
+    zero). Palettes were validated for colour-blindness in light and dark (first attempts
+    failed — red/amber too close; negative is rose for that reason).
+    **Data finding:** every September `daily_tracker` row is attributed to the
+    **Administrator** account, not to coordinators — the sheet-by-sheet reload used the
+    admin's id. Coordinators' outcome mix and month chart are therefore empty until they log
+    their own calls, or the rows are re-attributed.
+    **Left broken by a concurrent session, not fixed here (to avoid racing it):** a new
+    `GET /dashboard/coordinator/clock-duration` endpoint was inserted *between* the
+    `/dashboard/coordinator` handler's `catch` block and its closing `});`, so that `});` is
+    missing and the backend won't start (`'}' expected` at EOF). It also has no
+    `routePolicy.ts` entry, so once it parses it will 403 (default-deny).
+    *(Since fixed by that session — backend parses and runs again.)*
+    **Month graph redesigned as a heat strip, 21 Sep 2026 (user picked option A of three)** —
+    the multi-line chart piled every campus onto the zero line on quiet days. Now one row per
+    campus, one square per day (1 → 30/31), one shared blue scale (darker = more in light,
+    brighter = more in dark), zero = neutral square, future days striped ("not yet", never
+    zero), today outlined, row totals on the right, hover tooltip with calls + minutes.
+    Defaults to **Calls Count**: the imported September rows carry no `duration_seconds`, so a
+    Duration default showed an all-empty month. `monthly-calls` now sums a day's duration in
+    seconds and rounds once (it rounded per call, so short calls vanished).
+    **Merged into one card, same day (user request — "avoid 2 designs, save space").** The
+    separate "Campus Outcome Mix — Today" card is gone; the heat strip is always visible and
+    carries outcome columns on the right — Positive / Not Hiring / Negative / Follow Up
+    (**Other Progress deliberately not shown**, user decision; those calls still count in
+    Calls). The columns show **Today** by default, **Month** for the month to date, or any
+    day the user clicks. `monthly-calls` now returns `daily_outcomes` per campus (same
+    `OUTCOME_BUCKET` mapping). The component no longer calls `college-kpis`; its
+    `outcome_mix` field is still returned but unused by this card.
 
 ## 6. Module map
 ## 6. Module map

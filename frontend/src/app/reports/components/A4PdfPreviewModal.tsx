@@ -648,15 +648,6 @@ export function A4PdfPreviewModal({
           ) : (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') ? (
             <>
               <div className="flex items-center gap-1.5">
-                <Calendar size={13} className="text-emerald-700 shrink-0" />
-                <span>
-                  Report Date:{' '}
-                  <strong className="text-slate-900 font-semibold">
-                    {report.report_period || (report as any).day_date || report.kpi_summary?.report_date || report.generated_date}
-                  </strong>
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
                 <Calendar size={13} className="text-slate-400 shrink-0" />
                 <span>
                   Generated On:{' '}
@@ -2356,9 +2347,10 @@ export function A4PdfPreviewModal({
                             {r.college_code || r.college_name || '—'}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 justify-start sm:justify-end">
+                        <div className="flex items-center gap-1.5 justify-start sm:justify-end text-xs">
                           <User size={14} className="text-slate-500 shrink-0" />
-                          <span className="text-slate-600 font-medium">Coordinator:</span>
+                          <span className="text-slate-600 font-medium">Coordinator</span>
+                          <span className="text-slate-400 font-semibold px-0.5">:</span>
                           <span className="font-bold text-slate-800">
                             {r.coordinator || 'Placement Team'}
                           </span>
@@ -2481,9 +2473,10 @@ export function A4PdfPreviewModal({
                             {r.college_code || r.college_name || '—'}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 justify-start sm:justify-end">
+                        <div className="flex items-center gap-1.5 justify-start sm:justify-end text-xs">
                           <User size={14} className="text-slate-500 shrink-0" />
-                          <span className="text-slate-600 font-medium">Coordinator:</span>
+                          <span className="text-slate-600 font-medium">Coordinator</span>
+                          <span className="text-slate-400 font-semibold px-0.5">:</span>
                           <span className="font-bold text-slate-800">
                             {r.coordinator || 'Placement Team'}
                           </span>

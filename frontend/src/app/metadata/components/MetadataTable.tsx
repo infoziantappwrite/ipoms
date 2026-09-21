@@ -23,6 +23,7 @@ interface Props {
   page?: number;
   limit?: number;
   canDelete?: boolean;
+  highlightIds?: string[];
   onEdit: (company: CompanyRecord) => void;
   onDelete: (id: string, name: string) => void;
   onRestore: (id: string, name: string) => void;
@@ -35,6 +36,7 @@ export function MetadataTable({
   page = 1,
   limit = 50,
   canDelete = true,
+  highlightIds = [],
   onEdit,
   onDelete,
   onRestore,
@@ -70,17 +72,37 @@ export function MetadataTable({
             ) : (
               companies.map((c, idx) => {
                 const serialNo = c.serial_number ?? ((page - 1) * limit + idx + 1);
+                const isHighlighted = highlightIds.includes(String(c._id)) || highlightIds.includes(String(c.serial_number));
                 return (
-                  <tr key={c._id} className="hover:bg-surface-sunken/60 transition-colors">
+                  <tr
+                    key={c._id}
+                    id={`meta-row-${c._id}`}
+                    className={`transition-all duration-300 ${
+                      isHighlighted
+                        ? 'bg-emerald-500/15 dark:bg-emerald-500/25 ring-2 ring-inset ring-emerald-500/60 shadow-xs'
+                        : 'hover:bg-surface-sunken/60'
+                    }`}
+                  >
                     {/* Serial Number (#) */}
                     <td className="py-3.5 px-4 text-center font-mono text-[11px] font-semibold whitespace-nowrap">
-                      <span className="inline-block px-2 py-0.5 rounded-md bg-surface-sunken/90 border border-border text-fg font-mono text-xs font-bold shadow-2xs">
+                      <span className={`inline-block px-2 py-0.5 rounded-md border text-fg font-mono text-xs font-bold shadow-2xs ${
+                        isHighlighted
+                          ? 'bg-emerald-500/20 border-emerald-500 text-emerald-800 dark:text-emerald-200'
+                          : 'bg-surface-sunken/90 border border-border'
+                      }`}>
                         {serialNo}
                       </span>
                     </td>
 
                     {/* Company Name - Wrap Allowed */}
                     <td className="py-3.5 px-5 font-bold text-fg min-w-[200px] max-w-[280px] break-words leading-snug text-xs">
+                      {isHighlighted && (
+                        <div className="mb-1">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 border border-emerald-500/40 animate-pulse">
+                            ✨ New from Daily Tracker
+                          </span>
+                        </div>
+                      )}
                       {c.company_name}
                     </td>
 

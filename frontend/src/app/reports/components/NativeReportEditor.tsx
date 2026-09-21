@@ -1258,10 +1258,6 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           ) : (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') ? (
             <>
               <div className="flex items-center gap-1.5">
-                <Calendar size={13} className="text-primary shrink-0" />
-                <span>Report Date: <strong className="text-fg print:text-slate-900 font-semibold">{report.report_period || (report as any).day_date || report.kpi_summary?.report_date || report.effective_date || report.date || report.generated_date}</strong></span>
-              </div>
-              <div className="flex items-center gap-1.5">
                 <Calendar size={13} className="text-fg-subtle print:text-slate-400 shrink-0" />
                 <span>Generated On: <strong className="text-fg print:text-slate-900 font-semibold">{report.generated_date}</strong></span>
               </div>

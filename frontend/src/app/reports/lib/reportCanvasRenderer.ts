@@ -1390,7 +1390,7 @@ export async function generateReportCanvas(
         ...leads[0],
         isPos,
       };
-      totalH += 270 + 20;
+      totalH += 278 + 20;
     } else {
       const headers = ['#', 'Company Name', 'Role / Designation', 'CTC', 'Time', 'College', 'Coordinator'];
       // Total content width: 800px (34 + 210 + 175 + 85 + 75 + 80 + 141 = 800)
@@ -1652,8 +1652,7 @@ export async function generateReportCanvas(
   if (report.template_type === 'weekly_placement' && cleanPeriod) {
     metaText = `Period: ${cleanPeriod}         Generated On: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
   } else if (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') {
-    const reportDate = report.report_period || (report as any).day_date || report.kpi_summary?.report_date || report.generated_date;
-    metaText = `Report Date: ${reportDate}         Generated On: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
+    metaText = `Generated On: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
   } else {
     metaText = `Generated On: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
   }
@@ -1830,114 +1829,125 @@ export async function generateReportCanvas(
     const cardX = PADDING;
     const cardY = currentY;
     const cardW = CONTENT_W;
-    const cardH = 265;
+    const cardH = 278;
 
-    // Card Container with soft background & rounded corners
-    drawRoundRect(
-      cardX,
-      cardY,
-      cardW,
-      cardH,
-      12,
-      isPos ? '#f0fdf4' : '#eff6ff',
-      isPos ? '#86efac' : '#93c5fd',
-      1.5
-    );
+    // ── Card Outer Shell: white bg, rounded 16px, blue border ────────────────
+    drawRoundRect(cardX, cardY, cardW, cardH, 16, '#ffffff', isPos ? '#93c5fd' : '#93c5fd', 1.5);
 
-    // 1. Top Spotlight Badge Pill
-    const badgeText = isPos ? '⭐ SPOTLIGHT PLACEMENT' : '🚀 NEW OPPORTUNITY';
-    const badgeW = 184;
-    const badgeH = 24;
-    drawRoundRect(
-      cardX + 24,
-      cardY + 18,
-      badgeW,
-      badgeH,
-      12,
+    // ── TOP STRIP: Badge pill (left) + Time chip (right) ─────────────────────
+    const badgeLabel = isPos ? '✦ NEW PLACEMENT' : '✦ NEW JD ANNOUNCEMENT';
+    const badgeW = ctx.measureText(badgeLabel).width + 32;
+    const badgeH = 26;
+    const badgePillY = cardY + 18;
+
+    drawRoundRect(cardX + 22, badgePillY, badgeW, badgeH, 13,
       isPos ? '#dcfce7' : '#dbeafe',
-      isPos ? '#4ade80' : '#60a5fa',
-      1
-    );
-    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+      isPos ? '#86efac' : '#93c5fd', 1);
+    ctx.font = 'bold 10.5px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = isPos ? '#15803d' : '#1d4ed8';
     ctx.textAlign = 'center';
-    ctx.fillText(badgeText, cardX + 24 + badgeW / 2, cardY + 34);
+    ctx.fillText(badgeLabel, cardX + 22 + badgeW / 2, badgePillY + 17);
 
-    // Timestamp pill (Right aligned)
-    const timeText = singleHeroLead.time || singleHeroLead.time_stamp || singleHeroLead.event_time || (isPos ? 'Confirmed' : 'Active');
-    ctx.font = '600 11px monospace';
-    ctx.fillStyle = isPos ? '#047857' : '#1e40af';
-    ctx.textAlign = 'right';
-    ctx.fillText(timeText, cardX + cardW - 24, cardY + 34);
+    // Time chip (right side)
+    const timeVal = singleHeroLead.time || singleHeroLead.time_stamp || singleHeroLead.event_time || '';
+    if (timeVal) {
+      const timeW = ctx.measureText(timeVal).width + 20;
+      const timeH = 24;
+      const timeX = cardX + cardW - 22 - timeW;
+      drawRoundRect(timeX, badgePillY + 1, timeW, timeH, 8,
+        '#f8fafc', '#cbd5e1', 1);
+      ctx.font = '600 10.5px monospace';
+      ctx.fillStyle = '#475569';
+      ctx.textAlign = 'center';
+      ctx.fillText(timeVal, timeX + timeW / 2, badgePillY + 14);
+    }
 
-    // 2. Company Name
-    ctx.fillStyle = '#0a2540';
-    ctx.font = 'bold 24px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(singleHeroLead.company_name || '—', cardX + 24, cardY + 74);
-
-    // 3. Row 1: Role Box & Package Box
-    const col1W = 470;
-    const col2W = cardW - 48 - col1W - 14; // 268px
-    const row1Y = cardY + 94;
-    const row1H = 74;
-
-    // Role Box
-    drawRoundRect(cardX + 24, row1Y, col1W, row1H, 8, '#ffffff', '#e2e8f0', 1);
-    ctx.font = '600 10px system-ui, -apple-system, sans-serif';
-    ctx.fillStyle = '#64748b';
-    ctx.textAlign = 'left';
-    ctx.fillText('JOB ROLE / DESIGNATION', cardX + 38, row1Y + 22);
-
-    ctx.font = 'bold 15px system-ui, -apple-system, sans-serif';
+    // ── COMPANY NAME ─────────────────────────────────────────────────────────
     ctx.fillStyle = '#0f172a';
-    ctx.fillText(singleHeroLead.role || singleHeroLead.job_role || '—', cardX + 38, row1Y + 50);
+    ctx.font = 'bold 26px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(singleHeroLead.company_name || '—', cardX + 22, cardY + 80);
 
-    // Package (CTC) Box
-    drawRoundRect(
-      cardX + 24 + col1W + 14,
-      row1Y,
-      col2W,
-      row1H,
-      8,
-      isPos ? '#ecfdf5' : '#eff6ff',
-      isPos ? '#34d399' : '#60a5fa',
-      1.5
-    );
-    ctx.font = '700 10px system-ui, -apple-system, sans-serif';
+    // ── ROW 1: Role box (left 58%) + CTC box (right 40%) ─────────────────────
+    const gapBetween = 14;
+    const col1W = Math.round(cardW * 0.57) - 22;
+    const col2W = cardW - 44 - col1W - gapBetween;
+    const row1Y = cardY + 100;
+    const row1H = 80;
+
+    // Role box – white with grey border
+    drawRoundRect(cardX + 22, row1Y, col1W, row1H, 10, '#ffffff', '#e2e8f0', 1);
+
+    ctx.font = '600 9.5px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#94a3b8';
+    ctx.textAlign = 'left';
+    ctx.fillText('  JOB ROLE / DESIGNATION', cardX + 30, row1Y + 22);
+
+    ctx.font = 'bold 16px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#0f172a';
+    ctx.fillText(singleHeroLead.role || singleHeroLead.job_role || '—', cardX + 30, row1Y + 56);
+
+    // CTC box – light-blue bg, stronger blue border
+    drawRoundRect(cardX + 22 + col1W + gapBetween, row1Y, col2W, row1H, 10,
+      isPos ? '#f0fdf4' : '#eff6ff',
+      isPos ? '#34d399' : '#60a5fa', 1.5);
+
+    ctx.font = '700 9.5px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = isPos ? '#047857' : '#1e40af';
     ctx.textAlign = 'left';
-    ctx.fillText('OFFERED PACKAGE (CTC)', cardX + 24 + col1W + 28, row1Y + 22);
+    ctx.fillText('⚡ OFFERED PACKAGE (CTC)', cardX + 22 + col1W + gapBetween + 14, row1Y + 22);
 
-    ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
+    ctx.font = 'bold 24px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = isPos ? '#059669' : '#2563eb';
-    ctx.fillText(singleHeroLead.ctc || '—', cardX + 24 + col1W + 28, row1Y + 54);
+    ctx.fillText(singleHeroLead.ctc || '—', cardX + 22 + col1W + gapBetween + 14, row1Y + 60);
 
-    // 4. Row 2: Beneficiary Institution & Coordinator Box
-    const row2Y = row1Y + row1H + 12;
-    const row2H = 58;
+    // ── FOOTER BAR: College chip (left) + Coordinator (right) ────────────────
+    const footerBarY = row1Y + row1H + 14;
+    const footerBarH = 40;
+    drawRoundRect(cardX + 22, footerBarY, cardW - 44, footerBarH, 10, '#f8fafc', '#e2e8f0', 1);
 
-    // Beneficiary College Box
-    drawRoundRect(cardX + 24, row2Y, col1W, row2H, 8, '#ffffff', '#e2e8f0', 1);
-    ctx.font = '600 10px system-ui, -apple-system, sans-serif';
+    // College chip
+    const collegeVal = singleHeroLead.college_code || singleHeroLead.college_name || '—';
+    ctx.font = '600 11px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = '#64748b';
     ctx.textAlign = 'left';
-    ctx.fillText('BENEFICIARY INSTITUTION(S)', cardX + 38, row2Y + 20);
+    ctx.fillText('⊞ Target Colleges:', cardX + 34, footerBarY + 25);
 
-    ctx.font = 'bold 12.5px monospace';
-    ctx.fillStyle = isPos ? '#047857' : '#1d4ed8';
-    ctx.fillText(singleHeroLead.college_code || singleHeroLead.college_name || '—', cardX + 38, row2Y + 42);
+    const collegeLabelW = ctx.measureText('⊞ Target Colleges:').width + 10;
+    const chipW = ctx.measureText(collegeVal).width + 18;
+    const chipH = 22;
+    const chipY = footerBarY + (footerBarH - chipH) / 2;
+    const chipX = cardX + 34 + collegeLabelW;
+    drawRoundRect(chipX, chipY, chipW, chipH, 11,
+      isPos ? '#dcfce7' : '#dbeafe',
+      isPos ? '#86efac' : '#93c5fd', 1);
+    ctx.font = 'bold 10.5px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = isPos ? '#15803d' : '#1d4ed8';
+    ctx.textAlign = 'center';
+    ctx.fillText(collegeVal, chipX + chipW / 2, chipY + 15);
 
-    // Coordinator Box
-    drawRoundRect(cardX + 24 + col1W + 14, row2Y, col2W, row2H, 8, '#ffffff', '#e2e8f0', 1);
-    ctx.font = '600 10px system-ui, -apple-system, sans-serif';
+    // Coordinator (right side of footer bar)
+    const coordVal = singleHeroLead.coordinator || 'Placement Team';
+    const labelText = '👤 Coordinator : ';
+
+    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+    const nameWidth = ctx.measureText(coordVal).width;
+
+    ctx.font = '600 11px system-ui, -apple-system, sans-serif';
+    const labelWidth = ctx.measureText(labelText).width;
+
+    const rightPadding = 34;
+    const nameX = cardX + cardW - rightPadding - nameWidth;
+    const labelX = nameX - labelWidth;
+
     ctx.fillStyle = '#64748b';
     ctx.textAlign = 'left';
-    ctx.fillText('PLACEMENT COORDINATOR', cardX + 24 + col1W + 28, row2Y + 20);
+    ctx.fillText(labelText, labelX, footerBarY + 25);
 
-    ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
-    ctx.fillStyle = '#1e293b';
-    ctx.fillText(singleHeroLead.coordinator || 'Placement Team', cardX + 24 + col1W + 28, row2Y + 42);
+    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#0f172a';
+    ctx.textAlign = 'left';
+    ctx.fillText(coordVal, nameX, footerBarY + 25);
 
     currentY += cardH + 20;
   }

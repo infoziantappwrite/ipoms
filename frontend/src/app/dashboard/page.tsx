@@ -132,7 +132,12 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!sessionRead) return;
 
-    const refresh = () => loadDashboard(true);
+    const refresh = () => {
+      const currentHour = new Date().getHours();
+      // Live synchronization only active from 6:00 AM (06:00) to 7:00 PM (19:00)
+      if (currentHour < 6 || currentHour >= 19) return;
+      loadDashboard(true);
+    };
 
     let channel: BroadcastChannel | null = null;
     try {

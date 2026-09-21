@@ -80,33 +80,44 @@ export const DEFAULT_OFFICIAL_ALLOCATIONS: Record<string, string[]> = {
   'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
   'mohana': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
   'mohanaradha': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
+  'a.mohanaradha': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
+  'mohanaradha a': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
 
   // Thirisha: PSNA, DSU, SMVEC
   'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
   'thirisha': ['PSNA', 'DSU', 'SMVEC'],
+  'thirisha r': ['PSNA', 'DSU', 'SMVEC'],
 
   // Malvika: KLU, NGCE
   'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],
   'malavika': ['KLU', 'NGCE'],
   'malvika': ['KLU', 'NGCE'],
+  'malavika ramesh': ['KLU', 'NGCE'],
 
   // Lizenya: NPR, KIOT, ACEW
   'lizenya_r@infoziant.com': ['NPR', 'KIOT', 'ACEW'],
   'lizenya': ['NPR', 'KIOT', 'ACEW'],
+  'lizenya r': ['NPR', 'KIOT', 'ACEW'],
 
   // Megala: NGP, KAMARAJ
   'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ'],
   'megala': ['NGP', 'KAMARAJ'],
   'megaladevi': ['NGP', 'KAMARAJ'],
+  'megaladevi p s': ['NGP', 'KAMARAJ'],
+  'megaladevi ps': ['NGP', 'KAMARAJ'],
 
-  // Tamil: MCET, MEC
+  // Tamil / Seshmitha: MCET, MEC
   'seshmitha_tamil@icl.today': ['MCET', 'MEC'],
   'tamil': ['MCET', 'MEC'],
   'seshmitha': ['MCET', 'MEC'],
+  'tamilselvi': ['MCET', 'MEC'],
+  'seshmitha tamilselvi': ['MCET', 'MEC'],
+  'seshmitha tamilselvi r': ['MCET', 'MEC'],
 
   // Sujitha (Team Leader): NEHRU, MAREPHRA, KPR, HITS, SONA
   'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
   'sujitha': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
+  'sujitha s': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
 };
 
 /** Resolves default official college IDs for the current user */
@@ -116,11 +127,16 @@ export function getDefaultOfficialCollegeIdsForUser(user?: any): string[] {
 
   const email = (sessionUser.official_email || sessionUser.email || '').toLowerCase().trim();
   const username = (sessionUser.username || '').toLowerCase().trim();
+  const fullName = (sessionUser.full_name || '').toLowerCase().trim();
 
-  let codes = DEFAULT_OFFICIAL_ALLOCATIONS[email] || DEFAULT_OFFICIAL_ALLOCATIONS[username];
+  let codes = DEFAULT_OFFICIAL_ALLOCATIONS[email] || DEFAULT_OFFICIAL_ALLOCATIONS[username] || DEFAULT_OFFICIAL_ALLOCATIONS[fullName];
   if (!codes) {
     for (const [key, val] of Object.entries(DEFAULT_OFFICIAL_ALLOCATIONS)) {
-      if ((email && email.includes(key)) || (username && username.includes(key))) {
+      if (
+        (email && email.includes(key)) ||
+        (username && username.includes(key)) ||
+        (fullName && (fullName.includes(key) || key.includes(fullName)))
+      ) {
         codes = val;
         break;
       }
