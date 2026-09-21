@@ -188,3 +188,127 @@ export function smartParseTime(input: string | undefined | null, baseDate?: Date
     period,
   };
 }
+
+/**
+ * Automatically masks and formats time as the user types:
+ * 1. User types 1st two numbers (e.g. "03" or "15" or "10") -> automatically adds colon "03:" or "15:"
+ * 2. User types next two numbers (e.g. "48") -> 4 digits complete ("0348" or "1548")
+ * 3. Automatically deduces AM or PM and converts 24h to 12h:
+ *    - "0348" -> "03:48 PM" (hours 1-6 -> PM, 8-11 -> AM, 12 -> PM, 7 -> dynamic)
+ *    - "1548" -> "03:48 PM" (hours >= 13 -> PM and h-12)
+ *    - "0915" -> "09:15 AM"
+ * 4. Supports clean backspacing (doesn't trap the cursor when deleting colon).
+ * 5. Supports typing 'a' / 'am' or 'p' / 'pm' to switch period.
+ */
+export function formatTimeAutoMask(input: string, prevValue: string = ''): string {
+  if (!input) return '';
+
+  const raw = input.trim();
+  const isDeleting = prevValue.length > input.length;
+
+  // If user is backspacing from "03:" or "03: ", allow deleting without re-appending colon
+  if (isDeleting) {
+    if (prevValue.endsWith(':') && !input.endsWith(':')) {
+      return input.replace(/\D/g, '');
+    }
+    if (/\s[APMamp]{1,2}$/i.test(prevValue) && !/\s[APMamp]{2}$/i.test(input)) {
+      return input.replace(/\s*[APMamp]*$/i, '').trim();
+    }
+    return input;
+  }
+
+  // Check if explicit AM or PM indicator was entered
+  let explicitPeriod: 'AM' | 'PM' | null = null;
+  if (/a/i.test(raw)) explicitPeriod = 'AM';
+  if (/p/i.test(raw)) explicitPeriod = 'PM';
+
+  // Extract all digits
+  const digits = raw.replace(/\D/g, '');
+
+  if (digits.length === 0) {
+    return '';
+  }
+
+  if (digits.length === 1) {
+    if (raw.includes(':') || raw.includes(' ')) {
+      return `0${digits}:`;
+    }
+    return digits;
+  }
+
+  if (digits.length === 2) {
+    let h = parseInt(digits, 10);
+    if (h > 23) h = 23;
+    return `${digits}:`;
+  }
+
+  if (digits.length === 3) {
+    // If format is like "9:30" (single digit hour with colon already)
+    if (raw.startsWith(`${digits[0]}:`)) {
+      const h = parseInt(digits[0], 10);
+      const m = parseInt(digits.slice(1, 3), 10);
+      return deduceFullTime(h, m, explicitPeriod);
+    }
+    return `${digits.slice(0, 2)}:${digits[2]}`;
+  }
+
+  // 4 or more digits (e.g. "0348", "1548", "1030")
+  let h = parseInt(digits.slice(0, 2), 10);
+  let m = parseInt(digits.slice(2, 4), 10);
+
+  return deduceFullTime(h, m, explicitPeriod);
+}
+
+/**
+ * Deduce full 12-hour formatted time with automatic AM/PM deduction
+ */
+export function deduceFullTime(h: number, m: number, explicitPeriod: 'AM' | 'PM' | null = null): string {
+  if (isNaN(h)) h = 12;
+  if (isNaN(m)) m = 0;
+  if (m > 59) m = 59;
+  if (m < 0) m = 0;
+
+  let period: 'AM' | 'PM';
+
+  if (explicitPeriod) {
+    period = explicitPeriod;
+    if (h > 12) h = h % 12 || 12;
+    if (h === 0) h = 12;
+  } else {
+    if (h >= 13 && h <= 23) {
+      h = h - 12;
+      period = 'PM';
+    } else if (h === 0) {
+      h = 12;
+      period = 'AM';
+    } else if (h === 12) {
+      period = 'PM';
+    } else if (h >= 8 && h <= 11) {
+      period = 'AM';
+    } else if (h >= 1 && h <= 6) {
+      period = 'PM';
+    } else if (h === 7) {
+      const currentHour = new Date().getHours();
+      period = currentHour >= 12 ? 'PM' : 'AM';
+    } else {
+      period = new Date().getHours() >= 12 ? 'PM' : 'AM';
+    }
+  }
+
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}`;
+}
+
+/**
+ * Toggle AM/PM on an existing formatted time string
+ */
+export function toggleTimePeriod(currentTime: string): string {
+  if (!currentTime) return '';
+  if (/pm/i.test(currentTime)) {
+    return currentTime.replace(/\b(pm|p)\b/gi, 'AM');
+  }
+  if (/am/i.test(currentTime)) {
+    return currentTime.replace(/\b(am|a)\b/gi, 'PM');
+  }
+  return `${currentTime} AM`;
+}
+

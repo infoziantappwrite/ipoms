@@ -12,7 +12,7 @@ import {
   Target,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { getCoordinatorSelectedColleges, setActiveCollege } from '@/lib/collegeSession';
+import { getCoordinatorSelectedColleges, setActiveCollege, getCollegeAcronym } from '@/lib/collegeSession';
 
 interface CollegeKpiItem {
   college_id: string;
@@ -156,18 +156,19 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
 
       {/* ── Dynamic Per-College KPI Cards Grid ────────────────────────── */}
       <div className={`grid ${gridColsClass} gap-3`}>
-        {kpiData.map((item, index) => {
-          const totalOutreach = item.total_calls || 1;
-          const positivePct = Math.round(((item.total_positives || 0) / totalOutreach) * 100);
-          const notHiringPct = Math.round(((item.total_not_hiring || 0) / totalOutreach) * 100);
-          const negativePct = Math.round(((item.total_negatives || 0) / totalOutreach) * 100);
+        {kpiData.map((item) => {
+          const acronym = getCollegeAcronym({
+            college_code: item.college_code,
+            college_name: item.college_name,
+            college_id: item.college_id,
+          });
 
           return (
             <div
               key={item.college_id}
               className="rounded-xl border border-border/80 bg-surface shadow-2xs hover:border-border-strong hover:shadow-xs transition-all duration-200 overflow-hidden flex flex-col justify-between"
             >
-              {/* Card Header: Single Unified Link with College Details */}
+              {/* Card Header: College Acronym & Name Link */}
               <div className="px-3.5 py-2.5 border-b border-border/60 bg-surface">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1 flex items-center gap-2">
@@ -176,21 +177,17 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
                       onClick={() => {
                         setActiveCollege(item.college_id, item.college_name);
                       }}
-                      title={`${item.college_name}${item.location ? ` • ${item.location}` : ''} (Click to open tracker)`}
+                      title={`${item.college_name} (${acronym || ''}) - Click to open tracker`}
                       className="min-w-0 flex items-center gap-1.5 text-xs sm:text-sm font-bold text-fg hover:text-primary transition-colors group truncate"
                     >
                       <Building2 size={13} className="text-primary shrink-0 opacity-80 group-hover:opacity-100" />
-                      <span className="truncate group-hover:underline">{item.college_name}</span>
-                      {item.location && (
-                        <span className="text-[11px] font-normal text-fg-subtle shrink-0 hidden sm:inline">
-                          • {item.location}
+                      {acronym && (
+                        <span className="font-mono text-[10.5px] font-bold px-1.5 py-0.5 rounded-md bg-primary/10 text-primary dark:text-sky-300 border border-primary/25 shrink-0 tracking-wider">
+                          [{acronym}]
                         </span>
                       )}
+                      <span className="truncate group-hover:underline">{item.college_name}</span>
                     </Link>
-
-                    <span className="text-[9.5px] font-semibold text-fg-subtle shrink-0 bg-surface-sunken/80 px-1.5 py-0.5 rounded border border-border/60">
-                      Focus #{index + 1}
-                    </span>
                   </div>
 
                   {/* Positive Rate Badge */}
@@ -204,7 +201,7 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
               </div>
 
               {/* Minimal 4 KPI Metrics Grid */}
-              <div className="p-3 sm:p-3.5 space-y-2.5 flex-1 flex flex-col justify-between">
+              <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between">
                 <div className="grid grid-cols-2 gap-1.5">
                   {/* 1. Total Calls Made */}
                   <div className="p-2 rounded-lg bg-surface-sunken/60 border border-border/60 flex items-center justify-between gap-2">
@@ -256,37 +253,6 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
                       </span>
                     </div>
                     <Ban size={12} className="text-amber-600 dark:text-amber-400 shrink-0 opacity-80" />
-                  </div>
-                </div>
-
-                {/* Minimal Proportion Bar */}
-                <div className="space-y-1 pt-0.5">
-                  <div className="flex items-center justify-between text-[10px] text-fg-subtle font-medium">
-                    <span>Distribution</span>
-                    <span>{item.total_calls} Calls Logged</span>
-                  </div>
-                  <div className="w-full h-1 rounded-full bg-surface-sunken overflow-hidden flex">
-                    {item.total_positives > 0 && (
-                      <div
-                        style={{ width: `${positivePct}%` }}
-                        className="h-full bg-emerald-500"
-                        title={`Positives: ${item.total_positives}`}
-                      />
-                    )}
-                    {item.total_not_hiring > 0 && (
-                      <div
-                        style={{ width: `${notHiringPct}%` }}
-                        className="h-full bg-amber-500"
-                        title={`Not Hiring: ${item.total_not_hiring}`}
-                      />
-                    )}
-                    {item.total_negatives > 0 && (
-                      <div
-                        style={{ width: `${negativePct}%` }}
-                        className="h-full bg-slate-400 dark:bg-slate-600"
-                        title={`Negatives: ${item.total_negatives}`}
-                      />
-                    )}
                   </div>
                 </div>
               </div>

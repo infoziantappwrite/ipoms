@@ -40,6 +40,7 @@ import {
   formatTime,
   formatDurationMinutesLevel,
 } from '@/lib/timeValidation';
+import { SmoothTimeInput } from '@/components/ui/SmoothTimeInput';
 
 interface Props {
   coordinatorId: string;
@@ -847,18 +848,13 @@ export function ManualAddRowModal({
                   Now
                 </button>
               </div>
-              <div className="relative">
-                <Clock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
-                <input
-                  type="text"
-                  value={startTime}
-                  onChange={(e) => handleStartTimeChange(e.target.value)}
-                  onBlur={handleStartTimeBlur}
-                  placeholder="09:30 AM"
-                  title="Calling hours: 07:00 AM – 08:00 PM"
-                  className="w-full bg-surface-sunken border border-border text-xs text-fg pl-9 pr-2.5 py-2 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-fg-disabled shadow-2xs font-mono font-medium"
-                />
-              </div>
+              <SmoothTimeInput
+                value={startTime}
+                onChange={handleStartTimeChange}
+                onBlur={handleStartTimeBlur}
+                placeholder="09:30 AM"
+                title="Calling hours: 07:00 AM – 08:00 PM"
+              />
             </div>
 
             {/* End Time (Disabled / Auto-calculated) */}

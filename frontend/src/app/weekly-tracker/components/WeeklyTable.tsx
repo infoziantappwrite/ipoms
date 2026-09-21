@@ -1,13 +1,48 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { FolderOpen, Phone, Mail, Calendar, Copy, Check, GripVertical } from 'lucide-react';
+import { FolderOpen, Phone, Mail, Calendar, Copy, Check, GripVertical, Flame, AlertTriangle } from 'lucide-react';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { CompanyTypeDropdown } from './CompanyTypeDropdown';
+import { CtcInlineEditor } from './CtcInlineEditor';
 import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
 import { validateAndNormalizeIndianMobile, validateAndNormalizeEmail } from '@/lib/contactValidation';
 import { useToast } from '@/components/ui/Toast';
 import { triggerHaptic } from '@/lib/haptics';
+
+export type FollowUpStatus = 'today' | 'overdue' | 'upcoming' | 'none';
+
+// Follow-up tracking is deliberately scoped to just these two sections (user
+// decision, 20 Sep 2026) — shared with WeeklySection.tsx so the section-title
+// "N Overdue" pill and the in-table column/highlighting never drift apart.
+export const FOLLOWUP_SECTIONS = ['in_progress', 'pipeline'];
+
+export function getFollowUpStatus(followUpDate?: string | null): FollowUpStatus {
+  if (!followUpDate) return 'none';
+  try {
+    const d = new Date(followUpDate);
+    if (isNaN(d.getTime())) {
+      if (typeof followUpDate === 'string' && followUpDate.length === 10 && followUpDate.includes('-')) {
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        if (followUpDate === todayStr) return 'today';
+        if (followUpDate < todayStr) return 'overdue';
+        return 'upcoming';
+      }
+      return 'none';
+    }
+
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const targetStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    if (targetStr === todayStr) return 'today';
+    if (targetStr < todayStr) return 'overdue';
+    return 'upcoming';
+  } catch {
+    return 'none';
+  }
+}
 
 export interface WeeklyRow {
   _id: string;
@@ -26,8 +61,8 @@ export interface WeeklyRow {
   pipeline_section: string;
   is_pinned_top: boolean;
   current_status_text: string;
-  follow_up_date?: string;
-  drive_date?: string;
+  follow_up_date?: string | null;
+  drive_date?: string | null;
   registered_count?: number;
   shortlisted_count?: number;
   selected_count?: number;
@@ -72,6 +107,50 @@ async function copyToClipboard(text: string) {
   }
 }
 
+function formatCtcSegments(rawCtc?: string): string[] {
+  if (!rawCtc) return [];
+  const trimmed = rawCtc.trim();
+  if (!trimmed || trimmed === '-' || trimmed.toLowerCase() === 'not mentioned' || trimmed.toLowerCase() === 'competitive') {
+    return [];
+  }
+
+  // Split on newline or semicolon
+  let rawParts: string[] = [];
+  if (trimmed.includes('\n')) {
+    rawParts = trimmed.split('\n');
+  } else if (trimmed.includes(';')) {
+    rawParts = trimmed.split(';');
+  } else if (
+    trimmed.includes(',') &&
+    (trimmed.toLowerCase().includes('lpa') ||
+      trimmed.toLowerCase().includes('month') ||
+      trimmed.toLowerCase().includes('pm') ||
+      trimmed.toLowerCase().includes('stipend') ||
+      trimmed.toLowerCase().includes('k/'))
+  ) {
+    rawParts = trimmed.split(',');
+  } else {
+    // Check if both LPA and month/stipend appear in one unpunctuated string
+    const matchBoth = trimmed.match(/(.+?\b(?:LPA|lpa)\b)\s*(?:[\/,+]\s*|\s+)(.+?\b(?:month|pm|stipend)\b.*)/i);
+    if (matchBoth) {
+      rawParts = [matchBoth[1], matchBoth[2]];
+    } else {
+      rawParts = [trimmed];
+    }
+  }
+
+  return rawParts
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) =>
+      p
+        .replace(/(\d+(?:\.\d+)?)\s*[-–—]\s*(\d+(?:\.\d+)?)/g, '$1 - $2')
+        .replace(/(\d+)\s*LPA/gi, '$1 LPA')
+        .replace(/\s+/g, ' ')
+        .trim()
+    );
+}
+
 export function WeeklyTable({
   rows,
   sectionKey,
@@ -92,7 +171,7 @@ export function WeeklyTable({
   const [copiedEmail, setCopiedEmail] = useState(false);
 
   const isCompletedSection = sectionKey === 'completed';
-  const hasFollowUpColumn = ['drive_in_progress', 'in_drive', 'companies_in_drive', 'upcoming_drives', 'in_progress', 'pipeline', 'follow_ups_due_today'].includes(sectionKey);
+  const hasFollowUpColumn = FOLLOWUP_SECTIONS.includes(sectionKey);
   const hasContactAndEmail = ['drive_in_progress', 'in_drive', 'companies_in_drive', 'upcoming_drives', 'in_progress', 'pipeline'].includes(sectionKey);
   const hasJdDbDates = ['drive_in_progress', 'in_drive', 'companies_in_drive', 'upcoming_drives', 'in_progress'].includes(sectionKey);
 
@@ -381,7 +460,7 @@ export function WeeklyTable({
   const isPartiallySectionSelected = sectionSelectedCount > 0 && sectionSelectedCount < localRows.length;
 
   return (
-    <div className="overflow-x-auto bg-white dark:bg-[#161D2E]">
+    <div className="overflow-x-auto bg-white dark:bg-[#161D2E] scroll-smooth overscroll-x-contain">
       <table className="w-full text-xs text-left border-separate border-spacing-0 bg-white dark:bg-[#161D2E]">
         <thead>
           <tr className="bg-[#F1F5F9] dark:bg-[#0D111C] text-fg-muted font-semibold border-b border-border uppercase tracking-wider text-micro select-none">
@@ -431,7 +510,7 @@ export function WeeklyTable({
             {/* Frozen 4: CTC (Last Frozen Column with solid border & shadow) */}
             <th
               style={{ left: ctcLeft }}
-              className="sticky z-30 bg-[#F1F5F9] dark:bg-[#0D111C] py-2.5 px-3 w-[95px] min-w-[95px] max-w-[95px] border-b border-border border-r-2 border-border/80 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)] dark:shadow-[4px_0_10px_-2px_rgba(0,0,0,0.45)]"
+              className="sticky z-30 bg-[#F1F5F9] dark:bg-[#0D111C] py-2.5 px-2.5 w-[175px] min-w-[175px] max-w-[175px] border-b border-border border-r-2 border-border/80 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)] dark:shadow-[4px_0_10px_-2px_rgba(0,0,0,0.45)] select-none text-left"
             >
               CTC
             </th>
@@ -500,7 +579,7 @@ export function WeeklyTable({
                 Status <span className="text-rose-500 font-bold">*</span>
               </span>
             </th>
-            <th className="py-2.5 px-3 min-w-[190px] border-b border-border bg-[#F1F5F9] dark:bg-[#0D111C]">
+            <th className="py-2.5 px-3 min-w-[220px] border-b border-border bg-[#F1F5F9] dark:bg-[#0D111C]">
               Company Type
             </th>
 
@@ -693,22 +772,45 @@ function TableRow({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, field: string) => {
-    if (e.key === 'Enter') commitEdit(field);
-    if (e.key === 'Escape') setEditingField(null);
+    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+      e.preventDefault();
+      commitEdit(field);
+    } else if (e.key === 'Enter') {
+      commitEdit(field);
+    } else if (e.key === 'Escape') {
+      setEditingField(null);
+    }
   };
 
+  const followUpStatus = hasFollowUpColumn ? getFollowUpStatus(row.follow_up_date) : 'none';
+
+  // Row backgrounds are deliberately plain white/card everywhere now (user
+  // decision, 20 Sep 2026) — a fully-tinted row for every overdue/today/pinned
+  // company read as noisy across a long list ("every row a shade of red").
+  // The section title's "N Overdue"/"N Due Today" pill (WeeklySection.tsx)
+  // carries the aggregate signal now; a per-row cue still exists but is a
+  // small icon + a thin accent border on the frozen S.No cell only (below),
+  // never a full-row wash. Selection (checkbox mode) is the one state that
+  // still gets a background, since it's transient and needs to stay obvious.
   // 100% Solid opaque backgrounds with zero transparency so scrolled content never bleeds through
   const stickyBg = isSelected
     ? 'bg-indigo-50 dark:bg-indigo-950/60 group-hover/row:bg-indigo-100/90 dark:group-hover/row:bg-indigo-900/70'
-    : row.is_pinned_top
-    ? 'bg-[#EFF6FF] dark:bg-[#1E293B] group-hover/row:bg-[#DBEAFE] dark:group-hover/row:bg-[#253349]'
     : 'bg-white dark:bg-[#161D2E] group-hover/row:bg-[#F8FAFC] dark:group-hover/row:bg-[#1E2738]';
 
   const nonStickyBg = isSelected
     ? 'bg-indigo-50 dark:bg-indigo-950/60 group-hover/row:bg-indigo-100/90 dark:group-hover/row:bg-indigo-900/70'
-    : row.is_pinned_top
-    ? 'bg-[#EFF6FF] dark:bg-[#1E293B] group-hover/row:bg-[#DBEAFE] dark:group-hover/row:bg-[#253349]'
     : 'bg-white dark:bg-[#161D2E] group-hover/row:bg-[#F8FAFC] dark:group-hover/row:bg-[#1E2738]';
+
+  // Accent for the frozen S.No cell's left edge — applied to a <td>, not the
+  // <tr>, since a border set directly on a table row renders unreliably (a
+  // real bug found and reproduced live: two rows with the identical
+  // "border-l-rose-500" class computed different colors). A <td>'s own
+  // border always paints, per spec.
+  const snoAccentClass = followUpStatus === 'today'
+    ? 'border-l-[3px] border-l-amber-500 dark:border-l-amber-400'
+    : followUpStatus === 'overdue'
+    ? 'border-l-[3px] border-l-rose-500 dark:border-l-rose-400'
+    : 'border-l-[3px] border-l-transparent';
 
   return (
     <tr
@@ -756,8 +858,12 @@ function TableRow({
       {/* 1. S.No & Excel-like Drag Grip Handle (Frozen) */}
       <td
         style={{ left: sNoLeft }}
-        className={`sticky z-20 py-2.5 px-1.5 w-12 min-w-[48px] max-w-[48px] text-center text-fg-subtle font-mono text-micro font-medium border-b border-border/60 select-none cursor-grab active:cursor-grabbing group/sno ${stickyBg}`}
-        title="Hold or drag to swap row position (Excel-like row reordering)"
+        className={`sticky z-20 py-2.5 px-1.5 w-12 min-w-[48px] max-w-[48px] text-center text-fg-subtle font-mono text-micro font-medium border-b border-border/60 select-none cursor-grab active:cursor-grabbing group/sno ${stickyBg} ${snoAccentClass}`}
+        title={
+          followUpStatus === 'today' ? 'Follow-up due today'
+          : followUpStatus === 'overdue' ? 'Follow-up overdue'
+          : 'Hold or drag to swap row position (Excel-like row reordering)'
+        }
       >
         <div className="flex items-center justify-center gap-0.5 w-full">
           <GripVertical
@@ -774,7 +880,14 @@ function TableRow({
         style={{ left: companyLeft }}
         className={`sticky z-20 py-2.5 px-3 w-[200px] min-w-[200px] max-w-[200px] font-semibold text-fg border-b border-border/60 ${stickyBg}`}
       >
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-start gap-1.5">
+          {/* Icon-only marker shown from the start of the company name (Overdue / Today) */}
+          {followUpStatus === 'today' && (
+            <Flame size={13} strokeWidth={2.5} className="text-amber-500 shrink-0 mt-0.5" aria-label="Follow-up due today" />
+          )}
+          {followUpStatus === 'overdue' && (
+            <AlertTriangle size={13} strokeWidth={2.5} className="text-rose-500 shrink-0 mt-0.5" aria-label="Follow-up overdue" />
+          )}
           {editingField === 'company_name' ? (
             <input
               type="text"
@@ -788,7 +901,7 @@ function TableRow({
           ) : (
             <span
               onClick={() => startEdit('company_name', row.company_name)}
-              className="cursor-pointer hover:text-primary transition-colors font-bold whitespace-normal break-words leading-snug"
+              className="cursor-pointer hover:text-primary transition-colors font-bold whitespace-normal break-words leading-snug flex-1"
               title={row.company_name}
             >
               {row.company_name}
@@ -818,14 +931,18 @@ function TableRow({
             className="cursor-pointer hover:text-primary transition-colors flex flex-wrap gap-1"
           >
             {row.job_role && row.job_role.trim() ? (
-              row.job_role.split(',').map((r, i) => (
-                <span
-                  key={i}
-                  className="bg-surface-sunken border border-border text-fg-muted px-1.5 py-0.5 rounded text-micro truncate max-w-[150px]"
-                >
-                  {r.trim()}
-                </span>
-              ))
+              row.job_role
+                .split(/[,/\\;]+/)
+                .map((r) => r.trim())
+                .filter(Boolean)
+                .map((r, i) => (
+                  <span
+                    key={i}
+                    className="bg-surface-sunken border border-border text-fg-muted px-1.5 py-0.5 rounded text-micro truncate max-w-[150px]"
+                  >
+                    {r}
+                  </span>
+                ))
             ) : (
               <span className="text-fg-disabled italic">—</span>
             )}
@@ -836,26 +953,13 @@ function TableRow({
       {/* 4. CTC (Frozen - End of Frozen Zone with solid border and shadow) */}
       <td
         style={{ left: ctcLeft }}
-        className={`sticky z-20 py-2.5 px-3 w-[95px] min-w-[95px] max-w-[95px] text-emerald-600 dark:text-emerald-400 font-mono font-medium border-b border-border/60 border-r-2 border-border/80 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)] dark:shadow-[4px_0_10px_-2px_rgba(0,0,0,0.45)] ${stickyBg}`}
+        className={`sticky z-20 py-2 px-2.5 w-[175px] min-w-[175px] max-w-[175px] border-b border-border/60 border-r-2 border-border/80 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)] dark:shadow-[4px_0_10px_-2px_rgba(0,0,0,0.45)] ${stickyBg}`}
+        onClick={(e) => e.stopPropagation()}
       >
-        {editingField === 'ctc_lpa' ? (
-          <input
-            type="text"
-            value={tempValue}
-            onChange={(e) => setTempValue(e.target.value)}
-            onBlur={() => commitEdit('ctc_lpa')}
-            onKeyDown={(e) => handleKeyDown(e, 'ctc_lpa')}
-            autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-full outline-none shadow-xs"
-          />
-        ) : (
-          <span
-            onClick={() => startEdit('ctc_lpa', row.ctc_lpa)}
-            className="cursor-pointer hover:text-primary transition-colors font-bold"
-          >
-            {row.ctc_lpa || <span className="text-fg-disabled italic">—</span>}
-          </span>
-        )}
+        <CtcInlineEditor
+          value={row.ctc_lpa}
+          onChange={(newCtc) => onUpdateRow(row._id, { ctc_lpa: newCtc })}
+        />
       </td>
 
       {/* ── Scrollable Body Columns (Placed after CTC) ── */}
@@ -991,7 +1095,7 @@ function TableRow({
       </td>
 
       {/* 5b. Company Type */}
-      <td className={`py-2.5 px-3 whitespace-nowrap border-b border-border/60 relative z-0 ${nonStickyBg}`} onClick={(e) => e.stopPropagation()}>
+      <td className={`py-2.5 px-3 whitespace-nowrap border-b border-border/60 relative z-0 min-w-[220px] ${nonStickyBg}`} onClick={(e) => e.stopPropagation()}>
         <CompanyTypeDropdown
           value={row.company_type}
           onChange={(newType) => onUpdateRow(row._id, { company_type: newType })}
@@ -1001,7 +1105,13 @@ function TableRow({
       {/* ── Follow Up Date Column ── */}
       {hasFollowUpColumn && (
         <td className={`py-2.5 px-3 text-center whitespace-nowrap border-b border-border/60 relative z-0 ${nonStickyBg}`} onClick={(e) => e.stopPropagation()}>
-          <div className="inline-flex items-center justify-center">
+          <div className={`inline-flex items-center justify-center p-0.5 rounded-full transition-all ${
+            followUpStatus === 'today'
+              ? 'ring-2 ring-amber-500 dark:ring-amber-400 bg-amber-400/20 dark:bg-amber-500/20 animate-pulse'
+              : followUpStatus === 'overdue'
+              ? 'ring-2 ring-rose-400 dark:ring-rose-500 bg-rose-400/20 dark:bg-rose-500/20'
+              : ''
+          }`}>
             <SmoothDatePicker
               value={(() => {
                 if (!row.follow_up_date) return '';
@@ -1014,7 +1124,7 @@ function TableRow({
                 }
               })()}
               onChange={(newDate) => {
-                onUpdateRow(row._id, { follow_up_date: newDate || undefined });
+                onUpdateRow(row._id, { follow_up_date: newDate || null });
               }}
               minDate={(() => {
                 const now = new Date();
@@ -1028,7 +1138,7 @@ function TableRow({
               clearable={true}
               variant="pill"
               size="sm"
-              theme="navy"
+              theme={followUpStatus === 'today' ? 'amber' : 'navy'}
             />
           </div>
         </td>

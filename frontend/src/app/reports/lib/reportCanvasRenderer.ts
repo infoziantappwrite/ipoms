@@ -142,10 +142,9 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
     } else if (report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined) {
       kpiCards = [
         { label: 'Total Active Leads', val: report.kpi_summary.total_leads || 0, color: '#2563eb', bg: '#eff6ff', border: '#93c5fd', labelColor: '#1e40af', key: 'total_leads' },
-        { label: 'JD Received', val: report.kpi_summary.hot_leads_count || 0, color: '#d97706', bg: '#fffbeb', border: '#fcd34d', labelColor: '#92400e', key: 'hot_leads_count' },
-        { label: 'Positives Received', val: report.kpi_summary.warm_leads_count || 0, color: '#059669', bg: '#ecfdf5', border: '#6ee7b7', labelColor: '#065f46', key: 'warm_leads_count' },
-        { label: 'Weekly Pipeline', val: report.kpi_summary.pipeline_leads_count || 0, color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', labelColor: '#3730a3', key: 'pipeline_leads_count' },
-        { label: 'Graduating Batch', val: report.kpi_summary.graduating_year || '2027', color: '#059669', bg: '#ecfdf5', border: '#6ee7b7', labelColor: '#065f46', key: 'graduating_year' },
+        { label: 'JD Received Companies', val: report.kpi_summary.hot_leads_count ?? report.kpi_summary.jd_received_count ?? 0, color: '#d97706', bg: '#fffbeb', border: '#fcd34d', labelColor: '#92400e', key: 'hot_leads_count' },
+        { label: 'Companies in Pipeline', val: report.kpi_summary.pipeline_leads_count ?? report.kpi_summary.pipeline_count ?? 0, color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', labelColor: '#3730a3', key: 'pipeline_leads_count' },
+        { label: 'Graduating Batch', val: report.kpi_summary.graduating_year || 'All Batches', color: '#059669', bg: '#ecfdf5', border: '#6ee7b7', labelColor: '#065f46', key: 'graduating_year' },
       ];
     } else if (report.is_multi_college) {
       kpiCards = [
@@ -1548,7 +1547,7 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
   let rawTitle =
     report.report_title ||
     (report.template_type === 'month_end'
-      ? `${report.report_period?.split(' ')[0] || 'August'} Month Placement Operations Report`
+      ? `${report.report_period?.split(' ')[0] || 'August'} Month Placement Report`
       : report.template_type === 'pending_tasks'
       ? 'Pending Task Placement Report'
       : report.template_type === 'active_leads'
@@ -1607,9 +1606,12 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
   let metaText = '';
   const cleanPeriod = getCleanPeriod(report.report_period);
   if (report.template_type === 'weekly_placement' && cleanPeriod) {
-    metaText = `Period: ${cleanPeriod}         Generated Date: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
+    metaText = `Period: ${cleanPeriod}         Generated On: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
+  } else if (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') {
+    const reportDate = report.report_period || (report as any).day_date || report.kpi_summary?.report_date || report.generated_date;
+    metaText = `Report Date: ${reportDate}         Generated On: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
   } else {
-    metaText = `Generated Date: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
+    metaText = `Generated On: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
   }
   ctx.fillText(metaText, W / 2, currentY + 21);
 

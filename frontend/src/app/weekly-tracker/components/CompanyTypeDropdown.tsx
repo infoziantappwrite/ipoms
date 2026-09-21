@@ -24,14 +24,16 @@ export function CompanyTypeDropdown({
   const menuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const displayValue = value && value.trim() ? value.trim() : 'Select Sector';
-  const isPlaceholder = !value || !value.trim();
+  const rawVal = value && typeof value === 'string' ? value.trim() : '';
+  const isInvalidType = !rawVal || /^\d+$/.test(rawVal) || rawVal === '-' || rawVal.toLowerCase() === 'undefined' || rawVal.toLowerCase() === 'null';
+  const displayValue = isInvalidType ? 'Select Company Type' : rawVal;
+  const isPlaceholder = isInvalidType;
 
   const calculateCoords = useCallback(() => {
     if (!triggerRef.current) return null;
     const rect = triggerRef.current.getBoundingClientRect();
     const popoverHeight = 280;
-    const popoverWidth = 260;
+    const popoverWidth = 280;
     const spaceBelow = window.innerHeight - rect.bottom;
     const placeAbove = spaceBelow < popoverHeight && rect.top > popoverHeight;
 
@@ -125,7 +127,7 @@ export function CompanyTypeDropdown({
     : COMPANY_TYPES;
 
   return (
-    <div className="relative inline-block w-full max-w-[210px]" onClick={(e) => e.stopPropagation()}>
+    <div className="relative inline-block w-full min-w-[200px]" onClick={(e) => e.stopPropagation()}>
       {/* ── Minimal SaaS Trigger Pill / Button ─────────────────────────── */}
       <button
         ref={triggerRef}
@@ -139,7 +141,7 @@ export function CompanyTypeDropdown({
             : 'bg-surface-sunken/80 border-border/80 text-fg hover:border-primary/60 hover:bg-surface'
         } ${isOpen ? 'ring-2 ring-primary/20 border-primary bg-surface shadow-xs' : ''}`}
       >
-        <span className="truncate leading-tight text-micro block font-semibold">
+        <span className="leading-tight text-xs block font-semibold whitespace-nowrap">
           {displayValue}
         </span>
         <ChevronDown
@@ -163,7 +165,7 @@ export function CompanyTypeDropdown({
               top: coords.placeAbove ? 'auto' : `${coords.top}px`,
               bottom: coords.placeAbove ? `${window.innerHeight - coords.top}px` : 'auto',
               left: `${coords.left}px`,
-              width: '260px',
+              width: '280px',
               zIndex: 99999,
             }}
             className="bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 rounded-xl shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] p-1.5 flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150 ease-out text-fg select-none overflow-hidden"

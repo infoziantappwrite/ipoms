@@ -154,14 +154,19 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const toast = useCallback(
     (message: string, kind: ToastKind = 'info') => {
-      const id = nextId++;
-      setToasts((t) => [...t, { id, kind, message }]);
+      setToasts((t) => {
+        // Prevent duplicate identical toasts from stacking
+        if (t.some((existing) => existing.message === message)) {
+          return t;
+        }
+        const id = nextId++;
+        // Auto-dismiss in 4-6s
+        window.setTimeout(() => dismiss(id), kind === 'error' ? 6000 : 4200);
+        return [...t, { id, kind, message }];
+      });
 
       // Trigger multimodal haptic on dispatch
       triggerHaptic(kind === 'error' ? 'error' : kind === 'success' ? 'success' : 'light');
-
-      // Auto-dismiss in 4-6s
-      window.setTimeout(() => dismiss(id), kind === 'error' ? 6000 : 4200);
     },
     [dismiss],
   );

@@ -8,8 +8,6 @@ import {
   Sunrise,
   Sunset,
   Calendar,
-  PhoneCall,
-  ArrowRight,
   Sparkles,
   HelpCircle,
   type LucideIcon
@@ -192,7 +190,7 @@ export function DashboardHeader() {
 
   return (
     <header
-      className={`w-full relative overflow-hidden select-none border-b transition-colors duration-700 min-h-[5cm] flex items-center ${
+      className={`w-full relative overflow-hidden select-none border-b transition-colors duration-700 min-h-[7cm] h-[7cm] flex items-center ${
         isNight
           ? 'bg-gradient-to-r from-white via-slate-100/95 via-30% via-slate-300/80 via-60% to-[#0b1329] text-slate-900 dark:from-[#060c1c] dark:via-[#0c1630] dark:to-[#070e24] dark:text-white border-border dark:border-indigo-950/80 shadow-md'
           : 'bg-gradient-to-b from-surface via-surface to-background text-fg border-border shadow-xs'
@@ -201,13 +199,13 @@ export function DashboardHeader() {
       {/* ── Ambient Dynamic Sky Animation (Day: Sun + Clouds + Birds | Night: Full Moon + Twinkling Stars + Cosmic Nebula) ── */}
       <DashboardAmbientScene />
 
-      {/* ── Foreground Content Container (Compact 5cm Height) ── */}
-      <div className="w-full max-w-7xl mx-auto px-5 sm:px-6 py-3.5 relative z-10 flex flex-col justify-between min-h-[5cm] gap-2.5">
-        {/* ── TOP BAR: Compact Greeting Badge + Controls ── */}
+      {/* ── Foreground Content Container (7cm Height for all users) ── */}
+      <div className="w-full max-w-7xl mx-auto px-5 sm:px-6 py-5 relative z-10 flex flex-col justify-between min-h-[7cm] h-[7cm] gap-3">
+        {/* ── TOP BAR: Greeting Badge + Controls ── */}
         <div className="flex items-center justify-between gap-3">
           {/* Greeting Badge */}
           <div
-            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-bold shadow-2xs transition-colors ${
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full border text-xs font-bold shadow-2xs transition-colors ${
               isNight
                 ? 'bg-white/85 dark:bg-white/10 border-slate-200 dark:border-white/20 text-slate-800 dark:text-amber-300 backdrop-blur-md shadow-xs'
                 : 'bg-surface-sunken border-border text-fg'
@@ -245,13 +243,13 @@ export function DashboardHeader() {
           </div>
         </div>
 
-        {/* ── CENTER HERO: Profile Card + Compact Headline, Quote & Actions ── */}
-        <div className="flex items-center gap-4 sm:gap-6 flex-1">
+        {/* ── CENTER HERO: Profile Card + Headline, Quote & Actions ── */}
+        <div className="flex items-center gap-5 sm:gap-6 flex-1 pb-1">
           {/* Profile Photo Card */}
           <Link
             href="/settings"
             title="Click to view or edit photo in Settings"
-            className={`relative block w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border shadow-sm group shrink-0 transition-all duration-300 cursor-pointer ${
+            className={`relative block w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden border shadow-sm group shrink-0 transition-all duration-300 cursor-pointer ${
               isNight
                 ? 'bg-white/95 dark:bg-[#0e1938] border-slate-200 dark:border-indigo-500/40 shadow-md dark:shadow-xl ring-1 ring-slate-900/5 dark:ring-white/10 hover:shadow-primary/20 hover:border-primary/50'
                 : 'bg-surface border-border hover:shadow-primary/20 hover:border-primary/50'
@@ -265,7 +263,7 @@ export function DashboardHeader() {
               />
             ) : (
               <div
-                className={`w-full h-full flex items-center justify-center font-display font-black text-2xl sm:text-3xl group-hover:scale-105 transition-transform duration-300 ${
+                className={`w-full h-full flex items-center justify-center font-display font-black text-3xl sm:text-4xl group-hover:scale-105 transition-transform duration-300 ${
                   isNight
                     ? 'bg-primary-subtle text-primary dark:bg-gradient-to-br dark:from-[#162752] dark:to-[#0c1630] dark:text-sky-300 dark:drop-shadow-[0_0_20px_rgba(56,189,248,0.4)]'
                     : 'bg-primary-subtle text-primary'
@@ -277,9 +275,9 @@ export function DashboardHeader() {
           </Link>
 
           {/* Headline, Quote & Action Row */}
-          <div className="flex-1 min-w-0 space-y-1.5">
+          <div className="flex-1 min-w-0 space-y-2">
             <h1
-              className={`text-xl sm:text-2xl lg:text-3xl font-black tracking-tight font-display leading-tight truncate ${
+              className={`text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight font-display leading-tight truncate ${
                 isNight
                   ? 'text-slate-900 dark:text-white dark:drop-shadow-[0_2px_10px_rgba(0,0,0,0.7)]'
                   : 'text-fg'
@@ -290,17 +288,17 @@ export function DashboardHeader() {
 
             {/* Motivational Line (Smooth Auto-Fade) */}
             <p
-              className={`text-xs sm:text-sm max-w-2xl font-medium truncate transition-all duration-700 ${
+              className={`text-xs sm:text-sm md:text-base max-w-3xl font-medium truncate transition-all duration-700 ${
                 isNight ? 'text-slate-700 dark:text-slate-200' : 'text-fg-muted'
               } ${isFading ? 'opacity-0 translate-y-0.5' : 'opacity-100 translate-y-0'}`}
             >
               {currentQuote}
             </p>
 
-            {/* Action Bar: Date Pill + Launch Tracker Shortcut */}
+            {/* Action Bar: Date Pill */}
             <div className="flex flex-wrap items-center gap-2.5 pt-0.5 text-xs">
               <div
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-semibold shadow-2xs transition-colors text-[11px] sm:text-xs ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-semibold shadow-2xs transition-colors text-xs ${
                   isNight
                     ? 'bg-white/85 dark:bg-white/10 border border-slate-200 dark:border-white/15 text-slate-700 dark:text-slate-200 backdrop-blur-md'
                     : 'bg-surface-sunken border border-border text-fg-muted'
@@ -309,15 +307,6 @@ export function DashboardHeader() {
                 <Calendar size={13} className={isNight ? 'text-primary dark:text-amber-400' : 'text-primary'} />
                 <span>Today • {todayFormatted}</span>
               </div>
-
-              <Link
-                href="/tracker"
-                className="flex items-center gap-1.5 px-3.5 py-1 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-[11px] sm:text-xs font-bold shadow-xs transition-all hover:scale-105 active:scale-[0.992] cursor-pointer"
-              >
-                <PhoneCall size={12} />
-                <span>Launch Daily Tracker</span>
-                <ArrowRight size={12} />
-              </Link>
             </div>
           </div>
         </div>

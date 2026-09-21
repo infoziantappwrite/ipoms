@@ -168,9 +168,8 @@ const ACTIVE_17_COLLEGE_CODES = [
 
 const ACTIVE_LEADS_KPIS = [
   { key: 'total_leads', label: 'Total Leads', desc: 'Active Corporate Leads' },
-  { key: 'hot_leads_count', label: 'JD Received', desc: 'Verified JD Received' },
-  { key: 'warm_leads_count', label: 'Positives Received', desc: 'Confirmed Positives' },
-  { key: 'pipeline_leads_count', label: 'Weekly Pipeline', desc: 'In-Progress & Pipeline' },
+  { key: 'hot_leads_count', label: 'JD Received Companies', desc: 'In-Progress, In Drive & Completed' },
+  { key: 'pipeline_leads_count', label: 'Companies in Pipeline', desc: 'Pipeline Discussions' },
   { key: 'graduating_year', label: 'Graduating Batch', desc: 'Target Batch Year' },
 ];
 
@@ -279,15 +278,13 @@ export function ReportBuilderWizard({
     return initialDate || new Date().toISOString().split('T')[0];
   });
 
-  // Active Leads Stream Filter Selection (JD Received, Positives, Weekly Tracker)
+  // Active Leads Stream Filter Selection (JD Received Companies, Companies in Pipeline)
   const [activeLeadStreams, setActiveLeadStreams] = useState<{
     jd_received: boolean;
-    positives: boolean;
-    weekly_tracker: boolean;
+    pipeline: boolean;
   }>({
     jd_received: true,
-    positives: true,
-    weekly_tracker: true,
+    pipeline: true,
   });
 
   // Active Leads Table Columns Selector
@@ -302,7 +299,9 @@ export function ReportBuilderWizard({
   });
 
   // Prepared By / Sign-off Footer Options
-  const [includePreparedBy, setIncludePreparedBy] = useState<boolean>(true);
+  const [includePreparedBy, setIncludePreparedBy] = useState<boolean>(() => {
+    return initialTemplateType !== 'active_leads';
+  });
   const [preparedByName, setPreparedByName] = useState<string>(() => {
     return readSessionUser()?.full_name || 'Placement Coordinator';
   });
@@ -420,7 +419,7 @@ export function ReportBuilderWizard({
     } else if (initialTemplateType === 'active_leads') {
       s.kpi_summary = false;
       s.active_leads = true;
-      s.remarks = true;
+      s.remarks = false;
     } else if (initialTemplateType === 'month_end') {
       s.kpi_summary = false;
       s.completed_companies = true;
@@ -524,8 +523,10 @@ export function ReportBuilderWizard({
   // Prioritize active focus colleges first, followed by all remaining colleges in alphabetical order
   const prioritizedColleges = useMemo(() => {
     const coordinatorSelectedIds = getCoordinatorSelectedColleges();
-    const focusedIdsFromColleges = (colleges as any[]).filter((c) => c.is_selected_by_me).map((c) => c._id);
-    const activeFocusIds = Array.from(new Set([...coordinatorSelectedIds, ...focusedIdsFromColleges]));
+    const activeFocusIds =
+      coordinatorSelectedIds.length > 0
+        ? coordinatorSelectedIds
+        : (colleges as any[]).filter((c) => c.is_selected_by_me).map((c) => c._id);
     return sortCollegesWithPriority(colleges as any[], activeFocusIds);
   }, [colleges]);
 
@@ -900,8 +901,9 @@ export function ReportBuilderWizard({
         setSections({
           kpi_summary: false,
           active_leads: true,
-          remarks: true,
+          remarks: false,
         });
+        setIncludePreparedBy(false);
         setCustomRemarks('Comprehensive active corporate roster curated for campus recruitment engagements.');
       } else if (initialTemplateType === 'month_end') {
         setSections({
@@ -1082,13 +1084,15 @@ export function ReportBuilderWizard({
         pending_tasks: true,
         remarks: true,
       });
+      setIncludePreparedBy(true);
       setCustomRemarks('All pending action items are actively tracked with institutions and corporate HRs for prompt closure.');
     } else if (newType === 'active_leads') {
       setSections({
         kpi_summary: false,
         active_leads: true,
-        remarks: true,
+        remarks: false,
       });
+      setIncludePreparedBy(false);
       setCustomRemarks('Comprehensive active corporate roster curated for campus recruitment engagements.');
     } else if (newType === 'month_end') {
       setSections({
@@ -1101,6 +1105,7 @@ export function ReportBuilderWizard({
         on_hold_by_hr: true,
         remarks: false,
       });
+      setIncludePreparedBy(true);
       setStartDate('2026-08-01');
       setEndDate('2026-08-31');
       setCustomRemarks('Comprehensive monthly recruitment progress review covering conversions, scheduled drives, and placement selections.');
@@ -1137,6 +1142,7 @@ export function ReportBuilderWizard({
         on_hold_by_hr: true,
         remarks: true,
       });
+      setIncludePreparedBy(true);
       setCustomRemarks('All campus drives are progressing actively as per schedule. Follow-ups with upcoming tech partners remain on track.');
     }
   };
@@ -1166,8 +1172,8 @@ export function ReportBuilderWizard({
 
     // 2b. Active Leads Stream Selection (At least one stream must be active)
     if (templateType === 'active_leads') {
-      if (!activeLeadStreams.jd_received && !activeLeadStreams.positives && !activeLeadStreams.weekly_tracker) {
-        errors.push('Please select at least one stream (JD Received, Positives, or Weekly Tracker) to build the Active Leads report.');
+      if (!activeLeadStreams.jd_received && !activeLeadStreams.pipeline) {
+        errors.push('Please select at least one stream (JD Received Companies or Companies in Pipeline) to build the Active Leads report.');
       }
     }
 
@@ -1606,9 +1612,7 @@ export function ReportBuilderWizard({
                       );
                       const selectOptions = prioritizedColleges.map((c: any) => ({
                         value: c._id,
-                        label: c.college_name,
                         badge: c.college_code,
-                        sublabel: c.location,
                         isPinned: Boolean(c.isPinned || c.is_selected_by_me),
                       }));
 
@@ -1802,9 +1806,9 @@ export function ReportBuilderWizard({
               </div>
             </div>
 
-            {/* 3 Unified Interactive Cards with Tick Marks */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-              {/* 1. JD Received */}
+            {/* 2 Unified Interactive Cards with Tick Marks */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              {/* 1. JD Received Companies */}
               <div
                 onClick={() =>
                   setActiveLeadStreams((prev) => ({ ...prev, jd_received: !prev.jd_received }))
@@ -1824,9 +1828,9 @@ export function ReportBuilderWizard({
                     </span>
                     <div>
                       <h3 className="text-xs font-bold text-fg flex items-center gap-1.5">
-                        <span>JD Received</span>
+                        <span>JD Received Companies</span>
                       </h3>
-                      <p className="text-[10px] text-fg-subtle">Verified Job Descriptions • Drive Ready</p>
+                      <p className="text-[10px] text-fg-subtle">In-Progress • In Drive • Drive in Progress • Completed</p>
                     </div>
                   </div>
                   <div
@@ -1840,57 +1844,17 @@ export function ReportBuilderWizard({
                   </div>
                 </div>
                 <p className="text-[11px] text-fg-muted leading-snug">
-                  Companies with officially confirmed and received Job Descriptions ready for drive scheduling.
+                  Companies with officially confirmed JDs covering in-progress, companies in drive, drive in progress, and completed placement drives.
                 </p>
               </div>
 
-              {/* 2. Positives Received */}
+              {/* 2. Companies in Pipeline */}
               <div
                 onClick={() =>
-                  setActiveLeadStreams((prev) => ({ ...prev, positives: !prev.positives }))
+                  setActiveLeadStreams((prev) => ({ ...prev, pipeline: !prev.pipeline }))
                 }
                 className={`relative p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex flex-col justify-between ${
-                  activeLeadStreams.positives
-                    ? 'bg-emerald-500/10 border-emerald-500/50 shadow-xs ring-1 ring-emerald-500/30'
-                    : 'bg-surface-sunken/50 border-border opacity-70 hover:opacity-100 hover:border-border-strong'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold ${
-                      activeLeadStreams.positives ? 'bg-emerald-600 text-white' : 'bg-emerald-500/20 text-emerald-500'
-                    }`}>
-                      <Zap size={16} />
-                    </span>
-                    <div>
-                      <h3 className="text-xs font-bold text-fg flex items-center gap-1.5">
-                        <span>Positives Received</span>
-                      </h3>
-                      <p className="text-[10px] text-fg-subtle">Confirmed Positive Interest • In Discussion</p>
-                    </div>
-                  </div>
-                  <div
-                    className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all shrink-0 mt-0.5 ${
-                      activeLeadStreams.positives
-                        ? 'bg-emerald-600 border-emerald-700 text-white shadow-xs'
-                        : 'border-border bg-surface-sunken'
-                    }`}
-                  >
-                    {activeLeadStreams.positives && <Check size={13} strokeWidth={3} />}
-                  </div>
-                </div>
-                <p className="text-[11px] text-fg-muted leading-snug">
-                  Corporate HRs who confirmed direct hiring interest and affirmative recruiter responses.
-                </p>
-              </div>
-
-              {/* 3. Operational Leads - Weekly Tracker (In Progress & Pipeline) */}
-              <div
-                onClick={() =>
-                  setActiveLeadStreams((prev) => ({ ...prev, weekly_tracker: !prev.weekly_tracker }))
-                }
-                className={`relative p-3.5 rounded-2xl border transition-all cursor-pointer select-none flex flex-col justify-between ${
-                  activeLeadStreams.weekly_tracker
+                  activeLeadStreams.pipeline
                     ? 'bg-blue-500/10 border-blue-500/50 shadow-xs ring-1 ring-blue-500/30'
                     : 'bg-surface-sunken/50 border-border opacity-70 hover:opacity-100 hover:border-border-strong'
                 }`}
@@ -1898,32 +1862,32 @@ export function ReportBuilderWizard({
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2">
                     <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold ${
-                      activeLeadStreams.weekly_tracker ? 'bg-blue-600 text-white' : 'bg-blue-500/20 text-blue-500'
+                      activeLeadStreams.pipeline ? 'bg-blue-600 text-white' : 'bg-blue-500/20 text-blue-500'
                     }`}>
                       <Briefcase size={16} />
                     </span>
                     <div>
                       <h3 className="text-xs font-bold text-fg flex items-center gap-1.5">
-                        <span>Weekly Tracker</span>
+                        <span>Companies in Pipeline</span>
                         <span className="text-[9.5px] px-1.5 py-0.2 rounded font-extrabold bg-blue-500/20 text-blue-500 border border-blue-500/30">
                           PIPELINE
                         </span>
                       </h3>
-                      <p className="text-[10px] text-fg-subtle">Operations • In-Progress & Pipeline</p>
+                      <p className="text-[10px] text-fg-subtle">Pipeline • Prospective Outreach</p>
                     </div>
                   </div>
                   <div
                     className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all shrink-0 mt-0.5 ${
-                      activeLeadStreams.weekly_tracker
+                      activeLeadStreams.pipeline
                         ? 'bg-blue-600 border-blue-700 text-white shadow-xs'
                         : 'border-border bg-surface-sunken'
                     }`}
                   >
-                    {activeLeadStreams.weekly_tracker && <Check size={13} strokeWidth={3} />}
+                    {activeLeadStreams.pipeline && <Check size={13} strokeWidth={3} />}
                   </div>
                 </div>
                 <p className="text-[11px] text-fg-muted leading-snug">
-                  Active campus recruitment operations and corporate pipeline discussions from the weekly tracker.
+                  Companies currently in active discussions and prospective recruitment pipeline from the weekly tracker.
                 </p>
               </div>
             </div>
@@ -2008,10 +1972,10 @@ export function ReportBuilderWizard({
             </div>
 
             {/* Validation Notice if none selected */}
-            {!activeLeadStreams.jd_received && !activeLeadStreams.positives && !activeLeadStreams.weekly_tracker && (
+            {!activeLeadStreams.jd_received && !activeLeadStreams.pipeline && (
               <p className="text-[11.5px] text-rose-500 font-semibold flex items-center gap-1.5 bg-rose-500/10 border border-rose-500/20 p-2.5 rounded-xl animate-fadeIn">
                 <AlertCircle size={14} className="shrink-0" />
-                Please select at least one stream (JD Received, Positives, or Weekly Tracker) to build the Active Leads report.
+                Please select at least one stream (JD Received Companies or Companies in Pipeline) to build the Active Leads report.
               </p>
             )}
           </div>

@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Loader2,
 } from 'lucide-react';
-import { SmoothLeadStatusDropdown, LeadStatus } from '@/components/ui/SmoothLeadStatusDropdown';
 import { SmoothMonthDropdown } from '@/components/ui/SmoothMonthDropdown';
 import { SmoothYearDropdown } from '@/components/ui/SmoothYearDropdown';
 
@@ -16,16 +15,23 @@ export interface ActiveLeadItem {
   company_name: string;
   role: string;
   ctc: string;
-  status: LeadStatus | '';
+  lead_type?: 'pipeline' | 'jd_received';
+  pipeline_section?: string;
+  status?: string;
   followup_month: string;
   academic_year: string;
   created_at?: string;
   coordinator_id?: {
     full_name?: string;
   };
+  college_id?: {
+    college_name?: string;
+    college_code?: string;
+  };
 }
 
 interface Props {
+  activeTab?: 'pipeline' | 'jd_received';
   leads: ActiveLeadItem[];
   loading: boolean;
   onUpdateLead: (id: string, updates: Partial<ActiveLeadItem>) => Promise<boolean>;
@@ -211,6 +217,7 @@ function CtcTableCell({
 }
 
 export function ActiveLeadTable({
+  activeTab = 'pipeline',
   leads,
   loading,
   onUpdateLead,
@@ -219,7 +226,7 @@ export function ActiveLeadTable({
   onToggleSelectLead,
   onToggleSelectAll,
   page = 1,
-  limit = 50,
+  limit = 100,
 }: Props) {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [savedSuccessId, setSavedSuccessId] = useState<string | null>(null);
@@ -254,9 +261,13 @@ export function ActiveLeadTable({
         <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center">
           <Building2 size={26} strokeWidth={1.8} />
         </div>
-        <h3 className="text-base font-bold text-fg">No Active Leads Found</h3>
+        <h3 className="text-base font-bold text-fg">
+          {activeTab === 'pipeline' ? 'No Pipeline Leads Found' : 'No JD Leads Found for This Year'}
+        </h3>
         <p className="text-xs text-fg-subtle max-w-md">
-          No active company leads match your filter. Click <strong>Add</strong> to populate corporate leads for campus placement.
+          {activeTab === 'pipeline'
+            ? 'No pipeline company leads match your filter. Click Add to populate exploratory corporate leads.'
+            : 'No JD leads match your filter. Confirmed leads from weekly progress and drive sections appear here.'}
         </p>
       </div>
     );
@@ -287,11 +298,15 @@ export function ActiveLeadTable({
               )}
 
               <th className="py-3 px-3 w-12 text-center border-r border-border/80">S.No</th>
-              <th className="py-3 px-4 min-w-[200px] max-w-[280px] text-center border-r border-border/80">Company Name</th>
-              <th className="py-3 px-4 min-w-[170px] max-w-[220px] text-center border-r border-border/80">Role</th>
+              <th className="py-3 px-4 min-w-[220px] max-w-[320px] text-center border-r border-border/80">Company Name</th>
+              <th className="py-3 px-4 min-w-[170px] max-w-[240px] text-center border-r border-border/80">Role</th>
               <th className="py-3 px-3.5 min-w-[140px] text-center border-r border-border/80">CTC</th>
-              <th className="py-3 px-3.5 min-w-[150px] text-center border-r border-border/80">Status</th>
-              <th className="py-3 px-3.5 min-w-[160px] text-center border-r border-border/80">Followup Month</th>
+
+              {/* Followup Month column ONLY for Pipeline section */}
+              {activeTab === 'pipeline' && (
+                <th className="py-3 px-3.5 min-w-[160px] text-center border-r border-border/80">Followup Month</th>
+              )}
+
               <th className="py-3 px-3.5 min-w-[140px] text-center">Academic Year</th>
             </tr>
           </thead>
@@ -331,7 +346,7 @@ export function ActiveLeadTable({
                   </td>
 
                   {/* 2. Company Name */}
-                  <td className="py-2 px-3 text-center min-w-[200px] max-w-[280px] border-r border-border/60">
+                  <td className="py-2.5 px-3 text-center min-w-[220px] max-w-[320px] border-r border-border/60">
                     <AutoWrapCell
                       initialValue={lead.company_name}
                       onSave={(newVal) => handleFieldChange(lead._id, 'company_name', newVal)}
@@ -341,7 +356,7 @@ export function ActiveLeadTable({
                   </td>
 
                   {/* 3. Role */}
-                  <td className="py-2 px-3 text-center min-w-[170px] max-w-[220px] border-r border-border/60">
+                  <td className="py-2 px-3 text-center min-w-[170px] max-w-[240px] border-r border-border/60">
                     <AutoWrapCell
                       initialValue={lead.role}
                       onSave={(newVal) => handleFieldChange(lead._id, 'role', newVal)}
@@ -359,35 +374,21 @@ export function ActiveLeadTable({
                     />
                   </td>
 
-                  {/* 5. Status (Only 3 Options: Hiring, Invite Email, Follow Up) */}
-                  <td className="py-2.5 px-3 text-center border-r border-border/60">
-                    <div className="flex justify-center items-center">
-                      <SmoothLeadStatusDropdown
-                        value={lead.status || ''}
-                        placeholder="Select Status"
-                        onChange={(newStatus) => {
-                          handleFieldChange(lead._id, 'status', newStatus);
-                          if (newStatus !== 'Follow Up') {
-                            handleFieldChange(lead._id, 'followup_month', '');
-                          }
-                        }}
-                      />
-                    </div>
-                  </td>
-
-                  {/* 6. Followup Month (Enabled only when Status is 'Follow Up') */}
-                  <td className="py-2.5 px-3 text-center border-r border-border/60">
-                    <div className="flex justify-center items-center">
-                      <SmoothMonthDropdown
-                        value={lead.status === 'Follow Up' ? (lead.followup_month || '') : ''}
-                        disabled={lead.status !== 'Follow Up'}
-                        onChange={(newMonth) => {
-                          handleFieldChange(lead._id, 'followup_month', newMonth);
-                        }}
-                        placeholder="Pick Month"
-                      />
-                    </div>
-                  </td>
+                  {/* 5. Followup Month (ONLY for Pipeline section) */}
+                  {activeTab === 'pipeline' && (
+                    <td className="py-2.5 px-3 text-center border-r border-border/60">
+                      <div className="flex justify-center items-center">
+                        <SmoothMonthDropdown
+                          value={lead.followup_month || ''}
+                          disabled={false}
+                          onChange={(newMonth) => {
+                            handleFieldChange(lead._id, 'followup_month', newMonth);
+                          }}
+                          placeholder="Pick Month"
+                        />
+                      </div>
+                    </td>
+                  )}
 
                   {/* 6. Academic Year */}
                   <td className="py-2.5 px-3 text-center">

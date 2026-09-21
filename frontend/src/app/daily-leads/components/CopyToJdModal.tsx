@@ -93,8 +93,8 @@ export function CopyToJdModal({
   const originatingCollegeId = useMemo(() => {
     if (!selectedLead) return '';
     return typeof selectedLead.college_id === 'object' && (selectedLead.college_id as any)?._id
-      ? (selectedLead.college_id as any)._id
-      : (selectedLead.college_id as unknown as string) || '';
+      ? String((selectedLead.college_id as any)._id)
+      : String(selectedLead.college_id || '');
   }, [selectedLead]);
 
   // Originating college code
@@ -105,33 +105,46 @@ export function CopyToJdModal({
       : '';
   }, [selectedLead]);
 
-  // 2. Selected Target Colleges State
+  const focusedCollegeIds = useMemo(() => {
+    return focusedColleges.map((c) => String(c._id));
+  }, [focusedColleges]);
+
+  // 2. Selected Target Colleges State (strictly within focusedColleges)
   const [selectedCollegeIds, setSelectedCollegeIds] = useState<string[]>([]);
 
-  // When selected company changes, pre-check its originating college
+  // When selected company changes, pre-check its originating college if it is one of the focused colleges
   useEffect(() => {
-    if (originatingCollegeId) {
-      setSelectedCollegeIds((prev) => {
-        if (prev.length === 0) return [originatingCollegeId];
-        return prev.includes(originatingCollegeId) ? prev : [originatingCollegeId, ...prev];
-      });
+    if (originatingCollegeId && focusedCollegeIds.includes(originatingCollegeId)) {
+      setSelectedCollegeIds([originatingCollegeId]);
+    } else {
+      setSelectedCollegeIds([]);
     }
-  }, [originatingCollegeId]);
+  }, [originatingCollegeId, focusedCollegeIds]);
 
-  const isAllSelected = focusedColleges.length > 0 && selectedCollegeIds.length === focusedColleges.length;
+  const selectedCount = useMemo(() => {
+    return selectedCollegeIds.filter((id) => focusedCollegeIds.includes(id)).length;
+  }, [selectedCollegeIds, focusedCollegeIds]);
+
+  const isAllSelected = focusedColleges.length > 0 && selectedCount === focusedColleges.length;
 
   const handleToggleSelectAll = () => {
     if (isAllSelected) {
       setSelectedCollegeIds([]);
     } else {
-      setSelectedCollegeIds(focusedColleges.map((c) => c._id));
+      setSelectedCollegeIds(focusedColleges.map((c) => String(c._id)));
     }
   };
 
   const handleToggleCollege = (collegeId: string) => {
-    setSelectedCollegeIds((prev) =>
-      prev.includes(collegeId) ? prev.filter((id) => id !== collegeId) : [...prev, collegeId]
-    );
+    const idStr = String(collegeId);
+    setSelectedCollegeIds((prev) => {
+      const clean = prev.filter((id) => focusedCollegeIds.includes(id));
+      if (clean.includes(idStr)) {
+        return clean.filter((id) => id !== idStr);
+      } else {
+        return [...clean, idStr];
+      }
+    });
   };
 
   // Filter colleges by search within focused colleges
@@ -164,7 +177,8 @@ export function CopyToJdModal({
       toast('Please select a positive company to copy', 'warning');
       return;
     }
-    if (selectedCollegeIds.length === 0) {
+    const validSelectedIds = selectedCollegeIds.filter((id) => focusedCollegeIds.includes(id));
+    if (validSelectedIds.length === 0) {
       toast('Please select at least 1 target college where JD is received', 'warning');
       return;
     }
@@ -175,7 +189,7 @@ export function CopyToJdModal({
         date: selectedDate,
         company_name: selectedLead.company_name,
         lead_id: selectedLead._id,
-        college_ids: selectedCollegeIds,
+        college_ids: validSelectedIds,
         job_role: selectedLead.job_role,
         ctc: selectedLead.ctc,
         eligible_batch: selectedLead.eligible_batch,
@@ -189,14 +203,14 @@ export function CopyToJdModal({
       });
 
       if (res.success) {
-        toast((res as any).message || `Successfully copied "${selectedLead.company_name}" to JD Received!`, 'success');
+        toast((res as any).message || `Successfully moved "${selectedLead.company_name}" to JD Received!`, 'success');
         onCopied();
         onClose();
       } else {
-        toast((res as any)?.error?.message || 'Failed to copy to JD Received', 'error');
+        toast((res as any)?.error?.message || 'Failed to move to JD Received', 'error');
       }
     } catch (err: any) {
-      toast(err?.message || 'An error occurred while copying to JD Received', 'error');
+      toast(err?.message || 'An error occurred while moving to JD Received', 'error');
     } finally {
       setLoading(false);
     }
@@ -223,7 +237,7 @@ export function CopyToJdModal({
             </div>
             <div>
               <h3 className="text-base font-bold text-fg tracking-tight">
-                Copy to JD Received
+                Move to JD
               </h3>
               <p className="text-[11px] text-fg-subtle">
                 Transfer positive placement opportunities to focused campus JD records
@@ -253,9 +267,6 @@ export function CopyToJdModal({
                 <span className="w-4 h-4 rounded-full bg-amber-500 text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-2xs">1</span>
                 <span>Select Positive Company to Copy</span>
               </label>
-              <span className="text-[11px] font-semibold text-fg-subtle">
-                {uniqueCompanies.length} Positive Compan{uniqueCompanies.length === 1 ? 'y' : 'ies'}
-              </span>
             </div>
 
             {uniqueCompanies.length === 0 ? (
@@ -299,10 +310,7 @@ export function CopyToJdModal({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="hidden sm:inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-surface border border-border text-fg-subtle">
-                      {uniqueCompanies.length} available
-                    </span>
+                  <div className="flex items-center shrink-0">
                     <div className="w-6 h-6 rounded-md bg-surface border border-border flex items-center justify-center text-fg-subtle group-hover:text-fg shadow-2xs">
                       <ChevronDown
                         size={12}
@@ -425,7 +433,7 @@ export function CopyToJdModal({
                   <span>Select All</span>
                 </label>
                 <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
-                  {selectedCollegeIds.length} of {focusedColleges.length} Selected
+                  {selectedCount} of {focusedColleges.length} Selected
                 </span>
               </div>
             </div>
@@ -433,15 +441,16 @@ export function CopyToJdModal({
             {/* 4 Colleges in 1 Single Row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {focusedColleges.map((c) => {
-                const isSelected = selectedCollegeIds.includes(c._id);
-                const isOrigin = c._id === originatingCollegeId;
+                const idStr = String(c._id);
+                const isSelected = selectedCollegeIds.includes(idStr);
+                const isOrigin = idStr === originatingCollegeId;
                 return (
                   <label
-                    key={c._id}
+                    key={idStr}
                     title={c.college_name}
                     className={`flex items-center justify-between py-2 px-2.5 rounded-xl border transition-all cursor-pointer select-none ${
                       isSelected
-                        ? 'bg-amber-500/10 border-amber-500/50 text-fg shadow-2xs font-bold'
+                        ? 'bg-amber-500/10 border-amber-500/50 text-fg shadow-2xs font-bold ring-1 ring-amber-500/20'
                         : 'bg-surface-sunken hover:bg-surface border-border text-fg-muted hover:text-fg'
                     }`}
                   >
@@ -449,7 +458,7 @@ export function CopyToJdModal({
                       <input
                         type="checkbox"
                         checked={isSelected}
-                        onChange={() => handleToggleCollege(c._id)}
+                        onChange={() => handleToggleCollege(idStr)}
                         className="rounded border-border text-amber-600 focus:ring-amber-500 w-3.5 h-3.5 cursor-pointer shrink-0"
                       />
                       <span className="font-mono font-bold text-xs tracking-wide truncate">
@@ -474,11 +483,10 @@ export function CopyToJdModal({
           <button
             type="submit"
             form="copy-to-jd-form"
-            disabled={loading || !selectedLead || selectedCollegeIds.length === 0}
-            className="w-full sm:w-auto px-6 py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-amber-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.992]"
+            disabled={loading || !selectedLead || selectedCount === 0}
+            className="w-full sm:w-auto px-7 py-2.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-amber-500/20 transition-all flex items-center justify-center cursor-pointer active:scale-[0.992]"
           >
-            <Copy size={14} strokeWidth={2.5} />
-            <span>{loading ? 'Copying…' : `Copy to JD (${selectedCollegeIds.length} Colleges)`}</span>
+            <span>{loading ? 'Moving…' : 'Move'}</span>
           </button>
         </div>
       </div>

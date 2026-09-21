@@ -90,6 +90,56 @@ export function getCachedColleges(): CollegeOccupancy[] {
   return DEFAULT_OFFICIAL_COLLEGES;
 }
 
+export function getCollegeAcronym(college?: { college_code?: string; college_name?: string; _id?: string; id?: string; college_id?: string } | string | null): string {
+  if (!college) return '';
+  if (typeof college === 'string') {
+    const raw = college.trim();
+    if (raw.length <= 8 && !raw.includes(' ') && raw === raw.toUpperCase()) return raw;
+    const allKnown = getCachedColleges();
+    const match = allKnown.find((c) =>
+      c._id === raw ||
+      c.college_code.toUpperCase() === raw.toUpperCase() ||
+      c.college_name.toLowerCase() === raw.toLowerCase() ||
+      raw.toLowerCase().includes(c.college_name.toLowerCase()) ||
+      c.college_name.toLowerCase().includes(raw.toLowerCase())
+    );
+    if (match?.college_code) return match.college_code.toUpperCase();
+    const words = raw.split(/\s+/).filter((w) => !['of', 'and', '&', 'for', 'in', 'the'].includes(w.toLowerCase()));
+    if (words.length > 0) {
+      return words.map((w) => w[0]?.toUpperCase() || '').join('').slice(0, 6);
+    }
+    return raw;
+  }
+
+  if (college.college_code && college.college_code.trim()) {
+    return college.college_code.toUpperCase().trim();
+  }
+
+  const idToMatch = college._id || college.id || (college as any).college_id;
+  const nameToMatch = (college.college_name || '').toLowerCase().trim();
+
+  const allKnown = getCachedColleges();
+  const match = allKnown.find((c) => {
+    if (idToMatch && (c._id === idToMatch || String(c._id) === String(idToMatch))) return true;
+    if (nameToMatch && c.college_name.toLowerCase().trim() === nameToMatch) return true;
+    if (nameToMatch && (c.college_name.toLowerCase().includes(nameToMatch) || nameToMatch.includes(c.college_name.toLowerCase()))) return true;
+    return false;
+  });
+
+  if (match && match.college_code) {
+    return match.college_code.toUpperCase();
+  }
+
+  if (college.college_name) {
+    const words = college.college_name.split(/\s+/).filter((w) => !['of', 'and', '&', 'for', 'in', 'the'].includes(w.toLowerCase()));
+    if (words.length > 0) {
+      return words.map((w) => w[0]?.toUpperCase() || '').join('').slice(0, 6);
+    }
+  }
+
+  return '';
+}
+
 export function setCachedColleges(list: CollegeOccupancy[]): void {
   if (!Array.isArray(list) || list.length === 0) return;
   memoryCachedColleges = list;
@@ -103,7 +153,18 @@ export function setCachedColleges(list: CollegeOccupancy[]): void {
 export async function fetchAllCollegesCached(): Promise<CollegeOccupancy[]> {
   const cached = getCachedColleges();
   try {
-    const res = await apiFetch('/colleges/focus-matrix');
+    const user = readSessionUser();
+    const queryParams = new URLSearchParams();
+    const userId = user ? (user._id || (user as any).id) : null;
+    if (userId) {
+      queryParams.set('user_id', String(userId));
+    }
+    if (user?.official_email) {
+      queryParams.set('email', user.official_email);
+    }
+    const qStr = queryParams.toString() ? `?${queryParams.toString()}` : '';
+
+    const res = await apiFetch(`/colleges/focus-matrix${qStr}`);
     if (res.success && Array.isArray((res.data as any)?.colleges) && (res.data as any).colleges.length > 0) {
       const liveList: CollegeOccupancy[] = (res.data as any).colleges;
       setCachedColleges(liveList);
@@ -137,7 +198,18 @@ export async function fetchCollegeFocusMatrix(): Promise<{
   weekKey: string;
 }> {
   try {
-    const res = await apiFetch('/colleges/focus-matrix');
+    const user = readSessionUser();
+    const queryParams = new URLSearchParams();
+    const userId = user ? (user._id || (user as any).id) : null;
+    if (userId) {
+      queryParams.set('user_id', String(userId));
+    }
+    if (user?.official_email) {
+      queryParams.set('email', user.official_email);
+    }
+    const qStr = queryParams.toString() ? `?${queryParams.toString()}` : '';
+
+    const res = await apiFetch(`/colleges/focus-matrix${qStr}`);
     if (res.success && res.data) {
       const liveList: CollegeOccupancy[] = (res.data as any).colleges || [];
       const focusData = (res.data as any).current_user_focus || {};
@@ -186,9 +258,15 @@ export async function lockDailyFocusApi(ids: string[]): Promise<{ success: boole
   }
 
   try {
+    const user = readSessionUser();
+    const userId = user ? (user._id || (user as any).id) : null;
+    const bodyPayload: any = { college_ids: sanitized };
+    if (userId) bodyPayload.user_id = userId;
+    if (user?.official_email) bodyPayload.email = user.official_email;
+
     const res = await apiFetch('/colleges/lock-focus', {
       method: 'POST',
-      body: JSON.stringify({ college_ids: sanitized }),
+      body: JSON.stringify(bodyPayload),
     });
 
     if (!res.success) {
@@ -205,11 +283,29 @@ export async function lockDailyFocusApi(ids: string[]): Promise<{ success: boole
       localStorage.setItem(COORDINATOR_FOCUS_WEEK_KEY, weekKey);
       localStorage.setItem(COORDINATOR_FOCUS_LOCKED_KEY, 'true');
 
-      // Auto-set first selected college as active session
-      const all = getCachedColleges();
-      const firstCol = all.find((c) => c._id === sanitized[0]);
-      if (firstCol) {
-        setActiveCollege(firstCol._id, firstCol.college_name, firstCol);
+      // Update cached colleges is_selected_by_me flags to match exact locked selection
+      const updatedCache = getCachedColleges().map((c) => {
+        const isSelected = sanitized.includes(String(c._id)) || sanitized.includes(String(c.college_code));
+        return {
+          ...c,
+          is_selected_by_me: isSelected,
+          is_occupied: (c.other_handlers_count ?? 0) >= 2 && !isSelected,
+        };
+      });
+      setCachedColleges(updatedCache);
+
+      // Auto-set first selected college as active session if current active is not in focus
+      const currentActive = getActiveCollege();
+      const isCurrentInFocus = sanitized.some(
+        (id) => id === currentActive.id || (currentActive.obj && (id === currentActive.obj.college_code || id === currentActive.obj._id))
+      );
+      if (!isCurrentInFocus || !currentActive.id) {
+        const firstCol = updatedCache.find(
+          (c) => sanitized.includes(String(c._id)) || sanitized.includes(String(c.college_code))
+        );
+        if (firstCol) {
+          setActiveCollege(firstCol._id, firstCol.college_name, firstCol);
+        }
       }
 
       window.dispatchEvent(
@@ -220,6 +316,11 @@ export async function lockDailyFocusApi(ids: string[]): Promise<{ success: boole
       window.dispatchEvent(
         new CustomEvent('ipoms_coordinator_colleges_changed', {
           detail: { selectedIds: sanitized },
+        })
+      );
+      window.dispatchEvent(
+        new CustomEvent('ipoms_colleges_loaded', {
+          detail: { colleges: updatedCache },
         })
       );
     }
@@ -241,8 +342,15 @@ export async function lockDailyFocusApi(ids: string[]): Promise<{ success: boole
  */
 export async function unlockDailyFocusApi(): Promise<{ success: boolean; message?: string }> {
   try {
+    const user = readSessionUser();
+    const userId = user ? (user._id || (user as any).id) : null;
+    const bodyPayload: any = {};
+    if (userId) bodyPayload.user_id = userId;
+    if (user?.official_email) bodyPayload.email = user.official_email;
+
     const res = await apiFetch('/colleges/unlock-focus', {
       method: 'POST',
+      body: JSON.stringify(bodyPayload),
     });
 
     if (typeof window !== 'undefined') {
@@ -398,9 +506,31 @@ export function setCoordinatorSelectedColleges(ids: string[]): string[] {
     } else {
       localStorage.removeItem(COORDINATOR_SELECTED_COLLEGES_KEY);
     }
+
+    // Update cached colleges is_selected_by_me flag to strictly match
+    const updatedCache = getCachedColleges().map((c) => {
+      const isSelected = sanitized.includes(String(c._id)) || sanitized.includes(String(c.college_code));
+      return {
+        ...c,
+        is_selected_by_me: isSelected,
+        is_occupied: (c.other_handlers_count ?? 0) >= 2 && !isSelected,
+      };
+    });
+    setCachedColleges(updatedCache);
+
     window.dispatchEvent(
       new CustomEvent('ipoms_coordinator_colleges_changed', {
         detail: { selectedIds: sanitized },
+      })
+    );
+    window.dispatchEvent(
+      new CustomEvent('ipoms_focus_updated', {
+        detail: { selectedIds: sanitized, isLocked: isFocusLockedToday() },
+      })
+    );
+    window.dispatchEvent(
+      new CustomEvent('ipoms_colleges_loaded', {
+        detail: { colleges: updatedCache },
       })
     );
   } catch {}
@@ -419,13 +549,16 @@ export function sortCollegesWithPriority(
   const pinned: (College & { isPinned?: boolean })[] = [];
   const unpinned: (College & { isPinned?: boolean })[] = [];
 
-  const selectedSet = new Set(selectedIds.map(s => String(s).toLowerCase().trim()));
+  const selectedSet = new Set(selectedIds.map((s) => String(s).toLowerCase().trim()));
 
   for (const col of allColleges) {
+    // If selectedIds has items, STRICTLY match against selectedSet.
+    // If selectedIds is empty (e.g. unconfigured), fallback to is_selected_by_me.
     const isExplicitlyPinned =
-      selectedSet.has(String(col._id).toLowerCase()) ||
-      selectedSet.has(String(col.college_code).toLowerCase()) ||
-      Boolean((col as any).is_selected_by_me);
+      selectedIds.length > 0
+        ? selectedSet.has(String(col._id).toLowerCase().trim()) ||
+          selectedSet.has(String(col.college_code).toLowerCase().trim())
+        : Boolean((col as any).is_selected_by_me);
 
     if (isExplicitlyPinned) {
       pinned.push({ ...col, isPinned: true });
@@ -478,10 +611,38 @@ export function setActiveCollege(id: string, name: string, obj?: College | null)
 }
 
 export async function resolveDefaultCollege(): Promise<{ id: string; name: string; obj: College | null }> {
+  const focusedIds = getCoordinatorSelectedColleges();
   const current = getActiveCollege();
+  const all = getCachedColleges();
+
+  // 1. If coordinator has active focus colleges, prioritize active focus
+  if (focusedIds.length > 0) {
+    const isCurrentInFocus = focusedIds.some(
+      (fid) =>
+        fid.toLowerCase() === current.id.toLowerCase() ||
+        (current.obj &&
+          (fid.toLowerCase() === current.obj.college_code.toLowerCase() ||
+            fid.toLowerCase() === current.obj._id.toLowerCase()))
+    );
+    if (isCurrentInFocus && current.id) {
+      return current;
+    }
+
+    const firstFocused = all.find(
+      (c) =>
+        focusedIds.map((f) => f.toLowerCase()).includes(String(c._id).toLowerCase()) ||
+        focusedIds.map((f) => f.toLowerCase()).includes(String(c.college_code).toLowerCase())
+    );
+    if (firstFocused) {
+      setActiveCollege(firstFocused._id, firstFocused.college_name, firstFocused);
+      return { id: firstFocused._id, name: firstFocused.college_name, obj: firstFocused };
+    }
+  }
+
+  // 2. Fallback to existing active college
   if (current.id) return current;
 
-  // Check user session colleges
+  // 3. Check user session colleges
   const user = readSessionUser();
   if ((user as any)?.colleges && (user as any).colleges.length > 0) {
     const firstCol = (user as any).colleges[0];
@@ -494,7 +655,7 @@ export async function resolveDefaultCollege(): Promise<{ id: string; name: strin
     }
   }
 
-  // Fetch available colleges list
+  // 4. Fetch available colleges list
   try {
     const res = await apiFetch('/colleges');
     if (res.success && Array.isArray((res.data as any)?.colleges) && (res.data as any).colleges.length > 0) {

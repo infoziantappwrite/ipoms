@@ -11,6 +11,7 @@ import { validateAndNormalizeIndianMobile, validateAndNormalizeEmail } from '@/l
 const BATCH_YEARS = ['2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
 
 import { COMPANY_TYPES } from '../constants/companyTypes';
+import { ForeignCollegeWarningModal } from './ForeignCollegeWarningModal';
 
 interface Props {
   collegeId: string;
@@ -58,6 +59,7 @@ export function AddCompanyModal({
   const [followUpDate, setFollowUpDate] = useState('');
   const [currentStatusText, setCurrentStatusText] = useState('Drive confirmed and scheduled');
   const [loading, setLoading] = useState(false);
+  const [showForeignWarning, setShowForeignWarning] = useState(false);
 
   // Suggestions from Master Company DB
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -82,8 +84,8 @@ export function AddCompanyModal({
     }
   }, [companyName]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent, bypassForeignCheck = false) => {
+    if (e) e.preventDefault();
     if (!companyName.trim()) {
       toast('Company Name is mandatory.', 'warning');
       return;
@@ -121,12 +123,18 @@ export function AddCompanyModal({
       normalizedEmail = res.normalized;
     }
 
-    if (isForeignCollege) {
-      const proceed = window.confirm(
-        `${collegeName || 'This college'} is not one of your assigned colleges. `
-        + `Continue adding this company anyway? The coordinator who handles it will be notified.`
-      );
-      if (!proceed) return;
+    if (followUpDate) {
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      if (followUpDate < todayStr) {
+        toast('Follow-up date cannot be in the past. Please select today or an upcoming date.', 'warning');
+        return;
+      }
+    }
+
+    if (isForeignCollege && !bypassForeignCheck) {
+      setShowForeignWarning(true);
+      return;
     }
 
     let finalOffersCount = 0;
@@ -188,6 +196,18 @@ export function AddCompanyModal({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleSubmit(e as any);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSubmit]);
 
   return (
     <div className="fixed inset-0 bg-overlay/50 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 animate-fadeIn">
@@ -542,6 +562,18 @@ export function AddCompanyModal({
         </div>
 
       </div>
+
+      {/* ── Foreign College Warning In-App Modal ─────────────────────────── */}
+      <ForeignCollegeWarningModal
+        isOpen={showForeignWarning}
+        collegeName={collegeName || 'This Institution'}
+        actionText="add company"
+        onClose={() => setShowForeignWarning(false)}
+        onConfirm={() => {
+          setShowForeignWarning(false);
+          handleSubmit(undefined, true);
+        }}
+      />
     </div>
   );
 }

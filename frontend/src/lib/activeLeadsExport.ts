@@ -17,7 +17,7 @@ function escapeHtml(str: string): string {
  * Footer: Prepared by Infoziant & Page formatting
  */
 export function exportActiveLeadsPdf(leads: ActiveLeadItem[], academicYear: string) {
-  const currentYear = academicYear && academicYear !== 'all' ? academicYear : new Date().getFullYear().toString();
+  const currentYear = academicYear && academicYear !== 'all' ? academicYear : '2027';
   const title = `Active Leads List - ${currentYear}`;
   const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -36,7 +36,7 @@ export function exportActiveLeadsPdf(leads: ActiveLeadItem[], academicYear: stri
       <td class="col-role">${escapeHtml(lead.role || '—')}</td>
       <td class="col-ctc">${escapeHtml(lead.ctc || '—')}</td>
       <td class="col-status">${escapeHtml(lead.status || 'Hiring')}</td>
-      <td class="col-month">${escapeHtml(lead.status === 'Follow Up' ? (lead.followup_month || '—') : '—')}</td>
+      <td class="col-month">${escapeHtml(lead.followup_month || '—')}</td>
     </tr>
   `
     )
@@ -248,7 +248,7 @@ export function exportActiveLeadsPdf(leads: ActiveLeadItem[], academicYear: stri
  * - Footer: Prepared by Infoziant
  */
 export async function exportActiveLeadsImage(leads: ActiveLeadItem[], academicYear: string): Promise<void> {
-  const currentYear = academicYear && academicYear !== 'all' ? academicYear : new Date().getFullYear().toString();
+  const currentYear = academicYear && academicYear !== 'all' ? academicYear : '2027';
   const title = `Active Leads List - ${currentYear}`;
   const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 

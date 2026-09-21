@@ -7,7 +7,7 @@ import { triggerHaptic } from '@/lib/haptics';
 
 export interface SelectOption {
   value: string;
-  label: string;
+  label?: string;
   sublabel?: string;
   badge?: string;
   isPinned?: boolean;
@@ -64,7 +64,11 @@ export function SmoothSelect({
   const calculateCoords = useCallback(() => {
     if (!triggerRef.current) return null;
     const rect = triggerRef.current.getBoundingClientRect();
-    const popoverHeight = Math.min(options.length * 36 + (searchable ? 50 : 20), 240);
+    const estimatedListHeight = Math.min(options.length * 36, 175);
+    const headerHeight = title ? 30 : 0;
+    const searchHeight = searchable ? 45 : 0;
+    const popoverHeight = estimatedListHeight + headerHeight + searchHeight + 20;
+
     const popoverWidth = Math.max(rect.width, 240);
     const spaceBelow = window.innerHeight - rect.bottom;
     const placeAbove = spaceBelow < popoverHeight && rect.top > popoverHeight;
@@ -82,7 +86,7 @@ export function SmoothSelect({
       placement: placeAbove ? ('top' as const) : ('bottom' as const),
       ready: true,
     };
-  }, [options.length, searchable]);
+  }, [options.length, searchable, title]);
 
   const handleToggle = () => {
     if (disabled) return;
@@ -147,7 +151,7 @@ export function SmoothSelect({
   const filteredOptions = searchable && searchQuery.trim()
     ? options.filter(
         (opt) =>
-          opt.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (opt.label && opt.label.toLowerCase().includes(searchQuery.toLowerCase())) ||
           (opt.sublabel && opt.sublabel.toLowerCase().includes(searchQuery.toLowerCase())) ||
           (opt.badge && opt.badge.toLowerCase().includes(searchQuery.toLowerCase()))
       )
@@ -185,11 +189,13 @@ export function SmoothSelect({
           {selectedOption ? (
             <span className="truncate text-fg font-semibold flex items-center gap-1.5">
               {selectedOption.badge && (
-                <span className={`font-mono font-bold ${error ? 'text-rose-500' : 'text-primary'}`}>
+                <span className={`font-mono font-bold ${error ? 'text-rose-500' : 'text-primary dark:text-sky-300'}`}>
                   [{selectedOption.badge}]
                 </span>
               )}
-              <span className="truncate">{selectedOption.label}</span>
+              {selectedOption.label ? (
+                <span className="truncate">{selectedOption.label}</span>
+              ) : null}
             </span>
           ) : (
             <span className={error ? 'text-rose-600 dark:text-rose-300 font-normal' : 'text-fg-subtle font-normal'}>
@@ -206,7 +212,7 @@ export function SmoothSelect({
                 ? 'rotate-180 text-rose-500'
                 : 'text-rose-500 dark:text-rose-400'
               : isOpen
-              ? 'rotate-180 text-primary'
+              ? 'rotate-180 text-primary dark:text-sky-300'
               : 'text-fg-subtle'
           }`}
         />
@@ -249,7 +255,7 @@ export function SmoothSelect({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder={searchPlaceholder}
-                    className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-1 focus:ring-primary/30 rounded-lg pl-8 pr-7 py-1.5 text-xs text-fg placeholder:text-fg-disabled outline-none font-normal"
+                    className="w-full bg-surface-sunken border border-border focus:border-primary dark:focus:border-sky-400 focus:ring-1 focus:ring-primary/30 dark:focus:ring-sky-400/30 rounded-lg pl-8 pr-7 py-1.5 text-xs text-fg placeholder:text-fg-disabled outline-none font-normal"
                   />
                   {searchQuery && (
                     <button
@@ -264,8 +270,8 @@ export function SmoothSelect({
               </div>
             )}
 
-            {/* Option List */}
-            <div className="overflow-y-auto space-y-0.5 max-h-[194px] p-0.5 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            {/* Option List (Shows 4 to 5 items with invisible smooth scroller) */}
+            <div className="overflow-y-auto overscroll-contain space-y-0.5 max-h-[175px] p-0.5 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {filteredOptions.length === 0 ? (
                 <div className="px-3 py-3 text-center text-xs text-fg-disabled italic">
                   No matching options found
@@ -284,30 +290,40 @@ export function SmoothSelect({
                         setIsOpen(false);
                         setSearchQuery('');
                       }}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer text-left select-none ${
+                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs transition-colors cursor-pointer text-left select-none ${
                         isSelected
-                          ? 'bg-primary/10 text-primary font-bold shadow-2xs'
+                          ? 'bg-primary/10 dark:bg-sky-400/15 border border-primary/25 dark:border-sky-400/35 text-fg dark:text-white font-bold shadow-2xs'
                           : opt.isPinned
-                          ? 'bg-primary/5 text-fg font-semibold hover:bg-primary/10'
-                          : 'text-fg hover:bg-surface-raised'
+                          ? 'bg-primary/5 dark:bg-sky-400/5 text-fg font-semibold hover:bg-primary/10 dark:hover:bg-sky-400/10'
+                          : 'text-fg hover:bg-surface-raised font-medium'
                       }`}
                     >
                       <div className="flex items-center gap-2 truncate flex-1 min-w-0">
                         {OptionIcon && (
                           <OptionIcon
                             size={14}
-                            className={isSelected ? 'text-primary' : 'text-fg-subtle'}
+                            className={isSelected ? 'text-primary dark:text-sky-300' : 'text-fg-subtle'}
                           />
                         )}
                         <div className="truncate flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 truncate flex-wrap">
                             {opt.badge && (
-                              <span className="font-mono text-primary font-bold">[{opt.badge}]</span>
+                              <span className={`font-mono font-bold ${
+                                isSelected ? 'text-primary dark:text-sky-300' : 'text-primary dark:text-sky-400'
+                              }`}>
+                                [{opt.badge}]
+                              </span>
                             )}
-                            <span className="truncate">{opt.label}</span>
+                            {opt.label ? (
+                              <span className={`truncate ${
+                                isSelected ? 'font-bold text-fg dark:text-white' : 'font-medium text-fg dark:text-slate-100'
+                              }`}>
+                                {opt.label}
+                              </span>
+                            ) : null}
                             {opt.isPinned && (
-                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-primary/15 text-primary font-bold text-[9px] tracking-tight shrink-0 border border-primary/20">
-                                <Sparkles size={8} className="text-amber-500 shrink-0" /> Focus
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-amber-500/15 dark:bg-amber-400/15 text-amber-600 dark:text-amber-300 font-bold text-[9px] tracking-tight shrink-0 border border-amber-500/20 dark:border-amber-400/30">
+                                <Sparkles size={8} className="text-amber-500 dark:text-amber-400 shrink-0" /> Focus
                               </span>
                             )}
                           </div>
@@ -318,7 +334,7 @@ export function SmoothSelect({
                           )}
                         </div>
                       </div>
-                      {isSelected && <Check size={14} strokeWidth={2.5} className="text-primary shrink-0 ml-2" />}
+                      {isSelected && <Check size={14} strokeWidth={2.5} className="text-primary dark:text-sky-300 shrink-0 ml-2" />}
                     </button>
                   );
                 })

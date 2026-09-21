@@ -3,11 +3,34 @@ import { Types } from 'mongoose';
 import ExcelJS from 'exceljs';
 import { ActiveLead, IActiveLead, ACTIVE_LEAD_STATUSES, ACADEMIC_YEARS, FOLLOWUP_MONTHS, ActiveLeadStatus } from '../models/ActiveLead';
 import { DailyTracker } from '../models/DailyTracker';
+import { WeeklyTracker } from '../models/WeeklyTracker';
 import { authenticateJWT } from './authMiddleware';
 import { seedActiveLeadsFromMasterPositives } from './seedActiveLeadsFromMasterPositives';
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function isValidCtc(ctc?: string | null): boolean {
+  if (!ctc) return false;
+  const t = ctc.trim().toLowerCase();
+  if (
+    !t ||
+    t === '-' ||
+    t === '—' ||
+    t === 'null' ||
+    t === 'undefined' ||
+    t === 'tbd' ||
+    t === 'na' ||
+    t === 'n/a'
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function normalizeKey(str: string): string {
+  return str.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 /**
@@ -53,13 +76,12 @@ export async function syncLeadFromDailyTracker(data: {
       outcome.includes('later')
     ) {
       status = 'Follow Up';
-      const currentMonthIndex = new Date().getMonth();
-      followupMonth = FOLLOWUP_MONTHS[currentMonthIndex] || 'August';
+      followupMonth = '';
     }
 
     if (!status) return null;
 
-    const year = (data.academic_year as any) || '2026';
+    const year = (data.academic_year as any) || '2027';
 
     // Find existing lead or upsert (with safe regex escaping)
     const existing = await ActiveLead.findOne({
@@ -85,7 +107,7 @@ export async function syncLeadFromDailyTracker(data: {
       role: 'Graduate Trainee',
       ctc: '',
       status,
-      followup_month: status === 'Follow Up' ? followupMonth : '',
+      followup_month: followupMonth || '',
       academic_year: year,
       coordinator_id: data.coordinator_id || null,
       college_id: data.college_id || null,
@@ -106,16 +128,25 @@ export function registerActiveLeadRoutes(app: Express) {
     { $set: { status: '' } }
   ).catch(() => {});
 
+  // Migrate existing 2026 leads to 2027 batch (2026 graduation completed, 2027 is active batch till Dec 2026)
+  ActiveLead.updateMany(
+    { $or: [{ academic_year: '2026' }, { academic_year: { $exists: false } }, { academic_year: '' }, { academic_year: null }] },
+    { $set: { academic_year: '2027' } }
+  ).catch(() => {});
+
   // ── 1. GET /api/v1/active-leads (List with stats & search) ─────────────────
   app.get('/api/v1/active-leads', authenticateJWT, async (req: Request, res: Response) => {
     try {
+      const jdCount = await ActiveLead.countDocuments({ lead_type: 'jd_received', is_deleted: false });
       const totalCount = await ActiveLead.countDocuments({ is_deleted: false });
-      if (totalCount === 0) {
+      if (totalCount === 0 || jdCount === 0) {
         await seedActiveLeadsFromMasterPositives();
       }
 
       const {
         academic_year,
+        lead_type,
+        pipeline_section,
         status,
         followup_month,
         search,
@@ -125,6 +156,22 @@ export function registerActiveLeadRoutes(app: Express) {
 
       const filter: Record<string, any> = { is_deleted: false };
 
+      if (lead_type && lead_type !== 'all') {
+        filter.lead_type = String(lead_type);
+      }
+      if (pipeline_section && pipeline_section !== 'all') {
+        if (pipeline_section === 'in_drive' || pipeline_section === 'upcoming_drive') {
+          filter.pipeline_section = { $in: ['companies_in_drive', 'in_drive', 'upcoming_drive'] };
+        } else if (pipeline_section === 'in_progress') {
+          filter.pipeline_section = { $in: ['in_progress', 'companies_in_progress'] };
+        } else if (pipeline_section === 'completed') {
+          filter.pipeline_section = { $in: ['completed', 'companies_completed'] };
+        } else if (pipeline_section === 'drive_in_progress') {
+          filter.pipeline_section = 'drive_in_progress';
+        } else {
+          filter.pipeline_section = String(pipeline_section);
+        }
+      }
       if (academic_year && academic_year !== 'all') {
         filter.academic_year = { $regex: escapeRegex(String(academic_year)), $options: 'i' };
       }
@@ -162,32 +209,97 @@ export function registerActiveLeadRoutes(app: Express) {
         { $match: baseFilter },
         {
           $group: {
-            _id: '$status',
+            _id: { lead_type: '$lead_type', status: '$status' },
             count: { $sum: 1 },
           },
         },
       ]);
 
-      const stats = {
-        total: 0,
-        hiring: 0,
-        invite_email: 0,
-        follow_up: 0,
+      // Calculate 4 JD Received stage counts
+      const jdSectionAgg = await ActiveLead.aggregate([
+        { $match: { ...baseFilter, lead_type: 'jd_received' } },
+        {
+          $group: {
+            _id: '$pipeline_section',
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+
+      const jd_section_counts = {
+        all: 0,
+        in_progress: 0,
+        upcoming_drive: 0,
+        drive_in_progress: 0,
+        completed: 0,
       };
 
-      allStats.forEach((item) => {
-        stats.total += item.count;
-        if (item._id === 'Hiring') stats.hiring = item.count;
-        if (item._id === 'Invite Email') stats.invite_email = item.count;
-        if (item._id === 'Not Hiring') stats.invite_email += item.count;
-        if (item._id === 'Follow Up') stats.follow_up = item.count;
+      jdSectionAgg.forEach((item) => {
+        const sec = item._id || 'in_progress';
+        const count = item.count;
+        jd_section_counts.all += count;
+        if (sec === 'in_progress' || sec === 'companies_in_progress') {
+          jd_section_counts.in_progress += count;
+        } else if (sec === 'companies_in_drive' || sec === 'in_drive' || sec === 'upcoming_drive') {
+          jd_section_counts.upcoming_drive += count;
+        } else if (sec === 'drive_in_progress') {
+          jd_section_counts.drive_in_progress += count;
+        } else if (sec === 'completed' || sec === 'companies_completed') {
+          jd_section_counts.completed += count;
+        } else {
+          jd_section_counts.in_progress += count;
+        }
       });
+
+      const pipeline_stats = { total: 0, hiring: 0, invite_email: 0, follow_up: 0 };
+      const jd_received_stats = { total: 0, hiring: 0, invite_email: 0, follow_up: 0 };
+      const overall_stats = { total: 0, hiring: 0, invite_email: 0, follow_up: 0 };
+
+      allStats.forEach((item) => {
+        const type = item._id.lead_type || 'pipeline';
+        const st = item._id.status || '';
+        const count = item.count;
+
+        overall_stats.total += count;
+        if (st === 'Hiring') overall_stats.hiring += count;
+        if (st === 'Invite Email' || st === 'Not Hiring') overall_stats.invite_email += count;
+        if (st === 'Follow Up') overall_stats.follow_up += count;
+
+        if (type === 'pipeline') {
+          pipeline_stats.total += count;
+          if (st === 'Hiring') pipeline_stats.hiring += count;
+          if (st === 'Invite Email' || st === 'Not Hiring') pipeline_stats.invite_email += count;
+          if (st === 'Follow Up') pipeline_stats.follow_up += count;
+        } else if (type === 'jd_received') {
+          jd_received_stats.total += count;
+          if (st === 'Hiring') jd_received_stats.hiring += count;
+          if (st === 'Invite Email' || st === 'Not Hiring') jd_received_stats.invite_email += count;
+          if (st === 'Follow Up') jd_received_stats.follow_up += count;
+        }
+      });
+
+      // Active stats to return depending on current tab
+      const currentStats =
+        lead_type === 'pipeline'
+          ? pipeline_stats
+          : lead_type === 'jd_received'
+          ? jd_received_stats
+          : overall_stats;
 
       return res.json({
         success: true,
         data: {
           leads,
-          stats,
+          stats: currentStats,
+          pipeline_stats,
+          jd_received_stats,
+          jd_section_counts,
+          overall_stats,
+          tab_counts: {
+            pipeline: pipeline_stats.total,
+            jd_received: jd_received_stats.total,
+            all: overall_stats.total,
+          },
           total_count: leads.length,
         },
       });
@@ -197,122 +309,198 @@ export function registerActiveLeadRoutes(app: Express) {
     }
   });
 
-  // ── Sync from Daily Tracker (Hiring, Follow Up, Invite Email) ────────────
+  // ── Reseed Active Leads from Master Positives & Tracker ────────────
+  app.post('/api/v1/active-leads/reseed', authenticateJWT, async (_req: Request, res: Response) => {
+    try {
+      await seedActiveLeadsFromMasterPositives();
+      return res.json({ success: true, message: 'Active Leads reseeded successfully with pipeline sections!' });
+    } catch (err: any) {
+      console.error('POST /active-leads/reseed error:', err);
+      return res.status(500).json({ success: false, error: { message: err.message || 'Failed to reseed active leads' } });
+    }
+  });
+
+  // ── Sync from Weekly Tracker (Pipeline with CTC & JD Received Sections) ──
   app.post('/api/v1/active-leads/sync', authenticateJWT, async (req: Request, res: Response) => {
     try {
-      const { academic_year } = req.body || {};
-      const targetYear = academic_year || '2026';
+      // 1. Fetch all non-deleted Weekly Tracker rows
+      const allWeekly = await WeeklyTracker.find({ is_deleted: { $ne: true } }).lean();
 
-      // Find all Daily Tracker rows with outcomes matching Hiring, Follow Up, or Invite Email
-      const SYNCABLE_OUTCOMES = [
-        'hiring',
-        'jd_received',
-        'drive_completed',
-        'hiring_completed',
-        'invite_mail',
-        'in_connect',
-        'follow_up',
-        'call_back',
-      ];
+      // Build Weekly lookup map to backfill CTC
+      const weeklyMap = new Map<string, typeof allWeekly[0]>();
+      for (const w of allWeekly) {
+        if (w.company_name && w.company_name.trim()) {
+          const k = normalizeKey(w.company_name);
+          if (!weeklyMap.has(k) || (isValidCtc(w.ctc_lpa) && !isValidCtc(weeklyMap.get(k)?.ctc_lpa))) {
+            weeklyMap.set(k, w);
+          }
+        }
+      }
 
-      const trackerRows = await DailyTracker.find({
-        is_skipped: false,
-        outcome_status: { $in: SYNCABLE_OUTCOMES },
-        company_name: { $exists: true, $ne: '' },
-      }).lean();
+      // 2. Fetch current Active Leads
+      const allActive = await ActiveLead.find({ is_deleted: false });
 
-      let syncedCount = 0;
-      let createdCount = 0;
-      let updatedCount = 0;
+      // A. Backfill CTC for pipeline leads if present in Weekly Tracker
+      let backfilledCtcCount = 0;
+      for (const lead of allActive) {
+        if (lead.lead_type === 'pipeline' && !isValidCtc(lead.ctc)) {
+          const match = weeklyMap.get(normalizeKey(lead.company_name));
+          if (match && isValidCtc(match.ctc_lpa)) {
+            lead.ctc = match.ctc_lpa!.trim();
+            if (match.job_role && (!lead.role || lead.role === 'Graduate Trainee')) {
+              lead.role = match.job_role.trim();
+            }
+            await lead.save();
+            backfilledCtcCount++;
+          }
+        }
+      }
 
-      for (const row of trackerRows) {
-        if (!row.company_name || !row.company_name.trim()) continue;
-        const normalizedCompany = row.company_name.trim();
-        const outcome = (row.outcome_status || '').toLowerCase();
+      // B. REMOVE any pipeline companies that still do not have a valid CTC
+      const removedNoCtcResult = await ActiveLead.deleteMany({
+        lead_type: 'pipeline',
+        $or: [
+          { ctc: { $exists: false } },
+          { ctc: '' },
+          { ctc: '-' },
+          { ctc: '—' },
+          { ctc: { $regex: /^\s*$/ } },
+          { ctc: { $regex: /^(na|n\/a|null|undefined|tbd|-)$/i } },
+        ],
+      });
 
-        let status: ActiveLeadStatus | null = null;
-        let followupMonth = '';
+      // 3. Build Active lookup of existing companies across BOTH Pipeline and JD Received tabs
+      const refreshedActive = await ActiveLead.find({ is_deleted: false }).lean();
+      const existingNames = new Set<string>();
+      for (const lead of refreshedActive) {
+        if (lead.company_name) {
+          existingNames.add(normalizeKey(lead.company_name));
+        }
+      }
 
-        if (
-          outcome.includes('invite') ||
-          outcome.includes('mail') ||
-          outcome.includes('email') ||
-          outcome === 'in_connect'
-        ) {
-          status = 'Invite Email';
-        } else if (
-          outcome.includes('hiring') ||
-          outcome.includes('jd') ||
-          outcome.includes('positive') ||
-          outcome.includes('interested') ||
-          outcome.includes('drive_completed')
-        ) {
-          status = 'Hiring';
-        } else if (
-          outcome.includes('follow') ||
-          outcome.includes('call back') ||
-          outcome.includes('reschedule') ||
-          outcome.includes('later')
-        ) {
-          status = 'Follow Up';
-          followupMonth = row.follow_up_month || FOLLOWUP_MONTHS[new Date().getMonth()] || 'August';
+      // 4. Sync from Weekly Tracker:
+      // Focus on Pipeline companies FIRST
+      const weeklyPipeline = allWeekly.filter((w) => (w.pipeline_section || '').toLowerCase() === 'pipeline');
+      const weeklyJd = allWeekly.filter((w) =>
+        ['in_progress', 'companies_in_drive', 'in_drive', 'upcoming_drives', 'drive_in_progress', 'completed'].includes(
+          (w.pipeline_section || '').toLowerCase()
+        )
+      );
+
+      let newlySyncedPipeline = 0;
+      let skippedPipelineDuplicate = 0;
+      let skippedPipelineNoCtc = 0;
+      const leadsToInsert: any[] = [];
+
+      for (const w of weeklyPipeline) {
+        if (!w.company_name || !w.company_name.trim()) continue;
+        const norm = normalizeKey(w.company_name);
+
+        if (!isValidCtc(w.ctc_lpa)) {
+          skippedPipelineNoCtc++;
+          continue;
         }
 
-        if (!status) continue;
+        if (existingNames.has(norm)) {
+          skippedPipelineDuplicate++;
+          continue;
+        }
 
-        const rowYear = (row.year ? String(row.year) : targetYear) as any;
-
-        const existing = await ActiveLead.findOne({
-          company_name: { $regex: new RegExp(`^${escapeRegex(normalizedCompany)}$`, 'i') },
-          academic_year: rowYear,
+        existingNames.add(norm);
+        newlySyncedPipeline++;
+        leadsToInsert.push({
+          company_name: w.company_name.trim(),
+          role: w.job_role?.trim() || 'Graduate Trainee',
+          ctc: w.ctc_lpa?.trim() || '',
+          lead_type: 'pipeline',
+          pipeline_section: 'pipeline',
+          status: '',
+          followup_month: '',
+          academic_year: w.eligible_batch?.trim() || '2027',
+          college_id: w.college_id || null,
+          coordinator_id: w.coordinator_id || null,
           is_deleted: false,
         });
-
-        if (existing) {
-          existing.status = status;
-          if (status === 'Follow Up' && followupMonth) {
-            existing.followup_month = followupMonth as any;
-          }
-          if (row.coordinator_id && !existing.coordinator_id) {
-            existing.coordinator_id = row.coordinator_id as any;
-          }
-          if (row.college_id && !existing.college_id) {
-            existing.college_id = row.college_id as any;
-          }
-          existing.daily_tracker_id = row._id as any;
-          await existing.save();
-          updatedCount++;
-        } else {
-          await ActiveLead.create({
-            company_name: normalizedCompany,
-            role: 'Graduate Trainee',
-            ctc: '',
-            status,
-            followup_month: status === 'Follow Up' ? followupMonth : '',
-            academic_year: rowYear,
-            coordinator_id: row.coordinator_id || null,
-            college_id: row.college_id || null,
-            daily_tracker_id: row._id,
-          });
-          createdCount++;
-        }
-        syncedCount++;
       }
+
+      // Next, Focus on JD Received companies
+      let newlySyncedJd = 0;
+      let skippedJdDuplicate = 0;
+
+      for (const w of weeklyJd) {
+        if (!w.company_name || !w.company_name.trim()) continue;
+        const norm = normalizeKey(w.company_name);
+
+        if (existingNames.has(norm)) {
+          skippedJdDuplicate++;
+          continue;
+        }
+
+        let mappedSec = 'in_progress';
+        const sec = (w.pipeline_section || '').toLowerCase();
+        if (sec === 'completed' || sec === 'companies_completed') mappedSec = 'completed';
+        else if (sec === 'drive_in_progress') mappedSec = 'drive_in_progress';
+        else if (sec.includes('drive') || sec.includes('upcoming')) mappedSec = 'upcoming_drive';
+        else mappedSec = 'in_progress';
+
+        existingNames.add(norm);
+        newlySyncedJd++;
+        leadsToInsert.push({
+          company_name: w.company_name.trim(),
+          role: w.job_role?.trim() || 'Graduate Engineer Trainee',
+          ctc: w.ctc_lpa?.trim() || '',
+          lead_type: 'jd_received',
+          pipeline_section: mappedSec,
+          status: '',
+          followup_month: '',
+          academic_year: w.eligible_batch?.trim() || '2027',
+          college_id: w.college_id || null,
+          coordinator_id: w.coordinator_id || null,
+          is_deleted: false,
+        });
+      }
+
+      if (leadsToInsert.length > 0) {
+        await ActiveLead.insertMany(leadsToInsert);
+      }
+
+      const totalActiveLeads = await ActiveLead.countDocuments({ is_deleted: false });
 
       return res.json({
         success: true,
         data: {
-          synced_count: syncedCount,
-          created_count: createdCount,
-          updated_count: updatedCount,
+          synced_pipeline: newlySyncedPipeline,
+          synced_jd: newlySyncedJd,
+          skipped_pipeline_duplicates: skippedPipelineDuplicate,
+          skipped_jd_duplicates: skippedJdDuplicate,
+          removed_no_ctc: removedNoCtcResult.deletedCount,
+          total_active_leads: totalActiveLeads,
         },
-        message: `Successfully synced ${syncedCount} leads from Daily Tracker (${createdCount} added, ${updatedCount} updated)`,
+        message: `Successfully synced from Weekly Tracker (${newlySyncedPipeline} new Pipeline with CTC, ${newlySyncedJd} new JD Received, ${skippedPipelineDuplicate + skippedJdDuplicate} duplicates skipped)`,
       });
     } catch (err: any) {
       console.error('POST /active-leads/sync error:', err);
       return res.status(500).json({
         success: false,
-        error: { message: err.message || 'Failed to sync leads from Daily Tracker' },
+        error: { message: err.message || 'Failed to sync leads from Weekly Tracker' },
+      });
+    }
+  });
+
+  // ── Reseed & Classify All Sections (Pipeline & JD Received) ──────────────
+  app.post('/api/v1/active-leads/reseed', authenticateJWT, async (req: Request, res: Response) => {
+    try {
+      const result = await seedActiveLeadsFromMasterPositives();
+      return res.json({
+        success: true,
+        data: result,
+        message: 'Successfully reseeded and classified all Active Leads into Pipeline and JD Received sections',
+      });
+    } catch (err: any) {
+      console.error('POST /active-leads/reseed error:', err);
+      return res.status(500).json({
+        success: false,
+        error: { message: err.message || 'Failed to reseed active leads' },
       });
     }
   });
@@ -324,9 +512,11 @@ export function registerActiveLeadRoutes(app: Express) {
         company_name,
         role = 'Graduate Trainee',
         ctc = '',
+        lead_type = 'pipeline',
+        pipeline_section = 'pipeline',
         status = 'Hiring',
         followup_month = '',
-        academic_year = '2026',
+        academic_year = '2027',
         college_id,
       } = req.body;
 
@@ -344,8 +534,10 @@ export function registerActiveLeadRoutes(app: Express) {
         company_name: company_name.trim(),
         role: role.trim() || 'Graduate Trainee',
         ctc: ctc ? ctc.trim() : '',
+        lead_type: lead_type === 'jd_received' ? 'jd_received' : 'pipeline',
+        pipeline_section: pipeline_section || (lead_type === 'jd_received' ? 'in_progress' : 'pipeline'),
         status: status || '',
-        followup_month: status === 'Follow Up' ? followup_month : '',
+        followup_month: followup_month || '',
         academic_year: (req.body.academic_year as any) || '2027',
         coordinator_id: coordinatorId,
         college_id: college_id ? new Types.ObjectId(college_id) : null,
@@ -365,7 +557,7 @@ export function registerActiveLeadRoutes(app: Express) {
   // ── 3. POST /api/v1/active-leads/bulk (Bulk Paste & Create) ──────────────
   app.post('/api/v1/active-leads/bulk', authenticateJWT, async (req: Request, res: Response) => {
     try {
-      const { lines, academic_year = '2026', default_status = 'Hiring' } = req.body;
+      const { lines, academic_year = '2027', default_status = 'Hiring', lead_type = 'pipeline' } = req.body;
 
       if (!lines || !Array.isArray(lines) || lines.length === 0) {
         return res.status(400).json({ success: false, error: { message: 'No lines provided for bulk import' } });
@@ -395,12 +587,14 @@ export function registerActiveLeadRoutes(app: Express) {
         if (!ACTIVE_LEAD_STATUSES.includes(status as any)) {
           status = default_status;
         }
-        const followupMonth = status === 'Follow Up' ? (parts[4] || 'August') : '';
+        const followupMonth = parts[4] ? parts[4].trim() : '';
 
         const lead = await ActiveLead.create({
           company_name: companyName,
           role,
           ctc,
+          lead_type: lead_type === 'jd_received' ? 'jd_received' : 'pipeline',
+          pipeline_section: lead_type === 'jd_received' ? 'in_progress' : 'pipeline',
           status,
           followup_month: followupMonth,
           academic_year,
@@ -429,7 +623,7 @@ export function registerActiveLeadRoutes(app: Express) {
         return res.status(400).json({ success: false, error: { message: 'Invalid lead ID' } });
       }
 
-      const { company_name, role, ctc, status, followup_month, academic_year } = req.body;
+      const { company_name, role, ctc, lead_type, pipeline_section, status, followup_month, academic_year } = req.body;
 
       const lead = await ActiveLead.findById(id);
       if (!lead || lead.is_deleted) {
@@ -439,21 +633,19 @@ export function registerActiveLeadRoutes(app: Express) {
       if (company_name !== undefined) lead.company_name = company_name.trim();
       if (role !== undefined) lead.role = role.trim();
       if (ctc !== undefined) lead.ctc = ctc.trim();
+      if (lead_type !== undefined) lead.lead_type = lead_type;
+      if (pipeline_section !== undefined) lead.pipeline_section = pipeline_section;
       if (status !== undefined) {
         if (status && !ACTIVE_LEAD_STATUSES.includes(status)) {
           return res.status(400).json({ success: false, error: { message: 'Invalid status' } });
         }
         lead.status = status || '';
-        // If status is not Follow Up, clear followup_month
-        if (status !== 'Follow Up') {
-          lead.followup_month = '';
-        }
       }
-      if (followup_month !== undefined && lead.status === 'Follow Up') {
-        lead.followup_month = followup_month;
+      if (followup_month !== undefined) {
+        lead.followup_month = followup_month || '';
       }
       if (academic_year !== undefined) {
-        lead.academic_year = academic_year;
+        lead.academic_year = academic_year || '2027';
       }
 
       await lead.save();
@@ -589,8 +781,8 @@ export function registerActiveLeadRoutes(app: Express) {
           role: l.role || '—',
           ctc: l.ctc || '—',
           status: l.status || '—',
-          followup_month: l.status === 'Follow Up' ? (l.followup_month || '—') : 'N/A',
-          academic_year: l.academic_year || '2026',
+          followup_month: l.followup_month || '—',
+          academic_year: l.academic_year || '2027',
           coordinator: (l.coordinator_id as any)?.full_name || 'System',
           created_at: l.created_at ? new Date(l.created_at).toLocaleDateString('en-IN') : '—',
         });
@@ -638,4 +830,441 @@ export function registerActiveLeadRoutes(app: Express) {
       return res.status(500).json({ success: false, error: { message: err.message || 'Export failed' } });
     }
   });
+
+  // ── 7. GET /api/v1/active-leads/duplicate-audit (Audit all duplicate & near-duplicate company names) ──
+  app.get('/api/v1/active-leads/duplicate-audit', async (req: Request, res: Response) => {
+    try {
+      const filter: Record<string, any> = { is_deleted: false };
+      if (req.query.lead_type && req.query.lead_type !== 'all') {
+        filter.lead_type = String(req.query.lead_type);
+      }
+      const leads = await ActiveLead.find(filter).lean();
+      
+      const cleanName = (s: string) => {
+        return (s || '')
+          .toLowerCase()
+          .replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      };
+
+      const stripCorporateSuffixes = (s: string) => {
+        let n = cleanName(s);
+        const suffixes = [
+          'private limited', 'pvt ltd', 'pvt limited', 'private ltd', 'pvtltd',
+          'limited', 'ltd', 'inc', 'corporation', 'corp', 'llc', 'llp',
+          'technologies', 'technology', 'tech', 'solutions', 'solution',
+          'infotech', 'services', 'service', 'systems', 'system',
+          'enterprises', 'enterprise', 'studios', 'studio', 'group',
+          'consultancy', 'consulting', 'consultants', 'software', 'soft',
+          'digital', 'global', 'international', 'india', 'labs', 'lab'
+        ];
+        // Iteratively strip suffix words from the end
+        let changed = true;
+        while (changed) {
+          changed = false;
+          for (const suf of suffixes) {
+            const regex = new RegExp(`\\b${suf}\\b`, 'gi');
+            const before = n;
+            n = n.replace(regex, ' ').replace(/\s+/g, ' ').trim();
+            if (n !== before) changed = true;
+          }
+        }
+        return n || cleanName(s);
+      };
+
+      const levenshtein = (a: string, b: string): number => {
+        const matrix: number[][] = [];
+        for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+        for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+        for (let i = 1; i <= b.length; i++) {
+          for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) === a.charAt(j - 1)) {
+              matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+              matrix[i][j] = Math.min(
+                matrix[i - 1][j - 1] + 1,
+                matrix[i][j - 1] + 1,
+                matrix[i - 1][j] + 1
+              );
+            }
+          }
+        }
+        return matrix[b.length][a.length];
+      };
+
+      // 1. Group by exact normalized string
+      const exactGroups = new Map<string, any[]>();
+      for (const lead of leads) {
+        const key = cleanName(lead.company_name);
+        if (!exactGroups.has(key)) exactGroups.set(key, []);
+        exactGroups.get(key)!.push(lead);
+      }
+
+      const exactDuplicates: any[] = [];
+      for (const [key, items] of exactGroups.entries()) {
+        if (items.length > 1) {
+          exactDuplicates.push({
+            normalized_key: key,
+            count: items.length,
+            names: Array.from(new Set(items.map(i => i.company_name))),
+            roles: Array.from(new Set(items.map(i => i.role || '—'))),
+            ctcs: Array.from(new Set(items.map(i => i.ctc || '—'))),
+            batches: Array.from(new Set(items.map(i => i.academic_year || '—'))),
+            statuses: Array.from(new Set(items.map(i => i.status || '—'))),
+            leads: items.map(i => ({ _id: i._id, name: i.company_name, role: i.role, ctc: i.ctc, batch: i.academic_year })),
+          });
+        }
+      }
+
+      // 2. Group by stripped corporate suffixes
+      const strippedGroups = new Map<string, any[]>();
+      for (const lead of leads) {
+        const key = stripCorporateSuffixes(lead.company_name);
+        if (!strippedGroups.has(key)) strippedGroups.set(key, []);
+        strippedGroups.get(key)!.push(lead);
+      }
+
+      const corporateSuffixDuplicates: any[] = [];
+      for (const [key, items] of strippedGroups.entries()) {
+        const distinctCleanNames = new Set(items.map(i => cleanName(i.company_name)));
+        if (distinctCleanNames.size > 1) {
+          corporateSuffixDuplicates.push({
+            stripped_core_name: key,
+            count: items.length,
+            distinct_variants: Array.from(new Set(items.map(i => i.company_name))),
+            leads: items.map(i => ({ _id: i._id, name: i.company_name, role: i.role, ctc: i.ctc })),
+          });
+        }
+      }
+
+      // 3. Fuzzy match across all distinct clean names
+      const allDistinctEntries = Array.from(exactGroups.entries()).map(([cleanKey, items]) => ({
+        cleanKey,
+        coreKey: stripCorporateSuffixes(cleanKey),
+        sampleName: items[0].company_name,
+        count: items.length,
+        items,
+      }));
+
+      const fuzzyMatches: any[] = [];
+      const pairedKeys = new Set<string>();
+
+      for (let i = 0; i < allDistinctEntries.length; i++) {
+        for (let j = i + 1; j < allDistinctEntries.length; j++) {
+          const e1 = allDistinctEntries[i];
+          const e2 = allDistinctEntries[j];
+
+          // Skip if already captured in corporateSuffixDuplicates
+          if (e1.coreKey === e2.coreKey) continue;
+
+          // Check token subset (e.g. "unistring uts" vs "uts unistring")
+          const tokens1 = new Set(e1.cleanKey.split(' ').filter(Boolean));
+          const tokens2 = new Set(e2.cleanKey.split(' ').filter(Boolean));
+          const isSubset = Array.from(tokens1).every(t => tokens2.has(t)) || Array.from(tokens2).every(t => tokens1.has(t));
+
+          // Check Levenshtein distance on cleanKey or coreKey
+          const distClean = levenshtein(e1.cleanKey, e2.cleanKey);
+          const distCore = levenshtein(e1.coreKey, e2.coreKey);
+          const minLen = Math.min(e1.cleanKey.length, e2.cleanKey.length);
+          const minCoreLen = Math.min(e1.coreKey.length, e2.coreKey.length);
+
+          const isTypoMatch = (minLen > 4 && distClean <= 2) || (minCoreLen > 3 && distCore <= 1);
+
+          if (isSubset || isTypoMatch) {
+            const pairKey = [e1.cleanKey, e2.cleanKey].sort().join(' <--> ');
+            if (!pairedKeys.has(pairKey)) {
+              pairedKeys.add(pairKey);
+              fuzzyMatches.push({
+                type: isSubset ? 'Token Permutation / Subset' : 'Spelling / Typo Variation (Edit Distance ' + Math.min(distClean, distCore) + ')',
+                company_a: e1.sampleName,
+                company_b: e2.sampleName,
+                count_a: e1.count,
+                count_b: e2.count,
+                leads_a: e1.items.map(l => ({ _id: l._id, name: l.company_name, role: l.role, ctc: l.ctc })),
+                leads_b: e2.items.map(l => ({ _id: l._id, name: l.company_name, role: l.role, ctc: l.ctc })),
+              });
+            }
+          }
+        }
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          total_records: leads.length,
+          total_unique_clean_names: exactGroups.size,
+          exact_case_and_whitespace_duplicate_groups: exactDuplicates,
+          corporate_suffix_variation_groups: corporateSuffixDuplicates,
+          fuzzy_and_spelling_variation_pairs: fuzzyMatches,
+        },
+      });
+    } catch (err: any) {
+      console.error('GET /duplicate-audit error:', err);
+      return res.status(500).json({ success: false, error: { message: err.message || 'Duplicate audit failed' } });
+    }
+  });
+
+  /**
+   * POST/GET /api/v1/active-leads/deduplicate-pipeline
+   * Merge and deduplicate exact, suffix, and spelling variations in Pipeline leads,
+   * keeping 1 standard clean record per company while preserving multi-role tracks.
+   */
+  app.all('/api/v1/active-leads/deduplicate-pipeline', async (req: Request, res: Response) => {
+    try {
+      const allPipeline = await ActiveLead.find({ lead_type: 'pipeline', is_deleted: false }).lean();
+      const initialCount = allPipeline.length;
+
+      // 1. Create timestamped backup file
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const backupDir = path.join(__dirname, '../../backups');
+        if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+        const backupPath = path.join(backupDir, `pipeline_leads_backup_${Date.now()}.json`);
+        fs.writeFileSync(backupPath, JSON.stringify(allPipeline, null, 2));
+      } catch (backupErr) {
+        console.warn('Backup write warning:', backupErr);
+      }
+
+      function cleanStr(s: string): string {
+        return (s || '')
+          .toLowerCase()
+          .replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
+
+      function stripCorporateSuffixes(s: string): string {
+        let n = cleanStr(s);
+        // Handle common prefix/acronym patterns
+        if (n.startsWith('uts ') && n.includes('unistring')) {
+          n = n.replace(/^uts\s+/, '');
+        }
+        if (n.includes('movate') && n.includes('css corp')) {
+          n = 'movate';
+        }
+        if (n.includes('alstorm')) {
+          n = n.replace(/alstorm/g, 'alstom');
+        }
+
+        const suffixes = [
+          'private limited', 'pvt ltd', 'pvt limited', 'private ltd', 'pvtltd', 'pvt lmt', 'lmt',
+          'limited', 'ltd', 'inc', 'corporation', 'corp', 'llc', 'llp',
+          'technologies', 'technology', 'tech', 'solutions', 'solution',
+          'infotech', 'services', 'service', 'systems', 'system',
+          'enterprises', 'enterprise', 'studios', 'studio', 'group of companies', 'groups', 'group',
+          'consultancy', 'consulting', 'consultants', 'software solutions', 'software', 'soft',
+          'digital', 'global service', 'global solution centre', 'global',
+          'international llc', 'international', 'india pvt ltd', 'india private limited',
+          'india ltd', 'india', 'labs', 'lab', 'talent solutions', 'design systems',
+          'product and services', 'products and services', 'technical and services centre',
+          'technology business centre', 'life sciences', 'solutions and networks',
+          'careers', 'automations', 'automation', 'innovation labs', 'innovations', 'innovation'
+        ];
+        let changed = true;
+        while (changed) {
+          changed = false;
+          for (const suf of suffixes) {
+            const regex = new RegExp(`\\b${suf}\\b`, 'gi');
+            const before = n;
+            n = n.replace(regex, ' ').replace(/\s+/g, ' ').trim();
+            if (n !== before) changed = true;
+          }
+        }
+        return n || cleanStr(s);
+      }
+
+      function toSlug(s: string): string {
+        let stripped = stripCorporateSuffixes(s);
+        let slug = stripped.replace(/[^a-z0-9]/g, '');
+
+        // Normalize plural 's' at end of words for matching
+        if (slug.endsWith('s') && slug.length > 5 && !['siemens', 'tcs', 'cts', 'ciscoc', 'infosys'].includes(slug)) {
+          slug = slug.replace(/s$/, '');
+        }
+
+        const aliases: Record<string, string> = {
+          zenai: 'zeai',
+          nemekart: 'namekart',
+          stlumax: 'sllumax',
+          '247': '247ai',
+          nxtwave: 'nextwave',
+          novatec: 'novatech',
+          ltts: 'lttechnology',
+          lttechnologyservice: 'lttechnology',
+          lttechnologyserviceslimitedlt: 'lttechnology',
+          evobiautomation: 'evobi',
+          sheenlacpaint: 'sheenlac',
+          eleationcaeservice: 'eleation',
+        };
+
+        return aliases[slug] || slug;
+      }
+
+      function normalizeRole(r: string): string {
+        return (r || '')
+          .toLowerCase()
+          .replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
+
+      function areRolesEquivalent(r1: string, r2: string): boolean {
+        const n1 = normalizeRole(r1);
+        const n2 = normalizeRole(r2);
+        if (n1 === n2) return true;
+        if (!n1 || !n2) return true;
+        
+        const genericTrainee = ['graduate trainee', 'get', 'trainee', 'engineer trainee', 'intern', 'graduate engineer trainee', 'entry level'];
+        const isTrainee1 = genericTrainee.includes(n1) || genericTrainee.some(t => n1.includes(t));
+        const isTrainee2 = genericTrainee.includes(n2) || genericTrainee.some(t => n2.includes(t));
+        if (isTrainee1 && isTrainee2) return true;
+
+        const genericDev = ['sde', 'software engineer', 'software developer', 'associate software engineer', 'ase', 'developer', 'programmer', 'software dev'];
+        const isDev1 = genericDev.includes(n1) || genericDev.some(d => n1.includes(d));
+        const isDev2 = genericDev.includes(n2) || genericDev.some(d => n2.includes(d));
+        if (isDev1 && isDev2) return true;
+
+        if (n1.includes(n2) || n2.includes(n1)) return true;
+        return false;
+      }
+
+      function pickBestName(names: string[]): string {
+        return names.sort((a, b) => {
+          // Prefer TitleCase over ALL-CAPS or all-lowercase
+          const isUpperA = a === a.toUpperCase() && a.length > 5;
+          const isUpperB = b === b.toUpperCase() && b.length > 5;
+          if (isUpperA && !isUpperB) return 1;
+          if (!isUpperA && isUpperB) return -1;
+          return b.length - a.length;
+        })[0];
+      }
+
+      // Group leads by slug key
+      const groups = new Map<string, typeof allPipeline>();
+      for (const lead of allPipeline) {
+        const slug = toSlug(lead.company_name);
+        if (!groups.has(slug)) groups.set(slug, []);
+        groups.get(slug)!.push(lead);
+      }
+
+      let deletedCount = 0;
+      let updatedCount = 0;
+      let multiRoleTracksPreserved = 0;
+      const preservedMultiRoleDetails: Array<{ company: string; roles: string[] }> = [];
+
+      for (const [slug, group] of groups.entries()) {
+        if (group.length <= 1) continue;
+
+        const canonicalName = pickBestName(group.map(g => g.company_name));
+
+        // Group into distinct role buckets
+        const roleBuckets: Array<{ primary: typeof group[0]; duplicates: typeof group[0][] }> = [];
+
+        for (const item of group) {
+          let matchedBucket = false;
+          for (const bucket of roleBuckets) {
+            if (areRolesEquivalent(bucket.primary.role, item.role)) {
+              bucket.duplicates.push(item);
+              matchedBucket = true;
+              break;
+            }
+          }
+          if (!matchedBucket) {
+            roleBuckets.push({ primary: item, duplicates: [] });
+          }
+        }
+
+        if (roleBuckets.length > 1) {
+          multiRoleTracksPreserved += (roleBuckets.length - 1);
+          preservedMultiRoleDetails.push({
+            company: canonicalName,
+            roles: roleBuckets.map(b => b.primary.role || 'Graduate Trainee'),
+          });
+        }
+
+        // For each bucket, keep the best lead and merge data
+        for (const bucket of roleBuckets) {
+          const allInBucket = [bucket.primary, ...bucket.duplicates];
+
+          allInBucket.sort((a, b) => {
+            const aHasStatus = a.status ? 1 : 0;
+            const bHasStatus = b.status ? 1 : 0;
+            if (aHasStatus !== bHasStatus) return bHasStatus - aHasStatus;
+
+            const aIs2027 = (a.academic_year === '2027') ? 1 : 0;
+            const bIs2027 = (b.academic_year === '2027') ? 1 : 0;
+            if (aIs2027 !== bIs2027) return bIs2027 - aIs2027;
+
+            return (b.role?.length || 0) - (a.role?.length || 0);
+          });
+
+          const leadToKeep = allInBucket[0];
+          const leadsToDelete = allInBucket.slice(1);
+
+          let needsUpdate = false;
+          const updates: any = {};
+
+          if (leadToKeep.company_name !== canonicalName) {
+            updates.company_name = canonicalName;
+            needsUpdate = true;
+          }
+
+          // Inherit status if representative lead is blank
+          if (!leadToKeep.status) {
+            const withStatus = allInBucket.find(l => l.status);
+            if (withStatus) {
+              updates.status = withStatus.status;
+              if (withStatus.followup_month) updates.followup_month = withStatus.followup_month;
+              needsUpdate = true;
+            }
+          }
+
+          // Inherit role if representative lead is generic placeholder
+          if ((!leadToKeep.role || leadToKeep.role === 'Graduate Trainee') && allInBucket.some(l => l.role && l.role !== 'Graduate Trainee')) {
+            const withRole = allInBucket.find(l => l.role && l.role !== 'Graduate Trainee');
+            if (withRole) {
+              updates.role = withRole.role;
+              needsUpdate = true;
+            }
+          }
+
+          if (needsUpdate) {
+            await ActiveLead.findByIdAndUpdate(leadToKeep._id, { $set: updates });
+            updatedCount++;
+          }
+
+          for (const del of leadsToDelete) {
+            await ActiveLead.findByIdAndUpdate(del._id, {
+              $set: { is_deleted: true, deleted_at: new Date() },
+            });
+            deletedCount++;
+          }
+        }
+      }
+
+      const finalPipelineCount = await ActiveLead.countDocuments({ lead_type: 'pipeline', is_deleted: false });
+      const finalJdCount = await ActiveLead.countDocuments({ lead_type: 'jd_received', is_deleted: false });
+      const finalTotalActive = await ActiveLead.countDocuments({ is_deleted: false });
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          initial_pipeline_count: initialCount,
+          duplicates_removed: deletedCount,
+          records_updated_with_canonical_info: updatedCount,
+          multi_role_tracks_preserved: multiRoleTracksPreserved,
+          preserved_multi_role_details: preservedMultiRoleDetails,
+          final_pipeline_count: finalPipelineCount,
+          final_jd_count: finalJdCount,
+          final_total_active_leads: finalTotalActive,
+        },
+      });
+    } catch (err: any) {
+      console.error('POST /deduplicate-pipeline error:', err);
+      return res.status(500).json({ success: false, error: { message: err.message || 'Deduplication failed' } });
+    }
+  });
 }
+

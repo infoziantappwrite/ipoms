@@ -82,6 +82,22 @@ const CollegeSchema = new mongoose_1.Schema({
         trim: true,
         default: '',
     },
+    tpo_designation: {
+        type: String,
+        trim: true,
+        default: 'Head - Placements & Corporate Relations',
+    },
+    tpo_alternate_mobile: {
+        type: String,
+        trim: true,
+        default: '',
+    },
+    tpo_alternate_email: {
+        type: String,
+        trim: true,
+        lowercase: true,
+        default: '',
+    },
     departments: {
         type: [String],
         default: ['CSE', 'IT', 'AI & DS', 'ECE', 'EEE', 'MECH'],
@@ -92,6 +108,52 @@ const CollegeSchema = new mongoose_1.Schema({
     },
     nirf_ranking: {
         type: String,
+        trim: true,
+        default: '',
+    },
+    highest_package_lpa: {
+        type: String,
+        trim: true,
+        default: '',
+    },
+    average_package_lpa: {
+        type: String,
+        trim: true,
+        default: '',
+    },
+    lowest_package_lpa: {
+        type: String,
+        trim: true,
+        default: '',
+    },
+    established_year: {
+        type: String,
+        trim: true,
+        default: '',
+    },
+    landmarks: {
+        type: String,
+        trim: true,
+        default: '',
+    },
+    address: {
+        type: String,
+        trim: true,
+        default: '',
+    },
+    map_location: {
+        type: String,
+        trim: true,
+        default: '',
+    },
+    accreditations: {
+        type: String,
+        trim: true,
+        default: '',
+    },
+    placement_notes: {
+        type: String,
+        trim: true,
         default: '',
     },
     status: {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useCallback, useEffect, useState } from 'react';
-import { Phone, Check, Clock } from 'lucide-react';
+import { Phone, Check, Clock, CopyPlus } from 'lucide-react';
 import type { TrackerRow as TrackerRowType, CallOutcome } from '../page';
 import { triggerHaptic } from '@/lib/haptics';
 import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
@@ -10,6 +10,7 @@ import { RowMonthDropdown } from './RowMonthDropdown';
 import {
   smartParseTime,
   formatTime,
+  formatTimeAutoMask,
   formatDurationMinutesLevel,
   nowISO,
 } from '@/lib/timeValidation';
@@ -71,10 +72,12 @@ interface Props {
   onDelete: () => void;
   onCall?: (row: TrackerRowType) => void;
   onToggleSelect?: (rowId: string, index: number, shiftKey: boolean) => void;
+  onCopySingle?: (row: TrackerRowType) => void;
 }
 
-export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode, selectionTheme = 'blue', isReadOnly, onUpdate, onEdit, onDelete, onCall, onToggleSelect }: Props) {
+export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode, selectionTheme = 'blue', isReadOnly, onUpdate, onEdit, onDelete, onCall, onToggleSelect, onCopySingle }: Props) {
   const startTimeRef = useRef<HTMLInputElement>(null);
+  const prevStartTimeRef = useRef<string>(formatTime(row.call_start_time));
   const companyNameRef = useRef<HTMLInputElement>(null);
   const hrNameRef = useRef<HTMLInputElement>(null);
   const mobileRef = useRef<HTMLInputElement>(null);
@@ -178,10 +181,36 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
     }
 
     onUpdate(patch);
-  }, [onUpdate, row.call_end_time]);
+  }, [handleStartTimeBlur, nowISO, onUpdate, row.call_end_time]);
 
-  // ── Spacebar handler for Start Time (Spacebar fills Start Time)
+  // ── Auto-mask time input as user types: automatically adds colon after 2 digits, auto-deduces AM/PM on 4 digits
+  const handleStartTimeInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const masked = formatTimeAutoMask(raw, prevStartTimeRef.current);
+    prevStartTimeRef.current = masked;
+    e.target.value = masked;
+  }, []);
+
+  // ── Spacebar / 'a' / 'p' / Delete key handlers for Start Time
   const handleStartTimeKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    const val = startTimeRef.current?.value || '';
+
+    // Quick toggle period with 'a' or 'p'
+    if ((e.key === 'a' || e.key === 'A') && val.length >= 4) {
+      e.preventDefault();
+      const updated = val.replace(/\s*[APMamp]*$/i, '').trim() + ' AM';
+      prevStartTimeRef.current = updated;
+      if (startTimeRef.current) startTimeRef.current.value = updated;
+      return;
+    }
+    if ((e.key === 'p' || e.key === 'P') && val.length >= 4) {
+      e.preventDefault();
+      const updated = val.replace(/\s*[APMamp]*$/i, '').trim() + ' PM';
+      prevStartTimeRef.current = updated;
+      if (startTimeRef.current) startTimeRef.current.value = updated;
+      return;
+    }
+
     if (e.key === ' ') {
       e.preventDefault();
       handleSetCurrentStartTime();
@@ -344,8 +373,8 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
   }, [onUpdate]);
 
   const gridTemplate = isReadOnly
-    ? 'grid-cols-[56px_100px_90px_90px_260px_200px_220px_250px_150px_180px_150px_minmax(260px,1fr)]'
-    : 'grid-cols-[56px_100px_90px_90px_260px_200px_220px_250px_180px_150px_minmax(260px,1fr)]';
+    ? 'grid-cols-[56px_100px_90px_90px_260px_200px_240px_270px_150px_180px_150px_minmax(260px,1fr)]'
+    : 'grid-cols-[56px_100px_90px_90px_260px_200px_240px_270px_180px_150px_minmax(260px,1fr)]';
 
   return (
     <div
@@ -435,6 +464,7 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
               type="text"
               defaultValue={formatTime(row.call_start_time)}
               placeholder="Time"
+              onChange={handleStartTimeInput}
               onKeyDown={(e) => { handleStartTimeKeyDown(e); handleKeyDownEnter(e); }}
               onBlur={handleStartTimeBlur}
               title="Start time set • Click to edit or click clock icon to re-stamp current time"
@@ -469,7 +499,23 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
       {/* Company Name (Frozen Col 5 - Editable & Solid Right Divider) */}
       <div className={`sticky left-[336px] z-10 ${rowBg} px-2 py-1 flex items-center border-r-2 border-border-strong shadow-[6px_0_12px_-3px_rgba(0,0,0,0.12)] dark:shadow-[6px_0_12px_-3px_rgba(0,0,0,0.6)] transition-colors`} title={row.company_name}>
         {isReadOnly ? (
-          <span className="text-fg font-semibold break-words leading-snug select-text truncate">{row.company_name}</span>
+          <div className="flex items-center justify-between w-full min-w-0 gap-1.5">
+            <span className="text-fg font-semibold break-words leading-snug select-text truncate">{row.company_name}</span>
+            {onCopySingle && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCopySingle(row);
+                }}
+                title={`Copy "${row.company_name}" to today's daily tracker workspace`}
+                className="opacity-0 group-hover:opacity-100 hover:opacity-100 px-2 py-0.5 rounded-md bg-primary/10 hover:bg-primary text-primary hover:text-white border border-primary/25 hover:border-primary transition-all cursor-pointer shadow-2xs shrink-0 flex items-center gap-1 text-[10.5px] font-semibold active:scale-95"
+              >
+                <CopyPlus size={11} strokeWidth={2.4} />
+                <span className="hidden sm:inline">Copy to Today</span>
+              </button>
+            )}
+          </div>
         ) : (
           <input
             ref={companyNameRef}
@@ -491,7 +537,7 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
       </div>
 
       {/* HR Name (Editable) */}
-      <div className="px-2 py-1 flex items-center" title={row.hr_name || ''}>
+      <div className="px-2 py-1 flex items-center min-w-0" title={row.hr_name || ''}>
         {isReadOnly ? (
           <span className="text-fg font-medium text-xs leading-snug break-words select-text">
             {row.hr_name || <span className="text-fg-muted italic">—</span>}
@@ -511,15 +557,15 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
             }}
             onBlur={handleHrNameBlur}
             title="Click to edit HR Contact Name"
-            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg font-medium transition-colors cursor-text text-xs outline-none placeholder:text-fg-disabled"
+            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg font-medium transition-colors cursor-text text-xs outline-none placeholder:text-fg-disabled min-w-0"
           />
         )}
       </div>
 
       {/* Contact (Call / WhatsApp + Editable Mobile) */}
-      <div className="px-2 py-1 text-fg font-mono tabular-nums text-xs flex items-center gap-1.5 group/contact whitespace-nowrap">
+      <div className="px-2 py-1.5 text-fg font-mono tabular-nums text-xs flex items-start gap-1.5 group/contact min-w-0">
         {row.mobile_number && (
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1 shrink-0 mt-0.5">
             {!isReadOnly ? (
               <button
                 type="button"
@@ -527,7 +573,7 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
                   triggerHaptic('light');
                   onCall?.(row);
                 }}
-                title={`Click to call ${row.hr_name || row.company_name} (${row.mobile_number})`}
+                title={`Click to call ${row.hr_name || row.company_name} (${(row.mobile_number || '').split(/[,;/]+/)[0]?.trim() || row.mobile_number})`}
                 className="w-5 h-5 rounded-md bg-blue-500/15 hover:bg-blue-500/30 border border-blue-500/40 dark:border-blue-400/60 text-blue-600 dark:text-blue-400 flex items-center justify-center transition-all hover:scale-105 active:scale-[0.992] cursor-pointer shrink-0 shadow-2xs"
               >
                 <Phone size={11} strokeWidth={2.5} className="text-blue-600 dark:text-blue-400" />
@@ -539,7 +585,7 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
             )}
 
             <WhatsAppButton
-              mobileNumber={row.mobile_number}
+              mobileNumber={(row.mobile_number || '').split(/[,;/]+/)[0]?.trim() || row.mobile_number}
               contactName={row.hr_name}
               companyName={row.company_name}
             />
@@ -547,9 +593,26 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
         )}
 
         {isReadOnly ? (
-          <span className="whitespace-nowrap select-all font-medium text-fg">
-            {row.mobile_number || <span className="text-fg-muted italic">—</span>}
-          </span>
+          <div className="flex flex-col gap-0.5 min-w-0 leading-snug py-0.5">
+            {(() => {
+              const numbers = (row.mobile_number || '')
+                .split(/[,;/]+/)
+                .map((s) => s.trim())
+                .filter(Boolean);
+              if (numbers.length === 0) {
+                return <span className="text-fg-muted italic">—</span>;
+              }
+              const chunks: string[][] = [];
+              for (let i = 0; i < numbers.length; i += 2) {
+                chunks.push(numbers.slice(i, i + 2));
+              }
+              return chunks.map((chunk, cIdx) => (
+                <span key={cIdx} className="select-all font-medium text-fg break-all text-xs">
+                  {chunk.join(', ')}
+                </span>
+              ));
+            })()}
+          </div>
         ) : (
           <input
             ref={mobileRef}
@@ -565,21 +628,34 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
             }}
             onBlur={handleMobileBlur}
             title="Click to edit Mobile Number"
-            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg font-mono font-medium transition-colors cursor-text text-xs outline-none placeholder:text-fg-disabled"
+            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg font-mono font-medium transition-colors cursor-text text-xs outline-none placeholder:text-fg-disabled min-w-0"
           />
         )}
       </div>
 
       {/* Email ID (Editable) */}
-      <div className="px-2 py-1 flex items-center whitespace-nowrap text-xs" title={row.email_id || ''}>
+      <div className="px-2 py-1.5 flex items-center min-w-0 text-xs" title={row.email_id || ''}>
         {isReadOnly ? (
-          row.email_id ? (
-            <span className="text-fg-subtle whitespace-nowrap select-all hover:text-fg transition-colors">
-              {row.email_id}
-            </span>
-          ) : (
-            <span className="text-fg-muted italic">—</span>
-          )
+          <div className="flex flex-col gap-0.5 min-w-0 leading-snug py-0.5">
+            {(() => {
+              const emails = (row.email_id || '')
+                .split(/[,;/]+/)
+                .map((s) => s.trim().toLowerCase())
+                .filter(Boolean);
+              if (emails.length === 0) {
+                return <span className="text-fg-muted italic">—</span>;
+              }
+              return emails.map((em, eIdx) => (
+                <span
+                  key={eIdx}
+                  className="text-fg-subtle select-all hover:text-fg transition-colors break-all text-[11.5px]"
+                  title={em}
+                >
+                  {em}
+                </span>
+              ));
+            })()}
+          </div>
         ) : (
           <input
             ref={emailRef}
@@ -595,7 +671,7 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
             }}
             onBlur={handleEmailBlur}
             title="Click to edit Email Address"
-            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg transition-colors cursor-text text-xs outline-none placeholder:text-fg-disabled"
+            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg transition-colors cursor-text text-xs outline-none placeholder:text-fg-disabled min-w-0"
           />
         )}
       </div>

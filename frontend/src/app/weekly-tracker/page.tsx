@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalendarDays } from 'lucide-react';
 import { WeeklyHeader } from './components/WeeklyHeader';
@@ -9,13 +9,14 @@ import { WeeklySection } from './components/WeeklySection';
 import { AddCompanyModal } from './components/AddCompanyModal';
 import { BulkMoveModal } from './components/BulkMoveModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
+import { ForeignCollegeWarningModal } from './components/ForeignCollegeWarningModal';
 import { CollegeDossierModal } from '@/components/college/CollegeDossierModal';
 import type { WeeklyRow } from './components/WeeklyTable';
 import { apiFetch, apiFetchBlob } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
 import { useToast } from '@/components/ui/Toast';
 import { triggerHaptic } from '@/lib/haptics';
-import { resolveDefaultCollege } from '@/lib/collegeSession';
+import { resolveDefaultCollege, setActiveCollege, getCachedColleges } from '@/lib/collegeSession';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 
 interface SectionData {
@@ -149,12 +150,38 @@ export default function WeeklyTrackerPage() {
       }).catch((err) => console.error('Failed to load assigned colleges:', err));
     }
 
-    resolveDefaultCollege().then((col) => {
-      if (col.id) {
-        setSelectedCollegeId(col.id);
-        setSelectedCollegeName(col.name);
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const urlCollegeId = urlParams?.get('college_id');
+    const urlSection = urlParams?.get('section');
+
+    if (urlSection) {
+      setActiveSectionFilter(urlSection);
+    }
+
+    if (urlCollegeId) {
+      const cached = getCachedColleges();
+      const matched = cached.find((c) => c._id === urlCollegeId || c.college_code === urlCollegeId);
+      const colName = matched?.college_name || '';
+      setSelectedCollegeId(urlCollegeId);
+      setSelectedCollegeName(colName);
+      setActiveCollege(urlCollegeId, colName, matched || undefined);
+    } else {
+      resolveDefaultCollege().then((col) => {
+        if (col.id) {
+          setSelectedCollegeId(col.id);
+          setSelectedCollegeName(col.name);
+        }
+      });
+    }
+
+    const handleCollegeChange = (e: any) => {
+      if (e.detail?.id) {
+        setSelectedCollegeId(e.detail.id);
+        setSelectedCollegeName(e.detail.name || '');
       }
-    });
+    };
+    window.addEventListener('ipoms_college_change', handleCollegeChange);
+    return () => window.removeEventListener('ipoms_college_change', handleCollegeChange);
   }, []);
 
   // ── Load Weekly Tracker Sections
@@ -252,17 +279,36 @@ export default function WeeklyTrackerPage() {
     }
   }, [saveStatus]);
 
-  const confirmForeignAction = (actionLabel: string): boolean => {
-    if (!isForeignCollege) return true;
-    return window.confirm(
-      `${selectedCollegeName || 'This college'} is not one of your assigned colleges. `
-      + `Continue with this ${actionLabel} anyway? The coordinator who handles it will be notified.`
-    );
+  // ── In-App Foreign College Action Warning Modal State
+  const [pendingForeignAction, setPendingForeignAction] = useState<{
+    actionText: string;
+    onConfirm: () => void | Promise<void>;
+  } | null>(null);
+
+  const executeWithForeignCheck = (actionText: string, actionFn: () => void | Promise<void>) => {
+    if (!isForeignCollege) {
+      actionFn();
+      return;
+    }
+    setPendingForeignAction({
+      actionText,
+      onConfirm: async () => {
+        setPendingForeignAction(null);
+        await actionFn();
+      },
+    });
   };
 
   // ── Row Patch (Inline Edit) with Undo / Redo
   const handleUpdateRow = async (rowId: string, patch: Partial<WeeklyRow>, isUndoRedo = false) => {
-    if (!confirmForeignAction('edit')) return;
+    if (!isUndoRedo && isForeignCollege) {
+      executeWithForeignCheck('edit', () => performUpdateRow(rowId, patch, isUndoRedo));
+      return;
+    }
+    await performUpdateRow(rowId, patch, isUndoRedo);
+  };
+
+  const performUpdateRow = async (rowId: string, patch: Partial<WeeklyRow>, isUndoRedo = false) => {
 
     let existingRow: WeeklyRow | undefined;
     if (sections) {
@@ -315,7 +361,10 @@ export default function WeeklyTrackerPage() {
     try {
       const res = await apiFetch(`/weekly-tracker/${rowId}`, {
         method: 'PATCH',
-        body: JSON.stringify(patch),
+        body: JSON.stringify({
+          ...patch,
+          is_undo: isUndoRedo,
+        }),
       });
       if (res.success) {
         await loadWeeklyTracker();
@@ -343,7 +392,14 @@ export default function WeeklyTrackerPage() {
       }
     }
 
-    if (!confirmForeignAction('edit')) return;
+    if (isForeignCollege) {
+      executeWithForeignCheck('move section', () => performMoveSection(rowId, newSection));
+      return;
+    }
+    await performMoveSection(rowId, newSection);
+  };
+
+  const performMoveSection = async (rowId: string, newSection: string) => {
     setSaveStatus('saving');
     try {
       const res = await apiFetch(`/weekly-tracker/${rowId}/section`, {
@@ -415,7 +471,14 @@ export default function WeeklyTrackerPage() {
 
   // ── Delete Row (Soft delete) with Undo / Redo
   const handleDeleteRow = async (rowId: string, isUndoRedo = false) => {
-    if (!confirmForeignAction('delete')) return;
+    if (!isUndoRedo && isForeignCollege) {
+      executeWithForeignCheck('delete', () => performDeleteRow(rowId, isUndoRedo));
+      return;
+    }
+    await performDeleteRow(rowId, isUndoRedo);
+  };
+
+  const performDeleteRow = async (rowId: string, isUndoRedo = false) => {
 
     let deletedRow: WeeklyRow | undefined;
     if (sections) {
@@ -610,7 +673,24 @@ export default function WeeklyTrackerPage() {
 
     if (normSourceKey === normTargetKey) return;
 
-    if (!confirmForeignAction('move')) return;
+    if (!isUndoRedo && isForeignCollege) {
+      executeWithForeignCheck('move section', () =>
+        performMoveRowCrossSection(rowId, sourceSectionKey, targetSectionKey, targetIndex, isUndoRedo)
+      );
+      return;
+    }
+    await performMoveRowCrossSection(rowId, sourceSectionKey, targetSectionKey, targetIndex, isUndoRedo);
+  };
+
+  const performMoveRowCrossSection = async (
+    rowId: string,
+    sourceSectionKey: string,
+    targetSectionKey: string,
+    targetIndex?: number,
+    isUndoRedo = false
+  ) => {
+    const normSourceKey = normalizeSectionKey(sourceSectionKey);
+    const normTargetKey = normalizeSectionKey(targetSectionKey);
 
     const sourceSec = sections?.[normSourceKey];
     const targetSec = sections?.[normTargetKey];
@@ -812,7 +892,20 @@ export default function WeeklyTrackerPage() {
     isUndoRedo = false
   ) => {
     if (rowIdsToMove.length === 0) return;
-    if (!confirmForeignAction('move')) return;
+    if (!isUndoRedo && isForeignCollege) {
+      executeWithForeignCheck('bulk move', () =>
+        performBulkMoveSection(targetSectionKey, rowIdsToMove, isUndoRedo)
+      );
+      return;
+    }
+    await performBulkMoveSection(targetSectionKey, rowIdsToMove, isUndoRedo);
+  };
+
+  const performBulkMoveSection = async (
+    targetSectionKey: string,
+    rowIdsToMove: string[],
+    isUndoRedo = false
+  ) => {
 
     const normTargetKey = normalizeSectionKey(targetSectionKey);
     const targetLabel = targetSectionKey.replace(/_/g, ' ');
@@ -1007,7 +1100,14 @@ export default function WeeklyTrackerPage() {
   };
 
   // ── Global Save & Sync (Ctrl+S / Cmd+S) ──────────────────────────────────
+  const lastSaveTimeRef = useRef<number>(0);
   const handleSaveAll = useCallback(async () => {
+    const now = Date.now();
+    if (now - lastSaveTimeRef.current < 800) {
+      return; // Prevent duplicate rapid save executions
+    }
+    lastSaveTimeRef.current = now;
+
     if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
@@ -1015,6 +1115,8 @@ export default function WeeklyTrackerPage() {
     try {
       await Promise.all([loadWeeklyTracker(), loadKpi()]);
       window.dispatchEvent(new CustomEvent('ipoms_trigger_autosave_banner'));
+      toast('All changes saved successfully', 'success');
+      triggerHaptic('success');
     } catch (e) {
       console.error('Failed to sync weekly tracker on save:', e);
       toast('Failed to save changes. Please check your connection.', 'error');
@@ -1026,6 +1128,7 @@ export default function WeeklyTrackerPage() {
       const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement)?.tagName);
       if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
+        e.stopPropagation();
         handleSaveAll();
       } else if (!isInput && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
         e.preventDefault();
@@ -1430,6 +1533,19 @@ export default function WeeklyTrackerPage() {
           collegeId={selectedCollegeId}
         />
       )}
+
+      {/* ── Foreign College Warning In-App Modal ─────────────────────────── */}
+      <ForeignCollegeWarningModal
+        isOpen={pendingForeignAction !== null}
+        collegeName={selectedCollegeName || 'This Institution'}
+        actionText={pendingForeignAction?.actionText}
+        onClose={() => setPendingForeignAction(null)}
+        onConfirm={() => {
+          if (pendingForeignAction?.onConfirm) {
+            pendingForeignAction.onConfirm();
+          }
+        }}
+      />
 
     </div>
   );

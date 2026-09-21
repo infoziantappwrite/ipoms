@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { TrackerRow } from './TrackerRow';
 import type { TrackerRow as TrackerRowType } from '../page';
-import { ClipboardList, Copy, Check, CheckSquare } from 'lucide-react';
+import { ClipboardList, Copy, Check, CheckSquare, CopyPlus, Loader2, X } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 import { triggerHaptic } from '@/lib/haptics';
 import { formatTime } from '@/lib/timeValidation';
@@ -16,9 +16,10 @@ interface Props {
   onDelete: (rowId: string) => Promise<void>;
   onDeleteSelected?: (rowIds: string[]) => Promise<void>;
   onCall?: (row: TrackerRowType) => void;
+  onCopyFromHistory?: (rows: TrackerRowType[]) => Promise<void>;
 }
 
-export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, onDeleteSelected, onCall }: Props) {
+export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, onDeleteSelected, onCall, onCopyFromHistory }: Props) {
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [selectionTheme, setSelectionTheme] = useState<'blue' | 'emerald' | 'purple' | 'amber' | 'rose' | 'pink' | 'orange'>('blue');
@@ -362,6 +363,34 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
     }
   }, [rows, isReadOnly, toast]);
 
+  const [isCopyingToWorkspace, setIsCopyingToWorkspace] = useState(false);
+
+  const handleCopySelectedToWorkspace = useCallback(async () => {
+    if (selectedRowIds.size === 0) return;
+    const targetRows = rows.filter((r) => selectedRowIds.has(r._id));
+    if (targetRows.length === 0) return;
+
+    try {
+      setIsCopyingToWorkspace(true);
+      if (onCopyFromHistory) {
+        await onCopyFromHistory(targetRows);
+      }
+      setSelectedRowIds(new Set());
+      setIsSelectMode(false);
+      setLastSelectedIndex(null);
+    } catch (err) {
+      console.error('Failed to copy rows to workspace', err);
+    } finally {
+      setIsCopyingToWorkspace(false);
+    }
+  }, [rows, selectedRowIds, onCopyFromHistory]);
+
+  const handleCopySingleRowToWorkspace = useCallback(async (row: TrackerRowType) => {
+    if (onCopyFromHistory) {
+      await onCopyFromHistory([row]);
+    }
+  }, [onCopyFromHistory]);
+
   const handleDeleteSelected = useCallback(async () => {
     if (selectedRowIds.size === 0) return;
     const idsToDelete = Array.from(selectedRowIds);
@@ -546,14 +575,14 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
   }
 
   const gridTemplate = isReadOnly
-    ? 'grid-cols-[56px_100px_90px_90px_260px_200px_220px_250px_150px_180px_150px_minmax(260px,1fr)]'
-    : 'grid-cols-[56px_100px_90px_90px_260px_200px_220px_250px_180px_150px_minmax(260px,1fr)]';
+    ? 'grid-cols-[56px_100px_90px_90px_260px_200px_240px_270px_150px_180px_150px_minmax(260px,1fr)]'
+    : 'grid-cols-[56px_100px_90px_90px_260px_200px_240px_270px_180px_150px_minmax(260px,1fr)]';
 
   return (
     <div className="flex-1 relative flex flex-col min-h-0">
       {/* Grid Container */}
       <div className="flex-1 overflow-auto rounded-xl border border-border bg-surface">
-        <div className={isReadOnly ? 'min-w-[2016px]' : 'min-w-[1866px]'}>
+        <div className={isReadOnly ? 'min-w-[2060px]' : 'min-w-[1910px]'}>
           {/* Sticky Column Headers (Exact Sheet-grade CSS Grid) */}
           <div className={`sticky top-0 z-20 grid ${gridTemplate} divide-x divide-border bg-surface-sunken border-b border-border text-xs font-semibold text-fg-subtle uppercase tracking-wider shadow-2xs whitespace-nowrap select-none`}>
             {/* S.No / Select Toggle Button & Master Checkbox (Frozen Col 1) */}
@@ -699,11 +728,82 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
                 onDelete={() => onDelete(row._id)}
                 onCall={onCall}
                 onToggleSelect={handleToggleSelectRow}
+                onCopySingle={isReadOnly ? handleCopySingleRowToWorkspace : undefined}
               />
             ))}
           </div>
         </div>
       </div>
+
+      {/* Floating Action Toolbar in History Mode when rows are selected */}
+      {isReadOnly && selectedRowIds.size > 0 && (
+        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-40 bg-surface/95 dark:bg-zinc-900/95 backdrop-blur-md border border-border shadow-2xl rounded-2xl px-4 py-2.5 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center gap-2 pr-2 border-r border-border">
+            <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center shadow-xs">
+              {selectedRowIds.size}
+            </span>
+            <span className="text-xs font-semibold text-fg whitespace-nowrap">
+              {selectedRowIds.size} Row{selectedRowIds.size > 1 ? 's' : ''} Selected
+            </span>
+          </div>
+
+          {/* Primary Action: Copy Selected to Today's Workspace */}
+          <button
+            type="button"
+            onClick={handleCopySelectedToWorkspace}
+            disabled={isCopyingToWorkspace}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-primary hover:bg-blue-700 text-primary-foreground text-xs font-bold shadow-md transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50 whitespace-nowrap"
+          >
+            {isCopyingToWorkspace ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <CopyPlus size={14} strokeWidth={2.4} />
+            )}
+            <span>Copy to Today&apos;s Workspace</span>
+          </button>
+
+          {/* Secondary Action: Copy Text to Clipboard */}
+          <button
+            type="button"
+            onClick={(e) => handleCopyEntireRow(e as any)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-sunken hover:bg-surface-raised text-fg border border-border text-xs font-medium transition-all active:scale-[0.98] cursor-pointer whitespace-nowrap"
+            title="Copy selected row details as text"
+          >
+            <Copy size={13} strokeWidth={2} />
+            <span className="hidden sm:inline">Copy Text</span>
+          </button>
+
+          {/* Secondary Action: Copy Contacts */}
+          <button
+            type="button"
+            onClick={handleCopyContacts}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-surface-sunken hover:bg-surface-raised text-blue-600 dark:text-blue-400 border border-border text-xs font-medium transition-all active:scale-[0.98] cursor-pointer whitespace-nowrap"
+            title="Copy phone numbers from selected rows"
+          >
+            <span>Contacts</span>
+          </button>
+
+          {/* Secondary Action: Copy Emails */}
+          <button
+            type="button"
+            onClick={handleCopyEmails}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-surface-sunken hover:bg-surface-raised text-emerald-600 dark:text-emerald-400 border border-border text-xs font-medium transition-all active:scale-[0.98] cursor-pointer whitespace-nowrap"
+            title="Copy email IDs from selected rows"
+          >
+            <span>Emails</span>
+          </button>
+
+          {/* Deselect / Cancel */}
+          <button
+            type="button"
+            onClick={handleClearSelection}
+            className="p-1.5 rounded-xl hover:bg-surface-sunken text-fg-subtle hover:text-fg transition-colors cursor-pointer text-xs ml-1"
+            title="Clear selection (Esc)"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

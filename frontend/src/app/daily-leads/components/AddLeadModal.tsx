@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { ClipboardList, Plus, Sparkles, Zap, X, CheckCircle2, Building2, GraduationCap } from 'lucide-react';
+import { ClipboardList, Plus, Sparkles, X, Building2, GraduationCap } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
 import { sortCollegesWithPriority, getCoordinatorSelectedColleges } from '@/lib/collegeSession';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
 import { SmoothYearDropdown } from '@/components/ui/SmoothYearDropdown';
+import { SmoothTimeInput } from '@/components/ui/SmoothTimeInput';
 import { formatTime } from '@/lib/timeValidation';
 
 const BATCH_YEARS = ['2025', '2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
@@ -53,11 +54,6 @@ export function AddLeadModal({
   // Colleges list
   const [colleges, setColleges] = useState<College[]>([]);
 
-  // "Copy from Daily Tracker" shortcut drawer
-  const [showDtDrawer, setShowDtDrawer] = useState(false);
-  const [dtPositives, setDtPositives] = useState<any[]>([]);
-  const [dtLoading, setDtLoading] = useState(false);
-
   useEffect(() => {
     apiFetch('/colleges')
       .then((data) => {
@@ -71,33 +67,12 @@ export function AddLeadModal({
 
   const prioritizedColleges = useMemo(() => {
     const coordinatorSelectedIds = getCoordinatorSelectedColleges();
-    const focusedIdsFromColleges = (colleges as any[]).filter((c) => c.is_selected_by_me).map((c) => c._id);
-    const activeFocusIds = Array.from(new Set([...coordinatorSelectedIds, ...focusedIdsFromColleges]));
+    const activeFocusIds =
+      coordinatorSelectedIds.length > 0
+        ? coordinatorSelectedIds
+        : (colleges as any[]).filter((c) => c.is_selected_by_me).map((c) => c._id);
     return sortCollegesWithPriority(colleges as any[], activeFocusIds);
   }, [colleges]);
-
-  // Fetch Daily Tracker positives for Copy Shortcut
-  const handleOpenDtDrawer = () => {
-    setShowDtDrawer(true);
-    setDtLoading(true);
-    apiFetch(`/daily-leads/daily-tracker-positives?date=${leadDate}&coordinator_id=${coordinatorId}`)
-      .then((data) => {
-        if (data.success && (data.data as any)?.positives) {
-          setDtPositives((data.data as any).positives);
-        }
-      })
-      .catch(console.error)
-      .finally(() => setDtLoading(false));
-  };
-
-  // Copy selected Daily Tracker call data
-  const handleSelectDtPositive = (p: any) => {
-    setCompanyName(p.company_name);
-    setCollegeId(p.college_id?._id || p.college_id);
-    if (p.notes_remarks) setRemarks(`From DT Call: ${p.notes_remarks}`);
-    setDailyTrackerId(p._id);
-    setShowDtDrawer(false);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -218,63 +193,6 @@ export function AddLeadModal({
             </div>
           </div>
 
-          {/* Copy Shortcut Header Button */}
-          <div className="flex items-center justify-between bg-surface-sunken border border-border rounded-xl p-3">
-            <span className="text-micro text-fg-muted font-medium">
-              Have you already logged this call in Daily Tracker?
-            </span>
-            <button
-              type="button"
-              onClick={handleOpenDtDrawer}
-              className="bg-surface hover:bg-primary/10 text-primary border border-primary/20 px-3 py-1.5 rounded-lg text-micro font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              <Zap size={13} strokeWidth={2.5} />
-              <span>Copy from Daily Tracker</span>
-            </button>
-          </div>
-
-          {/* Drawer for Copy shortcut */}
-          {showDtDrawer && (
-            <div className="bg-primary/10 border border-primary/20 rounded-xl p-3.5 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-primary text-micro">Select Positive Call from Daily Tracker</span>
-                <button
-                  type="button"
-                  onClick={() => setShowDtDrawer(false)}
-                  aria-label="Close"
-                  className="text-fg-subtle hover:text-fg p-1"
-                >
-                  <X size={14} strokeWidth={2} />
-                </button>
-              </div>
-              {dtLoading ? (
-                <p className="text-fg-subtle italic py-2">Loading Daily Tracker positive calls…</p>
-              ) : dtPositives.length === 0 ? (
-                <p className="text-fg-subtle italic py-2">No positive calls found in Daily Tracker for {leadDate}.</p>
-              ) : (
-                <div className="max-h-36 overflow-y-auto space-y-2 pr-1 no-scrollbar">
-                  {dtPositives.map((p) => (
-                    <div
-                      key={p._id}
-                      onClick={() => handleSelectDtPositive(p)}
-                      className="p-2.5 bg-surface hover:bg-surface-raised border border-border rounded-xl cursor-pointer flex items-center justify-between transition-colors shadow-xs"
-                    >
-                      <div>
-                        <p className="font-bold text-fg">{p.company_name}</p>
-                        <p className="text-micro text-fg-subtle">
-                          {p.college_id?.college_name || 'College'} • {p.contact_person_name}
-                        </p>
-                      </div>
-                      <span className="text-micro bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-full font-bold">
-                        {p.outcome_status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Company Name */}
           <div>
             <label className="block text-fg font-semibold mb-1.5">
@@ -307,9 +225,7 @@ export function AddLeadModal({
                   { value: '', label: '— Select College (Required) —' },
                   ...prioritizedColleges.map((c: any) => ({
                     value: c._id,
-                    label: c.college_name,
                     badge: c.college_code,
-                    sublabel: c.location,
                     isPinned: Boolean(c.isPinned || c.is_selected_by_me),
                   })),
                 ]}
@@ -384,12 +300,10 @@ export function AddLeadModal({
             {/* Time */}
             <div>
               <label className="block text-fg font-semibold mb-1.5">Time Logged</label>
-              <input
-                type="text"
+              <SmoothTimeInput
                 value={eventTime}
-                onChange={(e) => setEventTime(e.target.value)}
+                onChange={setEventTime}
                 placeholder="e.g. 10:30 AM"
-                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-fg placeholder:text-fg-disabled text-xs transition-all outline-none"
               />
             </div>
 
@@ -427,10 +341,9 @@ export function AddLeadModal({
             type="submit"
             form="add-lead-form"
             disabled={loading}
-            className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.992] hover:shadow-md hover:shadow-primary/25"
+            className="w-full sm:w-auto px-6 py-2.5 bg-primary hover:bg-blue-700 disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center cursor-pointer active:scale-[0.992] hover:shadow-md hover:shadow-primary/25"
           >
-            <CheckCircle2 size={15} />
-            <span>{loading ? 'Saving…' : 'Save Entry'}</span>
+            {loading ? 'Saving…' : 'Save'}
           </button>
         </div>
 
