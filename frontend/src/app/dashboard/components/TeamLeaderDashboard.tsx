@@ -21,7 +21,7 @@ interface Props {
 export function TeamLeaderDashboard({ data, onRefresh }: Props) {
   const [selectedCollegeIds, setSelectedCollegeIds] = useState<string[]>([]);
   const [isLocked, setIsLocked] = useState<boolean>(false);
-  const [showTeamMatrix, setShowTeamMatrix] = useState(true);
+  const [showTeamMatrix, setShowTeamMatrix] = useState(false);
   const [presenceFilter, setPresenceFilter] = useState<'all' | 'online' | 'away' | 'offline' | 'active_today'>('all');
 
   useEffect(() => {
@@ -281,11 +281,22 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
             </button>
 
             <button
+              type="button"
               onClick={() => setShowTeamMatrix(!showTeamMatrix)}
-              className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-              title={showTeamMatrix ? 'Collapse matrix' : 'Expand matrix'}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs border ${
+                !showTeamMatrix
+                  ? 'bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/80 dark:hover:bg-blue-900/90 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-600 ring-2 ring-blue-500/20 hover:scale-[1.02]'
+                  : 'bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700'
+              }`}
+              title={showTeamMatrix ? 'Collapse coordinators matrix' : 'Expand coordinators matrix'}
             >
-              {showTeamMatrix ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              <span>{showTeamMatrix ? 'Collapse' : 'Expand Matrix'}</span>
+              <ChevronDown
+                size={16}
+                className={`transition-transform duration-300 ${
+                  showTeamMatrix ? 'rotate-180 text-zinc-500' : 'rotate-0 text-blue-600 dark:text-blue-400 animate-bounce'
+                }`}
+              />
             </button>
           </div>
         </div>
