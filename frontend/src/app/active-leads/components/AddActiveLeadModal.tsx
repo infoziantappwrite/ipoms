@@ -202,7 +202,7 @@ export function AddActiveLeadModal({ isOpen, onClose, defaultLeadType = 'pipelin
                       : 'bg-surface-sunken border-border text-fg-subtle hover:text-fg'
                   }`}
                 >
-                  <span>Pipeline</span>
+                  <span>Pipeline (Positives)</span>
                 </button>
                 <button
                   type="button"
@@ -213,7 +213,7 @@ export function AddActiveLeadModal({ isOpen, onClose, defaultLeadType = 'pipelin
                       : 'bg-surface-sunken border-border text-fg-subtle hover:text-fg'
                   }`}
                 >
-                  <span>JD</span>
+                  <span>JD Received</span>
                 </button>
               </div>
             </div>

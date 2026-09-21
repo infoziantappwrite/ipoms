@@ -262,7 +262,7 @@ export function ActiveLeadTable({
           <Building2 size={26} strokeWidth={1.8} />
         </div>
         <h3 className="text-base font-bold text-fg">
-          {activeTab === 'pipeline' ? 'No Pipeline Leads Found' : 'No JD Leads Found for This Year'}
+          {activeTab === 'pipeline' ? 'No Pipeline (Positives) Leads Found' : 'No JD Received Leads Found for This Year'}
         </h3>
         <p className="text-xs text-fg-subtle max-w-md">
           {activeTab === 'pipeline'
