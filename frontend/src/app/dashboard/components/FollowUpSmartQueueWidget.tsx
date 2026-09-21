@@ -449,7 +449,7 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
             </button>
 
             {/* Pulsing Action Call-to-Action with Red & Orange Gradient and Arrow Head Chevron */}
-            <div ref={triggerRef} className="flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-rose-600 via-orange-500 to-amber-500 text-white text-xs font-bold shadow-md shadow-orange-500/25 group-hover:from-rose-500 group-hover:via-orange-500 group-hover:to-amber-400 group-hover:shadow-lg group-hover:shadow-orange-500/35 group-hover:scale-105 transition-all shrink-0 border border-white/20">
+            <div ref={triggerRef as React.RefObject<HTMLDivElement>} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 via-orange-500 to-amber-500 text-white text-xs font-bold shadow-md shadow-orange-500/25 group-hover:from-rose-500 group-hover:via-orange-500 group-hover:to-amber-400 group-hover:shadow-lg group-hover:shadow-orange-500/35 group-hover:scale-105 transition-all shrink-0 border border-white/20">
               <span>Select College</span>
               <ChevronDown size={16} strokeWidth={2.5} className={`transition-transform duration-200 ease-out ${isDropdownOpen ? 'rotate-180' : ''}`} />
             </div>
