@@ -5,8 +5,9 @@ import {
   Users, CheckCircle2, Target,
   ChevronDown, ChevronUp, Building2,
   Sparkles, Mail, Phone, CalendarCheck, RefreshCw,
-  Clock, Timer, Zap
+  Clock, Timer, Zap, PhoneCall
 } from 'lucide-react';
+import { CoordinatorClockDurationWidget } from './CoordinatorClockDurationWidget';
 import { CoordinatorCollegeFocusSection } from './CoordinatorCollegeFocusSection';
 import { CoordinatorCollegeKpiCards } from './CoordinatorCollegeKpiCards';
 import { FollowUpSmartQueueWidget } from './FollowUpSmartQueueWidget';
@@ -73,6 +74,26 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
   const offlineCount = offlineCoordinators.length;
   const activeTodayCount = online_summary?.active_today ?? team_matrix.filter((m: any) => m.calls_today > 0 || m.online_status === 'online' || m.online_status === 'away').length;
 
+  // Cumulative team totals across all coordinators
+  const totalTeamDurationSeconds =
+    team_call_duration?.total_seconds ??
+    team_matrix.reduce((acc: number, curr: any) => acc + (curr.today_call_duration_seconds || 0), 0);
+
+  const totalTeamDurationFormatted =
+    team_call_duration?.total_formatted ||
+    (() => {
+      const h = Math.floor(totalTeamDurationSeconds / 3600);
+      const m = Math.floor((totalTeamDurationSeconds % 3600) / 60);
+      const s = totalTeamDurationSeconds % 60;
+      if (h > 0) return `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+      return `${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+    })();
+
+  const totalCallsOverall = team_matrix.reduce((acc: number, curr: any) => acc + (Number(curr.calls_today) || 0), 0);
+  const totalPositivesOverall = team_matrix.reduce((acc: number, curr: any) => acc + (Number(curr.positive_leads) || 0), 0);
+  const totalJdsOverall = team_matrix.reduce((acc: number, curr: any) => acc + (Number(curr.jds_received) || 0), 0);
+  const activeCallersCount = team_matrix.filter((c: any) => (c.today_call_duration_seconds || 0) > 0 || (c.calls_today || 0) > 0).length;
+
   const filteredMatrix = team_matrix.filter((c: any) => {
     if (presenceFilter === 'online') return c.online_status === 'online';
     if (presenceFilter === 'away') return c.online_status === 'away';
@@ -84,68 +105,11 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
 
-      {/* ── 0. Team Call Duration Telemetry Banner (Highlighted Clock Feature) ── */}
-      {team_call_duration && (
-        <div className="rounded-3xl bg-gradient-to-br from-white via-indigo-50/40 to-sky-50/30 dark:from-slate-900 dark:via-indigo-950 dark:to-slate-950 p-6 sm:p-7 border border-indigo-100/80 dark:border-indigo-500/20 shadow-xl shadow-indigo-100/60 dark:shadow-slate-950/50 relative overflow-hidden select-none group">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 dark:bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute bottom-0 left-1/3 w-80 h-80 bg-sky-500/10 dark:bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-transparent via-indigo-500 dark:via-cyan-400 to-transparent shadow-xs" />
-          
-          <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-6">
-            <div className="flex items-center gap-4 text-center lg:text-left">
-              <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/20 border border-indigo-200 dark:border-indigo-400/30 flex items-center justify-center shrink-0 shadow-md shadow-indigo-100 dark:shadow-indigo-950">
-                <Clock size={28} className="text-indigo-600 dark:text-cyan-300 animate-pulse" />
-              </div>
-              <div>
-                <h3 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight">
-                  Total Team Calling Time Today
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-300 mt-0.5">
-                  Synchronous cumulative outreach duration across all {team_matrix.length} placement coordinators
-                </p>
-              </div>
-            </div>
-
-            {/* Synchronous Digital Time Counter Badges */}
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2.5 bg-white dark:bg-slate-800/90 border border-indigo-100 dark:border-white/15 rounded-2xl px-5 py-3 shadow-md shadow-indigo-100/70 dark:shadow-inner">
-                <div className="text-center">
-                  <span className="text-2xl sm:text-3xl font-extrabold font-mono text-indigo-600 dark:text-cyan-300 drop-shadow-xs">
-                    {String(team_call_duration.hours || 0).padStart(2, '0')}
-                  </span>
-                  <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 font-mono mt-0.5">
-                    Hours
-                  </span>
-                </div>
-                <span className="text-2xl font-black text-indigo-400/70 dark:text-cyan-400/60 pb-3 font-mono animate-pulse">:</span>
-                <div className="text-center">
-                  <span className="text-2xl sm:text-3xl font-extrabold font-mono text-violet-600 dark:text-indigo-200 drop-shadow-xs">
-                    {String(team_call_duration.minutes || 0).padStart(2, '0')}
-                  </span>
-                  <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 font-mono mt-0.5">
-                    Mins
-                  </span>
-                </div>
-                <span className="text-2xl font-black text-indigo-400/70 dark:text-cyan-400/60 pb-3 font-mono animate-pulse">:</span>
-                <div className="text-center">
-                  <span className="text-2xl sm:text-3xl font-extrabold font-mono text-emerald-600 dark:text-emerald-300 drop-shadow-xs">
-                    {String(team_call_duration.seconds || 0).padStart(2, '0')}
-                  </span>
-                  <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400 font-mono mt-0.5">
-                    Secs
-                  </span>
-                </div>
-              </div>
-
-              <div className="hidden sm:flex flex-col gap-1.5 text-xs">
-                <div className="px-3.5 py-1.5 rounded-xl bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-white/10 font-medium text-slate-600 dark:text-slate-300 shadow-2xs">
-                  <strong className="text-slate-900 dark:text-white font-mono">{team_call_duration.active_calling_coordinators || 0}</strong> active callers
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ── 0. Dedicated Calling Time Today (Matching Coordinator Design for Sujitha / Team Leader) ── */}
+      <CoordinatorClockDurationWidget
+        clockData={data?.clock_duration}
+        coordinatorName={data?.coordinator?.name || 'Sujitha S'}
+      />
 
       {/* ── 3. Live Active Deployment Bar (Quick Glance) ── */}
       {onlineCoordinators.length > 0 && (
@@ -525,9 +489,73 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
                   })
                 )}
               </tbody>
+              <tfoot className="bg-zinc-50/90 dark:bg-zinc-800/70 border-t-2 border-zinc-200 dark:border-zinc-700 font-bold text-xs">
+                <tr>
+                  <td colSpan={4} className="py-3 px-5 text-zinc-700 dark:text-zinc-200 font-bold">
+                    <div className="flex items-center gap-2">
+                      <span className="uppercase text-[10px] tracking-wider text-zinc-500 dark:text-zinc-400">Team Cumulative Total</span>
+                      <span className="text-[11px] font-normal text-zinc-400 font-mono">({team_matrix.length} Coordinators • {activeCallersCount} Active)</span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-3 text-center">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-100/80 dark:bg-indigo-950 border border-indigo-300 dark:border-indigo-700 text-indigo-800 dark:text-indigo-200 font-mono font-bold text-xs shadow-2xs">
+                      <Clock size={12} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+                      {totalTeamDurationFormatted}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-center">
+                    <span className="font-bold font-mono text-sm text-blue-600 dark:text-blue-400">
+                      {totalCallsOverall}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-center">
+                    <span className="font-bold font-mono text-sm text-emerald-600 dark:text-emerald-400">
+                      {totalPositivesOverall}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-center">
+                    <span className="font-bold font-mono text-sm text-cyan-600 dark:text-cyan-400">
+                      {totalJdsOverall}
+                    </span>
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}
+
+        {/* Minimal Team Calling Duration & Daily Totals Summary Footer */}
+        <div className="px-5 py-3.5 bg-zinc-50/90 dark:bg-zinc-800/60 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between flex-wrap gap-4 text-xs">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/80 dark:border-indigo-800/60 shadow-2xs">
+              <Clock size={14} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <span className="font-semibold text-zinc-700 dark:text-zinc-200">
+                Total Duration Today Used:
+              </span>
+              <span className="font-mono font-bold text-indigo-700 dark:text-indigo-300">
+                {totalTeamDurationFormatted}
+              </span>
+            </div>
+            <span className="text-[11px] text-zinc-500 dark:text-zinc-400 font-medium hidden sm:inline">
+              Across all {team_matrix.length} placement coordinators ({activeCallersCount} active caller{activeCallersCount === 1 ? '' : 's'})
+            </span>
+          </div>
+
+          <div className="flex items-center gap-4 sm:gap-6 flex-wrap font-mono">
+            <div className="flex items-center gap-1.5" title="Total calls overall by all coordinators today">
+              <span className="text-zinc-500 dark:text-zinc-400 font-sans text-xs font-medium">Total Calls Overall:</span>
+              <span className="font-bold text-blue-600 dark:text-blue-400 text-sm">{totalCallsOverall}</span>
+            </div>
+            <div className="flex items-center gap-1.5" title="Total positive leads generated by all coordinators today">
+              <span className="text-zinc-500 dark:text-zinc-400 font-sans text-xs font-medium">Total Positives:</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">{totalPositivesOverall}</span>
+            </div>
+            <div className="flex items-center gap-1.5" title="Total JDs received by all coordinators today">
+              <span className="text-zinc-500 dark:text-zinc-400 font-sans text-xs font-medium">Total JD Received:</span>
+              <span className="font-bold text-cyan-600 dark:text-cyan-400 text-sm">{totalJdsOverall}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ── 4. Team Leader Active College Focus & Operational Workflow ── */}

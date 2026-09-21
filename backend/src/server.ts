@@ -9307,12 +9307,83 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
     const teamDurationInfo = formatDurationClock(totalTeamDurationSeconds);
     const activeCallingCoordinatorsCount = teamMatrix.filter((c) => (c.today_call_duration_seconds || 0) > 0 || (c.calls_today || 0) > 0).length;
 
+    // Sujitha / Leader Dedicated Calling Clock (matching Coordinator calling duration design)
+    const targetLeader =
+      (req.query.coordinator_id ? coordinators.find(c => String(c._id) === String(req.query.coordinator_id)) : null) ||
+      sujithaUser ||
+      coordinators.find((c) => c.role_codes?.includes('TEAM_LEADER') || c.role_codes?.includes('TEAM_LEAD')) ||
+      coordinators[0];
+
+    let leaderDurationSeconds = 0;
+    let leaderTodayCalls = 0;
+    let leaderTodayPositives = 0;
+    const leaderHourlyCalls: number[] = new Array(24).fill(0);
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    const POSITIVE_OUTCOMES = ['invite_mail', 'positive', 'callback_requested', 'jd_received'];
+
+    if (targetLeader) {
+      const leaderRows = await DailyTracker.find({
+        coordinator_id: targetLeader._id,
+        $or: [
+          { session_date: { $gte: todayStart, $lte: todayEnd } },
+          { created_at: { $gte: todayStart, $lte: todayEnd } },
+          { year: todayStart.getUTCFullYear(), month: todayStart.getUTCMonth() + 1, day: todayStart.getUTCDate() },
+        ],
+      }).select('duration_seconds call_start_time call_end_time outcome_status created_at').lean();
+
+      leaderTodayCalls = leaderRows.length;
+      for (const row of leaderRows) {
+        let dur = 0;
+        if (typeof row.duration_seconds === 'number' && row.duration_seconds > 0) {
+          dur = row.duration_seconds;
+        } else if (row.call_start_time && row.call_end_time) {
+          const sMs = new Date(row.call_start_time).getTime();
+          const eMs = new Date(row.call_end_time).getTime();
+          if (eMs > sMs) dur = Math.floor((eMs - sMs) / 1000);
+        }
+        leaderDurationSeconds += dur;
+        if (row.outcome_status && POSITIVE_OUTCOMES.includes(row.outcome_status as any)) {
+          leaderTodayPositives++;
+        }
+        const stamp = (row as any).call_start_time || (row as any).created_at;
+        if (stamp) {
+          const t = new Date(stamp).getTime();
+          if (!isNaN(t)) {
+            leaderHourlyCalls[new Date(t + IST_OFFSET_MS).getUTCHours()]++;
+          }
+        }
+      }
+    }
+
+    const leaderClockDurationInfo = formatDurationClock(leaderDurationSeconds);
+    const leaderAvgSeconds = leaderTodayCalls > 0 ? Math.round(leaderDurationSeconds / leaderTodayCalls) : 0;
+    const leaderAvgInfo = formatDurationClock(leaderAvgSeconds);
+
     return res.status(200).json({
       success: true,
       data: {
         greeting: {
           greeting: 'Team Operations Command Center 👔',
           subtext: 'Real-time coordinator monitoring, profile online activity, task dispatch, and drive velocity.',
+        },
+        coordinator: targetLeader
+          ? {
+              id: targetLeader._id,
+              name: targetLeader.full_name,
+              role: 'team_leader',
+            }
+          : { name: 'Sujitha S', role: 'team_leader' },
+        clock_duration: {
+          today_seconds: leaderDurationSeconds,
+          today_formatted: leaderClockDurationInfo.formatted,
+          hours: leaderClockDurationInfo.hours,
+          minutes: leaderClockDurationInfo.minutes,
+          seconds: leaderClockDurationInfo.seconds,
+          today_calls_count: leaderTodayCalls,
+          avg_call_duration_seconds: leaderAvgSeconds,
+          avg_call_duration_formatted: leaderAvgInfo.formatted,
+          positive_calls_count: leaderTodayPositives,
+          hourly_calls: leaderHourlyCalls,
         },
         online_summary: {
           total_coordinators: coordinators.length,
