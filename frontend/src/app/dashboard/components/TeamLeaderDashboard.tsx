@@ -111,63 +111,83 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
         coordinatorName={data?.coordinator?.name || 'Sujitha S'}
       />
 
-      {/* ── 3. Live Active Deployment Bar (Quick Glance) ── */}
+      {/* ── 3. Live Active Deployment Bar (High-Level Highlighted Executive Cockpit) ── */}
       {onlineCoordinators.length > 0 && (
-        <div className="bg-emerald-500/10 dark:bg-emerald-950/30 border border-emerald-300/80 dark:border-emerald-700/60 rounded-xl p-4 shadow-2xs">
-          <div className="flex items-center justify-between gap-3 mb-2.5">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+        <div className="rounded-2xl bg-gradient-to-r from-emerald-500/15 via-teal-500/10 to-emerald-500/15 dark:from-emerald-950/60 dark:via-teal-950/40 dark:to-emerald-950/60 border-2 border-emerald-400/80 dark:border-emerald-500/50 p-5 shadow-lg shadow-emerald-500/10 relative overflow-hidden">
+          {/* Decorative ambient aurora glows */}
+          <div className="absolute -top-16 -right-16 w-56 h-56 bg-emerald-400/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-16 -left-16 w-56 h-56 bg-teal-400/15 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative z-10 flex items-center justify-between gap-3 mb-3.5 flex-wrap">
+            <div className="flex items-center gap-2.5">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-80"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 shadow-xs"></span>
               </span>
-              <h4 className="text-xs font-bold text-emerald-900 dark:text-emerald-200 uppercase tracking-wider">
+              <h4 className="text-xs font-black text-emerald-950 dark:text-emerald-100 uppercase tracking-wider flex items-center gap-2">
                 Live Coordinator Deployment by College
               </h4>
             </div>
-            <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 font-mono">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/95 dark:bg-emerald-900/80 border border-emerald-300 dark:border-emerald-600/80 text-emerald-800 dark:text-emerald-200 text-xs font-black font-mono shadow-xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               {onlineCoordinators.length} Coordinator{onlineCoordinators.length === 1 ? '' : 's'} Active Right Now
             </span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
-            {onlineCoordinators.map((c: any) => (
-              <div
-                key={c.coordinator_id}
-                className="bg-white dark:bg-zinc-900 rounded-lg p-2.5 border border-emerald-200 dark:border-emerald-800/80 shadow-xs flex items-center justify-between gap-2"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-bold flex items-center justify-center text-xs shrink-0 border border-emerald-300 dark:border-emerald-700">
-                    {c.name?.charAt(0) || 'C'}
+
+          <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {onlineCoordinators.map((c: any) => {
+              const rawCode = c.active_college?.college_code || getCollegeAcronym(c.active_college) || 'Online';
+              const isSujitha = c.email === 'sujitha_s@infoziant.com' || c.username === 'sujitha' || /sujitha/i.test(c.name || '');
+              const activeCode = (isSujitha && (/mcet|mahalingam/i.test(rawCode) || /mcet|mahalingam/i.test(c.active_college?.college_name || '')))
+                ? 'NEHRU'
+                : rawCode;
+
+              return (
+                <div
+                  key={c.coordinator_id}
+                  className="bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md rounded-xl p-3.5 border border-emerald-200 dark:border-emerald-700/80 shadow-md shadow-emerald-900/5 hover:border-emerald-400 dark:hover:border-emerald-500 hover:shadow-lg transition-all flex items-center justify-between gap-3 group"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-200 dark:from-emerald-900 dark:to-teal-950 text-emerald-800 dark:text-emerald-200 font-black flex items-center justify-center text-sm shrink-0 border border-emerald-300 dark:border-emerald-700 shadow-2xs relative">
+                      {c.profile_photo_url ? (
+                        <img
+                          src={c.profile_photo_url}
+                          alt={c.name}
+                          className="w-full h-full rounded-xl object-cover"
+                        />
+                      ) : (
+                        c.name?.charAt(0) || 'C'
+                      )}
+                      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-zinc-900 shadow-xs" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 truncate block group-hover:text-emerald-700 dark:group-hover:text-emerald-300 transition-colors">
+                        {c.name}
+                      </span>
+                      <span className="text-micro text-zinc-500 dark:text-zinc-400 font-mono truncate block">
+                        {c.email.split('@')[0]}
+                      </span>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100 truncate block">
-                      {c.name}
-                    </span>
-                    <span className="text-micro text-zinc-500 dark:text-zinc-400 font-mono truncate block">
-                      {c.email.split('@')[0]}
-                    </span>
+
+                  <div className="text-right shrink-0">
+                    {c.active_college ? (
+                      <span
+                        title={c.active_college.college_name || activeCode}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-mono font-black text-xs shadow-md shadow-emerald-600/25 tracking-wider uppercase"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                        {activeCode}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-[11px] font-bold border border-zinc-200 dark:border-zinc-700 font-mono">
+                        Dashboard
+                      </span>
+                    )}
                   </div>
                 </div>
-                <div className="text-right shrink-0">
-                  {c.active_college ? (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold font-mono">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      {(() => {
-                        const rawCode = c.active_college.college_code || getCollegeAcronym(c.active_college) || 'Online';
-                        const isSujitha = c.email === 'sujitha_s@infoziant.com' || c.username === 'sujitha' || /sujitha/i.test(c.name || '');
-                        if (isSujitha && (/mcet|mahalingam/i.test(rawCode) || /mcet|mahalingam/i.test(c.active_college.college_name || ''))) {
-                          return 'NEHRU';
-                        }
-                        return rawCode;
-                      })()}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[10px] font-medium border border-zinc-200 dark:border-zinc-700">
-                      Dashboard
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
