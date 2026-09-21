@@ -1476,10 +1476,17 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
 
   totalH += PADDING; // Bottom padding
 
-  // Create High-Res Canvas
+  // Enforce standard A4 sheet dimension by default (even for single data or few items)
+  // Standard A4 aspect ratio: 210mm x 297mm (1 : 1.4142857)
+  // At canvas width W = 860px, standard A4 page height is Math.round(860 * (297 / 210)) = 1216px
+  const A4_PAGE_H = Math.round(W * (297 / 210)); // 1216px
+  const totalPages = Math.max(1, Math.ceil(totalH / A4_PAGE_H));
+  const finalCanvasH = totalPages * A4_PAGE_H;
+
+  // Create High-Res Canvas maintaining full A4 sheet dimensions
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(W * SCALE);
-  canvas.height = Math.round(totalH * SCALE);
+  canvas.height = Math.round(finalCanvasH * SCALE);
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
 
@@ -1522,7 +1529,7 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
 
   // Background
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, W, totalH);
+  ctx.fillRect(0, 0, W, finalCanvasH);
 
   let currentY = PADDING;
 
@@ -1800,24 +1807,25 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
 
   // Footer
   if (hasFooter) {
+    const footerY = Math.max(currentY + 20, finalCanvasH - PADDING - 24);
     ctx.strokeStyle = '#e2e8f0';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(PADDING, currentY);
-    ctx.lineTo(W - PADDING, currentY);
+    ctx.moveTo(PADDING, footerY);
+    ctx.lineTo(W - PADDING, footerY);
     ctx.stroke();
 
-    currentY += 22;
+    const footerTextY = footerY + 20;
     ctx.fillStyle = '#64748b';
     ctx.font = '500 11.5px system-ui, -apple-system, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText('© 2026 Infoziant. All rights reserved.', PADDING, currentY);
+    ctx.fillText('© 2026 Infoziant. All rights reserved.', PADDING, footerTextY);
 
     if (Boolean(report.generated_by || report.branding?.prepared_by)) {
       ctx.textAlign = 'right';
       ctx.fillStyle = '#0f172a';
       ctx.font = 'bold 11.5px system-ui, -apple-system, sans-serif';
-      ctx.fillText(`Prepared by: ${report.generated_by || report.branding?.prepared_by}`, W - PADDING, currentY);
+      ctx.fillText(`Prepared by: ${report.generated_by || report.branding?.prepared_by}`, W - PADDING, footerTextY);
     }
   }
 

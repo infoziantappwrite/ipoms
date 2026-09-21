@@ -1094,19 +1094,22 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
 
   // Print to PDF with custom document.title matching required export format (e.g. "aiht- August month report.pdf")
   const handlePrintPdf = () => {
-    const originalTitle = document.title;
-    const customTitle = getReportExportBaseFileName(report);
-    document.title = customTitle;
+    setShowA4Preview(false);
+    setTimeout(() => {
+      const originalTitle = document.title;
+      const customTitle = getReportExportBaseFileName(report);
+      document.title = customTitle;
 
-    window.print();
+      window.print();
 
-    // Restore original document title after print dialog closes
-    const restoreTitle = () => {
-      document.title = originalTitle;
-      window.removeEventListener('afterprint', restoreTitle);
-    };
-    window.addEventListener('afterprint', restoreTitle);
-    setTimeout(restoreTitle, 2000);
+      // Restore original document title after print dialog closes
+      const restoreTitle = () => {
+        document.title = originalTitle;
+        window.removeEventListener('afterprint', restoreTitle);
+      };
+      window.addEventListener('afterprint', restoreTitle);
+      setTimeout(restoreTitle, 2000);
+    }, 100);
   };
 
   // Export as Ultra High-Definition PNG Image
