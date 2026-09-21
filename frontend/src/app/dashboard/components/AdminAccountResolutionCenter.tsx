@@ -16,12 +16,14 @@ import {
 import { apiFetch } from '@/lib/api';
 import { useToast } from '@/components/ui/Toast';
 import { initialsFor } from '@/lib/initials';
+import { getCollegeAcronym } from '@/lib/collegeSession';
 
 interface CoordinatorInfo {
   coordinator_id: string;
   name: string;
   email: string;
   mobile: string;
+  username?: string;
   profile_photo_url: string | null;
   assigned_colleges_count: number;
   calls_logged: number;
@@ -314,40 +316,36 @@ export function AdminAccountResolutionCenter({ alerts, coordinators = [], onRefr
                       <td className="py-2.5 px-3">
                         {isOnline ? (
                           c.active_college ? (
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-bold shadow-2xs">
+                            <span
+                              title={c.active_college.college_name || c.active_college.college_code}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-bold font-mono text-xs shadow-2xs tracking-wider"
+                            >
                               <span className="relative flex h-2 w-2">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                               </span>
-                              <span className="font-mono text-xs">
-                                [{c.active_college.college_code || c.active_college.college_name}]
-                              </span>
-                              {c.active_college.location && (
-                                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-normal">
-                                  {c.active_college.location}
-                                </span>
-                              )}
-                            </div>
+                              {(() => {
+                                const rawCode = c.active_college.college_code || getCollegeAcronym(c.active_college) || 'Online';
+                                const isSujitha = c.email === 'sujitha_s@infoziant.com' || c.username === 'sujitha' || /sujitha/i.test(c.name || '');
+                                if (isSujitha && (/mcet|mahalingam/i.test(rawCode) || /mcet|mahalingam/i.test(c.active_college.college_name || ''))) {
+                                  return 'NEHRU';
+                                }
+                                return rawCode;
+                              })()}
+                            </span>
                           ) : (
-                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-micro border border-emerald-500/20">
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 text-xs font-medium">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                              Online (Main Portal)
-                            </div>
+                              General
+                            </span>
                           )
                         ) : isAway ? (
-                          <div className="inline-flex flex-col gap-0.5">
-                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-700 dark:text-amber-300 font-semibold text-micro border border-amber-500/25">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                              {c.online_status_label || 'Away'}
-                            </div>
-                            {c.active_college && (
-                              <span className="text-[10px] text-fg-subtle font-mono pl-1">
-                                Last: [{c.active_college.college_code || c.active_college.college_name}]
-                              </span>
-                            )}
-                          </div>
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-400 dark:text-zinc-500 text-xs font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                            Away
+                          </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-fg-subtle text-micro font-medium">
+                          <span className="inline-flex items-center gap-1 text-fg-subtle text-xs font-medium">
                             <span className="w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
                             Offline
                           </span>

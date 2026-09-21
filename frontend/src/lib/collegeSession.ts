@@ -701,6 +701,19 @@ export function getActiveCollege(): { id: string; name: string; obj: College | n
         obj = JSON.parse(objStr);
       } catch {}
     }
+    if ((!obj || !obj.college_code) && (id || name)) {
+      const all = getCachedColleges();
+      const match = all.find(c =>
+        (id && (c._id === id || String(c._id) === String(id) || c.college_code?.toUpperCase() === id.toUpperCase())) ||
+        (name && (c.college_name.toLowerCase() === name.toLowerCase() || c.college_name.toLowerCase().includes(name.toLowerCase())))
+      );
+      if (match) {
+        obj = match;
+        try {
+          localStorage.setItem(ACTIVE_COLLEGE_OBJ_KEY, JSON.stringify(match));
+        } catch {}
+      }
+    }
     return { id, name, obj };
   } catch {
     return { id: '', name: '', obj: null };
@@ -713,24 +726,64 @@ export function setActiveCollege(id: string, name: string, obj?: College | null)
     if (id) {
       localStorage.setItem(ACTIVE_COLLEGE_ID_KEY, id);
       localStorage.setItem(ACTIVE_COLLEGE_NAME_KEY, name || '');
-      if (obj) {
-        localStorage.setItem(ACTIVE_COLLEGE_OBJ_KEY, JSON.stringify(obj));
+      let resolvedObj = obj;
+      if (!resolvedObj || !resolvedObj.college_code) {
+        const allKnown = getCachedColleges();
+        resolvedObj = allKnown.find(c =>
+          c._id === id ||
+          String(c._id) === String(id) ||
+          c.college_code?.toUpperCase() === id.toUpperCase() ||
+          (name && c.college_name.toLowerCase() === name.toLowerCase())
+        ) || resolvedObj || null;
+      }
+      if (resolvedObj) {
+        localStorage.setItem(ACTIVE_COLLEGE_OBJ_KEY, JSON.stringify(resolvedObj));
       } else {
         localStorage.removeItem(ACTIVE_COLLEGE_OBJ_KEY);
       }
+      window.dispatchEvent(new CustomEvent('ipoms_college_change', { detail: { id, name, obj: resolvedObj } }));
     }
-    window.dispatchEvent(new CustomEvent('ipoms_college_change', { detail: { id, name, obj } }));
   } catch {}
 }
+
+// Official focus college allocations mapping for coordinators and team leaders
+export const DEFAULT_COORDINATOR_COLLEGE_ROSTER: Record<string, string[]> = {
+  'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
+  'sujitha': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
+  'seshmitha_tamil@icl.today': ['MCET', 'MEC'],
+  'seshmitha': ['MCET', 'MEC'],
+  'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
+  'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
+  'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],
+  'lizenya_r@infoziant.com': ['NPR', 'KIOT', 'ACEW'],
+  'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ'],
+};
 
 export async function resolveDefaultCollege(): Promise<{ id: string; name: string; obj: College | null }> {
   const focusedIds = getCoordinatorSelectedColleges();
   const current = getActiveCollege();
   const all = getCachedColleges();
+  const user = readSessionUser();
+
+  const userEmail = (user?.official_email || '').toLowerCase().trim();
+  const userName = (user?.username || '').toLowerCase().trim();
+  const isSujitha = userEmail.includes('sujitha') || userName.includes('sujitha') || /sujitha/i.test(user?.full_name || '');
+  const isTamil = userEmail.includes('tamil') || userName.includes('seshmitha') || /tamil/i.test(user?.full_name || '');
+
+  // Safety check: Sujitha handles HITS, NEHRU, KPR, SONA, MAREPHRA. She does NOT handle MCET (MCET is handled by Tamil Selvi).
+  if (isSujitha && (current.obj?.college_code === 'MCET' || /mahalingam|mcet/i.test(current.name))) {
+    localStorage.removeItem(ACTIVE_COLLEGE_ID_KEY);
+    localStorage.removeItem(ACTIVE_COLLEGE_NAME_KEY);
+    localStorage.removeItem(ACTIVE_COLLEGE_OBJ_KEY);
+    current.id = '';
+    current.name = '';
+    current.obj = null;
+  }
 
   // 1. If coordinator has active focus colleges, prioritize active focus
   if (focusedIds.length > 0) {
-    const isCurrentInFocus = focusedIds.some(
+    const validFocusedIds = isSujitha ? focusedIds.filter(id => id.toUpperCase() !== 'MCET') : focusedIds;
+    const isCurrentInFocus = validFocusedIds.some(
       (fid) =>
         fid.toLowerCase() === current.id.toLowerCase() ||
         (current.obj &&
@@ -743,8 +796,8 @@ export async function resolveDefaultCollege(): Promise<{ id: string; name: strin
 
     const firstFocused = all.find(
       (c) =>
-        focusedIds.map((f) => f.toLowerCase()).includes(String(c._id).toLowerCase()) ||
-        focusedIds.map((f) => f.toLowerCase()).includes(String(c.college_code).toLowerCase())
+        validFocusedIds.map((f) => f.toLowerCase()).includes(String(c._id).toLowerCase()) ||
+        validFocusedIds.map((f) => f.toLowerCase()).includes(String(c.college_code).toLowerCase())
     );
     if (firstFocused) {
       setActiveCollege(firstFocused._id, firstFocused.college_name, firstFocused);
@@ -752,29 +805,50 @@ export async function resolveDefaultCollege(): Promise<{ id: string; name: strin
     }
   }
 
-  // 2. Fallback to existing active college
-  if (current.id) return current;
-
-  // 3. Check user session colleges
-  const user = readSessionUser();
-  if ((user as any)?.colleges && (user as any).colleges.length > 0) {
-    const firstCol = (user as any).colleges[0];
-    const id = typeof firstCol === 'string' ? firstCol : firstCol._id;
-    const name = typeof firstCol === 'string' ? '' : firstCol.college_name;
-    const obj = typeof firstCol === 'string' ? null : firstCol;
-    if (id) {
-      setActiveCollege(id, name, obj);
-      return { id, name, obj };
+  // 2. Fallback to existing active college if valid
+  if (current.id && current.obj) {
+    if (!(isSujitha && (current.obj.college_code === 'MCET' || /mahalingam|mcet/i.test(current.name)))) {
+      return current;
     }
   }
 
-  // 4. Fetch available colleges list
+  // 3. Check official roster by user email/username
+  const officialCodes = DEFAULT_COORDINATOR_COLLEGE_ROSTER[userEmail] || DEFAULT_COORDINATOR_COLLEGE_ROSTER[userName];
+  if (officialCodes && officialCodes.length > 0) {
+    const matched = all.find((c) => officialCodes.some((code) => code.toUpperCase() === c.college_code?.toUpperCase()));
+    if (matched) {
+      setActiveCollege(matched._id, matched.college_name, matched);
+      return { id: matched._id, name: matched.college_name, obj: matched };
+    }
+  }
+
+  // 4. Check user session colleges / assigned_college_ids
+  const userAssigned = (user as any)?.assigned_college_ids || (user as any)?.colleges;
+  if (Array.isArray(userAssigned) && userAssigned.length > 0) {
+    const firstCol = userAssigned[0];
+    const id = typeof firstCol === 'string' ? firstCol : firstCol._id;
+    const matched = all.find(c => String(c._id) === String(id) || c.college_code === id);
+    if (matched) {
+      setActiveCollege(matched._id, matched.college_name, matched);
+      return { id: matched._id, name: matched.college_name, obj: matched };
+    }
+  }
+
+  // 5. Fetch available colleges list from API
   try {
     const res = await apiFetch('/colleges');
     if (res.success && Array.isArray((res.data as any)?.colleges) && (res.data as any).colleges.length > 0) {
-      const first = (res.data as any).colleges[0];
-      setActiveCollege(first._id, first.college_name, first);
-      return { id: first._id, name: first.college_name, obj: first };
+      const collegesList: College[] = (res.data as any).colleges;
+      let target = collegesList[0];
+      if (isSujitha) {
+        target = collegesList.find(c => c.college_code === 'NEHRU' || c.college_code === 'HITS') || target;
+      } else if (isTamil) {
+        target = collegesList.find(c => c.college_code === 'MCET' || c.college_code === 'MEC') || target;
+      }
+      if (target) {
+        setActiveCollege(target._id, target.college_name, target);
+        return { id: target._id, name: target.college_name, obj: target };
+      }
     }
   } catch {}
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { LeadsHeader } from './components/LeadsHeader';
 import type { LeadsSummaryData } from './components/LeadsSummaryStrip';
@@ -8,6 +8,7 @@ import { LeadsTabBar } from './components/LeadsTabBar';
 import { LeadsTable, DailyLeadRow } from './components/LeadsTable';
 import { AddLeadModal } from './components/AddLeadModal';
 import { CopyToJdModal } from './components/CopyToJdModal';
+import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser, roleOf } from '@/lib/session';
 import { getActiveCollege, setActiveCollege } from '@/lib/collegeSession';
@@ -26,14 +27,18 @@ export default function DailyLeadsPage() {
   // College List State for Table Dropdowns
   const [colleges, setColleges] = useState<{ _id: string; college_name: string; college_code: string }[]>([]);
 
-  // Tab State: 'positive' or 'jd_received' (with persistent localStorage memory per Spec Section 6.4)
+  // Tab State: Always defaults to 'positive' when visiting the Daily Leads module
   const [activeTab, setActiveTab] = useState<'positive' | 'jd_received'>('positive');
+  const activeTabRef = useRef<'positive' | 'jd_received'>('positive');
+  activeTabRef.current = activeTab;
 
   // Search Query
   const [searchQuery, setSearchQuery] = useState('');
 
   // Delete Mode State
   const [isDeleteMode, setIsDeleteMode] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Syncing State
   const [isSyncing, setIsSyncing] = useState(false);
@@ -51,17 +56,21 @@ export default function DailyLeadsPage() {
   const [loading, setLoading] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [coordinatorId, setCoordinatorId] = useState<string>('');
-  const [isCoordinator, setIsCoordinator] = useState<boolean>(true);
+  const [canManage, setCanManage] = useState<boolean>(true);
 
   // Multi-Selection State for Bulk Deletion
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isAllSelected, setIsAllSelected] = useState(false);
 
   useEffect(() => {
-    const user = readSessionUser();
-    if (user?._id) setCoordinatorId(user._id);
-    const r = roleOf(user);
-    setIsCoordinator(r === 'coordinator');
+    const syncUser = () => {
+      const user = readSessionUser();
+      if (user?._id) setCoordinatorId(user._id);
+      const r = roleOf(user);
+      setCanManage(r === 'coordinator' || r === 'team_leader' || r === 'admin');
+    };
+    syncUser();
+    window.addEventListener('ipoms_user_updated', syncUser);
 
     // Fetch colleges list for row-level dropdowns
     apiFetch('/colleges')
@@ -71,6 +80,10 @@ export default function DailyLeadsPage() {
         }
       })
       .catch(console.error);
+
+    return () => {
+      window.removeEventListener('ipoms_user_updated', syncUser);
+    };
   }, []);
 
   // Clear selection whenever filters or tab change
@@ -89,48 +102,33 @@ export default function DailyLeadsPage() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isDeleteMode]);
 
-  // ── Load Last Active Tab from localStorage on mount (Spec Section 6.4)
-  useEffect(() => {
-    try {
-      const savedTab = localStorage.getItem('ipoms_daily_leads_active_tab');
-      if (savedTab === 'positive' || savedTab === 'jd_received') {
-        setActiveTab(savedTab);
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
   const handleTabChange = (tab: 'positive' | 'jd_received') => {
+    if (tab === activeTab) return;
     setActiveTab(tab);
-
-    // Keep the currently selected date preserved across tab switches!
+    activeTabRef.current = tab;
+    setLeads([]); // Immediately clear old rows to prevent cross-tab flash glitch!
 
     // Reset search, delete mode, and selections
     setSearchQuery('');
     setIsDeleteMode(false);
     setSelectedIds([]);
     setIsAllSelected(false);
-
-    try {
-      localStorage.setItem('ipoms_daily_leads_active_tab', tab);
-    } catch {
-      // ignore
-    }
   };
 
   // ── Fetch Leads across all colleges for the selected date
   const loadLeads = useCallback(async (showSpinner = true) => {
+    const reqTab = activeTab;
     if (showSpinner) setLoading(true);
     try {
       const params = new URLSearchParams({
         date: selectedDate,
-        lead_type: activeTab,
+        lead_type: reqTab,
       });
       if (searchQuery.trim()) params.set('search', searchQuery.trim());
 
       const res = await apiFetch(`/daily-leads?${params.toString()}`);
-      if (res.success && res.data) {
+      // Only commit if the user has not switched tabs while this request was inflight
+      if (res.success && res.data && activeTabRef.current === reqTab) {
         setLeads((res.data as any).leads || []);
       }
     } catch (err) {
@@ -368,7 +366,7 @@ export default function DailyLeadsPage() {
       setIsAllSelected(false);
     } else {
       if (leads.length === 0) {
-        alert(`No ${activeTab === 'positive' ? 'positive leads' : 'JD received records'} to delete.`);
+        toast(`No ${activeTab === 'positive' ? 'positive leads' : 'JD received records'} to delete.`, 'info');
         return;
       }
       setIsDeleteMode(true);
@@ -381,23 +379,18 @@ export default function DailyLeadsPage() {
     setIsAllSelected(false);
   };
 
-  // ── Bulk Delete Selected Rows
-  const handleBulkDelete = async () => {
+  // ── Open In-App Delete Confirmation Modal
+  const handleBulkDelete = () => {
     if (selectedIds.length === 0) {
-      alert('Please select at least one row to delete.');
+      toast('Please select at least one row to delete.', 'info');
       return;
     }
-    const tabName = activeTab === 'positive' ? 'Positive Leads' : 'JD Received';
-    if (
-      !confirm(
-        `Are you sure you want to delete ${selectedIds.length} selected ${
-          selectedIds.length === 1 ? 'record' : 'records'
-        } from ${tabName}?`
-      )
-    ) {
-      return;
-    }
+    setIsDeleteModalOpen(true);
+  };
 
+  // ── Execute Bulk Delete upon Confirmation
+  const executeBulkDelete = async () => {
+    setIsDeleting(true);
     try {
       const res = await apiFetch('/daily-leads/batch-delete', {
         method: 'POST',
@@ -409,18 +402,22 @@ export default function DailyLeadsPage() {
       setSelectedIds([]);
       setIsAllSelected(false);
       setIsDeleteMode(false);
+      setIsDeleteModalOpen(false);
       await loadLeads();
       await loadSummary();
       broadcastDailyLeadMutation();
     } catch (err) {
       console.error('Failed to bulk delete leads:', err);
+      toast('Failed to delete selected records.', 'error');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   // ── Export XLSX
   const handleExportXlsx = () => {
     if (leads.length === 0) {
-      alert('No data to export.');
+      toast('No data to export.', 'info');
       return;
     }
 
@@ -466,7 +463,7 @@ export default function DailyLeadsPage() {
         onDateChange={setSelectedDate}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        onOpenAddModal={isCoordinator ? () => setIsAddModalOpen(true) : undefined}
+        onOpenAddModal={canManage ? () => setIsAddModalOpen(true) : undefined}
         onExportXlsx={handleExportXlsx}
         onExportPdf={handleOpenPdfModal}
         onExportImage={handleOpenImageModal}
@@ -474,17 +471,17 @@ export default function DailyLeadsPage() {
           loadLeads();
           loadSummary();
         }}
-        isDeleteMode={isCoordinator ? isDeleteMode : false}
-        onToggleDeleteMode={isCoordinator ? handleToggleDeleteMode : undefined}
-        onSyncPositives={isCoordinator ? handleSyncPositives : undefined}
+        isDeleteMode={canManage ? isDeleteMode : false}
+        onToggleDeleteMode={canManage ? handleToggleDeleteMode : undefined}
+        onSyncPositives={canManage ? handleSyncPositives : undefined}
         isSyncing={isSyncing}
         activeTab={activeTab}
         onTabChange={handleTabChange}
-        positivesCount={activeTab === 'positive' && !searchQuery.trim() ? Math.max(summary.positives_count, leads.length) : summary.positives_count}
-        jdCount={activeTab === 'jd_received' && !searchQuery.trim() ? Math.max(summary.jd_received_count, leads.length) : summary.jd_received_count}
+        positivesCount={summary.positives_count}
+        jdCount={summary.jd_received_count}
         selectedCount={selectedIds.length}
-        onBulkDelete={isCoordinator ? handleBulkDelete : undefined}
-        onOpenCopyToJdModal={isCoordinator ? () => setIsCopyToJdModalOpen(true) : undefined}
+        onBulkDelete={canManage ? handleBulkDelete : undefined}
+        onOpenCopyToJdModal={canManage ? () => setIsCopyToJdModalOpen(true) : undefined}
       />
 
       {/* ── Table Workspace ───────────────────────────────────────────────── */}
@@ -538,6 +535,16 @@ export default function DailyLeadsPage() {
           }}
         />
       )}
+
+      {/* ── In-App Warning Delete Confirm Modal ───────────────────────── */}
+      <DeleteConfirmModal
+        isOpen={isDeleteModalOpen}
+        count={selectedIds.length}
+        tabName={activeTab === 'positive' ? 'Positive Leads' : 'JD Received'}
+        isDeleting={isDeleting}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={executeBulkDelete}
+      />
 
     </div>
   );

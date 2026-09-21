@@ -11,7 +11,7 @@ import { SmoothYearDropdown } from '@/components/ui/SmoothYearDropdown';
 import { SmoothTimeInput } from '@/components/ui/SmoothTimeInput';
 import { formatTime } from '@/lib/timeValidation';
 
-const BATCH_YEARS = ['2025', '2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
+const BATCH_YEARS = ['2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
 
 interface College {
   _id: string;
@@ -42,7 +42,7 @@ export function AddLeadModal({
   const [jobRole, setJobRole] = useState('');
   const [ctc, setCtc] = useState('');
   const [ctcUnit, setCtcUnit] = useState<'LPA' | '/ Month'>('LPA');
-  const [eligibleBatch, setEligibleBatch] = useState('2026');
+  const [eligibleBatch, setEligibleBatch] = useState('2027');
   const [eventTime, setEventTime] = useState(() =>
     formatTime(new Date())
   );

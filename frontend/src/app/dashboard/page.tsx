@@ -41,8 +41,8 @@ export default function DashboardPage() {
     setSessionRead(true);
   }, []);
 
-  const loadDashboard = useCallback(async () => {
-    setLoading(true);
+  const loadDashboard = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const endpoint =
         role === 'team_leader'
@@ -111,6 +111,50 @@ export default function DashboardPage() {
   // identity — firing early would fetch one dashboard and then replace it.
   useEffect(() => {
     if (sessionRead) loadDashboard();
+  }, [sessionRead, loadDashboard]);
+
+  /**
+   * Keep "Dedicated Calling Time Today" honest without inventing a stopwatch.
+   *
+   * That figure is the SUM of the Daily Tracker duration column for this login,
+   * so the only correct way to move it is to re-read it after the underlying
+   * rows change. Two triggers, both cheap and silent (no loading spinner):
+   *
+   *  1. Daily Tracker broadcasts `ipoms_tracker_sync` on every row add / update /
+   *     delete (see tracker/page.tsx). That covers logging a call with the
+   *     dashboard open in a second tab.
+   *  2. Tab becoming visible again — covers the ordinary flow of switching to
+   *     the tracker, logging calls, and coming back.
+   *
+   * Deliberately NOT a polling interval: nothing changes unless this coordinator
+   * logs a call, so a timer would just add load to say "still the same".
+   */
+  useEffect(() => {
+    if (!sessionRead) return;
+
+    const refresh = () => loadDashboard(true);
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('ipoms_tracker_sync');
+      channel.onmessage = refresh;
+    } catch {
+      // BroadcastChannel unsupported — the visibility trigger below still works.
+    }
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      try {
+        channel?.close();
+      } catch {
+        // already closed
+      }
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [sessionRead, loadDashboard]);
 
   // Auto-sync review prompt: a coordinator's positive Daily Tracker calls that
@@ -190,9 +234,9 @@ export default function DashboardPage() {
             />
           )}
           {role === 'team_leader' && (
-            <TeamLeaderDashboard data={dashboardData} onRefresh={loadDashboard} />
+            <TeamLeaderDashboard data={dashboardData} onRefresh={() => loadDashboard(true)} />
           )}
-          {role === 'admin' && <AdminDashboard data={dashboardData} onRefresh={loadDashboard} />}
+          {role === 'admin' && <AdminDashboard data={dashboardData} onRefresh={() => loadDashboard(true)} />}
         </>
       )}
 

@@ -10,7 +10,7 @@ import { SmoothYearDropdown } from '@/components/ui/SmoothYearDropdown';
 import { SmoothTimeInput } from '@/components/ui/SmoothTimeInput';
 import type { DailyLeadRow, CollegeOption } from './LeadsTable';
 
-const BATCH_YEARS = ['2025', '2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
+const BATCH_YEARS = ['2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
 
 interface Props {
   lead: DailyLeadRow;
@@ -28,7 +28,7 @@ export function EditLeadModal({ lead, colleges, onClose, onSave, onDelete }: Pro
   const [leadType, setLeadType] = useState<'positive' | 'jd_received'>(lead.lead_type);
   const [companyName, setCompanyName] = useState(lead.company_name || '');
   const [jobRole, setJobRole] = useState(lead.job_role || '');
-  const [eligibleBatch, setEligibleBatch] = useState(lead.eligible_batch || '2026');
+  const [eligibleBatch, setEligibleBatch] = useState(lead.eligible_batch || '2027');
   const [eventTime, setEventTime] = useState(lead.event_time || '');
   const [remarks, setRemarks] = useState(lead.remarks || '');
 

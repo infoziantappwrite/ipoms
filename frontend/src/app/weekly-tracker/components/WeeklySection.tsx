@@ -45,6 +45,8 @@ interface Props {
     targetSectionKey: string,
     targetIndex?: number
   ) => Promise<void> | void;
+  /** When true, overrides local collapsed state to force this section collapsed */
+  isGloballyCollapsed?: boolean;
 }
 
 const SECTION_CONFIGS: Record<string, { Icon: any; headerBg: string; badgeClass: string; iconClass: string }> = {
@@ -86,9 +88,9 @@ const SECTION_CONFIGS: Record<string, { Icon: any; headerBg: string; badgeClass:
   },
   in_progress: {
     Icon: Rocket,
-    headerBg: 'bg-blue-50/80 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900/40 text-blue-900 dark:text-blue-300',
-    badgeClass: 'bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700/60',
-    iconClass: 'text-blue-600 dark:text-blue-400',
+    headerBg: 'bg-violet-50/80 dark:bg-violet-950/40 border-violet-200 dark:border-violet-900/40 text-violet-900 dark:text-violet-300',
+    badgeClass: 'bg-violet-100 dark:bg-violet-950/60 text-violet-800 dark:text-violet-300 border-violet-300 dark:border-violet-700/60',
+    iconClass: 'text-violet-600 dark:text-violet-400',
   },
   pipeline: {
     Icon: Inbox,
@@ -151,8 +153,14 @@ export function WeeklySection({
   onDeleteRow,
   onReorderRows,
   onMoveRowCrossSection,
+  isGloballyCollapsed = false,
 }: Props) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Sync local collapse state whenever the global toggle fires
+  useEffect(() => {
+    setIsCollapsed(isGloballyCollapsed);
+  }, [isGloballyCollapsed]);
   const [isLocalDeleteMode, setIsLocalDeleteMode] = useState(false);
   const [localSelectedRowIds, setLocalSelectedRowIds] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);

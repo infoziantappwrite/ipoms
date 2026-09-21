@@ -1000,6 +1000,53 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     Item 0 (the `role_codes` privilege-escalation history) is kept deliberately — see its own
     note. §6's module map row for User & Access updated to match.
 
+42. **Coordinator "Dedicated Calling Time" widget rebuilt, 21 Sep 2026 (user-requested
+    visual upgrade) — plus a truthfulness bug caught and removed mid-build.**
+    `CoordinatorClockDurationWidget.tsx` previously centred on a large analog clock dial
+    whose hands showed **the current wall-clock time** — not the metric the widget is named
+    after. It animated impressively while visualising nothing. Replaced with a "Momentum
+    Flow" treatment: drifting aurora background, an odometer whose digit columns roll on
+    real data change, and an **Hourly Rhythm** bar chart of when today's calls actually
+    happened, current hour highlighted.
+    **New backend field:** `clock_duration.hourly_calls` — 24 slots, index = IST hour, from
+    the Daily Tracker rows the endpoint already loads (`call_start_time`, falling back to
+    `created_at`). Uses explicit +05:30 offset math rather than `getHours()`, matching
+    `positiveSyncReminder.ts`: `getHours()` silently reports UTC hours the moment this runs
+    anywhere that isn't an IST box. An empty day is genuinely all zeros — the chart renders
+    a flat rail and an honest "No calls logged yet today", never a placeholder shape.
+    **The bug, caught before it shipped:** the first pass ticked the counter +1/second
+    locally "so it feels live". That is wrong — this value is the *summed duration of calls
+    already logged*, not a running stopwatch, so on a day with zero calls it would have
+    climbed to 00:04:12 while the true answer stayed 00:00:00. Exactly the failure mode of
+    §5 item 0g ("three screens told the user something untrue"). The local tick was removed;
+    the number now only moves when the server says it moved. Motion comes from the aurora
+    and the bars, not from a fake clock.
+    **Follow-up the same day — the figure now refreshes on real events.** With the fake tick
+    gone the number was correct but only re-read on mount, so a call logged with the
+    dashboard already open didn't show up. `dashboard/page.tsx` now silently re-runs
+    `loadDashboard(true)` on two triggers: the `ipoms_tracker_sync` BroadcastChannel that
+    Daily Tracker **already** fires on every row add/update/delete (7 call sites in
+    `tracker/page.tsx` — nothing new had to be published), and `visibilitychange` for the
+    ordinary "go log calls, come back" flow. Deliberately **not** an interval: this value
+    cannot change unless this coordinator logs a call, so a timer would only ever re-confirm
+    the same number.
+    **Verified against the live database, not by inspection:** inserted one marked throwaway
+    Daily Tracker row (`duration_seconds: 420`) → dashboard returned `07m 00s / 1 call`;
+    edited it to `900` → returned `15m 00s`; deleted it → back to `0`. Then, in a real
+    browser with the dashboard already open, added a 12m 18s row and fired the tracker's own
+    broadcast: the widget moved `00:00:00 → 00:12:18` with the 5p bar rising, **no reload**.
+    All throwaway rows removed afterwards (`daily_tracker` back to 1018, marker count 0).
+    **Styled-jsx trap hit and documented in-file:** the odometer digit markup lives in a
+    child component, and styled-jsx only scopes elements written lexically inside the
+    component holding the `<style jsx>` block — so the unscoped rules never matched and all
+    ten numerals rendered in a row. Those selectors are `:global()` on purpose, with
+    `ipoms-` prefixes because of it. The digit roll uses a **percentage** transform, not
+    pixels, so the smaller mobile digit height cannot desync the maths.
+    Verified live in a real browser across three states (populated, genuinely-empty, dark
+    mode), with the populated case driven by read-only Playwright response interception —
+    nothing was written to the database to stage the screenshot. `tsc --noEmit` clean both
+    sides.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

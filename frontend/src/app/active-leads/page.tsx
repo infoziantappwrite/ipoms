@@ -475,8 +475,7 @@ export default function ActiveLeadsPage() {
           if (!isDeletingSelected) setShowDeleteConfirmModal(false);
         }}
         size="sm"
-        title="Confirm Deletion"
-        description="Please confirm if you want to permanently delete the selected active leads."
+        title={selectedLeadIds.length === 1 ? 'Delete Lead' : 'Delete Selected Leads'}
         footer={
           <div className="flex items-center justify-end gap-2.5 w-full">
             <button
@@ -508,19 +507,21 @@ export default function ActiveLeadsPage() {
           </div>
         }
       >
-        <div className="p-4 sm:p-5 space-y-3.5">
-          <div className="flex items-start gap-3.5">
-            <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center justify-center shrink-0 shadow-2xs">
-              <Trash2 size={20} strokeWidth={2} />
-            </div>
-            <div className="space-y-1.5">
-              <h4 className="text-sm font-bold text-fg">
-                Delete {selectedLeadIds.length} Selected {selectedLeadIds.length === 1 ? 'Row' : 'Rows'}?
-              </h4>
-              <p className="text-xs text-fg-subtle leading-relaxed">
-                Do you want to delete the <strong className="text-rose-600 dark:text-rose-400 font-bold font-mono">{selectedLeadIds.length} {selectedLeadIds.length === 1 ? 'row' : 'rows'}</strong> you selected? This action cannot be undone and will permanently remove them from the Active Leads Directory.
-              </p>
-            </div>
+        <div className="py-2.5 flex items-start gap-3.5">
+          <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center justify-center shrink-0 shadow-2xs">
+            <Trash2 size={18} strokeWidth={2.2} />
+          </div>
+          <div className="space-y-1 pt-0.5">
+            <p className="text-xs text-fg leading-relaxed">
+              Are you sure you want to delete{' '}
+              <strong className="text-rose-600 dark:text-rose-400 font-bold font-mono">
+                {selectedLeadIds.length}
+              </strong>{' '}
+              selected {selectedLeadIds.length === 1 ? 'lead' : 'leads'}?
+            </p>
+            <p className="text-[11px] text-fg-subtle">
+              This action cannot be undone.
+            </p>
           </div>
         </div>
       </Modal>

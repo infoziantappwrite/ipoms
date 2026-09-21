@@ -10,7 +10,7 @@ import { WeeklyRow } from './WeeklyTable';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { validateAndNormalizeIndianMobile, validateAndNormalizeEmail } from '@/lib/contactValidation';
 
-const BATCH_YEARS = ['2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
+const BATCH_YEARS = ['2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
 
 import { COMPANY_TYPES } from '../constants/companyTypes';
 
@@ -68,7 +68,7 @@ export function EditCompanyModal({
     if (row.ctc_lpa && row.ctc_lpa.toLowerCase().includes('month')) return '/ Month';
     return 'LPA';
   });
-  const [eligibleBatch, setEligibleBatch] = useState(row.eligible_batch || '2026');
+  const [eligibleBatch, setEligibleBatch] = useState(row.eligible_batch || '2027');
   const [pipelineSection, setPipelineSection] = useState(row.pipeline_section || 'pipeline');
   const [followUpDate, setFollowUpDate] = useState(() => {
     if (!row.follow_up_date) return '';

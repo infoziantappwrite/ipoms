@@ -8,6 +8,8 @@ import {
   Undo2,
   Redo2,
   RefreshCw,
+  ChevronsUp,
+  ChevronsDown,
 } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { CollegeSelector, College } from '@/components/CollegeSelector';
@@ -49,6 +51,8 @@ interface Props {
   onUndo?: () => void;
   onRedo?: () => void;
   onOpenCollegeDossier?: () => void;
+  allSectionsCollapsed?: boolean;
+  onToggleCollapseAll?: () => void;
 }
 
 export function WeeklyHeader({
@@ -82,6 +86,8 @@ export function WeeklyHeader({
   onUndo,
   onRedo,
   onOpenCollegeDossier,
+  allSectionsCollapsed = false,
+  onToggleCollapseAll,
 }: Props) {
   const [selectedCollegeObj, setSelectedCollegeObj] = useState<College | null>(null);
 
@@ -254,6 +260,24 @@ export function WeeklyHeader({
                 </button>
               </div>
             ) : null
+          )}
+
+          {/* Collapse / Expand All Sections Toggle */}
+          {selectedCollegeId && onToggleCollapseAll && (
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('selection');
+                onToggleCollapseAll();
+              }}
+              title={allSectionsCollapsed ? 'Expand All Sections' : 'Collapse All Sections'}
+              aria-label={allSectionsCollapsed ? 'Expand all sections' : 'Collapse all sections'}
+              className="w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900/50 dark:hover:bg-zinc-800/80 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 border border-zinc-200 dark:border-zinc-700/80 shadow-2xs active:scale-[0.95] disabled:opacity-40"
+            >
+              {allSectionsCollapsed
+                ? <ChevronsDown size={15} strokeWidth={2.2} />
+                : <ChevronsUp size={15} strokeWidth={2.2} />}
+            </button>
           )}
 
           {/* Standalone Red Dustbin / Trash Icon Button */}

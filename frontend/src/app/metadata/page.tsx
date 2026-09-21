@@ -42,22 +42,23 @@ export default function MetadataPage() {
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [returnTo, setReturnTo] = useState<string | null>(null);
 
-  // Check for auto-open query parameters (e.g. from Daily Tracker)
+  // Check for auto-open query parameters (e.g. from Daily Tracker or Weekly Tracker)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const isAdd = params.get('add') === 'true';
-      const companyNameParam = params.get('company_name');
+      const companyNameParam = params.get('company_name') || params.get('addCompany');
       const hrNameParam = params.get('hr_name');
       const mobileParam = params.get('primary_mobile') || params.get('mobile');
       const emailParam = params.get('primary_email') || params.get('email');
-      const returnToParam = params.get('return_to');
+      const typeParam = params.get('company_type') || params.get('type');
+      const returnToParam = params.get('return_to') || params.get('returnUrl');
 
       if (returnToParam) {
         setReturnTo(returnToParam);
       }
 
-      if (isAdd || companyNameParam || mobileParam || emailParam) {
+      if (isAdd || companyNameParam || mobileParam || emailParam || typeParam) {
         if (companyNameParam && companyNameParam.trim()) {
           apiFetch<any>(`/companies/search?q=${encodeURIComponent(companyNameParam.trim())}&limit=5`)
             .then((res) => {
@@ -68,6 +69,7 @@ export default function MetadataPage() {
                 if (exact) {
                   setEditingData({
                     ...exact,
+                    company_type: typeParam || exact.company_type || 'IT / Software & Technology',
                     hr_name: hrNameParam || (exact.hr_name !== 'HR Contact' ? exact.hr_name : '') || '',
                     primary_mobile: mobileParam || exact.primary_mobile || '',
                     primary_email: emailParam || exact.primary_email || '',
@@ -79,6 +81,7 @@ export default function MetadataPage() {
               // Fallback: new contact
               setEditingData({
                 company_name: companyNameParam || '',
+                company_type: typeParam || 'IT / Software & Technology',
                 hr_name: hrNameParam || '',
                 primary_mobile: mobileParam || '',
                 primary_email: emailParam || '',
@@ -88,6 +91,7 @@ export default function MetadataPage() {
             .catch(() => {
               setEditingData({
                 company_name: companyNameParam || '',
+                company_type: typeParam || 'IT / Software & Technology',
                 hr_name: hrNameParam || '',
                 primary_mobile: mobileParam || '',
                 primary_email: emailParam || '',
@@ -97,6 +101,7 @@ export default function MetadataPage() {
         } else {
           setEditingData({
             company_name: companyNameParam || '',
+            company_type: typeParam || 'IT / Software & Technology',
             hr_name: hrNameParam || '',
             primary_mobile: mobileParam || '',
             primary_email: emailParam || '',
@@ -291,6 +296,9 @@ export default function MetadataPage() {
         setShowDuplicateModal(false);
         setShowEditModal(false);
         loadMetadata();
+        if (returnTo) {
+          window.location.href = returnTo;
+        }
       } else {
         alert(res.error?.message || 'Save failed');
       }

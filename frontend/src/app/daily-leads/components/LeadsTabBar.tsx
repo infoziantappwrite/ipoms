@@ -25,31 +25,41 @@ export function LeadsTabBar({
 }: Props) {
   return (
     <div className="px-6 border-b border-border flex items-center justify-between gap-4 bg-surface min-h-[48px]">
-      {/* ── Left: Tab Buttons ────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2">
+      {/* ── Left: Tab Buttons — Apple Smooth Sliding Segmented Control ── */}
+      <div className="relative grid grid-cols-2 gap-1 p-1 bg-surface-sunken/80 dark:bg-zinc-900/90 rounded-lg border border-border/80 shadow-2xs shrink-0 select-none">
+        {/* Glider / Smooth Sliding Indicator */}
+        <div
+          className={`absolute top-1 bottom-1 w-[calc((100%-12px)/2)] rounded-md border shadow-xs transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none ${
+            activeTab === 'positive'
+              ? 'left-1 translate-x-0 bg-white dark:bg-emerald-950/80 border-emerald-500/40 dark:border-emerald-600/50 shadow-emerald-500/10'
+              : 'left-1 translate-x-[calc(100%+4px)] bg-white dark:bg-blue-950/80 border-blue-500/40 dark:border-blue-600/50 shadow-blue-500/10'
+          }`}
+        />
+
         {/* Positives Tab */}
         <button
           type="button"
           onClick={() => onTabChange('positive')}
-          className={`flex items-center gap-2.5 px-6 py-3 text-xs font-bold transition-all relative select-none cursor-pointer rounded-t-lg
-                      ${
-                        activeTab === 'positive'
-                          ? 'text-emerald-950 dark:text-emerald-200 border-b-2 border-emerald-600 bg-emerald-100/90 dark:bg-emerald-950/50'
-                          : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 hover:bg-slate-100/80 dark:hover:bg-slate-800/50'
-                      }`}
+          className={`relative z-10 flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold transition-colors duration-200 cursor-pointer rounded-md ${
+            activeTab === 'positive'
+              ? 'text-emerald-900 dark:text-emerald-200 font-extrabold'
+              : 'text-fg-subtle hover:text-fg'
+          }`}
         >
           <Sparkles
-            size={15}
-            strokeWidth={2.5}
-            className={activeTab === 'positive' ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-500'}
+            size={14}
+            strokeWidth={2.3}
+            className={`transition-colors duration-200 ${
+              activeTab === 'positive' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-zinc-500'
+            }`}
             aria-hidden
           />
           <span className="tracking-wide uppercase font-extrabold">Positives</span>
           <span
-            className={`text-micro px-2 py-0.5 rounded-full font-bold transition-colors shadow-2xs ${
+            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-[4px] transition-colors duration-200 tabular-nums shadow-2xs ${
               activeTab === 'positive'
-                ? 'bg-emerald-700 text-white font-black'
-                : 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-bold'
+                ? 'bg-emerald-600 dark:bg-emerald-500 text-white font-black'
+                : 'bg-surface-sunken dark:bg-zinc-800 text-fg-muted'
             }`}
           >
             {positivesCount}
@@ -60,25 +70,26 @@ export function LeadsTabBar({
         <button
           type="button"
           onClick={() => onTabChange('jd_received')}
-          className={`flex items-center gap-2.5 px-6 py-3 text-xs font-bold transition-all relative select-none cursor-pointer rounded-t-lg
-                      ${
-                        activeTab === 'jd_received'
-                          ? 'text-blue-950 dark:text-blue-200 border-b-2 border-blue-600 bg-blue-100/90 dark:bg-blue-950/50'
-                          : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 hover:bg-slate-100/80 dark:hover:bg-slate-800/50'
-                      }`}
+          className={`relative z-10 flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold transition-colors duration-200 cursor-pointer rounded-md ${
+            activeTab === 'jd_received'
+              ? 'text-blue-900 dark:text-blue-200 font-extrabold'
+              : 'text-fg-subtle hover:text-fg'
+          }`}
         >
           <ClipboardList
-            size={15}
-            strokeWidth={2.5}
-            className={activeTab === 'jd_received' ? 'text-blue-700 dark:text-blue-300' : 'text-slate-500'}
+            size={14}
+            strokeWidth={2.3}
+            className={`transition-colors duration-200 ${
+              activeTab === 'jd_received' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-zinc-500'
+            }`}
             aria-hidden
           />
           <span className="tracking-wide uppercase font-extrabold">JD Received</span>
           <span
-            className={`text-micro px-2 py-0.5 rounded-full font-bold transition-colors shadow-2xs ${
+            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-[4px] transition-colors duration-200 tabular-nums shadow-2xs ${
               activeTab === 'jd_received'
-                ? 'bg-blue-700 text-white font-black'
-                : 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-bold'
+                ? 'bg-blue-600 dark:bg-blue-500 text-white font-black'
+                : 'bg-surface-sunken dark:bg-zinc-800 text-fg-muted'
             }`}
           >
             {jdCount}

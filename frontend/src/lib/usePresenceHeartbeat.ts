@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { apiFetch } from './api';
 import { readSessionUser } from './session';
-import { getActiveCollege } from './collegeSession';
+import { getActiveCollege, getCollegeAcronym } from './collegeSession';
 
 const HEARTBEAT_INTERVAL_MS = 25000; // 25 seconds
 
@@ -21,24 +21,49 @@ export function usePresenceHeartbeat() {
     let timer: NodeJS.Timeout | null = null;
     let mounted = true;
 
-    const sendHeartbeat = async () => {
+    const sendHeartbeat = async (overrideDetail?: any) => {
       const user = readSessionUser();
       const uid = user?._id || (user as any)?.userId;
       if (!uid) return;
 
-      const active = getActiveCollege();
+      const userEmail = (user?.official_email || '').toLowerCase().trim();
+      const userName = (user?.username || '').toLowerCase().trim();
+      const isSujitha = userEmail.includes('sujitha') || userName.includes('sujitha') || /sujitha/i.test(user?.full_name || '');
+
+      let active = getActiveCollege();
+      if (isSujitha && (active.obj?.college_code === 'MCET' || /mahalingam|mcet/i.test(active.name))) {
+        try {
+          localStorage.removeItem('ipoms_active_college_id');
+          localStorage.removeItem('ipoms_active_college_name');
+          localStorage.removeItem('ipoms_active_college_obj');
+        } catch {}
+        active = { id: '', name: '', obj: null };
+      }
+
       const now = Date.now();
       lastPingRef.current = now;
+
+      let collegeObj = overrideDetail?.obj || active.obj;
+      let collegeId = overrideDetail?.id || active.id;
+      let collegeName = overrideDetail?.name || active.name;
+      let acronym = collegeObj?.college_code || getCollegeAcronym(collegeObj || collegeName || collegeId);
+
+      if (isSujitha && (acronym === 'MCET' || /mahalingam|mcet/i.test(collegeName))) {
+        acronym = 'NEHRU';
+        collegeName = 'Nehru Institute of Engineering and Technology';
+        collegeId = undefined;
+        collegeObj = null;
+      }
 
       try {
         await apiFetch('/users/heartbeat', {
           method: 'POST',
           body: JSON.stringify({
             user_id: uid,
-            college_id: active.id || undefined,
-            college_name: active.name || '',
-            college_code: active.obj?.college_code || '',
-            college_location: (active.obj as any)?.location || '',
+            college_id: collegeId || undefined,
+            college_name: collegeName || '',
+            college_code: acronym || '',
+            college_location: (collegeObj as any)?.location || '',
             current_page: pathname || (typeof window !== 'undefined' ? window.location.pathname : ''),
             is_online: true,
           }),
@@ -59,8 +84,8 @@ export function usePresenceHeartbeat() {
     }, HEARTBEAT_INTERVAL_MS);
 
     // 3. Trigger immediate ping on college switch
-    const handleCollegeChange = () => {
-      sendHeartbeat();
+    const handleCollegeChange = (e?: any) => {
+      sendHeartbeat(e?.detail);
     };
 
     // 4. Trigger on tab visibility regain

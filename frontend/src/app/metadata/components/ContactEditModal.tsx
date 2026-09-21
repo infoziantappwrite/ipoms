@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Plus, Pencil, X, Building2, Briefcase, Sparkles, Info } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
+import { COMPANY_TYPES } from '@/app/weekly-tracker/constants/companyTypes';
 
 interface Props {
   initialData?: any | null;
@@ -30,22 +31,17 @@ export function ContactEditModal({
     initialData?.mobile_numbers?.filter((m: string) => m !== initialData?.primary_mobile).join(', ') || ''
   );
   const [primaryEmail, setPrimaryEmail] = useState(initialData?.primary_email || '');
-  const [companyType, setCompanyType] = useState(initialData?.company_type || 'software');
+  const [companyType, setCompanyType] = useState(initialData?.company_type || 'IT / Software & Technology');
   const [notes, setNotes] = useState(initialData?.notes || '');
   const [loading, setLoading] = useState(false);
 
-  const companyTypes = [
-    { id: 'software', label: 'Software' },
-    { id: 'ai', label: 'AI & Data' },
-    { id: 'bpo', label: 'BPO / BPM' },
-    { id: 'banking', label: 'Banking' },
-    { id: 'education', label: 'Education' },
-    { id: 'finance', label: 'Finance' },
-    { id: 'core_engineering', label: 'Core Engineering' },
-    { id: 'product', label: 'Product' },
-    { id: 'consulting', label: 'Consulting' },
-    { id: 'other', label: 'Other' },
-  ];
+  const companyTypeOptions = Array.from(
+    new Set([
+      'IT / Software & Technology',
+      ...(initialData?.company_type ? [initialData.company_type] : []),
+      ...COMPANY_TYPES,
+    ])
+  ).map((t) => ({ value: t, label: t }));
 
   const handleSubmit = async (e: React.FormEvent, forceSave = false) => {
     if (e) e.preventDefault();
@@ -184,10 +180,7 @@ export function ContactEditModal({
                 onChange={setCompanyType}
                 icon={Briefcase}
                 title="Company Industry Type"
-                options={companyTypes.map((t) => ({
-                  value: t.id,
-                  label: t.label,
-                }))}
+                options={companyTypeOptions}
               />
             </div>
           </div>

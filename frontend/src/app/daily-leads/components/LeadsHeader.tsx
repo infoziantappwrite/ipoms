@@ -81,31 +81,45 @@ export function LeadsHeader({
       <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t border-border/80">
         {/* Left Side: Tabs + Divider + Calendar Date Picker + Search */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Tabs: Positives & JD Received */}
+          {/* Tabs: Positives & JD Received — Apple Smooth Sliding Segmented Control */}
           {onTabChange && (
-            <div className="flex items-center gap-1.5 bg-surface-sunken/60 p-0.5 rounded-2xl border border-border/80 shadow-2xs shrink-0">
+            <div className="relative grid grid-cols-2 gap-1 p-1 bg-surface-sunken/80 dark:bg-zinc-900/90 rounded-lg border border-border/80 shadow-2xs shrink-0 select-none">
+              {/* Glider / Smooth Sliding Indicator */}
+              <div
+                className={`absolute top-1 bottom-1 w-[calc((100%-12px)/2)] rounded-md border shadow-xs transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none ${
+                  activeTab === 'positive'
+                    ? 'left-1 translate-x-0 bg-white dark:bg-emerald-950/80 border-emerald-500/40 dark:border-emerald-600/50 shadow-emerald-500/10'
+                    : 'left-1 translate-x-[calc(100%+4px)] bg-white dark:bg-blue-950/80 border-blue-500/40 dark:border-blue-600/50 shadow-blue-500/10'
+                }`}
+              />
+
               {/* Positives Tab */}
               <button
                 type="button"
-                onClick={() => onTabChange('positive')}
-                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold transition-all relative select-none cursor-pointer rounded-xl ${
+                onClick={() => {
+                  triggerHaptic('selection');
+                  onTabChange('positive');
+                }}
+                className={`relative z-10 flex items-center justify-center gap-2 px-3.5 py-1.5 text-xs font-bold transition-colors duration-200 cursor-pointer rounded-md ${
                   activeTab === 'positive'
-                    ? 'text-emerald-950 dark:text-emerald-200 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-400/60 dark:border-emerald-700/60 shadow-2xs font-extrabold'
-                    : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 hover:bg-slate-100/80 dark:hover:bg-slate-800/50 border border-transparent'
+                    ? 'text-emerald-900 dark:text-emerald-200 font-extrabold'
+                    : 'text-fg-subtle hover:text-fg'
                 }`}
               >
                 <Sparkles
                   size={14}
-                  strokeWidth={2.5}
-                  className={activeTab === 'positive' ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-500'}
+                  strokeWidth={2.3}
+                  className={`transition-colors duration-200 ${
+                    activeTab === 'positive' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-zinc-500'
+                  }`}
                   aria-hidden
                 />
                 <span className="tracking-wide uppercase font-extrabold">Positives</span>
                 <span
-                  className={`text-micro px-1.5 py-0.2 rounded-full font-bold transition-colors shadow-2xs ${
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-[4px] transition-colors duration-200 tabular-nums shadow-2xs ${
                     activeTab === 'positive'
-                      ? 'bg-emerald-700 text-white font-black'
-                      : 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-bold'
+                      ? 'bg-emerald-600 dark:bg-emerald-500 text-white font-black'
+                      : 'bg-surface-sunken dark:bg-zinc-800 text-fg-muted'
                   }`}
                 >
                   {positivesCount}
@@ -115,25 +129,30 @@ export function LeadsHeader({
               {/* JD Received Tab */}
               <button
                 type="button"
-                onClick={() => onTabChange('jd_received')}
-                className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold transition-all relative select-none cursor-pointer rounded-xl ${
+                onClick={() => {
+                  triggerHaptic('selection');
+                  onTabChange('jd_received');
+                }}
+                className={`relative z-10 flex items-center justify-center gap-2 px-3.5 py-1.5 text-xs font-bold transition-colors duration-200 cursor-pointer rounded-md ${
                   activeTab === 'jd_received'
-                    ? 'text-blue-950 dark:text-blue-200 bg-blue-100 dark:bg-blue-950/60 border border-blue-400/60 dark:border-blue-700/60 shadow-2xs font-extrabold'
-                    : 'text-slate-700 dark:text-slate-300 hover:text-slate-950 hover:bg-slate-100/80 dark:hover:bg-slate-800/50 border border-transparent'
+                    ? 'text-blue-900 dark:text-blue-200 font-extrabold'
+                    : 'text-fg-subtle hover:text-fg'
                 }`}
               >
                 <ClipboardList
                   size={14}
-                  strokeWidth={2.5}
-                  className={activeTab === 'jd_received' ? 'text-blue-700 dark:text-blue-300' : 'text-slate-500'}
+                  strokeWidth={2.3}
+                  className={`transition-colors duration-200 ${
+                    activeTab === 'jd_received' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-zinc-500'
+                  }`}
                   aria-hidden
                 />
                 <span className="tracking-wide uppercase font-extrabold">JD Received</span>
                 <span
-                  className={`text-micro px-1.5 py-0.2 rounded-full font-bold transition-colors shadow-2xs ${
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-[4px] transition-colors duration-200 tabular-nums shadow-2xs ${
                     activeTab === 'jd_received'
-                      ? 'bg-blue-700 text-white font-black'
-                      : 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 font-bold'
+                      ? 'bg-blue-600 dark:bg-blue-500 text-white font-black'
+                      : 'bg-surface-sunken dark:bg-zinc-800 text-fg-muted'
                   }`}
                 >
                   {jdCount}

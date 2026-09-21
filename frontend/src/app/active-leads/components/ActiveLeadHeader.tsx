@@ -24,6 +24,7 @@ import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { SmoothYearDropdown } from '@/components/ui/SmoothYearDropdown';
 import { SmoothMonthDropdown } from '@/components/ui/SmoothMonthDropdown';
 import { SmoothExportDropdown } from '@/components/ui/SmoothExportDropdown';
+import { triggerHaptic } from '@/lib/haptics';
 
 export type JdSection = 'all' | 'in_progress' | 'upcoming_drive' | 'drive_in_progress' | 'completed';
 
@@ -283,22 +284,35 @@ export function ActiveLeadHeader({
       <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-border/40 overflow-x-auto no-scrollbar flex-nowrap">
         {/* Left Side: Segmented Tab Switcher (No emojis) */}
         <div className="flex items-center gap-2.5 shrink-0">
-          <div className="flex items-center p-1 bg-surface-sunken border border-border/80 rounded-xl shadow-2xs shrink-0">
+          {/* Left Side: Segmented Tab Switcher — Apple Smooth Sliding Segmented Control */}
+          <div className="relative grid grid-cols-2 gap-1 p-1 bg-surface-sunken/80 dark:bg-zinc-900/90 rounded-lg border border-border/80 shadow-2xs shrink-0 select-none">
+            {/* Glider / Smooth Sliding Active Indicator */}
+            <div
+              className={`absolute top-1 bottom-1 w-[calc((100%-12px)/2)] rounded-md border shadow-xs transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none ${
+                activeTab === 'pipeline'
+                  ? 'left-1 translate-x-0 bg-blue-600 border-blue-500 shadow-blue-500/20'
+                  : 'left-1 translate-x-[calc(100%+4px)] bg-blue-600 dark:bg-blue-600 border-blue-500 shadow-blue-500/20'
+              }`}
+            />
+
             <button
               type="button"
-              onClick={() => onTabChange('pipeline')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer select-none ${
+              onClick={() => {
+                triggerHaptic('selection');
+                onTabChange('pipeline');
+              }}
+              className={`relative z-10 flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-bold transition-colors duration-200 cursor-pointer select-none ${
                 activeTab === 'pipeline'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-fg-subtle hover:text-fg hover:bg-surface'
+                  ? 'text-white font-extrabold'
+                  : 'text-fg-subtle hover:text-fg'
               }`}
             >
               <span>Pipeline (Positives)</span>
               <span
-                className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                className={`px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold transition-colors duration-200 tabular-nums ${
                   activeTab === 'pipeline'
                     ? 'bg-blue-700/80 text-white'
-                    : 'bg-surface border border-border text-fg-subtle'
+                    : 'bg-surface-sunken dark:bg-zinc-800 border border-border text-fg-subtle'
                 }`}
               >
                 {tabCounts.pipeline}
@@ -307,19 +321,22 @@ export function ActiveLeadHeader({
 
             <button
               type="button"
-              onClick={() => onTabChange('jd_received')}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer select-none ${
+              onClick={() => {
+                triggerHaptic('selection');
+                onTabChange('jd_received');
+              }}
+              className={`relative z-10 flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-bold transition-colors duration-200 cursor-pointer select-none ${
                 activeTab === 'jd_received'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-fg-subtle hover:text-fg hover:bg-surface'
+                  ? 'text-white font-extrabold'
+                  : 'text-fg-subtle hover:text-fg'
               }`}
             >
               <span>JD Received</span>
               <span
-                className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold ${
+                className={`px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold transition-colors duration-200 tabular-nums ${
                   activeTab === 'jd_received'
-                    ? 'bg-emerald-700/80 text-white'
-                    : 'bg-surface border border-border text-fg-subtle'
+                    ? 'bg-blue-700/80 text-white'
+                    : 'bg-surface-sunken dark:bg-zinc-800 border border-border text-fg-subtle'
                 }`}
               >
                 {tabCounts.jd_received}

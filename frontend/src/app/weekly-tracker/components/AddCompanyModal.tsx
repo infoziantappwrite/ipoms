@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, X, Building2, Briefcase, Layers, GraduationCap, Trophy, Phone, Mail, Calendar } from 'lucide-react';
+import { Plus, X, Building2, Briefcase, Layers, GraduationCap, Trophy, Phone, Mail, Calendar, Database, Info, Sparkles } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
 import { useToast } from '@/components/ui/Toast';
 import { validateAndNormalizeIndianMobile, validateAndNormalizeEmail } from '@/lib/contactValidation';
 
-const BATCH_YEARS = ['2026', '2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
+const BATCH_YEARS = ['2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
 
 import { COMPANY_TYPES } from '../constants/companyTypes';
 import { ForeignCollegeWarningModal } from './ForeignCollegeWarningModal';
@@ -21,6 +21,7 @@ interface Props {
   /** True when collegeId isn't one of the acting coordinator's assigned colleges. */
   isForeignCollege?: boolean;
   collegeName?: string;
+  initialDraft?: any;
 }
 
 const SECTIONS = [
@@ -42,24 +43,27 @@ export function AddCompanyModal({
   onAdded,
   isForeignCollege,
   collegeName,
+  initialDraft,
 }: Props) {
   const { toast } = useToast();
-  const [companyName, setCompanyName] = useState('');
-  const [contactNumber, setContactNumber] = useState('');
-  const [emailId, setEmailId] = useState('');
-  const [jdReceivedDate, setJdReceivedDate] = useState('');
-  const [dbSharedDate, setDbSharedDate] = useState('');
-  const [jobRole, setJobRole] = useState('Graduate Trainee');
-  const [companyType, setCompanyType] = useState('IT / Software & Technology');
-  const [ctcValue, setCtcValue] = useState('');
-  const [ctcUnit, setCtcUnit] = useState<'LPA' | '/ Month'>('LPA');
-  const [eligibleBatch, setEligibleBatch] = useState('2026');
-  const [pipelineSection, setPipelineSection] = useState('completed');
-  const [offersReceived, setOffersReceived] = useState<string>('0');
-  const [followUpDate, setFollowUpDate] = useState('');
-  const [currentStatusText, setCurrentStatusText] = useState('Drive confirmed and scheduled');
+  const [companyName, setCompanyName] = useState(initialDraft?.companyName || '');
+  const [contactNumber, setContactNumber] = useState(initialDraft?.contactNumber || '');
+  const [emailId, setEmailId] = useState(initialDraft?.emailId || '');
+  const [jdReceivedDate, setJdReceivedDate] = useState(initialDraft?.jdReceivedDate || '');
+  const [dbSharedDate, setDbSharedDate] = useState(initialDraft?.dbSharedDate || '');
+  const [jobRole, setJobRole] = useState(initialDraft?.jobRole || 'Graduate Trainee');
+  const [companyType, setCompanyType] = useState(initialDraft?.companyType || 'IT / Software & Technology');
+  const [ctcValue, setCtcValue] = useState(initialDraft?.ctcValue || '');
+  const [ctcUnit, setCtcUnit] = useState<'LPA' | '/ Month'>(initialDraft?.ctcUnit || 'LPA');
+  const [eligibleBatch, setEligibleBatch] = useState(initialDraft?.eligibleBatch || '2027');
+  const [pipelineSection, setPipelineSection] = useState(initialDraft?.pipelineSection || 'pipeline');
+  const [offersReceived, setOffersReceived] = useState<string>(initialDraft?.offersReceived !== undefined ? String(initialDraft.offersReceived) : '0');
+  const [followUpDate, setFollowUpDate] = useState(initialDraft?.followUpDate || '');
+  const [currentStatusText, setCurrentStatusText] = useState(initialDraft?.currentStatusText || 'Drive confirmed and scheduled');
   const [loading, setLoading] = useState(false);
   const [showForeignWarning, setShowForeignWarning] = useState(false);
+  const [showNotInMetaModal, setShowNotInMetaModal] = useState(false);
+  const [isRestoredDraft, setIsRestoredDraft] = useState(Boolean(initialDraft?.companyName));
 
   // Suggestions from Master Company DB
   const [suggestions, setSuggestions] = useState<any[]>([]);
@@ -83,6 +87,40 @@ export function AddCompanyModal({
       setShowSuggestions(false);
     }
   }, [companyName]);
+
+  const handleRedirectToMetadata = () => {
+    if (typeof window !== 'undefined') {
+      const draft = {
+        companyName: companyName.trim(),
+        contactNumber: contactNumber.trim(),
+        emailId: emailId.trim(),
+        jdReceivedDate,
+        dbSharedDate,
+        jobRole: jobRole.trim(),
+        companyType,
+        ctcValue: ctcValue.trim(),
+        ctcUnit,
+        eligibleBatch,
+        pipelineSection,
+        offersReceived,
+        followUpDate,
+        currentStatusText: currentStatusText.trim(),
+        collegeId,
+        timestamp: Date.now(),
+      };
+      sessionStorage.setItem('ipoms_weekly_add_company_draft', JSON.stringify(draft));
+
+      const params = new URLSearchParams({
+        add: 'true',
+        company_name: companyName.trim(),
+        primary_mobile: contactNumber.trim(),
+        primary_email: emailId.trim(),
+        company_type: companyType,
+        return_to: `/weekly-tracker?college_id=${encodeURIComponent(collegeId)}`,
+      });
+      window.location.href = `/metadata?${params.toString()}`;
+    }
+  };
 
   const handleSubmit = async (e?: React.FormEvent, bypassForeignCheck = false) => {
     if (e) e.preventDefault();
@@ -184,10 +222,21 @@ export function AddCompanyModal({
 
       if (res.success) {
         toast(`"${companyName.trim()}" added to Weekly Tracker.`, 'success');
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('ipoms_weekly_add_company_draft');
+        }
         onAdded();
         onClose();
       } else {
-        toast(res.message || res.error?.message || 'Failed to add company', 'error');
+        if (
+          res.error?.code === 'COMPANY_NOT_IN_METADATA' ||
+          (typeof res.error?.message === 'string' && res.error.message.includes('not in the Metadata database')) ||
+          (typeof res.message === 'string' && res.message.includes('not in the Metadata database'))
+        ) {
+          setShowNotInMetaModal(true);
+        } else {
+          toast(res.message || res.error?.message || 'Failed to add company', 'error');
+        }
       }
     } catch (err: any) {
       console.error('Add company error:', err);
@@ -240,6 +289,23 @@ export function AddCompanyModal({
 
         {/* ── Form Body ──────────────────── */}
         <form id="add-company-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 text-xs no-scrollbar bg-surface">
+
+          {/* Restored Draft Alert Banner */}
+          {isRestoredDraft && (
+            <div className="p-3 bg-emerald-500/10 dark:bg-emerald-950/40 border border-emerald-500/30 rounded-xl flex items-center justify-between gap-2 text-xs text-emerald-800 dark:text-emerald-300 animate-fadeIn">
+              <div className="flex items-center gap-2 font-medium">
+                <Sparkles size={14} className="text-emerald-500 shrink-0" />
+                <span>Metadata saved! All your details are restored. Simply click <strong>Add</strong> to place in pipeline.</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRestoredDraft(false)}
+                className="text-micro hover:underline font-bold text-emerald-700 dark:text-emerald-400 cursor-pointer shrink-0"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
 
           {/* Company Name with live suggestions */}
           <div className="relative">
@@ -574,6 +640,56 @@ export function AddCompanyModal({
           handleSubmit(undefined, true);
         }}
       />
+
+      {/* ── Interactive Modal: Company Not in Metadata Database ── */}
+      {showNotInMetaModal && (
+        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-surface text-fg rounded-2xl w-full max-w-md border border-border shadow-2xl p-6 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 border-b border-border pb-3.5">
+              <div className="w-10 h-10 rounded-xl bg-primary/15 text-primary border border-primary/30 flex items-center justify-center shrink-0 shadow-xs">
+                <Database size={20} strokeWidth={2.2} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-fg">Company Not in Metadata Database</h3>
+                <p className="text-micro text-fg-subtle">Master Company Directory Sync</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs text-fg-muted leading-relaxed">
+              <p>
+                The company <strong className="text-fg font-semibold">&ldquo;{companyName.trim()}&rdquo;</strong> is not registered in the Master Metadata Database.
+              </p>
+              <div className="p-3.5 bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-xl space-y-1.5 text-[11.5px]">
+                <p className="font-semibold text-primary flex items-center gap-1.5">
+                  <Info size={14} />
+                  Do you want to add this company to the Metadata Database?
+                </p>
+                <p className="text-fg-subtle leading-normal">
+                  Adding it to Metadata permanently registers this company in the master directory. Once saved, you will automatically return right here with all your entered details intact so you can complete adding it to your college pipeline.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setShowNotInMetaModal(false)}
+                className="px-5 py-2 bg-surface-sunken hover:bg-surface-raised border border-border text-fg rounded-xl text-xs font-semibold transition-colors cursor-pointer active:scale-[0.992]"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRedirectToMetadata}
+                className="px-6 py-2 bg-primary hover:bg-blue-700 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer hover:scale-[1.02] active:scale-[0.992]"
+              >
+                Yes, Add to Metadata
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
