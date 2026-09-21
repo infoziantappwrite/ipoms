@@ -35,6 +35,7 @@ import {
   generateReportCanvas,
   exportReportAsImage,
   getReportExportBaseFileName,
+  type ImageExportSize,
 } from '../lib/reportCanvasRenderer';
 
 function getCleanPeriod(period?: string): string {
@@ -88,6 +89,7 @@ export function A4PdfPreviewModal({
   const [zoomImage, setZoomImage] = useState<number>(100);
   const [logoFailed, setLogoFailed] = useState(false);
   const [paperPages, setPaperPages] = useState(1);
+  const [imageSize, setImageSize] = useState<ImageExportSize>('auto');
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
   const paperRef = useRef<HTMLDivElement>(null);
@@ -137,13 +139,13 @@ export function A4PdfPreviewModal({
     };
   }, [isOpen, onClose]);
 
-  // Generate Image preview from canvas when modal is opened or report changes
+  // Generate Image preview from canvas when modal is opened, report changes, or size changes
   useEffect(() => {
     if (!isOpen || !report) return;
     let isMounted = true;
     setImageLoading(true);
 
-    generateReportCanvas(report)
+    generateReportCanvas(report, { size: imageSize })
       .then((canvas) => {
         if (!isMounted) return;
         if (canvas) {
@@ -159,7 +161,7 @@ export function A4PdfPreviewModal({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, report]);
+  }, [isOpen, report, imageSize]);
 
   // Calculate paper height / pages for A4 layout
   useEffect(() => {
@@ -191,7 +193,7 @@ export function A4PdfPreviewModal({
       a.click();
       document.body.removeChild(a);
     } else {
-      await exportReportAsImage(report);
+      await exportReportAsImage(report, { size: imageSize });
     }
   };
 
@@ -2296,13 +2298,75 @@ export function A4PdfPreviewModal({
             </>
           )}
 
-          {/* Daily Positives Table */}
+          {/* Daily Positives Table / Spotlight Card */}
           {report.template_type === 'daily_positives' && report.included_sections?.daily_positives !== false && report.sections?.daily_positives && (
             <div className="space-y-1.5">
               {report.sections.daily_positives.length === 0 ? (
                 <p className="text-[11px] text-slate-400 italic py-1 pl-1">
                   No positive leads recorded for this day.
                 </p>
+              ) : report.sections.daily_positives.length === 1 ? (
+                (() => {
+                  const r = report.sections.daily_positives[0];
+                  return (
+                    <div className="bg-gradient-to-br from-emerald-50/70 via-white to-emerald-50/30 border-2 border-emerald-300/80 rounded-2xl p-6 shadow-sm">
+                      <div className="flex items-center justify-between gap-3 mb-4">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100/90 border border-emerald-300 text-emerald-800 text-[11px] font-bold tracking-wide">
+                          <Sparkles size={13} className="text-emerald-600" />
+                          <span>TODAY&apos;S PLACEMENT HIGHLIGHT</span>
+                        </div>
+                        <div className="text-xs font-mono font-semibold text-emerald-700 bg-emerald-100/50 px-2.5 py-0.5 rounded-md border border-emerald-200">
+                          {r.time || r.time_stamp || r.event_time || 'Confirmed'}
+                        </div>
+                      </div>
+
+                      <div className="mb-5">
+                        <h2 className="text-2xl sm:text-3xl font-black text-[#0a2540] tracking-tight">
+                          {r.company_name}
+                        </h2>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-4">
+                        <div className="p-3.5 bg-white border border-slate-200 rounded-xl shadow-xs">
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1">
+                            <Briefcase size={12} className="text-slate-400" />
+                            <span>Job Role / Designation</span>
+                          </div>
+                          <div className="text-base font-bold text-slate-900 leading-snug">
+                            {r.role || r.job_role || '—'}
+                          </div>
+                        </div>
+
+                        <div className="p-3.5 bg-emerald-50/70 border-2 border-emerald-300 rounded-xl shadow-xs">
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 mb-1 flex items-center gap-1">
+                            <Trophy size={12} className="text-emerald-600" />
+                            <span>Offered Package (CTC)</span>
+                          </div>
+                          <div className="text-2xl font-black text-emerald-700 tracking-tight">
+                            {r.ctc || '—'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50/90 border border-slate-200 rounded-xl p-3">
+                        <div className="flex items-center gap-2">
+                          <Building2 size={14} className="text-emerald-700 shrink-0" />
+                          <span className="text-slate-600 font-medium">Beneficiary:</span>
+                          <span className="font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded border border-emerald-200 font-mono text-[11px]">
+                            {r.college_code || r.college_name || '—'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 justify-start sm:justify-end">
+                          <User size={14} className="text-slate-500 shrink-0" />
+                          <span className="text-slate-600 font-medium">Coordinator:</span>
+                          <span className="font-bold text-slate-800">
+                            {r.coordinator || 'Placement Team'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
               ) : (
                 <table className="w-full text-[11px] border-collapse table-fixed bg-white">
                   <colgroup>
@@ -2359,13 +2423,75 @@ export function A4PdfPreviewModal({
             </div>
           )}
 
-          {/* Daily JD Received Table */}
+          {/* Daily JD Received Table / Spotlight Card */}
           {report.template_type === 'daily_jd_received' && report.included_sections?.daily_jd_received !== false && report.sections?.daily_jd_received && (
             <div className="space-y-1.5">
               {report.sections.daily_jd_received.length === 0 ? (
                 <p className="text-[11px] text-slate-400 italic py-1 pl-1">
                   No JDs received recorded for this day.
                 </p>
+              ) : report.sections.daily_jd_received.length === 1 ? (
+                (() => {
+                  const r = report.sections.daily_jd_received[0];
+                  return (
+                    <div className="bg-gradient-to-br from-blue-50/70 via-white to-blue-50/30 border-2 border-blue-300/80 rounded-2xl p-6 shadow-sm">
+                      <div className="flex items-center justify-between gap-3 mb-4">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100/90 border border-blue-300 text-blue-800 text-[11px] font-bold tracking-wide">
+                          <Rocket size={13} className="text-blue-600" />
+                          <span>NEW JD ANNOUNCEMENT</span>
+                        </div>
+                        <div className="text-xs font-mono font-semibold text-blue-700 bg-blue-100/50 px-2.5 py-0.5 rounded-md border border-blue-200">
+                          {r.time || r.time_stamp || r.event_time || 'Active Opportunity'}
+                        </div>
+                      </div>
+
+                      <div className="mb-5">
+                        <h2 className="text-2xl sm:text-3xl font-black text-[#0a2540] tracking-tight">
+                          {r.company_name}
+                        </h2>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-4">
+                        <div className="p-3.5 bg-white border border-slate-200 rounded-xl shadow-xs">
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1">
+                            <Briefcase size={12} className="text-slate-400" />
+                            <span>Job Role / Designation</span>
+                          </div>
+                          <div className="text-base font-bold text-slate-900 leading-snug">
+                            {r.role || r.job_role || '—'}
+                          </div>
+                        </div>
+
+                        <div className="p-3.5 bg-blue-50/70 border-2 border-blue-300 rounded-xl shadow-xs">
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-blue-700 mb-1 flex items-center gap-1">
+                            <Zap size={12} className="text-blue-600" />
+                            <span>Offered Package (CTC)</span>
+                          </div>
+                          <div className="text-2xl font-black text-blue-700 tracking-tight">
+                            {r.ctc || '—'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50/90 border border-slate-200 rounded-xl p-3">
+                        <div className="flex items-center gap-2">
+                          <Building2 size={14} className="text-blue-700 shrink-0" />
+                          <span className="text-slate-600 font-medium">Target Colleges:</span>
+                          <span className="font-bold text-blue-800 bg-blue-100/80 px-2 py-0.5 rounded border border-blue-200 font-mono text-[11px]">
+                            {r.college_code || r.college_name || '—'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 justify-start sm:justify-end">
+                          <User size={14} className="text-slate-500 shrink-0" />
+                          <span className="text-slate-600 font-medium">Coordinator:</span>
+                          <span className="font-bold text-slate-800">
+                            {r.coordinator || 'Placement Team'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()
               ) : (
                 <table className="w-full text-[11px] border-collapse table-fixed bg-white">
                   <colgroup>
@@ -2634,8 +2760,8 @@ export function A4PdfPreviewModal({
             <div className="flex flex-col h-full min-h-0 bg-slate-100/50 dark:bg-slate-950/70 overflow-hidden">
               {/* Left Pane Scrollable Body */}
               <div className="flex-1 overflow-auto p-4 sm:p-6 flex flex-col items-center bg-slate-200/50 dark:bg-slate-950 no-scrollbar">
-                {/* Compact Zoom Controls directly above Image */}
-                <div className="flex items-center justify-center mb-3 shrink-0">
+                {/* Compact Zoom & Size Controls directly above Image */}
+                <div className="flex items-center justify-center gap-2 mb-3 shrink-0 flex-wrap">
                   <div className="flex items-center gap-1 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full px-2.5 py-1 shadow-sm">
                     <button
                       type="button"
@@ -2660,6 +2786,58 @@ export function A4PdfPreviewModal({
                       title="Zoom In Image (+)"
                     >
                       <ZoomIn size={12} />
+                    </button>
+                  </div>
+
+                  {/* Size Switcher Pills */}
+                  <div className="flex items-center gap-0.5 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full p-0.5 shadow-sm text-[10.5px]">
+                    <button
+                      type="button"
+                      onClick={() => setImageSize('auto')}
+                      className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
+                        imageSize === 'auto'
+                          ? 'bg-sky-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      }`}
+                      title="Smart auto-fit: Compact card for single company, A4 for multi-company"
+                    >
+                      ⚡ Auto
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImageSize('compact')}
+                      className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
+                        imageSize === 'compact'
+                          ? 'bg-sky-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      }`}
+                      title="WhatsApp / Mobile Card format"
+                    >
+                      📱 WhatsApp
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImageSize('a4')}
+                      className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
+                        imageSize === 'a4'
+                          ? 'bg-sky-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      }`}
+                      title="Standard full A4 document sheet"
+                    >
+                      📄 A4
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImageSize('square')}
+                      className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
+                        imageSize === 'square'
+                          ? 'bg-sky-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      }`}
+                      title="Square 1:1 format"
+                    >
+                      🔲 1:1
                     </button>
                   </div>
                 </div>
@@ -2709,8 +2887,8 @@ export function A4PdfPreviewModal({
           <div className="flex flex-col h-full min-h-0 bg-slate-100/50 dark:bg-slate-950 overflow-hidden">
             {/* Scrollable Viewport */}
             <div className="flex-1 overflow-auto p-4 sm:p-8 flex flex-col items-center bg-slate-200/50 dark:bg-slate-950 no-scrollbar">
-              {/* Compact Zoom Pill directly above Image */}
-              <div className="flex items-center justify-center mb-3 shrink-0">
+              {/* Compact Zoom & Size Controls directly above Image */}
+              <div className="flex items-center justify-center gap-2.5 mb-3 shrink-0 flex-wrap">
                 <div className="flex items-center gap-1.5 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full px-3 py-1 shadow-sm">
                   <button
                     type="button"
@@ -2735,6 +2913,58 @@ export function A4PdfPreviewModal({
                     title="Zoom In (+)"
                   >
                     <ZoomIn size={13} />
+                  </button>
+                </div>
+
+                {/* Size Switcher Pills */}
+                <div className="flex items-center gap-1 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full p-1 shadow-sm text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setImageSize('auto')}
+                    className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
+                      imageSize === 'auto'
+                        ? 'bg-sky-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                    }`}
+                    title="Smart auto-fit: Compact card for single company, A4 for multi-company"
+                  >
+                    ⚡ Auto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImageSize('compact')}
+                    className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
+                      imageSize === 'compact'
+                        ? 'bg-sky-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                    }`}
+                    title="Compact Mobile / WhatsApp Card format"
+                  >
+                    📱 WhatsApp Card
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImageSize('a4')}
+                    className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
+                      imageSize === 'a4'
+                        ? 'bg-sky-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                    }`}
+                    title="Standard full A4 document sheet"
+                  >
+                    📄 A4 Sheet
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImageSize('square')}
+                    className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
+                      imageSize === 'square'
+                        ? 'bg-sky-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                    }`}
+                    title="Square 1:1 format"
+                  >
+                    🔲 Square (1:1)
                   </button>
                 </div>
               </div>
