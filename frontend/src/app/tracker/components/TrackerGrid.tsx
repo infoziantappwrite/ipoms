@@ -3,10 +3,23 @@
 import { useState, useCallback, useEffect } from 'react';
 import { TrackerRow } from './TrackerRow';
 import type { TrackerRow as TrackerRowType } from '../page';
-import { ClipboardList, Copy, Check, CheckSquare, CopyPlus, Loader2, X } from 'lucide-react';
+import { ClipboardList, Copy, Check, CheckSquare, CopyPlus, Loader2, X, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 import { triggerHaptic } from '@/lib/haptics';
 import { formatTime } from '@/lib/timeValidation';
+
+const COLUMN_FIELDS = [
+  'start_time',
+  'end_time',
+  'duration',
+  'company_name',
+  'hr_name',
+  'mobile_number',
+  'email_id',
+  'outcome_status',
+  'follow_up_month',
+  'comments',
+];
 
 interface Props {
   rows: TrackerRowType[];
@@ -25,6 +38,12 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
   const [selectionTheme, setSelectionTheme] = useState<'blue' | 'emerald' | 'purple' | 'amber' | 'rose' | 'pink' | 'orange'>('blue');
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number | null>(null);
+
+  // ── Excel / Google Sheets-style Cell Selection & Drag Range
+  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
+  const [dragStartCell, setDragStartCell] = useState<{ rowIndex: number; colIndex: number; field: string } | null>(null);
+  const [isDraggingCells, setIsDraggingCells] = useState(false);
+
   const [copiedContact, setCopiedContact] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [copiedBoth, setCopiedBoth] = useState(false);
@@ -43,6 +62,156 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
       })
     );
   }, [selectedRowIds.size, isDeleteMode]);
+
+  // ── Cell Drag Range Selection (Excel / Google Sheets style)
+  const handleCellMouseDown = useCallback(
+    (rowId: string, rowIndex: number, field: string, e: React.MouseEvent) => {
+      if (isReadOnly) return;
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.tagName === 'BUTTON' ||
+        target.closest('button')
+      ) {
+        if (selectedCells.size > 0 && !selectedCells.has(`${rowId}:${field}`)) {
+          setSelectedCells(new Set());
+        }
+        return;
+      }
+
+      e.preventDefault();
+      triggerHaptic('light');
+      const colIdx = COLUMN_FIELDS.indexOf(field);
+      setIsDraggingCells(true);
+      setDragStartCell({ rowIndex, colIndex: colIdx !== -1 ? colIdx : 0, field });
+
+      if (e.shiftKey && dragStartCell) {
+        const rMin = Math.min(dragStartCell.rowIndex, rowIndex);
+        const rMax = Math.max(dragStartCell.rowIndex, rowIndex);
+        const cMin = Math.min(dragStartCell.colIndex, colIdx);
+        const cMax = Math.max(dragStartCell.colIndex, colIdx);
+
+        const newSet = new Set<string>();
+        for (let r = rMin; r <= rMax; r++) {
+          const rowObj = rows[r];
+          if (!rowObj) continue;
+          for (let c = cMin; c <= cMax; c++) {
+            const f = COLUMN_FIELDS[c];
+            if (f) newSet.add(`${rowObj._id}:${f}`);
+          }
+        }
+        setSelectedCells(newSet);
+      } else {
+        setSelectedCells(new Set([`${rowId}:${field}`]));
+      }
+    },
+    [isReadOnly, rows, dragStartCell, selectedCells]
+  );
+
+  const handleCellMouseEnter = useCallback(
+    (rowId: string, rowIndex: number, field: string) => {
+      if (!isDraggingCells || !dragStartCell || isReadOnly) return;
+
+      const colIdx = COLUMN_FIELDS.indexOf(field);
+      if (colIdx === -1) return;
+
+      const rMin = Math.min(dragStartCell.rowIndex, rowIndex);
+      const rMax = Math.max(dragStartCell.rowIndex, rowIndex);
+      const cMin = Math.min(dragStartCell.colIndex, colIdx);
+      const cMax = Math.max(dragStartCell.colIndex, colIdx);
+
+      const newSet = new Set<string>();
+      for (let r = rMin; r <= rMax; r++) {
+        const rowObj = rows[r];
+        if (!rowObj) continue;
+        for (let c = cMin; c <= cMax; c++) {
+          const f = COLUMN_FIELDS[c];
+          if (f) newSet.add(`${rowObj._id}:${f}`);
+        }
+      }
+      setSelectedCells(newSet);
+    },
+    [isDraggingCells, dragStartCell, isReadOnly, rows]
+  );
+
+  // Global mouseup to stop dragging
+  useEffect(() => {
+    const handleMouseUp = () => {
+      if (isDraggingCells) {
+        setIsDraggingCells(false);
+      }
+    };
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => window.removeEventListener('mouseup', handleMouseUp);
+  }, [isDraggingCells]);
+
+  // Clear / delete selected cells (like Excel / Google Sheets)
+  const handleClearSelectedCells = useCallback(async () => {
+    if (selectedCells.size === 0 || isReadOnly) return;
+
+    // Group cells by rowId
+    const rowPatches: Record<string, Partial<TrackerRowType>> = {};
+
+    selectedCells.forEach((cellKey) => {
+      const [rowId, field] = cellKey.split(':');
+      if (!rowId || !field) return;
+      if (!rowPatches[rowId]) rowPatches[rowId] = {};
+
+      switch (field) {
+        case 'start_time':
+          rowPatches[rowId].call_start_time = undefined;
+          rowPatches[rowId].duration_seconds = undefined;
+          rowPatches[rowId].duration_formatted = undefined;
+          break;
+        case 'end_time':
+          rowPatches[rowId].call_end_time = undefined;
+          rowPatches[rowId].duration_seconds = undefined;
+          rowPatches[rowId].duration_formatted = undefined;
+          break;
+        case 'duration':
+          rowPatches[rowId].duration_seconds = undefined;
+          rowPatches[rowId].duration_formatted = undefined;
+          break;
+        case 'company_name':
+          rowPatches[rowId].company_name = '';
+          break;
+        case 'hr_name':
+          rowPatches[rowId].hr_name = '';
+          break;
+        case 'mobile_number':
+          rowPatches[rowId].mobile_number = '';
+          break;
+        case 'email_id':
+          rowPatches[rowId].email_id = '';
+          break;
+        case 'outcome_status':
+          rowPatches[rowId].outcome_status = null as any;
+          break;
+        case 'follow_up_month':
+          rowPatches[rowId].follow_up_month = null as any;
+          break;
+        case 'comments':
+          rowPatches[rowId].comments = '';
+          break;
+      }
+    });
+
+    triggerHaptic('success');
+    const totalCells = selectedCells.size;
+    setSelectedCells(new Set());
+
+    try {
+      await Promise.all(
+        Object.entries(rowPatches).map(([rowId, patch]) => onRowUpdate(rowId, patch))
+      );
+      toast(`Cleared values from ${totalCells} cell${totalCells > 1 ? 's' : ''}`, 'success');
+    } catch (err) {
+      console.error('Failed to clear cells', err);
+      toast('Failed to clear selected cells', 'error');
+    }
+  }, [selectedCells, isReadOnly, onRowUpdate, toast]);
 
   const handleToggleSelectMode = useCallback(() => {
     triggerHaptic('selection');
@@ -254,7 +423,17 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
       const hr = (r.hr_name || '').replace(/[\t\n\r]+/g, ' ').trim();
       const contact = (r.mobile_number || '').trim();
       const email = (r.email_id || '').trim();
-      const coordinator = isReadOnly ? (r.coordinator_name || '').trim() : '';
+      const coordinator = isReadOnly
+        ? (() => {
+            const code = (r.college_code || '').toUpperCase();
+            if (['ACET', 'AIHT', 'KARPAGAM', 'KPR'].includes(code)) {
+              if (!r.coordinator_name || r.coordinator_name === 'Administrator') {
+                return 'A.Mohanaradha';
+              }
+            }
+            return (r.coordinator_name || '').trim();
+          })()
+        : '';
       const outcome = r.outcome_status ? (outcomeLabels[r.outcome_status] || r.outcome_status) : '';
       const followUp = (r.follow_up_month || '').trim();
       const comments = (r.comments || '').replace(/[\t\n\r]+/g, ' ').trim();
@@ -327,7 +506,17 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
       const hr = (r.hr_name || '').replace(/[\t\n\r]+/g, ' ').trim();
       const contact = (r.mobile_number || '').trim();
       const email = (r.email_id || '').trim();
-      const coordinator = isReadOnly ? (r.coordinator_name || '').trim() : '';
+      const coordinator = isReadOnly
+        ? (() => {
+            const code = (r.college_code || '').toUpperCase();
+            if (['ACET', 'AIHT', 'KARPAGAM', 'KPR'].includes(code)) {
+              if (!r.coordinator_name || r.coordinator_name === 'Administrator') {
+                return 'A.Mohanaradha';
+              }
+            }
+            return (r.coordinator_name || '').trim();
+          })()
+        : '';
       const outcome = r.outcome_status ? (outcomeLabels[r.outcome_status] || r.outcome_status) : '';
       const followUp = (r.follow_up_month || '').trim();
       const comments = (r.comments || '').replace(/[\t\n\r]+/g, ' ').trim();
@@ -489,7 +678,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
     toast,
   ]);
 
-  // ── Sheet-like Keyboard Shortcuts: Ctrl+A (Select All), Ctrl+C (Copy Rows), Escape (Clear) ──
+  // ── Sheet-like Keyboard Shortcuts: Ctrl+A (Select All), Ctrl+C (Copy Rows), Escape (Clear), Delete (Clear Cells) ──
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
@@ -502,8 +691,13 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
           activeEl.tagName === 'SELECT' ||
           activeEl.getAttribute('contenteditable') === 'true');
 
-      // 1. Escape: Clear Row Selection / Exit Delete Mode
+      // 1. Escape: Clear Cell Selection / Row Selection / Exit Delete Mode
       if (e.key === 'Escape') {
+        if (selectedCells.size > 0) {
+          e.preventDefault();
+          setSelectedCells(new Set());
+          return;
+        }
         if (selectedRowIds.size > 0 || isSelectMode || isDeleteMode) {
           e.preventDefault();
           handleClearSelection();
@@ -511,7 +705,16 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
         return;
       }
 
-      // 2. Ctrl+A / Cmd+A: Copy All Rows (when not focused in an input/textarea)
+      // 2. Delete / Backspace: Clear Selected Cell Values (when cells are selected and not typing in an input)
+      if ((e.key === 'Delete' || e.key === 'Backspace') && !isEditingInput) {
+        if (selectedCells.size > 0) {
+          e.preventDefault();
+          handleClearSelectedCells();
+          return;
+        }
+      }
+
+      // 3. Ctrl+A / Cmd+A: Copy All Rows (when not focused in an input/textarea)
       if (isCmdOrCtrl && (e.key === 'a' || e.key === 'A')) {
         if (!isEditingInput && rows.length > 0) {
           e.preventDefault();
@@ -520,7 +723,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
         return;
       }
 
-      // 3. Ctrl+C / Cmd+C: Copy Selected Rows (ONLY when rows are selected)
+      // 4. Ctrl+C / Cmd+C: Copy Selected Rows (ONLY when rows are selected)
       if (isCmdOrCtrl && (e.key === 'c' || e.key === 'C')) {
         const highlightedText = typeof window !== 'undefined' ? window.getSelection()?.toString() : '';
         // If the user has highlighted specific text with mouse in a cell or input, let browser native copy handle it
@@ -536,7 +739,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
         return;
       }
 
-      // 4. Shift+D / Shift+d: Delete Selected Rows (or Toggle Delete Mode)
+      // 5. Shift+D / Shift+d: Delete Selected Rows (or Toggle Delete Mode)
       if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'd' || e.key === 'D')) {
         if (!isEditingInput) {
           e.preventDefault();
@@ -552,22 +755,35 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [rows, selectedRowIds, isSelectMode, isDeleteMode, handleDeleteSelected, handleToggleDeleteMode, handleClearSelection, handleCopyAll, handleCopyEntireRow, toast]);
+  }, [
+    rows,
+    selectedRowIds,
+    selectedCells,
+    isSelectMode,
+    isDeleteMode,
+    handleDeleteSelected,
+    handleClearSelectedCells,
+    handleToggleDeleteMode,
+    handleClearSelection,
+    handleCopyAll,
+    handleCopyEntireRow,
+    toast,
+  ]);
 
   if (rows.length === 0) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200/80 shadow-xs flex items-center justify-center text-slate-400">
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 py-16 text-center animate-fadeIn">
+        <div className="w-14 h-14 rounded-2xl bg-surface-sunken border border-border shadow-xs flex items-center justify-center text-fg-subtle">
           <ClipboardList size={26} strokeWidth={1.75} className="text-primary" />
         </div>
         <div>
-          <p className="text-sm font-bold text-slate-800">
-            {isReadOnly ? 'No Calls Logged on this Date' : 'Daily Calling Register Ready'}
+          <p className="text-sm font-bold text-fg">
+            {isReadOnly ? 'No Calls Logged for this Date' : 'Daily Calling Register Ready'}
           </p>
-          <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+          <p className="text-xs text-fg-subtle mt-1 max-w-sm mx-auto">
             {isReadOnly
-              ? 'There are no call records for the selected date.'
-              : 'Click "Load Contacts" in the toolbar to populate your target company contacts for today.'}
+              ? 'There are no call records or scheduled calls for the selected date.'
+              : 'Click "Load Contacts" or "Paste from Excel" in the toolbar to populate your target company contacts for today.'}
           </p>
         </div>
       </div>
@@ -729,11 +945,46 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
                 onCall={onCall}
                 onToggleSelect={handleToggleSelectRow}
                 onCopySingle={isReadOnly ? handleCopySingleRowToWorkspace : undefined}
+                isCellSelected={(field) => selectedCells.has(`${row._id}:${field}`)}
+                onCellMouseDown={(field, e) => handleCellMouseDown(row._id, index, field, e)}
+                onCellMouseEnter={(field) => handleCellMouseEnter(row._id, index, field)}
               />
             ))}
           </div>
         </div>
       </div>
+
+      {/* Floating Action Indicator for Selected Cells (Excel / Google Sheets style delete) */}
+      {!isReadOnly && selectedCells.size > 0 && (
+        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-40 bg-white/95 dark:bg-[#161D2E]/95 backdrop-blur-md border border-blue-500/40 dark:border-sky-400/40 shadow-2xl rounded-2xl px-4 py-2 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center gap-2 pr-2 border-r border-border">
+            <span className="w-5 h-5 rounded-full bg-blue-600 dark:bg-sky-500 text-white text-[11px] font-bold flex items-center justify-center shadow-xs">
+              {selectedCells.size}
+            </span>
+            <span className="text-xs font-semibold text-fg whitespace-nowrap">
+              Cell{selectedCells.size > 1 ? 's' : ''} Selected
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleClearSelectedCells}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+            title="Press Delete on keyboard or click to clear values from selected cells"
+          >
+            <Trash2 size={12} /> Clear Values (Del)
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedCells(new Set())}
+            className="p-1 rounded-lg text-fg-subtle hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+            title="Deselect cells (Esc)"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Floating Action Toolbar in History Mode when rows are selected */}
       {isReadOnly && selectedRowIds.size > 0 && (
@@ -743,7 +994,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
               {selectedRowIds.size}
             </span>
             <span className="text-xs font-semibold text-fg whitespace-nowrap">
-              {selectedRowIds.size} Row{selectedRowIds.size > 1 ? 's' : ''} Selected
+              Row{selectedRowIds.size > 1 ? 's' : ''} Selected
             </span>
           </div>
 

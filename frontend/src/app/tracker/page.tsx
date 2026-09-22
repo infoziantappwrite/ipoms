@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { CollegeSelector, College } from './components/CollegeSelector';
+import type { CoordinatorItem } from './components/CoordinatorSelector';
 import { ContactPickerModal } from './components/ContactPickerModal';
 import { TrackerGrid } from './components/TrackerGrid';
 import { CalendarPicker } from './components/CalendarPicker';
@@ -9,15 +10,17 @@ import { SoftphonePanel, SoftphoneCallResult } from './components/SoftphonePanel
 import { SmoothOutcomeDropdown } from '@/components/ui/SmoothOutcomeDropdown';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { AutoSaveBadge } from '@/components/ui/AutoSaveBadge';
-import { AlertTriangle, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Cloud, Loader2, PhoneCall, Plus, Save, Search, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Cloud, FileSpreadsheet, Loader2, PhoneCall, Plus, Save, Search, Trash2, Upload, User, Users } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { readSessionUser } from '@/lib/session';
+import { readSessionUser, roleOf } from '@/lib/session';
+import { getCoordinatorSelectedColleges } from '@/lib/collegeSession';
 import { ManualAddRowModal } from './components/ManualAddRowModal';
 import { EditTrackerRowModal } from './components/EditTrackerRowModal';
 import { BulkDeleteTrackerModal } from './components/BulkDeleteTrackerModal';
 import { DeleteRowConfirmModal } from './components/DeleteRowConfirmModal';
 import { TrackerActionsDropdown } from './components/TrackerActionsDropdown';
 import { DailySummaryModal } from './components/DailySummaryModal';
+import { ExcelPasteModal } from './components/ExcelPasteModal';
 import { CollegeDossierModal } from '@/components/college/CollegeDossierModal';
 import { useToast } from '@/components/ui/Toast';
 import { triggerHaptic } from '@/lib/haptics';
@@ -58,6 +61,8 @@ export interface TrackerRow {
   last_saved_at?: string;
   /** Only present in history mode — whose call this was, now that history spans every coordinator. */
   coordinator_name?: string;
+  college_code?: string;
+  college_name?: string;
 }
 
 export interface KpiData {
@@ -85,6 +90,21 @@ export default function DailyTrackerPage() {
   const [selectedCollegeId, setSelectedCollegeId] = useState<string>('');
   const [selectedCollegeName, setSelectedCollegeName] = useState<string>('');
   const [selectedCollegeObj, setSelectedCollegeObj] = useState<College | null>(null);
+  const [userRole, setUserRole] = useState<string>('');
+  const [viewingCoordinatorId, setViewingCoordinatorId] = useState<string>('');
+  const [viewingCoordinatorName, setViewingCoordinatorName] = useState<string>('');
+  const [viewingCoordinatorFocusColleges, setViewingCoordinatorFocusColleges] = useState<College[]>([]);
+  const [allCoordinators, setAllCoordinators] = useState<CoordinatorItem[]>([]);
+
+  useEffect(() => {
+    apiFetch('/coordinators')
+      .then((res) => {
+        if (res.success && Array.isArray((res.data as any)?.coordinators)) {
+          setAllCoordinators((res.data as any).coordinators);
+        }
+      })
+      .catch((e) => console.error('[DailyTracker] Failed to load coordinators', e));
+  }, []);
   const [rows, setRows] = useState<TrackerRow[]>([]);
   const [kpi, setKpi] = useState<KpiData | null>(null);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -107,7 +127,11 @@ export default function DailyTrackerPage() {
   const [isDeleteMode, setIsDeleteMode] = useState<boolean>(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState<boolean>(false);
   const [isDossierOpen, setIsDossierOpen] = useState<boolean>(false);
+  const [isPasteModalOpen, setIsPasteModalOpen] = useState<boolean>(false);
+  const [pasteInitialText, setPasteInitialText] = useState<string>('');
   const { toast } = useToast();
+
+  const isSupervisorUser = ['team_leader', 'admin', 'administrator'].includes(userRole.toLowerCase());
 
   // ── Global Undo / Redo Hook ──
   const { pushAction, undo, redo, canUndo, canRedo } = useUndoRedo({
@@ -144,7 +168,11 @@ export default function DailyTrackerPage() {
   useEffect(() => {
     const user = readSessionUser();
     const cId = user?._id ?? '';
+    const uRole = roleOf(user);
     setCoordinatorId(cId);
+    setUserRole(uRole);
+    setViewingCoordinatorId(cId);
+    setViewingCoordinatorName(user?.full_name || 'My Calling Sheet');
 
     resolveDefaultCollege().then((col) => {
       if (col.id) {
@@ -154,6 +182,9 @@ export default function DailyTrackerPage() {
       }
     });
   }, []);
+
+  const isViewingOtherUser = Boolean(viewingCoordinatorId && viewingCoordinatorId !== coordinatorId);
+  const isEffectiveReadOnly = isHistoryMode || isViewingOtherUser;
 
   // ── Derive today's title (e.g. "August Tracker 2026")
   const today = new Date();
@@ -166,39 +197,51 @@ export default function DailyTrackerPage() {
 
   // ── Load today's tracker rows
   const loadTodayRows = useCallback(async () => {
-    if (!selectedCollegeId || !coordinatorId) return;
+    if (!selectedCollegeId) return;
+    const activeCoord = viewingCoordinatorId || coordinatorId;
+    if (!activeCoord) return;
     try {
-      const res = await apiFetch(`/daily-tracker/today?coordinator_id=${coordinatorId}&college_id=${selectedCollegeId}`);
+      const res = await apiFetch(`/daily-tracker/today?coordinator_id=${activeCoord}&college_id=${selectedCollegeId}`);
       if (res.success) {
-        setRows((res.data as any).rows);
+        setRows((res.data as any).rows || []);
         setSessionDate((res.data as any).session_date);
       }
     } catch (e) { console.error('[DT] Load today failed', e); }
-  }, [selectedCollegeId, coordinatorId]);
+  }, [selectedCollegeId, coordinatorId, viewingCoordinatorId]);
 
   // ── Load KPI counts
   const loadKpi = useCallback(async () => {
-    if (!selectedCollegeId || !coordinatorId) return;
+    if (!selectedCollegeId) return;
+    const activeCoord = viewingCoordinatorId || coordinatorId;
+    if (!activeCoord) return;
     try {
-      const res = await apiFetch(`/daily-tracker/kpi?coordinator_id=${coordinatorId}&college_id=${selectedCollegeId}`);
+      const res = await apiFetch(`/daily-tracker/kpi?coordinator_id=${activeCoord}&college_id=${selectedCollegeId}`);
       if (res.success) setKpi((res.data as any).kpi);
     } catch (e) { console.error('[KPI] Load failed', e); }
-  }, [selectedCollegeId, coordinatorId]);
+  }, [selectedCollegeId, coordinatorId, viewingCoordinatorId]);
 
-  // ── Load both on college change or refresh
+  // ── Sync official coordinator allocations in background on initial load
+  useEffect(() => {
+    apiFetch('/daily-tracker/sync-coordinators').catch(() => {});
+  }, []);
+
+  // ── Load both on college or coordinator change or refresh
   useEffect(() => {
     if (selectedCollegeId) {
       loadTodayRows();
       loadKpi();
     }
-  }, [selectedCollegeId, loadTodayRows, loadKpi]);
+  }, [selectedCollegeId, viewingCoordinatorId, loadTodayRows, loadKpi]);
 
-  // ── Auto-refresh KPI every 30 seconds (live update)
+  // ── Auto-refresh live tracker rows & KPI counts every 8 seconds (real-time live monitoring)
   useEffect(() => {
     if (!selectedCollegeId) return;
-    const interval = setInterval(loadKpi, 30000);
+    const interval = setInterval(() => {
+      loadTodayRows();
+      loadKpi();
+    }, 8000);
     return () => clearInterval(interval);
-  }, [selectedCollegeId, loadKpi]);
+  }, [selectedCollegeId, loadTodayRows, loadKpi]);
 
   // ── Handle contact picker load (Debounced to prevent multiple parallel triggers)
   const lastSyncRef = useRef<{ time: number; ids: string }>({ time: 0, ids: '' });
@@ -457,7 +500,50 @@ export default function DailyTrackerPage() {
     }
   }, [selectedCollegeId, coordinatorId, rows, toast, broadcastTrackerMutation]);
 
-  // ── Keyboard shortcuts (Ctrl+S to save, Shift+S for summary pop-up, Shift+H for history, Shift+A for manual entry, Escape to close/exit)
+  // ── Import rows pasted from Excel / Google Sheets
+  const handleImportFromExcel = useCallback(
+    async (incomingRows: Array<{ company_name: string; hr_name: string; mobile_number: string; email_id: string; comments?: string }>) => {
+      if (!selectedCollegeId || selectedCollegeId === 'all' || !coordinatorId) {
+        toast('Please select a specific college first', 'warning');
+        return { success: false, error: 'Please select a specific college first' };
+      }
+
+      try {
+        const res = await apiFetch<any>('/daily-tracker/bulk-paste', {
+          method: 'POST',
+          body: JSON.stringify({
+            coordinator_id: coordinatorId,
+            college_id: selectedCollegeId,
+            rows: incomingRows,
+          }),
+        });
+
+        if (res.success) {
+          await loadTodayRows();
+          await loadKpi();
+          broadcastTrackerMutation();
+          const data = res.data as any;
+          toast(
+            `Successfully imported ${data?.created_count || incomingRows.length} company records into Daily Tracker${
+              data?.new_metadata_count > 0 ? ` (${data.new_metadata_count} new saved to Metadata Base)` : ''
+            }`,
+            'success'
+          );
+          return res;
+        } else {
+          toast(res.error?.message || 'Failed to import records from Excel', 'error');
+          return res;
+        }
+      } catch (e: any) {
+        console.error('Import from Excel failed', e);
+        toast('Error importing records from Excel', 'error');
+        return { success: false, error: e.message || 'Error importing records' };
+      }
+    },
+    [selectedCollegeId, coordinatorId, loadTodayRows, loadKpi, broadcastTrackerMutation, toast]
+  );
+
+  // ── Keyboard shortcuts (Ctrl+S to save, Ctrl+V to paste from Excel, Shift+S for summary, Shift+H for history, Shift+A for manual entry, Escape to close/exit)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const targetTag = (e.target as HTMLElement)?.tagName;
@@ -505,7 +591,30 @@ export default function DailyTrackerPage() {
       if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
         handleSaveProgress();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V') && !isInput) {
+        if (!isEffectiveReadOnly && selectedCollegeId && selectedCollegeId !== 'all') {
+          e.preventDefault();
+          if (navigator.clipboard && navigator.clipboard.readText) {
+            navigator.clipboard
+              .readText()
+              .then((text) => {
+                setPasteInitialText(text || '');
+                setIsPasteModalOpen(true);
+              })
+              .catch(() => {
+                setPasteInitialText('');
+                setIsPasteModalOpen(true);
+              });
+          } else {
+            setPasteInitialText('');
+            setIsPasteModalOpen(true);
+          }
+        }
       } else if (e.key === 'Escape') {
+        if (isPasteModalOpen) {
+          setIsPasteModalOpen(false);
+          return;
+        }
         if (isPickerOpen) {
           return;
         }
@@ -527,7 +636,8 @@ export default function DailyTrackerPage() {
           !isCalendarOpen &&
           !isManualAddOpen &&
           !editingRow &&
-          !isBulkDeleteOpen
+          !isBulkDeleteOpen &&
+          !isPasteModalOpen
         ) {
           setIsHistoryMode(false);
         }
@@ -535,7 +645,19 @@ export default function DailyTrackerPage() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleSaveProgress, isPickerOpen, isSummaryOpen, isCalendarOpen, isManualAddOpen, isHistoryMode, editingRow, isBulkDeleteOpen, selectedCollegeId]);
+  }, [
+    handleSaveProgress,
+    isPickerOpen,
+    isSummaryOpen,
+    isCalendarOpen,
+    isManualAddOpen,
+    isHistoryMode,
+    editingRow,
+    isBulkDeleteOpen,
+    isPasteModalOpen,
+    isEffectiveReadOnly,
+    selectedCollegeId,
+  ]);
 
   // ── Bulk Delete Tracker Data
   const handleBulkDelete = useCallback(async (scope: 'today' | 'college_all' | 'entire_database') => {
@@ -576,18 +698,17 @@ export default function DailyTrackerPage() {
   // ── Load history view
   // Deliberately organization-wide, not scoped to the signed-in coordinator:
   // any Coordinator, Team Leader, or Administrator can review any college's
-  // past daily-tracker calls (user decision, 6 Sep 2026) — history is a shared
-  // record, unlike the live "Today" workspace which stays per-coordinator.
+  // past or upcoming daily-tracker records in read-only mode.
   const handleViewHistory = useCallback(async (date: string, collegeIdOverride?: string) => {
     setIsCalendarOpen(false);
     setHistoryDate(date);
+    setIsHistoryMode(true);
     try {
       const collegeId = collegeIdOverride ?? selectedCollegeId;
-      const collegeParam = collegeId ? `&college_id=${collegeId}` : '';
+      const collegeParam = collegeId && collegeId !== 'all' ? `&college_id=${collegeId}` : '';
       const res = await apiFetch(`/daily-tracker/history?date=${date}${collegeParam}`);
       if (res.success) {
-        setHistoryRows((res.data as any).rows);
-        setIsHistoryMode(true);
+        setHistoryRows((res.data as any).rows || []);
       }
     } catch (e) { console.error('[DT] History load failed', e); }
   }, [selectedCollegeId]);
@@ -693,6 +814,8 @@ export default function DailyTrackerPage() {
         weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
       })
     : '';
+  const todayDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const isUpcomingDate = Boolean(historyDate && historyDate > todayDateStr);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -711,18 +834,36 @@ export default function DailyTrackerPage() {
               <h1 className="text-base font-bold text-fg tracking-tight">
                 Daily Tracker
               </h1>
-              <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full font-semibold">
-                {isHistoryMode ? 'History Archive' : `${monthName} ${yearStr}`}
+              <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
+                isHistoryMode
+                  ? isUpcomingDate
+                    ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-400/30'
+                    : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-400/30'
+                  : isViewingOtherUser
+                  ? 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-400/30'
+                  : 'bg-primary/10 text-primary border border-primary/20'
+              }`}>
+                {isHistoryMode ? (isUpcomingDate ? 'Upcoming Schedule' : 'History Archive') : isViewingOtherUser ? `${viewingCoordinatorName}` : `${monthName} ${yearStr}`}
               </span>
-              {isHistoryMode && (
-                <span className="text-micro bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 px-2.5 py-0.5 rounded-full font-bold">
-                  Read-Only
+              {(isHistoryMode || isViewingOtherUser) && (
+                <span className={`text-micro px-2.5 py-0.5 rounded-full font-bold border ${
+                  isHistoryMode && isUpcomingDate
+                    ? 'bg-sky-50 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border-sky-300 dark:border-sky-700/60'
+                    : 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700/60'
+                }`}>
+                  {isHistoryMode && isUpcomingDate ? 'Upcoming · Read-Only' : isViewingOtherUser && !isHistoryMode ? 'Viewing User · Read-Only' : 'Read-Only'}
                 </span>
               )}
             </div>
             <p className="text-xs text-fg-subtle mt-0.5">
               {isHistoryMode
-                ? `Viewing archived records for ${historyDisplayDate}`
+                ? isUpcomingDate
+                  ? `Viewing upcoming schedule for ${historyDisplayDate} • Read-Only Mode`
+                  : `Viewing archived records for ${historyDisplayDate} • Read-Only Mode`
+                : isViewingOtherUser
+                ? `Viewing ${viewingCoordinatorName}'s calling sheet for ${sessionDate ? new Date(sessionDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : todayDisplay} • Read-Only Mode`
+                : selectedCollegeId === 'all'
+                ? `Active Session: All Partner Colleges (${sessionDate ? new Date(sessionDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : todayDisplay}) • Auto-resets at 6:00 AM IST`
                 : `Active Session: ${sessionDate ? new Date(sessionDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : todayDisplay} • Auto-resets at 6:00 AM IST`}
             </p>
           </div>
@@ -762,7 +903,7 @@ export default function DailyTrackerPage() {
             )}
 
             <div className="flex items-center gap-2 shrink-0">
-              {!isHistoryMode && <AutoSaveBadge status={saveStatus} lastSavedAt={lastSavedAt} />}
+              {!isEffectiveReadOnly && <AutoSaveBadge status={saveStatus} lastSavedAt={lastSavedAt} />}
               <UserSignOutButton />
             </div>
           </div>
@@ -785,33 +926,82 @@ export default function DailyTrackerPage() {
           </div>
         )}
 
-        {/* ── Sub-bar: Unified Controls Row (College Selector + Actions + Filter + Search) ── */}
+        {/* ── Sub-bar: Unified Controls Row (College Selector + Coordinator Selector + Actions + Filter + Search) ── */}
         <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t border-border/80 relative z-30">
           <div className="flex items-center gap-2.5 flex-wrap">
             <CollegeSelector
               selectedCollegeId={selectedCollegeId}
+              allowAll={viewingCoordinatorId === 'all'}
+              allLabel="All Partner Colleges"
               onSelect={(id, name) => {
                 setSelectedCollegeId(id);
                 setSelectedCollegeName(name);
-                setIsHistoryMode(false);
-                try {
-                  localStorage.setItem('ipoms_daily_tracker_college_id', id);
-                  localStorage.setItem('ipoms_daily_tracker_college_name', name);
-                } catch (e) {}
               }}
               onSelectCollege={(col) => {
+                if (!col) return;
+                setSelectedCollegeId(col._id);
+                setSelectedCollegeName(col.college_name);
                 setSelectedCollegeObj(col);
-                try {
-                  if (col) {
+
+                // If currently viewing history archive, stay in history mode and load that date's calls for the new college
+                if (isHistoryMode && historyDate) {
+                  handleViewHistory(historyDate, col._id);
+                  return;
+                }
+
+                // Check if selected college belongs to logged-in user's focus
+                const myFocus = getCoordinatorSelectedColleges();
+                const myFocusSet = new Set(myFocus.map((s) => String(s).toLowerCase().trim()));
+                const isMyFocus =
+                  myFocusSet.has(String(col._id).toLowerCase().trim()) ||
+                  (col.college_code && myFocusSet.has(String(col.college_code).toLowerCase().trim())) ||
+                  (col.college_code && myFocusSet.has(`col_${col.college_code.toLowerCase().trim()}`));
+
+                if (isMyFocus || !coordinatorId) {
+                  // Switch to self / Edit Mode
+                  setViewingCoordinatorId(coordinatorId);
+                  setViewingCoordinatorName('My Calling Sheet');
+                  setViewingCoordinatorFocusColleges([]);
+                  try {
+                    localStorage.setItem('ipoms_daily_tracker_college_id', col._id);
+                    localStorage.setItem('ipoms_daily_tracker_college_name', col.college_name);
                     localStorage.setItem('ipoms_daily_tracker_college_obj', JSON.stringify(col));
+                  } catch (e) {}
+                } else {
+                  // College is outside user focus -> Automatically find assigned coordinator and open in READ-ONLY mode
+                  const targetCode = (col.college_code || '').toUpperCase().trim();
+                  const targetId = String(col._id).toLowerCase().trim();
+
+                  const matchedCoord = allCoordinators.find((coord) => {
+                    if (coord._id === coordinatorId) return false;
+                    return (
+                      coord.focus_colleges?.some(
+                        (fc) =>
+                          fc.college_code?.toUpperCase() === targetCode ||
+                          String(fc._id).toLowerCase() === targetId
+                      ) ||
+                      coord.focus_college_ids?.some(
+                        (fcId) =>
+                          String(fcId).toLowerCase() === targetId ||
+                          String(fcId).toUpperCase() === targetCode
+                      )
+                    );
+                  });
+
+                  if (matchedCoord) {
+                    setViewingCoordinatorId(matchedCoord._id);
+                    setViewingCoordinatorName(matchedCoord.full_name);
+                    setViewingCoordinatorFocusColleges(matchedCoord.focus_colleges || []);
                   } else {
-                    localStorage.removeItem('ipoms_daily_tracker_college_obj');
+                    setViewingCoordinatorId('read_only');
+                    setViewingCoordinatorName('Read-Only View');
+                    setViewingCoordinatorFocusColleges([col]);
                   }
-                } catch (e) {}
+                }
               }}
             />
 
-            {selectedCollegeId && (
+            {selectedCollegeId && selectedCollegeId !== 'all' && (
               <button
                 type="button"
                 onClick={() => setIsDossierOpen(true)}
@@ -829,6 +1019,29 @@ export default function DailyTrackerPage() {
 
             {!isHistoryMode ? (
               <>
+                {/* Back to My Sheet button if viewing another user in today session */}
+                {isViewingOtherUser && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('selection');
+                      setViewingCoordinatorId(coordinatorId);
+                      setViewingCoordinatorName('My Calling Sheet');
+                      setViewingCoordinatorFocusColleges([]);
+                      resolveDefaultCollege().then((col) => {
+                        if (col.id) {
+                          setSelectedCollegeId(col.id);
+                          setSelectedCollegeName(col.name);
+                          if (col.obj) setSelectedCollegeObj(col.obj);
+                        }
+                      });
+                    }}
+                    className="flex items-center gap-1.5 bg-primary hover:bg-blue-700 text-primary-foreground px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
+                  >
+                    Back to My Sheet
+                  </button>
+                )}
+
                 {/* Filter by outcome (Smooth UI Dropdown) */}
                 <SmoothOutcomeDropdown
                   value={outcomeFilter}
@@ -861,13 +1074,17 @@ export default function DailyTrackerPage() {
                   Back to Today
                 </button>
 
-                {/* History Date Badge */}
+                {/* History / Upcoming Date Badge */}
                 <button
                   type="button"
                   onClick={() => setIsCalendarOpen(true)}
-                  className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer shrink-0"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold shadow-xs transition-colors cursor-pointer shrink-0 border ${
+                    isUpcomingDate
+                      ? 'bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/60 dark:hover:bg-sky-900/60 text-sky-900 dark:text-sky-300 border-sky-300 dark:border-sky-700/60'
+                      : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300'
+                  }`}
                 >
-                  <CalendarDays size={14} strokeWidth={2} aria-hidden /> {historyDate}
+                  <CalendarDays size={14} strokeWidth={2} aria-hidden /> {historyDate} {isUpcomingDate ? '(Upcoming)' : ''}
                 </button>
 
                 {/* Divider */}
@@ -883,7 +1100,7 @@ export default function DailyTrackerPage() {
                 <div className="w-48 sm:w-56 shrink-0">
                   <input
                     type="text"
-                    placeholder="Search history records…"
+                    placeholder="Search records…"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 text-fg text-xs px-3.5 py-1.5 rounded-xl outline-none placeholder:text-fg-disabled shadow-xs"
@@ -893,9 +1110,42 @@ export default function DailyTrackerPage() {
             )}
           </div>
 
-          {/* ── Right Top Corner: Delete Bin Button & 3 Vertical Dots (Actions Menu) ── */}
-          {!isHistoryMode && (
+          {/* ── Right Top Corner: Paste from Excel, Delete Bin Button & 3 Vertical Dots (Actions Menu) ── */}
+          {!isEffectiveReadOnly && (
             <div className="ml-auto shrink-0 flex items-center gap-2">
+              {/* Dedicated Paste from Excel Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic('light');
+                  if (!selectedCollegeId || selectedCollegeId === 'all') {
+                    alert('Please select a specific college first to paste contacts.');
+                    return;
+                  }
+                  if (navigator.clipboard && navigator.clipboard.readText) {
+                    navigator.clipboard
+                      .readText()
+                      .then((text) => {
+                        setPasteInitialText(text || '');
+                        setIsPasteModalOpen(true);
+                      })
+                      .catch(() => {
+                        setPasteInitialText('');
+                        setIsPasteModalOpen(true);
+                      });
+                  } else {
+                    setPasteInitialText('');
+                    setIsPasteModalOpen(true);
+                  }
+                }}
+                disabled={!selectedCollegeId || selectedCollegeId === 'all'}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-[0.98] shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Paste bulk contacts from Excel / Google Sheets (Ctrl+V)"
+              >
+                <FileSpreadsheet size={13} strokeWidth={2.2} />
+                <span>Paste</span>
+              </button>
+
               {/* Standalone Red Dustbin / Trash Icon Button */}
               <button
                 type="button"
@@ -941,14 +1191,28 @@ export default function DailyTrackerPage() {
                 rows={rows}
                 onFilterOutcome={setOutcomeFilter}
                 onLoadContacts={() => {
-                  if (!selectedCollegeId) {
-                    alert('Please select a college first');
+                  if (!selectedCollegeId || selectedCollegeId === 'all') {
+                    alert('Please select a specific college first to load contacts.');
                     return;
                   }
                   setIsPickerOpen(true);
                 }}
+                onPasteFromExcel={() => {
+                  if (!selectedCollegeId || selectedCollegeId === 'all') {
+                    alert('Please select a specific college first to paste contacts.');
+                    return;
+                  }
+                  setPasteInitialText('');
+                  setIsPasteModalOpen(true);
+                }}
                 onSaveProgress={handleSaveProgress}
-                onAddManualRow={() => setIsManualAddOpen(true)}
+                onAddManualRow={() => {
+                  if (!selectedCollegeId || selectedCollegeId === 'all') {
+                    alert('Please select a specific college first to add a manual entry.');
+                    return;
+                  }
+                  setIsManualAddOpen(true);
+                }}
                 onOpenHistory={() => setIsCalendarOpen(true)}
                 onCopyAll={() => {
                   window.dispatchEvent(new CustomEvent('ipoms_tracker_copy_all'));
@@ -980,7 +1244,7 @@ export default function DailyTrackerPage() {
         <div className="flex-1 overflow-hidden flex flex-col px-6 pt-5 pb-4 min-h-0">
           <TrackerGrid
             rows={displayRows}
-            isReadOnly={isHistoryMode}
+            isReadOnly={isEffectiveReadOnly}
             onRowUpdate={handleRowUpdate}
             onEdit={(row) => setEditingRow(row)}
             onDelete={handleDeleteRow}
@@ -1001,7 +1265,8 @@ export default function DailyTrackerPage() {
 
       {isCalendarOpen && (
         <CalendarPicker
-          coordinatorId={coordinatorId}
+          coordinatorId={viewingCoordinatorId || coordinatorId}
+          collegeId={selectedCollegeId}
           onClose={() => setIsCalendarOpen(false)}
           onSelectDate={handleViewHistory}
         />
@@ -1074,6 +1339,15 @@ export default function DailyTrackerPage() {
         row={activeCallRow}
         onSave={handleSoftphoneSave}
         onClose={() => setActiveCallRow(null)}
+      />
+
+      {/* ── Excel / Sheets Bulk Paste Modal (Ctrl+V) ──────────────────────── */}
+      <ExcelPasteModal
+        isOpen={isPasteModalOpen}
+        onClose={() => setIsPasteModalOpen(false)}
+        onImport={handleImportFromExcel}
+        collegeName={selectedCollegeObj?.college_code || selectedCollegeName}
+        initialText={pasteInitialText}
       />
 
       {/* ── College Profile / Placement Officer Dossier Modal ──────────── */}

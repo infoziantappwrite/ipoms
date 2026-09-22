@@ -5,7 +5,8 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 interface Props {
-  coordinatorId: string;
+  coordinatorId?: string;
+  collegeId?: string;
   onClose: () => void;
   onSelectDate: (date: string) => void;
 }
@@ -15,7 +16,7 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) {
+export function CalendarPicker({ coordinatorId, collegeId, onClose, onSelectDate }: Props) {
   const today = new Date();
   const todayYear = today.getFullYear();
   const todayMonth = today.getMonth() + 1;
@@ -31,7 +32,14 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
     let isMounted = true;
     setLoadingDots(true);
 
-    apiFetch(`/tracker/active-days?coordinator_id=${coordinatorId}&year=${viewYear}&month=${viewMonth}`)
+    const params = new URLSearchParams({
+      year: String(viewYear),
+      month: String(viewMonth),
+    });
+    if (coordinatorId) params.append('coordinator_id', coordinatorId);
+    if (collegeId) params.append('college_id', collegeId);
+
+    apiFetch(`/tracker/active-days?${params.toString()}`)
       .then((data) => {
         if (isMounted && data.success && Array.isArray((data.data as any)?.days)) {
           setActiveDays(new Set((data.data as any).days));
@@ -47,7 +55,7 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
     return () => {
       isMounted = false;
     };
-  }, [coordinatorId, viewYear, viewMonth]);
+  }, [coordinatorId, collegeId, viewYear, viewMonth]);
 
   // Close on Escape key
   useEffect(() => {
@@ -151,28 +159,34 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
             return (
               <button
                 key={day}
-                onClick={() => !isFuture && handleDayClick(day)}
-                disabled={isFuture}
+                onClick={() => handleDayClick(day)}
                 className={`
-                  relative h-9 flex flex-col items-center justify-center rounded-xl text-xs transition-colors
+                  relative h-9 flex flex-col items-center justify-center rounded-xl text-xs transition-colors cursor-pointer
                   ${
-                    isFuture
-                      ? 'text-fg-disabled cursor-not-allowed font-normal'
-                      : 'cursor-pointer hover:bg-surface-raised hover:text-primary font-medium'
+                    isToday
+                      ? 'bg-primary text-primary-foreground font-bold shadow-xs hover:bg-primary-hover hover:text-primary-foreground'
+                      : isFuture
+                      ? 'text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 font-medium'
+                      : hasActivity
+                      ? 'text-fg font-bold hover:bg-surface-raised hover:text-primary'
+                      : 'text-fg-muted hover:bg-surface-raised hover:text-primary font-medium'
                   }
-                  ${isToday ? 'bg-primary text-primary-foreground font-bold shadow-xs hover:bg-primary-hover hover:text-primary-foreground' : ''}
-                  ${hasActivity && !isToday ? 'text-fg font-bold' : ''}
-                  ${!hasActivity && !isToday && !isFuture ? 'text-fg-muted' : ''}
                 `}
+                title={
+                  isToday
+                    ? 'Today (Live Session)'
+                    : isFuture
+                    ? `Upcoming date (${day} ${MONTHS[viewMonth - 1]} ${viewYear}) - Click to view in Read-Only Mode`
+                    : `Past date (${day} ${MONTHS[viewMonth - 1]} ${viewYear}) - Click to view archived tracker`
+                }
               >
                 <span>{day}</span>
                 {/* Activity Dot */}
-                {hasActivity && (
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full mt-0.5 ${
-                      isToday ? 'bg-white' : 'bg-primary'
-                    }`}
-                  />
+                {hasActivity && !isToday && (
+                  <span className="w-1.5 h-1.5 rounded-full mt-0.5 bg-primary" />
+                )}
+                {isFuture && (
+                  <span className="w-1 h-1 rounded-full mt-0.5 bg-sky-400/70" />
                 )}
               </button>
             );
@@ -180,8 +194,8 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
         </div>
 
         {/* ── Legend & Footer ────────────────────────────────── */}
-        <div className="flex items-center justify-start px-5 py-3 border-t border-border bg-surface-sunken text-xs">
-          <div className="flex items-center gap-3 text-fg-muted font-medium">
+        <div className="flex items-center justify-between px-5 py-3 border-t border-border bg-surface-sunken text-xs">
+          <div className="flex items-center gap-3 text-fg-muted font-medium flex-wrap">
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-primary" />
               <span className="text-micro">Has calls</span>
@@ -191,6 +205,10 @@ export function CalendarPicker({ coordinatorId, onClose, onSelectDate }: Props) 
                 T
               </span>
               <span className="text-micro">Today</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+              <span className="text-micro">Upcoming</span>
             </div>
           </div>
         </div>

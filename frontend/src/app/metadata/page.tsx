@@ -41,6 +41,7 @@ export default function MetadataPage() {
   const [showBulkPasteModal, setShowBulkPasteModal] = useState<boolean>(false);
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [returnTo, setReturnTo] = useState<string | null>(null);
+  const [highlightIds, setHighlightIds] = useState<string[]>([]);
 
   // Check for auto-open query parameters (e.g. from Daily Tracker or Weekly Tracker)
   useEffect(() => {
@@ -53,9 +54,25 @@ export default function MetadataPage() {
       const emailParam = params.get('primary_email') || params.get('email');
       const typeParam = params.get('company_type') || params.get('type');
       const returnToParam = params.get('return_to') || params.get('returnUrl');
+      const highlightParam = params.get('highlight');
+      const recentParam = params.get('recent');
+      const searchParam = params.get('q') || params.get('search');
 
       if (returnToParam) {
         setReturnTo(returnToParam);
+      }
+
+      if (highlightParam) {
+        const ids = highlightParam.split(',').map((s) => s.trim()).filter(Boolean);
+        setHighlightIds(ids);
+      }
+
+      if (recentParam === 'true') {
+        setIsRecent(true);
+      }
+
+      if (searchParam && !companyNameParam) {
+        setSearchQuery(searchParam);
       }
 
       if (isAdd || companyNameParam || mobileParam || emailParam || typeParam) {
@@ -453,6 +470,25 @@ export default function MetadataPage() {
 
 
 
+        {/* Highlight notification banner from Daily Tracker */}
+        {highlightIds.length > 0 && (
+          <div className="flex items-center justify-between gap-3 px-4 py-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-200 rounded-2xl text-xs font-semibold shadow-xs animate-fadeIn">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">✨</span>
+              <span>
+                Displaying <strong>{highlightIds.length} newly saved contact{highlightIds.length > 1 ? 's' : ''}</strong> from Daily Tracker import. Highlighted in green below.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setHighlightIds([])}
+              className="text-emerald-700 dark:text-emerald-300 hover:opacity-80 px-2 py-0.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-[11px] font-bold cursor-pointer"
+            >
+              Dismiss Highlight
+            </button>
+          </div>
+        )}
+
         {loading ? (
           <div className="p-12 text-center text-fg-subtle italic text-xs">
             Loading corporate metadata database…
@@ -464,6 +500,7 @@ export default function MetadataPage() {
             page={page}
             limit={50}
             canDelete={canDelete}
+            highlightIds={highlightIds}
             onEdit={handleOpenEdit}
             onDelete={handleDelete}
             onRestore={handleRestore}

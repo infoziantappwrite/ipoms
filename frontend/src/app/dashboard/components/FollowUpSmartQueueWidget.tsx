@@ -388,13 +388,7 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
     if (totalAllPending === 0) {
       return (
         <div className="relative" ref={dropdownRef}>
-          <div
-            onClick={() => {
-              triggerHaptic('selection');
-              setIsDropdownOpen((prev) => !prev);
-            }}
-            className="py-3.5 px-5 flex items-center justify-between gap-4 bg-surface dark:bg-[#111622] rounded-2xl border border-border dark:border-slate-800 shadow-2xs hover:border-border-strong dark:hover:border-slate-700 transition-colors cursor-pointer group flex-wrap relative select-none"
-          >
+          <div className="py-3.5 px-5 flex items-center justify-between gap-4 bg-surface dark:bg-[#111622] rounded-2xl border border-border dark:border-slate-800 shadow-2xs hover:border-border-strong dark:hover:border-slate-700 transition-colors flex-wrap relative select-none">
             <div className="flex items-center gap-3.5 min-w-0 z-10">
               {/* Static Clear Icon */}
               <div className="w-10 h-10 rounded-xl bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
@@ -433,13 +427,20 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
                 <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
               </button>
 
-              <div
-                ref={triggerRef}
+              <button
+                ref={triggerRef as any}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerHaptic('selection');
+                  setIsDropdownOpen((prev) => !prev);
+                }}
                 className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-surface hover:bg-surface-raised border border-border text-fg text-xs font-semibold shadow-2xs transition-colors shrink-0 cursor-pointer"
+                title="Select a college"
               >
                 <span>Select College</span>
                 <ChevronDown size={14} strokeWidth={2} className={`transition-transform duration-200 ease-out ${isDropdownOpen ? 'rotate-180' : ''}`} />
-              </div>
+              </button>
             </div>
           </div>
 
@@ -452,13 +453,7 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
     // 1B. Attention Banner when pending follow-up drives exist (> 0)
     return (
       <div className="relative" ref={dropdownRef}>
-        <div
-          onClick={() => {
-            triggerHaptic('selection');
-            setIsDropdownOpen((prev) => !prev);
-          }}
-          className="py-4 px-5 flex items-center justify-between gap-4 bg-gradient-to-r from-rose-500/10 via-amber-500/10 to-primary/10 dark:from-rose-950/40 dark:via-amber-950/30 dark:to-sky-950/40 rounded-2xl border-2 border-rose-500/30 dark:border-rose-500/40 shadow-md hover:shadow-lg transition-all cursor-pointer group flex-wrap relative overflow-hidden ring-4 ring-rose-500/10 dark:ring-rose-500/20"
-        >
+        <div className="py-4 px-5 flex items-center justify-between gap-4 bg-gradient-to-r from-rose-500/10 via-amber-500/10 to-primary/10 dark:from-rose-950/40 dark:via-amber-950/30 dark:to-sky-950/40 rounded-2xl border-2 border-rose-500/30 dark:border-rose-500/40 shadow-md transition-all flex-wrap relative overflow-hidden ring-4 ring-rose-500/10 dark:ring-rose-500/20">
           {/* Continuous ambient shimmer wave */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 dark:via-white/10 to-transparent -translate-x-full animate-[indeterminate_2.5s_infinite_linear] pointer-events-none" />
 
@@ -467,7 +462,7 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
             <div className="relative flex items-center justify-center shrink-0">
               <span className="animate-ping absolute inline-flex h-10 w-10 rounded-full bg-rose-500 opacity-50" />
               <span className="animate-pulse absolute inline-flex h-12 w-12 rounded-full bg-amber-400/30" />
-              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-rose-600 via-amber-500 to-orange-500 text-white flex items-center justify-center shadow-md relative group-hover:scale-110 transition-transform">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-rose-600 via-amber-500 to-orange-500 text-white flex items-center justify-center shadow-md relative">
                 <Flame size={22} className="animate-bounce" />
               </div>
             </div>
@@ -492,7 +487,7 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
                 )}
               </div>
               <p className="text-xs text-fg-subtle font-medium mt-1">
-                Click here or choose a college to review and resolve scheduled follow-ups before proceeding with daily operations.
+                Choose a college using the button to review and resolve scheduled follow-ups before proceeding with daily operations.
               </p>
             </div>
           </div>
@@ -515,12 +510,20 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             </button>
 
-            {/* Pulsing Action Call-to-Action with Red & Orange Gradient and Arrow Head Chevron */}
-            <div ref={triggerRef as React.RefObject<HTMLDivElement>} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 via-orange-500 to-amber-500 text-white text-xs font-bold shadow-md shadow-orange-500/25 group-hover:from-rose-500 group-hover:via-orange-500 group-hover:to-amber-400 group-hover:shadow-lg group-hover:shadow-orange-500/35 group-hover:scale-105 transition-all shrink-0 border border-white/20">
-
+            {/* Select College CTA Button */}
+            <button
+              ref={triggerRef as any}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                triggerHaptic('selection');
+                setIsDropdownOpen((prev) => !prev);
+              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 via-orange-500 to-amber-500 text-white text-xs font-bold shadow-md shadow-orange-500/25 hover:from-rose-500 hover:via-orange-500 hover:to-amber-400 hover:shadow-lg hover:shadow-orange-500/35 hover:scale-105 transition-all shrink-0 border border-white/20 cursor-pointer"
+            >
               <span>Select College</span>
               <ChevronDown size={16} strokeWidth={2.5} className={`transition-transform duration-200 ease-out ${isDropdownOpen ? 'rotate-180' : ''}`} />
-            </div>
+            </button>
           </div>
         </div>
 

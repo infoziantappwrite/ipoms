@@ -108,7 +108,7 @@ const POLICIES: Policy[] = [
   { method: 'PATCH',  pattern: new RegExp(`^/colleges/${ID}/status/?$`), roles: TL_ADMIN },
   { method: 'POST',   pattern: /^\/colleges\/sync-roster\/?$/,           roles: TL_ADMIN },
   { method: '*',      pattern: /^\/colleges(\/.*)?$/,                    roles: STAFF },
-  { method: 'GET',    pattern: /^\/coordinators\/?$/,                    roles: TL_ADMIN },
+  { method: 'GET',    pattern: /^\/coordinators\/?$/,                    roles: STAFF },
 
   // ── Daily Tracker (own call log) ──────────────────────────────────────────
   { method: '*',      pattern: /^\/daily-tracker(\/.*)?$/,               roles: STAFF },
@@ -142,6 +142,8 @@ const POLICIES: Policy[] = [
   { method: 'GET',    pattern: /^\/dashboard\/admin\/?$/,                roles: ADMIN },
   { method: 'GET',    pattern: /^\/dashboard\/team-leader\/?$/,          roles: TL_ADMIN },
   { method: 'GET',    pattern: /^\/dashboard\/college-kpis\/?$/,         roles: STAFF },
+  // Month trend of calls per campus — ownership-scoped in the handler, same as college-kpis.
+  { method: 'GET',    pattern: /^\/dashboard\/monthly-calls\/?$/,        roles: STAFF },
   // Any staff member may call this; WHICH coordinator's data comes back is
   // decided by ownership scoping in the handler, not here.
   { method: 'GET',    pattern: /^\/dashboard\/coordinator\/?$/,          roles: STAFF },
