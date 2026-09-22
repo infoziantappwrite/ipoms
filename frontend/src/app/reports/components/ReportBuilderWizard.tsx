@@ -38,6 +38,7 @@ import {
   RotateCcw,
   Star,
   ClipboardList,
+  PhoneCall,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser } from '@/lib/session';
@@ -192,6 +193,16 @@ const MONTH_OPTIONS = [
   { value: '2027-04', label: 'April 2027', badge: '30 Days', sublabel: '01 Apr 2027 – 30 Apr 2027 • Ends on 30th', start: '2027-04-01', end: '2027-04-30' },
   { value: '2027-05', label: 'May 2027', badge: '31 Days', sublabel: '01 May 2027 – 31 May 2027 • Ends on 31st', start: '2027-05-01', end: '2027-05-31' },
 ];
+
+// Was hardcoded to '2026-08' in three places (initial state + two template-switch
+// resets), so opening Month-End on any day after August silently pre-selected an
+// already-passed month. Matches the current calendar month against the fixed
+// MONTH_OPTIONS list; falls back to the first option only if genuinely out of range.
+function getCurrentMonthOption() {
+  const now = new Date();
+  const value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  return MONTH_OPTIONS.find((m) => m.value === value) || MONTH_OPTIONS[0];
+}
 
 const MONTH_END_KPIS = [
   { key: 'total_conversion_count', label: 'Total Conversions', desc: 'Total Conversion Count' },
@@ -384,7 +395,7 @@ export function ReportBuilderWizard({
   }, [rawPendingTasksList, pendingTasksList, pendingSelectedIds]);
 
   // Selected Month for Month-End reports
-  const [selectedMonth, setSelectedMonth] = useState('2026-08');
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthOption().value);
 
   // Dynamic Interactive Date Range Calendar Selection (Blank by default)
   const [startDate, setStartDate] = useState('');
@@ -465,6 +476,11 @@ export function ReportBuilderWizard({
   });
 
   const [colleges, setColleges] = useState<College[]>(() => getCachedColleges());
+  const [monthEndSelectedCollegeIds, setMonthEndSelectedCollegeIds] = useState<string[]>(() => {
+    const cached = getCachedColleges();
+    return cached.map((c: any) => c._id);
+  });
+  const [monthEndCollegeSearch, setMonthEndCollegeSearch] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
@@ -509,6 +525,10 @@ export function ReportBuilderWizard({
         const fetched = await fetchAllCollegesCached();
         if (isMounted && fetched && fetched.length > 0) {
           setColleges(fetched);
+          setMonthEndSelectedCollegeIds((prev) => {
+            if (prev.length === 0) return fetched.map((c: any) => c._id);
+            return prev;
+          });
         }
       } catch (err) {
         console.error('Failed to load colleges in ReportBuilderWizard:', err);
@@ -520,6 +540,115 @@ export function ReportBuilderWizard({
     };
   }, []);
 
+  // ── Auto-Restore Saved Wizard Configuration from localStorage ──
+  const [hasRestoredSavedState, setHasRestoredSavedState] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || hasRestoredSavedState) return;
+    try {
+      const raw = localStorage.getItem('ipoms_report_builder_wizard_state');
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved && typeof saved === 'object') {
+          if (saved.templateType && !initialTemplateType) setTemplateType(saved.templateType);
+          if (saved.collegeId && !initialCollegeId) setCollegeId(saved.collegeId);
+          if (saved.academicYear) setAcademicYear(saved.academicYear);
+          if (saved.weeklyTargetMode) setWeeklyTargetMode(saved.weeklyTargetMode);
+          if (Array.isArray(saved.selectedGroupCollegeIds)) setSelectedGroupCollegeIds(saved.selectedGroupCollegeIds);
+          if (Array.isArray(saved.monthEndSelectedCollegeIds) && saved.monthEndSelectedCollegeIds.length > 0) {
+            setMonthEndSelectedCollegeIds(saved.monthEndSelectedCollegeIds);
+          }
+          if (saved.selectedMonth) setSelectedMonth(saved.selectedMonth);
+          if (saved.startDate) setStartDate(saved.startDate);
+          if (saved.endDate) setEndDate(saved.endDate);
+          if (saved.weekLabel) setWeekLabel(saved.weekLabel);
+          if (saved.theme) setTheme(saved.theme);
+          if (typeof saved.customRemarks === 'string') setCustomRemarks(saved.customRemarks);
+          if (saved.sections) setSections(saved.sections);
+          if (saved.kpiCards) setKpiCards(saved.kpiCards);
+          if (saved.activeLeadStreams) setActiveLeadStreams(saved.activeLeadStreams);
+          if (saved.activeLeadsColumns) setActiveLeadsColumns(saved.activeLeadsColumns);
+          if (typeof saved.includePreparedBy === 'boolean') setIncludePreparedBy(saved.includePreparedBy);
+          if (saved.preparedByName) setPreparedByName(saved.preparedByName);
+          if (saved.pendingTaskSections) setPendingTaskSections(saved.pendingTaskSections);
+          if (Array.isArray(saved.pendingSelectedIds)) setPendingSelectedIds(new Set(saved.pendingSelectedIds));
+          if (Array.isArray(saved.highlightedTaskIds)) setHighlightedTaskIds(new Set(saved.highlightedTaskIds));
+          if (saved.highlightColor) setHighlightColor(saved.highlightColor);
+          if (saved.highlightColorMap) setHighlightColorMap(saved.highlightColorMap);
+          if (saved.weeklyMinCtc !== undefined) setWeeklyMinCtc(saved.weeklyMinCtc);
+          if (typeof saved.weeklyIncludeCompetitive === 'boolean') setWeeklyIncludeCompetitive(saved.weeklyIncludeCompetitive);
+        }
+      }
+    } catch (err) {
+      console.error('[ReportBuilderWizard] Failed to restore saved wizard state:', err);
+    } finally {
+      setHasRestoredSavedState(true);
+    }
+  }, [hasRestoredSavedState, initialTemplateType, initialCollegeId]);
+
+  // ── Auto-Save Wizard Configuration to localStorage whenever options change ──
+  useEffect(() => {
+    if (typeof window === 'undefined' || !hasRestoredSavedState) return;
+    try {
+      const stateToSave = {
+        templateType,
+        collegeId,
+        academicYear,
+        weeklyTargetMode,
+        selectedGroupCollegeIds,
+        monthEndSelectedCollegeIds,
+        selectedMonth,
+        startDate,
+        endDate,
+        weekLabel,
+        theme,
+        customRemarks,
+        sections,
+        kpiCards,
+        activeLeadStreams,
+        activeLeadsColumns,
+        includePreparedBy,
+        preparedByName,
+        pendingTaskSections,
+        pendingSelectedIds: Array.from(pendingSelectedIds),
+        highlightedTaskIds: Array.from(highlightedTaskIds),
+        highlightColor,
+        highlightColorMap,
+        weeklyMinCtc,
+        weeklyIncludeCompetitive,
+      };
+      localStorage.setItem('ipoms_report_builder_wizard_state', JSON.stringify(stateToSave));
+    } catch (err) {
+      console.error('[ReportBuilderWizard] Failed to auto-save wizard state:', err);
+    }
+  }, [
+    hasRestoredSavedState,
+    templateType,
+    collegeId,
+    academicYear,
+    weeklyTargetMode,
+    selectedGroupCollegeIds,
+    monthEndSelectedCollegeIds,
+    selectedMonth,
+    startDate,
+    endDate,
+    weekLabel,
+    theme,
+    customRemarks,
+    sections,
+    kpiCards,
+    activeLeadStreams,
+    activeLeadsColumns,
+    includePreparedBy,
+    preparedByName,
+    pendingTaskSections,
+    pendingSelectedIds,
+    highlightedTaskIds,
+    highlightColor,
+    highlightColorMap,
+    weeklyMinCtc,
+    weeklyIncludeCompetitive,
+  ]);
+
   // Prioritize active focus colleges first, followed by all remaining colleges in alphabetical order
   const prioritizedColleges = useMemo(() => {
     const coordinatorSelectedIds = getCoordinatorSelectedColleges();
@@ -529,6 +658,17 @@ export function ReportBuilderWizard({
         : (colleges as any[]).filter((c) => c.is_selected_by_me).map((c) => c._id);
     return sortCollegesWithPriority(colleges as any[], activeFocusIds);
   }, [colleges]);
+
+  const filteredMonthEndColleges = useMemo(() => {
+    if (!monthEndCollegeSearch.trim()) return prioritizedColleges;
+    const q = monthEndCollegeSearch.toLowerCase().trim();
+    return prioritizedColleges.filter(
+      (c: any) =>
+        (c.college_name || '').toLowerCase().includes(q) ||
+        (c.college_code || '').toLowerCase().includes(q) ||
+        (c.location || '').toLowerCase().includes(q)
+    );
+  }, [prioritizedColleges, monthEndCollegeSearch]);
 
   const filteredGroupColleges = useMemo(() => {
     if (!groupSearchQuery.trim()) return prioritizedColleges;
@@ -914,6 +1054,7 @@ export function ReportBuilderWizard({
           company_drives_scheduled: true,
           on_hold_by_college: true,
           on_hold_by_hr: true,
+          calling_activity: true,
           remarks: false,
         });
         setCustomRemarks('Comprehensive monthly recruitment progress review covering conversions, scheduled drives, and placement selections.');
@@ -1103,11 +1244,22 @@ export function ReportBuilderWizard({
         company_drives_scheduled: true,
         on_hold_by_college: true,
         on_hold_by_hr: true,
+        calling_activity: true,
         remarks: false,
       });
       setIncludePreparedBy(true);
-      setStartDate('2026-08-01');
-      setEndDate('2026-08-31');
+      if (monthEndSelectedCollegeIds.length === 0 && colleges.length > 0) {
+        setMonthEndSelectedCollegeIds(colleges.map((c: any) => c._id));
+      }
+      if (!collegeId) {
+        setCollegeId('all');
+      }
+      // Was hardcoded to August 2026 — defaults to the real current month now.
+      const currentMonth = getCurrentMonthOption();
+      setSelectedMonth(currentMonth.value);
+      setStartDate(currentMonth.start);
+      setEndDate(currentMonth.end);
+      setWeekLabel(`${currentMonth.label} (${currentMonth.start} – ${currentMonth.end})`);
       setCustomRemarks('Comprehensive monthly recruitment progress review covering conversions, scheduled drives, and placement selections.');
     } else if (newType === 'daily_positives') {
       setSections({
@@ -1162,9 +1314,13 @@ export function ReportBuilderWizard({
           errors.push('Target Institution is required. Please pick a college to generate the report.');
         }
       }
-    } else if (templateType === 'pending_tasks' || templateType === 'month_end') {
+    } else if (templateType === 'pending_tasks') {
       if (!collegeId || collegeId.trim() === '' || collegeId === 'all') {
         errors.push('Target Institution is required. Please pick a college to generate the report.');
+      }
+    } else if (templateType === 'month_end') {
+      if (monthEndSelectedCollegeIds.length === 0) {
+        errors.push('Please select at least one college to include in the Month-End report.');
       }
     }
 
@@ -1223,13 +1379,19 @@ export function ReportBuilderWizard({
         method: 'POST',
         body: JSON.stringify({
           template_type: templateType,
-          is_multi_college: isMultiWeekly,
-          college_ids: isMultiWeekly ? selectedGroupCollegeIds : undefined,
-          college_id: isMultiWeekly ? 'multi' : (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? 'all' : (templateType === 'active_leads' ? (collegeId || 'all') : collegeId),
+          is_multi_college: isMultiWeekly || templateType === 'month_end',
+          college_ids: isMultiWeekly ? selectedGroupCollegeIds : (templateType === 'month_end' ? monthEndSelectedCollegeIds : undefined),
+          selected_college_ids: templateType === 'month_end' ? monthEndSelectedCollegeIds : undefined,
+          college_id: isMultiWeekly ? 'multi' : (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? 'all' : (templateType === 'active_leads' ? (collegeId || 'all') : (templateType === 'month_end' ? (collegeId || 'all') : collegeId)),
           coordinator_id: coordinatorId || readSessionUser()?._id || readSessionUser()?.id || '',
           academic_year: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? (academicYear && academicYear !== 'all' ? academicYear : getDefaultGraduatingBatch()) : academicYear,
           date: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? dailyReportDate : undefined,
           effective_date: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? dailyReportDate : undefined,
+          // The month picker already resolves real start/end dates (see MONTH_OPTIONS) but
+          // they were never actually sent — the backend was deriving only a display month
+          // *name* out of week_label text, so Calling Activity had no real range to query.
+          date_from: templateType === 'month_end' ? startDate : undefined,
+          date_to: templateType === 'month_end' ? endDate : undefined,
           lead_type: templateType === 'daily_positives' ? 'positive' : (templateType === 'daily_jd_received' ? 'jd_received' : undefined),
           week_label: effectiveWeekLabel,
           theme,
@@ -1346,6 +1508,12 @@ export function ReportBuilderWizard({
           desc: 'Drives on hold from corporate employer / HR side',
           companies: weeklyCompanies.on_hold_by_hr,
           badgeColor: 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
+        },
+        {
+          key: 'calling_activity',
+          label: 'Calling Activity Summary',
+          icon: PhoneCall,
+          desc: 'Calls made and hours dedicated per college for the selected month — real numbers, computed on generate',
         },
       ];
     }
@@ -1610,16 +1778,24 @@ export function ReportBuilderWizard({
                       const isMissingCollege = validationErrors.some(
                         (e) => e.toLowerCase().includes('institution') || e.toLowerCase().includes('college')
                       );
-                      const selectOptions = prioritizedColleges.map((c: any) => ({
+                      let selectOptions = prioritizedColleges.map((c: any) => ({
                         value: c._id,
+                        label: `[${c.college_code}] ${c.college_name}`,
                         badge: c.college_code,
                         isPinned: Boolean(c.isPinned || c.is_selected_by_me),
                       }));
 
+                      if (templateType === 'month_end') {
+                        selectOptions = [
+                          { value: 'all', badge: 'ALL', isPinned: true, label: 'All Handled Institutions (Filter Below)' },
+                          ...selectOptions,
+                        ];
+                      }
+
                       return (
                         <div>
                           <SmoothSelect
-                            value={collegeId}
+                            value={collegeId || (templateType === 'month_end' ? 'all' : '')}
                             error={isMissingCollege}
                             onChange={(val) => {
                               setCollegeId(val);
@@ -2470,6 +2646,126 @@ export function ReportBuilderWizard({
                   sublabel: m.sublabel,
                 }))}
               />
+            </div>
+
+            {/* Target Colleges Checklist for Month-End Calling Activity & Report */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between border-b border-border/80 pb-2 flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Building2 size={16} className="text-indigo-600 shrink-0" />
+                  <div>
+                    <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
+                      Target Colleges for Month-End Report & Calling Activity
+                    </h2>
+                    <p className="text-[11px] text-fg-subtle mt-0.5">
+                      Select which of your handled institutions should appear in the Month-End Calling Activity Summary and report totals. Unticked colleges will be omitted.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                  <span>{monthEndSelectedCollegeIds.length} of {colleges.length} Selected</span>
+                </div>
+              </div>
+
+              <div className="border border-border rounded-xl p-3.5 bg-surface-sunken/40 space-y-3">
+                {/* Quick Action Ribbon */}
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMonthEndSelectedCollegeIds(colleges.map((c: any) => c._id));
+                        setValidationErrors([]);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 text-xs font-semibold hover:bg-indigo-500/20 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                    >
+                      Select All ({colleges.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMonthEndSelectedCollegeIds([])}
+                      className="px-2.5 py-1 rounded-lg bg-surface border border-border text-xs font-medium text-fg-muted hover:text-rose-600 transition-colors cursor-pointer shadow-2xs"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+
+                  <span className="text-[11px] text-fg-subtle italic">
+                    Tick marks determine colleges shown in Month-End Calling Summary
+                  </span>
+                </div>
+
+                {/* Search filter inside Month-End college selector */}
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={monthEndCollegeSearch}
+                    onChange={(e) => setMonthEndCollegeSearch(e.target.value)}
+                    placeholder="Search college by name, code or city…"
+                    className="w-full pl-8 pr-3 py-1.5 bg-surface border border-border rounded-lg text-xs text-fg outline-none focus:border-indigo-500 placeholder:text-fg-disabled"
+                  />
+                  <Search size={13} className="absolute left-2.5 top-2.5 text-fg-disabled pointer-events-none" />
+                  {monthEndCollegeSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setMonthEndCollegeSearch('')}
+                      className="absolute right-2.5 top-2 text-fg-subtle hover:text-fg cursor-pointer p-0.5"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Scrollable Checkbox List */}
+                <div className="max-h-56 overflow-y-auto pr-1 space-y-1 divide-y divide-border/40 border border-border rounded-lg bg-surface p-1.5 [scrollbar-width:thin]">
+                  {filteredMonthEndColleges.length === 0 ? (
+                    <p className="text-center py-4 text-xs text-fg-disabled italic">No institutions match search</p>
+                  ) : (
+                    filteredMonthEndColleges.map((c: any) => {
+                      const isSelected = monthEndSelectedCollegeIds.includes(c._id);
+
+                      return (
+                        <label
+                          key={c._id}
+                          className={`flex items-center justify-between gap-2 p-2 rounded-md hover:bg-surface-sunken cursor-pointer transition-colors ${
+                            isSelected ? 'bg-indigo-500/5 font-medium' : 'opacity-70 hover:opacity-100'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => {
+                                setValidationErrors([]);
+                                setMonthEndSelectedCollegeIds((prev) =>
+                                  isSelected ? prev.filter((id) => id !== c._id) : [...prev, c._id]
+                                );
+                              }}
+                              className="w-4 h-4 rounded border-border text-indigo-600 focus:ring-indigo-500 accent-indigo-600 cursor-pointer shrink-0"
+                            />
+                            <span className={`text-xs truncate ${isSelected ? 'text-fg font-bold' : 'text-fg-muted'}`}>
+                              {c.college_name}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-surface-sunken border border-border text-fg-subtle font-semibold">
+                              {c.college_code}
+                            </span>
+                          </div>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+
+                {validationErrors.some((e) => e.toLowerCase().includes('at least one college to include in the month-end report')) && (
+                  <p className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold mt-0.5 flex items-center gap-1">
+                    <AlertCircle size={12} className="shrink-0" />
+                    Please select at least one college to include in the Month-End report.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         )}

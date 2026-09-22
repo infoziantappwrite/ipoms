@@ -8,7 +8,7 @@ import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
 import { WeeklyRow } from './WeeklyTable';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
-import { validateAndNormalizeIndianMobile, validateAndNormalizeEmail } from '@/lib/contactValidation';
+import { validateAndNormalizeMultiMobile, validateAndNormalizeMultiEmail } from '@/lib/contactValidation';
 
 const BATCH_YEARS = ['2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
 
@@ -115,23 +115,27 @@ export function EditCompanyModal({
     }
 
     let normalizedContact = '';
+    let mobArr: string[] = [];
     if (contactNumber.trim()) {
-      const res = validateAndNormalizeIndianMobile(contactNumber.trim());
+      const res = validateAndNormalizeMultiMobile(contactNumber.trim());
       if (!res.valid) {
         alert(res.error || 'Invalid Indian mobile number');
         return;
       }
       normalizedContact = res.normalized;
+      mobArr = res.normalized ? res.normalized.split(',').map((s) => s.trim()).filter(Boolean) : [];
     }
 
     let normalizedEmail = '';
+    let emailArr: string[] = [];
     if (emailId.trim()) {
-      const res = validateAndNormalizeEmail(emailId.trim());
+      const res = validateAndNormalizeMultiEmail(emailId.trim());
       if (!res.valid) {
         alert(res.error || 'Invalid email address');
         return;
       }
       normalizedEmail = res.normalized;
+      emailArr = res.normalized ? res.normalized.split(',').map((s) => s.trim()).filter(Boolean) : [];
     }
 
     if (followUpDate) {
@@ -153,9 +157,9 @@ export function EditCompanyModal({
       const patch: Partial<WeeklyRow> = {
         company_name: companyName.trim(),
         contact_number: normalizedContact || undefined,
-        mobile_numbers: normalizedContact ? [normalizedContact] : [],
+        mobile_numbers: mobArr,
         email_id: normalizedEmail || undefined,
-        email_ids: normalizedEmail ? [normalizedEmail] : [],
+        email_ids: emailArr,
         jd_received_date: jdReceivedDate || undefined,
         db_shared_date: dbSharedDate || undefined,
         job_role: jobRole.trim(),

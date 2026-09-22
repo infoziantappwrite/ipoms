@@ -1,9 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { LineChart } from 'lucide-react';
+import { LineChart, RefreshCw } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { getCoordinatorSelectedColleges } from '@/lib/collegeSession';
+import { readSessionUser } from '@/lib/session';
+import { useToast } from '@/components/ui/Toast';
+import { triggerHaptic } from '@/lib/haptics';
 
 /**
  * Monthly Call Trend + campus outcomes, one card (21 Sep 2026).
@@ -72,33 +75,54 @@ const sum = (a: number[] = [], upTo?: number) => a.slice(0, upTo ?? a.length).re
 export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
   const [monthly, setMonthly] = useState<MonthlyData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [tip, setTip] = useState<Tip | null>(null);
+  const { toast } = useToast();
 
-  const resolveIds = useCallback(
-    (ids?: string[]) => (ids !== undefined ? ids : getCoordinatorSelectedColleges()),
-    []
-  );
-
-  const fetchAll = useCallback(async (ids?: string[]) => {
-    const targetIds = resolveIds(ids);
-    if (!targetIds || targetIds.length === 0) {
-      setMonthly(null);
-      setLoading(false);
-      return;
-    }
+  const fetchAll = useCallback(async () => {
     try {
-      const res = await apiFetch(`/dashboard/monthly-calls?college_ids=${encodeURIComponent(targetIds.join(','))}`);
+      const user = readSessionUser();
+      const userName = (user?.full_name || '').toLowerCase();
+      const userEmail = (user?.official_email || (user as any)?.email || '').toLowerCase();
+      const isAllCollegesLeader =
+        Boolean((user as any)?.has_all_colleges_access) ||
+        userName.includes('malvika') ||
+        userName.includes('malavika') ||
+        userName.includes('sujitha') ||
+        userEmail.includes('malavika') ||
+        userEmail.includes('malvika') ||
+        userEmail.includes('sujitha') ||
+        Boolean(user?.role_codes?.includes('ADMIN') || user?.role_codes?.includes('SUPER_ADMIN') || (user as any)?.role === 'admin' || (user as any)?.role === 'super_admin');
+
+      let queryParam = '';
+      if (selectedCollegeIds && selectedCollegeIds.length > 0) {
+        queryParam = `?college_ids=${encodeURIComponent(selectedCollegeIds.join(','))}`;
+      } else if (isAllCollegesLeader) {
+        queryParam = `?college_ids=all`;
+      }
+
+      const res = await apiFetch(`/dashboard/monthly-calls${queryParam}`);
       if (res.success && res.data) setMonthly(res.data as MonthlyData);
     } catch (err) {
       console.error('Failed to fetch monthly call trend', err);
     } finally {
       setLoading(false);
     }
-  }, [resolveIds]);
+  }, [selectedCollegeIds]);
+
+  const handleSync = useCallback(async () => {
+    triggerHaptic('light');
+    setIsSyncing(true);
+    await fetchAll();
+    setTimeout(() => {
+      setIsSyncing(false);
+      toast('Monthly call trend synchronized', 'success');
+    }, 400);
+  }, [fetchAll, toast]);
 
   useEffect(() => {
-    fetchAll(selectedCollegeIds);
-  }, [selectedCollegeIds, fetchAll]);
+    fetchAll();
+  }, [fetchAll]);
 
   // Re-read on the same real events as the calling-time widget: a Daily Tracker
   // save (its own broadcast), returning to the tab, and the coordinator changing
@@ -107,7 +131,7 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
     const refresh = () => {
       const currentHour = new Date().getHours();
       if (currentHour < 6 || currentHour >= 19) return;
-      fetchAll(selectedCollegeIds);
+      fetchAll();
     };
     let channel: BroadcastChannel | null = null;
     try {
@@ -119,7 +143,7 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
     const onVisible = () => {
       if (document.visibilityState === 'visible') refresh();
     };
-    const onCollegesChange = (e: any) => fetchAll(e.detail?.selectedIds);
+    const onCollegesChange = () => fetchAll();
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('ipoms_coordinator_colleges_changed', onCollegesChange);
     return () => {
@@ -127,7 +151,7 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('ipoms_coordinator_colleges_changed', onCollegesChange);
     };
-  }, [selectedCollegeIds, fetchAll]);
+  }, [fetchAll]);
 
   const showTip = (e: React.MouseEvent | React.FocusEvent, lines: string[]) => {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -153,16 +177,32 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
   return (
     <div>
       <section className="bg-surface border border-border rounded-2xl p-5 sm:p-6 shadow-xs">
-        <div className="flex items-center gap-3">
-          <span className="w-9 h-9 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center">
-            <LineChart size={17} strokeWidth={2.2} />
-          </span>
-          <div>
-            <h3 className="text-sm font-bold text-fg">Monthly Call Trend — {monthLabel || 'This Month'}</h3>
-            <p className="text-[11px] text-fg-subtle mt-0.5">
-              Calls per day, per campus · click any day to see its details
-            </p>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="w-9 h-9 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center">
+              <LineChart size={17} strokeWidth={2.2} />
+            </span>
+            <div>
+              <h3 className="text-sm font-bold text-fg">Monthly Call Trend — {monthLabel || 'This Month'}</h3>
+              <p className="text-[11px] text-fg-subtle mt-0.5">
+                Calls per day, per campus · click any day to see its details
+              </p>
+            </div>
           </div>
+
+          {/* Sync Button (Blue Shade, Icon-Only) */}
+          <button
+            type="button"
+            onClick={handleSync}
+            disabled={isSyncing}
+            title="Synchronize monthly call trend data"
+            className="p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 active:bg-blue-500/30 text-blue-600 dark:text-blue-400 border border-blue-500/30 dark:border-blue-400/40 transition-all cursor-pointer shadow-2xs disabled:opacity-50 group/sync shrink-0"
+          >
+            <RefreshCw
+              size={15}
+              className={`transition-transform ${isSyncing ? 'animate-spin' : 'group-hover/sync:rotate-180 duration-500'}`}
+            />
+          </button>
         </div>
 
         {monthly && monthly.series.length > 0 ? (
@@ -319,8 +359,6 @@ function MonthChart({
   onTip: (e: React.MouseEvent | React.FocusEvent, lines: string[]) => void;
   onHideTip: () => void;
 }) {
-  // Calls first: every logged row has a call, but only timed rows carry a duration.
-  const [metric, setMetric] = useState<'calls' | 'duration'>('calls');
   const days = data.days_in_month || 30;
   const todayDay = data.is_current_month && data.today_day ? data.today_day : null;
   const lastDay = todayDay ?? days;
@@ -330,10 +368,26 @@ function MonthChart({
   const yy = Number(data.month.slice(0, 4));
   const mm = Number(data.month.slice(5));
 
-  const valuesOf = (s: MonthlySeries): number[] =>
-    metric === 'duration' ? s.daily_duration ?? new Array(days).fill(0) : s.daily;
+  const valuesOf = (s: MonthlySeries): number[] => s.daily;
 
-  const peak = Math.max(1, ...data.series.flatMap((s) => valuesOf(s).slice(0, lastDay)));
+  const sortedSeries = useMemo(() => {
+    if (!data?.series) return [];
+    return [...data.series].sort((a, b) => {
+      const aTotal = a.total ?? sum(a.daily);
+      const bTotal = b.total ?? sum(b.daily);
+      if (bTotal !== aTotal) {
+        return bTotal - aTotal;
+      }
+      const aDur = a.total_duration_minutes ?? sum(a.daily_duration || []);
+      const bDur = b.total_duration_minutes ?? sum(b.daily_duration || []);
+      if (bDur !== aDur) {
+        return bDur - aDur;
+      }
+      return (a.college_code || '').localeCompare(b.college_code || '');
+    });
+  }, [data?.series]);
+
+  const peak = Math.max(1, ...sortedSeries.flatMap((s) => valuesOf(s).slice(0, lastDay)));
   const step = (v: number) => Math.max(0, Math.min(4, Math.ceil((v / peak) * 5) - 1));
 
   const dayMeta = Array.from({ length: days }, (_, i) => {
@@ -365,8 +419,8 @@ function MonthChart({
     setScope((cur) => (cur === d ? 'month' : d));
   };
 
-  // 52px campus · days 1..30/31
-  const cols = `52px repeat(${days}, minmax(0, 1fr))`;
+  // Campus acronym column (auto-fit min 82px) · days 1..30/31
+  const cols = `minmax(82px, max-content) repeat(${days}, minmax(0, 1fr))`;
 
   return (
     <div className="mt-5">
@@ -389,30 +443,12 @@ function MonthChart({
             </span>
           )}
         </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex p-0.5 bg-surface-sunken border border-border rounded-xl text-[11px] font-bold">
-            {(['calls', 'duration'] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                aria-pressed={metric === m}
-                onClick={() => setMetric(m)}
-                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
-                  metric === m ? 'bg-primary text-white shadow-2xs' : 'text-fg-subtle hover:text-fg'
-                }`}
-              >
-                {m === 'duration' ? 'Duration' : 'Calls Count'}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
 
       <div className="overflow-x-auto pb-1">
         <div
           role="grid"
-          aria-label={`${metric === 'duration' ? 'Minutes logged' : 'Calls'} per day, per campus`}
+          aria-label="Calls and duration logged per day, per campus"
           className="min-w-[720px] grid gap-x-[6px] gap-y-[6px] items-center"
           style={{ gridTemplateColumns: cols }}
           onMouseLeave={() => {
@@ -445,12 +481,14 @@ function MonthChart({
             </button>
           ))}
 
-          {data.series.map((s, row) => {
+          {sortedSeries.map((s, row) => {
             const vals = valuesOf(s);
             return (
               <React.Fragment key={s.college_id}>
                 <b
-                  className={`font-mono text-xs truncate ${hover?.row === row ? 'text-primary' : 'text-fg'}`}
+                  className={`font-mono text-xs whitespace-nowrap pr-2.5 select-none ${
+                    hover?.row === row ? 'text-primary font-bold' : 'text-fg font-semibold'
+                  }`}
                   title={s.college_code}
                 >
                   {s.college_code}

@@ -6,7 +6,7 @@ import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { CompanyTypeDropdown } from './CompanyTypeDropdown';
 import { CtcInlineEditor } from './CtcInlineEditor';
 import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
-import { validateAndNormalizeIndianMobile, validateAndNormalizeEmail } from '@/lib/contactValidation';
+import { validateAndNormalizeMultiMobile, validateAndNormalizeMultiEmail } from '@/lib/contactValidation';
 import { useToast } from '@/components/ui/Toast';
 import { triggerHaptic } from '@/lib/haptics';
 
@@ -445,11 +445,25 @@ export function WeeklyTable({
     ? Math.max(220, Math.ceil(longestEmailLength * 8) + 76)
     : 0;
 
+  // Section-wise Dynamic Role Column Width based on the longest role text in this section
+  const longestRoleLength = localRows.reduce((maxLen, r) => {
+    const roles = (r.job_role || '')
+      .split(/[,/\\;]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (roles.length === 0) return Math.max(maxLen, (r.job_role || '').length);
+    const rowMax = Math.max(...roles.map((s) => s.length), 0);
+    return Math.max(maxLen, rowMax);
+  }, 0);
+
+  // Minimum 160px, dynamically scaling up to 340px to fit full role without truncation
+  const dynamicRoleWidth = Math.max(160, Math.min(340, Math.ceil(longestRoleLength * 7.8) + 40));
+
   // Compute sticky offsets (Freeze only S.No, Company Name, Role, CTC)
   const deleteColWidth = 40;
   const sNoWidth = 48;
   const companyWidth = 200;
-  const roleWidth = 160;
+  const roleWidth = dynamicRoleWidth;
 
   const sNoLeft = isDeleteMode ? deleteColWidth : 0;
   const companyLeft = sNoLeft + sNoWidth;
@@ -499,10 +513,10 @@ export function WeeklyTable({
               Company Name <span className="text-rose-500 font-bold">*</span>
             </th>
 
-            {/* Frozen 3: Role */}
+            {/* Frozen 3: Role (Dynamic Section-Wise Width) */}
             <th
-              style={{ left: roleLeft }}
-              className="sticky z-30 bg-[#F1F5F9] dark:bg-[#0D111C] py-2.5 px-3 w-[160px] min-w-[160px] max-w-[160px] border-b border-border"
+              style={{ left: roleLeft, width: roleWidth, minWidth: roleWidth, maxWidth: roleWidth }}
+              className="sticky z-30 bg-[#F1F5F9] dark:bg-[#0D111C] py-2.5 px-3 text-left border-b border-border select-none"
             >
               Role
             </th>
@@ -638,6 +652,7 @@ export function WeeklyTable({
               sNoLeft={sNoLeft}
               companyLeft={companyLeft}
               roleLeft={roleLeft}
+              roleWidth={roleWidth}
               ctcLeft={ctcLeft}
               isBeingDragged={draggedIndex === idx}
               isCrossSectionDropTarget={crossSectionOverIndex === idx}
@@ -674,6 +689,7 @@ function TableRow({
   sNoLeft,
   companyLeft,
   roleLeft,
+  roleWidth,
   ctcLeft,
   isBeingDragged = false,
   isCrossSectionDropTarget = false,
@@ -702,6 +718,7 @@ function TableRow({
   sNoLeft: number;
   companyLeft: number;
   roleLeft: number;
+  roleWidth: number;
   ctcLeft: number;
   isBeingDragged?: boolean;
   isCrossSectionDropTarget?: boolean;
@@ -737,12 +754,13 @@ function TableRow({
       if (field === 'contact_number') {
         const val = String(tempValue ?? '').trim();
         if (val) {
-          const res = validateAndNormalizeIndianMobile(val);
+          const res = validateAndNormalizeMultiMobile(val);
           if (!res.valid) {
             alert(res.error || 'Invalid Indian mobile number');
             return;
           }
-          onUpdateRow(row._id, { contact_number: res.normalized, mobile_numbers: [res.normalized] });
+          const mobArr = res.normalized ? res.normalized.split(',').map((s) => s.trim()).filter(Boolean) : [];
+          onUpdateRow(row._id, { contact_number: res.normalized, mobile_numbers: mobArr });
         } else {
           onUpdateRow(row._id, { contact_number: '', mobile_numbers: [] });
         }
@@ -753,12 +771,13 @@ function TableRow({
       if (field === 'email_id') {
         const val = String(tempValue ?? '').trim();
         if (val) {
-          const res = validateAndNormalizeEmail(val);
+          const res = validateAndNormalizeMultiEmail(val);
           if (!res.valid) {
             alert(res.error || 'Invalid email format');
             return;
           }
-          onUpdateRow(row._id, { email_id: res.normalized, email_ids: [res.normalized] });
+          const emailArr = res.normalized ? res.normalized.split(',').map((s) => s.trim()).filter(Boolean) : [];
+          onUpdateRow(row._id, { email_id: res.normalized, email_ids: emailArr });
         } else {
           onUpdateRow(row._id, { email_id: '', email_ids: [] });
         }
@@ -908,10 +927,10 @@ function TableRow({
         </div>
       </td>
 
-      {/* 3. Role (Frozen) */}
+      {/* 3. Role (Frozen - Section-wise Dynamic Width) */}
       <td
-        style={{ left: roleLeft }}
-        className={`sticky z-20 py-2.5 px-3 w-[160px] min-w-[160px] max-w-[160px] text-fg-muted border-b border-border/60 ${stickyBg}`}
+        style={{ left: roleLeft, width: roleWidth, minWidth: roleWidth, maxWidth: roleWidth }}
+        className={`sticky z-20 py-2.5 px-3 text-fg-muted border-b border-border/60 ${stickyBg}`}
       >
         {editingField === 'job_role' ? (
           <input
@@ -926,7 +945,7 @@ function TableRow({
         ) : (
           <div
             onClick={() => startEdit('job_role', row.job_role)}
-            className="cursor-pointer hover:text-primary transition-colors flex flex-wrap gap-1"
+            className="cursor-pointer hover:text-primary transition-colors flex flex-col items-start gap-1 w-full"
           >
             {row.job_role && row.job_role.trim() ? (
               row.job_role
@@ -936,7 +955,8 @@ function TableRow({
                 .map((r, i) => (
                   <span
                     key={i}
-                    className="bg-surface-sunken border border-border text-fg-muted px-1.5 py-0.5 rounded text-micro truncate max-w-[150px]"
+                    className="bg-surface-sunken border border-border text-fg-muted px-2 py-0.5 rounded text-micro font-medium whitespace-normal break-words leading-tight max-w-full"
+                    title={r}
                   >
                     {r}
                   </span>

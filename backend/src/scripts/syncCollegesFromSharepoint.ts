@@ -30,6 +30,7 @@ export const COLLEGE_DEFAULT_LOCATIONS: Record<string, string> = {
   HITS: 'Padur, Chennai, Tamil Nadu',
   NEHRU: 'Coimbatore, Tamil Nadu',
   MAR: 'Kanyakumari, Tamil Nadu',
+  MAREPHRAM: 'Kanyakumari, Tamil Nadu',
   MAREPHRA: 'Kanyakumari, Tamil Nadu',
   NGCE: 'Kanyakumari, Tamil Nadu',
   ACEW: 'Kanyakumari, Tamil Nadu',

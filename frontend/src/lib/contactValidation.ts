@@ -516,3 +516,74 @@ export function validateAndNormalizeEmail(raw: string): ValidationResult {
     normalized: cleaned,
   };
 }
+
+/**
+ * Validates and normalizes multiple Email addresses separated by commas, semicolons, or slashes.
+ * Returns comma-separated normalized emails if all are valid.
+ */
+export function validateAndNormalizeMultiEmail(raw: string): ValidationResult {
+  if (!raw || !raw.trim()) {
+    return { valid: true, normalized: '' };
+  }
+
+  const parts = raw
+    .split(/[,;/]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    return { valid: true, normalized: '' };
+  }
+
+  const normalizedList: string[] = [];
+  for (const part of parts) {
+    const res = validateAndNormalizeEmail(part);
+    if (!res.valid) {
+      return res; // Return error from first invalid email
+    }
+    if (!normalizedList.includes(res.normalized)) {
+      normalizedList.push(res.normalized);
+    }
+  }
+
+  return {
+    valid: true,
+    normalized: normalizedList.join(', '),
+  };
+}
+
+/**
+ * Validates and normalizes multiple Indian Mobile Numbers separated by commas, semicolons, or slashes.
+ * Returns comma-separated normalized mobile numbers if all are valid.
+ */
+export function validateAndNormalizeMultiMobile(raw: string): ValidationResult {
+  if (!raw || !raw.trim()) {
+    return { valid: true, normalized: '' };
+  }
+
+  const parts = raw
+    .split(/[,;/]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    return { valid: true, normalized: '' };
+  }
+
+  const normalizedList: string[] = [];
+  for (const part of parts) {
+    const res = validateAndNormalizeIndianMobile(part);
+    if (!res.valid) {
+      return res; // Return error from first invalid mobile
+    }
+    if (!normalizedList.includes(res.normalized)) {
+      normalizedList.push(res.normalized);
+    }
+  }
+
+  return {
+    valid: true,
+    normalized: normalizedList.join(', '),
+  };
+}
+

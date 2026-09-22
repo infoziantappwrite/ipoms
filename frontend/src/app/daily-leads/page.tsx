@@ -81,10 +81,34 @@ export default function DailyLeadsPage() {
       })
       .catch(console.error);
 
+    // Restore saved Daily Leads state from localStorage
+    try {
+      const savedLeadsState = localStorage.getItem('ipoms_daily_leads_saved_state');
+      if (savedLeadsState) {
+        const parsed = JSON.parse(savedLeadsState);
+        if (parsed.activeTab) {
+          setActiveTab(parsed.activeTab);
+          activeTabRef.current = parsed.activeTab;
+        }
+        if (parsed.selectedDate) setSelectedDate(parsed.selectedDate);
+      }
+    } catch {}
+
     return () => {
       window.removeEventListener('ipoms_user_updated', syncUser);
     };
   }, []);
+
+  // Save Daily Leads state to localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('ipoms_daily_leads_saved_state', JSON.stringify({
+        activeTab,
+        selectedDate,
+      }));
+    } catch {}
+  }, [activeTab, selectedDate]);
 
   // Clear selection whenever filters or tab change
   useEffect(() => {

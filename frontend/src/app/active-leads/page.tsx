@@ -9,6 +9,7 @@ import { Modal } from '@/components/ui/Modal';
 import { ActiveLeadHeader } from './components/ActiveLeadHeader';
 import { ActiveLeadTable, ActiveLeadItem } from './components/ActiveLeadTable';
 import { AddActiveLeadModal } from './components/AddActiveLeadModal';
+import { DuplicateResolutionModal, DuplicateConflict, ConflictResolution } from './components/DuplicateResolutionModal';
 
 export default function ActiveLeadsPage() {
   const router = useRouter();
@@ -51,6 +52,43 @@ export default function ActiveLeadsPage() {
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [isDeletingSelected, setIsDeletingSelected] = useState(false);
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+
+  // Sync Duplicate Resolution Modal State
+  const [conflicts, setConflicts] = useState<DuplicateConflict[]>([]);
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [isResolvingConflicts, setIsResolvingConflicts] = useState(false);
+
+  // ── Auto-Restore & Save Active Leads View State from/to localStorage ──
+  const [hasRestoredActiveLeadsState, setHasRestoredActiveLeadsState] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || hasRestoredActiveLeadsState) return;
+    try {
+      const raw = localStorage.getItem('ipoms_active_leads_saved_state');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.activeTab) setActiveTab(parsed.activeTab);
+        if (parsed.selectedSection) setSelectedSection(parsed.selectedSection);
+        if (parsed.selectedYear) setSelectedYear(parsed.selectedYear);
+        if (parsed.selectedStatus) setSelectedStatus(parsed.selectedStatus);
+        if (parsed.selectedMonth) setSelectedMonth(parsed.selectedMonth);
+      }
+    } catch {} finally {
+      setHasRestoredActiveLeadsState(true);
+    }
+  }, [hasRestoredActiveLeadsState]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !hasRestoredActiveLeadsState) return;
+    try {
+      localStorage.setItem('ipoms_active_leads_saved_state', JSON.stringify({
+        activeTab,
+        selectedSection,
+        selectedYear,
+        selectedStatus,
+        selectedMonth,
+      }));
+    } catch {}
+  }, [hasRestoredActiveLeadsState, activeTab, selectedSection, selectedYear, selectedStatus, selectedMonth]);
 
   // Reset page to 1 when filters, search, section or active tab changes
   useEffect(() => {
@@ -308,29 +346,81 @@ export default function ActiveLeadsPage() {
     }
   };
 
-  // Sync leads from Daily Tracker
+  // Sync leads from Weekly Tracker with Duplicate Role Resolution
   const handleSyncTracker = async () => {
     try {
       setIsSyncing(true);
-      const res = await apiFetch('/active-leads/sync', {
+      // Step 1: Check if there are any duplicate role conflicts from the Weekly Tracker
+      const checkRes = await apiFetch<{
+        has_conflicts?: boolean;
+        conflicts?: DuplicateConflict[];
+        count?: number;
+      }>('/active-leads/sync', {
+        method: 'POST',
+        body: JSON.stringify({
+          check_only: true,
+          academic_year: selectedYear !== 'all' ? selectedYear : undefined,
+        }),
+      });
+
+      const foundConflicts = checkRes.data?.conflicts || (checkRes as any).conflicts || [];
+      const hasConflicts = checkRes.data?.has_conflicts || (checkRes as any).has_conflicts || foundConflicts.length > 0;
+
+      if (checkRes.success && hasConflicts && foundConflicts.length > 0) {
+        setConflicts(foundConflicts);
+        setShowConflictModal(true);
+        return;
+      }
+
+      // Step 2: If no conflicts, execute standard sync cleanly
+      const syncRes = await apiFetch('/active-leads/sync', {
         method: 'POST',
         body: JSON.stringify({
           academic_year: selectedYear !== 'all' ? selectedYear : undefined,
         }),
       });
 
-      if (res.success) {
+      if (syncRes.success) {
         await fetchLeads(false);
         broadcastMutation();
-        toast(res.message || 'Leads synchronized from Daily Tracker successfully!', 'success');
+        toast(syncRes.message || 'Leads synchronized from Weekly Tracker successfully!', 'success');
       } else {
-        toast(res.error?.message || 'Failed to sync leads from Daily Tracker', 'error');
+        toast(syncRes.error?.message || 'Failed to sync leads from Weekly Tracker', 'error');
       }
     } catch (err: any) {
       console.error('Sync tracker error:', err);
-      toast('Failed to sync leads from Daily Tracker. Please try again.', 'error');
+      toast('Failed to sync leads from Weekly Tracker. Please try again.', 'error');
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  // Confirm user's duplicate role resolutions from the In-App Modal
+  const handleConfirmConflictResolutions = async (resolutions: Record<string, ConflictResolution>) => {
+    try {
+      setIsResolvingConflicts(true);
+      const res = await apiFetch('/active-leads/sync', {
+        method: 'POST',
+        body: JSON.stringify({
+          resolutions,
+          academic_year: selectedYear !== 'all' ? selectedYear : undefined,
+        }),
+      });
+
+      if (res.success) {
+        setShowConflictModal(false);
+        setConflicts([]);
+        await fetchLeads(false);
+        broadcastMutation();
+        toast('Duplicate conflicts resolved & Active Leads updated successfully!', 'success');
+      } else {
+        toast(res.error?.message || 'Failed to update resolved roles', 'error');
+      }
+    } catch (err: any) {
+      console.error('Confirm resolutions error:', err);
+      toast('Failed to apply role resolutions. Please try again.', 'error');
+    } finally {
+      setIsResolvingConflicts(false);
     }
   };
 
@@ -525,6 +615,15 @@ export default function ActiveLeadsPage() {
           </div>
         </div>
       </Modal>
+
+      {/* In-App Duplicate Role Conflict Resolution Modal */}
+      <DuplicateResolutionModal
+        isOpen={showConflictModal}
+        conflicts={conflicts}
+        onClose={() => setShowConflictModal(false)}
+        onConfirm={handleConfirmConflictResolutions}
+        isResolving={isResolvingConflicts}
+      />
     </div>
   );
 }

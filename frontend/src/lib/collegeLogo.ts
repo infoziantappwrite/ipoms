@@ -52,6 +52,8 @@ export const COLLEGE_LOGO_MAP: Record<string, string> = {
   LICET: '/college-logos/layola.png',
   LAYOLA: '/college-logos/layola.png',
   LOYOLA: '/college-logos/layola.png',
+  MAREPHRAM: '/college-logos/mar ephream.png',
+  MAREPHRA: '/college-logos/mar ephream.png',
   MAR: '/college-logos/mar ephream.png',
   'MAR EPHRAEM': '/college-logos/mar ephream.png',
   'MAR EPHREAM': '/college-logos/mar ephream.png',

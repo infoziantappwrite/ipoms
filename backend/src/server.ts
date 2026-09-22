@@ -866,7 +866,7 @@ export const OFFICIAL_COLLEGE_DEFINITIONS = [
   { college_code: 'NGCE', college_name: 'Narayanaguru College of Engineering', location: 'Kanyakumari, Tamil Nadu', logo_url: '/college-logos/ngce.png' },
   { college_code: 'HITS', college_name: 'Hindustan Institute of Technology and Science', location: 'Chennai, Tamil Nadu', logo_url: '/college-logos/hits.png' },
   { college_code: 'NEHRU', college_name: 'Nehru Institute of Technology', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/nehru.png' },
-  { college_code: 'MAREPHRA', college_name: 'Mar Ephraem College of Engineering and Technology', location: 'Kanyakumari, Tamil Nadu', logo_url: '/college-logos/marephraem.png' },
+  { college_code: 'MAREPHRAM', college_name: 'Mar Ephraem College of Engineering and Technology', location: 'Kanyakumari, Tamil Nadu', logo_url: '/college-logos/marephraem.png' },
 ];
 
 export const ACTIVE_COLLEGE_CODES = OFFICIAL_COLLEGE_DEFINITIONS.map(c => c.college_code);
@@ -877,6 +877,7 @@ export function resolveOfficialCollegeAcronym(input?: any): string {
   const str = String(typeof input === 'string' ? input : (input.college_code || input.college_name || input.name || '')).trim();
   if (!str) return '';
   const upper = str.toUpperCase();
+  if (upper === 'MAREPHRA') return 'MAREPHRAM';
   // 1. Direct match on official code
   const byCode = OFFICIAL_COLLEGE_DEFINITIONS.find(c => c.college_code.toUpperCase() === upper);
   if (byCode) return byCode.college_code;
@@ -897,6 +898,51 @@ export function resolveOfficialCollegeAcronym(input?: any): string {
   return upper;
 }
 
+export const DEFAULT_OFFICIAL_COORDINATOR_ALLOCATIONS: Record<string, string[]> = {
+  // Mohana: KARPAGAM, AIHT, ACHARIYA (ACET), KPR
+  'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
+  'mohana': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
+  'mohanaradha': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
+  'a.mohanaradha': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
+  'mohanaradha a': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
+
+  // Thirisha: PSNA, DSU, SMVEC
+  'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
+  'thirisha': ['PSNA', 'DSU', 'SMVEC'],
+  'thirisha r': ['PSNA', 'DSU', 'SMVEC'],
+
+  // Malvika: KLU, NGCE
+  'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],
+  'malavika': ['KLU', 'NGCE'],
+  'malvika': ['KLU', 'NGCE'],
+  'malavika ramesh': ['KLU', 'NGCE'],
+
+  // Lizenya: NPR, KIOT, ACEW
+  'lizenya_r@infoziant.com': ['NPR', 'KIOT', 'ACEW'],
+  'lizenya': ['NPR', 'KIOT', 'ACEW'],
+  'lizenya r': ['NPR', 'KIOT', 'ACEW'],
+
+  // Megala: NGP, KAMARAJ
+  'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ'],
+  'megala': ['NGP', 'KAMARAJ'],
+  'megaladevi': ['NGP', 'KAMARAJ'],
+  'megaladevi p s': ['NGP', 'KAMARAJ'],
+  'megaladevi ps': ['NGP', 'KAMARAJ'],
+
+  // Tamil / Seshmitha: MCET, MEC
+  'seshmitha_tamil@icl.today': ['MCET', 'MEC'],
+  'tamil': ['MCET', 'MEC'],
+  'seshmitha': ['MCET', 'MEC'],
+  'tamilselvi': ['MCET', 'MEC'],
+  'seshmitha tamilselvi': ['MCET', 'MEC'],
+  'seshmitha tamilselvi r': ['MCET', 'MEC'],
+
+  // Sujitha (Team Leader): NEHRU, MAREPHRAM, KPR, HITS, SONA
+  'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
+  'sujitha': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
+  'sujitha s': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
+};
+
 // Helper to initialize/sync active roster on startup or demand
 export async function syncActiveCollegesRoster() {
   try {
@@ -904,23 +950,36 @@ export async function syncActiveCollegesRoster() {
       let existing = await College.findOne({
         $or: [
           { college_code: def.college_code },
+          { college_code: 'MAREPHRA' },
           { college_name: new RegExp('^' + def.college_name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') },
         ],
       });
-      if (existing) {
-        existing.status = 'active';
-        if (!existing.location) existing.location = def.location;
-        if (!existing.logo_url) existing.logo_url = def.logo_url;
-        await existing.save();
-      } else {
-        await College.create({
-          college_name: def.college_name,
-          college_code: def.college_code,
-          location: def.location,
-          logo_url: def.logo_url,
-          status: 'active',
-          assigned_coordinator_ids: [],
-        });
+      try {
+        if (existing) {
+          existing.status = 'active';
+          existing.college_code = def.college_code;
+          if (!existing.location) existing.location = def.location;
+          if (!existing.logo_url) existing.logo_url = def.logo_url;
+          await existing.save();
+        } else {
+          await College.findOneAndUpdate(
+            { college_code: def.college_code },
+            {
+              $setOnInsert: {
+                college_name: def.college_name,
+                location: def.location,
+                logo_url: def.logo_url,
+                status: 'active',
+                assigned_coordinator_ids: [],
+              },
+            },
+            { upsert: true, new: true }
+          );
+        }
+      } catch (colErr: any) {
+        if (colErr.code !== 11000) {
+          console.warn(`[Colleges] Sync note for ${def.college_code}:`, colErr.message);
+        }
       }
     }
     await College.updateMany(
@@ -1109,7 +1168,7 @@ app.get('/api/v1/colleges/focus-matrix', async (req: Request, res: Response) => 
 
     // Official focus college allocations mapping for default weekly pre-selection
     const DEFAULT_COORDINATOR_COLLEGE_MAP: Record<string, string[]> = {
-      'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
+      'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
       'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
       'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
       'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],
@@ -1517,10 +1576,10 @@ app.post('/api/v1/colleges/lock-focus', async (req: Request, res: Response) => {
       });
     }
 
-    if (resolvedCollegeDocs.length > 5) {
+    if (resolvedCollegeDocs.length > 4) {
       return res.status(400).json({
         success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'Maximum 5 colleges allowed.' },
+        error: { code: 'VALIDATION_ERROR', message: 'Maximum 4 colleges allowed per coordinator.' },
       });
     }
 
@@ -1528,9 +1587,9 @@ app.post('/api/v1/colleges/lock-focus', async (req: Request, res: Response) => {
     const selectedColleges = resolvedCollegeDocs;
 
     // ── CO-HANDLING & MUTUAL EXCLUSION CHECK ──
-    // Rule 1: A minimum of 1 college must be selected, and a maximum of 4 are allowed (checked above).
+    // Rule 1: A minimum of 1 college must be selected, and a maximum of 4 are allowed.
     // Rule 2: At most 2 coordinators or team leaders can handle any single college.
-    // Rule 3: Per coordinator / team leader, at most 1 college can be co-handled with another person.
+    // Rule 3: Per coordinator / team leader, at most 2 colleges can be co-handled with another person.
     const otherCoordinators = await User.find({
       _id: { $ne: new Types.ObjectId(currentUserId) },
       role_codes: { $in: ['COORDINATOR', 'PLACEMENT_COORDINATOR', 'TEAM_LEADER'] },
@@ -1570,13 +1629,13 @@ app.post('/api/v1/colleges/lock-focus', async (req: Request, res: Response) => {
       }
     }
 
-    // Rule: At a time, maximum 1 college only is allowed to be co-handled per user
-    if (sharedCollegesCount > 1) {
+    // Rule: At a time, maximum 2 colleges are allowed to be co-handled per user
+    if (sharedCollegesCount > 2) {
       return res.status(409).json({
         success: false,
         error: {
           code: 'MAX_SHARED_COLLEGES_EXCEEDED',
-          message: `You have selected ${sharedCollegesCount} co-handled colleges (${sharedCollegeNames.join(', ')}). At a time, maximum 1 college only is allowed to be co-handled by 2 coordinators or team leader.`,
+          message: `You have selected ${sharedCollegesCount} co-handled colleges (${sharedCollegeNames.join(', ')}). At a time, maximum 2 colleges are allowed to be co-handled by 2 coordinators or team leaders.`,
         },
       });
     }
@@ -1744,8 +1803,8 @@ app.get('/api/v1/coordinators', async (req: Request, res: Response) => {
 
     const DEFAULT_COORDINATOR_COLLEGE_MAP: Record<string, string[]> = {
       // Sujitha
-      'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
-      'sujitha': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
+      'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
+      'sujitha': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
       // Mohana / Mohanaradha
       'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
       'mohana': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
@@ -1899,7 +1958,7 @@ app.get('/api/v1/daily-tracker/today', async (req: Request, res: Response) => {
       if (!coordName || coordName === 'Administrator') {
         if (['ACET', 'AIHT', 'KARPAGAM', 'KPR'].includes(colCode)) {
           coordName = 'A.Mohanaradha';
-        } else if (['NEHRU', 'MAREPHRA', 'HITS', 'SONA'].includes(colCode)) {
+        } else if (['NEHRU', 'MAREPHRAM', 'MAREPHRA', 'HITS', 'SONA'].includes(colCode)) {
           coordName = 'Sujitha S';
         } else if (['PSNA', 'DSU', 'SMVEC'].includes(colCode)) {
           coordName = 'Thirisha R';
@@ -2193,16 +2252,7 @@ app.post('/api/v1/daily-tracker/manual-row', async (req: Request, res: Response)
       duplicate_acknowledged: false,
     });
 
-    if (newRow.outcome_status && newRow.company_name) {
-      syncLeadFromDailyTracker({
-        company_name: newRow.company_name,
-        call_outcome: newRow.outcome_status,
-        remarks: newRow.comments,
-        coordinator_id: newRow.coordinator_id,
-        college_id: newRow.college_id,
-        daily_tracker_id: newRow._id,
-      }).catch((e) => console.error('Auto-lead sync error on create:', e));
-    }
+    // Note: Active Leads is now exclusively sourced from Weekly Tracker (Daily Tracker sync decoupled)
 
     const enrichedRow = {
       ...(newRow.toObject ? newRow.toObject() : newRow),
@@ -2698,7 +2748,7 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
     row.last_saved_at = new Date();
     await row.save();
 
-    // Lively sync edited contact info to CompanyMetadata
+    // Lively sync edited contact info to CompanyMetadata & synchronize across catalog
     if (row.company_id || row.company_name) {
       (async () => {
         try {
@@ -2711,6 +2761,8 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
           }
           if (meta && !meta.is_deleted) {
             let metaUpdated = false;
+
+            // 1. Sync HR Names (Comma / semicolon / slash separated)
             if (row.hr_name && row.hr_name.trim()) {
               const existingHrs = (meta.hr_name || '')
                 .split(/[,;/]+/)
@@ -2726,30 +2778,86 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
                 metaUpdated = true;
               }
             }
+
+            // 2. Sync Mobile Numbers (Comma / semicolon / slash separated)
             if (row.mobile_number && row.mobile_number.trim()) {
-              const mob = row.mobile_number.trim();
-              if (!meta.mobile_numbers.includes(mob)) {
-                meta.mobile_numbers.push(mob);
-                metaUpdated = true;
+              const incomingMobiles = row.mobile_number
+                .split(/[,;/]+/)
+                .map((m: string) => m.trim())
+                .filter((m: string) => m.length > 0);
+              for (const mob of incomingMobiles) {
+                if (!meta.mobile_numbers.includes(mob)) {
+                  meta.mobile_numbers.push(mob);
+                  metaUpdated = true;
+                }
               }
-              if (!meta.primary_mobile) {
-                meta.primary_mobile = mob;
+              if (!meta.primary_mobile && meta.mobile_numbers.length > 0) {
+                meta.primary_mobile = meta.mobile_numbers[0];
                 metaUpdated = true;
               }
             }
+
+            // 3. Sync Email IDs (Comma / semicolon / slash separated)
             if (row.email_id && row.email_id.trim()) {
-              const em = row.email_id.trim().toLowerCase();
-              if (!meta.email_ids.includes(em)) {
-                meta.email_ids.push(em);
-                metaUpdated = true;
+              const incomingEmails = row.email_id
+                .split(/[,;/]+/)
+                .map((e: string) => e.trim().toLowerCase())
+                .filter((e: string) => e.length > 0);
+              for (const em of incomingEmails) {
+                if (!meta.email_ids.includes(em)) {
+                  meta.email_ids.push(em);
+                  metaUpdated = true;
+                }
               }
-              if (!meta.primary_email) {
-                meta.primary_email = em;
+              if (!meta.primary_email && meta.email_ids.length > 0) {
+                meta.primary_email = meta.email_ids[0];
                 metaUpdated = true;
               }
             }
+
             if (metaUpdated) {
               await meta.save();
+            }
+
+            // Synchronize full merged emails/mobiles/hr_name across DailyTracker & connected modules
+            const fullMergedEmails = meta.email_ids.join(', ');
+            const fullMergedMobiles = meta.mobile_numbers.join(', ');
+            const fullMergedHr = meta.hr_name;
+
+            let rowUpdated = false;
+            if (fullMergedEmails && row.email_id !== fullMergedEmails) {
+              row.email_id = fullMergedEmails;
+              rowUpdated = true;
+            }
+            if (fullMergedMobiles && row.mobile_number !== fullMergedMobiles) {
+              row.mobile_number = fullMergedMobiles;
+              rowUpdated = true;
+            }
+            if (fullMergedHr && row.hr_name !== fullMergedHr) {
+              row.hr_name = fullMergedHr;
+              rowUpdated = true;
+            }
+            if (rowUpdated) {
+              await row.save();
+            }
+
+            // Cascade to other DailyTracker records for this company
+            if (fullMergedEmails || fullMergedMobiles || fullMergedHr) {
+              const dtCascade: any = {};
+              if (fullMergedEmails) dtCascade.email_id = fullMergedEmails;
+              if (fullMergedMobiles) dtCascade.mobile_number = fullMergedMobiles;
+              if (fullMergedHr) dtCascade.hr_name = fullMergedHr;
+
+              await DailyTracker.updateMany(
+                {
+                  _id: { $ne: row._id },
+                  $or: [
+                    { company_id: meta._id },
+                    { company_name: { $regex: new RegExp(`^${escapeRegex(row.company_name.trim())}$`, 'i') } },
+                  ],
+                },
+                { $set: dtCascade }
+              );
             }
           }
         } catch (syncErr) {
@@ -2758,17 +2866,7 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
       })();
     }
 
-    // Auto-sync into Active Leads if outcome indicates positive / hiring / follow up / invite
-    if (row.outcome_status && row.company_name) {
-      syncLeadFromDailyTracker({
-        company_name: row.company_name,
-        call_outcome: row.outcome_status,
-        remarks: row.comments,
-        coordinator_id: row.coordinator_id,
-        college_id: row.college_id,
-        daily_tracker_id: row._id,
-      }).catch((e) => console.error('Auto-lead sync error:', e));
-    }
+    // Note: Active Leads is now exclusively sourced from Weekly Tracker (Daily Tracker sync decoupled)
 
     // ── Cascade Edits / Outcome changes to already connected DailyLead and WeeklyTracker ──
     (async () => {
@@ -3303,7 +3401,7 @@ app.get('/api/v1/daily-tracker/history', async (req: Request, res: Response) => 
       if (!coordName || coordName === 'Administrator') {
         if (['ACET', 'AIHT', 'KARPAGAM', 'KPR'].includes(colCode)) {
           coordName = 'A.Mohanaradha';
-        } else if (['NEHRU', 'MAREPHRA', 'HITS', 'SONA'].includes(colCode)) {
+        } else if (['NEHRU', 'MAREPHRAM', 'MAREPHRA', 'HITS', 'SONA'].includes(colCode)) {
           coordName = 'Sujitha S';
         } else if (['PSNA', 'DSU', 'SMVEC'].includes(colCode)) {
           coordName = 'Thirisha R';
@@ -4863,6 +4961,46 @@ app.patch('/api/v1/weekly-tracker/:id', async (req: Request, res: Response) => {
             );
           }
         }
+
+        // Sync contact edits from WeeklyTracker to CompanyMetadata
+        if (row.company_name) {
+          try {
+            let meta = await CompanyMetadata.findOne({
+              company_name: { $regex: new RegExp(`^${escapeRegex(row.company_name.trim())}$`, 'i') },
+              is_deleted: false,
+            });
+            if (meta) {
+              let metaUpdated = false;
+              const incomingMobiles = (row.contact_number || (row.mobile_numbers || []).join(', '))
+                .split(/[,;/]+/)
+                .map((m: string) => m.trim())
+                .filter(Boolean);
+              for (const mob of incomingMobiles) {
+                if (!meta.mobile_numbers.includes(mob)) {
+                  meta.mobile_numbers.push(mob);
+                  metaUpdated = true;
+                }
+              }
+              const incomingEmails = (row.email_id || (row.email_ids || []).join(', '))
+                .split(/[,;/]+/)
+                .map((e: string) => e.trim().toLowerCase())
+                .filter(Boolean);
+              for (const em of incomingEmails) {
+                if (!meta.email_ids.includes(em)) {
+                  meta.email_ids.push(em);
+                  metaUpdated = true;
+                }
+              }
+              if (metaUpdated) {
+                if (!meta.primary_mobile && meta.mobile_numbers.length > 0) meta.primary_mobile = meta.mobile_numbers[0];
+                if (!meta.primary_email && meta.email_ids.length > 0) meta.primary_email = meta.email_ids[0];
+                await meta.save();
+              }
+            }
+          } catch (mErr) {
+            console.error('WT to CompanyMetadata sync error:', mErr);
+          }
+        }
       } catch (cascadeErr) {
         console.error('Cascade WT update error:', cascadeErr);
       }
@@ -5377,6 +5515,7 @@ app.get('/api/v1/weekly-tracker/kpi', async (req: Request, res: Response) => {
 });
 
 // ── WT-8: POST /api/v1/weekly-tracker/sync-daily-positives
+// ── WT-8: POST /api/v1/weekly-tracker/sync-daily-positives
 // Ingest positive leads from Daily Leads (Positives section) into Weekly Tracker Pipeline (Companies in Pipeline)
 app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res: Response) => {
   try {
@@ -5384,7 +5523,7 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
     const targetYear = Number(academic_year) || (await getCurrentAcademicYear());
     const { startFriday, endThursday, weekNumber } = getFridayWeekBounds();
 
-    // Resolve all matching college IDs (aliases/codes) so college references are consistent
+    // Resolve active college IDs (aliases/codes) for requested college_id
     const queryCollegeIds: any[] = [];
     if (!college_id || college_id === 'all') {
       const allCols = await College.find({ is_active: { $ne: false } });
@@ -5415,22 +5554,37 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
       foundCols.forEach((fc) => queryCollegeIds.push(fc._id));
     }
 
-    // Clean up any existing duplicate records in weekly_tracker for this college/year
+    // Expand query scope to include all colleges assigned to the coordinator (behind the scenes)
+    const allSyncCollegeIds: any[] = [...queryCollegeIds];
+    if (coordinator_id && Types.ObjectId.isValid(String(coordinator_id))) {
+      const coordUser = await User.findById(coordinator_id).select('assigned_college_ids').lean();
+      if (coordUser && Array.isArray(coordUser.assigned_college_ids)) {
+        for (const cid of coordUser.assigned_college_ids) {
+          if (cid && !allSyncCollegeIds.some((id) => String(id) === String(cid))) {
+            allSyncCollegeIds.push(new Types.ObjectId(String(cid)));
+          }
+        }
+      }
+    }
+
+    // Clean up any existing duplicate records in weekly_tracker per college/year
     const existingAll = await WeeklyTracker.find({
-      college_id: { $in: queryCollegeIds },
+      college_id: { $in: allSyncCollegeIds },
       academic_year: targetYear,
       is_deleted: false,
     }).sort({ created_at: 1 });
 
-    const seenNames = new Set<string>();
+    const seenCollegeCompanyKeys = new Set<string>();
     const dupIdsToDelete: Types.ObjectId[] = [];
     for (const row of existingAll) {
-      const key = row.company_name ? row.company_name.trim().toLowerCase() : '';
-      if (key) {
-        if (seenNames.has(key)) {
+      const colIdStr = String(row.college_id);
+      const nameKey = row.company_name ? row.company_name.trim().toLowerCase() : '';
+      if (nameKey) {
+        const compositeKey = `${colIdStr}::${nameKey}`;
+        if (seenCollegeCompanyKeys.has(compositeKey)) {
           dupIdsToDelete.push(row._id);
         } else {
-          seenNames.add(key);
+          seenCollegeCompanyKeys.add(compositeKey);
         }
       }
     }
@@ -5438,9 +5592,9 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
       await WeeklyTracker.deleteMany({ _id: { $in: dupIdsToDelete } });
     }
 
-    // Daily Leads filter: Positive section leads for these college(s)
+    // Daily Leads filter: Positive section leads ONLY (lead_type = 'positive') for these college(s)
     const dailyLeadFilter: any = {
-      college_id: { $in: queryCollegeIds },
+      college_id: { $in: allSyncCollegeIds },
       lead_type: 'positive',
       is_deleted: false,
     };
@@ -5452,38 +5606,23 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
     const positiveDailyLeads = await DailyLead.find(dailyLeadFilter).sort({ lead_date: 1, created_at: 1 });
     const batchYear = await getCurrentGraduatingBatchYear();
 
-    // Find the highest existing order_index in pipeline for sequential continuation
-    const maxPipelineRow = await WeeklyTracker.findOne({
-      college_id: { $in: queryCollegeIds },
-      academic_year: targetYear,
-      pipeline_section: 'pipeline',
-      is_deleted: false,
-    }).sort({ order_index: -1 });
-
-    let nextOrderIndex = maxPipelineRow && typeof maxPipelineRow.order_index === 'number'
-      ? maxPipelineRow.order_index + 1
-      : (await WeeklyTracker.countDocuments({
-          college_id: { $in: queryCollegeIds },
-          academic_year: targetYear,
-          pipeline_section: 'pipeline',
-          is_deleted: false,
-        }));
-
     let syncedCount = 0;
-    const inBatchSyncedNames = new Set<string>(seenNames);
+    const inBatchSyncedKeys = new Set<string>(seenCollegeCompanyKeys);
 
     for (const lead of positiveDailyLeads) {
-      if (!lead.company_name || !lead.company_name.trim()) continue;
+      if (!lead.company_name || !lead.company_name.trim() || !lead.college_id) continue;
       const trimmedName = lead.company_name.trim();
-      const normalizedKey = trimmedName.toLowerCase();
+      const normalizedName = trimmedName.toLowerCase();
+      const leadCollegeIdStr = String(lead.college_id);
+      const compositeKey = `${leadCollegeIdStr}::${normalizedName}`;
 
-      // Already present in Weekly Tracker or already processed in this batch
-      if (inBatchSyncedNames.has(normalizedKey)) {
-        // If existing record has empty role or CTC, but DailyLead now has them, backfill them
+      // Already present in Weekly Tracker for this specific college or already processed in this batch
+      if (inBatchSyncedKeys.has(compositeKey)) {
+        // If existing record for THIS college has empty role or CTC, but DailyLead now has them, backfill them
         if (lead.job_role || lead.ctc) {
           const safeRegex = new RegExp(`^${escapeRegex(trimmedName)}$`, 'i');
           const existingRow = await WeeklyTracker.findOne({
-            college_id: { $in: queryCollegeIds },
+            college_id: lead.college_id,
             academic_year: targetYear,
             company_name: { $regex: safeRegex },
             is_deleted: false,
@@ -5507,16 +5646,33 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
         continue;
       }
 
-      // Check if already present in weekly_tracker for this academic year
+      // Check if already present in weekly_tracker for THIS specific college and academic year
       const safeRegex = new RegExp(`^${escapeRegex(trimmedName)}$`, 'i');
       const existing = await WeeklyTracker.findOne({
-        college_id: { $in: queryCollegeIds },
+        college_id: lead.college_id,
         academic_year: targetYear,
         company_name: { $regex: safeRegex },
         is_deleted: false,
       });
 
       if (!existing) {
+        // Find next order_index for this specific college's pipeline section
+        const maxPipelineRow = await WeeklyTracker.findOne({
+          college_id: lead.college_id,
+          academic_year: targetYear,
+          pipeline_section: 'pipeline',
+          is_deleted: false,
+        }).sort({ order_index: -1 });
+
+        const nextOrderIndex = maxPipelineRow && typeof maxPipelineRow.order_index === 'number'
+          ? maxPipelineRow.order_index + 1
+          : (await WeeklyTracker.countDocuments({
+              college_id: lead.college_id,
+              academic_year: targetYear,
+              pipeline_section: 'pipeline',
+              is_deleted: false,
+            }));
+
         // Retrieve full metadata / daily tracker contacts if available
         let metaContacts: { mobile_numbers?: string[]; email_ids?: string[]; company_type?: string } = {};
         if (lead.company_id && Types.ObjectId.isValid(String(lead.company_id))) {
@@ -5566,7 +5722,7 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
           pipeline_section: 'pipeline',
           current_status_text: 'Invite sent, Awaiting JD',
           follow_up_date: null,
-          order_index: nextOrderIndex++,
+          order_index: nextOrderIndex,
           week_number: weekNumber,
           week_start_date: startFriday,
           week_end_date: endThursday,
@@ -5575,14 +5731,14 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
           last_status_updated_at: new Date(),
         });
         syncedCount++;
-        inBatchSyncedNames.add(normalizedKey);
+        inBatchSyncedKeys.add(compositeKey);
       }
     }
 
-    // Modernize any existing records with the legacy status text
+    // Modernize any existing records with legacy status text
     await WeeklyTracker.updateMany(
       {
-        college_id: { $in: queryCollegeIds },
+        college_id: { $in: allSyncCollegeIds },
         academic_year: targetYear,
         current_status_text: 'Invite mail shared awaiting JD',
         is_deleted: false,
@@ -5713,7 +5869,7 @@ app.get('/api/v1/daily-leads', async (req: Request, res: Response) => {
 
     const OFFICIAL_COORDINATOR_COLLEGE_MAP: Record<string, string[]> = {
       'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
-      'sujitha_s@infoziant.com': ['NEHRU', 'SONA', 'MAREPHRA', 'KPR', 'MKCE', 'KARUNYA', 'AVS', 'AAA', 'KGISL', 'SSEI', 'HITS', 'EGS'],
+      'sujitha_s@infoziant.com': ['NEHRU', 'SONA', 'MAREPHRAM', 'KPR', 'MKCE', 'KARUNYA', 'AVS', 'AAA', 'KGISL', 'SSEI', 'HITS', 'EGS'],
       'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
       'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],
       'lizenya_r@infoziant.com': ['NPR', 'KIOT', 'ACEW'],
@@ -7659,7 +7815,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
 
       const OFFICIAL_COORDINATOR_COLLEGE_MAP: Record<string, string[]> = {
         'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
-        'sujitha_s@infoziant.com': ['NEHRU', 'SONA', 'MAREPHRA', 'KPR', 'MKCE', 'KARUNYA', 'AVS', 'AAA', 'KGISL', 'SSEI', 'HITS', 'EGS'],
+        'sujitha_s@infoziant.com': ['NEHRU', 'SONA', 'MAREPHRAM', 'KPR', 'MKCE', 'KARUNYA', 'AVS', 'AAA', 'KGISL', 'SSEI', 'HITS', 'EGS'],
         'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
         'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],
         'lizenya_r@infoziant.com': ['NPR', 'KIOT', 'ACEW'],
@@ -7876,7 +8032,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
 
       const OFFICIAL_COORDINATOR_COLLEGE_MAP: Record<string, string[]> = {
         'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
-        'sujitha_s@infoziant.com': ['NEHRU', 'SONA', 'MAREPHRA', 'KPR', 'MKCE', 'KARUNYA', 'AVS', 'AAA', 'KGISL', 'SSEI', 'HITS', 'EGS'],
+        'sujitha_s@infoziant.com': ['NEHRU', 'SONA', 'MAREPHRAM', 'KPR', 'MKCE', 'KARUNYA', 'AVS', 'AAA', 'KGISL', 'SSEI', 'HITS', 'EGS'],
         'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
         'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],
         'lizenya_r@infoziant.com': ['NPR', 'KIOT', 'ACEW'],
@@ -8061,10 +8217,25 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         handledColleges = await College.find({ is_deleted: { $ne: true } }).select('college_name college_code location');
       }
 
+      // Filter handledColleges if selected_college_ids or college_ids is explicitly provided
+      const requestedCollegeIds = Array.isArray(req.body.selected_college_ids) && req.body.selected_college_ids.length > 0
+        ? req.body.selected_college_ids
+        : (Array.isArray(req.body.college_ids) && req.body.college_ids.length > 0 ? req.body.college_ids : null);
+
+      if (requestedCollegeIds) {
+        const selectedIdStrings = new Set(requestedCollegeIds.map((id: any) => String(id)));
+        const filteredHandled = handledColleges.filter((col) => selectedIdStrings.has(String(col._id)));
+        if (filteredHandled.length > 0) {
+          handledColleges = filteredHandled;
+        }
+      }
+
       const collegeIdsToMatch: any[] = [];
       if (targetCollege?._id) collegeIdsToMatch.push(targetCollege._id);
-      if (college_id && college_id !== 'all' && Types.ObjectId.isValid(String(college_id))) {
+      if (college_id && college_id !== 'all' && college_id !== 'multi' && Types.ObjectId.isValid(String(college_id))) {
         collegeIdsToMatch.push(new Types.ObjectId(String(college_id)));
+      } else if (handledColleges.length > 0) {
+        handledColleges.forEach(col => collegeIdsToMatch.push(col._id));
       }
 
       // 2. Fetch conversions (Exclusively from 'in_progress' section of Weekly Tracker for the target college)
@@ -8226,6 +8397,71 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         college_name: (wt.college_id as any)?.college_name || targetCollege?.college_name || 'Target Institution',
       }));
 
+      // ── Calling Activity Summary — real calls + duration per handled college
+      // for the report's month, straight from Daily Tracker (user-requested,
+      // perf/security session, 22 Sep 2026). Month bounds come from date_from/
+      // date_to when the wizard's month picker sends them; falls back to the
+      // current IST calendar month so an older client that doesn't send them
+      // yet still gets a real (if less exact) answer, never a silently empty one.
+      let monthRangeStart: Date;
+      let monthRangeEnd: Date;
+      const parsedFrom = date_from ? new Date(String(date_from) + 'T00:00:00Z') : null;
+      const parsedTo = date_to ? new Date(String(date_to) + 'T23:59:59Z') : null;
+      if (parsedFrom && !isNaN(parsedFrom.getTime()) && parsedTo && !isNaN(parsedTo.getTime())) {
+        monthRangeStart = parsedFrom;
+        monthRangeEnd = parsedTo;
+      } else {
+        const todayIst = getTodayDate();
+        monthRangeStart = new Date(Date.UTC(todayIst.getUTCFullYear(), todayIst.getUTCMonth(), 1, 0, 0, 0));
+        monthRangeEnd = new Date(Date.UTC(todayIst.getUTCFullYear(), todayIst.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+      }
+
+      // Deliberately NOT narrowed to collegeIdsToMatch like the other sections —
+      // the user asked for "how many calls per college handled by the user", i.e.
+      // this coordinator's whole monthly picture, not just whichever single
+      // institution the rest of the report currently targets.
+      const callingActivityRows = await Promise.all(
+        handledColleges.map(async (col, idx) => {
+          const rows = await DailyTracker.find({
+            coordinator_id: coordinator._id,
+            college_id: col._id,
+            is_skipped: { $ne: true },
+            $or: [
+              { session_date: { $gte: monthRangeStart, $lte: monthRangeEnd } },
+              { created_at: { $gte: monthRangeStart, $lte: monthRangeEnd } },
+            ],
+          }).select('duration_seconds call_start_time call_end_time').lean();
+
+          let durationSecs = 0;
+          for (const row of rows) {
+            if (typeof row.duration_seconds === 'number' && row.duration_seconds > 0) {
+              durationSecs += row.duration_seconds;
+            } else if (row.call_start_time && row.call_end_time) {
+              const s = new Date(row.call_start_time).getTime();
+              const e = new Date(row.call_end_time).getTime();
+              if (e > s) durationSecs += Math.floor((e - s) / 1000);
+            }
+          }
+
+          return {
+            s_no: idx + 1,
+            college_name: col.college_name,
+            college_code: col.college_code,
+            total_calls: rows.length,
+            total_duration_seconds: durationSecs,
+            total_duration_formatted: formatDurationClock(durationSecs).formatted,
+          };
+        })
+      );
+
+      const callingActivityTotals = callingActivityRows.reduce(
+        (acc, r) => ({
+          calls: acc.calls + r.total_calls,
+          seconds: acc.seconds + r.total_duration_seconds,
+        }),
+        { calls: 0, seconds: 0 }
+      );
+
       let monthName = 'August';
       if (week_label) {
         const cleaned = String(week_label).trim();
@@ -8267,6 +8503,8 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
           total_conversion_count: conversionsList.length + companiesInDriveList.length,
           total_companies_scheduled: companiesInDriveList.length,
           total_offers_moved: totalOffersReceived,
+          total_calls_this_month: callingActivityTotals.calls,
+          total_hours_dedicated: formatDurationClock(callingActivityTotals.seconds).formatted,
         },
         sections: {
           completed_companies: completedCompaniesList,
@@ -8275,6 +8513,11 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
           company_drives_scheduled: companiesInDriveList,
           on_hold_by_college: onHoldByCollegeList,
           on_hold_by_hr: onHoldByHrList,
+          calling_activity: callingActivityRows,
+        },
+        calling_activity_totals: {
+          total_calls: callingActivityTotals.calls,
+          total_duration_formatted: formatDurationClock(callingActivityTotals.seconds).formatted,
         },
         remarks: custom_remarks || 'All scheduled month-end campus drives and JD received companies have been reviewed. Follow-ups with corporate HRs remain on track.',
         included_sections: included_sections || {
@@ -8285,6 +8528,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
           company_drives_scheduled: true,
           on_hold_by_college: true,
           on_hold_by_hr: true,
+          calling_activity: true,
           remarks: false,
         },
         included_kpi_cards: kpi_cards || {
@@ -9107,6 +9351,41 @@ const OUTCOME_BUCKET: Record<string, OutcomeBucket> = {
   drive_completed: 'other_progress',
 };
 
+/**
+ * Determines whether a DailyTracker row represents a completed call.
+ * A call is completed ONLY when its status/outcome is set (and not empty/pending),
+ * or when duration_seconds > 0, or when call start/end times are recorded.
+ * Loaded/uncalled rows with no status updated are NOT counted as completed calls.
+ */
+function isTrackerRowCompleted(row: any): boolean {
+  if (!row) return false;
+  if (row.is_skipped) return false;
+
+  const status = String(row.outcome_status || '').trim().toLowerCase();
+  if (status !== '' && status !== 'null' && status !== 'undefined' && status !== 'pending') {
+    return true;
+  }
+
+  if (typeof row.duration_seconds === 'number' && row.duration_seconds > 0) {
+    return true;
+  }
+
+  if (row.call_start_time || row.call_end_time) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Returns the timestamp when a call's status update or completion occurred.
+ * Priority order: call_end_time -> call_start_time -> last_saved_at -> updated_at -> created_at -> session_date
+ */
+function getTrackerCompletionTimestamp(row: any): Date {
+  const ts = row.call_end_time || row.call_start_time || row.last_saved_at || row.updated_at || row.created_at || row.session_date;
+  return ts ? new Date(ts) : new Date();
+}
+
 // ── DB-1: GET /api/v1/dashboard/coordinator
 // Coordinator Dashboard (Spec Section 5.1 & 7) — "What should I do today?"
 app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => {
@@ -9176,7 +9455,7 @@ app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => 
           { created_at: { $gte: dayStart, $lte: dayEnd } },
           { year: today.getUTCFullYear(), month: today.getUTCMonth() + 1, day: today.getUTCDate() },
         ],
-      }).select('duration_seconds call_start_time call_end_time outcome_status created_at session_date').lean(),
+      }).select('duration_seconds call_start_time call_end_time outcome_status created_at updated_at last_saved_at session_date is_skipped').lean(),
       DailyLead.countDocuments({
         coordinator_id: coordinator._id,
         lead_type: 'jd_received',
@@ -9193,7 +9472,8 @@ app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => 
     ]);
 
     let totalDurationSeconds = 0;
-    const todayCalls = todayTrackerRows.length;
+    const completedTrackerRows = todayTrackerRows.filter((r) => isTrackerRowCompleted(r));
+    const todayCalls = completedTrackerRows.length;
     let todayPositives = 0;
     const todayOutcomes = {
       positive: 0,
@@ -9210,7 +9490,7 @@ app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => 
     const hourlyCalls: number[] = new Array(24).fill(0);
     const hourlyPositives: number[] = new Array(24).fill(0);
 
-    for (const row of todayTrackerRows) {
+    for (const row of completedTrackerRows) {
       let dur = 0;
       if (typeof row.duration_seconds === 'number' && row.duration_seconds > 0) {
         dur = row.duration_seconds;
@@ -9233,17 +9513,13 @@ app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => 
       else if (b === 'negative') todayOutcomes.negative++;
       else if (b === 'follow_up') todayOutcomes.follow_up++;
 
-      // call_start_time is the truth when the coordinator logged one; created_at
-      // is the honest fallback for rows saved without a manual start time.
-      const stamp = (row as any).call_start_time || (row as any).created_at;
-      if (stamp) {
-        const t = new Date(stamp).getTime();
-        if (!isNaN(t)) {
-          const hour = new Date(t + IST_OFFSET_MS).getUTCHours();
-          hourlyCalls[hour]++;
-          if (isPositive) {
-            hourlyPositives[hour]++;
-          }
+      const stamp = getTrackerCompletionTimestamp(row);
+      const t = stamp.getTime();
+      if (!isNaN(t)) {
+        const hour = new Date(t + IST_OFFSET_MS).getUTCHours();
+        hourlyCalls[hour]++;
+        if (isPositive) {
+          hourlyPositives[hour]++;
         }
       }
     }
@@ -9263,6 +9539,8 @@ app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => 
         WeeklyTracker.countDocuments({ ...pipelineFilter, pipeline_section: 'pipeline' }),
         DailyTracker.distinct('company_name', {
           coordinator_id: coordinator._id,
+          is_skipped: false,
+          outcome_status: { $nin: [null, ''] },
           $or: [
             { session_date: { $gte: dayStart, $lte: dayEnd } },
             { created_at: { $gte: dayStart, $lte: dayEnd } },
@@ -9411,11 +9689,12 @@ app.get('/api/v1/dashboard/coordinator/clock-duration', async (req: Request, res
       ],
     })
       .populate('college_id', 'college_name college_code')
-      .select('duration_seconds call_start_time call_end_time outcome_status created_at session_date college_id')
+      .select('duration_seconds call_start_time call_end_time outcome_status created_at updated_at last_saved_at session_date college_id is_skipped')
       .lean();
 
     let totalDurationSeconds = 0;
-    const totalCalls = trackerRows.length;
+    const completedTrackerRows = trackerRows.filter((r) => isTrackerRowCompleted(r));
+    const totalCalls = completedTrackerRows.length;
     let positiveCalls = 0;
     const dayOutcomes = {
       positive: 0,
@@ -9427,7 +9706,7 @@ app.get('/api/v1/dashboard/coordinator/clock-duration', async (req: Request, res
     const hourlyPositives = new Array(24).fill(0);
     const collegeMap = new Map<string, { college_id: string; college_name: string; college_code: string; duration_seconds: number; calls_count: number; positive_count: number }>();
 
-    for (const row of trackerRows) {
+    for (const row of completedTrackerRows) {
       let dur = 0;
       if (typeof row.duration_seconds === 'number' && row.duration_seconds > 0) {
         dur = row.duration_seconds;
@@ -9450,15 +9729,13 @@ app.get('/api/v1/dashboard/coordinator/clock-duration', async (req: Request, res
       else if (b === 'negative') dayOutcomes.negative++;
       else if (b === 'follow_up') dayOutcomes.follow_up++;
 
-      const stamp = (row as any).call_start_time || (row as any).created_at;
-      if (stamp) {
-        const t = new Date(stamp).getTime();
-        if (!isNaN(t)) {
-          const hour = new Date(t + IST_OFFSET_MS).getUTCHours();
-          hourlyCalls[hour]++;
-          if (isPositive) {
-            hourlyPositives[hour]++;
-          }
+      const stamp = getTrackerCompletionTimestamp(row);
+      const t = stamp.getTime();
+      if (!isNaN(t)) {
+        const hour = new Date(t + IST_OFFSET_MS).getUTCHours();
+        hourlyCalls[hour]++;
+        if (isPositive) {
+          hourlyPositives[hour]++;
         }
       }
 
@@ -9578,6 +9855,7 @@ app.get('/api/v1/dashboard/coordinator/duration-history', async (req: Request, r
         if (!isWeekend) workingDaysCount++;
 
         const dayRows = trackerRows.filter((r) => {
+          if (!isTrackerRowCompleted(r)) return false;
           if (r.day === d && (!r.month || r.month === reqMonth) && (!r.year || r.year === reqYear)) return true;
           if (r.session_date) {
             const dt = new Date(r.session_date);
@@ -9707,12 +9985,13 @@ app.get('/api/v1/dashboard/coordinator/duration-history', async (req: Request, r
         .select('duration_seconds outcome_status college_id')
         .lean();
 
+      const completedRows = rows.filter((r) => isTrackerRowCompleted(r));
       let mSecs = 0;
-      let mCalls = rows.length;
+      let mCalls = completedRows.length;
       let mPos = 0;
       const cMap = new Map<string, { name: string; seconds: number }>();
 
-      for (const r of rows) {
+      for (const r of completedRows) {
         let dur = 0;
         if (typeof r.duration_seconds === 'number' && r.duration_seconds > 0) dur = r.duration_seconds;
         mSecs += dur;
@@ -9973,123 +10252,219 @@ app.get('/api/v1/dashboard/monthly-calls', async (req: Request, res: Response) =
     const isCurrentMonth = year === today.getUTCFullYear() && monthIdx === today.getUTCMonth();
     const todayDay = today.getUTCDate();
 
-    const ids = String(req.query.college_ids || '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .slice(0, 10);
+    const callingUserId = (req as any).user?.userId || coordinatorId;
+    let callingUser: any = null;
+    if (callingUserId && Types.ObjectId.isValid(callingUserId)) {
+      callingUser = await User.findById(callingUserId).populate('assigned_college_ids', 'college_name college_code');
+    }
+
+    const userName = (callingUser?.full_name || '').toLowerCase();
+    const userEmail = (callingUser?.official_email || (req as any).user?.email || '').toLowerCase();
+    const userRoles = ((req as any).user?.roles || callingUser?.role_codes || []).map((r: any) => String(r).toUpperCase());
+
+    // Only Malvika Kumar and Sujitha (along with Admins and Team Leaders with full college access)
+    // view all colleges org-wide in the monthly call trend. Placement coordinators only view their respective colleges.
+    const isAllCollegesLeader =
+      Boolean(callingUser?.has_all_colleges_access) ||
+      userName.includes('malvika') ||
+      userName.includes('malavika') ||
+      userName.includes('sujitha') ||
+      userEmail.includes('malavika') ||
+      userEmail.includes('malvika') ||
+      userEmail.includes('sujitha') ||
+      userRoles.includes('ADMINISTRATOR') ||
+      userRoles.includes('ADMIN') ||
+      userRoles.includes('SUPER_ADMIN');
+
+    const rawIds = String(req.query.college_ids || '').trim();
+    let targetColleges: any[] = [];
+
+    if (rawIds && rawIds !== 'all') {
+      const ids = rawIds.split(',').map((s) => s.trim()).filter(Boolean);
+      targetColleges = (
+        await Promise.all(
+          ids.map(async (idOrCode) => {
+            let college: any = null;
+            if (Types.ObjectId.isValid(idOrCode)) college = await College.findById(idOrCode);
+            if (!college) {
+              const stripped = idOrCode.replace(/^col_/, '');
+              college = await College.findOne({
+                college_code: { $in: [new RegExp(`^${escapeRegex(idOrCode)}$`, 'i'), new RegExp(`^${escapeRegex(stripped)}$`, 'i')] },
+              });
+            }
+            return college;
+          })
+        )
+      ).filter(Boolean);
+    } else if (isAllCollegesLeader) {
+      // Malvika Kumar, Sujitha, and Administrators see all active colleges
+      targetColleges = await College.find({ status: { $ne: 'deleted' } }).sort({ college_code: 1 });
+    } else {
+      // Placement Coordinators: ONLY show their respective assigned/allocated colleges
+      if (callingUser && Array.isArray(callingUser.assigned_college_ids) && callingUser.assigned_college_ids.length > 0) {
+        targetColleges = callingUser.assigned_college_ids;
+      }
+
+      if (targetColleges.length === 0) {
+        // Resolve default official allocations by coordinator email / username / name
+        let codes = DEFAULT_OFFICIAL_COORDINATOR_ALLOCATIONS[userEmail] ||
+                    DEFAULT_OFFICIAL_COORDINATOR_ALLOCATIONS[userName] ||
+                    DEFAULT_OFFICIAL_COORDINATOR_ALLOCATIONS[(callingUser?.username || '').toLowerCase()];
+
+        if (!codes) {
+          for (const [key, val] of Object.entries(DEFAULT_OFFICIAL_COORDINATOR_ALLOCATIONS)) {
+            if ((userEmail && userEmail.includes(key)) || (userName && userName.includes(key))) {
+              codes = val;
+              break;
+            }
+          }
+        }
+
+        if (codes && codes.length > 0) {
+          targetColleges = await College.find({
+            college_code: { $in: codes },
+            status: { $ne: 'deleted' },
+          }).sort({ college_code: 1 });
+        }
+      }
+
+      if (targetColleges.length === 0 && callingUserId && Types.ObjectId.isValid(callingUserId)) {
+        targetColleges = await College.find({
+          assigned_coordinator_ids: new Types.ObjectId(callingUserId),
+          status: { $ne: 'deleted' },
+        }).sort({ college_code: 1 });
+      }
+
+      if (targetColleges.length === 0 && callingUserId) {
+        const loggedCollegeIds = await DailyTracker.distinct('college_id', {
+          $or: [
+            { coordinator_id: callingUserId },
+            ...(Types.ObjectId.isValid(callingUserId) ? [{ coordinator_id: new Types.ObjectId(callingUserId) }] : []),
+          ],
+        });
+        if (loggedCollegeIds.length > 0) {
+          targetColleges = await College.find({
+            _id: { $in: loggedCollegeIds },
+            status: { $ne: 'deleted' },
+          }).sort({ college_code: 1 });
+        }
+      }
+    }
 
     const series = (
-      await Promise.all(
-        ids.map(async (idOrCode) => {
-          let college: any = null;
-          if (Types.ObjectId.isValid(idOrCode)) college = await College.findById(idOrCode);
-          if (!college) {
-            const stripped = idOrCode.replace(/^col_/, '');
-            college = await College.findOne({
-              college_code: { $in: [new RegExp(`^${escapeRegex(idOrCode)}$`, 'i'), new RegExp(`^${escapeRegex(stripped)}$`, 'i')] },
-            });
-          }
-          if (!college) return null;
+      (
+        await Promise.all(
+          targetColleges.map(async (college) => {
+            if (!college) return null;
 
-          const rows = await DailyTracker.find({
-            $or: [
-              { college_id: college._id },
-              { college_id: college._id.toString() },
-            ],
-            is_skipped: { $ne: true },
-            $and: [
-              {
-                $or: [
-                  { session_date: { $gte: monthStart, $lt: nextMonthStart } },
-                  { created_at: { $gte: monthStart, $lt: nextMonthStart } },
-                  { year: year, month: monthIdx + 1 },
-                ],
-              },
-            ],
-          }).select('duration_seconds session_date created_at day month year call_start_time call_end_time outcome_status').lean();
+            const rows = await DailyTracker.find({
+              $or: [
+                { college_id: college._id },
+                { college_id: college._id.toString() },
+              ],
+              is_skipped: { $ne: true },
+              $and: [
+                {
+                  $or: [
+                    { session_date: { $gte: monthStart, $lt: nextMonthStart } },
+                    { created_at: { $gte: monthStart, $lt: nextMonthStart } },
+                    { year: year, month: monthIdx + 1 },
+                  ],
+                },
+              ],
+            }).select('duration_seconds session_date created_at day month year call_start_time call_end_time outcome_status').lean();
 
-          const dailyCalls: number[] = new Array(daysInMonth).fill(0);
-          // Per-day outcome counts, same buckets as the outcome mix. Only the four
-          // the dashboard shows; Other Progress / no outcome stay inside calls.
-          const shownBuckets = ['positive', 'not_hiring', 'negative', 'follow_up'] as const;
-          const dailyOutcomes: Record<(typeof shownBuckets)[number], number[]> = {
-            positive: new Array(daysInMonth).fill(0),
-            not_hiring: new Array(daysInMonth).fill(0),
-            negative: new Array(daysInMonth).fill(0),
-            follow_up: new Array(daysInMonth).fill(0),
-          };
-          // Summed in seconds, rounded once per day — rounding each call first
-          // would turn ten 20-second calls into 0m.
-          const dailyDurationSecs: number[] = new Array(daysInMonth).fill(0);
+            const dailyCalls: number[] = new Array(daysInMonth).fill(0);
+            // Per-day outcome counts, same buckets as the outcome mix. Only the four
+            // the dashboard shows; Other Progress / no outcome stay inside calls.
+            const shownBuckets = ['positive', 'not_hiring', 'negative', 'follow_up'] as const;
+            const dailyOutcomes: Record<(typeof shownBuckets)[number], number[]> = {
+              positive: new Array(daysInMonth).fill(0),
+              not_hiring: new Array(daysInMonth).fill(0),
+              negative: new Array(daysInMonth).fill(0),
+              follow_up: new Array(daysInMonth).fill(0),
+            };
+            // Summed in seconds, rounded once per day — rounding each call first
+            // would turn ten 20-second calls into 0m.
+            const dailyDurationSecs: number[] = new Array(daysInMonth).fill(0);
 
-          for (const row of rows) {
-            let d: number | null = null;
-            if (typeof row.day === 'number' && row.day >= 1 && row.day <= daysInMonth) {
-              if ((!row.year || row.year === year) && (!row.month || row.month === (monthIdx + 1))) {
-                d = row.day;
+            for (const row of rows) {
+              let d: number | null = null;
+              if (typeof row.day === 'number' && row.day >= 1 && row.day <= daysInMonth) {
+                if ((!row.year || row.year === year) && (!row.month || row.month === (monthIdx + 1))) {
+                  d = row.day;
+                }
               }
-            }
-            if (!d) {
-              if (row.session_date) {
-                const dt = new Date(row.session_date);
-                if (!isNaN(dt.getTime())) {
-                  if (dt.getUTCFullYear() === year && (dt.getUTCMonth() + 1) === (monthIdx + 1)) {
-                    d = dt.getUTCDate();
-                  } else {
-                    const istDt = new Date(dt.getTime() + IST_OFFSET_MS);
-                    if (istDt.getUTCFullYear() === year && (istDt.getUTCMonth() + 1) === (monthIdx + 1)) {
-                      d = istDt.getUTCDate();
+              if (!d) {
+                if (row.session_date) {
+                  const dt = new Date(row.session_date);
+                  if (!isNaN(dt.getTime())) {
+                    if (dt.getUTCFullYear() === year && (dt.getUTCMonth() + 1) === (monthIdx + 1)) {
+                      d = dt.getUTCDate();
+                    } else {
+                      const istDt = new Date(dt.getTime() + IST_OFFSET_MS);
+                      if (istDt.getUTCFullYear() === year && (istDt.getUTCMonth() + 1) === (monthIdx + 1)) {
+                        d = istDt.getUTCDate();
+                      }
+                    }
+                  }
+                }
+                if (!d && row.created_at) {
+                  const cd = new Date(row.created_at);
+                  if (!isNaN(cd.getTime())) {
+                    const istCd = new Date(cd.getTime() + IST_OFFSET_MS);
+                    if (istCd.getUTCFullYear() === year && (istCd.getUTCMonth() + 1) === (monthIdx + 1)) {
+                      d = istCd.getUTCDate();
+                    } else {
+                      d = cd.getUTCDate();
                     }
                   }
                 }
               }
-              if (!d && row.created_at) {
-                const cd = new Date(row.created_at);
-                if (!isNaN(cd.getTime())) {
-                  const istCd = new Date(cd.getTime() + IST_OFFSET_MS);
-                  if (istCd.getUTCFullYear() === year && (istCd.getUTCMonth() + 1) === (monthIdx + 1)) {
-                    d = istCd.getUTCDate();
-                  } else {
-                    d = cd.getUTCDate();
-                  }
+
+              if (d && d >= 1 && d <= daysInMonth) {
+                dailyCalls[d - 1]++;
+                const bucket = OUTCOME_BUCKET[String((row as any).outcome_status || '')];
+                if (bucket && bucket in dailyOutcomes) {
+                  dailyOutcomes[bucket as keyof typeof dailyOutcomes][d - 1]++;
                 }
+                let durSec = 0;
+                if (typeof row.duration_seconds === 'number' && row.duration_seconds > 0) {
+                  durSec = row.duration_seconds;
+                } else if (row.call_start_time && row.call_end_time) {
+                  const s = new Date(row.call_start_time).getTime();
+                  const e = new Date(row.call_end_time).getTime();
+                  if (e > s) durSec = Math.floor((e - s) / 1000);
+                }
+                dailyDurationSecs[d - 1] += durSec;
               }
             }
 
-            if (d && d >= 1 && d <= daysInMonth) {
-              dailyCalls[d - 1]++;
-              const bucket = OUTCOME_BUCKET[String((row as any).outcome_status || '')];
-              if (bucket && bucket in dailyOutcomes) {
-                dailyOutcomes[bucket as keyof typeof dailyOutcomes][d - 1]++;
-              }
-              let durSec = 0;
-              if (typeof row.duration_seconds === 'number' && row.duration_seconds > 0) {
-                durSec = row.duration_seconds;
-              } else if (row.call_start_time && row.call_end_time) {
-                const s = new Date(row.call_start_time).getTime();
-                const e = new Date(row.call_end_time).getTime();
-                if (e > s) durSec = Math.floor((e - s) / 1000);
-              }
-              dailyDurationSecs[d - 1] += durSec;
-            }
-          }
+            const dailyDurationMins = dailyDurationSecs.map((sec) => Math.round(sec / 60));
 
-          const dailyDurationMins = dailyDurationSecs.map((sec) => Math.round(sec / 60));
-
-          return {
-            college_id: college._id,
-            college_name: college.college_name,
-            college_code: college.college_code,
-            daily: dailyCalls,
-            daily_duration: dailyDurationMins,
-            daily_outcomes: dailyOutcomes,
-            total: dailyCalls.reduce((a, b) => a + b, 0),
-            total_duration_minutes: dailyDurationMins.reduce((a, b) => a + b, 0),
-          };
-        })
-      )
-    ).filter(Boolean);
+            return {
+              college_id: college._id,
+              college_name: college.college_name,
+              college_code: college.college_code,
+              daily: dailyCalls,
+              daily_duration: dailyDurationMins,
+              daily_outcomes: dailyOutcomes,
+              total: dailyCalls.reduce((a, b) => a + b, 0),
+              total_duration_minutes: dailyDurationMins.reduce((a, b) => a + b, 0),
+            };
+          })
+        )
+      ).filter(Boolean) as any[]
+    ).sort((a: any, b: any) => {
+      // Descending order: highest calls count first -> lowest -> zero calls
+      if (b.total !== a.total) {
+        return b.total - a.total;
+      }
+      if ((b.total_duration_minutes || 0) !== (a.total_duration_minutes || 0)) {
+        return (b.total_duration_minutes || 0) - (a.total_duration_minutes || 0);
+      }
+      return (a.college_code || '').localeCompare(b.college_code || '');
+    });
 
     return res.status(200).json({
       success: true,
@@ -10240,7 +10615,7 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
     if (sujithaUser) {
       const sujithaColleges = await College.find({
         $or: [
-          { college_code: { $in: ['HITS', 'NEHRU', 'KPR', 'SONA', 'MAREPHRA'] } },
+          { college_code: { $in: ['HITS', 'NEHRU', 'KPR', 'SONA', 'MAREPHRAM', 'MAREPHRA'] } },
           { college_name: { $in: [/hindustan/i, /nehru/i, /^KPR Institute/i, /^SONA/i, /ephraem/i] } },
         ],
         status: 'active',
@@ -10305,12 +10680,94 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
       .populate('assigned_college_ids', 'college_name college_code')
       .sort({ full_name: 1 });
 
+    // Who is actually looking at this dashboard right now. Previously unused here —
+    // targetLeader below fell back to Sujitha by hardcoded email whenever no
+    // `?coordinator_id=` was passed, which the frontend never sends, so every
+    // Team Leader's "Dedicated Calling Time" widget was silently showing Sujitha's
+    // numbers instead of their own (found while wiring up Malvika Kumar's dashboard,
+    // 22 Sep 2026 — same failure shape as the other "screen told the user something
+    // untrue" bugs already recorded in this file).
+    const viewerId = (req as any).user?.userId;
+    const viewingUser = viewerId ? coordinators.find((c) => String(c._id) === String(viewerId)) : null;
+
+    // A Team Leader with has_all_colleges_access (e.g. Malvika Kumar) is meant to
+    // cover every college automatically, including ones added after her account was
+    // created — self-heals her stored assigned_college_ids to match reality on every
+    // dashboard load rather than needing a script re-run each time a college is added.
+    let viewerCollegeIds: any[] = [];
+    const viewerHasFullAccess = Boolean(viewingUser?.has_all_colleges_access);
+    if (viewingUser && viewerHasFullAccess) {
+      const allActiveColleges = await College.find({ status: 'active' })
+        .select('college_name college_code')
+        .sort({ college_name: 1 });
+      viewerCollegeIds = allActiveColleges;
+      const currentIds = new Set((viewingUser.assigned_college_ids || []).map((c: any) => String(c._id || c)));
+      const freshIds = allActiveColleges.map((c) => String(c._id));
+      const isStale = freshIds.length !== currentIds.size || freshIds.some((id) => !currentIds.has(id));
+      if (isStale) {
+        await User.findByIdAndUpdate(viewingUser._id, {
+          assigned_college_ids: allActiveColleges.map((c) => c._id),
+        });
+      }
+    }
+
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date();
     todayEnd.setHours(23, 59, 59, 999);
 
     const nowMs = Date.now();
+
+    // College Activity Today — org-wide calls + duration per college, today only,
+    // for a full-access Team Leader (Malvika Kumar, 22 Sep 2026) in place of a
+    // personal calling-time clock, since she doesn't place calls herself. Only
+    // colleges with at least one real call today are included — the user was
+    // explicit that an inactive college shouldn't get a bar at all, so 21 colleges
+    // reduces to however many genuinely had activity (could be 3, could be 15).
+    // Naturally resets at midnight with no separate job: it's always "today's"
+    // window, so the next day's first load already reflects the new day.
+    let todayCollegeActivity: Array<{
+      college_id: string; college_code: string; college_name: string;
+      calls: number; duration_seconds: number; duration_formatted: string;
+    }> = [];
+    if (viewerHasFullAccess) {
+      const activityAgg = await DailyTracker.aggregate([
+        {
+          $match: {
+            is_skipped: { $ne: true },
+            $or: [
+              { session_date: { $gte: todayStart, $lte: todayEnd } },
+              { created_at: { $gte: todayStart, $lte: todayEnd } },
+            ],
+          },
+        },
+        {
+          $group: {
+            _id: '$college_id',
+            calls: { $sum: 1 },
+            duration_seconds: { $sum: { $ifNull: ['$duration_seconds', 0] } },
+          },
+        },
+      ]);
+      const collegeIds = activityAgg.map((a) => a._id).filter(Boolean);
+      const activityColleges = await College.find({ _id: { $in: collegeIds } }).select('college_name college_code');
+      const collegeById = new Map(activityColleges.map((c) => [String(c._id), c]));
+      todayCollegeActivity = activityAgg
+        .filter((a) => a.calls > 0 && collegeById.has(String(a._id)))
+        .map((a) => {
+          const col = collegeById.get(String(a._id))!;
+          const resolvedCode = resolveOfficialCollegeAcronym(col.college_code || col.college_name);
+          return {
+            college_id: String(a._id),
+            college_code: resolvedCode || col.college_code,
+            college_name: col.college_name,
+            calls: a.calls,
+            duration_seconds: a.duration_seconds || 0,
+            duration_formatted: formatDurationClock(a.duration_seconds || 0).formatted,
+          };
+        })
+        .sort((a, b) => b.calls - a.calls);
+    }
 
     // Per-coordinator live profile & activity telemetry
     const teamMatrix = await Promise.all(
@@ -10340,11 +10797,12 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
             .select('company_name session_date outcome_status created_at college_id'),
         ]);
 
-        const positives = todayTrackerRows.filter((r) => r.outcome_status === 'invite_mail').length;
+        const completedTrackerRows = todayTrackerRows.filter((r) => isTrackerRowCompleted(r));
+        const positives = completedTrackerRows.filter((r) => r.outcome_status === 'invite_mail').length;
 
         let coordinatorDuration = 0;
-        const calls = todayTrackerRows.length;
-        for (const row of todayTrackerRows) {
+        const calls = completedTrackerRows.length;
+        for (const row of completedTrackerRows) {
           let dur = 0;
           if (typeof row.duration_seconds === 'number' && row.duration_seconds > 0) {
             dur = row.duration_seconds;
@@ -10503,9 +10961,13 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
     const teamDurationInfo = formatDurationClock(totalTeamDurationSeconds);
     const activeCallingCoordinatorsCount = teamMatrix.filter((c) => (c.today_call_duration_seconds || 0) > 0 || (c.calls_today || 0) > 0).length;
 
-    // Sujitha / Leader Dedicated Calling Clock (matching Coordinator calling duration design)
+    // Leader Dedicated Calling Clock — an explicit ?coordinator_id= (one Team
+    // Leader inspecting another's numbers) wins when present; otherwise defaults
+    // to the actual logged-in viewer (see viewingUser above), not a hardcoded
+    // Sujitha fallback, so each Team Leader sees their own clock by default.
     const targetLeader =
       (req.query.coordinator_id ? coordinators.find(c => String(c._id) === String(req.query.coordinator_id)) : null) ||
+      viewingUser ||
       sujithaUser ||
       coordinators.find((c) => c.role_codes?.includes('TEAM_LEADER') || c.role_codes?.includes('TEAM_LEAD')) ||
       coordinators[0];
@@ -10525,10 +10987,11 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
           { created_at: { $gte: todayStart, $lte: todayEnd } },
           { year: todayStart.getUTCFullYear(), month: todayStart.getUTCMonth() + 1, day: todayStart.getUTCDate() },
         ],
-      }).select('duration_seconds call_start_time call_end_time outcome_status created_at').lean();
+      }).select('duration_seconds call_start_time call_end_time outcome_status created_at updated_at last_saved_at session_date is_skipped').lean();
 
-      leaderTodayCalls = leaderRows.length;
-      for (const row of leaderRows) {
+      const completedLeaderRows = leaderRows.filter((r) => isTrackerRowCompleted(r));
+      leaderTodayCalls = completedLeaderRows.length;
+      for (const row of completedLeaderRows) {
         let dur = 0;
         if (typeof row.duration_seconds === 'number' && row.duration_seconds > 0) {
           dur = row.duration_seconds;
@@ -10541,12 +11004,10 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
         if (row.outcome_status && POSITIVE_OUTCOMES.includes(row.outcome_status as any)) {
           leaderTodayPositives++;
         }
-        const stamp = (row as any).call_start_time || (row as any).created_at;
-        if (stamp) {
-          const t = new Date(stamp).getTime();
-          if (!isNaN(t)) {
-            leaderHourlyCalls[new Date(t + IST_OFFSET_MS).getUTCHours()]++;
-          }
+        const stamp = getTrackerCompletionTimestamp(row);
+        const t = stamp.getTime();
+        if (!isNaN(t)) {
+          leaderHourlyCalls[new Date(t + IST_OFFSET_MS).getUTCHours()]++;
         }
       }
     }
@@ -10594,7 +11055,14 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
           seconds: teamDurationInfo.seconds,
           active_calling_coordinators: activeCallingCoordinatorsCount,
         },
-        team_matrix: teamMatrix,
+        // A Team Leader shouldn't see their own row in the list of people they're
+        // monitoring — exclude the viewer, not anyone else (this table stays
+        // team-wide for everyone else, e.g. Sujitha still sees Malvika and vice
+        // versa; each just doesn't see themselves).
+        team_matrix: viewerId ? teamMatrix.filter((m) => String(m.coordinator_id) !== String(viewerId)) : teamMatrix,
+        viewer_has_full_access: viewerHasFullAccess,
+        viewer_college_ids: viewerHasFullAccess ? viewerCollegeIds.map((c) => String(c._id)) : [],
+        today_college_activity: todayCollegeActivity,
         assignments_overview: {
           total_dispatched: totalDispatchedAssignments,
           completed: completedAssignments,
@@ -12509,6 +12977,7 @@ app.patch('/api/v1/users/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR', 
       account_status,
       presence_status,
       password,
+      has_all_colleges_access,
     } = req.body;
 
     const user = await User.findById(id);
@@ -12559,6 +13028,22 @@ app.patch('/api/v1/users/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR', 
 
     if (assigned_college_ids !== undefined) {
       user.assigned_college_ids = assigned_college_ids.map((cId: string) => new Types.ObjectId(cId));
+    }
+
+    // Administrator-only — grants a Team Leader oversight of every college, present
+    // and future, rather than a fixed list (see the User model comment). A Team
+    // Leader editing another account must not be able to grant this to themselves
+    // or anyone else.
+    if (has_all_colleges_access !== undefined) {
+      const requesterRoles = (req as any).user?.roles || [];
+      const requesterIsAdmin = requesterRoles.includes('ADMINISTRATOR') || requesterRoles.includes('ADMIN');
+      if (!requesterIsAdmin) {
+        return res.status(403).json({
+          success: false,
+          error: { code: 'ADMIN_ONLY_FIELD', message: 'Only an Administrator may change all-colleges access.' },
+        });
+      }
+      user.has_all_colleges_access = Boolean(has_all_colleges_access);
     }
 
     if (role_codes !== undefined) {
@@ -13901,7 +14386,7 @@ const ensureDefaultAccounts = async () => {
     // Sujitha handles: HITS, NEHRU, KPR (partially with Mohanaradha), SONA, MAREPHRA
     // Mohanaradha handles: KARPAGAM, AIHT, ACET, KPR (partially with Sujitha)
     const DEFAULT_COORDINATOR_COLLEGE_MAP: Record<string, string[]> = {
-      'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
+      'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
       'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
       'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
       'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],

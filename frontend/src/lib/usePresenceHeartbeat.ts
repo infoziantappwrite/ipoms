@@ -41,6 +41,9 @@ export function usePresenceHeartbeat() {
       }
 
       const now = Date.now();
+      if (!overrideDetail && lastPingRef.current > 0 && now - lastPingRef.current < 5000) {
+        return;
+      }
       lastPingRef.current = now;
 
       let collegeObj = overrideDetail?.obj || active.obj;

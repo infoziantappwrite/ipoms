@@ -358,160 +358,185 @@ export function registerActiveLeadRoutes(app: Express) {
   // ── Sync from Weekly Tracker (Pipeline with CTC & JD Received Sections) ──
   app.post('/api/v1/active-leads/sync', authenticateJWT, async (req: Request, res: Response) => {
     try {
+      const { check_only = false, resolutions } = req.body || {};
+
       // 1. Fetch all non-deleted Weekly Tracker rows
       const allWeekly = await WeeklyTracker.find({ is_deleted: { $ne: true } }).lean();
 
-      // Build Weekly lookup map to backfill CTC
-      const weeklyMap = new Map<string, typeof allWeekly[0]>();
-      for (const w of allWeekly) {
-        if (w.company_name && w.company_name.trim()) {
-          const k = normalizeKey(w.company_name);
-          if (!weeklyMap.has(k) || (isValidCtc(w.ctc_lpa) && !isValidCtc(weeklyMap.get(k)?.ctc_lpa))) {
-            weeklyMap.set(k, w);
-          }
-        }
-      }
-
       // 2. Fetch current Active Leads
       const allActive = await ActiveLead.find({ is_deleted: false });
+      const activeMap = new Map<string, typeof allActive[0]>();
+      for (const a of allActive) {
+        if (a.company_name) {
+          activeMap.set(normalizeKey(a.company_name), a);
+        }
+      }
 
-      // A. Backfill CTC for pipeline leads if present in Weekly Tracker
-      let backfilledCtcCount = 0;
-      for (const lead of allActive) {
-        if (lead.lead_type === 'pipeline' && !isValidCtc(lead.ctc)) {
-          const match = weeklyMap.get(normalizeKey(lead.company_name));
-          if (match && isValidCtc(match.ctc_lpa)) {
-            lead.ctc = match.ctc_lpa!.trim();
-            if (match.job_role && (!lead.role || lead.role === 'Graduate Trainee')) {
-              lead.role = match.job_role.trim();
-            }
-            await lead.save();
-            backfilledCtcCount++;
+      // Group weekly records by normalized company name
+      const weeklyByCompany = new Map<string, typeof allWeekly>();
+      for (const w of allWeekly) {
+        if (!w.company_name || !w.company_name.trim()) continue;
+        const norm = normalizeKey(w.company_name);
+        if (!weeklyByCompany.has(norm)) weeklyByCompany.set(norm, []);
+        weeklyByCompany.get(norm)!.push(w);
+      }
+
+      // Detect Conflicts (multiple distinct roles for the same company)
+      const conflicts: any[] = [];
+      for (const [normKey, rows] of weeklyByCompany.entries()) {
+        const rawName = rows[0].company_name.trim();
+        const existingLead = activeMap.get(normKey);
+
+        const rolesSet = new Set<string>();
+        if (existingLead?.role && existingLead.role !== 'Graduate Trainee') {
+          existingLead.role.split(/[,;/]+/).map((r) => r.trim()).filter(Boolean).forEach((r) => rolesSet.add(r));
+        }
+
+        let hasValidCtcRow = false;
+        let bestCtc = existingLead?.ctc || '';
+        let leadType: 'pipeline' | 'jd_received' = 'pipeline';
+        let section = 'pipeline';
+
+        for (const r of rows) {
+          const sec = (r.pipeline_section || '').toLowerCase();
+          const isJd = ['in_progress', 'companies_in_progress', 'companies_in_drive', 'in_drive', 'upcoming_drives', 'drive_in_progress', 'completed', 'companies_completed'].includes(sec);
+          if (isJd) {
+            leadType = 'jd_received';
+            if (sec === 'completed' || sec === 'companies_completed') section = 'completed';
+            else if (sec === 'drive_in_progress') section = 'drive_in_progress';
+            else if (sec.includes('drive') || sec.includes('upcoming')) section = 'upcoming_drive';
+            else section = 'in_progress';
+          }
+
+          if (isValidCtc(r.ctc_lpa) && r.ctc_lpa) {
+            hasValidCtcRow = true;
+            if (!bestCtc || isValidCtc(r.ctc_lpa)) bestCtc = r.ctc_lpa.trim();
+          }
+
+          if (r.job_role && r.job_role.trim()) {
+            r.job_role.split(/[,;/]+/).map((str) => str.trim()).filter(Boolean).forEach((str) => rolesSet.add(str));
           }
         }
-      }
 
-      // B. REMOVE any pipeline companies that still do not have a valid CTC
-      const removedNoCtcResult = await ActiveLead.deleteMany({
-        lead_type: 'pipeline',
-        $or: [
-          { ctc: { $exists: false } },
-          { ctc: '' },
-          { ctc: '-' },
-          { ctc: '—' },
-          { ctc: { $regex: /^\s*$/ } },
-          { ctc: { $regex: /^(na|n\/a|null|undefined|tbd|-)$/i } },
-        ],
-      });
-
-      // 3. Build Active lookup of existing companies across BOTH Pipeline and JD Received tabs
-      const refreshedActive = await ActiveLead.find({ is_deleted: false }).lean();
-      const existingNames = new Set<string>();
-      for (const lead of refreshedActive) {
-        if (lead.company_name) {
-          existingNames.add(normalizeKey(lead.company_name));
-        }
-      }
-
-      // 4. Sync from Weekly Tracker:
-      // Focus on Pipeline companies FIRST
-      const weeklyPipeline = allWeekly.filter((w) => (w.pipeline_section || '').toLowerCase() === 'pipeline');
-      const weeklyJd = allWeekly.filter((w) =>
-        ['in_progress', 'companies_in_drive', 'in_drive', 'upcoming_drives', 'drive_in_progress', 'completed'].includes(
-          (w.pipeline_section || '').toLowerCase()
-        )
-      );
-
-      let newlySyncedPipeline = 0;
-      let skippedPipelineDuplicate = 0;
-      let skippedPipelineNoCtc = 0;
-      const leadsToInsert: any[] = [];
-
-      for (const w of weeklyPipeline) {
-        if (!w.company_name || !w.company_name.trim()) continue;
-        const norm = normalizeKey(w.company_name);
-
-        if (!isValidCtc(w.ctc_lpa)) {
-          skippedPipelineNoCtc++;
+        // Only consider if eligible (Pipeline must have CTC or JD Received)
+        if (leadType === 'pipeline' && !hasValidCtcRow && !isValidCtc(existingLead?.ctc)) {
           continue;
         }
 
-        if (existingNames.has(norm)) {
-          skippedPipelineDuplicate++;
-          continue;
+        if (rolesSet.size > 1) {
+          const distinctRoles = Array.from(rolesSet);
+          conflicts.push({
+            company_name: rawName,
+            lead_id: existingLead?._id,
+            existing_role: existingLead?.role || '',
+            existing_ctc: existingLead?.ctc || '',
+            weekly_roles: distinctRoles,
+            suggested_merged_role: distinctRoles.join(', '),
+            lead_type: leadType,
+            pipeline_section: section,
+            ctc: bestCtc,
+          });
         }
+      }
 
-        existingNames.add(norm);
-        newlySyncedPipeline++;
-        leadsToInsert.push({
-          company_name: w.company_name.trim(),
-          role: w.job_role?.trim() || 'Graduate Trainee',
-          ctc: w.ctc_lpa?.trim() || '',
-          lead_type: 'pipeline',
-          pipeline_section: 'pipeline',
-          status: '',
-          followup_month: '',
-          academic_year: w.eligible_batch?.trim() || '2027',
-          college_id: w.college_id || null,
-          coordinator_id: w.coordinator_id || null,
-          is_deleted: false,
+      // If check_only is requested OR we have conflicts and no user resolutions provided yet
+      if (check_only || (conflicts.length > 0 && (!resolutions || Object.keys(resolutions).length === 0))) {
+        return res.json({
+          success: true,
+          has_conflicts: conflicts.length > 0,
+          conflicts,
+          count: conflicts.length,
+          data: {
+            has_conflicts: conflicts.length > 0,
+            conflicts,
+            count: conflicts.length,
+          },
+          message: conflicts.length > 0
+            ? `Found ${conflicts.length} company records with multiple roles. Review and resolve in the modal.`
+            : 'No duplicate role conflicts detected. Ready to sync.',
         });
       }
 
-      // Next, Focus on JD Received companies
-      let newlySyncedJd = 0;
-      let skippedJdDuplicate = 0;
+      // Apply Resolutions and Synchronize cleanly
+      const appliedResolutions = resolutions || {};
+      let updatedConflictCount = 0;
+      let newlyAddedCount = 0;
 
-      for (const w of weeklyJd) {
-        if (!w.company_name || !w.company_name.trim()) continue;
-        const norm = normalizeKey(w.company_name);
+      for (const [normKey, rows] of weeklyByCompany.entries()) {
+        const rawName = rows[0].company_name.trim();
+        let existingLead = activeMap.get(normKey);
 
-        if (existingNames.has(norm)) {
-          skippedJdDuplicate++;
+        let leadType: 'pipeline' | 'jd_received' = 'pipeline';
+        let section = 'pipeline';
+        let bestCtc = existingLead?.ctc || '';
+
+        for (const r of rows) {
+          const sec = (r.pipeline_section || '').toLowerCase();
+          const isJd = ['in_progress', 'companies_in_progress', 'companies_in_drive', 'in_drive', 'upcoming_drives', 'drive_in_progress', 'completed', 'companies_completed'].includes(sec);
+          if (isJd) {
+            leadType = 'jd_received';
+            if (sec === 'completed' || sec === 'companies_completed') section = 'completed';
+            else if (sec === 'drive_in_progress') section = 'drive_in_progress';
+            else if (sec.includes('drive') || sec.includes('upcoming')) section = 'upcoming_drive';
+            else section = 'in_progress';
+          }
+          if (isValidCtc(r.ctc_lpa) && r.ctc_lpa) bestCtc = r.ctc_lpa.trim();
+        }
+
+        // Pipeline leads MUST have verified CTC
+        if (leadType === 'pipeline' && !isValidCtc(bestCtc)) {
           continue;
         }
 
-        let mappedSec = 'in_progress';
-        const sec = (w.pipeline_section || '').toLowerCase();
-        if (sec === 'completed' || sec === 'companies_completed') mappedSec = 'completed';
-        else if (sec === 'drive_in_progress') mappedSec = 'drive_in_progress';
-        else if (sec.includes('drive') || sec.includes('upcoming')) mappedSec = 'upcoming_drive';
-        else mappedSec = 'in_progress';
+        // Determine final role
+        let finalRole = rows[0].job_role?.trim() || 'Graduate Trainee';
+        const resolution = appliedResolutions[rawName] || appliedResolutions[normKey];
 
-        existingNames.add(norm);
-        newlySyncedJd++;
-        leadsToInsert.push({
-          company_name: w.company_name.trim(),
-          role: w.job_role?.trim() || 'Graduate Engineer Trainee',
-          ctc: w.ctc_lpa?.trim() || '',
-          lead_type: 'jd_received',
-          pipeline_section: mappedSec,
-          status: '',
-          followup_month: '',
-          academic_year: w.eligible_batch?.trim() || '2027',
-          college_id: w.college_id || null,
-          coordinator_id: w.coordinator_id || null,
-          is_deleted: false,
-        });
-      }
+        if (resolution && resolution.chosen_role) {
+          finalRole = resolution.chosen_role.trim();
+          if (resolution.chosen_ctc) bestCtc = resolution.chosen_ctc.trim();
+        } else if (existingLead?.role && existingLead.role !== 'Graduate Trainee') {
+          finalRole = existingLead.role;
+        }
 
-      if (leadsToInsert.length > 0) {
-        await ActiveLead.insertMany(leadsToInsert);
+        if (existingLead) {
+          existingLead.role = finalRole;
+          if (isValidCtc(bestCtc)) existingLead.ctc = bestCtc;
+          existingLead.lead_type = leadType;
+          existingLead.pipeline_section = section;
+          existingLead.is_deleted = false;
+          await existingLead.save();
+          updatedConflictCount++;
+        } else {
+          const newLead = await ActiveLead.create({
+            company_name: rawName,
+            role: finalRole,
+            ctc: bestCtc,
+            lead_type: leadType,
+            pipeline_section: section,
+            status: '',
+            followup_month: '',
+            academic_year: rows[0].eligible_batch?.trim() || '2027',
+            college_id: rows[0].college_id || null,
+            coordinator_id: rows[0].coordinator_id || null,
+            is_deleted: false,
+          });
+          activeMap.set(normKey, newLead);
+          newlyAddedCount++;
+        }
       }
 
       const totalActiveLeads = await ActiveLead.countDocuments({ is_deleted: false });
 
       return res.json({
         success: true,
+        has_conflicts: false,
         data: {
-          synced_pipeline: newlySyncedPipeline,
-          synced_jd: newlySyncedJd,
-          skipped_pipeline_duplicates: skippedPipelineDuplicate,
-          skipped_jd_duplicates: skippedJdDuplicate,
-          removed_no_ctc: removedNoCtcResult.deletedCount,
           total_active_leads: totalActiveLeads,
+          updated_records: updatedConflictCount,
+          newly_added: newlyAddedCount,
         },
-        message: `Successfully synced from Weekly Tracker (${newlySyncedPipeline} new Pipeline with CTC, ${newlySyncedJd} new JD Received, ${skippedPipelineDuplicate + skippedJdDuplicate} duplicates skipped)`,
+        message: `Active Leads successfully synchronized from Weekly Tracker (${newlyAddedCount} added, ${updatedConflictCount} updated).`,
       });
     } catch (err: any) {
       console.error('POST /active-leads/sync error:', err);

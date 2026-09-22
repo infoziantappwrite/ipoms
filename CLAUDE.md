@@ -1203,6 +1203,160 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     persisting or created-then-immediately-deleted throwaway rows; no real record was
     altered.
 
+45. **Month-End Report: Calling Activity Summary + a stale-date bug fix, 22 Sep 2026
+    (user-requested feature).** The user asked for the month-end report to show calls made
+    and hours dedicated per college, so a coordinator's monthly effort is visible alongside
+    the conversions/drives it already reports. New backend section in the `month_end`
+    branch of `POST /reports/generate` (`server.ts`): `sections.calling_activity` — one row
+    per college the coordinator **handles** (deliberately every assigned college, not just
+    whichever single "Target Institution" the rest of the report is scoped to — the user
+    asked for "each college handled by the user", a coordinator-level view, not a
+    single-campus one), each with real `total_calls` and `total_duration_formatted` summed
+    from `DailyTracker` for the report's month. Plus `calling_activity_totals` (a TOTAL row)
+    and two new `kpi_summary` fields (`total_calls_this_month`, `total_hours_dedicated`,
+    not yet surfaced as KPI cards — see below).
+    **Real bug found and fixed in the same area:** the month picker in
+    `ReportBuilderWizard.tsx` already resolved real `start`/`end` dates from a fixed
+    `MONTH_OPTIONS` list, but they were **never sent** in the generate request — only a
+    text label (`week_label`) was, so the backend derived just a month *name* by regexing
+    that string, never a real date range. Wired `date_from`/`date_to` into the payload
+    (those params already existed on the backend, previously used only as a single-date
+    fallback for the daily-lead templates) so `calling_activity`'s query has a genuine
+    range to work with. **Second bug in the same code, same pattern already documented
+    elsewhere in this file (items 30/37 — hardcoded years/dates going stale):**
+    `selectedMonth` state and both `newType === 'month_end'` / `initialTemplateType ===
+    'month_end'` reset blocks were hardcoded to `'2026-08'` / `2026-08-01`–`2026-08-31` —
+    opening Month-End on any day after August silently pre-selected an already-passed
+    month. Added `getCurrentMonthOption()` (matches today's real date against
+    `MONTH_OPTIONS`) and used it in all three places. Verified live: the wizard now opens
+    on "September 2026" instead of frozen "August 2026".
+    **Rendering surface, and why it's four separate edits, not one:** this codebase's
+    report output has **no shared section-rendering component** — `NativeReportEditor.tsx`
+    (the on-screen editable view *and* its own separate `window.print()` HTML-string
+    builder, both inside the same file), `A4PdfPreviewModal.tsx` (a fully independent
+    ~3,000-line preview modal, not importing `NativeReportEditor`), and
+    `reportCanvasRenderer.ts` (the PNG/PDF canvas export) each re-implement every section
+    from scratch. A new section has to be added to all of them individually or it only
+    shows in whichever one someone happened to update — this is a real structural cost
+    worth knowing about before adding the next section, not something to try to work
+    around ad hoc. Added the table (`# | College | Calls Made | Hours Dedicated` + a
+    highlighted TOTAL row) to all four; the on-screen version is deliberately **read-only**
+    (no `EditableReportCell`, unlike every other month-end section) — these are computed
+    Daily Tracker numbers, not a company row a coordinator would ever legitimately hand-edit.
+    New wizard checkbox: "Calling Activity Summary" in the month-end sections panel,
+    defaulted on.
+    **Deliberately not done:** no new KPI cards for the two new `kpi_summary` totals — each
+    render surface hardcodes its own fixed 3-card list for month-end (`MONTH_END_KPIS` in
+    the wizard doesn't actually drive what renders), so adding cards would mean the same
+    4-surface duplication problem again for a total the new table's own TOTAL row already
+    shows. Skipped for now rather than expanding scope further without being asked.
+    **Verified live, real data, not sample data:** generated an actual month-end report as
+    Mohanaradha for September 2026 — all 4 of her assigned colleges appear
+    (ACET/AIHT/KARPAGAM/KPR), ACET correctly shows 5 real calls (matching a direct API
+    check against the same month range) with the other three honestly at 0, and the TOTAL
+    row sums correctly. Confirmed identical numbers render in both the on-screen editor and
+    the A4 PDF preview modal side by side. `tsc --noEmit` clean both sides.
+
+46. **Second Team Leader account created, 22 Sep 2026 (user-requested) — genuinely
+    `TEAM_LEADER`, not a hidden `ADMINISTRATOR`.** Malvika Kumar
+    (`malvika@infoziant.com` / `malvika_kumar`) was added through the real `POST /users`
+    path (same one every account goes through since self-registration was removed, item
+    41), with `role_codes: ['TEAM_LEADER']` — the same role Sujitha holds, and RBAC in this
+    app is role-based, not per-account, so she automatically inherits every rule that
+    applies to that role: full read/write on Daily Tracker, Weekly Tracker, Daily Leads,
+    and Reports (all gated to `STAFF`, which spans all three roles), User Management
+    access, but **not** the Administrator-only endpoints (Role Matrix, System Config, the
+    `/metadata/*` data-repair routes). The user asked for her to informally "act as the
+    main administrator" without literally being one — verified live this is exactly what
+    role-based RBAC already produces here, so nothing needed inventing: `POST
+    /metadata/renumber` correctly returned `403` for her, `GET /users` and `GET
+    /weekly-tracker` both `200`, matching Sujitha's real boundary precisely.
+    **Differs from Sujitha on one deliberate point, confirmed with the user first:**
+    college scope. Sujitha's 5 colleges (item 32) are a specific, named ownership set;
+    Malvika was given all 21 active colleges instead, matching her broader informal role
+    rather than literally duplicating Sujitha's 5 — the user picked this explicitly when
+    asked, over "same 5 colleges" (which would have made them co-owners, both getting
+    cross-college-edit notification emails on the same 5) and "assign later manually".
+    Verified live: login succeeds, `role_codes: ['TEAM_LEADER']`, `assigned_college_ids`
+    length 21.
+
+47. **`has_all_colleges_access` dashboard tier for a full-oversight Team Leader, 22 Sep
+    2026 (user-requested) — plus a real "screen told the user something untrue" bug
+    found and fixed while building it.** Item 46 gave Malvika Kumar all 21 colleges, but
+    the user then asked for her dashboard itself to look different from Sujitha's — no
+    Active College Focus section (the 1-5 lock doesn't make sense when she already holds
+    every college), no Follow-up Drives Pending banner, her own row excluded from
+    "Coordinators Profile & Live Institutional Presence" (she's the one watching that
+    table, not a row in it), and the Monthly Call Trend showing every college directly
+    instead of a manually-selected 1-5.
+    **Modeled as a reusable flag, not a hardcoded name/email check** — a new
+    `User.has_all_colleges_access` boolean (Administrator-settable only, via `PATCH
+    /users/:id`; a Team Leader can't grant it to themselves or anyone else). `GET
+    /dashboard/team-leader` self-heals the flagged user's `assigned_college_ids` to match
+    every currently-active college on each load, so "if you had any new colleges also she
+    can able to use them" is satisfied automatically — no script to re-run when a college
+    gets added later, since colleges in this app are added via ad-hoc scripts (there's no
+    `POST /colleges`), not a path this could otherwise hook into. Response grows
+    `viewer_has_full_access` and `viewer_college_ids`; `TeamLeaderDashboard.tsx` branches
+    on the first to skip `FollowUpSmartQueueWidget` + `CoordinatorCollegeFocusSection`
+    entirely and feeds `CoordinatorCollegeKpiCards` the second instead of the
+    focus-selection state — Sujitha's branch is untouched byte-for-byte.
+    **Real bug found and fixed in the same handler, unrelated to what was asked:**
+    `targetLeader` (whose numbers feed "Dedicated Calling Time Today") defaulted to
+    `sujithaUser` by hardcoded email whenever no `?coordinator_id=` was passed — and the
+    frontend never sends one. So **every** Team Leader's own dashboard, including
+    Sujitha's by coincidence-only, was silently reading Sujitha's clock, not the actual
+    logged-in viewer's. Fixed by resolving the real viewer from `req.user.userId` first
+    (an explicit `?coordinator_id=` — one Team Leader inspecting another's numbers — still
+    wins over that default). Verified live: Malvika's dashboard now correctly reads
+    "for Malvika Kumar"; Sujitha's still correctly reads "for Sujitha S", now for the
+    right reason.
+    **Verified live, both accounts, real data, no regression:** Malvika's dashboard shows
+    the clock fix, no Focus/Follow-up sections, "All (7)" in the presence table (her own
+    row excluded), and a Monthly Call Trend spanning all her colleges (ACET, AIHT, ACEW,
+    DSU, MCET, NGP, HITS, KPR, KLU, KAMARAJ, …). Sujitha's dashboard, screenshotted the
+    same session, is untouched: Follow-up widget present, "Active College Focus — 5/5
+    Selected · Saved & Locked for Week" with her real 5 colleges, Monthly Call Trend
+    capped to exactly those 5, and her own row likewise excluded from the presence table
+    (7 there too — same total staff count, different person subtracted). `tsc --noEmit`
+    clean on both files I touched.
+    **Left alone, flagged rather than fixed:** while typechecking, two real errors turned
+    up in files this session never touched —
+    `frontend/src/app/reports/components/ReportBuilderWizard.tsx` (`prioritizedColleges`
+    used before its declaration; an object literal with an unknown `label` property) and
+    `frontend/src/app/tracker/components/TrackerRow.tsx` (calls to
+    `validateAndNormalizeMultiMobile`/`validateAndNormalizeMultiEmail`, neither of which
+    exist) — evidence another tool/session is mid-edit on both files in this same working
+    directory right now. Not fixed here, to avoid the same collision documented earlier
+    this session (item 44's aftermath) — surfaced to the user instead.
+
+48. **"College Activity Today" replaces the personal clock for a full-access Team
+    Leader, 22 Sep 2026 (user-requested).** Malvika Kumar doesn't place calls herself, so
+    "Dedicated Calling Time Today" (a personal duration clock) always read 00:00:00 for
+    her — meaningless. New component `CollegeActivityTodayWidget.tsx`: a horizontal bar
+    per college with **any** real activity today, org-wide (not scoped to who's assigned
+    where — an inactive college gets no bar at all, per the user's explicit correction
+    mid-request: "we are not going to show all the colleges... just going to focus on
+    the [ones] active today"), showing calls or minutes with a Calls/Duration toggle
+    (same pattern as item 43's heat strip). `TeamLeaderDashboard.tsx` swaps it in only
+    when `data.viewer_has_full_access` is true; Sujitha's `CoordinatorClockDurationWidget`
+    is untouched.
+    **Backend:** `GET /dashboard/team-leader` grows `today_college_activity` — a
+    `DailyTracker` aggregate grouped by `college_id` for today's date bounds (already
+    computed in this handler), gated behind `viewerHasFullAccess` so a normal Team Leader
+    doesn't pay for the extra query. Resets itself at midnight with no cron: the query is
+    always "today", so the next day's first load already reflects the new day.
+    **Verified live, real data:** Malvika's dashboard shows 5 real colleges with genuine
+    activity (SONA 24 calls, MAREPHRA 22, AIHT 18, NPR 14, DSU 1) out of her 21 — the
+    other 16 correctly have no bar rather than a zero one. Bar widths are proportional
+    and animate on change (`transition: width`), matching the "graph box will go up and
+    down" ask. **Not re-verified in dark mode this session** — the CSS uses the same
+    validated `:global(.dark)` token-swap pattern as item 43's heat strip (same file,
+    same session), but an automated dark-mode screenshot attempt hit a tooling quirk
+    (the theme toggle didn't take in that particular browser context) and wasn't worth
+    chasing further; flagged rather than claimed. `tsc --noEmit` clean on both files
+    touched (excluding the pre-existing unrelated errors from item 47).
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map
