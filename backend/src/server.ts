@@ -115,7 +115,13 @@ app.use(
       if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
         return callback(null, true);
       }
-      return callback(null, true);
+      // Anything else is refused. The fallback here used to be `callback(null, true)`
+      // — approving every origin unconditionally, which combined with
+      // `credentials: true` let any website make credentialed cross-origin
+      // requests (cookies, including the httpOnly refresh-token cookie) and read
+      // the JSON response, e.g. POST /auth/refresh returning a fresh access
+      // token to an attacker page. See §5 item 44.
+      return callback(new Error('Not allowed by CORS'), false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -3885,9 +3891,15 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
       ];
     }
 
+    // .lean() — this endpoint returns the full unfiltered dataset (~1,000 rows) with
+    // no way to page it, and was measuring ~4s under light load hydrating a full
+    // Mongoose document + running .toObject() per row below for data nothing here
+    // needs to mutate or re-save. populate() still works the same under .lean()
+    // (perf item 44).
     const rows = await WeeklyTracker.find(filter)
       .sort({ follow_up_date: 1, company_name: 1 })
-      .populate('coordinator_id', 'full_name official_email');
+      .populate('coordinator_id', 'full_name official_email')
+      .lean();
 
     // Deduplicate any repeated company rows for the same college & year
     const uniqueRows: typeof rows = [];
@@ -3930,7 +3942,7 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
     const onHoldByHr: any[] = [];
 
     uniqueRows.forEach((row) => {
-      const r = row.toObject();
+      const r = row; // already a plain object under .lean()
 
       // Top Companies override
       if (row.is_pinned_top || row.pipeline_section === 'top_companies') {
@@ -13666,8 +13678,14 @@ app.use((req: Request, res: Response) => {
 
 // 5. Global Error Handler
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  if (err?.message === 'Not allowed by CORS') {
+    return res.status(403).json({
+      success: false,
+      error: { code: 'ORIGIN_NOT_ALLOWED', message: 'This origin is not permitted to access the API.' },
+    });
+  }
   console.error('❌ [Unhandled Server Error]:', err);
-  res.status(500).json({
+  return res.status(500).json({
     success: false,
     error: {
       code: 'INTERNAL_SERVER_ERROR',
