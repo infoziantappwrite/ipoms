@@ -115,7 +115,13 @@ app.use(
       if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
         return callback(null, true);
       }
-      return callback(null, true);
+      // Anything else is refused. The fallback here used to be `callback(null, true)`
+      // — approving every origin unconditionally, which combined with
+      // `credentials: true` let any website make credentialed cross-origin
+      // requests (cookies, including the httpOnly refresh-token cookie) and read
+      // the JSON response, e.g. POST /auth/refresh returning a fresh access
+      // token to an attacker page. See §5 item 44.
+      return callback(new Error('Not allowed by CORS'), false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -8961,6 +8967,7 @@ app.post('/api/v1/users/heartbeat', async (req: Request, res: Response) => {
     const updateDoc: any = {
       last_active_at: new Date(),
       is_online: true,
+      logged_out_at: null,
     };
 
     const resolvedAcronym = resolveOfficialCollegeAcronym(college_code || college_name || college_id);
@@ -8997,24 +9004,34 @@ app.post('/api/v1/users/heartbeat', async (req: Request, res: Response) => {
       updateDoc.active_college_name = college_name;
     }
 
-    // Safety guard: Sujitha S handles HITS, NEHRU, KPR, SONA, MAREPHRA.
-    // She NEVER handles MCET (MCET is handled by Tamil Selvi / Seshmitha).
+    // Safety guard: Ensure user can only broadcast active colleges belonging to their assigned focus
     const user = await User.findById(userId).populate('assigned_college_ids', 'college_name college_code location');
     if (user) {
       const isSujitha = user.official_email === 'sujitha_s@infoziant.com' || user.username === 'sujitha' || /sujitha/i.test(user.full_name);
+      const isSystemAdmin = user.role_codes?.some((r: string) => r.toUpperCase().includes('ADMIN'));
+      const assignedCols = (user.assigned_college_ids as any[]) || [];
+
+      // Sujitha S CANNOT be active in MCET (MCET is handled by Tamil Selvi / Seshmitha)
       if (isSujitha && (updateDoc.active_college_code === 'MCET' || /mahalingam|mcet/i.test(updateDoc.active_college_name || ''))) {
-        const assignedCols = (user.assigned_college_ids as any[]) || [];
         const primary = assignedCols.find((c: any) => c.college_code === 'NEHRU' || c.college_code === 'HITS') || assignedCols[0];
         if (primary) {
           updateDoc.active_college_id = primary._id;
           updateDoc.active_college_code = primary.college_code || 'NEHRU';
           updateDoc.active_college_name = primary.college_name || '';
           updateDoc.active_college_location = primary.location || '';
-        } else {
-          delete updateDoc.active_college_id;
-          delete updateDoc.active_college_code;
-          delete updateDoc.active_college_name;
-          delete updateDoc.active_college_location;
+        }
+      } else if (!isSystemAdmin && assignedCols.length > 0 && updateDoc.active_college_code) {
+        const assignedCodes = assignedCols.map((ac: any) => (ac.college_code || '').toUpperCase()).filter(Boolean);
+        const reqCode = (updateDoc.active_college_code || '').toUpperCase();
+        const isMatched = assignedCodes.includes(reqCode) || assignedCols.some((ac: any) => String(ac._id) === String(updateDoc.active_college_id));
+        if (!isMatched) {
+          const primary = assignedCols[0];
+          if (primary) {
+            updateDoc.active_college_id = primary._id;
+            updateDoc.active_college_code = primary.college_code || '';
+            updateDoc.active_college_name = primary.college_name || '';
+            updateDoc.active_college_location = primary.location || '';
+          }
         }
       }
     }
@@ -9184,7 +9201,7 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
         let onlineStatus: 'online' | 'away' | 'offline' | 'on_leave' | 'partial_working' = 'offline';
         let onlineStatusLabel = 'Offline';
 
-        const isExplicitLoggedOut = c.logged_out_at && c.last_active_at && new Date(c.logged_out_at) >= new Date(c.last_active_at);
+        const isExplicitLoggedOut = c.is_online === false || (Boolean(c.logged_out_at) && (!c.last_login_at || new Date(c.logged_out_at as any) >= new Date(c.last_login_at as any)));
 
         if (c.account_status === 'on_leave') {
           onlineStatus = 'on_leave';
@@ -9192,12 +9209,15 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
         } else if (c.account_status === 'partial_working') {
           onlineStatus = 'partial_working';
           onlineStatusLabel = 'Partial Working';
-        } else if (lastActiveTime) {
-          const diffMinutes = Math.floor((nowMs - lastActiveTime.getTime()) / (1000 * 60));
-          if (!isExplicitLoggedOut && diffMinutes <= 5) {
+        } else if (isExplicitLoggedOut) {
+          onlineStatus = 'offline';
+          onlineStatusLabel = 'Offline';
+        } else if (c.last_active_at) {
+          const diffMinutes = Math.floor((nowMs - new Date(c.last_active_at).getTime()) / (1000 * 60));
+          if (diffMinutes <= 3) {
             onlineStatus = 'online';
             onlineStatusLabel = 'Online';
-          } else if (diffMinutes <= 60) {
+          } else if (diffMinutes <= 15) {
             onlineStatus = 'away';
             onlineStatusLabel = 'Away';
           } else {
@@ -9598,7 +9618,7 @@ app.get('/api/v1/dashboard/admin', async (req: Request, res: Response) => {
       let onlineStatus: 'online' | 'away' | 'offline' | 'on_leave' | 'partial_working' = 'offline';
       let onlineStatusLabel = 'Offline';
 
-      const isExplicitLoggedOut = u.logged_out_at && u.last_active_at && new Date(u.logged_out_at) >= new Date(u.last_active_at);
+      const isExplicitLoggedOut = u.is_online === false || (Boolean(u.logged_out_at) && (!u.last_login_at || new Date(u.logged_out_at as any) >= new Date(u.last_login_at as any)));
 
       if (u.account_status === 'on_leave') {
         onlineStatus = 'on_leave';
@@ -9606,12 +9626,15 @@ app.get('/api/v1/dashboard/admin', async (req: Request, res: Response) => {
       } else if (u.account_status === 'partial_working') {
         onlineStatus = 'partial_working';
         onlineStatusLabel = 'Partial Working';
-      } else if (lastActiveTime) {
-        const diffMinutes = Math.floor((nowMs - lastActiveTime.getTime()) / (1000 * 60));
-        if (!isExplicitLoggedOut && diffMinutes <= 5) {
+      } else if (isExplicitLoggedOut) {
+        onlineStatus = 'offline';
+        onlineStatusLabel = 'Offline';
+      } else if (u.last_active_at) {
+        const diffMinutes = Math.floor((nowMs - new Date(u.last_active_at).getTime()) / (1000 * 60));
+        if (diffMinutes <= 3) {
           onlineStatus = 'online';
           onlineStatusLabel = 'Online';
-        } else if (diffMinutes <= 60) {
+        } else if (diffMinutes <= 15) {
           onlineStatus = 'away';
           onlineStatusLabel = 'Away';
         } else {
@@ -12425,8 +12448,14 @@ app.use((req: Request, res: Response) => {
 
 // 5. Global Error Handler
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  if (err?.message === 'Not allowed by CORS') {
+    return res.status(403).json({
+      success: false,
+      error: { code: 'ORIGIN_NOT_ALLOWED', message: 'This origin is not permitted to access the API.' },
+    });
+  }
   console.error('❌ [Unhandled Server Error]:', err);
-  res.status(500).json({
+  return res.status(500).json({
     success: false,
     error: {
       code: 'INTERNAL_SERVER_ERROR',

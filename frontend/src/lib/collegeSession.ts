@@ -572,6 +572,26 @@ export function unlockDailyFocus(): void {
   } catch {}
 }
 
+/** Purges all active college and focus selections from browser storage on logout or user switch */
+export function clearAllCollegeSessionState(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(ACTIVE_COLLEGE_ID_KEY);
+    localStorage.removeItem(ACTIVE_COLLEGE_NAME_KEY);
+    localStorage.removeItem(ACTIVE_COLLEGE_OBJ_KEY);
+    localStorage.removeItem(COORDINATOR_SELECTED_COLLEGES_KEY);
+    localStorage.removeItem(COORDINATOR_FOCUS_DATE_KEY);
+    localStorage.removeItem(COORDINATOR_FOCUS_WEEK_KEY);
+    localStorage.removeItem(COORDINATOR_FOCUS_LOCKED_KEY);
+    sessionStorage.removeItem(ACTIVE_COLLEGE_ID_KEY);
+    sessionStorage.removeItem(ACTIVE_COLLEGE_NAME_KEY);
+    sessionStorage.removeItem(ACTIVE_COLLEGE_OBJ_KEY);
+
+    window.dispatchEvent(new CustomEvent('ipoms_college_change', { detail: { id: '', name: '', obj: null } }));
+    window.dispatchEvent(new CustomEvent('ipoms_focus_updated', { detail: { selectedIds: [], isLocked: false } }));
+  } catch {}
+}
+
 /** Preserves weekly focus on login if already locked for current week */
 export function clearDailyFocusOnLogin(): void {
   if (typeof window === 'undefined') return;
@@ -590,22 +610,35 @@ export function clearDailyFocusOnLogin(): void {
 
 export function getCoordinatorSelectedColleges(): string[] {
   if (typeof window === 'undefined') return [];
+  const sessionUser = readSessionUser();
+  const officialDefaults = getDefaultOfficialCollegeIdsForUser(sessionUser);
+
   try {
     const raw = localStorage.getItem(COORDINATOR_SELECTED_COLLEGES_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.slice(0, 5);
+        // If official defaults exist for this specific user, ensure at least one parsed college matches their official roster
+        if (officialDefaults.length > 0) {
+          const isValidForUser = parsed.some((id) =>
+            officialDefaults.includes(String(id)) || officialDefaults.includes(String(id).toUpperCase())
+          );
+          if (isValidForUser) {
+            return parsed.slice(0, 5);
+          }
+        } else {
+          return parsed.slice(0, 5);
+        }
       }
     }
   } catch {}
-  // Default fallback to official allocation for current user if not yet stored
-  const defaults = getDefaultOfficialCollegeIdsForUser();
-  if (defaults.length > 0) {
+
+  // Fallback to official allocation for current user if not yet stored or invalid
+  if (officialDefaults.length > 0) {
     try {
-      localStorage.setItem(COORDINATOR_SELECTED_COLLEGES_KEY, JSON.stringify(defaults));
+      localStorage.setItem(COORDINATOR_SELECTED_COLLEGES_KEY, JSON.stringify(officialDefaults));
     } catch {}
-    return defaults;
+    return officialDefaults;
   }
   return [];
 }

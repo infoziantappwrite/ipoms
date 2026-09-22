@@ -374,9 +374,17 @@ export function registerAuthRoutes(app: Express) {
       }
       if (uid) {
         await User.findByIdAndUpdate(uid, {
-          is_online: false,
-          logged_out_at: new Date(),
-          last_active_at: new Date(),
+          $set: {
+            is_online: false,
+            logged_out_at: new Date(),
+          },
+          $unset: {
+            active_college_id: '',
+            active_college_code: '',
+            active_college_name: '',
+            active_college_location: '',
+            current_page: '',
+          },
         });
       }
     } catch {}
