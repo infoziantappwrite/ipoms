@@ -2089,61 +2089,72 @@ export function ReportBuilderWizard({
             )}
 
             {/* Highlighting Toolbar: Palette Swatches & Quick Actions */}
-            <div className="p-3.5 rounded-xl bg-surface-sunken/80 border border-border flex items-center justify-between flex-wrap gap-3">
-              {/* Color Swatches */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-fg-muted flex items-center gap-1.5">
-                  <Palette size={13} className="text-primary" /> Highlighter Shade:
-                </span>
-                <div className="flex items-center gap-1.5">
-                  {HIGHLIGHT_PALETTES.map((pal) => {
-                    const isSelected = highlightColor === pal.color;
-                    return (
-                      <button
-                        key={pal.color}
-                        type="button"
-                        onClick={() => {
-                          setHighlightColor(pal.color);
-                          if (highlightedTaskIds.size > 0) {
-                            const updatedMap: Record<string, string> = {};
-                            highlightedTaskIds.forEach((id) => {
-                              updatedMap[id] = pal.color;
-                            });
-                            setHighlightColorMap(updatedMap);
-                          }
-                        }}
-                        title={`${pal.label} (${pal.badge})`}
-                        style={{ backgroundColor: pal.color, borderColor: pal.border }}
-                        className={`w-6 h-6 rounded-full border-2 transition-all cursor-pointer flex items-center justify-center shadow-2xs ${
-                          isSelected ? 'scale-110 ring-2 ring-primary ring-offset-1 ring-offset-surface' : 'hover:scale-105 opacity-80 hover:opacity-100'
-                        }`}
-                      >
-                        {isSelected && <Check size={11} className="text-slate-900 font-bold" strokeWidth={3.5} />}
-                      </button>
-                    );
-                  })}
+            <div className="space-y-2">
+              <div className="p-3.5 rounded-xl bg-surface-sunken/80 border border-border flex items-center justify-between flex-wrap gap-3">
+                {/* Color Swatches */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-fg-muted flex items-center gap-1.5">
+                    <Palette size={13} className="text-primary" /> Active Highlighter:
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {HIGHLIGHT_PALETTES.map((pal) => {
+                      const isSelected = highlightColor === pal.color;
+                      return (
+                        <button
+                          key={pal.color}
+                          type="button"
+                          onClick={() => {
+                            setHighlightColor(pal.color);
+                          }}
+                          title={`${pal.label} (${pal.badge}) - Click then click any row to highlight`}
+                          style={{ backgroundColor: pal.color, borderColor: pal.border }}
+                          className={`w-6 h-6 rounded-full border-2 transition-all cursor-pointer flex items-center justify-center shadow-2xs ${
+                            isSelected ? 'scale-110 ring-2 ring-primary ring-offset-1 ring-offset-surface' : 'hover:scale-105 opacity-80 hover:opacity-100'
+                          }`}
+                        >
+                          {isSelected && <Check size={11} className="text-slate-900 font-bold" strokeWidth={3.5} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <span className="text-[11px] font-semibold text-fg-muted ml-1">
+                    ({HIGHLIGHT_PALETTES.find((p) => p.color === highlightColor)?.label || 'Yellow'})
+                  </span>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleHighlightAllTasks}
+                    className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 border border-amber-500/30 transition-all cursor-pointer flex items-center gap-1"
+                  >
+                    <Highlighter size={12} />
+                    Highlight All
+                  </button>
+
+                  {highlightedTaskIds.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearAllHighlights}
+                      className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-rose-600 hover:bg-rose-500/10 border border-rose-500/30 transition-all cursor-pointer flex items-center gap-1"
+                    >
+                      <X size={12} />
+                      Clear Highlights ({highlightedTaskIds.size})
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={handleHighlightAllTasks}
-                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 border border-amber-500/30 transition-all cursor-pointer"
-                >
-                  Highlight All
-                </button>
-
-                {highlightedTaskIds.size > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleClearAllHighlights}
-                    className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-rose-600 hover:bg-rose-500/10 border border-rose-500/30 transition-all cursor-pointer"
-                  >
-                    Clear Highlights
-                  </button>
-                )}
+              {/* Helpful Instruction Banner */}
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-primary/5 border border-primary/20 text-fg text-xs">
+                <Highlighter size={15} className="text-primary shrink-0" />
+                <div className="leading-snug">
+                  <span className="font-bold text-primary mr-1">How to apply colors:</span>
+                  <span className="text-fg-muted">
+                    Pick your highlighter color above, then <strong>click anywhere on any row</strong> (Company, Role, Status) to highlight it for high priority. Click again to remove. Checkboxes on the left select which rows are included in the report.
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -2253,7 +2264,12 @@ export function ReportBuilderWizard({
                                       title="Toggle select all in this section"
                                     />
                                   </th>
-                                  <th className="py-2.5 px-2 w-12 text-center font-mono">#</th>
+                                  <th className="py-2.5 px-2 w-16 text-center font-mono" title="Click any cell in the row to apply the selected highlighter shade">
+                                    <span className="inline-flex items-center justify-center gap-1">
+                                      <Highlighter size={11} className="text-primary" />
+                                      <span>#</span>
+                                    </span>
+                                  </th>
                                   <th className="py-2.5 px-3 text-center min-w-[190px]">Company Name</th>
                                   <th className="py-2.5 px-3 text-center min-w-[150px]">Role</th>
                                   <th className="py-2.5 px-2 text-center min-w-[110px]">CTC</th>
@@ -2279,10 +2295,15 @@ export function ReportBuilderWizard({
                                     <tr
                                       key={t._id || rowIdx}
                                       style={isHl && isIncluded ? { backgroundColor: rowHlColor } : undefined}
-                                      className={`transition-colors ${
+                                      title={
+                                        isHl
+                                          ? 'Row highlighted (click anywhere to remove highlight)'
+                                          : 'Click anywhere on row to highlight with active shade'
+                                      }
+                                      className={`transition-colors cursor-pointer ${
                                         isHl && isIncluded
                                           ? 'font-semibold text-slate-950 shadow-2xs'
-                                          : 'bg-surface hover:bg-surface-sunken/40'
+                                          : 'bg-surface hover:bg-surface-sunken/60'
                                       }`}
                                     >
                                       {/* Checkbox column */}
@@ -2310,9 +2331,18 @@ export function ReportBuilderWizard({
                                           backgroundColor: isHl && isIncluded ? rowHlColor : undefined,
                                         }}
                                         onClick={() => handleToggleRowHighlight(t._id)}
-                                        title="Click row to toggle highlight"
+                                        title={
+                                          isHl
+                                            ? 'Row highlighted (click to remove highlight)'
+                                            : 'Click to highlight with active shade'
+                                        }
                                       >
-                                        <span>{rowIdx + 1}</span>
+                                        <div className="flex items-center justify-center gap-1">
+                                          {isHl && isIncluded && (
+                                            <span className="w-1.5 h-1.5 rounded-full bg-slate-900 shrink-0" />
+                                          )}
+                                          <span>{rowIdx + 1}</span>
+                                        </div>
                                       </td>
 
                                       {/* Company Name column */}

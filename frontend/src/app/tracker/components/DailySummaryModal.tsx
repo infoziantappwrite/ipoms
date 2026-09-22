@@ -62,9 +62,7 @@ export function DailySummaryModal({
     rows.filter((r) => !r.is_finalized && !r.call_end_time && !r.outcome_status).length;
   const positiveCount =
     kpi?.positive ??
-    rows.filter((r) =>
-      ['jd_received', 'hiring', 'drive_completed', 'invite_mail'].includes(r.outcome_status || '')
-    ).length;
+    rows.filter((r) => r.outcome_status === 'invite_mail').length;
   const followUpCount =
     kpi?.follow_up ??
     rows.filter((r) => ['follow_up', 'call_back'].includes(r.outcome_status || '')).length;

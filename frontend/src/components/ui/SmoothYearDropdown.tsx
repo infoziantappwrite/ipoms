@@ -6,8 +6,6 @@ import { ChevronDown, Check, GraduationCap } from 'lucide-react';
 import { triggerHaptic } from '@/lib/haptics';
 
 export const YEAR_OPTIONS = [
-  '2025',
-  '2026',
   '2027',
   '2028',
   '2029',

@@ -255,6 +255,7 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
 
   const totalAllOverdue = useMemo(() => colleges.reduce((sum, c) => sum + (c.overdue_count || 0), 0), [colleges]);
   const totalAllDueNow = useMemo(() => colleges.reduce((sum, c) => sum + (c.due_now_count || 0), 0), [colleges]);
+  const totalAllPending = totalAllOverdue + totalAllDueNow;
 
   const todayStr = (() => {
     const now = new Date();
@@ -381,8 +382,74 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
     return ReactDOM.createPortal(popover, document.body);
   };
 
-  // ── State 1: When no college is selected, render ONLY the animated attention banner ──
+  // ── State 1: When no college is selected ──
   if (!selectedCollegeId) {
+    // 1A. Static calm view when there is NO pending follow-up work
+    if (totalAllPending === 0) {
+      return (
+        <div className="relative" ref={dropdownRef}>
+          <div
+            onClick={() => {
+              triggerHaptic('selection');
+              setIsDropdownOpen((prev) => !prev);
+            }}
+            className="py-3.5 px-5 flex items-center justify-between gap-4 bg-surface dark:bg-[#111622] rounded-2xl border border-border dark:border-slate-800 shadow-2xs hover:border-border-strong dark:hover:border-slate-700 transition-colors cursor-pointer group flex-wrap relative select-none"
+          >
+            <div className="flex items-center gap-3.5 min-w-0 z-10">
+              {/* Static Clear Icon */}
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                <CheckCircle2 size={20} strokeWidth={2.2} />
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="text-xs sm:text-sm font-bold text-fg tracking-tight flex items-center gap-1.5">
+                    <span>Follow-up Queue Status</span>
+                  </h4>
+                  <span className="text-micro font-semibold bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                    All Clear (0 Pending)
+                  </span>
+                </div>
+                <p className="text-xs text-fg-subtle font-normal mt-0.5">
+                  No scheduled follow-up drives pending for today. Select a college to review institutional records.
+                </p>
+              </div>
+            </div>
+
+            {/* Right Actions: Sync & Select College */}
+            <div className="flex items-center gap-2 shrink-0 z-10">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerHaptic('light');
+                  setSelectedCollegeId('');
+                  loadFollowUps();
+                  toast('Syncing follow-up leads from Weekly Tracker…', 'info');
+                }}
+                title="Sync with Weekly Tracker"
+                className="h-8 w-8 rounded-xl bg-surface hover:bg-surface-raised border border-border text-fg-subtle hover:text-fg flex items-center justify-center transition-colors cursor-pointer shadow-2xs active:scale-95"
+              >
+                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              </button>
+
+              <div
+                ref={triggerRef}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-surface hover:bg-surface-raised border border-border text-fg text-xs font-semibold shadow-2xs transition-colors shrink-0 cursor-pointer"
+              >
+                <span>Select College</span>
+                <ChevronDown size={14} strokeWidth={2} className={`transition-transform duration-200 ease-out ${isDropdownOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </div>
+          </div>
+
+          {/* Dropdown Popover attached to the static banner */}
+          {renderDropdownPopover()}
+        </div>
+      );
+    }
+
+    // 1B. Attention Banner when pending follow-up drives exist (> 0)
     return (
       <div className="relative" ref={dropdownRef}>
         <div
@@ -392,11 +459,11 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
           }}
           className="py-4 px-5 flex items-center justify-between gap-4 bg-gradient-to-r from-rose-500/10 via-amber-500/10 to-primary/10 dark:from-rose-950/40 dark:via-amber-950/30 dark:to-sky-950/40 rounded-2xl border-2 border-rose-500/30 dark:border-rose-500/40 shadow-md hover:shadow-lg transition-all cursor-pointer group flex-wrap relative overflow-hidden ring-4 ring-rose-500/10 dark:ring-rose-500/20"
         >
-          {/* Continuous infinite animated ambient shimmer wave */}
+          {/* Continuous ambient shimmer wave */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 dark:via-white/10 to-transparent -translate-x-full animate-[indeterminate_2.5s_infinite_linear] pointer-events-none" />
 
           <div className="flex items-center gap-3.5 min-w-0 z-10">
-            {/* Continuous Dual Pulsing Beacon Icon */}
+            {/* Pulsing Beacon Icon */}
             <div className="relative flex items-center justify-center shrink-0">
               <span className="animate-ping absolute inline-flex h-10 w-10 rounded-full bg-rose-500 opacity-50" />
               <span className="animate-pulse absolute inline-flex h-12 w-12 rounded-full bg-amber-400/30" />
@@ -432,7 +499,7 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
 
           {/* Right Actions: Sync & Select College */}
           <div className="flex items-center gap-2 shrink-0 z-10">
-            {/* Sync Button in Orange & Red Gradient */}
+            {/* Sync Button */}
             <button
               type="button"
               onClick={(e) => {
@@ -450,6 +517,7 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
 
             {/* Pulsing Action Call-to-Action with Red & Orange Gradient and Arrow Head Chevron */}
             <div ref={triggerRef as React.RefObject<HTMLDivElement>} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 via-orange-500 to-amber-500 text-white text-xs font-bold shadow-md shadow-orange-500/25 group-hover:from-rose-500 group-hover:via-orange-500 group-hover:to-amber-400 group-hover:shadow-lg group-hover:shadow-orange-500/35 group-hover:scale-105 transition-all shrink-0 border border-white/20">
+
               <span>Select College</span>
               <ChevronDown size={16} strokeWidth={2.5} className={`transition-transform duration-200 ease-out ${isDropdownOpen ? 'rotate-180' : ''}`} />
             </div>
@@ -463,6 +531,8 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
   }
 
   // ── State 2: A college is selected -> Render the full widget card with its header and cards ──
+  const selectedCollegePending = dueNowCount + overdueCount;
+
   return (
     <div className="rounded-2xl bg-surface border border-border shadow-xs overflow-hidden">
       {/* ── Widget Header ─────────────────────────────────────────── */}
@@ -475,8 +545,16 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
           className="flex items-center gap-2.5 cursor-pointer select-none group"
           title={isSectionCollapsed ? "Click to open / pull down follow-up section" : "Click to minimize / pull up follow-up section"}
         >
-          <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-            <Flame size={17} className="animate-pulse text-rose-500" />
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform ${
+            selectedCollegePending > 0
+              ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+              : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+          }`}>
+            {selectedCollegePending > 0 ? (
+              <Flame size={17} className="text-rose-500" />
+            ) : (
+              <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />
+            )}
           </div>
           <div>
             <h2 className="text-xs sm:text-sm font-bold text-fg tracking-tight flex items-center gap-1.5">
@@ -570,7 +648,7 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
             <ChevronRight size={13} strokeWidth={2.5} />
           </Link>
 
-          {/* Sync Button in Orange & Red Gradient */}
+          {/* Sync Button */}
           <button
             onClick={() => {
               triggerHaptic('light');
@@ -579,7 +657,11 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
               toast('Syncing follow-up leads from Weekly Tracker…', 'info');
             }}
             title="Sync with Weekly Tracker"
-            className="h-8 px-3 rounded-full bg-gradient-to-r from-rose-600 via-orange-500 to-amber-500 text-white flex items-center gap-1.5 text-xs font-bold shadow-md shadow-orange-500/25 hover:from-rose-500 hover:via-orange-500 hover:to-amber-400 hover:shadow-lg hover:shadow-orange-500/35 hover:scale-105 transition-all cursor-pointer border border-white/20 active:scale-95"
+            className={`h-8 px-3 transition-all cursor-pointer border active:scale-95 flex items-center gap-1.5 text-xs font-semibold shadow-2xs ${
+              selectedCollegePending > 0
+                ? 'rounded-full bg-gradient-to-r from-rose-600 via-orange-500 to-amber-500 text-white font-bold shadow-md shadow-orange-500/25 hover:from-rose-500 hover:via-orange-500 hover:to-amber-400 border-white/20'
+                : 'rounded-xl bg-surface hover:bg-surface-raised border-border text-fg'
+            }`}
           >
             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
             <span>Sync</span>

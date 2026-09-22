@@ -46,7 +46,7 @@ interface Props {
   onToggleSelect: (id: string) => void;
   onToggleSelectAll: () => void;
   onClearSelection: () => void;
-  onBulkDelete: () => Promise<void>;
+  onBulkDelete: () => void | Promise<void>;
   onUpdateRow: (rowId: string, patch: Partial<DailyLeadRow>) => Promise<void>;
   onDeleteRow?: (rowId: string) => Promise<void>;
   onMoveToJd?: (rowId: string) => Promise<void>;
@@ -106,7 +106,7 @@ export function LeadsTable({
                   />
                 </th>
               )}
-              <th className="py-3 px-2 w-10 text-center font-bold border-r border-border/80">#</th>
+              <th className="py-3 px-3 w-14 min-w-[54px] text-center font-bold border-r border-border/80">#</th>
               <th className="py-3 px-3 min-w-[100px] text-center border-r border-border/80">Time Stamp</th>
               <th className="py-3 px-3 min-w-[110px] text-center border-r border-border/80">Date</th>
               <th className="py-3 px-3 min-w-[120px] text-center border-r border-border/80">College</th>
@@ -264,7 +264,7 @@ function TableRow({
       )}
 
       {/* Row Index */}
-      <td className="py-2.5 px-2 text-center text-fg-subtle font-mono text-micro font-bold border-r border-border/60">
+      <td className="py-2.5 px-3 w-14 min-w-[54px] text-center text-fg-subtle font-mono text-micro font-bold border-r border-border/60">
         {index}
       </td>
 
@@ -450,7 +450,7 @@ function TableRow({
         )}
       </td>
 
-      {/* Eligible Batch (Multi-select from 2025 onwards) */}
+      {/* Eligible Batch (Multi-select from 2027 onwards) */}
       <td className="py-2.5 px-3 text-fg-muted whitespace-nowrap min-w-[110px] text-center border-r border-border/60">
         <SmoothYearDropdown
           value={row.eligible_batch}

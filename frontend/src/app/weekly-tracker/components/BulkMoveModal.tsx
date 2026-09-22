@@ -127,7 +127,7 @@ export function BulkMoveModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-xl bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-3xl lg:max-w-4xl bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-raised">
           <div className="flex items-center gap-3">
@@ -158,7 +158,7 @@ export function BulkMoveModal({
             <label className="block text-xs font-bold uppercase tracking-wider text-fg-muted mb-2.5">
               Select Destination Section *
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {TARGET_SECTIONS.map((sec) => {
                 const isSelected = selectedTargetSection === sec.key;
                 const IconComponent = sec.Icon;
@@ -170,18 +170,20 @@ export function BulkMoveModal({
                       triggerHaptic('selection');
                       setSelectedTargetSection(sec.key);
                     }}
-                    className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all cursor-pointer shadow-2xs ${
+                    className={`p-3.5 rounded-xl border text-left flex items-center justify-between gap-3 transition-all cursor-pointer shadow-2xs ${
                       isSelected
                         ? sec.activeClass
                         : `${sec.colorClass} opacity-85 hover:opacity-100`
                     }`}
                   >
-                    <IconComponent size={16} strokeWidth={2.2} className="shrink-0 mt-0.5" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold truncate">{sec.label}</p>
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <IconComponent size={18} strokeWidth={2.2} className="shrink-0" />
+                      <span className="text-xs sm:text-[13px] font-bold leading-snug whitespace-normal break-words">
+                        {sec.label}
+                      </span>
                     </div>
                     {isSelected && (
-                      <CheckCircle2 size={14} className="text-primary shrink-0" />
+                      <CheckCircle2 size={16} className="text-primary shrink-0 ml-1.5" />
                     )}
                   </button>
                 );

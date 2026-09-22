@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Layers, Sparkles, ArrowUpRight, Lock, Target } from 'lucide-react';
+import { CoordinatorClockDurationWidget } from './CoordinatorClockDurationWidget';
 import { CoordinatorCollegeFocusSection } from './CoordinatorCollegeFocusSection';
 import { CoordinatorCollegeKpiCards } from './CoordinatorCollegeKpiCards';
 import { FollowUpSmartQueueWidget } from './FollowUpSmartQueueWidget';
@@ -37,6 +38,12 @@ export function CoordinatorDashboard({ data }: Props) {
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-8 p-6">
+      {/* ── 0. Live Clock Duration Telemetry (Centerpiece) ── */}
+      <CoordinatorClockDurationWidget
+        clockData={data?.clock_duration}
+        coordinatorName={data?.coordinator?.name}
+      />
+
       {/* ── 1. Follow up Due (Follow-Up Smart Queue) ── */}
       <FollowUpSmartQueueWidget
         selectedCollegeIds={selectedCollegeIds}

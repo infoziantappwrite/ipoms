@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalendarDays } from 'lucide-react';
 import { WeeklyHeader } from './components/WeeklyHeader';
-import { WeeklyKpiCards, WeeklyKpiData } from './components/WeeklyKpiCards';
 import { WeeklySection } from './components/WeeklySection';
 import { AddCompanyModal } from './components/AddCompanyModal';
 import { BulkMoveModal } from './components/BulkMoveModal';
@@ -96,13 +95,13 @@ export default function WeeklyTrackerPage() {
   const [academicYear, setAcademicYear] = useState<string>('all');
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [sections, setSections] = useState<SectionsResponse | null>(null);
-  const [kpi, setKpi] = useState<WeeklyKpiData | null>(null);
   const [totalRecords, setTotalRecords] = useState<number>(0);
   const [loading, setLoading] = useState(false);
+  const [allSectionsCollapsed, setAllSectionsCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [companyTypeFilter, setCompanyTypeFilter] = useState('all');
-  const [activeSectionFilter, setActiveSectionFilter] = useState<string>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [draftToAdd, setDraftToAdd] = useState<any | null>(null);
   const [coordinatorId, setCoordinatorId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
@@ -154,8 +153,28 @@ export default function WeeklyTrackerPage() {
     const urlCollegeId = urlParams?.get('college_id');
     const urlSection = urlParams?.get('section');
 
-    if (urlSection) {
-      setActiveSectionFilter(urlSection);
+    // Check if returning with a saved draft from Metadata
+    if (typeof window !== 'undefined') {
+      try {
+        const savedDraftStr = sessionStorage.getItem('ipoms_weekly_add_company_draft');
+        if (savedDraftStr) {
+          const draft = JSON.parse(savedDraftStr);
+          if (draft && draft.companyName) {
+            setDraftToAdd(draft);
+            setIsAddModalOpen(true);
+            if (draft.collegeId && !urlCollegeId) {
+              const cached = getCachedColleges();
+              const matched = cached.find((c) => c._id === draft.collegeId || c.college_code === draft.collegeId);
+              const colName = matched?.college_name || '';
+              setSelectedCollegeId(draft.collegeId);
+              setSelectedCollegeName(colName);
+              setActiveCollege(draft.collegeId, colName, matched || undefined);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse weekly draft from sessionStorage:', e);
+      }
     }
 
     if (urlCollegeId) {
@@ -215,9 +234,7 @@ export default function WeeklyTrackerPage() {
     if (!selectedCollegeId) return;
     try {
       const res = await apiFetch(`/weekly-tracker/kpi?college_id=${selectedCollegeId}&academic_year=${academicYear}&week_offset=${weekOffset}`);
-      if (res.success && res.data) {
-        setKpi((res.data as any).kpi);
-      }
+        // kpi state removed — counts are derived directly from sections rows
     } catch (err) {
       console.error('Failed to load weekly KPI:', err);
     }
@@ -728,45 +745,98 @@ export default function WeeklyTrackerPage() {
       const tSec = prev[normTargetKey];
       if (!sSec || !tSec) return prev;
 
-      const r = sSec.rows.find((x) => x._id === rowId);
+      const r = sSec.rows.find((x) => x._id === rowId) || (prev.pipeline?.rows || []).find((x) => x._id === rowId) || (prev.top_companies?.rows || []).find((x) => x._id === rowId);
       if (!r) return prev;
 
-      nextSourceRows = sSec.rows.filter((x) => x._id !== rowId);
-      const updatedRow: WeeklyRow = {
-        ...r,
-        pipeline_section: targetSectionKey,
-        is_pinned_top: targetSectionKey === 'top_companies' ? true : r.is_pinned_top,
-      };
+      const nextState: any = { ...prev };
 
-      nextTargetRows = [...tSec.rows.filter((x) => x._id !== rowId)];
-      if (typeof targetIndex === 'number' && targetIndex >= 0 && targetIndex <= nextTargetRows.length) {
-        nextTargetRows.splice(targetIndex, 0, updatedRow);
+      if (normSourceKey === 'pipeline' && normTargetKey === 'top_companies') {
+        // Moving from pipeline to top_companies:
+        // KEEP in pipeline, AND add as fresh entry in top_companies
+        nextSourceRows = [...sSec.rows];
+        const updatedRow: WeeklyRow = {
+          ...r,
+          pipeline_section: 'pipeline',
+          is_pinned_top: true,
+        };
+        nextTargetRows = [...tSec.rows.filter((x) => x._id !== rowId)];
+        if (typeof targetIndex === 'number' && targetIndex >= 0 && targetIndex <= nextTargetRows.length) {
+          nextTargetRows.splice(targetIndex, 0, updatedRow);
+        } else {
+          nextTargetRows.unshift(updatedRow); // fresh entry at top of top_companies
+        }
+        nextState.pipeline = { ...sSec, rows: nextSourceRows };
+        nextState.top_companies = { ...tSec, rows: nextTargetRows };
+      } else if (normSourceKey === 'top_companies' && normTargetKey === 'pipeline') {
+        // Moving from top_companies to pipeline (unpinning from top):
+        // Remove from top_companies, ensure present in pipeline
+        nextSourceRows = sSec.rows.filter((x) => x._id !== rowId);
+        const pipelineSec = prev.pipeline || tSec;
+        const existsInPipeline = pipelineSec.rows.some((x) => x._id === rowId);
+        nextTargetRows = existsInPipeline
+          ? pipelineSec.rows.map((x) => x._id === rowId ? { ...x, is_pinned_top: false } : x)
+          : [{ ...r, pipeline_section: 'pipeline', is_pinned_top: false }, ...pipelineSec.rows];
+        nextState.top_companies = { ...sSec, rows: nextSourceRows };
+        nextState.pipeline = { ...pipelineSec, rows: nextTargetRows };
+      } else if (normTargetKey === 'in_progress') {
+        // Moving to in_progress (from pipeline or any section):
+        // Delete/remove from source section (and from top_companies / pipeline if present)
+        nextSourceRows = sSec.rows.filter((x) => x._id !== rowId);
+        const updatedRow: WeeklyRow = {
+          ...r,
+          pipeline_section: 'in_progress',
+          is_pinned_top: false,
+        };
+        nextTargetRows = [...tSec.rows.filter((x) => x._id !== rowId)];
+        if (typeof targetIndex === 'number' && targetIndex >= 0 && targetIndex <= nextTargetRows.length) {
+          nextTargetRows.splice(targetIndex, 0, updatedRow);
+        } else {
+          nextTargetRows.unshift(updatedRow); // fresh entry at top of in_progress
+        }
+        nextState[normSourceKey] = { ...sSec, rows: nextSourceRows };
+        nextState.in_progress = { ...tSec, rows: nextTargetRows };
+        if (normSourceKey === 'pipeline' && nextState.top_companies) {
+          nextState.top_companies = {
+            ...nextState.top_companies,
+            rows: nextState.top_companies.rows.filter((x: WeeklyRow) => x._id !== rowId),
+          };
+        } else if (normSourceKey === 'top_companies' && nextState.pipeline) {
+          nextState.pipeline = {
+            ...nextState.pipeline,
+            rows: nextState.pipeline.rows.filter((x: WeeklyRow) => x._id !== rowId),
+          };
+        }
       } else {
-        nextTargetRows.push(updatedRow);
+        // Standard cross-section move
+        nextSourceRows = sSec.rows.filter((x) => x._id !== rowId);
+        const updatedRow: WeeklyRow = {
+          ...r,
+          pipeline_section: targetSectionKey,
+          is_pinned_top: targetSectionKey === 'top_companies' ? true : r.is_pinned_top,
+        };
+        nextTargetRows = [...tSec.rows.filter((x) => x._id !== rowId)];
+        if (typeof targetIndex === 'number' && targetIndex >= 0 && targetIndex <= nextTargetRows.length) {
+          nextTargetRows.splice(targetIndex, 0, updatedRow);
+        } else {
+          nextTargetRows.push(updatedRow);
+        }
+        nextState[normSourceKey] = { ...sSec, rows: nextSourceRows };
+        nextState[normTargetKey] = { ...tSec, rows: nextTargetRows };
       }
 
-      const updatedSource = { ...sSec, rows: nextSourceRows };
-      const updatedTarget = { ...tSec, rows: nextTargetRows };
-
-      const nextState: any = {
-        ...prev,
-        [normSourceKey]: updatedSource,
-        [normTargetKey]: updatedTarget,
-      };
-
       if (normSourceKey === 'in_drive' || normTargetKey === 'in_drive') {
-        const d = normSourceKey === 'in_drive' ? updatedSource : updatedTarget;
+        const d = normSourceKey === 'in_drive' ? nextState[normSourceKey] : nextState[normTargetKey];
         nextState.in_drive = d;
         nextState.upcoming_drives = d;
         nextState.companies_in_drive = d;
       }
       if (normSourceKey === 'rejected_companies' || normTargetKey === 'rejected_companies') {
-        const d = normSourceKey === 'rejected_companies' ? updatedSource : updatedTarget;
+        const d = normSourceKey === 'rejected_companies' ? nextState[normSourceKey] : nextState[normTargetKey];
         nextState.rejected_companies = d;
         nextState.rejected_by_hr = d;
       }
       if (normSourceKey === 'on_hold_by_college' || normTargetKey === 'on_hold_by_college') {
-        const d = normSourceKey === 'on_hold_by_college' ? updatedSource : updatedTarget;
+        const d = normSourceKey === 'on_hold_by_college' ? nextState[normSourceKey] : nextState[normTargetKey];
         nextState.on_hold_by_college = d;
         nextState.rejected_by_college = d;
       }
@@ -975,24 +1045,49 @@ export default function WeeklyTrackerPage() {
           const matching = (sData as any).rows.filter((r: WeeklyRow) => rowIdsToMove.includes(r._id));
           if (matching.length > 0) {
             rowsToTransfer.push(...matching);
-            nextState[sKey] = {
-              ...(sData as any),
-              rows: (sData as any).rows.filter((r: WeeklyRow) => !rowIdsToMove.includes(r._id)),
-            };
+            // If moving to top_companies, DO NOT remove from pipeline!
+            if (normTargetKey === 'top_companies' && sKey === 'pipeline') {
+              // keep rows in pipeline
+            } else {
+              nextState[sKey] = {
+                ...(sData as any),
+                rows: (sData as any).rows.filter((r: WeeklyRow) => !rowIdsToMove.includes(r._id)),
+              };
+            }
           }
+        }
+      }
+
+      // If moving to in_progress, also ensure cleaned from top_companies and pipeline
+      if (normTargetKey === 'in_progress') {
+        if (nextState.top_companies) {
+          nextState.top_companies = {
+            ...nextState.top_companies,
+            rows: nextState.top_companies.rows.filter((r: WeeklyRow) => !rowIdsToMove.includes(r._id)),
+          };
+        }
+        if (nextState.pipeline) {
+          nextState.pipeline = {
+            ...nextState.pipeline,
+            rows: nextState.pipeline.rows.filter((r: WeeklyRow) => !rowIdsToMove.includes(r._id)),
+          };
         }
       }
 
       const currentTargetSec = nextState[normTargetKey] || { title: targetLabel, order: 99, summary_metric: '', rows: [] };
       const updatedTransferRows = rowsToTransfer.map((r) => ({
         ...r,
-        pipeline_section: targetSectionKey,
-        is_pinned_top: targetSectionKey === 'top_companies' ? true : r.is_pinned_top,
+        pipeline_section: normTargetKey === 'top_companies' ? 'pipeline' : targetSectionKey,
+        is_pinned_top: normTargetKey === 'top_companies' ? true : false,
       }));
+
+      // Deduplicate rows in target section
+      const existingTargetIds = new Set(currentTargetSec.rows.map((r: WeeklyRow) => r._id));
+      const newRowsToAdd = updatedTransferRows.filter((r) => !existingTargetIds.has(r._id));
 
       nextState[normTargetKey] = {
         ...currentTargetSec,
-        rows: [...currentTargetSec.rows, ...updatedTransferRows],
+        rows: [...newRowsToAdd, ...currentTargetSec.rows], // fresh at top
       };
 
       return normalizeAllSections(nextState);
@@ -1165,59 +1260,9 @@ export default function WeeklyTrackerPage() {
     };
   }, [handleSaveAll]);
 
-  // Filter sections if activeSectionFilter is set from clicking a KPI card
-  const shouldRenderSection = (key: string) => {
-    if (activeSectionFilter === 'all') return true;
-    if (activeSectionFilter === 'rejected' && key === 'rejected_companies') return true;
-    if (activeSectionFilter === 'in_drive' && (key === 'in_drive' || key === 'companies_in_drive' || key === 'upcoming_drives')) return true;
-    if (activeSectionFilter === 'drive_in_progress' && key === 'drive_in_progress') return true;
-    return activeSectionFilter === key;
-  };
+  // All sections are always rendered (KPI filter cards removed)
+  const shouldRenderSection = (_key: string) => true;
 
-  // ── Dynamically compute live KPI counts from active sections state ──
-  // Guarantees all counts (including Pipeline, Completed, Drives, etc.) are 100% reactive to row updates, moves, and deletions
-  const dynamicKpi: WeeklyKpiData = useMemo(() => {
-    const completedRows = sections?.completed?.rows || [];
-    const totalOffers = completedRows.reduce((sum: number, r: any) => sum + (Number(r.selected_count) || 0), 0);
-
-    const completed = sections?.completed?.rows?.length ?? kpi?.completed ?? 0;
-    const drive_in_progress = sections?.drive_in_progress?.rows?.length ?? kpi?.drive_in_progress ?? 0;
-    const upcoming_drives = (
-      sections?.in_drive?.rows?.length ??
-      sections?.upcoming_drives?.rows?.length ??
-      sections?.companies_in_drive?.rows?.length ??
-      kpi?.upcoming_drives ??
-      kpi?.in_drive ??
-      0
-    );
-    const in_progress = sections?.in_progress?.rows?.length ?? kpi?.in_progress ?? 0;
-    const pipeline = (
-      sections?.pipeline?.rows?.length ??
-      (sections as any)?.companies_in_pipeline?.rows?.length ??
-      kpi?.pipeline ??
-      0
-    );
-    const top_companies = sections?.top_companies?.rows?.length ?? kpi?.top_companies ?? 0;
-    const rejected = (
-      (sections?.rejected_companies?.rows?.length ?? 0) +
-      (sections?.on_hold_by_college?.rows?.length ?? 0) +
-      (sections?.rejected_by_hr?.rows?.length ?? 0) +
-      (sections?.rejected_by_college?.rows?.length ?? 0)
-    ) || (kpi?.rejected ?? 0);
-
-    return {
-      completed,
-      drive_in_progress,
-      upcoming_drives,
-      in_drive: upcoming_drives,
-      in_progress,
-      pipeline,
-      top_companies,
-      rejected,
-      total_offers: totalOffers || (kpi?.total_offers ?? 0),
-      follow_ups_due_today: kpi?.follow_ups_due_today ?? 0,
-    };
-  }, [sections, kpi]);
 
   return (
     <div className="h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-primary-foreground overflow-hidden">
@@ -1259,18 +1304,9 @@ export default function WeeklyTrackerPage() {
           onUndo={undo}
           onRedo={redo}
           onOpenCollegeDossier={() => setIsDossierOpen(true)}
+          allSectionsCollapsed={allSectionsCollapsed}
+          onToggleCollapseAll={() => setAllSectionsCollapsed((prev) => !prev)}
         />
-
-        {/* ── KPI Cards (Slim Single-Row Profile) ──────────────────────── */}
-        {selectedCollegeId && (
-          <div className="px-6 py-2 border-t border-border/70 bg-surface/50">
-            <WeeklyKpiCards
-              kpi={dynamicKpi}
-              activeSectionFilter={activeSectionFilter}
-              onFilterSection={setActiveSectionFilter}
-            />
-          </div>
-        )}
       </header>
 
       {/* ── Empty State when no college is selected ──────────────────────── */}
@@ -1310,6 +1346,7 @@ export default function WeeklyTrackerPage() {
               onDeleteRow={handleDeleteRow}
               onReorderRows={handleReorderRows}
               onMoveRowCrossSection={handleMoveRowCrossSection}
+              isGloballyCollapsed={allSectionsCollapsed}
             />
           )}
 
@@ -1332,6 +1369,7 @@ export default function WeeklyTrackerPage() {
               onDeleteRow={handleDeleteRow}
               onReorderRows={handleReorderRows}
               onMoveRowCrossSection={handleMoveRowCrossSection}
+              isGloballyCollapsed={allSectionsCollapsed}
             />
           )}
 
@@ -1354,6 +1392,7 @@ export default function WeeklyTrackerPage() {
               onDeleteRow={handleDeleteRow}
               onReorderRows={handleReorderRows}
               onMoveRowCrossSection={handleMoveRowCrossSection}
+              isGloballyCollapsed={allSectionsCollapsed}
             />
           )}
 
@@ -1376,6 +1415,7 @@ export default function WeeklyTrackerPage() {
               onDeleteRow={handleDeleteRow}
               onReorderRows={handleReorderRows}
               onMoveRowCrossSection={handleMoveRowCrossSection}
+              isGloballyCollapsed={allSectionsCollapsed}
             />
           )}
 
@@ -1398,6 +1438,7 @@ export default function WeeklyTrackerPage() {
               onDeleteRow={handleDeleteRow}
               onReorderRows={handleReorderRows}
               onMoveRowCrossSection={handleMoveRowCrossSection}
+              isGloballyCollapsed={allSectionsCollapsed}
             />
           )}
 
@@ -1420,6 +1461,7 @@ export default function WeeklyTrackerPage() {
               onDeleteRow={handleDeleteRow}
               onReorderRows={handleReorderRows}
               onMoveRowCrossSection={handleMoveRowCrossSection}
+              isGloballyCollapsed={allSectionsCollapsed}
             />
           )}
 
@@ -1442,6 +1484,7 @@ export default function WeeklyTrackerPage() {
               onDeleteRow={handleDeleteRow}
               onReorderRows={handleReorderRows}
               onMoveRowCrossSection={handleMoveRowCrossSection}
+              isGloballyCollapsed={allSectionsCollapsed}
             />
           )}
 
@@ -1464,6 +1507,7 @@ export default function WeeklyTrackerPage() {
               onDeleteRow={handleDeleteRow}
               onReorderRows={handleReorderRows}
               onMoveRowCrossSection={handleMoveRowCrossSection}
+              isGloballyCollapsed={allSectionsCollapsed}
             />
           )}
 
@@ -1486,6 +1530,7 @@ export default function WeeklyTrackerPage() {
               onDeleteRow={handleDeleteRow}
               onReorderRows={handleReorderRows}
               onMoveRowCrossSection={handleMoveRowCrossSection}
+              isGloballyCollapsed={allSectionsCollapsed}
             />
           )}
         </main>
@@ -1498,8 +1543,19 @@ export default function WeeklyTrackerPage() {
           coordinatorId={coordinatorId ?? ''}
           isForeignCollege={isForeignCollege}
           collegeName={selectedCollegeName}
-          onClose={() => setIsAddModalOpen(false)}
+          initialDraft={draftToAdd}
+          onClose={() => {
+            setIsAddModalOpen(false);
+            setDraftToAdd(null);
+            if (typeof window !== 'undefined') {
+              sessionStorage.removeItem('ipoms_weekly_add_company_draft');
+            }
+          }}
           onAdded={() => {
+            setDraftToAdd(null);
+            if (typeof window !== 'undefined') {
+              sessionStorage.removeItem('ipoms_weekly_add_company_draft');
+            }
             loadWeeklyTracker();
             loadKpi();
           }}

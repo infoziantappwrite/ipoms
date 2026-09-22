@@ -183,6 +183,27 @@ function formatDuration(seconds: number): string {
   return `${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
 }
 
+// Format duration from seconds into Hours, Minutes, Seconds with breakdown
+function formatDurationClock(seconds: number): {
+  hours: number;
+  minutes: number;
+  seconds: number;
+  formatted: string;
+} {
+  const total = Math.max(0, Math.floor(seconds || 0));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  let formatted = '';
+  if (h > 0) {
+    formatted = `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+  } else {
+    formatted = `${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+  }
+  return { hours: h, minutes: m, seconds: s, formatted };
+}
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // CORE INFRASTRUCTURE ENDPOINTS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -843,6 +864,32 @@ export const OFFICIAL_COLLEGE_DEFINITIONS = [
 
 export const ACTIVE_COLLEGE_CODES = OFFICIAL_COLLEGE_DEFINITIONS.map(c => c.college_code);
 
+/** Resolves any college code, name, or id to the official uppercase acronym */
+export function resolveOfficialCollegeAcronym(input?: any): string {
+  if (!input) return '';
+  const str = String(typeof input === 'string' ? input : (input.college_code || input.college_name || input.name || '')).trim();
+  if (!str) return '';
+  const upper = str.toUpperCase();
+  // 1. Direct match on official code
+  const byCode = OFFICIAL_COLLEGE_DEFINITIONS.find(c => c.college_code.toUpperCase() === upper);
+  if (byCode) return byCode.college_code;
+  // 2. Direct match on official name or substring
+  const byName = OFFICIAL_COLLEGE_DEFINITIONS.find(c =>
+    c.college_name.toLowerCase() === str.toLowerCase() ||
+    c.college_name.toLowerCase().includes(str.toLowerCase()) ||
+    str.toLowerCase().includes(c.college_name.toLowerCase())
+  );
+  if (byName) return byName.college_code;
+  // 3. Short acronym already
+  if (upper.length <= 8 && !upper.includes(' ')) return upper;
+  // 4. Initial letters of words fallback
+  const words = str.split(/\s+/).filter(w => !['of', 'and', '&', 'for', 'in', 'the'].includes(w.toLowerCase()));
+  if (words.length > 0) {
+    return words.map(w => w[0]?.toUpperCase() || '').join('').slice(0, 6);
+  }
+  return upper;
+}
+
 // Helper to initialize/sync active roster on startup or demand
 export async function syncActiveCollegesRoster() {
   try {
@@ -1082,6 +1129,14 @@ app.get('/api/v1/colleges/focus-matrix', async (req: Request, res: Response) => 
         myAssignedCollegeIds = allColleges
           .filter((c) => defaultCodes.some((code) => code.toUpperCase() === c.college_code?.toUpperCase()))
           .map((c) => String(c._id));
+      }
+    }
+
+    const isSujithaUser = (currentUser?.official_email || currentUserEmail || '').toLowerCase().includes('sujitha') || (currentUser?.username || '').toLowerCase().includes('sujitha');
+    if (isSujithaUser) {
+      const mcetColId = allColleges.find(c => c.college_code === 'MCET' || /mahalingam/i.test(c.college_name))?._id;
+      if (mcetColId) {
+        myAssignedCollegeIds = myAssignedCollegeIds.filter(id => String(id) !== String(mcetColId));
       }
     }
 
@@ -3386,7 +3441,8 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
           onHoldByHr.push(r);
           break;
         case 'top_companies':
-          // Top companies are also included in top companies section
+          // Top companies are also included in companies in pipeline section
+          pipeline.push(r);
           break;
         case 'pipeline':
         default:
@@ -3717,7 +3773,7 @@ app.get('/api/v1/weekly-tracker/export-xlsx', async (req: Request, res: Response
     const driveInProgress = rows.filter((r) => r.pipeline_section === 'drive_in_progress');
     const inDrive = rows.filter((r) => r.pipeline_section === 'in_drive' || r.pipeline_section === 'companies_in_drive' || r.pipeline_section === 'upcoming_drives');
     const inProgress = rows.filter((r) => r.pipeline_section === 'in_progress');
-    const pipeline = rows.filter((r) => r.pipeline_section === 'pipeline');
+    const pipeline = rows.filter((r) => r.pipeline_section === 'pipeline' || r.pipeline_section === 'top_companies' || (r.is_pinned_top && r.pipeline_section !== 'in_progress' && r.pipeline_section !== 'completed' && !r.pipeline_section?.startsWith('rejected') && !r.pipeline_section?.startsWith('on_hold')));
     const topCompanies = rows.filter((r) => r.is_pinned_top || r.pipeline_section === 'top_companies');
     const rejectedByHr = rows.filter((r) => r.pipeline_section === 'rejected_by_hr' || r.pipeline_section === 'rejected_companies');
     const rejectedByCollege = rows.filter((r) => r.pipeline_section === 'rejected_by_college' || r.pipeline_section === 'on_hold_by_college');
@@ -4203,6 +4259,14 @@ app.patch('/api/v1/weekly-tracker/:id', async (req: Request, res: Response) => {
       row.selected_count = isNaN(num) ? 0 : Math.min(50, Math.max(0, num));
     }
 
+    if (patchData.pipeline_section === 'top_companies') {
+      row.is_pinned_top = true;
+      row.pipeline_section = 'pipeline';
+    } else if (patchData.pipeline_section === 'in_progress') {
+      row.pipeline_section = 'in_progress';
+      row.is_pinned_top = false;
+    }
+
     row.last_status_updated_at = new Date();
     await row.save();
 
@@ -4294,8 +4358,20 @@ app.patch('/api/v1/weekly-tracker/:id/section', async (req: Request, res: Respon
       });
     }
 
-    row.pipeline_section = pipeline_section;
-    row.is_pinned_top = pipeline_section === 'top_companies';
+    if (pipeline_section === 'top_companies') {
+      row.is_pinned_top = true;
+      row.pipeline_section = 'pipeline';
+    } else if (pipeline_section === 'in_progress') {
+      row.pipeline_section = 'in_progress';
+      row.is_pinned_top = false;
+      row.order_index = 0;
+    } else {
+      row.pipeline_section = pipeline_section;
+      if (pipeline_section !== 'pipeline') {
+        row.is_pinned_top = false;
+      }
+    }
+
     if (current_status_text) {
       row.current_status_text = current_status_text;
     }
@@ -4340,18 +4416,40 @@ app.post('/api/v1/weekly-tracker/batch-move-section', async (req: Request, res: 
     const objectIds = row_ids
       .filter((id: string) => Types.ObjectId.isValid(id))
       .map((id: string) => new Types.ObjectId(id));
-    const isPinnedTop = pipeline_section === 'top_companies';
-
-    await WeeklyTracker.updateMany(
-      { _id: { $in: objectIds }, is_deleted: false },
-      {
-        $set: {
-          pipeline_section,
-          is_pinned_top: isPinnedTop,
-          last_status_updated_at: new Date(),
-        },
-      }
-    );
+    if (pipeline_section === 'top_companies') {
+      await WeeklyTracker.updateMany(
+        { _id: { $in: objectIds }, is_deleted: false },
+        {
+          $set: {
+            pipeline_section: 'pipeline',
+            is_pinned_top: true,
+            last_status_updated_at: new Date(),
+          },
+        }
+      );
+    } else if (pipeline_section === 'in_progress') {
+      await WeeklyTracker.updateMany(
+        { _id: { $in: objectIds }, is_deleted: false },
+        {
+          $set: {
+            pipeline_section: 'in_progress',
+            is_pinned_top: false,
+            last_status_updated_at: new Date(),
+          },
+        }
+      );
+    } else {
+      await WeeklyTracker.updateMany(
+        { _id: { $in: objectIds }, is_deleted: false },
+        {
+          $set: {
+            pipeline_section,
+            is_pinned_top: false,
+            last_status_updated_at: new Date(),
+          },
+        }
+      );
+    }
 
     return res.status(200).json({
       success: true,
@@ -4696,7 +4794,7 @@ app.get('/api/v1/weekly-tracker/kpi', async (req: Request, res: Response) => {
       WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: 'drive_in_progress' }),
       WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: { $in: ['in_drive', 'companies_in_drive', 'upcoming_drives'] } }),
       WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: 'in_progress' }),
-      WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: { $in: ['pipeline', 'companies_in_pipeline'] } }),
+      WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: { $in: ['pipeline', 'companies_in_pipeline', 'top_companies'] } }),
       WeeklyTracker.countDocuments({ ...baseFilter, $or: [{ pipeline_section: 'top_companies' }, { is_pinned_top: true }] }),
       WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: { $in: ['rejected_companies', 'rejected_by_hr', 'rejected_by_college', 'on_hold_by_college', 'on_hold_by_hr'] } }),
       WeeklyTracker.countDocuments({
@@ -7899,7 +7997,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       WeeklyTracker.find({ ...wtFilter, pipeline_section: 'drive_in_progress' }).sort({ created_at: -1 }),
       WeeklyTracker.find({ ...wtFilter, pipeline_section: { $in: ['in_drive', 'companies_in_drive', 'upcoming_drives'] } }).sort({ drive_date: 1, created_at: -1, company_name: 1 }),
       WeeklyTracker.find({ ...wtFilter, pipeline_section: 'in_progress' }).sort({ created_at: -1 }),
-      WeeklyTracker.find({ ...wtFilter, pipeline_section: 'pipeline' }).sort({ created_at: -1 }),
+      WeeklyTracker.find({ ...wtFilter, pipeline_section: { $in: ['pipeline', 'top_companies'] } }).sort({ created_at: -1 }),
       WeeklyTracker.find({
         ...wtFilter,
         $or: [{ pipeline_section: 'top_companies' }, { is_pinned_top: true }],
@@ -7942,7 +8040,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         WeeklyTracker.find({ ...fallbackFilter, pipeline_section: 'drive_in_progress' }).sort({ created_at: -1 }),
         WeeklyTracker.find({ ...fallbackFilter, pipeline_section: { $in: ['in_drive', 'companies_in_drive', 'upcoming_drives'] } }).sort({ drive_date: 1, created_at: -1, company_name: 1 }),
         WeeklyTracker.find({ ...fallbackFilter, pipeline_section: 'in_progress' }).sort({ created_at: -1 }),
-        WeeklyTracker.find({ ...fallbackFilter, pipeline_section: 'pipeline' }).sort({ created_at: -1 }),
+        WeeklyTracker.find({ ...fallbackFilter, pipeline_section: { $in: ['pipeline', 'top_companies'] } }).sort({ created_at: -1 }),
         WeeklyTracker.find({
           ...fallbackFilter,
           $or: [{ pipeline_section: 'top_companies' }, { is_pinned_top: true }],
@@ -8503,22 +8601,15 @@ app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => 
     const dayEnd = new Date(today);
     dayEnd.setHours(23, 59, 59, 999);
 
-    const [todayCalls, todayPositives, todayJds, pendingFollowUps] = await Promise.all([
-      DailyTracker.countDocuments({
+    const [todayTrackerRows, todayJds, pendingFollowUps] = await Promise.all([
+      DailyTracker.find({
         coordinator_id: coordinator._id,
-        call_date: {
-          $gte: new Date(today.setHours(0, 0, 0, 0)),
-          $lt: new Date(today.setHours(23, 59, 59, 999)),
-        },
-      }),
-      DailyTracker.countDocuments({
-        coordinator_id: coordinator._id,
-        outcome_status: { $in: POSITIVE_OUTCOMES },
-        call_date: {
-          $gte: new Date(today.setHours(0, 0, 0, 0)),
-          $lt: new Date(today.setHours(23, 59, 59, 999)),
-        },
-      }),
+        $or: [
+          { session_date: { $gte: dayStart, $lte: dayEnd } },
+          { created_at: { $gte: dayStart, $lte: dayEnd } },
+          { year: today.getUTCFullYear(), month: today.getUTCMonth() + 1, day: today.getUTCDate() },
+        ],
+      }).select('duration_seconds call_start_time call_end_time outcome_status created_at session_date').lean(),
       DailyLead.countDocuments({
         coordinator_id: coordinator._id,
         lead_type: 'jd_received',
@@ -8528,11 +8619,53 @@ app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => 
         coordinator_id: coordinator._id,
         is_deleted: false,
         follow_up_date: {
-          $gte: new Date(new Date().setHours(0, 0, 0, 0)),
-          $lt: new Date(new Date().setHours(23, 59, 59, 999)),
+          $gte: dayStart,
+          $lte: dayEnd,
         },
       }),
     ]);
+
+    let totalDurationSeconds = 0;
+    const todayCalls = todayTrackerRows.length;
+    let todayPositives = 0;
+
+    // When each call actually happened, bucketed by IST hour (0-23). Drives the
+    // dashboard's hourly rhythm bars. Explicit +05:30 rather than getHours(),
+    // matching positiveSyncReminder.ts — getHours() would silently report UTC
+    // hours (5.5h off) the moment this runs on a server that isn't set to IST.
+    const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
+    const hourlyCalls: number[] = new Array(24).fill(0);
+
+    for (const row of todayTrackerRows) {
+      let dur = 0;
+      if (typeof row.duration_seconds === 'number' && row.duration_seconds > 0) {
+        dur = row.duration_seconds;
+      } else if (row.call_start_time && row.call_end_time) {
+        const startMs = new Date(row.call_start_time).getTime();
+        const endMs = new Date(row.call_end_time).getTime();
+        if (endMs > startMs) {
+          dur = Math.floor((endMs - startMs) / 1000);
+        }
+      }
+      totalDurationSeconds += dur;
+      if (row.outcome_status && POSITIVE_OUTCOMES.includes(row.outcome_status as any)) {
+        todayPositives++;
+      }
+
+      // call_start_time is the truth when the coordinator logged one; created_at
+      // is the honest fallback for rows saved without a manual start time.
+      const stamp = (row as any).call_start_time || (row as any).created_at;
+      if (stamp) {
+        const t = new Date(stamp).getTime();
+        if (!isNaN(t)) {
+          hourlyCalls[new Date(t + IST_OFFSET_MS).getUTCHours()]++;
+        }
+      }
+    }
+
+    const clockDurationInfo = formatDurationClock(totalDurationSeconds);
+    const avgDurationSeconds = todayCalls > 0 ? Math.round(totalDurationSeconds / todayCalls) : 0;
+    const avgDurationInfo = formatDurationClock(avgDurationSeconds);
 
     // Company funnel — "how many companies are at each stage, and how many did
     // I actually speak to today". `companies_talked_today` counts DISTINCT
@@ -8545,7 +8678,11 @@ app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => 
         WeeklyTracker.countDocuments({ ...pipelineFilter, pipeline_section: 'pipeline' }),
         DailyTracker.distinct('company_name', {
           coordinator_id: coordinator._id,
-          call_date: { $gte: dayStart, $lt: dayEnd },
+          $or: [
+            { session_date: { $gte: dayStart, $lte: dayEnd } },
+            { created_at: { $gte: dayStart, $lte: dayEnd } },
+            { year: today.getUTCFullYear(), month: today.getUTCMonth() + 1, day: today.getUTCDate() },
+          ],
         }).then((names) => names.filter(Boolean).length),
       ]);
 
@@ -8602,6 +8739,20 @@ app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => 
             }
           : null,
         today_tasks: todayTasks,
+        clock_duration: {
+          today_seconds: totalDurationSeconds,
+          today_formatted: clockDurationInfo.formatted,
+          hours: clockDurationInfo.hours,
+          minutes: clockDurationInfo.minutes,
+          seconds: clockDurationInfo.seconds,
+          today_calls_count: todayCalls,
+          avg_call_duration_seconds: avgDurationSeconds,
+          avg_call_duration_formatted: avgDurationInfo.formatted,
+          positive_calls_count: todayPositives,
+          // 24 slots, index = IST hour. Real counts only — an empty day is all
+          // zeros, never a placeholder shape.
+          hourly_calls: hourlyCalls,
+        },
         kpi_summary: {
           // Company funnel — the coordinator's headline numbers.
           companies_completed: companiesCompleted,
@@ -8614,6 +8765,8 @@ app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => 
           positive_responses: todayPositives,
           jds_received: todayJds,
           pending_follow_ups: pendingFollowUps,
+          today_call_duration_seconds: totalDurationSeconds,
+          today_call_duration_formatted: clockDurationInfo.formatted,
         },
         insights,
       },
@@ -8664,7 +8817,8 @@ app.get('/api/v1/dashboard/college-kpis', async (req: Request, res: Response) =>
       });
     }
 
-    const POSITIVE_STATUSES = ['hiring', 'invite_mail', 'follow_up', 'jd_received', 'drive_completed', 'in_connect'];
+    // ONLY 'invite_mail' is considered as positive out of all call outcomes (user rule)
+    const POSITIVE_STATUSES = ['invite_mail'];
     const NEGATIVE_STATUSES = ['invalid', 'no_response', 'hiring_freezed', 'call_back'];
     const NOT_HIRING_STATUSES = ['not_hiring'];
 
@@ -8809,16 +8963,63 @@ app.post('/api/v1/users/heartbeat', async (req: Request, res: Response) => {
       is_online: true,
     };
 
-    if (college_id) {
-      updateDoc.active_college_id = college_id;
+    const resolvedAcronym = resolveOfficialCollegeAcronym(college_code || college_name || college_id);
+
+    let col: any = null;
+    if (college_id && mongoose.Types.ObjectId.isValid(college_id)) {
+      try {
+        col = await College.findById(college_id).select('college_code college_name location');
+      } catch {}
     }
-    if (college_name !== undefined) {
+    if (!col && (college_id || college_name || college_code || resolvedAcronym)) {
+      const searchCode = (resolvedAcronym || college_code || '').toUpperCase();
+      const searchName = (college_name || '').trim();
+      try {
+        col = await College.findOne({
+          $or: [
+            ...(searchCode ? [{ college_code: searchCode }] : []),
+            ...(searchName ? [{ college_name: searchName }] : []),
+            ...(searchName ? [{ college_name: new RegExp(`^${searchName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i') }] : []),
+          ],
+        }).select('college_code college_name location');
+      } catch {}
+    }
+
+    if (col) {
+      updateDoc.active_college_id = col._id;
+      updateDoc.active_college_code = (col.college_code || resolvedAcronym || '').toUpperCase();
+      updateDoc.active_college_name = col.college_name;
+      if (col.location) updateDoc.active_college_location = col.location;
+    } else if (resolvedAcronym) {
+      updateDoc.active_college_code = resolvedAcronym;
+      if (college_name) updateDoc.active_college_name = college_name;
+    } else if (college_name) {
       updateDoc.active_college_name = college_name;
     }
-    if (college_code !== undefined) {
-      updateDoc.active_college_code = college_code;
+
+    // Safety guard: Sujitha S handles HITS, NEHRU, KPR, SONA, MAREPHRA.
+    // She NEVER handles MCET (MCET is handled by Tamil Selvi / Seshmitha).
+    const user = await User.findById(userId).populate('assigned_college_ids', 'college_name college_code location');
+    if (user) {
+      const isSujitha = user.official_email === 'sujitha_s@infoziant.com' || user.username === 'sujitha' || /sujitha/i.test(user.full_name);
+      if (isSujitha && (updateDoc.active_college_code === 'MCET' || /mahalingam|mcet/i.test(updateDoc.active_college_name || ''))) {
+        const assignedCols = (user.assigned_college_ids as any[]) || [];
+        const primary = assignedCols.find((c: any) => c.college_code === 'NEHRU' || c.college_code === 'HITS') || assignedCols[0];
+        if (primary) {
+          updateDoc.active_college_id = primary._id;
+          updateDoc.active_college_code = primary.college_code || 'NEHRU';
+          updateDoc.active_college_name = primary.college_name || '';
+          updateDoc.active_college_location = primary.location || '';
+        } else {
+          delete updateDoc.active_college_id;
+          delete updateDoc.active_college_code;
+          delete updateDoc.active_college_name;
+          delete updateDoc.active_college_location;
+        }
+      }
     }
-    if (college_location !== undefined) {
+
+    if (college_location !== undefined && !updateDoc.active_college_location) {
       updateDoc.active_college_location = college_location;
     }
     if (current_page !== undefined) {
@@ -8840,7 +9041,7 @@ app.post('/api/v1/users/heartbeat', async (req: Request, res: Response) => {
 // Team Leader Dashboard (Spec Section 5.2) — Coordinator Profile Online Activity & Live Performance Matrix
 app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => {
   try {
-    // Ensure Sujitha (Team Leader) has her assigned focus colleges: HITS, NEHRU, KPR, SONA, MAREPHRA
+    // Ensure Sujitha (Team Leader) has her official focus colleges: HITS, NEHRU, KPR, SONA, MAREPHRA (Sujitha does NOT handle MCET)
     const sujithaUser = await User.findOne({
       $or: [
         { official_email: 'sujitha_s@infoziant.com' },
@@ -8858,12 +9059,48 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
         status: 'active',
       });
       const targetIds = sujithaColleges.map((c) => c._id);
-      const existingIds = (sujithaUser.assigned_college_ids || []).map((id: any) => String(id));
-      const needsUpdate = targetIds.some((id) => !existingIds.includes(String(id)));
-      if (needsUpdate || !sujithaUser.assigned_college_ids || sujithaUser.assigned_college_ids.length === 0) {
-        sujithaUser.assigned_college_ids = targetIds;
-        await sujithaUser.save();
+      sujithaUser.assigned_college_ids = targetIds;
+      const mcetCol = await College.findOne({
+        $or: [{ college_code: 'MCET' }, { college_name: /mahalingam/i }]
+      });
+      const isMcetActive =
+        sujithaUser.active_college_code?.toUpperCase() === 'MCET' ||
+        (sujithaUser.active_college_name && /mahalingam|mcet/i.test(sujithaUser.active_college_name)) ||
+        (mcetCol && sujithaUser.active_college_id && String(sujithaUser.active_college_id) === String(mcetCol._id));
+
+      if (isMcetActive) {
+        const primary = sujithaColleges.find(c => c.college_code === 'NEHRU' || c.college_code === 'HITS') || sujithaColleges[0];
+        if (primary) {
+          sujithaUser.active_college_id = primary._id;
+          sujithaUser.active_college_code = primary.college_code;
+          sujithaUser.active_college_name = primary.college_name;
+          sujithaUser.active_college_location = primary.location || '';
+        }
       }
+      await sujithaUser.save();
+    }
+
+    // Ensure Tamil Selvi (Seshmitha Tamilselvi R) has her official focus colleges: MCET, MEC
+    const tamilUser = await User.findOne({
+      $or: [
+        { official_email: 'seshmitha_tamil@icl.today' },
+        { username: 'seshmitha' },
+        { full_name: /tamil/i },
+      ],
+      is_deleted: false,
+    });
+    if (tamilUser) {
+      const tamilColleges = await College.find({
+        $or: [
+          { college_code: { $in: ['MCET', 'MEC'] } },
+          { college_name: { $in: [/mahalingam/i, /muthayammal/i] } },
+        ],
+        status: 'active',
+      });
+      const targetTamilIds = tamilColleges.map((c) => c._id);
+      tamilUser.assigned_college_ids = targetTamilIds;
+      if (!tamilUser.account_status) tamilUser.account_status = 'active';
+      await tamilUser.save();
     }
 
     const coordinators = await User.find({
@@ -8871,6 +9108,9 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
         { role_codes: { $in: ['COORDINATOR', 'PLACEMENT_COORDINATOR', 'TEAM_LEADER', 'TEAM_LEAD'] } },
         { official_email: 'sujitha_s@infoziant.com' },
         { username: 'sujitha' },
+        { official_email: 'seshmitha_tamil@icl.today' },
+        { username: 'seshmitha' },
+        { full_name: /tamil/i },
       ],
       account_status: { $in: ['active', 'on_leave', 'partial_working'] },
       is_deleted: false,
@@ -8888,11 +9128,15 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
     // Per-coordinator live profile & activity telemetry
     const teamMatrix = await Promise.all(
       coordinators.map(async (c) => {
-        const [calls, positives, jds, pendingWork, latestCall] = await Promise.all([
-          DailyTracker.countDocuments({
+        const [todayTrackerRows, positives, jds, pendingWork, latestCall] = await Promise.all([
+          DailyTracker.find({
             coordinator_id: c._id,
-            call_date: { $gte: todayStart, $lte: todayEnd },
-          }),
+            $or: [
+              { session_date: { $gte: todayStart, $lte: todayEnd } },
+              { created_at: { $gte: todayStart, $lte: todayEnd } },
+              { year: todayStart.getUTCFullYear(), month: todayStart.getUTCMonth() + 1, day: todayStart.getUTCDate() },
+            ],
+          }).select('duration_seconds call_start_time call_end_time outcome_status').lean(),
           DailyTracker.countDocuments({
             coordinator_id: c._id,
             outcome_status: 'invite_mail',
@@ -8904,6 +9148,21 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
             .populate('college_id', 'college_name college_code')
             .select('company_name session_date outcome_status created_at college_id'),
         ]);
+
+        let coordinatorDuration = 0;
+        const calls = todayTrackerRows.length;
+        for (const row of todayTrackerRows) {
+          let dur = 0;
+          if (typeof row.duration_seconds === 'number' && row.duration_seconds > 0) {
+            dur = row.duration_seconds;
+          } else if (row.call_start_time && row.call_end_time) {
+            const sMs = new Date(row.call_start_time).getTime();
+            const eMs = new Date(row.call_end_time).getTime();
+            if (eMs > sMs) dur = Math.floor((eMs - sMs) / 1000);
+          }
+          coordinatorDuration += dur;
+        }
+        const coordDurInfo = formatDurationClock(coordinatorDuration);
 
         // Determine real-time online status and last activity
         let lastActiveTime: Date | null = c.last_active_at ? new Date(c.last_active_at) : null;
@@ -8937,28 +9196,70 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
           const diffMinutes = Math.floor((nowMs - lastActiveTime.getTime()) / (1000 * 60));
           if (!isExplicitLoggedOut && diffMinutes <= 5) {
             onlineStatus = 'online';
-            if (c.active_college_name || c.active_college_code) {
-              onlineStatusLabel = `Active in ${c.active_college_code || c.active_college_name}`;
-            } else {
-              onlineStatusLabel = 'Online';
-            }
+            onlineStatusLabel = 'Online';
           } else if (diffMinutes <= 60) {
             onlineStatus = 'away';
-            onlineStatusLabel = diffMinutes <= 1 ? 'Away (just now)' : `Away (${diffMinutes}m ago)`;
+            onlineStatusLabel = 'Away';
           } else {
             onlineStatus = 'offline';
             onlineStatusLabel = 'Offline';
           }
         }
 
-        const activeCollegeData = (onlineStatus === 'online' || onlineStatus === 'away') && (c.active_college_name || c.active_college_code || c.active_college_id)
-          ? {
-              college_id: c.active_college_id ? String(c.active_college_id) : '',
-              college_code: c.active_college_code || '',
-              college_name: c.active_college_name || '',
-              location: c.active_college_location || '',
+        // Active college is ONLY populated when the coordinator is currently actively ONLINE
+        let activeCollegeData: any = null;
+        if (onlineStatus === 'online') {
+          const isSujitha = c.official_email === 'sujitha_s@infoziant.com' || c.username === 'sujitha' || /sujitha/i.test(c.full_name);
+          const isTamil = c.official_email === 'seshmitha_tamil@icl.today' || c.username === 'seshmitha' || /tamil/i.test(c.full_name);
+
+          let code = resolveOfficialCollegeAcronym(c.active_college_code || c.active_college_name || c.active_college_id);
+          let colName = c.active_college_name || '';
+          let colId = c.active_college_id ? String(c.active_college_id) : '';
+          let colLoc = c.active_college_location || '';
+
+          // Sujitha S CANNOT be active in MCET (MCET is handled by Tamil Selvi / Seshmitha)
+          if (isSujitha && (code === 'MCET' || /mahalingam|mcet/i.test(colName))) {
+            const assignedCols = (c.assigned_college_ids as any[]) || [];
+            const primary = assignedCols.find((col) => col.college_code === 'NEHRU' || col.college_code === 'HITS') || assignedCols[0];
+            if (primary) {
+              code = primary.college_code || 'NEHRU';
+              colName = primary.college_name || '';
+              colId = String(primary._id || '');
+              colLoc = primary.location || '';
+            } else {
+              code = 'NEHRU';
             }
-          : null;
+          }
+
+          if (!code && c.assigned_college_ids) {
+            const matchCol = (c.assigned_college_ids as any[])?.find(
+              (col) => col.college_name === colName || String(col._id) === colId
+            );
+            if (matchCol?.college_code) {
+              code = matchCol.college_code.toUpperCase();
+              if (!colName) colName = matchCol.college_name;
+              if (!colId) colId = String(matchCol._id);
+            }
+          }
+
+          if (isSujitha && (code === 'MCET' || /mahalingam|mcet/i.test(colName))) {
+            code = 'NEHRU';
+            colName = 'Nehru Institute of Engineering and Technology';
+          }
+
+          if (code || colName || colId) {
+            activeCollegeData = {
+              college_id: colId,
+              college_code: code,
+              college_name: colName,
+              location: colLoc,
+            };
+            if (isSujitha && (activeCollegeData.college_code === 'MCET' || /mahalingam|mcet/i.test(activeCollegeData.college_name || ''))) {
+              activeCollegeData.college_code = 'NEHRU';
+              activeCollegeData.college_name = 'Nehru Institute of Engineering and Technology';
+            }
+          }
+        }
 
         const isTeamLeader = c.role_codes?.includes('TEAM_LEADER') || c.role_codes?.includes('TEAM_LEAD') || c.official_email === 'sujitha_s@infoziant.com' || c.username === 'sujitha';
 
@@ -8982,6 +9283,11 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
           active_college: activeCollegeData,
           current_page: c.current_page || '',
           calls_today: calls,
+          today_call_duration_seconds: coordinatorDuration,
+          today_call_duration_formatted: coordDurInfo.formatted,
+          hours: coordDurInfo.hours,
+          minutes: coordDurInfo.minutes,
+          seconds: coordDurInfo.seconds,
           positive_leads: positives,
           jds_received: jds,
           pending_assigned_work: pendingWork,
@@ -8993,9 +9299,13 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
     const totalDispatchedAssignments = await AssignedWork.countDocuments({ is_deleted: false });
     const completedAssignments = await AssignedWork.countDocuments({ is_completed: true, is_deleted: false });
 
-    // Count online coordinators
+    // Count online coordinators and calling durations
     const onlineCount = teamMatrix.filter((m) => m.online_status === 'online').length;
     const activeTodayCount = teamMatrix.filter((m) => m.calls_today > 0 || m.online_status === 'online' || m.online_status === 'away').length;
+
+    const totalTeamDurationSeconds = teamMatrix.reduce((acc, curr) => acc + (curr.today_call_duration_seconds || 0), 0);
+    const teamDurationInfo = formatDurationClock(totalTeamDurationSeconds);
+    const activeCallingCoordinatorsCount = teamMatrix.filter((c) => (c.today_call_duration_seconds || 0) > 0 || (c.calls_today || 0) > 0).length;
 
     return res.status(200).json({
       success: true,
@@ -9008,6 +9318,14 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
           total_coordinators: coordinators.length,
           currently_online: onlineCount,
           active_today: activeTodayCount,
+        },
+        team_call_duration: {
+          total_seconds: totalTeamDurationSeconds,
+          total_formatted: teamDurationInfo.formatted,
+          hours: teamDurationInfo.hours,
+          minutes: teamDurationInfo.minutes,
+          seconds: teamDurationInfo.seconds,
+          active_calling_coordinators: activeCallingCoordinatorsCount,
         },
         team_matrix: teamMatrix,
         assignments_overview: {
@@ -9189,21 +9507,35 @@ app.get('/api/v1/dashboard/admin', async (req: Request, res: Response) => {
       };
     });
 
-    // ── Workforce & Coordinator Snapshot ──
+    // ── Workforce & Coordinator Calling Telemetry Snapshot ──
     const coordinatorUsers = allCoordinators.filter((u: any) =>
       u.role_codes?.includes('PLACEMENT_COORDINATOR') || u.role_codes?.includes('COORDINATOR')
     );
 
-    const coordinatorCallsAgg = await DailyTracker.aggregate([
-      {
-        $group: {
-          _id: '$coordinator_id',
-          calls: { $sum: 1 },
-          positives: {
-            $sum: { $cond: [{ $in: ['$outcome_status', POSITIVE_OUTCOMES] }, 1, 0] },
+    const adminTodayStart = new Date();
+    adminTodayStart.setHours(0, 0, 0, 0);
+    const adminTodayEnd = new Date();
+    adminTodayEnd.setHours(23, 59, 59, 999);
+
+    const [coordinatorCallsAgg, todayAllTrackerRows] = await Promise.all([
+      DailyTracker.aggregate([
+        {
+          $group: {
+            _id: '$coordinator_id',
+            calls: { $sum: 1 },
+            positives: {
+              $sum: { $cond: [{ $in: ['$outcome_status', POSITIVE_OUTCOMES] }, 1, 0] },
+            },
           },
         },
-      },
+      ]),
+      DailyTracker.find({
+        $or: [
+          { session_date: { $gte: adminTodayStart, $lte: adminTodayEnd } },
+          { created_at: { $gte: adminTodayStart, $lte: adminTodayEnd } },
+          { year: adminTodayStart.getUTCFullYear(), month: adminTodayStart.getUTCMonth() + 1, day: adminTodayStart.getUTCDate() },
+        ],
+      }).select('coordinator_id duration_seconds call_start_time call_end_time outcome_status').lean(),
     ]);
 
     const coordStatsMap = new Map<string, { calls: number; positives: number }>();
@@ -9211,12 +9543,40 @@ app.get('/api/v1/dashboard/admin', async (req: Request, res: Response) => {
       coordStatsMap.set(String(c._id), { calls: c.calls, positives: c.positives });
     });
 
+    let globalTodayDurationSeconds = 0;
+    const coordTodayStatsMap = new Map<string, { seconds: number; calls: number; positives: number }>();
+
+    for (const row of todayAllTrackerRows) {
+      let dur = 0;
+      if (typeof row.duration_seconds === 'number' && row.duration_seconds > 0) {
+        dur = row.duration_seconds;
+      } else if (row.call_start_time && row.call_end_time) {
+        const sMs = new Date(row.call_start_time).getTime();
+        const eMs = new Date(row.call_end_time).getTime();
+        if (eMs > sMs) dur = Math.floor((eMs - sMs) / 1000);
+      }
+      globalTodayDurationSeconds += dur;
+
+      const cId = String(row.coordinator_id);
+      const prev = coordTodayStatsMap.get(cId) || { seconds: 0, calls: 0, positives: 0 };
+      prev.seconds += dur;
+      prev.calls += 1;
+      if (row.outcome_status && POSITIVE_OUTCOMES.includes(row.outcome_status as any)) {
+        prev.positives += 1;
+      }
+      coordTodayStatsMap.set(cId, prev);
+    }
+
+    const globalDurationInfo = formatDurationClock(globalTodayDurationSeconds);
+
     const lockedAccountsList: any[] = [];
     const nowMs = Date.now();
 
     const workforce = coordinatorUsers.map((u: any) => {
       const uIdStr = String(u._id);
       const cStats = coordStatsMap.get(uIdStr) || { calls: 0, positives: 0 };
+      const todayStats = coordTodayStatsMap.get(uIdStr) || { seconds: 0, calls: 0, positives: 0 };
+      const durInfo = formatDurationClock(todayStats.seconds);
       const assignedCount = Array.isArray(u.assigned_college_ids) ? u.assigned_college_ids.length : 0;
       const isLocked = !!u.is_password_locked || (u.failed_login_attempts >= 4) || (u.is_profile_locked === true);
 
@@ -9250,24 +9610,21 @@ app.get('/api/v1/dashboard/admin', async (req: Request, res: Response) => {
         const diffMinutes = Math.floor((nowMs - lastActiveTime.getTime()) / (1000 * 60));
         if (!isExplicitLoggedOut && diffMinutes <= 5) {
           onlineStatus = 'online';
-          if (u.active_college_name || u.active_college_code) {
-            onlineStatusLabel = `Active in ${u.active_college_code || u.active_college_name}`;
-          } else {
-            onlineStatusLabel = 'Online';
-          }
+          onlineStatusLabel = 'Online';
         } else if (diffMinutes <= 60) {
           onlineStatus = 'away';
-          onlineStatusLabel = diffMinutes <= 1 ? 'Away (just now)' : `Away (${diffMinutes}m ago)`;
+          onlineStatusLabel = 'Away';
         } else {
           onlineStatus = 'offline';
           onlineStatusLabel = 'Offline';
         }
       }
 
-      const activeCollegeData = (onlineStatus === 'online' || onlineStatus === 'away') && (u.active_college_name || u.active_college_code || u.active_college_id)
+      // Active college is ONLY populated when the coordinator is currently actively ONLINE
+      const activeCollegeData = (onlineStatus === 'online') && (u.active_college_name || u.active_college_code || u.active_college_id)
         ? {
             college_id: u.active_college_id ? String(u.active_college_id) : '',
-            college_code: u.active_college_code || '',
+            college_code: resolveOfficialCollegeAcronym(u.active_college_code || u.active_college_name || u.active_college_id),
             college_name: u.active_college_name || '',
             location: u.active_college_location || '',
           }
@@ -9282,6 +9639,12 @@ app.get('/api/v1/dashboard/admin', async (req: Request, res: Response) => {
         assigned_colleges_count: assignedCount,
         calls_logged: cStats.calls,
         positives_secured: cStats.positives,
+        calls_today: todayStats.calls,
+        today_call_duration_seconds: todayStats.seconds,
+        today_call_duration_formatted: durInfo.formatted,
+        hours: durInfo.hours,
+        minutes: durInfo.minutes,
+        seconds: durInfo.seconds,
         is_active: u.is_active !== false,
         is_locked: isLocked,
         is_overloaded: assignedCount > 4,
@@ -9292,6 +9655,11 @@ app.get('/api/v1/dashboard/admin', async (req: Request, res: Response) => {
         last_active_at: lastActiveTime,
       };
     });
+
+    // Coordinator calling duration leaderboard
+    const coordinatorDurationLeaderboard = [...workforce].sort(
+      (a, b) => b.today_call_duration_seconds - a.today_call_duration_seconds || b.calls_today - a.calls_today
+    );
 
     // ── Stale Pipeline Alerts (WeeklyTracker records with follow-ups older than 7 days) ──
     const sevenDaysAgo = new Date();
@@ -9400,9 +9768,21 @@ app.get('/api/v1/dashboard/admin', async (req: Request, res: Response) => {
         },
         funnel_stages: funnelStages,
         leaderboard,
+        global_calling_duration: {
+          today_seconds: globalTodayDurationSeconds,
+          today_formatted: globalDurationInfo.formatted,
+          hours: globalDurationInfo.hours,
+          minutes: globalDurationInfo.minutes,
+          seconds: globalDurationInfo.seconds,
+          total_calls_today: todayAllTrackerRows.length,
+          active_calling_coordinators: Array.from(coordTodayStatsMap.values()).filter((v) => v.calls > 0 || v.seconds > 0).length,
+        },
+        coordinator_duration_leaderboard: coordinatorDurationLeaderboard,
         workforce_snapshot: {
           total_coordinators: coordinatorUsers.length,
-          active_today: workforce.filter((w) => w.calls_logged > 0).length || coordinatorUsers.length,
+          active_today: workforce.filter((w) => w.calls_today > 0 || w.calls_logged > 0).length || coordinatorUsers.length,
+          total_calling_duration_seconds: globalTodayDurationSeconds,
+          total_calling_duration_formatted: globalDurationInfo.formatted,
           coordinators: workforce,
         },
         critical_alerts: criticalAlerts,
@@ -12284,17 +12664,25 @@ const ensureDefaultAccounts = async () => {
         const isTL = coordUser.role_codes?.includes('TEAM_LEADER') || coordUser.official_email === 'sujitha_s@infoziant.com';
         const maxLimit = isTL ? 5 : 4;
         const mappedIds = codes.map((c) => codeMap.get(c.toUpperCase())).filter(Boolean).slice(0, maxLimit);
-        if (!coordUser.assigned_college_ids || coordUser.assigned_college_ids.length === 0 || coordUser.assigned_college_ids.length > maxLimit) {
-          coordUser.assigned_college_ids = mappedIds;
-          coordUser.weekly_focus_locked = true;
-          coordUser.weekly_focus_week_key = currentWeekMonday;
-          coordUser.weekly_focus_locked_at = new Date();
-          await coordUser.save();
-          await College.updateMany(
-            { _id: { $in: mappedIds } },
-            { $addToSet: { assigned_coordinator_ids: coordUser._id } }
-          );
+        coordUser.assigned_college_ids = mappedIds;
+        coordUser.weekly_focus_locked = true;
+        coordUser.weekly_focus_week_key = currentWeekMonday;
+        if (!coordUser.weekly_focus_locked_at) coordUser.weekly_focus_locked_at = new Date();
+
+        // If Sujitha has MCET, correct it to NEHRU immediately in MongoDB!
+        if (isTL && (coordUser.active_college_code === 'MCET' || (coordUser.active_college_name && /mahalingam|mcet/i.test(coordUser.active_college_name)))) {
+          const primaryId = codeMap.get('NEHRU') || mappedIds[0];
+          const primaryCol = activeCollegesList.find(c => String(c._id) === String(primaryId));
+          coordUser.active_college_id = primaryId;
+          coordUser.active_college_code = primaryCol?.college_code || 'NEHRU';
+          coordUser.active_college_name = primaryCol?.college_name || 'Nehru Institute of Engineering and Technology';
+          coordUser.active_college_location = primaryCol?.location || '';
         }
+        await coordUser.save();
+        await College.updateMany(
+          { _id: { $in: mappedIds } },
+          { $addToSet: { assigned_coordinator_ids: coordUser._id } }
+        );
       }
     }
 
@@ -12372,6 +12760,16 @@ const startServer = async () => {
   await ensureDefaultAccounts();
   await ensureCompanyMetadataSerialNumbers();
   await syncActiveCollegesRoster();
+
+  // ── Reconcile legacy top companies records ──
+  try {
+    await WeeklyTracker.updateMany(
+      { pipeline_section: 'top_companies', is_deleted: false },
+      { $set: { is_pinned_top: true, pipeline_section: 'pipeline' } }
+    );
+  } catch (err: any) {
+    console.error('Failed to reconcile legacy top_companies records:', err);
+  }
 
   // ── Reconcile same-day moved positive leads ──
   try {

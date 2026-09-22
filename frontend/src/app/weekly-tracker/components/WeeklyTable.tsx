@@ -820,8 +820,6 @@ function TableRow({
       onDrop={onDrop}
       onDragEnd={onDragEnd}
       className={`group/row transition-all duration-150 relative ${
-        isSelected ? 'font-medium' : row.is_pinned_top ? 'font-medium' : ''
-      } ${
         isBeingDragged
           ? 'opacity-40 scale-[0.995] bg-primary/10 dark:bg-primary/20 shadow-inner'
           : ''
@@ -999,7 +997,7 @@ function TableRow({
                   </div>
                   <span
                     onClick={() => startEdit('contact_number', row.contact_number || row.mobile_numbers?.[0] || '')}
-                    className="cursor-pointer hover:text-primary transition-colors font-medium select-all whitespace-nowrap inline-block"
+                    className="cursor-pointer hover:text-primary transition-colors font-normal text-fg select-all whitespace-nowrap inline-block"
                     title="Click to edit contact number"
                   >
                     {row.contact_number || row.mobile_numbers?.[0]}
@@ -1034,7 +1032,7 @@ function TableRow({
               onKeyDown={(e) => handleKeyDown(e, 'email_id')}
               placeholder="e.g. hr@company.com"
               autoFocus
-              className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-full max-w-[340px] outline-none shadow-xs"
+              className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg font-normal w-full max-w-[340px] outline-none shadow-xs"
             />
           ) : (
             <div className="flex items-center gap-1.5 group/email whitespace-nowrap">
@@ -1072,7 +1070,7 @@ function TableRow({
 
       {/* ── Scrollable Body Columns (z-0 relative) ── */}
       {/* 5. Status */}
-      <td className={`py-2.5 px-3 text-fg-muted border-b border-border/60 relative z-0 ${nonStickyBg}`}>
+      <td className={`py-2.5 px-3 text-fg font-normal border-b border-border/60 relative z-0 ${nonStickyBg}`}>
         {editingField === 'current_status_text' ? (
           <input
             type="text"
@@ -1081,15 +1079,15 @@ function TableRow({
             onBlur={() => commitEdit('current_status_text')}
             onKeyDown={(e) => handleKeyDown(e, 'current_status_text')}
             autoFocus
-            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg w-full outline-none shadow-xs"
+            className="bg-surface border border-primary rounded px-1.5 py-0.5 text-xs text-fg font-normal w-full outline-none shadow-xs"
           />
         ) : (
           <span
             onClick={() => startEdit('current_status_text', row.current_status_text)}
-            className="cursor-pointer hover:text-primary transition-colors break-words leading-relaxed whitespace-pre-wrap max-w-[320px] inline-block"
+            className="cursor-pointer hover:text-primary transition-colors break-words leading-relaxed whitespace-pre-wrap max-w-[320px] inline-block font-normal text-fg"
             title={row.current_status_text}
           >
-            {row.current_status_text || <span className="text-fg-disabled italic">—</span>}
+            {row.current_status_text || <span className="text-fg-disabled italic font-normal">—</span>}
           </span>
         )}
       </td>

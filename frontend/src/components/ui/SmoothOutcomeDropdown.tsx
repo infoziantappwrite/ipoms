@@ -29,10 +29,10 @@ export interface OutcomeOption {
 
 export const CALL_OUTCOME_OPTIONS: OutcomeOption[] = [
   { value: 'all', label: 'All Call Statuses', dotColor: 'bg-primary' },
-  { value: 'jd_received', label: 'JD Received', dotColor: 'bg-blue-500', category: 'Positive' },
-  { value: 'hiring', label: 'Hiring', dotColor: 'bg-emerald-500', category: 'Positive' },
-  { value: 'drive_completed', label: 'Drive Completed', dotColor: 'bg-emerald-500', category: 'Positive' },
   { value: 'invite_mail', label: 'Invite Mail', dotColor: 'bg-sky-500', category: 'Positive' },
+  { value: 'jd_received', label: 'JD Received', dotColor: 'bg-blue-500', category: 'JD Received' },
+  { value: 'hiring', label: 'Hiring', dotColor: 'bg-emerald-500', category: 'Hiring' },
+  { value: 'drive_completed', label: 'Drive Completed', dotColor: 'bg-emerald-500', category: 'Conducted' },
   { value: 'in_connect', label: 'In Connect', dotColor: 'bg-indigo-500', category: 'Neutral' },
   { value: 'follow_up', label: 'Follow Up', dotColor: 'bg-amber-500', category: 'Action Req' },
   { value: 'call_back', label: 'Call Back', dotColor: 'bg-amber-500', category: 'Action Req' },
