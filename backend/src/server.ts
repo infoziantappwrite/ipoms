@@ -3358,9 +3358,15 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
       ];
     }
 
+    // .lean() — this endpoint returns the full unfiltered dataset (~1,000 rows) with
+    // no way to page it, and was measuring ~4s under light load hydrating a full
+    // Mongoose document + running .toObject() per row below for data nothing here
+    // needs to mutate or re-save. populate() still works the same under .lean()
+    // (perf item 44).
     const rows = await WeeklyTracker.find(filter)
       .sort({ follow_up_date: 1, company_name: 1 })
-      .populate('coordinator_id', 'full_name official_email');
+      .populate('coordinator_id', 'full_name official_email')
+      .lean();
 
     // Deduplicate any repeated company rows for the same college & year
     const uniqueRows: typeof rows = [];
@@ -3403,7 +3409,7 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
     const onHoldByHr: any[] = [];
 
     uniqueRows.forEach((row) => {
-      const r = row.toObject();
+      const r = row; // already a plain object under .lean()
 
       // Top Companies override
       if (row.is_pinned_top || row.pipeline_section === 'top_companies') {
