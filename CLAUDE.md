@@ -126,7 +126,7 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
 | 7 | Password: 8 chars, any special (M08 §8) | 9 chars, only `@` and `.` | **Implementation is correct** — later user decision. |
 | 8 | `role_code` lowercase regex `/^[a-z0-9_]+$/` (Ch.5 §5.5); Ch.4 lists 6 codes incl. `director`, `ceo` | 4 UPPERCASE codes | **UPPERCASE 4-role set is correct** (roadmap + live DB + all code). Ch.5's regex and Ch.4's list are stale. |
 | 9 | Error envelope `{success, error:{code, message, details, requestId}}` (Checklist §4) vs `{success, statusCode, errorCode, message, errors[]}` (Ch.5 §5.3) | Code uses the **Checklist** shape, minus `requestId` | Checklist shape wins. `requestId` tracing is unbuilt. |
-| 10 | `x-request-id` on every request, Winston JSON logs, Helmet, rate limiting | Not implemented | Open gap (Ch.7 §7.3, Checklist §4) |
+| 10 | `x-request-id` on every request, Winston JSON logs, Helmet, rate limiting | **Helmet is wired** (`server.ts`, confirmed live 22 Sep 2026 — CSP/HSTS/X-Frame-Options/COOP/CORP all present on a real response). `x-request-id`, structured logging, and rate limiting are still genuinely missing. | Partially closed — see §5 item 44 |
 | 11 | Endpoints `kebab-case` plural (Ch.7 §7.1.6) | Mixed: `/daily-leads` ✓ but `/metadata`, `/assigned-work/:id/complete` | Cosmetic; don't churn URLs without a reason |
 | 12 | Files `kebab-case.tsx`, backend `camelCaseController.ts` (Ch.7 §7.1.2) | Frontend uses `PascalCase.tsx` throughout | Codebase-wide; follow the **existing** convention, not the spec |
 | 13 | ≥80% unit coverage, Supertest RBAC suites, 7 E2E journeys (Ch.7 §7.4) | Zero tests | Blocks the Phase-8/9 gate outright |
@@ -1046,6 +1046,162 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     mode), with the populated case driven by read-only Playwright response interception —
     nothing was written to the database to stage the screenshot. `tsc --noEmit` clean both
     sides.
+    **"Ongoing process" polish, same day (user-requested).** Motion was added *around* the
+    number, never *to* it: a gradient arc travelling round the card border, a periodic light
+    sweep, a radar ping on the Live dot, a "synced h:mm" timestamp that updates on every
+    real refetch, a brief indigo glow on the odometer only when the total genuinely changes,
+    a **"now" marker** on the rhythm rail at the real wall-clock position (a time-axis
+    position, not a quantity, so it may move freely; hidden outside the bar window rather
+    than pinned to an edge), and on an empty day a brightness-only wave along the flat rail
+    (deliberately never height, so it can't read as call volume). Gotcha worth keeping: a
+    `text-shadow` glow on the digits is clipped by each digit's `overflow:hidden` window and
+    renders as faint boxes — the glow is a `drop-shadow` filter on the container instead.
+    Testing note: faking the browser clock (Playwright `clock.install`) trips React hydration
+    errors from the time-of-day greeting banner, because the server renders at real time — an
+    artifact of the test, not the widget; un-faked runs are clean.
+    **Hourly Rhythm window moved to 10am–7pm, 21 Sep 2026 (user decision)** — still widens
+    for calls outside it rather than dropping them.
+
+43. **Campus Outcome Mix + Monthly Call Trend, 21 Sep 2026 (user-requested)** — replaced the
+    grouped bar chart in `CoordinatorCollegeKpiCards.tsx` (also rendered on the Team Leader
+    dashboard). That chart drew every **zero** as a ~35px bar and showed parts-of-calls as
+    rival bars. Now: one row per campus (acronym only), a stacked bar of that campus's calls,
+    and positive rate; plus a table view. **Buckets (user-chosen, server-side
+    `OUTCOME_BUCKET` in `server.ts`)**: Positive = `invite_mail` only (matches
+    `POSITIVE_OUTCOMES`); Not Hiring = `not_hiring`, `hiring_freezed`; Negative =
+    `no_response`, `invalid`, `in_connect`, `hiring_completed`; Follow Up = `follow_up`,
+    `call_back`; Other Progress = `jd_received`, `hiring`, `drive_completed`; no outcome yet =
+    `pending`. All 12 outcomes map, so segments always sum to calls — verified on real data
+    (NGP 209, KAMARAJ 203, MCET 128, KLU 107, every campus `sum === calls`). Returned as a new
+    `outcome_mix` field; the older `total_negatives` etc. are left unchanged (they use a
+    *different* negative definition — don't mix them). **New endpoint**
+    `GET /dashboard/monthly-calls?month=YYYY-MM&college_ids=…` — calls per day per campus,
+    `scopeToSelf`-scoped, returns `is_last_day_of_month` computed in IST; policy entry added
+    (`verify:policy` 100/100). The chart auto-opens on the last day of the month, otherwise
+    behind a "View Month Graph" button; lines stop at today (a future day is "not yet", not
+    zero). Palettes were validated for colour-blindness in light and dark (first attempts
+    failed — red/amber too close; negative is rose for that reason).
+    **Data finding:** every September `daily_tracker` row is attributed to the
+    **Administrator** account, not to coordinators — the sheet-by-sheet reload used the
+    admin's id. Coordinators' outcome mix and month chart are therefore empty until they log
+    their own calls, or the rows are re-attributed.
+    **Left broken by a concurrent session, not fixed here (to avoid racing it):** a new
+    `GET /dashboard/coordinator/clock-duration` endpoint was inserted *between* the
+    `/dashboard/coordinator` handler's `catch` block and its closing `});`, so that `});` is
+    missing and the backend won't start (`'}' expected` at EOF). It also has no
+    `routePolicy.ts` entry, so once it parses it will 403 (default-deny).
+    *(Since fixed by that session — backend parses and runs again.)*
+    **Month graph redesigned as a heat strip, 21 Sep 2026 (user picked option A of three)** —
+    the multi-line chart piled every campus onto the zero line on quiet days. Now one row per
+    campus, one square per day (1 → 30/31), one shared blue scale (darker = more in light,
+    brighter = more in dark), zero = neutral square, future days striped ("not yet", never
+    zero), today outlined, row totals on the right, hover tooltip with calls + minutes.
+    Defaults to **Calls Count**: the imported September rows carry no `duration_seconds`, so a
+    Duration default showed an all-empty month. `monthly-calls` now sums a day's duration in
+    seconds and rounds once (it rounded per call, so short calls vanished).
+    **Merged into one card, same day (user request — "avoid 2 designs, save space").** The
+    separate "Campus Outcome Mix — Today" card is gone; the heat strip is always visible and
+    carries outcome columns on the right — Positive / Not Hiring / Negative / Follow Up
+    (**Other Progress deliberately not shown**, user decision; those calls still count in
+    Calls). The columns show **Today** by default, **Month** for the month to date, or any
+    day the user clicks. `monthly-calls` now returns `daily_outcomes` per campus (same
+    `OUTCOME_BUCKET` mapping). The component no longer calls `college-kpis`; its
+    `outcome_mix` field is still returned but unused by this card.
+
+44. **Full performance + security + background-job check, 22 Sep 2026 (user-requested).**
+    Ran against the local dev backend/frontend only, which itself talks to the real
+    **production** MongoDB Atlas cluster (`ipoms-prod.7e8ft3k.mongodb.net`) — "local dev"
+    is not a separate database here; keep that in mind before any future load or write test.
+    **Found and fixed live, most severe first:**
+    (a) **CORS accepted every origin, with `credentials: true`.** `cors()`'s `origin`
+    callback in `server.ts` had a real allowlist (localhost, local network, `*.vercel.app`,
+    a fixed list) but then fell through to an unconditional `callback(null, true)` for
+    anything that didn't match — dead-code allowlist. Combined with `credentials: true` and
+    `exposedHeaders: ['Authorization', 'Set-Cookie']`, any website could make a credentialed
+    `fetch()` to this API — cookies (including the httpOnly 30-day refresh-token cookie,
+    §3) ride along automatically — and read the JSON response. Verified live before the
+    fix: `curl -H "Origin: https://evil.example.com"` against `POST /auth/refresh` and
+    `GET /health` both came back `Access-Control-Allow-Origin: https://evil.example.com` +
+    `Access-Control-Allow-Credentials: true` — a malicious page could have silently minted
+    a fresh access token for any logged-in visitor's account. Fixed: the fallback now
+    rejects (`callback(new Error('Not allowed by CORS'), false)`), and the existing global
+    Express error handler was given a case for that error so a rejected origin gets a clean
+    `403 ORIGIN_NOT_ALLOWED` instead of falling through to a generic `500`. Verified live:
+    a foreign origin now gets `403` with no CORS headers (the browser blocks it either way,
+    but the clean status matters for legibility); `localhost:3000`, `ipoms.vercel.app`, and
+    any `*.vercel.app` preview still get `200` with the right headers, unchanged.
+    **Open, not fixed this session — needs your call:** `next` is pinned at `14.2.35`,
+    inside the range of a `npm audit`-reported **critical** advisory bundle (RCE on
+    Windows-hosted servers, SSRF, cache poisoning, others) that only clears at a major
+    version bump; `xlsx@0.18.5` (real company-data import/export) carries a **high**
+    prototype-pollution/ReDoS advisory with **no fixed version published upstream** at all;
+    `nodemailer@9.0.5` (used for every OTP/reminder/notification email) has a **high**
+    advisory bundle including domain-allowlist bypass and a DoS via `addressparser`, fixed
+    in `>9.1.0`. Backend also carries 6 moderate transitive advisories (`body-parser`,
+    `express`, `qs`, `morgan`, `uuid`, `exceljs`'s `uuid`) and frontend 2 more moderate
+    (`uuid`, `@capacitor/cli`'s `xcode`) — none of the moderates look actively exploited
+    here, but the full lists can be regenerated with `npm audit --json` on each side.
+    (b) **`GET /weekly-tracker` (the full, unfiltered dataset — ~1,000 rows) measured
+    p50 ≈ 3.9s / p99 ≈ 4.3s under light concurrent load (8 concurrent requests).** The
+    query has no `.lean()`, so every row is a fully-hydrated Mongoose document (plus a
+    `.populate('coordinator_id', ...)` and a `.toObject()` per row before the in-memory
+    dedupe/partition/sort). None of the 6 compound indexes on `WeeklyTracker` lead with a
+    bare `is_deleted`, so an unfiltered call (no `college_id`) can't use any of them.
+    Not fixed this session (a `.lean()` swap needs a check that nothing downstream relies
+    on Mongoose document methods — `row.toObject()` is called explicitly a few lines later,
+    so `.lean()` may need that call removed too, not just added).
+    (c) **`GET /dashboard/admin` measured p50 ≈ 2.3s / p99 ≈ 4.0s**, and **the "5:00 AM
+    Dashboard Refresh" job (item 35/`finalizeDailyTracker.ts`) does not actually cache
+    anything** — it runs two `countDocuments()` calls and only *logs* the numbers
+    ("Campus Outreach & Conversion Analytics cache refreshed" is a log line, not a real
+    cache write). So every `/dashboard/admin` load fans out live: 9 `countDocuments`
+    (two of them, the missing-mobile/email counts, unindexed `$exists`/empty-string
+    scans over ~3,700 `company_metadata` rows), 1 aggregate with a `$sum`, a
+    `College.find()`, a `User.find()` over all active staff, 3 more parallel aggregates
+    grouped by college, and a `DailyTracker.distinct('company_name')` with no index on
+    `company_name`. Not fixed this session — this needs either a real cache write in the
+    5 AM job or a documented decision that live-compute is acceptable at current data
+    volume; flagging rather than guessing which.
+    (d) **`GET /dashboard/coordinator` measured p50 ≈ 1.0s.** Lighter than (b)/(c) but
+    still does 2 sequential `find`/`findOne` calls before its `Promise.all` — not urgent,
+    noted for completeness.
+    **Everything else tested came back clean:**
+    - Unauthenticated → `401` on every endpoint tried (`/colleges`, `/users`,
+      `/metadata/renumber`); RBAC → coordinator gets `403` on `/users`,
+      `/metadata/renumber`, and a self-escalation attempt via `PATCH /users/:id`.
+    - JWT: a garbage token and a forged `alg:none` token (valid-looking header/payload,
+      empty signature, `role_codes:["ADMINISTRATOR"]`) both `401` — signature verification
+      is genuinely enforced, not skippable.
+    - NoSQL injection: `{"email":{"$ne":null},"password":{"$ne":null}}` on `/auth/login`
+      is rejected (`401`, not a Mongoose cast/operator-injection bypass — the handler's own
+      shape validation runs first); unescaped regex specials (`(`, `.*`) on `/metadata` and
+      `/weekly-tracker` search no longer 500 (matches the fixes recorded in items 17/0e —
+      no regression).
+    - Ownership scoping: a coordinator passing another coordinator's real id as
+      `?coordinator_id=` on `/daily-leads`, and passing the Administrator's id as
+      `?user_id=` on `/notifications`, both silently get only their own data back —
+      `scopeToSelf()` still holds (items 0f/19).
+    - Brute force: 6 rapid failed logins against a nonexistent account all returned
+      identical `401`s with no growing delay — **confirms the already-documented gap**
+      (§8 release-gate item 6, no rate limiting) rather than finding something new; the
+      3-strike lockout itself (§2) was not re-tested against a real account, to avoid
+      locking anyone out.
+    - Response headers: Helmet **is** actually wired (`CSP`, `HSTS`, `X-Frame-Options`,
+      `X-Content-Type-Options`, `COOP`/`CORP` all present on a live response) — **this
+      corrects §4 divergence-ledger row 10**, which still claimed Helmet wasn't
+      implemented; only `x-request-id` from that row is still genuinely missing.
+    - Background jobs: all 4 scheduled jobs (5 AM refresh, 6 AM finalize, 8 PM reminder,
+      10 PM auto-sync) confirmed registered at boot and each wrapped in its own
+      `try/catch`, so one job's failure can't take down the process or the other jobs.
+    - Secrets: `backend/.env` is gitignored and untracked at HEAD (confirmed via
+      `git check-ignore`); it only appears in commit history before it was untracked
+      (already recorded in §8 release-gate item 1 — rotate those secrets if that hasn't
+      happened yet).
+    **Test harness** (throwaway, not committed): a hand-rolled Node load/security script
+    using the platform `fetch`, since `autocannon` isn't a project dependency — avoided
+    adding one. All writes during the security probes were either rejected before
+    persisting or created-then-immediately-deleted throwaway rows; no real record was
+    altered.
 
 ## 6. Module map
 ## 6. Module map

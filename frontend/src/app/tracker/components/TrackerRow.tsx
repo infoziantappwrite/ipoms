@@ -73,9 +73,29 @@ interface Props {
   onCall?: (row: TrackerRowType) => void;
   onToggleSelect?: (rowId: string, index: number, shiftKey: boolean) => void;
   onCopySingle?: (row: TrackerRowType) => void;
+  isCellSelected?: (field: string) => boolean;
+  onCellMouseDown?: (field: string, e: React.MouseEvent) => void;
+  onCellMouseEnter?: (field: string) => void;
 }
 
-export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode, selectionTheme = 'blue', isReadOnly, onUpdate, onEdit, onDelete, onCall, onToggleSelect, onCopySingle }: Props) {
+export function TrackerRow({
+  row,
+  index,
+  isSelected,
+  isSelectMode,
+  isDeleteMode,
+  selectionTheme = 'blue',
+  isReadOnly,
+  onUpdate,
+  onEdit,
+  onDelete,
+  onCall,
+  onToggleSelect,
+  onCopySingle,
+  isCellSelected,
+  onCellMouseDown,
+  onCellMouseEnter,
+}: Props) {
   const startTimeRef = useRef<HTMLInputElement>(null);
   const prevStartTimeRef = useRef<string>(formatTime(row.call_start_time));
   const companyNameRef = useRef<HTMLInputElement>(null);
@@ -101,6 +121,13 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
     : isSelected
     ? (rowBgTheme[effectiveTheme] || rowBgTheme.blue)
     : OUTCOME_ROW_COLORS[row.outcome_status ?? 'none'];
+
+  const getCellSelectionClass = (field: string) => {
+    if (isCellSelected?.(field)) {
+      return 'ring-2 ring-inset ring-blue-500 bg-blue-500/15 dark:bg-blue-500/25';
+    }
+    return '';
+  };
 
   useEffect(() => {
     if (companyNameRef.current && companyNameRef.current.value !== (row.company_name ?? '')) {
@@ -399,29 +426,29 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
                 : effectiveTheme === 'pink'
                 ? isSelected
                   ? 'bg-pink-600 border-pink-600 text-white scale-105 ring-2 ring-pink-500/30'
-                  : 'border-pink-400 dark:border-pink-500 hover:border-pink-600 bg-pink-50/40 dark:bg-pink-950/20 text-transparent hover:text-pink-500 ring-1 ring-pink-400/25'
+                  : 'border-pink-400 hover:border-pink-600 bg-surface'
                 : effectiveTheme === 'orange'
                 ? isSelected
                   ? 'bg-orange-600 border-orange-600 text-white scale-105 ring-2 ring-orange-500/30'
-                  : 'border-orange-400 dark:border-orange-500 hover:border-orange-600 bg-orange-50/40 dark:bg-orange-950/20 text-transparent hover:text-orange-500 ring-1 ring-orange-400/25'
+                  : 'border-orange-400 hover:border-orange-600 bg-surface'
                 : effectiveTheme === 'emerald'
                 ? isSelected
                   ? 'bg-emerald-600 border-emerald-600 text-white scale-105 ring-2 ring-emerald-500/30'
-                  : 'border-emerald-400 dark:border-emerald-500 hover:border-emerald-600 bg-emerald-50/40 dark:bg-emerald-950/20 text-transparent hover:text-emerald-500 ring-1 ring-emerald-400/25'
+                  : 'border-emerald-400 hover:border-emerald-600 bg-surface'
                 : effectiveTheme === 'purple'
                 ? isSelected
                   ? 'bg-purple-600 border-purple-600 text-white scale-105 ring-2 ring-purple-500/30'
-                  : 'border-purple-400 dark:border-purple-500 hover:border-purple-600 bg-purple-50/40 dark:bg-purple-950/20 text-transparent hover:text-purple-500 ring-1 ring-purple-400/25'
+                  : 'border-purple-400 hover:border-purple-600 bg-surface'
                 : effectiveTheme === 'amber'
                 ? isSelected
                   ? 'bg-amber-600 border-amber-600 text-white scale-105 ring-2 ring-amber-500/30'
-                  : 'border-amber-400 dark:border-amber-500 hover:border-amber-600 bg-amber-50/40 dark:bg-amber-950/20 text-transparent hover:text-amber-500 ring-1 ring-amber-400/25'
+                  : 'border-amber-400 hover:border-amber-600 bg-surface'
                 : isSelected
                 ? 'bg-blue-600 border-blue-600 text-white scale-105 ring-2 ring-blue-500/30'
-                : 'border-blue-400 dark:border-blue-500 hover:border-blue-600 bg-blue-50/40 dark:bg-blue-950/20 text-transparent hover:text-blue-500 ring-1 ring-blue-400/25'
+                : 'border-blue-400 hover:border-blue-600 bg-surface'
             }`}
           >
-            <Check size={11} strokeWidth={3} className={isSelected ? 'block text-white' : 'opacity-0 hover:opacity-100'} />
+            {isSelected && <Check size={11} strokeWidth={3} />}
           </button>
         ) : (
           <button
@@ -442,7 +469,11 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
       </div>
 
       {/* Start Time (Frozen Col 2 - 1-Click Clock Stamp & Editable) */}
-      <div className={`sticky left-[56px] z-10 ${rowBg} px-1.5 py-1 flex items-center transition-colors`}>
+      <div
+        className={`sticky left-[56px] z-10 ${rowBg} px-1.5 py-1 flex items-center transition-colors ${getCellSelectionClass('start_time')}`}
+        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('start_time', e); }}
+        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('start_time'); }}
+      >
         {isReadOnly ? (
           <span className="text-fg-muted text-xs tabular-nums px-1">{formatTime(row.call_start_time) || '—'}</span>
         ) : !row.call_start_time ? (
@@ -483,21 +514,36 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
       </div>
 
       {/* End Time (Frozen Col 3 - Auto Display) */}
-      <div className={`sticky left-[156px] z-10 ${rowBg} px-2.5 py-2 text-fg-subtle tabular-nums text-xs flex items-center whitespace-nowrap transition-colors`} title={formatTime(row.call_end_time) || 'Auto-captured on status selection'}>
+      <div
+        className={`sticky left-[156px] z-10 ${rowBg} px-2.5 py-2 text-fg-subtle tabular-nums text-xs flex items-center whitespace-nowrap transition-colors ${getCellSelectionClass('end_time')}`}
+        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('end_time', e); }}
+        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('end_time'); }}
+        title={formatTime(row.call_end_time) || 'Auto-captured on status selection'}
+      >
         {formatTime(row.call_end_time) || (
           <span className="text-fg-muted italic">auto</span>
         )}
       </div>
 
       {/* Duration (Frozen Col 4 - Auto Display) */}
-      <div className={`sticky left-[246px] z-10 ${rowBg} px-2.5 py-2 text-fg-subtle tabular-nums text-xs flex items-center whitespace-nowrap transition-colors`} title={row.duration_formatted || 'Auto-calculated on status selection'}>
+      <div
+        className={`sticky left-[246px] z-10 ${rowBg} px-2.5 py-2 text-fg-subtle tabular-nums text-xs flex items-center whitespace-nowrap transition-colors ${getCellSelectionClass('duration')}`}
+        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('duration', e); }}
+        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('duration'); }}
+        title={row.duration_formatted || 'Auto-calculated on status selection'}
+      >
         {row.duration_formatted || (
           <span className="text-fg-muted">—</span>
         )}
       </div>
 
       {/* Company Name (Frozen Col 5 - Editable & Solid Right Divider) */}
-      <div className={`sticky left-[336px] z-10 ${rowBg} px-2 py-1 flex items-center border-r-2 border-border-strong shadow-[6px_0_12px_-3px_rgba(0,0,0,0.12)] dark:shadow-[6px_0_12px_-3px_rgba(0,0,0,0.6)] transition-colors`} title={row.company_name}>
+      <div
+        className={`sticky left-[336px] z-10 ${rowBg} px-2 py-1 flex items-center border-r-2 border-border-strong shadow-[6px_0_12px_-3px_rgba(0,0,0,0.12)] dark:shadow-[6px_0_12px_-3px_rgba(0,0,0,0.6)] transition-colors ${getCellSelectionClass('company_name')}`}
+        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('company_name', e); }}
+        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('company_name'); }}
+        title={row.company_name}
+      >
         {isReadOnly ? (
           <div className="flex items-center justify-between w-full min-w-0 gap-1.5">
             <span className="text-fg font-semibold break-words leading-snug select-text truncate">{row.company_name}</span>
@@ -537,7 +583,12 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
       </div>
 
       {/* HR Name (Editable) */}
-      <div className="px-2 py-1 flex items-center min-w-0" title={row.hr_name || ''}>
+      <div
+        className={`px-2 py-1 flex items-center min-w-0 ${getCellSelectionClass('hr_name')}`}
+        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('hr_name', e); }}
+        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('hr_name'); }}
+        title={row.hr_name || ''}
+      >
         {isReadOnly ? (
           <span className="text-fg font-medium text-xs leading-snug break-words select-text">
             {row.hr_name || <span className="text-fg-muted italic">—</span>}
@@ -563,7 +614,11 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
       </div>
 
       {/* Contact (Call / WhatsApp + Editable Mobile) */}
-      <div className="px-2 py-1.5 text-fg font-mono tabular-nums text-xs flex items-start gap-1.5 group/contact min-w-0">
+      <div
+        className={`px-2 py-1.5 text-fg font-mono tabular-nums text-xs flex items-start gap-1.5 group/contact min-w-0 ${getCellSelectionClass('mobile_number')}`}
+        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('mobile_number', e); }}
+        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('mobile_number'); }}
+      >
         {row.mobile_number && (
           <div className="flex items-center gap-1 shrink-0 mt-0.5">
             {!isReadOnly ? (
@@ -602,13 +657,13 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
               if (numbers.length === 0) {
                 return <span className="text-fg-muted italic">—</span>;
               }
-              const chunks: string[][] = [];
-              for (let i = 0; i < numbers.length; i += 2) {
-                chunks.push(numbers.slice(i, i + 2));
-              }
-              return chunks.map((chunk, cIdx) => (
-                <span key={cIdx} className="select-all font-medium text-fg break-all text-xs">
-                  {chunk.join(', ')}
+              return numbers.map((num, nIdx) => (
+                <span
+                  key={nIdx}
+                  className="text-fg-subtle select-all hover:text-fg transition-colors"
+                  title={num}
+                >
+                  {num}
                 </span>
               ));
             })()}
@@ -634,7 +689,12 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
       </div>
 
       {/* Email ID (Editable) */}
-      <div className="px-2 py-1.5 flex items-center min-w-0 text-xs" title={row.email_id || ''}>
+      <div
+        className={`px-2 py-1.5 flex items-center min-w-0 text-xs ${getCellSelectionClass('email_id')}`}
+        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('email_id', e); }}
+        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('email_id'); }}
+        title={row.email_id || ''}
+      >
         {isReadOnly ? (
           <div className="flex flex-col gap-0.5 min-w-0 leading-snug py-0.5">
             {(() => {
@@ -676,15 +736,39 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
         )}
       </div>
 
-      {/* Coordinator — only shown in read-only history, which now spans every coordinator */}
+      {/* Coordinator & College — shown in read-only history, which spans coordinators and colleges */}
       {isReadOnly && (
-        <div className="px-2.5 py-2 flex items-center whitespace-nowrap text-xs" title={row.coordinator_name || ''}>
-          <span className="text-fg-subtle select-text">{row.coordinator_name || '—'}</span>
+        <div
+          className="px-2.5 py-2 flex items-center gap-1.5 whitespace-nowrap text-xs"
+          title={`${row.college_name || row.college_code || ''} ${
+            row.coordinator_name ? `• ${row.coordinator_name}` : ''
+          }`.trim()}
+        >
+          {row.college_code && (
+            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 shrink-0">
+              {row.college_code}
+            </span>
+          )}
+          <span className="text-fg-subtle select-text truncate max-w-[130px]">
+            {(() => {
+              const code = (row.college_code || '').toUpperCase();
+              if (['ACET', 'AIHT', 'KARPAGAM', 'KPR'].includes(code)) {
+                if (!row.coordinator_name || row.coordinator_name === 'Administrator') {
+                  return 'A.Mohanaradha';
+                }
+              }
+              return row.coordinator_name || '—';
+            })()}
+          </span>
         </div>
       )}
 
       {/* Call Status (Dropdown directly in cell) */}
-      <div className="px-2 py-1.5 min-w-0 flex items-center">
+      <div
+        className={`px-2 py-1.5 min-w-0 flex items-center ${getCellSelectionClass('outcome_status')}`}
+        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('outcome_status', e); }}
+        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('outcome_status'); }}
+      >
         {isReadOnly ? (
           <OutcomeBadge outcome={row.outcome_status} />
         ) : (
@@ -696,7 +780,11 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
       </div>
 
       {/* Follow Up (Month Dropdown directly in cell) */}
-      <div className="px-2 py-1.5 min-w-0 flex items-center">
+      <div
+        className={`px-2 py-1.5 min-w-0 flex items-center ${getCellSelectionClass('follow_up_month')}`}
+        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('follow_up_month', e); }}
+        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('follow_up_month'); }}
+      >
         {isReadOnly ? (
           <span className="text-xs text-fg-subtle px-1">
             {row.outcome_status === 'follow_up' && row.follow_up_month ? row.follow_up_month : '—'}
@@ -711,7 +799,11 @@ export function TrackerRow({ row, index, isSelected, isSelectMode, isDeleteMode,
       </div>
 
       {/* Comments (Textarea directly in cell) */}
-      <div className="px-2.5 py-1.5 min-w-0 flex items-center">
+      <div
+        className={`px-2.5 py-1.5 min-w-0 flex items-center ${getCellSelectionClass('comments')}`}
+        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('comments', e); }}
+        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('comments'); }}
+      >
         {isReadOnly ? (
           <p className="text-fg-subtle italic text-xs break-words leading-relaxed whitespace-pre-wrap">
             {row.comments || '—'}

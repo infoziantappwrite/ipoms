@@ -11,7 +11,7 @@ import {
   ShieldAlert, Lock, Unlock, RotateCcw, KeyRound, Eye, EyeOff, Sparkles
 } from 'lucide-react';
 import { armNavIntro } from '@/lib/session';
-import { clearDailyFocusOnLogin } from '@/lib/collegeSession';
+import { clearDailyFocusOnLogin, clearAllCollegeSessionState, resolveDefaultCollege } from '@/lib/collegeSession';
 import { isPasswordValid } from '@/lib/passwordPolicy';
 
 import { getApiBase } from '@/lib/api';
@@ -123,6 +123,9 @@ export default function LoginPage() {
         return;
       }
 
+      // Clear any leftover college session state from previous users on this browser
+      clearAllCollegeSessionState();
+
       // Persist session
       const user = data.data?.user;
       const token = data.data?.token;
@@ -151,6 +154,11 @@ export default function LoginPage() {
 
       armNavIntro();
       clearDailyFocusOnLogin();
+
+      // Resolve and set initial active college session for this newly logged in user
+      try {
+        await resolveDefaultCollege();
+      } catch {}
 
       router.push('/dashboard');
     } catch {

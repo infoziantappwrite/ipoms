@@ -1,264 +1,504 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import {
-  PhoneCall,
-  CheckCircle2,
-  XCircle,
-  Ban,
-  Building2,
-  TrendingUp,
-  Target,
-} from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { LineChart } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { getCoordinatorSelectedColleges, setActiveCollege, getCollegeAcronym } from '@/lib/collegeSession';
+import { getCoordinatorSelectedColleges } from '@/lib/collegeSession';
 
-interface CollegeKpiItem {
+/**
+ * Monthly Call Trend + campus outcomes, one card (21 Sep 2026).
+ *
+ * Left: a heat strip — one row per campus, one square per day of the month,
+ * darker = more calls (or minutes). Right: that campus's Positive / Not Hiring /
+ * Negative / Follow Up counts for the selected day (today by default) or the
+ * whole month. Clicking a day selects it. This replaced a separate "Campus
+ * Outcome Mix — Today" card, so the dashboard shows both in half the space.
+ *
+ * Outcome buckets are decided server-side (OUTCOME_BUCKET in server.ts).
+ * Other Progress and calls with no outcome yet are counted in Calls but have
+ * no column of their own (user decision).
+ */
+
+type ShownBucket = 'positive' | 'not_hiring' | 'negative' | 'follow_up';
+
+interface MonthlySeries {
   college_id: string;
-  college_name: string;
   college_code: string;
-  location?: string;
-  logo_url?: string;
-  total_calls: number;
-  total_positives: number;
-  total_negatives: number;
-  total_not_hiring: number;
-  active_leads: number;
-  weekly_pipeline: number;
-  positive_rate: number;
+  daily: number[];
+  daily_duration?: number[];
+  daily_outcomes?: Record<ShownBucket, number[]>;
+  total: number;
+  total_duration_minutes?: number;
+}
+
+interface MonthlyData {
+  month: string;
+  days_in_month: number;
+  is_current_month: boolean;
+  today_day: number | null;
+  is_last_day_of_month: boolean;
+  series: MonthlySeries[];
 }
 
 interface Props {
   selectedCollegeIds?: string[];
 }
 
-export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
-  const [kpiData, setKpiData] = useState<CollegeKpiItem[]>([]);
-  const [loading, setLoading] = useState(true);
+const OUTCOMES: { key: ShownBucket; label: string; detail: string }[] = [
+  { key: 'positive', label: 'Positive', detail: 'Invite Mail' },
+  { key: 'not_hiring', label: 'Not Hiring', detail: 'Not Hiring, Hiring Freezed' },
+  { key: 'negative', label: 'Negative', detail: 'No Response, Invalid, In Connect, Hiring Completed' },
+  { key: 'follow_up', label: 'Follow Up', detail: 'Follow Up, Call Back' },
+];
 
-  const fetchKpis = async (ids?: string[]) => {
+const HEAT_STEPS = ['--ipoms-hm-1', '--ipoms-hm-2', '--ipoms-hm-3', '--ipoms-hm-4', '--ipoms-hm-5'];
+
+interface Tip {
+  x: number;
+  top: number;
+  bottom: number;
+  lines: string[];
+}
+
+function fmtMins(m: number): string {
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  return r ? `${h}h ${r}m` : `${h}h`;
+}
+
+const sum = (a: number[] = [], upTo?: number) => a.slice(0, upTo ?? a.length).reduce((x, y) => x + (y || 0), 0);
+
+export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
+  const [monthly, setMonthly] = useState<MonthlyData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [tip, setTip] = useState<Tip | null>(null);
+
+  const resolveIds = useCallback(
+    (ids?: string[]) => (ids !== undefined ? ids : getCoordinatorSelectedColleges()),
+    []
+  );
+
+  const fetchAll = useCallback(async (ids?: string[]) => {
+    const targetIds = resolveIds(ids);
+    if (!targetIds || targetIds.length === 0) {
+      setMonthly(null);
+      setLoading(false);
+      return;
+    }
     try {
-      setLoading(true);
-      const targetIds = ids !== undefined ? ids : getCoordinatorSelectedColleges();
-      if (!targetIds || targetIds.length === 0) {
-        setKpiData([]);
-        setLoading(false);
-        return;
-      }
-      const queryParam = `?college_ids=${encodeURIComponent(targetIds.join(','))}`;
-      const res = await apiFetch(`/dashboard/college-kpis${queryParam}`);
-      if (res.success && Array.isArray((res.data as any)?.colleges)) {
-        setKpiData((res.data as any).colleges);
-      }
+      const res = await apiFetch(`/dashboard/monthly-calls?college_ids=${encodeURIComponent(targetIds.join(','))}`);
+      if (res.success && res.data) setMonthly(res.data as MonthlyData);
     } catch (err) {
-      console.error('Failed to fetch college KPIs', err);
+      console.error('Failed to fetch monthly call trend', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [resolveIds]);
 
   useEffect(() => {
-    fetchKpis(selectedCollegeIds);
-  }, [selectedCollegeIds]);
+    fetchAll(selectedCollegeIds);
+  }, [selectedCollegeIds, fetchAll]);
 
-  // ── Auto-refresh every morning at 12:00:00 AM Midnight & on Tab Visibility ──
+  // Re-read on the same real events as the calling-time widget: a Daily Tracker
+  // save (its own broadcast), returning to the tab, and the coordinator changing
+  // their focus colleges.
   useEffect(() => {
-    // Calculate time until next 12:00:00 AM midnight
-    const now = new Date();
-    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
-    const msUntilMidnight = Math.max(1000, tomorrow.getTime() - now.getTime());
-
-    const midnightTimer = setTimeout(() => {
-      fetchKpis(selectedCollegeIds);
-      // Recurring 24-hour interval after first midnight hit
-      const dailyInterval = setInterval(() => {
-        fetchKpis(selectedCollegeIds);
-      }, 24 * 60 * 60 * 1000);
-      return () => clearInterval(dailyInterval);
-    }, msUntilMidnight);
-
-    // Re-check and refresh immediately when the user returns to the tab next morning
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        fetchKpis(selectedCollegeIds);
-      }
+    const refresh = () => {
+      const currentHour = new Date().getHours();
+      if (currentHour < 6 || currentHour >= 19) return;
+      fetchAll(selectedCollegeIds);
     };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('ipoms_tracker_sync');
+      channel.onmessage = refresh;
+    } catch {
+      // unsupported — visibility refresh still covers the common flow
+    }
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    const onCollegesChange = (e: any) => fetchAll(e.detail?.selectedIds);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('ipoms_coordinator_colleges_changed', onCollegesChange);
     return () => {
-      clearTimeout(midnightTimer);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      try { channel?.close(); } catch { /* closed */ }
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('ipoms_coordinator_colleges_changed', onCollegesChange);
     };
-  }, [selectedCollegeIds]);
+  }, [selectedCollegeIds, fetchAll]);
 
-  // Listen to global changes
-  useEffect(() => {
-    const handleCollegesChange = (e: any) => {
-      if (e.detail?.selectedIds) {
-        fetchKpis(e.detail.selectedIds);
-      } else {
-        fetchKpis();
-      }
-    };
-    window.addEventListener('ipoms_coordinator_colleges_changed', handleCollegesChange);
-    return () => window.removeEventListener('ipoms_coordinator_colleges_changed', handleCollegesChange);
-  }, []);
+  const showTip = (e: React.MouseEvent | React.FocusEvent, lines: string[]) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const mx = 'clientX' in e ? e.clientX : r.left + r.width / 2;
+    setTip({ x: mx, top: r.top, bottom: r.bottom, lines });
+  };
+  const hideTip = () => setTip(null);
 
-  if (loading && kpiData.length === 0) {
+  const monthLabel = useMemo(() => {
+    if (!monthly) return '';
+    const [y, m] = monthly.month.split('-').map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  }, [monthly]);
+
+  if (loading && !monthly) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="h-6 w-48 bg-surface-sunken animate-pulse rounded-lg" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-64 rounded-2xl bg-surface-sunken animate-pulse border border-border" />
-          ))}
-        </div>
+      <div className="bg-surface border border-border rounded-2xl p-6 text-xs text-fg-subtle">
+        Loading monthly call trend…
       </div>
     );
   }
 
-  if (kpiData.length === 0) {
-    return null;
-  }
-
-  const gridColsClass =
-    kpiData.length === 1
-      ? 'grid-cols-1 max-w-xl'
-      : kpiData.length === 2
-      ? 'grid-cols-1 md:grid-cols-2'
-      : kpiData.length === 3
-      ? 'grid-cols-1 md:grid-cols-3'
-      : kpiData.length === 4
-      ? 'grid-cols-1 md:grid-cols-2'
-      : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
-
   return (
-    <div className="space-y-3">
-      {/* ── Section Title ────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Target size={16} className="text-primary" />
-          <h2 className="text-sm font-bold tracking-tight text-fg">
-            Campus Outreach &amp; Conversion Analytics
-          </h2>
-          <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-primary/10 text-primary border border-primary/20">
-            {kpiData.length} {kpiData.length === 1 ? 'Campus' : 'Campuses'}
+    <div>
+      <section className="bg-surface border border-border rounded-2xl p-5 sm:p-6 shadow-xs">
+        <div className="flex items-center gap-3">
+          <span className="w-9 h-9 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center">
+            <LineChart size={17} strokeWidth={2.2} />
           </span>
+          <div>
+            <h3 className="text-sm font-bold text-fg">Monthly Call Trend — {monthLabel || 'This Month'}</h3>
+            <p className="text-[11px] text-fg-subtle mt-0.5">
+              Calls per day, per campus · click any day to see its details
+            </p>
+          </div>
         </div>
 
-        <p className="text-[11px] text-fg-subtle">
-          Today&apos;s outreach metrics (Refreshes daily at 12:00 AM)
-        </p>
+        {monthly && monthly.series.length > 0 ? (
+          <MonthChart data={monthly} onTip={showTip} onHideTip={hideTip} />
+        ) : (
+          <p className="text-xs text-fg-subtle pt-4">No focus campuses selected.</p>
+        )}
+      </section>
+
+      {tip && (() => {
+        const winHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+        const winWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+        // If the element's bottom is within 110px of window bottom, flip tooltip above
+        const isNearBottom = tip.bottom + 110 > winHeight;
+        const leftPos = Math.min(Math.max(12, tip.x - 20), winWidth - 250);
+        const topPos = isNearBottom ? Math.max(10, tip.top - 8) : tip.bottom + 8;
+        return (
+          <div
+            role="tooltip"
+            className="ipoms-tip"
+            style={{
+              left: leftPos,
+              top: topPos,
+              transform: isNearBottom ? 'translateY(-100%)' : undefined,
+            }}
+          >
+            <b>{tip.lines[0]}</b>
+            {tip.lines.slice(1).map((l, i) => (
+              <span key={i}>{l}</span>
+            ))}
+          </div>
+        );
+      })()}
+
+      <style jsx>{`
+        /* Validated palettes (light / dark). Declared :global because the chart
+           and tooltip markup live in a child component, outside this scope. */
+        :global(:root) {
+          --ipoms-oc-positive: #059669;
+          --ipoms-oc-not_hiring: #f59e0b;
+          --ipoms-oc-negative: #e11d48;
+          --ipoms-oc-follow_up: #2563eb;
+          --ipoms-hm-1: #e6f1fb;
+          --ipoms-hm-2: #b5d4f4;
+          --ipoms-hm-3: #85b7eb;
+          --ipoms-hm-4: #378add;
+          --ipoms-hm-5: #185fa5;
+          --ipoms-hm-zero: #f1efe8;
+          --ipoms-hm-stripe: #e1e0d9;
+          --ipoms-hm-today: #0b0b0b;
+        }
+        :global(.dark) {
+          --ipoms-oc-positive: #0ea271;
+          --ipoms-oc-not_hiring: #bf8508;
+          --ipoms-oc-negative: #e04e8a;
+          --ipoms-oc-follow_up: #5b8def;
+          --ipoms-hm-1: #1a2a40;
+          --ipoms-hm-2: #1f4a80;
+          --ipoms-hm-3: #2d6fc0;
+          --ipoms-hm-4: #3987e5;
+          --ipoms-hm-5: #8cbaf5;
+          --ipoms-hm-zero: #2c2c2a;
+          --ipoms-hm-stripe: #383835;
+          --ipoms-hm-today: #f0efec;
+        }
+        :global(.ipoms-sw) {
+          display: inline-block;
+          width: 10px;
+          height: 10px;
+          border-radius: 3px;
+          flex: none;
+        }
+        :global(.ipoms-hm-cell) {
+          display: block;
+          width: 100%;
+          height: 24px;
+          border-radius: 4px;
+          padding: 0;
+          border: 0;
+          cursor: pointer;
+          box-sizing: border-box;
+          transition: transform 0.12s ease;
+        }
+        :global(.ipoms-hm-key) {
+          width: 12px;
+          height: 12px;
+          border-radius: 3px;
+          cursor: default;
+        }
+        :global(.ipoms-hm-zero) {
+          background: var(--ipoms-hm-zero);
+        }
+        :global(.ipoms-hm-future) {
+          background: repeating-linear-gradient(45deg, transparent 0 3px, var(--ipoms-hm-stripe) 3px 4px);
+          cursor: default;
+        }
+        :global(.ipoms-hm-today) {
+          box-shadow: inset 0 0 0 2px var(--ipoms-hm-today);
+          position: relative;
+          z-index: 1;
+        }
+        :global(.ipoms-hm-hot) {
+          transform: scale(1.08);
+          box-shadow: 0 0 0 1.5px rgb(var(--surface)), 0 0 0 2.5px rgb(var(--primary));
+          z-index: 10;
+        }
+        :global(.ipoms-hm-col-sel) {
+          background: rgb(var(--primary) / 0.08);
+          border-radius: 6px;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          :global(.ipoms-hm-cell) {
+            transition: none;
+          }
+        }
+        :global(.ipoms-tip) {
+          position: fixed;
+          z-index: 9999;
+          pointer-events: none;
+          display: flex;
+          flex-direction: column;
+          gap: 2.5px;
+          min-width: 160px;
+          max-width: 250px;
+          padding: 8px 12px;
+          border-radius: 8px;
+          font-size: 11.5px;
+          line-height: 1.4;
+          background: #0f172a;
+          color: #f8fafc;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+        }
+        :global(.dark) :global(.ipoms-tip) {
+          background: #1e293b;
+          color: #f1f5f9;
+          box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.15);
+        }
+        :global(.ipoms-tip b) {
+          font-weight: 700;
+        }
+      `}</style>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+
+function MonthChart({
+  data,
+  onTip,
+  onHideTip,
+}: {
+  data: MonthlyData;
+  onTip: (e: React.MouseEvent | React.FocusEvent, lines: string[]) => void;
+  onHideTip: () => void;
+}) {
+  // Calls first: every logged row has a call, but only timed rows carry a duration.
+  const [metric, setMetric] = useState<'calls' | 'duration'>('calls');
+  const days = data.days_in_month || 30;
+  const todayDay = data.is_current_month && data.today_day ? data.today_day : null;
+  const lastDay = todayDay ?? days;
+  // Outcome columns follow this: a day number, or 'month' for the whole month.
+  const [scope, setScope] = useState<number | 'month'>(todayDay ?? 'month');
+  const [hover, setHover] = useState<{ row: number; day: number } | null>(null);
+  const yy = Number(data.month.slice(0, 4));
+  const mm = Number(data.month.slice(5));
+
+  const valuesOf = (s: MonthlySeries): number[] =>
+    metric === 'duration' ? s.daily_duration ?? new Array(days).fill(0) : s.daily;
+
+  const peak = Math.max(1, ...data.series.flatMap((s) => valuesOf(s).slice(0, lastDay)));
+  const step = (v: number) => Math.max(0, Math.min(4, Math.ceil((v / peak) * 5) - 1));
+
+  const dayMeta = Array.from({ length: days }, (_, i) => {
+    const d = new Date(yy, mm - 1, i + 1);
+    return {
+      day: i + 1,
+      sunday: d.getDay() === 0,
+      label: d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }),
+    };
+  });
+
+  const plural = (n: number) => `${n} call${n === 1 ? '' : 's'}`;
+  const outcomeAt = (s: MonthlySeries, key: ShownBucket, day: number | 'month') => {
+    const arr = s.daily_outcomes?.[key] ?? [];
+    return day === 'month' ? sum(arr, lastDay) : arr[day - 1] || 0;
+  };
+  const callsAt = (s: MonthlySeries, day: number | 'month') =>
+    day === 'month' ? sum(s.daily, lastDay) : s.daily[day - 1] || 0;
+
+  const scopeLabel =
+    scope === 'month'
+      ? `${new Date(yy, mm - 1, 1).toLocaleDateString('en-IN', { month: 'long' })} total`
+      : scope === todayDay
+      ? `Today · ${dayMeta[scope - 1].label}`
+      : dayMeta[scope - 1].label;
+
+  const selectDay = (d: number) => {
+    if (d > lastDay) return;
+    setScope((cur) => (cur === d ? 'month' : d));
+  };
+
+  // 52px campus · days 1..30/31
+  const cols = `52px repeat(${days}, minmax(0, 1fr))`;
+
+  return (
+    <div className="mt-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-fg-subtle">
+          <span>Fewer</span>
+          <span className="inline-flex gap-[3px]">
+            <i className="ipoms-hm-cell ipoms-hm-key ipoms-hm-zero" />
+            {HEAT_STEPS.map((v) => (
+              <i key={v} className="ipoms-hm-cell ipoms-hm-key" style={{ background: `var(${v})` }} />
+            ))}
+          </span>
+          <span>More</span>
+          <span className="inline-flex items-center gap-1.5 ml-2">
+            <i className="ipoms-hm-cell ipoms-hm-key ipoms-hm-future" /> Not yet
+          </span>
+          {todayDay && (
+            <span className="inline-flex items-center gap-1.5">
+              <i className="ipoms-hm-cell ipoms-hm-key ipoms-hm-zero ipoms-hm-today" /> Today
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex p-0.5 bg-surface-sunken border border-border rounded-xl text-[11px] font-bold">
+            {(['calls', 'duration'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={metric === m}
+                onClick={() => setMetric(m)}
+                className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                  metric === m ? 'bg-primary text-white shadow-2xs' : 'text-fg-subtle hover:text-fg'
+                }`}
+              >
+                {m === 'duration' ? 'Duration' : 'Calls Count'}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* ── Dynamic Per-College KPI Cards Grid ────────────────────────── */}
-      <div className={`grid ${gridColsClass} gap-3`}>
-        {kpiData.map((item) => {
-          const acronym = getCollegeAcronym({
-            college_code: item.college_code,
-            college_name: item.college_name,
-            college_id: item.college_id,
-          });
-
-          return (
-            <div
-              key={item.college_id}
-              className="rounded-xl border border-border/80 bg-surface shadow-2xs hover:border-border-strong hover:shadow-xs transition-all duration-200 overflow-hidden flex flex-col justify-between"
+      <div className="overflow-x-auto pb-1">
+        <div
+          role="grid"
+          aria-label={`${metric === 'duration' ? 'Minutes logged' : 'Calls'} per day, per campus`}
+          className="min-w-[720px] grid gap-x-[6px] gap-y-[6px] items-center"
+          style={{ gridTemplateColumns: cols }}
+          onMouseLeave={() => {
+            setHover(null);
+            onHideTip();
+          }}
+        >
+          {/* Day numbers */}
+          <span />
+          {dayMeta.map((m) => (
+            <button
+              key={m.day}
+              type="button"
+              disabled={m.day > lastDay}
+              onClick={() => selectDay(m.day)}
+              title={m.day > lastDay ? undefined : `Show details for ${m.label}`}
+              className={`text-center text-[10px] font-mono tabular-nums py-0.5 rounded disabled:cursor-default ${
+                scope === m.day ? 'ipoms-hm-col-sel text-primary font-extrabold' : ''
+              } ${
+                m.day === todayDay
+                  ? 'text-fg font-extrabold'
+                  : hover?.day === m.day
+                  ? 'text-primary font-bold'
+                  : m.sunday
+                  ? 'text-fg-subtle/50'
+                  : 'text-fg-subtle'
+              }`}
             >
-              {/* Card Header: College Acronym & Name Link */}
-              <div className="px-3.5 py-2.5 border-b border-border/60 bg-surface">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0 flex-1 flex items-center gap-2">
-                    <Link
-                      href="/tracker"
-                      onClick={() => {
-                        setActiveCollege(item.college_id, item.college_name);
+              {m.day}
+            </button>
+          ))}
+
+          {data.series.map((s, row) => {
+            const vals = valuesOf(s);
+            return (
+              <React.Fragment key={s.college_id}>
+                <b
+                  className={`font-mono text-xs truncate ${hover?.row === row ? 'text-primary' : 'text-fg'}`}
+                  title={s.college_code}
+                >
+                  {s.college_code}
+                </b>
+                {dayMeta.map((m, i) => {
+                  const future = m.day > lastDay;
+                  const v = vals[i] || 0;
+                  const cls = [
+                    'ipoms-hm-cell',
+                    future ? 'ipoms-hm-future' : v === 0 ? 'ipoms-hm-zero' : '',
+                    m.day === todayDay ? 'ipoms-hm-today' : '',
+                    (hover && hover.row === row && hover.day === m.day) || scope === m.day ? 'ipoms-hm-hot' : '',
+                  ].join(' ');
+                  const dCalls = s.daily[i] || 0;
+                  const mins = s.daily_duration?.[i] || 0;
+                  const tipLines = future
+                    ? [`${s.college_code} · ${m.label}`, 'Not yet']
+                    : [
+                        `${s.college_code} · ${m.label}`,
+                        `${plural(dCalls)} · ${fmtMins(mins)} logged`,
+                        `Positive ${outcomeAt(s, 'positive', m.day)} · Not Hiring ${outcomeAt(s, 'not_hiring', m.day)}`,
+                        `Negative ${outcomeAt(s, 'negative', m.day)} · Follow Up ${outcomeAt(s, 'follow_up', m.day)}`,
+                      ];
+                  return (
+                    <button
+                      key={m.day}
+                      type="button"
+                      role="gridcell"
+                      disabled={future}
+                      aria-label={`${s.college_code}, ${m.label}: ${
+                        future ? 'not yet' : `${plural(dCalls)}, ${fmtMins(mins)} logged`
+                      }`}
+                      className={cls}
+                      style={!future && v > 0 ? { background: `var(${HEAT_STEPS[step(v)]})` } : undefined}
+                      onClick={() => selectDay(m.day)}
+                      onMouseEnter={(e) => {
+                        setHover({ row, day: m.day });
+                        onTip(e, tipLines);
                       }}
-                      title={`${item.college_name} (${acronym || ''}) - Click to open tracker`}
-                      className="min-w-0 flex items-center gap-1.5 text-xs sm:text-sm font-bold text-fg hover:text-primary transition-colors group truncate"
-                    >
-                      <Building2 size={13} className="text-primary shrink-0 opacity-80 group-hover:opacity-100" />
-                      {acronym && (
-                        <span className="font-mono text-[10.5px] font-bold px-1.5 py-0.5 rounded-md bg-primary/10 text-primary dark:text-sky-300 border border-primary/25 shrink-0 tracking-wider">
-                          [{acronym}]
-                        </span>
-                      )}
-                      <span className="truncate group-hover:underline">{item.college_name}</span>
-                    </Link>
-                  </div>
-
-                  {/* Positive Rate Badge */}
-                  <div className="flex items-center shrink-0">
-                    <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-bold text-[10.5px] border border-emerald-500/20">
-                      <TrendingUp size={11} />
-                      <span>{item.positive_rate}%</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Minimal 4 KPI Metrics Grid */}
-              <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between">
-                <div className="grid grid-cols-2 gap-1.5">
-                  {/* 1. Total Calls Made */}
-                  <div className="p-2 rounded-lg bg-surface-sunken/60 border border-border/60 flex items-center justify-between gap-2">
-                    <div className="space-y-0.5 min-w-0">
-                      <span className="text-[9.5px] font-semibold uppercase tracking-wider text-fg-subtle block truncate">
-                        Calls Made
-                      </span>
-                      <span className="text-sm sm:text-base font-bold font-mono tracking-tight text-fg block">
-                        {item.total_calls}
-                      </span>
-                    </div>
-                    <PhoneCall size={12} className="text-primary shrink-0 opacity-70" />
-                  </div>
-
-                  {/* 2. Total Positives Received */}
-                  <div className="p-2 rounded-lg bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/20 flex items-center justify-between gap-2">
-                    <div className="space-y-0.5 min-w-0">
-                      <span className="text-[9.5px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 block truncate">
-                        Positives
-                      </span>
-                      <span className="text-sm sm:text-base font-bold font-mono tracking-tight text-emerald-600 dark:text-emerald-400 block">
-                        {item.total_positives}
-                      </span>
-                    </div>
-                    <CheckCircle2 size={12} className="text-emerald-600 dark:text-emerald-400 shrink-0 opacity-80" />
-                  </div>
-
-                  {/* 3. Total Negatives Received */}
-                  <div className="p-2 rounded-lg bg-surface-sunken/60 border border-border/60 flex items-center justify-between gap-2">
-                    <div className="space-y-0.5 min-w-0">
-                      <span className="text-[9.5px] font-semibold uppercase tracking-wider text-fg-subtle block truncate">
-                        Negatives
-                      </span>
-                      <span className="text-sm sm:text-base font-bold font-mono tracking-tight text-fg block">
-                        {item.total_negatives}
-                      </span>
-                    </div>
-                    <XCircle size={12} className="text-rose-500 shrink-0 opacity-70" />
-                  </div>
-
-                  {/* 4. Total Not Hiring Received */}
-                  <div className="p-2 rounded-lg bg-amber-500/5 dark:bg-amber-950/20 border border-amber-500/20 flex items-center justify-between gap-2">
-                    <div className="space-y-0.5 min-w-0">
-                      <span className="text-[9.5px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400 block truncate">
-                        Not Hiring
-                      </span>
-                      <span className="text-sm sm:text-base font-bold font-mono tracking-tight text-amber-600 dark:text-amber-400 block">
-                        {item.total_not_hiring}
-                      </span>
-                    </div>
-                    <Ban size={12} className="text-amber-600 dark:text-amber-400 shrink-0 opacity-80" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+                      onFocus={(e) => onTip(e, tipLines)}
+                      onBlur={onHideTip}
+                    />
+                  );
+                })}
+              </React.Fragment>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

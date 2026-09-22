@@ -45,7 +45,16 @@ export function getReportExportBaseFileName(report: any): string {
   return `${collegePart}-${titlePart}-${dateStr}`;
 }
 
-export async function generateReportCanvas(report: any): Promise<HTMLCanvasElement | null> {
+export type ImageExportSize = 'auto' | 'a4' | 'compact' | 'square';
+
+export interface ReportCanvasOptions {
+  size?: ImageExportSize;
+}
+
+export async function generateReportCanvas(
+  report: any,
+  options?: ReportCanvasOptions
+): Promise<HTMLCanvasElement | null> {
   if (!report) return null;
 
   const collegeName = report.branding?.college_name || 'Consolidated Partner Institutions';
@@ -1370,66 +1379,77 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
   }
 
   // 6. Daily Positives & Daily JD Received Sections
+  let singleHeroLead: any = null;
   if (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') {
     const isPos = report.template_type === 'daily_positives';
     const leads = (isPos ? report.sections?.daily_positives : report.sections?.daily_jd_received) || [];
-    const headers = ['#', 'Company Name', 'Role / Designation', 'CTC', 'Time', 'College', 'Coordinator'];
-    // Total content width: 800px (34 + 210 + 175 + 85 + 75 + 80 + 141 = 800)
-    const colWidths = [34, 210, 175, 85, 75, 80, 141];
-    const rawRows = leads.map((r: any, idx: number) => [
-      String(r.s_no || idx + 1),
-      String(r.company_name || '—'),
-      String(r.role || r.job_role || '—'),
-      String(r.ctc || '—'),
-      String(r.time || r.time_stamp || r.event_time || '—'),
-      String(r.college_code || '—'),
-      String(r.coordinator || 'Placement Team'),
-    ]);
+    
+    if (leads.length === 1) {
+      // Single Lead Spotlight Hero Card
+      singleHeroLead = {
+        ...leads[0],
+        isPos,
+      };
+      totalH += 278 + 20;
+    } else {
+      const headers = ['#', 'Company Name', 'Role / Designation', 'CTC', 'Time', 'College', 'Coordinator'];
+      // Total content width: 800px (34 + 210 + 175 + 85 + 75 + 80 + 141 = 800)
+      const colWidths = [34, 210, 175, 85, 75, 80, 141];
+      const rawRows = leads.map((r: any, idx: number) => [
+        String(r.s_no || idx + 1),
+        String(r.company_name || '—'),
+        String(r.role || r.job_role || '—'),
+        String(r.ctc || '—'),
+        String(r.time || r.time_stamp || r.event_time || '—'),
+        String(r.college_code || '—'),
+        String(r.coordinator || 'Placement Team'),
+      ]);
 
-    const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
-      let maxLines = 1;
-      const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
-        const colW = colWidths[cIdx];
-        const maxCellW = colW - 10;
-        const font = cIdx === 1
-          ? 'bold 11.5px system-ui, -apple-system, sans-serif'
-          : (cIdx === 0 || cIdx === 4 || cIdx === 5)
-          ? '600 10.5px monospace'
-          : (cIdx === 3)
-          ? 'bold 11px system-ui, -apple-system, sans-serif'
-          : (cIdx === 6)
-          ? '600 11px system-ui, -apple-system, sans-serif'
-          : '500 11px system-ui, -apple-system, sans-serif';
-        const fillStyle = cIdx === 1
-          ? '#0a2540'
-          : cIdx === 0
-          ? (isPos ? '#059669' : '#2563eb')
-          : (cIdx === 5)
-          ? (isPos ? '#047857' : '#1d4ed8')
-          : (cIdx === 3)
-          ? (isPos ? '#059669' : '#2563eb')
-          : (cIdx === 6)
-          ? '#1e293b'
-          : '#334155';
+      const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
+        let maxLines = 1;
+        const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
+          const colW = colWidths[cIdx];
+          const maxCellW = colW - 10;
+          const font = cIdx === 1
+            ? 'bold 11.5px system-ui, -apple-system, sans-serif'
+            : (cIdx === 0 || cIdx === 4 || cIdx === 5)
+            ? '600 10.5px monospace'
+            : (cIdx === 3)
+            ? 'bold 11px system-ui, -apple-system, sans-serif'
+            : (cIdx === 6)
+            ? '600 11px system-ui, -apple-system, sans-serif'
+            : '500 11px system-ui, -apple-system, sans-serif';
+          const fillStyle = cIdx === 1
+            ? '#0a2540'
+            : cIdx === 0
+            ? (isPos ? '#059669' : '#2563eb')
+            : (cIdx === 5)
+            ? (isPos ? '#047857' : '#1d4ed8')
+            : (cIdx === 3)
+            ? (isPos ? '#059669' : '#2563eb')
+            : (cIdx === 6)
+            ? '#1e293b'
+            : '#334155';
 
-        const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
-        if (lines.length > maxLines) maxLines = lines.length;
-        return { lines, font, fillStyle };
+          const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
+          if (lines.length > maxLines) maxLines = lines.length;
+          return { lines, font, fillStyle };
+        });
+        const height = Math.max(34, maxLines * 15 + 14);
+        return { cells, height };
       });
-      const height = Math.max(34, maxLines * 15 + 14);
-      return { cells, height };
-    });
 
-    sectionsToDraw.push({
-      title: '',
-      badge: `${leads.length} Leads`,
-      accentBg: isPos ? '#ecfdf5' : '#eff6ff',
-      accentBorder: isPos ? '#a7f3d0' : '#bfdbfe',
-      accentText: '#0a2540',
-      headers,
-      colWidths,
-      measuredRows,
-    });
+      sectionsToDraw.push({
+        title: '',
+        badge: `${leads.length} Leads`,
+        accentBg: isPos ? '#ecfdf5' : '#eff6ff',
+        accentBorder: isPos ? '#a7f3d0' : '#bfdbfe',
+        accentText: '#0a2540',
+        headers,
+        colWidths,
+        measuredRows,
+      });
+    }
   }
 
   // Calculate total sections height
@@ -1476,10 +1496,34 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
 
   totalH += PADDING; // Bottom padding
 
-  // Create High-Res Canvas
+  // Size Switcher Calculations (Auto, A4 Sheet, WhatsApp Card / Compact, Square 1:1)
+  const exportSize: ImageExportSize = options?.size || 'auto';
+  const A4_PAGE_H = Math.round(W * (297 / 210)); // 1216px
+  let finalCanvasH: number;
+
+  if (exportSize === 'a4') {
+    const totalPages = Math.max(1, Math.ceil(totalH / A4_PAGE_H));
+    finalCanvasH = totalPages * A4_PAGE_H;
+  } else if (exportSize === 'square') {
+    finalCanvasH = Math.max(W, totalH);
+  } else if (exportSize === 'compact') {
+    finalCanvasH = totalH;
+  } else {
+    // 'auto' mode:
+    // If single company / compact report, fit canvas to content (ideal for WhatsApp / mobile)
+    // If larger multi-page report, enforce standard A4 sheet dimensions
+    if (singleHeroLead || totalH <= 750) {
+      finalCanvasH = totalH;
+    } else {
+      const totalPages = Math.max(1, Math.ceil(totalH / A4_PAGE_H));
+      finalCanvasH = totalPages * A4_PAGE_H;
+    }
+  }
+
+  // Create High-Res Canvas maintaining full A4 sheet dimensions
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(W * SCALE);
-  canvas.height = Math.round(totalH * SCALE);
+  canvas.height = Math.round(finalCanvasH * SCALE);
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
 
@@ -1522,7 +1566,7 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
 
   // Background
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, W, totalH);
+  ctx.fillRect(0, 0, W, finalCanvasH);
 
   let currentY = PADDING;
 
@@ -1608,8 +1652,7 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
   if (report.template_type === 'weekly_placement' && cleanPeriod) {
     metaText = `Period: ${cleanPeriod}         Generated On: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
   } else if (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') {
-    const reportDate = report.report_period || (report as any).day_date || report.kpi_summary?.report_date || report.generated_date;
-    metaText = `Report Date: ${reportDate}         Generated On: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
+    metaText = `Generated On: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
   } else {
     metaText = `Generated On: ${report.generated_date || new Date().toLocaleDateString('en-IN')}`;
   }
@@ -1780,6 +1823,135 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
     currentY += 22;
   });
 
+  // ── Render Spotlight Hero Card for Single Company Placement / JD ──────────
+  if (singleHeroLead) {
+    const isPos = singleHeroLead.isPos;
+    const cardX = PADDING;
+    const cardY = currentY;
+    const cardW = CONTENT_W;
+    const cardH = 278;
+
+    // ── Card Outer Shell: white bg, rounded 16px, blue border ────────────────
+    drawRoundRect(cardX, cardY, cardW, cardH, 16, '#ffffff', isPos ? '#93c5fd' : '#93c5fd', 1.5);
+
+    // ── TOP STRIP: Badge pill (left) + Time chip (right) ─────────────────────
+    const badgeLabel = isPos ? '✦ NEW PLACEMENT' : '✦ NEW JD ANNOUNCEMENT';
+    const badgeW = ctx.measureText(badgeLabel).width + 32;
+    const badgeH = 26;
+    const badgePillY = cardY + 18;
+
+    drawRoundRect(cardX + 22, badgePillY, badgeW, badgeH, 13,
+      isPos ? '#dcfce7' : '#dbeafe',
+      isPos ? '#86efac' : '#93c5fd', 1);
+    ctx.font = 'bold 10.5px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = isPos ? '#15803d' : '#1d4ed8';
+    ctx.textAlign = 'center';
+    ctx.fillText(badgeLabel, cardX + 22 + badgeW / 2, badgePillY + 17);
+
+    // Time chip (right side)
+    const timeVal = singleHeroLead.time || singleHeroLead.time_stamp || singleHeroLead.event_time || '';
+    if (timeVal) {
+      const timeW = ctx.measureText(timeVal).width + 20;
+      const timeH = 24;
+      const timeX = cardX + cardW - 22 - timeW;
+      drawRoundRect(timeX, badgePillY + 1, timeW, timeH, 8,
+        '#f8fafc', '#cbd5e1', 1);
+      ctx.font = '600 10.5px monospace';
+      ctx.fillStyle = '#475569';
+      ctx.textAlign = 'center';
+      ctx.fillText(timeVal, timeX + timeW / 2, badgePillY + 14);
+    }
+
+    // ── COMPANY NAME ─────────────────────────────────────────────────────────
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 26px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(singleHeroLead.company_name || '—', cardX + 22, cardY + 80);
+
+    // ── ROW 1: Role box (left 58%) + CTC box (right 40%) ─────────────────────
+    const gapBetween = 14;
+    const col1W = Math.round(cardW * 0.57) - 22;
+    const col2W = cardW - 44 - col1W - gapBetween;
+    const row1Y = cardY + 100;
+    const row1H = 80;
+
+    // Role box – white with grey border
+    drawRoundRect(cardX + 22, row1Y, col1W, row1H, 10, '#ffffff', '#e2e8f0', 1);
+
+    ctx.font = '600 9.5px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#94a3b8';
+    ctx.textAlign = 'left';
+    ctx.fillText('  JOB ROLE / DESIGNATION', cardX + 30, row1Y + 22);
+
+    ctx.font = 'bold 16px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#0f172a';
+    ctx.fillText(singleHeroLead.role || singleHeroLead.job_role || '—', cardX + 30, row1Y + 56);
+
+    // CTC box – light-blue bg, stronger blue border
+    drawRoundRect(cardX + 22 + col1W + gapBetween, row1Y, col2W, row1H, 10,
+      isPos ? '#f0fdf4' : '#eff6ff',
+      isPos ? '#34d399' : '#60a5fa', 1.5);
+
+    ctx.font = '700 9.5px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = isPos ? '#047857' : '#1e40af';
+    ctx.textAlign = 'left';
+    ctx.fillText('⚡ OFFERED PACKAGE (CTC)', cardX + 22 + col1W + gapBetween + 14, row1Y + 22);
+
+    ctx.font = 'bold 24px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = isPos ? '#059669' : '#2563eb';
+    ctx.fillText(singleHeroLead.ctc || '—', cardX + 22 + col1W + gapBetween + 14, row1Y + 60);
+
+    // ── FOOTER BAR: College chip (left) + Coordinator (right) ────────────────
+    const footerBarY = row1Y + row1H + 14;
+    const footerBarH = 40;
+    drawRoundRect(cardX + 22, footerBarY, cardW - 44, footerBarH, 10, '#f8fafc', '#e2e8f0', 1);
+
+    // College chip
+    const collegeVal = singleHeroLead.college_code || singleHeroLead.college_name || '—';
+    ctx.font = '600 11px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#64748b';
+    ctx.textAlign = 'left';
+    ctx.fillText('⊞ Target Colleges:', cardX + 34, footerBarY + 25);
+
+    const collegeLabelW = ctx.measureText('⊞ Target Colleges:').width + 10;
+    const chipW = ctx.measureText(collegeVal).width + 18;
+    const chipH = 22;
+    const chipY = footerBarY + (footerBarH - chipH) / 2;
+    const chipX = cardX + 34 + collegeLabelW;
+    drawRoundRect(chipX, chipY, chipW, chipH, 11,
+      isPos ? '#dcfce7' : '#dbeafe',
+      isPos ? '#86efac' : '#93c5fd', 1);
+    ctx.font = 'bold 10.5px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = isPos ? '#15803d' : '#1d4ed8';
+    ctx.textAlign = 'center';
+    ctx.fillText(collegeVal, chipX + chipW / 2, chipY + 15);
+
+    // Coordinator (right side of footer bar)
+    const coordVal = singleHeroLead.coordinator || 'Placement Team';
+    const labelText = '👤 Coordinator : ';
+
+    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+    const nameWidth = ctx.measureText(coordVal).width;
+
+    ctx.font = '600 11px system-ui, -apple-system, sans-serif';
+    const labelWidth = ctx.measureText(labelText).width;
+
+    const rightPadding = 34;
+    const nameX = cardX + cardW - rightPadding - nameWidth;
+    const labelX = nameX - labelWidth;
+
+    ctx.fillStyle = '#64748b';
+    ctx.textAlign = 'left';
+    ctx.fillText(labelText, labelX, footerBarY + 25);
+
+    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#0f172a';
+    ctx.textAlign = 'left';
+    ctx.fillText(coordVal, nameX, footerBarY + 25);
+
+    currentY += cardH + 20;
+  }
+
   // Observations Box
   if (hasObservations) {
     drawRoundRect(PADDING, currentY, CONTENT_W, obsBoxH, 6, '#f8fafc', '#e2e8f0', 1);
@@ -1800,32 +1972,33 @@ export async function generateReportCanvas(report: any): Promise<HTMLCanvasEleme
 
   // Footer
   if (hasFooter) {
+    const footerY = Math.max(currentY + 20, finalCanvasH - PADDING - 24);
     ctx.strokeStyle = '#e2e8f0';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(PADDING, currentY);
-    ctx.lineTo(W - PADDING, currentY);
+    ctx.moveTo(PADDING, footerY);
+    ctx.lineTo(W - PADDING, footerY);
     ctx.stroke();
 
-    currentY += 22;
+    const footerTextY = footerY + 20;
     ctx.fillStyle = '#64748b';
     ctx.font = '500 11.5px system-ui, -apple-system, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText('© 2026 Infoziant. All rights reserved.', PADDING, currentY);
+    ctx.fillText('© 2026 Infoziant. All rights reserved.', PADDING, footerTextY);
 
     if (Boolean(report.generated_by || report.branding?.prepared_by)) {
       ctx.textAlign = 'right';
       ctx.fillStyle = '#0f172a';
       ctx.font = 'bold 11.5px system-ui, -apple-system, sans-serif';
-      ctx.fillText(`Prepared by: ${report.generated_by || report.branding?.prepared_by}`, W - PADDING, currentY);
+      ctx.fillText(`Prepared by: ${report.generated_by || report.branding?.prepared_by}`, W - PADDING, footerTextY);
     }
   }
 
   return canvas;
 }
 
-export async function exportReportAsImage(report: any): Promise<void> {
-  const canvas = await generateReportCanvas(report);
+export async function exportReportAsImage(report: any, options?: ReportCanvasOptions): Promise<void> {
+  const canvas = await generateReportCanvas(report, options);
   if (!canvas) return;
 
   const fileName = getReportExportBaseFileName(report);

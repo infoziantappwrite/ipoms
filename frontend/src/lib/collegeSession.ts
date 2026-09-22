@@ -80,33 +80,44 @@ export const DEFAULT_OFFICIAL_ALLOCATIONS: Record<string, string[]> = {
   'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
   'mohana': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
   'mohanaradha': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
+  'a.mohanaradha': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
+  'mohanaradha a': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
 
   // Thirisha: PSNA, DSU, SMVEC
   'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
   'thirisha': ['PSNA', 'DSU', 'SMVEC'],
+  'thirisha r': ['PSNA', 'DSU', 'SMVEC'],
 
   // Malvika: KLU, NGCE
   'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],
   'malavika': ['KLU', 'NGCE'],
   'malvika': ['KLU', 'NGCE'],
+  'malavika ramesh': ['KLU', 'NGCE'],
 
   // Lizenya: NPR, KIOT, ACEW
   'lizenya_r@infoziant.com': ['NPR', 'KIOT', 'ACEW'],
   'lizenya': ['NPR', 'KIOT', 'ACEW'],
+  'lizenya r': ['NPR', 'KIOT', 'ACEW'],
 
   // Megala: NGP, KAMARAJ
   'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ'],
   'megala': ['NGP', 'KAMARAJ'],
   'megaladevi': ['NGP', 'KAMARAJ'],
+  'megaladevi p s': ['NGP', 'KAMARAJ'],
+  'megaladevi ps': ['NGP', 'KAMARAJ'],
 
-  // Tamil: MCET, MEC
+  // Tamil / Seshmitha: MCET, MEC
   'seshmitha_tamil@icl.today': ['MCET', 'MEC'],
   'tamil': ['MCET', 'MEC'],
   'seshmitha': ['MCET', 'MEC'],
+  'tamilselvi': ['MCET', 'MEC'],
+  'seshmitha tamilselvi': ['MCET', 'MEC'],
+  'seshmitha tamilselvi r': ['MCET', 'MEC'],
 
   // Sujitha (Team Leader): NEHRU, MAREPHRA, KPR, HITS, SONA
   'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
   'sujitha': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
+  'sujitha s': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
 };
 
 /** Resolves default official college IDs for the current user */
@@ -116,11 +127,16 @@ export function getDefaultOfficialCollegeIdsForUser(user?: any): string[] {
 
   const email = (sessionUser.official_email || sessionUser.email || '').toLowerCase().trim();
   const username = (sessionUser.username || '').toLowerCase().trim();
+  const fullName = (sessionUser.full_name || '').toLowerCase().trim();
 
-  let codes = DEFAULT_OFFICIAL_ALLOCATIONS[email] || DEFAULT_OFFICIAL_ALLOCATIONS[username];
+  let codes = DEFAULT_OFFICIAL_ALLOCATIONS[email] || DEFAULT_OFFICIAL_ALLOCATIONS[username] || DEFAULT_OFFICIAL_ALLOCATIONS[fullName];
   if (!codes) {
     for (const [key, val] of Object.entries(DEFAULT_OFFICIAL_ALLOCATIONS)) {
-      if ((email && email.includes(key)) || (username && username.includes(key))) {
+      if (
+        (email && email.includes(key)) ||
+        (username && username.includes(key)) ||
+        (fullName && (fullName.includes(key) || key.includes(fullName)))
+      ) {
         codes = val;
         break;
       }
@@ -572,6 +588,26 @@ export function unlockDailyFocus(): void {
   } catch {}
 }
 
+/** Purges all active college and focus selections from browser storage on logout or user switch */
+export function clearAllCollegeSessionState(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(ACTIVE_COLLEGE_ID_KEY);
+    localStorage.removeItem(ACTIVE_COLLEGE_NAME_KEY);
+    localStorage.removeItem(ACTIVE_COLLEGE_OBJ_KEY);
+    localStorage.removeItem(COORDINATOR_SELECTED_COLLEGES_KEY);
+    localStorage.removeItem(COORDINATOR_FOCUS_DATE_KEY);
+    localStorage.removeItem(COORDINATOR_FOCUS_WEEK_KEY);
+    localStorage.removeItem(COORDINATOR_FOCUS_LOCKED_KEY);
+    sessionStorage.removeItem(ACTIVE_COLLEGE_ID_KEY);
+    sessionStorage.removeItem(ACTIVE_COLLEGE_NAME_KEY);
+    sessionStorage.removeItem(ACTIVE_COLLEGE_OBJ_KEY);
+
+    window.dispatchEvent(new CustomEvent('ipoms_college_change', { detail: { id: '', name: '', obj: null } }));
+    window.dispatchEvent(new CustomEvent('ipoms_focus_updated', { detail: { selectedIds: [], isLocked: false } }));
+  } catch {}
+}
+
 /** Preserves weekly focus on login if already locked for current week */
 export function clearDailyFocusOnLogin(): void {
   if (typeof window === 'undefined') return;
@@ -590,22 +626,35 @@ export function clearDailyFocusOnLogin(): void {
 
 export function getCoordinatorSelectedColleges(): string[] {
   if (typeof window === 'undefined') return [];
+  const sessionUser = readSessionUser();
+  const officialDefaults = getDefaultOfficialCollegeIdsForUser(sessionUser);
+
   try {
     const raw = localStorage.getItem(COORDINATOR_SELECTED_COLLEGES_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.slice(0, 5);
+        // If official defaults exist for this specific user, ensure at least one parsed college matches their official roster
+        if (officialDefaults.length > 0) {
+          const isValidForUser = parsed.some((id) =>
+            officialDefaults.includes(String(id)) || officialDefaults.includes(String(id).toUpperCase())
+          );
+          if (isValidForUser) {
+            return parsed.slice(0, 5);
+          }
+        } else {
+          return parsed.slice(0, 5);
+        }
       }
     }
   } catch {}
-  // Default fallback to official allocation for current user if not yet stored
-  const defaults = getDefaultOfficialCollegeIdsForUser();
-  if (defaults.length > 0) {
+
+  // Fallback to official allocation for current user if not yet stored or invalid
+  if (officialDefaults.length > 0) {
     try {
-      localStorage.setItem(COORDINATOR_SELECTED_COLLEGES_KEY, JSON.stringify(defaults));
+      localStorage.setItem(COORDINATOR_SELECTED_COLLEGES_KEY, JSON.stringify(officialDefaults));
     } catch {}
-    return defaults;
+    return officialDefaults;
   }
   return [];
 }

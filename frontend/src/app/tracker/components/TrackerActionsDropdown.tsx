@@ -33,6 +33,7 @@ interface Props {
   onCopyEntireRows: () => void;
   onFilterOutcome?: (outcome: CallOutcome | 'all') => void;
   onOpenSummary?: () => void;
+  onPasteFromExcel?: () => void;
 }
 
 export function TrackerActionsDropdown({
@@ -50,6 +51,7 @@ export function TrackerActionsDropdown({
   onCopyEntireRows,
   onFilterOutcome,
   onOpenSummary,
+  onPasteFromExcel,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeSubmenu, setActiveSubmenu] = useState<'copy' | null>(null);
@@ -152,6 +154,25 @@ export function TrackerActionsDropdown({
                   Shift+L
                 </kbd>
               </button>
+
+              {/* Paste from Excel / Sheets */}
+              {onPasteFromExcel && (
+                <button
+                  type="button"
+                  onClick={() => executeAction(onPasteFromExcel)}
+                  className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold rounded-lg text-fg hover:bg-emerald-500/10 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-md bg-emerald-500/10 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+                      <FileSpreadsheet size={12} strokeWidth={2.5} />
+                    </div>
+                    <span>Paste</span>
+                  </div>
+                  <kbd className="text-[9px] font-mono text-fg-subtle bg-surface-sunken border border-border px-1 py-0.2 rounded">
+                    Ctrl+V
+                  </kbd>
+                </button>
+              )}
 
               {/* Save Progress */}
               <button

@@ -6,6 +6,8 @@ import { LogOut } from 'lucide-react';
 import { readSessionUser, type SessionUser } from '@/lib/session';
 import { apiFetch } from '@/lib/api';
 
+import { clearAllCollegeSessionState } from '@/lib/collegeSession';
+
 interface Props {
   className?: string;
 }
@@ -23,8 +25,14 @@ export function UserSignOutButton({ className = '' }: Props) {
     if (isSigningOut) return;
     setIsSigningOut(true);
 
+    const currentUser = user || readSessionUser();
+    const uid = currentUser?._id || currentUser?.id;
+
     try {
-      await apiFetch('/auth/logout', { method: 'POST' });
+      await apiFetch('/auth/logout', {
+        method: 'POST',
+        body: JSON.stringify({ user_id: uid }),
+      });
     } catch {
       /* network error — proceed with local sign-out anyway */
     }
@@ -36,10 +44,13 @@ export function UserSignOutButton({ className = '' }: Props) {
         localStorage.removeItem('ipoms_nav_collapsed');
         sessionStorage.removeItem('ipoms_nav_intro');
         sessionStorage.removeItem('ipoms_splash_seen');
+        sessionStorage.removeItem('ipoms_login_time');
       }
     } catch {
       /* storage error ignore */
     }
+
+    clearAllCollegeSessionState();
 
     // Smooth redirect to login
     router.push('/login');
