@@ -7,6 +7,7 @@ import { MetadataTable } from './components/MetadataTable';
 import { ContactEditModal } from './components/ContactEditModal';
 import { DuplicateWarningModal } from './components/DuplicateWarningModal';
 import { BulkPasteModal } from './components/BulkPasteModal';
+import { ConfirmModal } from './components/ConfirmModal';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { exportToXlsx } from '@/lib/exportExcel';
@@ -39,6 +40,23 @@ export default function MetadataPage() {
   const [isExactDuplicate, setIsExactDuplicate] = useState<boolean>(false);
 
   const [showBulkPasteModal, setShowBulkPasteModal] = useState<boolean>(false);
+  const [showEmptyRecycleBinModal, setShowEmptyRecycleBinModal] = useState<boolean>(false);
+  const [isEmptyingRecycleBin, setIsEmptyingRecycleBin] = useState<boolean>(false);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState<boolean>(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState<boolean>(false);
+  const [isSelectionMode, setIsSelectionMode] = useState<boolean>(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [singleActionModalConfig, setSingleActionModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
   const [isExporting, setIsExporting] = useState<boolean>(false);
   const [returnTo, setReturnTo] = useState<string | null>(null);
   const [highlightIds, setHighlightIds] = useState<string[]>([]);
@@ -86,7 +104,7 @@ export default function MetadataPage() {
                 if (exact) {
                   setEditingData({
                     ...exact,
-                    company_type: typeParam || exact.company_type || 'IT / Software & Technology',
+                    company_type: typeParam || exact.company_type || '',
                     hr_name: hrNameParam || (exact.hr_name !== 'HR Contact' ? exact.hr_name : '') || '',
                     primary_mobile: mobileParam || exact.primary_mobile || '',
                     primary_email: emailParam || exact.primary_email || '',
@@ -98,7 +116,7 @@ export default function MetadataPage() {
               // Fallback: new contact
               setEditingData({
                 company_name: companyNameParam || '',
-                company_type: typeParam || 'IT / Software & Technology',
+                company_type: typeParam || '',
                 hr_name: hrNameParam || '',
                 primary_mobile: mobileParam || '',
                 primary_email: emailParam || '',
@@ -144,6 +162,9 @@ export default function MetadataPage() {
         setCompanies(res.data.companies || []);
         setTotalCount(res.data.total || 0);
         setTotalPages(res.data.totalPages || 1);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('ipoms_metadata_updated'));
+        }
       } else {
         setCompanies([]);
       }
@@ -204,6 +225,26 @@ export default function MetadataPage() {
     };
   }, [loadMetadata]);
 
+  // Handle Escape Key: Closes active modal first; pressing Escape again exits selection mode & clears checkmarks
+  useEffect(() => {
+    const handleEscapeKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (singleActionModalConfig.isOpen) {
+          setSingleActionModalConfig((prev) => ({ ...prev, isOpen: false }));
+        } else if (showBulkDeleteModal) {
+          setShowBulkDeleteModal(false);
+        } else if (showEmptyRecycleBinModal) {
+          setShowEmptyRecycleBinModal(false);
+        } else if (isSelectionMode) {
+          setIsSelectionMode(false);
+          setSelectedIds([]);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleEscapeKey);
+    return () => window.removeEventListener('keydown', handleEscapeKey);
+  }, [singleActionModalConfig.isOpen, showBulkDeleteModal, showEmptyRecycleBinModal, isSelectionMode]);
+
   // Reset page to 1 on filter/search change
   const handleSearchChange = (q: string) => {
     setSearchQuery(q);
@@ -232,7 +273,57 @@ export default function MetadataPage() {
     setPage(1);
   };
 
-  // Actions
+  const handleToggleSelectRow = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllRows = (selectAll: boolean) => {
+    if (selectAll) {
+      setSelectedIds(companies.map((c) => String(c._id)));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleBulkDeleteSelected = () => {
+    if (selectedIds.length === 0) return;
+    if (!canDelete) {
+      alert('Access Denied: Only authorized coordinators can delete records.');
+      return;
+    }
+    setShowBulkDeleteModal(true);
+  };
+
+  const handleConfirmBulkDelete = async () => {
+    setIsBulkDeleting(true);
+    try {
+      if (!isRecycleBin) {
+        const results = await Promise.all(
+          selectedIds.map((id) => apiFetch(`/metadata/${id}`, { method: 'DELETE' }))
+        );
+        const successCount = results.filter((r) => r.success).length;
+        toast?.(`Successfully moved ${successCount} contact(s) to the Recycle Bin.`, 'success');
+      } else {
+        const results = await Promise.all(
+          selectedIds.map((id) => apiFetch(`/metadata/${id}/purge`, { method: 'DELETE' }))
+        );
+        const successCount = results.filter((r) => r.success).length;
+        toast?.(`Permanently purged ${successCount} contact(s) from database.`, 'success');
+      }
+      setSelectedIds([]);
+      setIsSelectionMode(false);
+      setShowBulkDeleteModal(false);
+      loadMetadata();
+    } catch (err) {
+      console.error('Bulk delete operation error:', err);
+      alert('Bulk delete operation failed.');
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   const handleOpenAdd = () => {
     setEditingData(null);
     setShowEditModal(true);
@@ -243,29 +334,38 @@ export default function MetadataPage() {
     setShowEditModal(true);
   };
 
-  const handleDelete = async (id: string, name: string) => {
+  const handleDelete = (id: string, name: string) => {
     if (!canDelete) {
       alert('Access Denied: Only A. Mohanaradha among coordinators has authorization to delete from the Master Metadata Database.');
       return;
     }
-    if (!confirm(`Are you sure you want to move "${name}" to the Recycle Bin?`)) return;
-    try {
-      const res = await apiFetch(`/metadata/${id}`, { method: 'DELETE' });
-      if (res.success) {
-        loadMetadata();
-      } else {
-        alert(res.error?.message || 'Delete failed');
-      }
-    } catch (err) {
-      console.error('Delete metadata error:', err);
-    }
+    setSingleActionModalConfig({
+      isOpen: true,
+      title: 'Move to Recycle Bin',
+      message: `Are you sure you want to move "${name}" to the Recycle Bin? You can restore this record later from the Recycle Bin.`,
+      onConfirm: async () => {
+        try {
+          const res = await apiFetch(`/metadata/${id}`, { method: 'DELETE' });
+          if (res.success) {
+            toast?.(`"${name}" moved to Recycle Bin.`, 'success');
+            loadMetadata();
+          } else {
+            alert(res.error?.message || 'Delete failed');
+          }
+        } catch (err) {
+          console.error('Delete metadata error:', err);
+        } finally {
+          setSingleActionModalConfig((prev) => ({ ...prev, isOpen: false }));
+        }
+      },
+    });
   };
 
   const handleRestore = async (id: string, name: string) => {
     try {
       const res = await apiFetch(`/metadata/${id}/restore`, { method: 'POST' });
       if (res.success) {
-        alert(`"${name}" restored successfully from Recycle Bin!`);
+        toast?.(`"${name}" restored successfully from Recycle Bin!`, 'success');
         loadMetadata();
       } else {
         alert(res.error?.message || 'Restore failed');
@@ -275,21 +375,61 @@ export default function MetadataPage() {
     }
   };
 
-  const handlePurge = async (id: string, name: string) => {
+  const handlePurge = (id: string, name: string) => {
     if (!canDelete) {
       alert('Access Denied: Only A. Mohanaradha among coordinators has authorization to permanently purge records from the Master Metadata Database.');
       return;
     }
-    if (!confirm(`⚠️ PERMANENT PURGE: Are you sure you want to completely delete "${name}" from the database? This cannot be undone.`)) return;
+    setSingleActionModalConfig({
+      isOpen: true,
+      title: 'Confirm Permanent Deletion',
+      message: `This particular data ("${name}") will be deleted permanently and you cannot retain it back from anywhere in your login.`,
+      onConfirm: async () => {
+        try {
+          const res = await apiFetch(`/metadata/${id}/purge`, { method: 'DELETE' });
+          if (res.success) {
+            toast?.(`"${name}" permanently purged from database.`, 'success');
+            loadMetadata();
+          } else {
+            alert(res.error?.message || 'Purge failed');
+          }
+        } catch (err) {
+          console.error('Purge metadata error:', err);
+        } finally {
+          setSingleActionModalConfig((prev) => ({ ...prev, isOpen: false }));
+        }
+      },
+    });
+  };
+
+  const handleEmptyRecycleBin = () => {
+    if (!canDelete) {
+      alert('Access Denied: Only A. Mohanaradha among coordinators has authorization to permanently purge records from the Master Metadata Database.');
+      return;
+    }
+    if (totalCount === 0) {
+      toast?.('Recycle Bin is already empty.', 'info');
+      return;
+    }
+    setShowEmptyRecycleBinModal(true);
+  };
+
+  const handleConfirmEmptyRecycleBin = async () => {
+    setIsEmptyingRecycleBin(true);
     try {
-      const res = await apiFetch(`/metadata/${id}/purge`, { method: 'DELETE' });
+      const res = await apiFetch<any>('/metadata/purge-all', { method: 'DELETE' });
       if (res.success) {
+        toast?.(`Recycle Bin emptied successfully! ${(res as any).deleted_count || totalCount} metadata record(s) permanently cleared.`, 'success');
+        setShowEmptyRecycleBinModal(false);
         loadMetadata();
       } else {
-        alert(res.error?.message || 'Purge failed');
+        alert(res.error?.message || 'Failed to empty Recycle Bin.');
       }
     } catch (err) {
-      console.error('Purge metadata error:', err);
+      console.error('Empty recycle bin error:', err);
+      alert('Failed to empty Recycle Bin.');
+    } finally {
+      setIsEmptyingRecycleBin(false);
     }
   };
 
@@ -436,6 +576,14 @@ export default function MetadataPage() {
         totalPages={totalPages}
         onPageChange={setPage}
         canDelete={canDelete}
+        isSelectionMode={isSelectionMode}
+        selectedCount={selectedIds.length}
+        onToggleSelectionMode={() => {
+          setIsSelectionMode(!isSelectionMode);
+          setSelectedIds([]);
+        }}
+        onBulkDeleteSelected={handleBulkDeleteSelected}
+        onEmptyRecycleBin={handleEmptyRecycleBin}
       />
 
       {/* ── Main Working Table View ───────────────────────────────────────── */}
@@ -501,6 +649,10 @@ export default function MetadataPage() {
             limit={50}
             canDelete={canDelete}
             highlightIds={highlightIds}
+            isSelectionMode={isSelectionMode}
+            selectedIds={selectedIds}
+            onToggleSelectRow={handleToggleSelectRow}
+            onSelectAllRows={handleSelectAllRows}
             onEdit={handleOpenEdit}
             onDelete={handleDelete}
             onRestore={handleRestore}
@@ -538,6 +690,45 @@ export default function MetadataPage() {
           onSuccess={loadMetadata}
         />
       )}
+
+      <ConfirmModal
+        isOpen={showEmptyRecycleBinModal}
+        title="Empty Recycle Bin"
+        message="Are you sure you want to permanently delete all items in the Recycle Bin? This action cannot be undone and these records cannot be retained back from anywhere in your login."
+        confirmLabel="OK"
+        cancelLabel="Cancel"
+        isDanger={true}
+        loading={isEmptyingRecycleBin}
+        onConfirm={handleConfirmEmptyRecycleBin}
+        onCancel={() => setShowEmptyRecycleBinModal(false)}
+      />
+
+      <ConfirmModal
+        isOpen={showBulkDeleteModal}
+        title={isRecycleBin ? 'Confirm Permanent Deletion' : 'Confirm Multi-Row Deletion'}
+        message={
+          isRecycleBin
+            ? `These ${selectedIds.length} selected data record(s) will be deleted permanently and you cannot retain them back from anywhere in your login.`
+            : `Are you sure you want to move ${selectedIds.length} selected company contact(s) to the Recycle Bin? You can restore these records later.`
+        }
+        confirmLabel="OK"
+        cancelLabel="Cancel"
+        isDanger={true}
+        loading={isBulkDeleting}
+        onConfirm={handleConfirmBulkDelete}
+        onCancel={() => setShowBulkDeleteModal(false)}
+      />
+
+      <ConfirmModal
+        isOpen={singleActionModalConfig.isOpen}
+        title={singleActionModalConfig.title}
+        message={singleActionModalConfig.message}
+        confirmLabel="OK"
+        cancelLabel="Cancel"
+        isDanger={true}
+        onConfirm={singleActionModalConfig.onConfirm}
+        onCancel={() => setSingleActionModalConfig((prev) => ({ ...prev, isOpen: false }))}
+      />
 
     </div>
   );

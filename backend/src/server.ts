@@ -233,6 +233,86 @@ app.get('/api/v1/health', (req: Request, res: Response) => {
   });
 });
 
+// Metadata Contact Audit Endpoint
+app.get('/api/v1/meta-audit', async (req: Request, res: Response) => {
+  try {
+    const allRecords = await CompanyMetadata.find({ is_deleted: { $ne: true } }).lean();
+    const suspiciousRecords: any[] = [];
+
+    for (const c of allRecords) {
+      const issues: string[] = [];
+
+      // 1. Mobile Number Audit
+      const mobs = [...(c.mobile_numbers || [])];
+      if (c.primary_mobile) mobs.push(c.primary_mobile);
+      const invalidMobiles: string[] = [];
+      for (const m of mobs) {
+        if (!m) continue;
+        const clean = m.replace(/[\s\-\(\)\+]/g, '');
+        if (clean.length > 0 && clean.length < 10) {
+          invalidMobiles.push(`${m} (Incomplete < 10 digits)`);
+        } else if (/^(\d)\1{9,}$/.test(clean)) {
+          invalidMobiles.push(`${m} (Repeated digits)`);
+        } else if (['1234567890', '9876543210', '0000000000', '1111111111'].includes(clean)) {
+          invalidMobiles.push(`${m} (Dummy number)`);
+        }
+      }
+      if (invalidMobiles.length > 0) {
+        issues.push(`Invalid/Suspicious Mobile: ${Array.from(new Set(invalidMobiles)).join(', ')}`);
+      }
+
+      // 2. Email ID Audit
+      const emails = [...(c.email_ids || [])];
+      if (c.primary_email) emails.push(c.primary_email);
+      const invalidEmails: string[] = [];
+      for (const e of emails) {
+        if (!e) continue;
+        const trimmed = e.trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+          invalidEmails.push(`${e} (Invalid Email Format)`);
+        } else if (trimmed.includes('test.com') || trimmed.includes('example.com') || trimmed.includes('noemail') || trimmed.includes('abc.com')) {
+          invalidEmails.push(`${e} (Dummy/Placeholder Domain)`);
+        }
+      }
+      if (invalidEmails.length > 0) {
+        issues.push(`Invalid/Suspicious Email: ${Array.from(new Set(invalidEmails)).join(', ')}`);
+      }
+
+      // 3. Complete Contact Information Missing
+      const hasValidMobile = mobs.some(m => m && m.replace(/\D/g, '').length >= 10);
+      const hasValidEmail = emails.some(e => e && e.includes('@') && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim()));
+      if (!hasValidMobile && !hasValidEmail) {
+        issues.push('Missing both valid Mobile Number and valid Email ID');
+      }
+
+      // 4. Missing/Generic HR Name
+      if (!c.hr_name || c.hr_name.trim() === '' || ['hr', 'test', 'unknown', 'na', 'n/a', 'nil'].includes(c.hr_name.trim().toLowerCase())) {
+        issues.push(`Missing/Generic HR Name (${c.hr_name ? `"${c.hr_name}"` : 'Empty'})`);
+      }
+
+      if (issues.length > 0) {
+        suspiciousRecords.push({
+          id: c._id,
+          serial_number: c.serial_number || 'N/A',
+          company_name: c.company_name,
+          hr_name: c.hr_name || 'N/A',
+          primary_mobile: c.primary_mobile || 'N/A',
+          primary_email: c.primary_email || 'N/A',
+          issues
+        });
+      }
+    }
+
+    res.json({
+      total_active_records: allRecords.length,
+      total_suspicious: suspiciousRecords.length,
+      suspicious_records: suspiciousRecords
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 1b. Duplicate Company Audit across Active Leads & Master Sources
 app.get('/health/duplicate-audit', async (req: Request, res: Response) => {
   try {
@@ -1859,7 +1939,7 @@ app.get('/api/v1/coordinators', async (req: Request, res: Response) => {
                 String(col._id) === cd
             )
           )
-        : allColleges.slice(0, 3);
+        : [];
 
       return {
         _id: String(coord._id),
@@ -2324,6 +2404,123 @@ app.post('/api/v1/daily-tracker/check-metadata-batch', async (req: Request, res:
     return res.status(500).json({
       success: false,
       error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to check metadata batch' },
+    });
+  }
+});
+
+// ── DT-BULK-MOVE: POST /api/v1/daily-tracker/bulk-move
+// Bulk move or copy selected daily tracker company call rows to another target college
+app.post('/api/v1/daily-tracker/bulk-move', async (req: Request, res: Response) => {
+  try {
+    const { row_ids, target_college_id, mode = 'move' } = req.body;
+
+    if (!Array.isArray(row_ids) || row_ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'At least one row ID is required to process' },
+      });
+    }
+
+    if (!target_college_id || !Types.ObjectId.isValid(String(target_college_id))) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'Valid Target College ID is required' },
+      });
+    }
+
+    const targetCollege = await College.findById(target_college_id);
+    if (!targetCollege) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'COLLEGE_NOT_FOUND', message: 'Target college not found' },
+      });
+    }
+
+    const objectIds = row_ids.map((id: string) => new Types.ObjectId(String(id)));
+
+    if (mode === 'copy') {
+      let copiedCount = 0;
+      const sourceRows = await DailyTracker.find({ _id: { $in: objectIds }, is_deleted: { $ne: true } });
+      for (const src of sourceRows) {
+        await DailyTracker.create({
+          session_date: src.session_date || new Date(),
+          day: src.day,
+          month: src.month,
+          year: src.year,
+          academic_year: (src as any).academic_year || 2026,
+          college_id: new Types.ObjectId(String(target_college_id)),
+          coordinator_id: src.coordinator_id,
+          company_id: src.company_id || null,
+          company_name: src.company_name,
+          hr_name: src.hr_name || 'HR Contact',
+          mobile_number: src.mobile_number || '',
+          email_id: src.email_id || '',
+          is_contact_added: (src as any).is_contact_added || false,
+          is_skipped: false,
+          is_promoted_to_weekly: false,
+          is_deleted: false,
+          call_start_time: src.call_start_time || null,
+          call_end_time: src.call_end_time || null,
+          duration_seconds: src.duration_seconds || 0,
+          outcome_status: src.outcome_status || null,
+          follow_up_month: src.follow_up_month || null,
+          comments: src.comments || '',
+          created_at: new Date(),
+          updated_at: new Date(),
+        });
+        copiedCount++;
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: `Successfully copied ${copiedCount} company call(s) to ${targetCollege.college_name}`,
+        data: {
+          action: 'copy',
+          processed_count: copiedCount,
+          target_college: {
+            _id: targetCollege._id,
+            college_name: targetCollege.college_name,
+            college_code: targetCollege.college_code,
+          },
+        },
+      });
+    }
+
+    // Default Mode: Move (re-assign college_id)
+    const updateRes = await DailyTracker.updateMany(
+      { _id: { $in: objectIds } },
+      { $set: { college_id: new Types.ObjectId(String(target_college_id)), updated_at: new Date() } }
+    );
+
+    // Also cascade college_id update to any linked DailyLead or WeeklyTracker records
+    await DailyLead.updateMany(
+      { daily_tracker_id: { $in: objectIds } },
+      { $set: { college_id: new Types.ObjectId(String(target_college_id)), updated_at: new Date() } }
+    );
+
+    await WeeklyTracker.updateMany(
+      { daily_tracker_id: { $in: objectIds } },
+      { $set: { college_id: new Types.ObjectId(String(target_college_id)), updated_at: new Date() } }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully moved ${updateRes.modifiedCount} company call(s) to ${targetCollege.college_name}`,
+      data: {
+        action: 'move',
+        processed_count: updateRes.modifiedCount,
+        target_college: {
+          _id: targetCollege._id,
+          college_name: targetCollege.college_name,
+          college_code: targetCollege.college_code,
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('❌ [DailyTracker] Bulk move/copy error:', error);
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to process daily tracker rows' },
     });
   }
 });
@@ -3506,48 +3703,7 @@ const getActiveDaysHandler = async (req: Request, res: Response) => {
       }
     }
 
-    // Fallback to org-wide records for that month if college/coordinator filter had no records
-    if (daysSet.size === 0 && (filter.coordinator_id || filter.college_id)) {
-      const fallbackRecords = await DailyTracker.find({
-        $or: [
-          { session_date: { $gte: startOfMonth, $lte: endOfMonth } },
-          { created_at: { $gte: startOfMonth, $lte: endOfMonth } },
-          { year, month },
-        ],
-      }).select('session_date day created_at year month').lean();
-
-      for (const r of fallbackRecords) {
-        if (typeof r.day === 'number' && r.day >= 1 && r.day <= 31) {
-          if (!r.year || r.year === year) {
-            if (!r.month || r.month === month) {
-              daysSet.add(r.day);
-            }
-          }
-        }
-        if (r.session_date) {
-          const d = new Date(r.session_date);
-          if (!isNaN(d.getTime())) {
-            if (d.getUTCFullYear() === year && (d.getUTCMonth() + 1) === month) {
-              daysSet.add(d.getUTCDate());
-            }
-            const ist = new Date(d.getTime() + IST_OFFSET_MS);
-            if (ist.getUTCFullYear() === year && (ist.getUTCMonth() + 1) === month) {
-              daysSet.add(ist.getUTCDate());
-            }
-          }
-        }
-        if (r.created_at) {
-          const cd = new Date(r.created_at);
-          if (!isNaN(cd.getTime())) {
-            const ist = new Date(cd.getTime() + IST_OFFSET_MS);
-            if (ist.getUTCFullYear() === year && (ist.getUTCMonth() + 1) === month) {
-              daysSet.add(ist.getUTCDate());
-            }
-          }
-        }
-      }
-    }
-
+    // Only include active days matching the specific college / coordinator filter
     return res.status(200).json({
       success: true,
       data: {
@@ -5592,10 +5748,14 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
       await WeeklyTracker.deleteMany({ _id: { $in: dupIdsToDelete } });
     }
 
-    // Daily Leads filter: Positive section leads ONLY (lead_type = 'positive') for these college(s)
+    // Daily Leads filter: Include positive & jd_received leads for current active day only (today)
+    const todayStart = getTodayDate();
+    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+
     const dailyLeadFilter: any = {
       college_id: { $in: allSyncCollegeIds },
-      lead_type: 'positive',
+      lead_type: { $in: ['positive', 'jd_received'] },
+      lead_date: { $gte: todayStart, $lt: todayEnd },
       is_deleted: false,
     };
 
@@ -5656,11 +5816,15 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
       });
 
       if (!existing) {
+        const isJdLead = lead.lead_type === 'jd_received';
+        const targetSection = isJdLead ? 'in_progress' : 'pipeline';
+        const statusText = isJdLead ? 'JD Received' : 'Invite sent, Awaiting JD';
+
         // Find next order_index for this specific college's pipeline section
         const maxPipelineRow = await WeeklyTracker.findOne({
           college_id: lead.college_id,
           academic_year: targetYear,
-          pipeline_section: 'pipeline',
+          pipeline_section: targetSection,
           is_deleted: false,
         }).sort({ order_index: -1 });
 
@@ -5669,7 +5833,7 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
           : (await WeeklyTracker.countDocuments({
               college_id: lead.college_id,
               academic_year: targetYear,
-              pipeline_section: 'pipeline',
+              pipeline_section: targetSection,
               is_deleted: false,
             }));
 
@@ -5716,11 +5880,11 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
           email_id: primaryEmail,
           email_ids: allEmails,
           cdc_reference: dtContact?.hr_name ? `${dtContact.hr_name}${dtContact.mobile_number ? ` (${dtContact.mobile_number})` : ''}` : '',
-          company_type: metaContacts.company_type || 'Software / IT',
+          company_type: metaContacts.company_type || '',
           ctc_lpa: lead.ctc?.trim() || '',
           eligible_batch: lead.eligible_batch?.trim() || `${batchYear} Batch`,
-          pipeline_section: 'pipeline',
-          current_status_text: 'Invite sent, Awaiting JD',
+          pipeline_section: targetSection,
+          current_status_text: statusText,
           follow_up_date: null,
           order_index: nextOrderIndex,
           week_number: weekNumber,
@@ -5754,8 +5918,8 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
     return res.status(200).json({
       success: true,
       message: syncedCount > 0
-        ? `${syncedCount} positive lead(s) from Daily Leads synced into Companies in Pipeline.`
-        : 'All positive leads from Daily Leads are already synchronized into Weekly Tracker.',
+        ? `${syncedCount} lead(s) / JD(s) from Daily Leads synced into Weekly Tracker.`
+        : 'All positive leads & JD Received records are already synchronized into Weekly Tracker.',
       data: { synced: syncedCount },
     });
   } catch (error: any) {
@@ -12401,7 +12565,7 @@ app.post('/api/v1/metadata', async (req: Request, res: Response) => {
       mobile_numbers: allMobiles,
       primary_email: trimmedEmail,
       email_ids: allEmails,
-      company_type: company_type.toLowerCase(),
+      company_type: (company_type || 'IT / Software & Technology').trim(),
       notes: notes.trim(),
       is_deleted: false,
     });
@@ -12455,7 +12619,7 @@ app.patch('/api/v1/metadata/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR
       record.primary_email = primary_email.trim().toLowerCase();
       record.email_ids = Array.from(new Set([record.primary_email, ...(email_ids || record.email_ids)].filter(Boolean)));
     }
-    if (company_type !== undefined) record.company_type = company_type.toLowerCase();
+    if (company_type !== undefined) record.company_type = company_type.trim();
     if (notes !== undefined) record.notes = notes.trim();
 
     await record.save();
@@ -12560,6 +12724,44 @@ app.post('/api/v1/metadata/:id/restore', authenticateJWT, authorizeRoles('ADMINI
     return res.status(500).json({
       success: false,
       error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to restore metadata record' },
+    });
+  }
+});
+
+// ── MD-6A: DELETE /api/v1/metadata/purge-all
+// Empty Recycle Bin: Permanently purge all soft-deleted records from database at once
+app.delete('/api/v1/metadata/purge-all', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER', 'TEAM_LEAD', 'PLACEMENT_COORDINATOR', 'COORDINATOR'), async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const isCoordOnly = user?.roles?.some((r: string) => ['PLACEMENT_COORDINATOR', 'COORDINATOR'].includes(r)) &&
+      !user?.roles?.some((r: string) => ['ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER', 'TEAM_LEAD'].includes(r));
+
+    if (isCoordOnly) {
+      const isMohana =
+        (user?.email || '').toLowerCase().includes('mohanaradha') ||
+        (user?.fullName || '').toLowerCase().includes('mohana');
+      if (!isMohana) {
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Access Denied: Only A. Mohanaradha among coordinators has authorization to permanently purge records from the Master Metadata Database.',
+          },
+        });
+      }
+    }
+
+    const result = await CompanyMetadata.deleteMany({ is_deleted: true });
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully emptied Recycle Bin. ${result.deletedCount} metadata record(s) permanently purged from database.`,
+      deleted_count: result.deletedCount,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to empty recycle bin' },
     });
   }
 });

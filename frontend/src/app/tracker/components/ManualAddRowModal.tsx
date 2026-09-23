@@ -141,30 +141,29 @@ export function ManualAddRowModal({
   // Fetch live total count of companies in Meta Database on mount & sync on events
   useEffect(() => {
     let isMounted = true;
-    apiFetch<any>('/companies/search?limit=1')
-      .then((res) => {
-        if (isMounted && res.success && typeof res.data?.pagination?.total === 'number') {
-          setTotalMetaCount(res.data.pagination.total);
+    const fetchMetaCount = async () => {
+      try {
+        const res = await apiFetch<any>('/metadata?limit=1');
+        if (isMounted && res.success) {
+          const count = res.data?.total ?? res.data?.pagination?.total ?? null;
+          if (count !== null) setTotalMetaCount(count);
         }
-      })
-      .catch((err) => console.error('Failed to fetch meta directory total count:', err));
-
-    const handleSync = () => {
-      apiFetch<any>('/companies/search?limit=1')
-        .then((res) => {
-          if (isMounted && res.success && typeof res.data?.pagination?.total === 'number') {
-            setTotalMetaCount(res.data.pagination.total);
-          }
-        })
-        .catch(() => {});
+      } catch (err) {
+        console.error('Failed to fetch meta directory total count:', err);
+      }
     };
-    window.addEventListener('storage', handleSync);
-    window.addEventListener('ipoms_metadata_updated', handleSync);
+
+    fetchMetaCount();
+
+    window.addEventListener('storage', fetchMetaCount);
+    window.addEventListener('ipoms_metadata_updated', fetchMetaCount);
+    window.addEventListener('focus', fetchMetaCount);
 
     return () => {
       isMounted = false;
-      window.removeEventListener('storage', handleSync);
-      window.removeEventListener('ipoms_metadata_updated', handleSync);
+      window.removeEventListener('storage', fetchMetaCount);
+      window.removeEventListener('ipoms_metadata_updated', fetchMetaCount);
+      window.removeEventListener('focus', fetchMetaCount);
     };
   }, []);
 

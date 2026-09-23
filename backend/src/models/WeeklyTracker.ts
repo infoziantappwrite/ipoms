@@ -161,7 +161,7 @@ const WeeklyTrackerSchema: Schema<IWeeklyTracker> = new Schema(
     company_type: {
       type: String,
       trim: true,
-      default: 'Software / IT',
+      default: '',
     },
     ctc_lpa: {
       type: String,

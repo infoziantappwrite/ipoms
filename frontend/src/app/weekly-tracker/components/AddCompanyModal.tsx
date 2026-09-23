@@ -52,7 +52,7 @@ export function AddCompanyModal({
   const [jdReceivedDate, setJdReceivedDate] = useState(initialDraft?.jdReceivedDate || '');
   const [dbSharedDate, setDbSharedDate] = useState(initialDraft?.dbSharedDate || '');
   const [jobRole, setJobRole] = useState(initialDraft?.jobRole || 'Graduate Trainee');
-  const [companyType, setCompanyType] = useState(initialDraft?.companyType || 'IT / Software & Technology');
+  const [companyType, setCompanyType] = useState(initialDraft?.companyType || '');
   const [ctcValue, setCtcValue] = useState(initialDraft?.ctcValue || '');
   const [ctcUnit, setCtcUnit] = useState<'LPA' | '/ Month'>(initialDraft?.ctcUnit || 'LPA');
   const [eligibleBatch, setEligibleBatch] = useState(initialDraft?.eligibleBatch || '2027');
@@ -478,8 +478,11 @@ export function AddCompanyModal({
                 value={companyType}
                 onChange={setCompanyType}
                 icon={Briefcase}
+                placeholder="Select Company Type"
                 title="Company Industry Type"
                 options={COMPANY_TYPES.map((t) => ({ value: t, label: t }))}
+                searchable={true}
+                searchPlaceholder="Search company type..."
               />
             </div>
 

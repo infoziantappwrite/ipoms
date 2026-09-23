@@ -137,33 +137,39 @@ export function CollegeActivityTodayWidget({ rows = [], onRefresh }: Props) {
       ) : (
         <>
           <div className="space-y-2">
-            {rows.map((r) => {
-              const val = metric === 'calls' ? r.calls : r.duration_seconds;
-              const pct = Math.max(4, Math.round((val / maxVal) * 100));
-              const displayCode = r.college_code === 'MAREPHRA' ? 'MAREPHRAM' : (r.college_code || '');
-              return (
-                <div key={r.college_id} className="flex items-center gap-3">
-                  <span className="w-24 sm:w-28 shrink-0 text-right font-mono text-xs font-bold text-primary whitespace-nowrap" title={r.college_name}>
-                    {displayCode}
-                  </span>
-                  <div className="flex-1 min-w-0 h-[30px] rounded-lg bg-surface-sunken overflow-hidden">
-                    <div
-                      className="ipoms-cat-bar h-full rounded-lg flex items-center justify-end px-2.5"
-                      style={{ width: `${pct}%` }}
-                    >
-                      {pct >= 18 && (
-                        <span className="text-[11px] font-bold text-white tabular-nums whitespace-nowrap">
-                          {metric === 'calls' ? `${r.calls} calls` : r.duration_formatted}
-                        </span>
-                      )}
+            {[...rows]
+              .sort((a, b) =>
+                metric === 'calls'
+                  ? b.calls - a.calls || b.duration_seconds - a.duration_seconds
+                  : b.duration_seconds - a.duration_seconds || b.calls - a.calls
+              )
+              .map((r) => {
+                const val = metric === 'calls' ? r.calls : r.duration_seconds;
+                const pct = Math.max(8, Math.round((val / maxVal) * 100));
+                const displayCode = r.college_code === 'MAREPHRA' ? 'MAREPHRAM' : (r.college_code || '');
+                return (
+                  <div key={r.college_id} className="flex items-center gap-3">
+                    <span className="w-24 sm:w-28 shrink-0 text-right font-mono text-xs font-bold text-primary whitespace-nowrap" title={r.college_name}>
+                      {displayCode}
+                    </span>
+                    <div className="flex-1 min-w-0 h-[30px] rounded-lg bg-surface-sunken overflow-hidden">
+                      <div
+                        className="ipoms-cat-bar h-full rounded-lg flex items-center justify-end px-2.5"
+                        style={{ width: `${pct}%` }}
+                      >
+                        {pct >= 12 && (
+                          <span className="text-[11px] font-bold text-white tabular-nums whitespace-nowrap">
+                            {metric === 'calls' ? `${r.calls} calls` : r.duration_formatted}
+                          </span>
+                        )}
+                      </div>
                     </div>
+                    <span className="w-24 shrink-0 text-xs font-semibold text-fg-subtle tabular-nums">
+                      {pct < 12 ? (metric === 'calls' ? `${r.calls} calls` : r.duration_formatted) : ''}
+                    </span>
                   </div>
-                  <span className="w-24 shrink-0 text-xs font-semibold text-fg-subtle tabular-nums">
-                    {pct < 18 ? (metric === 'calls' ? `${r.calls} calls` : r.duration_formatted) : ''}
-                  </span>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
 
           <div className="mt-4 pt-3 border-t border-border flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-fg-subtle">

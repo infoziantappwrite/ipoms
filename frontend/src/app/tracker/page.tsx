@@ -10,7 +10,7 @@ import { SoftphonePanel, SoftphoneCallResult } from './components/SoftphonePanel
 import { SmoothOutcomeDropdown } from '@/components/ui/SmoothOutcomeDropdown';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { AutoSaveBadge } from '@/components/ui/AutoSaveBadge';
-import { AlertTriangle, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Cloud, FileSpreadsheet, Loader2, PhoneCall, Plus, Save, Search, Trash2, Upload, User, Users } from 'lucide-react';
+import { AlertTriangle, ArrowLeftRight, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Cloud, FileSpreadsheet, Loader2, PhoneCall, Plus, Save, Search, Trash2, Upload, User, Users } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser, roleOf } from '@/lib/session';
 import { getCoordinatorSelectedColleges } from '@/lib/collegeSession';
@@ -21,6 +21,7 @@ import { DeleteRowConfirmModal } from './components/DeleteRowConfirmModal';
 import { TrackerActionsDropdown } from './components/TrackerActionsDropdown';
 import { DailySummaryModal } from './components/DailySummaryModal';
 import { ExcelPasteModal } from './components/ExcelPasteModal';
+import { MoveCollegeModal } from './components/MoveCollegeModal';
 import { CollegeDossierModal } from '@/components/college/CollegeDossierModal';
 import { useToast } from '@/components/ui/Toast';
 import { triggerHaptic } from '@/lib/haptics';
@@ -124,6 +125,8 @@ export default function DailyTrackerPage() {
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [bulkDeleteSuccessMsg, setBulkDeleteSuccessMsg] = useState<string | null>(null);
   const [selectedRowCount, setSelectedRowCount] = useState<number>(0);
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [isMoveModalOpen, setIsMoveModalOpen] = useState<boolean>(false);
   const [isDeleteMode, setIsDeleteMode] = useState<boolean>(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState<boolean>(false);
   const [isDossierOpen, setIsDossierOpen] = useState<boolean>(false);
@@ -138,11 +141,14 @@ export default function DailyTrackerPage() {
     enableKeyboardShortcuts: true,
   });
 
-  // Listen for selection count, delete mode, and confirmation events from TrackerGrid
+  // Listen for selection count, selected IDs, delete mode, and confirmation events from TrackerGrid
   useEffect(() => {
     const handleCount = (e: Event) => {
-      const customEvent = e as CustomEvent<{ count: number; isDeleteMode?: boolean }>;
+      const customEvent = e as CustomEvent<{ count: number; isDeleteMode?: boolean; selectedIds?: string[] }>;
       setSelectedRowCount(customEvent.detail?.count || 0);
+      if (Array.isArray(customEvent.detail?.selectedIds)) {
+        setSelectedRowIds(customEvent.detail.selectedIds);
+      }
       if (customEvent.detail?.isDeleteMode !== undefined) {
         setIsDeleteMode(customEvent.detail.isDeleteMode);
       }
@@ -160,6 +166,50 @@ export default function DailyTrackerPage() {
       window.removeEventListener('ipoms_tracker_open_delete_confirm', handleOpenConfirm);
     };
   }, []);
+
+  const handleConfirmMoveCollege = async (targetCollegeId: string, targetCollegeObj: any, mode: 'move' | 'copy' = 'move') => {
+    if (selectedRowIds.length === 0) return;
+    try {
+      const res = await apiFetch<any>('/daily-tracker/bulk-move', {
+        method: 'POST',
+        body: JSON.stringify({
+          row_ids: selectedRowIds,
+          target_college_id: targetCollegeId,
+          mode,
+        }),
+      });
+
+      if (res.success) {
+        const actionWord = mode === 'copy' ? 'copied' : 'moved';
+        toast(res.message || `Successfully ${actionWord} ${selectedRowIds.length} company call(s) to ${targetCollegeObj.college_name}`, 'success');
+
+        // Reset selection state
+        setSelectedRowCount(0);
+        setSelectedRowIds([]);
+        setIsDeleteMode(false);
+
+        // Switch active working area to target college!
+        setSelectedCollegeId(targetCollegeObj._id);
+        setSelectedCollegeName(targetCollegeObj.college_name);
+        if (targetCollegeObj) setSelectedCollegeObj(targetCollegeObj);
+
+        window.dispatchEvent(
+          new CustomEvent('ipoms_college_change', {
+            detail: {
+              id: targetCollegeObj._id,
+              name: targetCollegeObj.college_name,
+              obj: targetCollegeObj,
+            },
+          })
+        );
+      } else {
+        toast(res.error?.message || `Failed to ${mode} company calls`, 'error');
+      }
+    } catch (err: any) {
+      console.error(`[DT] ${mode} college error:`, err);
+      toast(`Failed to ${mode} company calls`, 'error');
+    }
+  };
 
   // Real signed-in identity. The backend still enforces ownership itself
   // (scopeToSelf pins a coordinator to their own id regardless of what's
@@ -604,21 +654,8 @@ export default function DailyTrackerPage() {
       } else if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V') && !isInput) {
         if (!isEffectiveReadOnly && selectedCollegeId && selectedCollegeId !== 'all') {
           e.preventDefault();
-          if (navigator.clipboard && navigator.clipboard.readText) {
-            navigator.clipboard
-              .readText()
-              .then((text) => {
-                setPasteInitialText(text || '');
-                setIsPasteModalOpen(true);
-              })
-              .catch(() => {
-                setPasteInitialText('');
-                setIsPasteModalOpen(true);
-              });
-          } else {
-            setPasteInitialText('');
-            setIsPasteModalOpen(true);
-          }
+          setPasteInitialText('');
+          setIsPasteModalOpen(true);
         }
       } else if (e.key === 'Escape') {
         if (isPasteModalOpen) {
@@ -1156,6 +1193,22 @@ export default function DailyTrackerPage() {
                 <span>Paste</span>
               </button>
 
+              {/* Move Selected Companies to Another College Button */}
+              {selectedRowCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('medium');
+                    setIsMoveModalOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-[0.98] shrink-0 animate-in fade-in duration-150"
+                  title={`Move ${selectedRowCount} selected company call(s) to another college`}
+                >
+                  <ArrowLeftRight size={13} strokeWidth={2.2} />
+                  <span>Move ({selectedRowCount})</span>
+                </button>
+              )}
+
               {/* Standalone Red Dustbin / Trash Icon Button */}
               <button
                 type="button"
@@ -1358,6 +1411,15 @@ export default function DailyTrackerPage() {
         onImport={handleImportFromExcel}
         collegeName={selectedCollegeObj?.college_code || selectedCollegeName}
         initialText={pasteInitialText}
+      />
+
+      {/* ── Move Selected Companies to Another College Modal ─────────────── */}
+      <MoveCollegeModal
+        isOpen={isMoveModalOpen}
+        selectedCount={selectedRowCount}
+        currentCollegeId={selectedCollegeId}
+        onClose={() => setIsMoveModalOpen(false)}
+        onConfirm={handleConfirmMoveCollege}
       />
 
       {/* ── College Profile / Placement Officer Dossier Modal ──────────── */}

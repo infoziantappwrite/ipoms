@@ -16,7 +16,7 @@ export function SnoRangeSelector({
   fromSno,
   toSno,
   minSno = 1,
-  maxSno = 4050,
+  maxSno,
   onApplyRange,
   onClearRange,
 }: Props) {
@@ -25,16 +25,9 @@ export function SnoRangeSelector({
   const [localTo, setLocalTo] = useState<string>(toSno ? String(toSno) : '');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const maxSnoRef = useRef<number>(Math.max(4050, maxSno || 4050));
-
-  useEffect(() => {
-    if (maxSno && maxSno > 500 && maxSno > maxSnoRef.current) {
-      maxSnoRef.current = maxSno;
-    }
-  }, [maxSno]);
 
   const effectiveMin = Math.max(1, minSno || 1);
-  const effectiveMax = Math.max(effectiveMin, maxSnoRef.current, maxSno || 4050);
+  const effectiveMax = Math.max(effectiveMin, maxSno || 1);
 
   // Sync with prop changes
   useEffect(() => {

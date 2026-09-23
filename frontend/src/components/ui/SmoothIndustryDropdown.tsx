@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Check, Layers } from 'lucide-react';
+import { ChevronDown, Check, Layers, Search, X } from 'lucide-react';
 import { triggerHaptic } from '@/lib/haptics';
 
 export interface IndustryOption {
@@ -43,8 +43,22 @@ export function SmoothIndustryDropdown({
   align = 'left',
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) {
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    }
+  }, [isOpen]);
+
+  const filteredIndustries = searchQuery.trim()
+    ? COMPANY_INDUSTRIES.filter((opt) =>
+        opt.label.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : COMPANY_INDUSTRIES;
   const [coords, setCoords] = useState<{
     top: number;
     left: number;
@@ -206,39 +220,72 @@ export function SmoothIndustryDropdown({
               <span className="flex items-center gap-1.5">
                 <Layers size={12} className="text-primary" /> Filter by Industry
               </span>
-              <span className="font-mono text-[10px] text-fg-disabled">{COMPANY_INDUSTRIES.length}</span>
+              <span className="font-mono text-[10px] text-fg-disabled">{filteredIndustries.length}</span>
+            </div>
+
+            {/* Quick Search Bar */}
+            <div className="p-1 border-b border-border/60 bg-surface-sunken">
+              <div className="relative flex items-center">
+                <Search size={12} className="absolute left-2.5 text-fg-subtle pointer-events-none" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search industry…"
+                  className="w-full bg-surface border border-border focus:border-primary focus:ring-1 focus:ring-primary/30 rounded-lg pl-7 pr-6 py-1 text-xs text-fg placeholder:text-fg-subtle outline-none font-normal"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 text-fg-subtle hover:text-fg cursor-pointer"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Industry Options List */}
             <div className="max-h-[194px] overflow-y-auto p-1.5 space-y-0.5 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden bg-white dark:bg-[#161D2E] divide-y divide-border/30">
-              {COMPANY_INDUSTRIES.map((opt) => {
-                const isSelected = opt.id === value;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={(e) => handleSelect(opt.id, e)}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between gap-2.5 transition-colors cursor-pointer select-none ${
-                      isSelected
-                        ? 'bg-primary/10 text-primary font-bold shadow-2xs'
-                        : 'hover:bg-slate-100 dark:hover:bg-slate-800/80 text-fg'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span
-                        className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${opt.dotColor || 'bg-primary'} ring-1 ring-black/10 dark:ring-white/20 ${
-                          isSelected ? 'ring-2 ring-primary/60' : ''
-                        }`}
-                      />
-                      <span className="truncate">{opt.label}</span>
-                    </div>
+              {filteredIndustries.length === 0 ? (
+                <div className="px-3 py-3 text-center text-xs text-fg-subtle italic">
+                  No matching industry found
+                </div>
+              ) : (
+                filteredIndustries.map((opt) => {
+                  const isSelected = opt.id === value;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={(e) => {
+                        handleSelect(opt.id, e);
+                        setSearchQuery('');
+                      }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs flex items-center justify-between gap-2.5 transition-colors cursor-pointer select-none ${
+                        isSelected
+                          ? 'bg-primary/10 text-primary font-bold shadow-2xs'
+                          : 'hover:bg-slate-100 dark:hover:bg-slate-800/80 text-fg'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span
+                          className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${opt.dotColor || 'bg-primary'} ring-1 ring-black/10 dark:ring-white/20 ${
+                            isSelected ? 'ring-2 ring-primary/60' : ''
+                          }`}
+                        />
+                        <span className="truncate">{opt.label}</span>
+                      </div>
 
-                    {isSelected && (
-                      <Check size={14} strokeWidth={2.5} className="text-primary shrink-0" />
-                    )}
-                  </button>
-                );
-              })}
+                      {isSelected && (
+                        <Check size={14} strokeWidth={2.5} className="text-primary shrink-0" />
+                      )}
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>,
           document.body

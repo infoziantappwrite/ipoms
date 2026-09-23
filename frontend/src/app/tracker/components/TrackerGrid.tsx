@@ -56,14 +56,14 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
   const isAllSelected = rows.length > 0 && selectedRowIds.size === rows.length;
   const isSomeSelected = selectedRowIds.size > 0 && selectedRowIds.size < rows.length;
 
-  // Broadcast selection count and delete mode to parent header
+  // Broadcast selection count, selected IDs, and delete mode to parent header
   useEffect(() => {
     window.dispatchEvent(
       new CustomEvent('ipoms_tracker_selection_count', {
-        detail: { count: selectedRowIds.size, isDeleteMode },
+        detail: { count: selectedRowIds.size, isDeleteMode, selectedIds: Array.from(selectedRowIds) },
       })
     );
-  }, [selectedRowIds.size, isDeleteMode]);
+  }, [selectedRowIds, isDeleteMode]);
 
   // ── Active Working Row Focus & Auto-Advancement ──
   const [activeRowId, setActiveRowId] = useState<string | null>(null);

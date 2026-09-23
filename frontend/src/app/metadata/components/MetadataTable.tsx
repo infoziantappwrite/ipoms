@@ -24,6 +24,10 @@ interface Props {
   limit?: number;
   canDelete?: boolean;
   highlightIds?: string[];
+  isSelectionMode?: boolean;
+  selectedIds?: string[];
+  onToggleSelectRow?: (id: string) => void;
+  onSelectAllRows?: (selectAll: boolean) => void;
   onEdit: (company: CompanyRecord) => void;
   onDelete: (id: string, name: string) => void;
   onRestore: (id: string, name: string) => void;
@@ -37,6 +41,10 @@ export function MetadataTable({
   limit = 50,
   canDelete = true,
   highlightIds = [],
+  isSelectionMode = false,
+  selectedIds = [],
+  onToggleSelectRow,
+  onSelectAllRows,
   onEdit,
   onDelete,
   onRestore,
@@ -47,12 +55,25 @@ export function MetadataTable({
     alert(`Copied "${text}" to clipboard!`);
   };
 
+  const allSelected = companies.length > 0 && companies.every((c) => selectedIds.includes(String(c._id)));
+
   return (
     <div className="glass-panel rounded-2xl border border-border overflow-hidden shadow-1 bg-surface">
       <div className="overflow-x-auto">
         <table className="w-full text-xs text-left">
           <thead>
             <tr className="bg-surface-sunken text-fg-subtle font-semibold border-b border-border text-micro uppercase tracking-wider">
+              {isSelectionMode && !isRecycleBin && (
+                <th className="py-3.5 px-3 w-9 text-center">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={(e) => onSelectAllRows && onSelectAllRows(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded border-border text-rose-600 focus:ring-rose-500 cursor-pointer accent-rose-600"
+                    title={allSelected ? 'Unselect All' : 'Select All Rows'}
+                  />
+                </th>
+              )}
               <th className="py-3.5 px-4 w-12 text-center">#</th>
               <th className="py-3.5 px-5 min-w-[200px] max-w-[280px] text-left">Company Name</th>
               <th className="py-3.5 px-4 min-w-[140px] max-w-[220px]">HR Contact Person</th>
@@ -65,7 +86,7 @@ export function MetadataTable({
           <tbody className="divide-y divide-border/60">
             {companies.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-fg-subtle">
+                <td colSpan={isSelectionMode && !isRecycleBin ? 8 : 7} className="py-12 text-center text-fg-subtle">
                   {isRecycleBin ? 'Recycle bin is empty' : 'No matching companies found in metadata catalog'}
                 </td>
               </tr>
@@ -73,16 +94,31 @@ export function MetadataTable({
               companies.map((c, idx) => {
                 const serialNo = c.serial_number ?? ((page - 1) * limit + idx + 1);
                 const isHighlighted = highlightIds.includes(String(c._id)) || highlightIds.includes(String(c.serial_number));
+                const isSelected = selectedIds.includes(String(c._id));
+
                 return (
                   <tr
                     key={c._id}
                     id={`meta-row-${c._id}`}
                     className={`transition-all duration-300 ${
-                      isHighlighted
+                      isSelected
+                        ? 'bg-rose-500/10 dark:bg-rose-500/20 ring-1 ring-inset ring-rose-500/40'
+                        : isHighlighted
                         ? 'bg-emerald-500/15 dark:bg-emerald-500/25 ring-2 ring-inset ring-emerald-500/60 shadow-xs'
                         : 'hover:bg-surface-sunken/60'
                     }`}
                   >
+                    {/* Minimal Checkbox Column (Just before Serial Number) */}
+                    {isSelectionMode && !isRecycleBin && (
+                      <td className="py-3.5 px-3 text-center align-middle">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => onToggleSelectRow && onToggleSelectRow(String(c._id))}
+                          className="w-3.5 h-3.5 rounded border-border text-rose-600 focus:ring-rose-500 cursor-pointer accent-rose-600"
+                        />
+                      </td>
+                    )}
                     {/* Serial Number (#) */}
                     <td className="py-3.5 px-4 text-center font-mono text-[11px] font-semibold whitespace-nowrap">
                       <span className={`inline-block px-2 py-0.5 rounded-md border text-fg font-mono text-xs font-bold shadow-2xs ${

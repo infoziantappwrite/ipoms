@@ -345,12 +345,24 @@ export function ExcelPasteModal({ isOpen, onClose, onImport, collegeName, initia
 
       setParsedRows(rows);
       if (rows.length > 0) {
-        setActiveTab('preview');
         checkMetadataBatch(rows);
       }
     },
     [validateRow, checkMetadataBatch]
   );
+
+  const handleReviewAndValidate = useCallback(() => {
+    if (!rawText || !rawText.trim()) return;
+    triggerHaptic('selection');
+    parseClipboardText(rawText);
+    setActiveTab('preview');
+  }, [rawText, parseClipboardText]);
+
+  const handleClearRawText = useCallback(() => {
+    triggerHaptic('light');
+    setRawText('');
+    setParsedRows([]);
+  }, []);
 
   // Initial load handler
   useEffect(() => {
@@ -358,7 +370,6 @@ export function ExcelPasteModal({ isOpen, onClose, onImport, collegeName, initia
       setImportResult(null);
       if (initialText) {
         setRawText(initialText);
-        parseClipboardText(initialText);
       } else {
         setRawText('');
         setParsedRows([]);
@@ -366,7 +377,7 @@ export function ExcelPasteModal({ isOpen, onClose, onImport, collegeName, initia
         setTimeout(() => textareaRef.current?.focus(), 100);
       }
     }
-  }, [isOpen, initialText, parseClipboardText]);
+  }, [isOpen, initialText]);
 
   // Handle cell edit in preview
   const handleCellChange = (
@@ -459,7 +470,6 @@ export function ExcelPasteModal({ isOpen, onClose, onImport, collegeName, initia
       const text = await navigator.clipboard.readText();
       if (text) {
         setRawText(text);
-        parseClipboardText(text);
       }
     } catch {
       textareaRef.current?.focus();
@@ -597,8 +607,8 @@ export function ExcelPasteModal({ isOpen, onClose, onImport, collegeName, initia
           </div>
         ) : (
           <>
-            {/* Tab Switcher */}
-            <div className="px-6 pt-3 pb-0 flex items-center justify-between border-b border-border/60 bg-surface">
+            {/* Tab Switcher & Action Header in Single Clean Row */}
+            <div className="px-6 pt-2 pb-0 flex items-center justify-between border-b border-border/60 bg-surface">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -621,7 +631,7 @@ export function ExcelPasteModal({ isOpen, onClose, onImport, collegeName, initia
                       : 'border-transparent text-fg-subtle hover:text-fg disabled:opacity-40 disabled:cursor-not-allowed'
                   }`}
                 >
-                  <span>2. Review & Validate</span>
+                  <span>2. Review &amp; Validate</span>
                   {parsedRows.length > 0 && (
                     <span
                       className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
@@ -636,99 +646,57 @@ export function ExcelPasteModal({ isOpen, onClose, onImport, collegeName, initia
                 </button>
               </div>
 
-              {parsedRows.length > 0 && (
-                <div className="flex items-center gap-3 text-xs pb-1.5">
-                  <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
-                    <CheckCircle2 size={13} /> {validCount} Valid
-                  </span>
-                  {invalidCount > 0 && (
-                    <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-semibold">
-                      <AlertCircle size={13} /> {invalidCount} Need Fix
+              {activeTab === 'paste' ? (
+                <button
+                  type="button"
+                  onClick={handleReadClipboard}
+                  className="mb-1 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary/30 bg-primary/10 text-primary text-xs font-semibold hover:bg-primary/15 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
+                >
+                  <ClipboardPaste size={13} /> Paste from Clipboard
+                </button>
+              ) : parsedRows.length > 0 ? (
+                <div className="flex items-center gap-4 text-xs pb-1.5">
+                  <div className="flex items-center gap-3 font-semibold">
+                    <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle2 size={13} /> {validCount} Valid
                     </span>
+                    {invalidCount > 0 && (
+                      <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                        <AlertCircle size={13} /> {invalidCount} Need Fix
+                      </span>
+                    )}
+                  </div>
+
+                  {invalidCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearInvalidRows}
+                      className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400 hover:text-amber-800 font-semibold cursor-pointer underline ml-1"
+                    >
+                      <Trash2 size={12} /> Remove {invalidCount} Invalid Row{invalidCount > 1 ? 's' : ''}
+                    </button>
                   )}
                 </div>
-              )}
+              ) : null}
             </div>
 
             {/* Tab 1: Paste Input */}
             {activeTab === 'paste' && (
-              <div className="p-6 flex-1 flex flex-col gap-4 overflow-y-auto">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-fg-subtle">
-                    Copy cells from Excel (<kbd className="px-1.5 py-0.5 rounded bg-surface-sunken border border-border text-[11px] font-mono">Ctrl+C</kbd>) and paste below (<kbd className="px-1.5 py-0.5 rounded bg-surface-sunken border border-border text-[11px] font-mono">Ctrl+V</kbd>).
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleReadClipboard}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-primary/30 bg-primary/10 text-primary text-xs font-semibold hover:bg-primary/15 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
-                  >
-                    <ClipboardPaste size={13} /> Paste from Clipboard
-                  </button>
-                </div>
-
+              <div className="p-6 flex-1 flex flex-col gap-3 overflow-y-auto">
                 <textarea
                   ref={textareaRef}
                   value={rawText}
-                  onChange={(e) => {
-                    setRawText(e.target.value);
-                    parseClipboardText(e.target.value);
-                  }}
+                  onChange={(e) => setRawText(e.target.value)}
                   placeholder={`Example format (copy rows directly from Excel):\nSuguna Foods Pvt Limited\tMansoor Ahamed S J\t9176967025\tmansoorahamed@sugunafoods.com\nRenault Nissan\tAnchaneyalu KN\t9003213177\tanchaneyalu.kurra-nagaiah@rntbci.com\nOmega Healthcare\t\t9790759083\nCaresoft Global\t\t\tjayakumar@caresoft.com`}
-                  rows={10}
-                  className="w-full flex-1 min-h-[220px] p-3 rounded-xl border border-border bg-surface text-xs font-mono text-fg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-fg-disabled resize-none"
+                  rows={12}
+                  className="w-full flex-1 min-h-[280px] p-3.5 rounded-xl border border-border bg-surface text-xs font-mono text-fg outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-fg-disabled resize-none"
                 />
-
-                {/* Formatting Constraints Tip Box */}
-                <div className="p-3.5 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 text-xs text-fg-subtle flex items-start gap-2.5">
-                  <HelpCircle size={15} className="text-primary shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <div className="font-semibold text-fg">Automated Validation Rules:</div>
-                    <ul className="list-disc list-inside space-y-0.5 text-[11.5px]">
-                      <li><strong className="text-fg">Company Name:</strong> Mandatory (min 2 characters).</li>
-                      <li><strong className="text-fg">Contact Requirement:</strong> Each row must have either a <strong>Mobile Number</strong> OR an <strong>Email ID</strong> (at least one valid contact point is required). Rows missing both will be flagged as invalid.</li>
-                      <li><strong className="text-fg">HR Name:</strong> Optional (defaults to &quot;HR Contact&quot; if left empty).</li>
-                      <li><strong className="text-fg">Auto-Save to Metadata:</strong> Any newly discovered contact will be automatically created in the Corporate Metadata Base.</li>
-                    </ul>
-                  </div>
-                </div>
               </div>
             )}
 
             {/* Tab 2: Preview & Validation Grid */}
             {activeTab === 'preview' && (
               <div className="flex-1 flex flex-col overflow-hidden">
-                {/* Metadata status header alert */}
-                {metadataStatus.new.length > 0 && (
-                  <div className="px-6 py-2.5 bg-emerald-500/10 border-b border-emerald-500/20 flex items-center justify-between text-xs text-emerald-900 dark:text-emerald-100">
-                    <div className="flex items-center gap-2">
-                      <Sparkles size={14} className="text-emerald-600 dark:text-emerald-400" />
-                      <span>
-                        <strong>{metadataStatus.new.length} new contact{metadataStatus.new.length > 1 ? 's' : ''}</strong> will be automatically saved to the <strong>Corporate Metadata Database</strong> upon import!
-                      </span>
-                    </div>
-                    <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
-                      {metadataStatus.existing.length} already exist
-                    </span>
-                  </div>
-                )}
-
-                {/* Toolbar above grid */}
-                <div className="px-6 py-2 bg-slate-50 dark:bg-[#1A2234] border-b border-border/60 flex items-center justify-between text-xs">
-                  <span className="text-fg-subtle">
-                    Review parsed data. Rows missing both mobile &amp; email are invalid and can be removed with one click.
-                  </span>
-
-                  {invalidCount > 0 && (
-                    <button
-                      type="button"
-                      onClick={handleClearInvalidRows}
-                      className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400 hover:text-amber-800 font-semibold cursor-pointer underline"
-                    >
-                      <Trash2 size={12} /> Remove {invalidCount} Invalid Row{invalidCount > 1 ? 's' : ''}
-                    </button>
-                  )}
-                </div>
-
                 {/* Table */}
                 <div className="flex-1 overflow-auto p-4">
                   <table className="w-full text-left text-xs border-collapse border border-border rounded-lg overflow-hidden">
@@ -914,43 +882,64 @@ export function ExcelPasteModal({ isOpen, onClose, onImport, collegeName, initia
             {/* Footer */}
             <div className="px-6 py-4 border-t border-border/80 flex items-center justify-between bg-slate-50 dark:bg-[#1A2234]">
               <div className="text-xs text-fg-subtle">
-                {parsedRows.length > 0 ? (
+                {activeTab === 'paste' ? (
+                  <span>Paste tabular data from Excel/Sheets, then click Review &amp; Validate to proceed.</span>
+                ) : (
                   <span>
                     Ready to import <strong className="text-fg">{validCount}</strong> of <strong className="text-fg">{parsedRows.length}</strong> row{parsedRows.length > 1 ? 's' : ''} into today&apos;s tracker.
                   </span>
-                ) : (
-                  <span>Paste tabular data from Excel/Sheets to proceed.</span>
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  disabled={isImporting}
-                  className="px-4 py-2 rounded-xl border border-border bg-surface text-fg hover:bg-surface-raised text-xs font-semibold transition-all cursor-pointer shadow-2xs"
-                >
-                  Cancel
-                </button>
+              <div className="flex items-center gap-2.5">
+                {activeTab === 'paste' ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleClearRawText}
+                      disabled={!rawText}
+                      className="px-4 py-2 rounded-xl border border-border bg-surface text-fg hover:bg-surface-raised text-xs font-semibold transition-all cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Clear
+                    </button>
 
-                <button
-                  type="button"
-                  disabled={validCount === 0 || isImporting}
-                  onClick={handleExecuteImport}
-                  className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-[0.98]"
-                >
-                  {isImporting ? (
-                    <>
-                      <Loader2 size={14} className="animate-spin" />
-                      Importing…
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles size={14} />
-                      Import {validCount > 0 ? `${validCount} Rows` : ''} to Tracker
-                    </>
-                  )}
-                </button>
+                    <button
+                      type="button"
+                      disabled={!rawText || !rawText.trim()}
+                      onClick={handleReviewAndValidate}
+                      className="px-5 py-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-[0.98]"
+                    >
+                      Review &amp; Validate
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('paste')}
+                      disabled={isImporting}
+                      className="px-4 py-2 rounded-xl border border-border bg-surface text-fg hover:bg-surface-raised text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+                    >
+                      Back to Edit
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={validCount === 0 || isImporting}
+                      onClick={handleExecuteImport}
+                      className="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-[0.98]"
+                    >
+                      {isImporting ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          Importing…
+                        </>
+                      ) : (
+                        <span>Import to Tracker</span>
+                      )}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </>

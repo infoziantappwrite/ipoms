@@ -152,6 +152,8 @@ export function CalendarPicker({ coordinatorId, collegeId, onClose, onSelectDate
           {/* Days */}
           {Array.from({ length: daysInMonth }).map((_, i) => {
             const day = i + 1;
+            const dayOfWeek = new Date(viewYear, viewMonth - 1, day).getDay(); // 0 = Sun, 6 = Sat
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
             const isToday = day === todayDate && viewMonth === todayMonth && viewYear === todayYear;
             const hasActivity = activeDays.has(day);
             const isFuture = new Date(viewYear, viewMonth - 1, day) > today;
@@ -181,11 +183,11 @@ export function CalendarPicker({ coordinatorId, collegeId, onClose, onSelectDate
                 }
               >
                 <span>{day}</span>
-                {/* Activity Dot */}
-                {hasActivity && !isToday && (
+                {/* Activity Dot (No dots on Saturdays and Sundays) */}
+                {hasActivity && !isToday && !isWeekend && (
                   <span className="w-1.5 h-1.5 rounded-full mt-0.5 bg-primary" />
                 )}
-                {isFuture && (
+                {isFuture && !isWeekend && (
                   <span className="w-1 h-1 rounded-full mt-0.5 bg-sky-400/70" />
                 )}
               </button>

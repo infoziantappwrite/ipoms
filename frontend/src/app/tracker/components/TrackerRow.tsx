@@ -136,22 +136,22 @@ export function TrackerRow({
   };
 
   useEffect(() => {
-    if (companyNameRef.current && companyNameRef.current.value !== (row.company_name ?? '')) {
+    if (companyNameRef.current && document.activeElement !== companyNameRef.current && companyNameRef.current.value !== (row.company_name ?? '')) {
       companyNameRef.current.value = row.company_name ?? '';
     }
-    if (hrNameRef.current && hrNameRef.current.value !== (row.hr_name ?? '')) {
+    if (hrNameRef.current && document.activeElement !== hrNameRef.current && hrNameRef.current.value !== (row.hr_name ?? '')) {
       hrNameRef.current.value = row.hr_name ?? '';
     }
-    if (mobileRef.current && mobileRef.current.value !== (row.mobile_number ?? '')) {
+    if (mobileRef.current && document.activeElement !== mobileRef.current && mobileRef.current.value !== (row.mobile_number ?? '')) {
       mobileRef.current.value = row.mobile_number ?? '';
     }
-    if (emailRef.current && emailRef.current.value !== (row.email_id ?? '')) {
+    if (emailRef.current && document.activeElement !== emailRef.current && emailRef.current.value !== (row.email_id ?? '')) {
       emailRef.current.value = row.email_id ?? '';
     }
-    if (startTimeRef.current && startTimeRef.current.value !== formatTime(row.call_start_time)) {
+    if (startTimeRef.current && document.activeElement !== startTimeRef.current && startTimeRef.current.value !== formatTime(row.call_start_time)) {
       startTimeRef.current.value = formatTime(row.call_start_time);
     }
-    if (commentsRef.current && commentsRef.current.value !== (row.comments ?? '')) {
+    if (commentsRef.current && document.activeElement !== commentsRef.current && commentsRef.current.value !== (row.comments ?? '')) {
       commentsRef.current.value = row.comments ?? '';
     }
   }, [row.company_name, row.hr_name, row.mobile_number, row.email_id, row.call_start_time, row.comments]);
@@ -388,22 +388,33 @@ export function TrackerRow({
     onUpdate({ follow_up_month: month || null });
   }, [onUpdate]);
 
-  // ── Comments debounced auto-save + blur persist (max 200 chars)
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleCommentsChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const text = e.target.value.slice(0, 200);
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    debounceTimerRef.current = setTimeout(() => {
-      onUpdate({ comments: text });
-    }, 600);
-  }, [onUpdate]);
-
+  // ── Comments save on blur & Enter press (max 200 chars)
   const handleCommentsBlur = useCallback(() => {
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     const text = (commentsRef.current?.value ?? '').slice(0, 200);
-    onUpdate({ comments: text });
-  }, [onUpdate]);
+    if (text !== (row.comments ?? '')) {
+      onUpdate({ comments: text });
+    }
+  }, [onUpdate, row.comments]);
+
+  const handleCommentsKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      commentsRef.current?.blur();
+      const text = (commentsRef.current?.value ?? '').slice(0, 200);
+      if (text !== (row.comments ?? '')) {
+        onUpdate({ comments: text });
+      }
+      // Advance focus to next row's start time without triggering call timer
+      const currentRow = (e.currentTarget as HTMLElement).closest('[data-row-id]');
+      if (currentRow) {
+        const nextRow = currentRow.nextElementSibling as HTMLElement;
+        if (nextRow) {
+          const nextStart = nextRow.querySelector<HTMLElement>('[data-field="start_time"]');
+          if (nextStart) nextStart.focus();
+        }
+      }
+    }
+  }, [onUpdate, row.comments]);
 
   const gridTemplate = isReadOnly
     ? 'grid-cols-[56px_100px_90px_90px_260px_200px_240px_270px_150px_180px_150px_minmax(260px,1fr)]'
@@ -825,14 +836,7 @@ export function TrackerRow({
             maxLength={200}
             placeholder="Optional notes (max 200 chars)…"
             rows={row.comments && row.comments.length > 35 ? Math.min(4, Math.ceil(row.comments.length / 35)) : 1}
-            onChange={handleCommentsChange}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleCommentsBlur();
-                handleKeyDownEnter(e);
-              }
-            }}
+            onKeyDown={handleCommentsKeyDown}
             onBlur={handleCommentsBlur}
             onInput={(e) => {
               const target = e.currentTarget;
