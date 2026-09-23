@@ -8,6 +8,7 @@ import {
   Clock, Timer, Zap, PhoneCall
 } from 'lucide-react';
 import { CoordinatorClockDurationWidget } from './CoordinatorClockDurationWidget';
+import { CollegeActivityTodayWidget } from './CollegeActivityTodayWidget';
 import { CoordinatorCollegeFocusSection } from './CoordinatorCollegeFocusSection';
 import { CoordinatorCollegeKpiCards } from './CoordinatorCollegeKpiCards';
 import { FollowUpSmartQueueWidget } from './FollowUpSmartQueueWidget';
@@ -65,6 +66,15 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
 
   const { team_matrix = [], online_summary, team_call_duration } = data;
 
+  // A small number of Team Leaders (e.g. Malvika Kumar, 22 Sep 2026) oversee every
+  // college rather than a fixed 1-5 focus set — for them, the whole Active College
+  // Focus lock/select flow and the follow-up queue it drives don't apply, and the
+  // outcome/trend cards below show every college directly instead of a manual
+  // selection. Backend-computed (`viewer_has_full_access`), not re-derived here, so
+  // it can never disagree with what the dashboard endpoint actually did.
+  const hasFullCollegeAccess = Boolean(data.viewer_has_full_access);
+  const fullAccessCollegeIds: string[] = data.viewer_college_ids || [];
+
   const onlineCoordinators = team_matrix.filter((m: any) => m.online_status === 'online');
   const awayCoordinators = team_matrix.filter((m: any) => m.online_status === 'away');
   const offlineCoordinators = team_matrix.filter((m: any) => m.online_status === 'offline' || m.online_status === 'on_leave' || m.online_status === 'partial_working');
@@ -105,11 +115,18 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
 
-      {/* ── 0. Dedicated Calling Time Today (Matching Coordinator Design for Sujitha / Team Leader) ── */}
-      <CoordinatorClockDurationWidget
-        clockData={data?.clock_duration}
-        coordinatorName={data?.coordinator?.name || 'Sujitha S'}
-      />
+      {/* ── 0. Dedicated Calling Time Today — a full-access Team Leader (Malvika
+          Kumar) doesn't place calls herself, so a personal timer would always
+          read 00:00:00; she gets College Activity Today instead. Sujitha's
+          experience here is unchanged. ── */}
+      {hasFullCollegeAccess ? (
+        <CollegeActivityTodayWidget rows={data?.today_college_activity} onRefresh={onRefresh} />
+      ) : (
+        <CoordinatorClockDurationWidget
+          clockData={data?.clock_duration}
+          coordinatorName={data?.coordinator?.name || 'Sujitha S'}
+        />
+      )}
 
       {/* ── 3. Live Active Deployment Bar (High-Level Highlighted Executive Cockpit) ── */}
       {onlineCoordinators.length > 0 && (
@@ -517,37 +534,6 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
                   })
                 )}
               </tbody>
-              <tfoot className="bg-zinc-50/90 dark:bg-zinc-800/70 border-t-2 border-zinc-200 dark:border-zinc-700 font-bold text-xs">
-                <tr>
-                  <td colSpan={4} className="py-3 px-5 text-zinc-700 dark:text-zinc-200 font-bold">
-                    <div className="flex items-center gap-2">
-                      <span className="uppercase text-[10px] tracking-wider text-zinc-500 dark:text-zinc-400">Team Cumulative Total</span>
-                      <span className="text-[11px] font-normal text-zinc-400 font-mono">({team_matrix.length} Coordinators • {activeCallersCount} Active)</span>
-                    </div>
-                  </td>
-                  <td className="py-3 px-3 text-center">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-100/80 dark:bg-indigo-950 border border-indigo-300 dark:border-indigo-700 text-indigo-800 dark:text-indigo-200 font-mono font-bold text-xs shadow-2xs">
-                      <Clock size={12} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
-                      {totalTeamDurationFormatted}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-center">
-                    <span className="font-bold font-mono text-sm text-blue-600 dark:text-blue-400">
-                      {totalCallsOverall}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-center">
-                    <span className="font-bold font-mono text-sm text-emerald-600 dark:text-emerald-400">
-                      {totalPositivesOverall}
-                    </span>
-                  </td>
-                  <td className="py-3 px-3 text-center">
-                    <span className="font-bold font-mono text-sm text-cyan-600 dark:text-cyan-400">
-                      {totalJdsOverall}
-                    </span>
-                  </td>
-                </tr>
-              </tfoot>
             </table>
           </div>
         )}
@@ -586,45 +572,59 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
         </div>
       </div>
 
-      {/* ── 4. Team Leader Active College Focus & Operational Workflow ── */}
-      <div className="space-y-6 pt-2">
-        {/* 1. Follow up Due */}
-        <FollowUpSmartQueueWidget
-          selectedCollegeIds={selectedCollegeIds}
-        />
-
-        {/* 2. Active College Focus */}
-        <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6">
-          <CoordinatorCollegeFocusSection
-            onSelectionChange={(ids, locked) => {
-              setSelectedCollegeIds(ids);
-              setIsLocked(locked);
-            }}
+      {/* ── 4. Team Leader Active College Focus & Operational Workflow ──
+          Skipped entirely for a full-access Team Leader (e.g. Malvika Kumar) —
+          the 1-5 focus lock and the follow-up queue it drives don't apply when
+          every college is already in scope; her outcome/trend cards below show
+          all colleges directly instead. */}
+      {!hasFullCollegeAccess && (
+        <div className="space-y-6 pt-2">
+          {/* 1. Follow up Due */}
+          <FollowUpSmartQueueWidget
+            selectedCollegeIds={selectedCollegeIds}
           />
-        </div>
 
-        {/* 3. Campus Outreach Analytics Cards for Selected Colleges */}
-        {selectedCollegeIds.length === 0 ? (
-          <div className="bg-zinc-50/60 dark:bg-zinc-900/40 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl p-8 text-center flex flex-col items-center justify-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60 flex items-center justify-center">
-              <Target size={20} strokeWidth={2} />
-            </div>
-            <h4 className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
-              Select Colleges to Start Operational Outreach
-            </h4>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-md leading-relaxed">
-              Choose 1 to 5 partner colleges above to activate live college KPIs, pipeline tracker velocity, and follow-up queues.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-8 animate-in fade-in duration-200">
-            {/* Campus Outreach & Conversion Analytics Cards */}
-            <CoordinatorCollegeKpiCards
-              selectedCollegeIds={selectedCollegeIds}
+          {/* 2. Active College Focus */}
+          <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6">
+            <CoordinatorCollegeFocusSection
+              onSelectionChange={(ids, locked) => {
+                setSelectedCollegeIds(ids);
+                setIsLocked(locked);
+              }}
             />
           </div>
-        )}
-      </div>
+
+          {/* 3. Campus Outreach Analytics Cards for Selected Colleges */}
+          {selectedCollegeIds.length === 0 ? (
+            <div className="bg-zinc-50/60 dark:bg-zinc-900/40 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl p-8 text-center flex flex-col items-center justify-center gap-2.5">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60 flex items-center justify-center">
+                <Target size={20} strokeWidth={2} />
+              </div>
+              <h4 className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
+                Select Colleges to Start Operational Outreach
+              </h4>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-md leading-relaxed">
+                Choose 1 to 5 partner colleges above to activate live college KPIs, pipeline tracker velocity, and follow-up queues.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-8 animate-in fade-in duration-200">
+              {/* Campus Outreach & Conversion Analytics Cards */}
+              <CoordinatorCollegeKpiCards
+                selectedCollegeIds={selectedCollegeIds}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {hasFullCollegeAccess && (
+        <div className="space-y-8 pt-2 animate-in fade-in duration-200">
+          <CoordinatorCollegeKpiCards
+            selectedCollegeIds={fullAccessCollegeIds}
+          />
+        </div>
+      )}
 
     </div>
   );

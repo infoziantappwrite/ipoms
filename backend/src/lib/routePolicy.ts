@@ -144,6 +144,7 @@ const POLICIES: Policy[] = [
   { method: 'GET',    pattern: /^\/dashboard\/college-kpis\/?$/,         roles: STAFF },
   // Month trend of calls per campus — ownership-scoped in the handler, same as college-kpis.
   { method: 'GET',    pattern: /^\/dashboard\/monthly-calls\/?$/,        roles: STAFF },
+  { method: 'GET',    pattern: /^\/dashboard\/september-audit\/?$/,      roles: STAFF },
   // Any staff member may call this; WHICH coordinator's data comes back is
   // decided by ownership scoping in the handler, not here.
   { method: 'GET',    pattern: /^\/dashboard\/coordinator\/?$/,          roles: STAFF },

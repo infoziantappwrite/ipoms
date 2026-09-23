@@ -177,6 +177,17 @@ export default function WeeklyTrackerPage() {
       }
     }
 
+    // Restore saved Weekly Tracker view state (academicYear, weekOffset, companyTypeFilter)
+    try {
+      const savedWeeklyState = localStorage.getItem('ipoms_weekly_tracker_saved_state');
+      if (savedWeeklyState) {
+        const parsed = JSON.parse(savedWeeklyState);
+        if (parsed.academicYear) setAcademicYear(parsed.academicYear);
+        if (typeof parsed.weekOffset === 'number') setWeekOffset(parsed.weekOffset);
+        if (parsed.companyTypeFilter) setCompanyTypeFilter(parsed.companyTypeFilter);
+      }
+    } catch {}
+
     if (urlCollegeId) {
       const cached = getCachedColleges();
       const matched = cached.find((c) => c._id === urlCollegeId || c.college_code === urlCollegeId);
@@ -202,6 +213,18 @@ export default function WeeklyTrackerPage() {
     window.addEventListener('ipoms_college_change', handleCollegeChange);
     return () => window.removeEventListener('ipoms_college_change', handleCollegeChange);
   }, []);
+
+  // Save Weekly Tracker filter state to localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('ipoms_weekly_tracker_saved_state', JSON.stringify({
+        academicYear,
+        weekOffset,
+        companyTypeFilter,
+      }));
+    } catch {}
+  }, [academicYear, weekOffset, companyTypeFilter]);
 
   // ── Load Weekly Tracker Sections
   const loadWeeklyTracker = useCallback(async () => {
@@ -1260,9 +1283,93 @@ export default function WeeklyTrackerPage() {
     };
   }, [handleSaveAll]);
 
+  // ── Smooth Auto-Scroll when dragging rows cross-section (Up / Down)
+  const mainScrollRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    let animationFrameId: number | null = null;
+    let scrollSpeed = 0;
+
+    const performAutoScroll = () => {
+      const container = mainScrollRef.current;
+      if (container && scrollSpeed !== 0) {
+        container.scrollTop += scrollSpeed;
+        animationFrameId = requestAnimationFrame(performAutoScroll);
+      } else {
+        animationFrameId = null;
+      }
+    };
+
+    const handleDragOver = (e: DragEvent) => {
+      const isDragging = (window as any).__ipoms_dragged_weekly_row;
+      if (!isDragging) {
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = null;
+          scrollSpeed = 0;
+        }
+        return;
+      }
+
+      const container = mainScrollRef.current;
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const clientY = e.clientY;
+
+      // Sensitive edge detection zones (140px from top and bottom boundaries)
+      const topThreshold = rect.top + 140;
+      const bottomThreshold = rect.bottom - 140;
+
+      if (clientY < topThreshold && clientY >= rect.top - 60) {
+        // Move upward: closer to top -> faster scroll (from -4px to -22px per frame)
+        const intensity = Math.max(0, Math.min(1, (topThreshold - clientY) / 140));
+        scrollSpeed = -Math.round(4 + intensity * 18);
+        if (!animationFrameId) {
+          animationFrameId = requestAnimationFrame(performAutoScroll);
+        }
+      } else if (clientY > bottomThreshold && clientY <= rect.bottom + 60) {
+        // Move downward: closer to bottom -> faster scroll (from 4px to 22px per frame)
+        const intensity = Math.max(0, Math.min(1, (clientY - bottomThreshold) / 140));
+        scrollSpeed = Math.round(4 + intensity * 18);
+        if (!animationFrameId) {
+          animationFrameId = requestAnimationFrame(performAutoScroll);
+        }
+      } else {
+        scrollSpeed = 0;
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = null;
+        }
+      }
+    };
+
+    const stopAutoScroll = () => {
+      scrollSpeed = 0;
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+    };
+
+    window.addEventListener('dragover', handleDragOver);
+    window.addEventListener('dragend', stopAutoScroll);
+    window.addEventListener('drop', stopAutoScroll);
+    window.addEventListener('mouseup', stopAutoScroll);
+    window.addEventListener('mouseleave', stopAutoScroll);
+
+    return () => {
+      stopAutoScroll();
+      window.removeEventListener('dragover', handleDragOver);
+      window.removeEventListener('dragend', stopAutoScroll);
+      window.removeEventListener('drop', stopAutoScroll);
+      window.removeEventListener('mouseup', stopAutoScroll);
+      window.removeEventListener('mouseleave', stopAutoScroll);
+    };
+  }, []);
+
   // All sections are always rendered (KPI filter cards removed)
   const shouldRenderSection = (_key: string) => true;
-
 
   return (
     <div className="h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-primary-foreground overflow-hidden">
@@ -1326,7 +1433,7 @@ export default function WeeklyTrackerPage() {
 
       {/* ── Operational Sections (Scrollable with Invisible Scroller) ────── */}
       {selectedCollegeId && sections && (
-        <main className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-none no-scrollbar px-6 py-4 pb-16 space-y-4">
+        <main ref={mainScrollRef} className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-none no-scrollbar px-6 py-4 pb-16 space-y-4">
           {/* Section 1: Companies Completed */}
           {shouldRenderSection('completed') && (
             <WeeklySection
@@ -1551,10 +1658,24 @@ export default function WeeklyTrackerPage() {
               sessionStorage.removeItem('ipoms_weekly_add_company_draft');
             }
           }}
-          onAdded={() => {
+          onAdded={(newRow?: any) => {
             setDraftToAdd(null);
             if (typeof window !== 'undefined') {
               sessionStorage.removeItem('ipoms_weekly_add_company_draft');
+            }
+            if (newRow && newRow._id) {
+              const companyName = newRow.company_name || 'company';
+              pushAction({
+                description: `Added "${companyName}"`,
+                undo: async () => {
+                  await performDeleteRow(newRow._id, true);
+                },
+                redo: async () => {
+                  await apiFetch(`/weekly-tracker/${newRow._id}/restore`, { method: 'POST' });
+                  await loadWeeklyTracker();
+                  await loadKpi();
+                },
+              });
             }
             loadWeeklyTracker();
             loadKpi();

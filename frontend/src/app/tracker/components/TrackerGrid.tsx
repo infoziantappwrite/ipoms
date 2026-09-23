@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { TrackerRow } from './TrackerRow';
+import { TrackerRow, OUTCOMES, MONTHS } from './TrackerRow';
 import type { TrackerRow as TrackerRowType } from '../page';
-import { ClipboardList, Copy, Check, CheckSquare, CopyPlus, Loader2, X, Trash2 } from 'lucide-react';
+import { ClipboardList, Copy, CopyPlus, Check, CheckSquare, Loader2, X, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 import { triggerHaptic } from '@/lib/haptics';
-import { formatTime } from '@/lib/timeValidation';
+import { formatTime, smartParseTime } from '@/lib/timeValidation';
+import { validateAndNormalizeMultiEmail, validateAndNormalizeMultiMobile } from '@/lib/contactValidation';
 
 const COLUMN_FIELDS = [
   'start_time',
@@ -43,6 +44,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
   const [dragStartCell, setDragStartCell] = useState<{ rowIndex: number; colIndex: number; field: string } | null>(null);
   const [isDraggingCells, setIsDraggingCells] = useState(false);
+  const [showCellDeleteConfirm, setShowCellDeleteConfirm] = useState(false);
 
   const [copiedContact, setCopiedContact] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(false);
@@ -63,11 +65,94 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
     );
   }, [selectedRowIds.size, isDeleteMode]);
 
+  // ── Active Working Row Focus & Auto-Advancement ──
+  const [activeRowId, setActiveRowId] = useState<string | null>(null);
+
+  // Default activeRowId to the first pending/uncompleted row
+  useEffect(() => {
+    if (rows.length > 0) {
+      if (!activeRowId || !rows.some((r) => r._id === activeRowId)) {
+        const firstPending = rows.find((r) => !r.outcome_status && !r.is_skipped);
+        setActiveRowId(firstPending ? firstPending._id : rows[0]._id);
+      }
+    }
+  }, [rows, activeRowId]);
+
+  const autoAdvanceRow = useCallback(
+    (currentRowId: string) => {
+      const currentIndex = rows.findIndex((r) => r._id === currentRowId);
+      if (currentIndex === -1) return;
+
+      let nextRow = rows.slice(currentIndex + 1).find((r) => !r.outcome_status && !r.is_skipped);
+      if (!nextRow && currentIndex + 1 < rows.length) {
+        nextRow = rows[currentIndex + 1];
+      }
+
+      if (nextRow) {
+        setActiveRowId(nextRow._id);
+        setTimeout(() => {
+          const el = document.querySelector(`[data-row-id="${nextRow._id}"]`);
+          if (el) {
+            el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+        }, 60);
+      }
+    },
+    [rows]
+  );
+
+  const handleRowUpdateWithAutoAdvance = useCallback(
+    async (rowId: string, patch: Partial<TrackerRowType>) => {
+      const targetRow = rows.find((r) => r._id === rowId);
+
+      await onRowUpdate(rowId, patch);
+
+      if (!targetRow) return;
+
+      const newOutcome = patch.outcome_status !== undefined ? patch.outcome_status : targetRow.outcome_status;
+      const newFollowUpMonth = patch.follow_up_month !== undefined ? patch.follow_up_month : targetRow.follow_up_month;
+
+      // Rule: If call outcome is 'follow_up', do NOT advance unless follow_up_month is set!
+      if (newOutcome === 'follow_up') {
+        if (!newFollowUpMonth) {
+          setActiveRowId(rowId);
+          return;
+        }
+      }
+
+      // If call outcome status is set or follow_up_month was selected, auto-advance to next row!
+      if (patch.outcome_status || (newOutcome && patch.follow_up_month)) {
+        autoAdvanceRow(rowId);
+      }
+    },
+    [rows, onRowUpdate, autoAdvanceRow]
+  );
+
   // ── Cell Drag Range Selection (Excel / Google Sheets style)
   const handleCellMouseDown = useCallback(
     (rowId: string, rowIndex: number, field: string, e: React.MouseEvent) => {
       if (isReadOnly) return;
       const target = e.target as HTMLElement;
+      const cellKey = `${rowId}:${field}`;
+
+      // ── Ctrl / Cmd + Click: Toggle individual cell in disjoint random selection (even on inputs)
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        triggerHaptic('light');
+        setActiveRowId(rowId);
+        const colIdx = COLUMN_FIELDS.indexOf(field);
+        setDragStartCell({ rowIndex, colIndex: colIdx !== -1 ? colIdx : 0, field });
+
+        const newSet = new Set(selectedCells);
+        if (newSet.has(cellKey)) {
+          newSet.delete(cellKey);
+        } else {
+          newSet.add(cellKey);
+        }
+        setSelectedCells(newSet);
+        return;
+      }
+
       if (
         target.tagName === 'INPUT' ||
         target.tagName === 'TEXTAREA' ||
@@ -75,7 +160,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
         target.tagName === 'BUTTON' ||
         target.closest('button')
       ) {
-        if (selectedCells.size > 0 && !selectedCells.has(`${rowId}:${field}`)) {
+        if (selectedCells.size > 0 && !selectedCells.has(cellKey)) {
           setSelectedCells(new Set());
         }
         return;
@@ -83,6 +168,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
 
       e.preventDefault();
       triggerHaptic('light');
+      setActiveRowId(rowId);
       const colIdx = COLUMN_FIELDS.indexOf(field);
       setIsDraggingCells(true);
       setDragStartCell({ rowIndex, colIndex: colIdx !== -1 ? colIdx : 0, field });
@@ -104,7 +190,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
         }
         setSelectedCells(newSet);
       } else {
-        setSelectedCells(new Set([`${rowId}:${field}`]));
+        setSelectedCells(new Set([cellKey]));
       }
     },
     [isReadOnly, rows, dragStartCell, selectedCells]
@@ -147,9 +233,17 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
     return () => window.removeEventListener('mouseup', handleMouseUp);
   }, [isDraggingCells]);
 
-  // Clear / delete selected cells (like Excel / Google Sheets)
-  const handleClearSelectedCells = useCallback(async () => {
+  // Request cell delete: opens in-app confirmation modal without clearing selection
+  const handleRequestCellDelete = useCallback(() => {
     if (selectedCells.size === 0 || isReadOnly) return;
+    triggerHaptic('warning');
+    setShowCellDeleteConfirm(true);
+  }, [selectedCells.size, isReadOnly]);
+
+  // Confirm cell delete: clears cell values and closes modal while keeping selected cells selection intact
+  const handleConfirmCellDelete = useCallback(async () => {
+    if (selectedCells.size === 0 || isReadOnly) return;
+    setShowCellDeleteConfirm(false);
 
     // Group cells by rowId
     const rowPatches: Record<string, Partial<TrackerRowType>> = {};
@@ -200,7 +294,6 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
 
     triggerHaptic('success');
     const totalCells = selectedCells.size;
-    setSelectedCells(new Set());
 
     try {
       await Promise.all(
@@ -212,6 +305,399 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
       toast('Failed to clear selected cells', 'error');
     }
   }, [selectedCells, isReadOnly, onRowUpdate, toast]);
+
+  // ── Copy Selected Cell Range (Excel TSV format for Ctrl+C & random disjoint selection support)
+  const handleCopySelectedCells = useCallback(async () => {
+    if (selectedCells.size === 0) return;
+
+    const rowIndicesSet = new Set<number>();
+    const colIndicesSet = new Set<number>();
+    const selectedList: { rIdx: number; cIdx: number; val: string }[] = [];
+
+    selectedCells.forEach((cellKey) => {
+      const [rowId, field] = cellKey.split(':');
+      const rIdx = rows.findIndex((r) => r._id === rowId);
+      const cIdx = COLUMN_FIELDS.indexOf(field);
+      if (rIdx !== -1 && cIdx !== -1) {
+        rowIndicesSet.add(rIdx);
+        colIndicesSet.add(cIdx);
+        const rowObj = rows[rIdx];
+        let val = '';
+        if (rowObj) {
+          switch (field) {
+            case 'start_time':
+              val = formatTime(rowObj.call_start_time);
+              break;
+            case 'end_time':
+              val = formatTime(rowObj.call_end_time);
+              break;
+            case 'duration':
+              val = rowObj.duration_formatted ?? '';
+              break;
+            case 'company_name':
+              val = rowObj.company_name ?? '';
+              break;
+            case 'hr_name':
+              val = rowObj.hr_name ?? '';
+              break;
+            case 'mobile_number':
+              val = rowObj.mobile_number ?? '';
+              break;
+            case 'email_id':
+              val = rowObj.email_id ?? '';
+              break;
+            case 'outcome_status':
+              val = rowObj.outcome_status ?? '';
+              break;
+            case 'follow_up_month':
+              val = rowObj.follow_up_month ?? '';
+              break;
+            case 'comments':
+              val = rowObj.comments ?? '';
+              break;
+          }
+        }
+        selectedList.push({ rIdx, cIdx, val });
+      }
+    });
+
+    if (selectedList.length === 0) return;
+
+    const minRow = Math.min(...Array.from(rowIndicesSet));
+    const maxRow = Math.max(...Array.from(rowIndicesSet));
+    const minCol = Math.min(...Array.from(colIndicesSet));
+    const maxCol = Math.max(...Array.from(colIndicesSet));
+
+    const boundingBoxArea = (maxRow - minRow + 1) * (maxCol - minCol + 1);
+    let tsvText = '';
+
+    if (boundingBoxArea === selectedCells.size) {
+      // Solid continuous rectangular range
+      const tsvRows: string[] = [];
+      for (let r = minRow; r <= maxRow; r++) {
+        const rowObj = rows[r];
+        if (!rowObj) continue;
+        const rowVals: string[] = [];
+        for (let c = minCol; c <= maxCol; c++) {
+          const field = COLUMN_FIELDS[c];
+          const cellKey = `${rowObj._id}:${field}`;
+          if (selectedCells.has(cellKey)) {
+            let val = '';
+            switch (field) {
+              case 'start_time':
+                val = formatTime(rowObj.call_start_time);
+                break;
+              case 'end_time':
+                val = formatTime(rowObj.call_end_time);
+                break;
+              case 'duration':
+                val = rowObj.duration_formatted ?? '';
+                break;
+              case 'company_name':
+                val = rowObj.company_name ?? '';
+                break;
+              case 'hr_name':
+                val = rowObj.hr_name ?? '';
+                break;
+              case 'mobile_number':
+                val = rowObj.mobile_number ?? '';
+                break;
+              case 'email_id':
+                val = rowObj.email_id ?? '';
+                break;
+              case 'outcome_status':
+                val = rowObj.outcome_status ?? '';
+                break;
+              case 'follow_up_month':
+                val = rowObj.follow_up_month ?? '';
+                break;
+              case 'comments':
+                val = rowObj.comments ?? '';
+                break;
+            }
+            rowVals.push(val);
+          } else {
+            rowVals.push('');
+          }
+        }
+        tsvRows.push(rowVals.join('\t'));
+      }
+      tsvText = tsvRows.join('\n');
+    } else {
+      // Disjoint random multi-cell selection
+      selectedList.sort((a, b) => (a.rIdx !== b.rIdx ? a.rIdx - b.rIdx : a.cIdx - b.cIdx));
+      tsvText = selectedList.map((item) => item.val).join('\n');
+    }
+
+    await copyToClipboard(tsvText);
+    triggerHaptic('success');
+    toast(`Copied ${selectedCells.size} cell(s) to clipboard`, 'success');
+  }, [selectedCells, rows, toast]);
+
+  // ── Paste Clipboard Data into Selected Cell Range (Strict Rules per Column)
+  const handlePasteSelectedCells = useCallback(
+    async (clipboardTextOverride?: string) => {
+      if (isReadOnly) return;
+
+      let text = clipboardTextOverride;
+      if (!text) {
+        try {
+          if (navigator.clipboard && navigator.clipboard.readText) {
+            text = await navigator.clipboard.readText();
+          }
+        } catch (err) {
+          console.warn('Clipboard API access blocked, fallback to keyboard event:', err);
+        }
+      }
+
+      if (!text || !text.trim()) return;
+
+      const rawLines = text.split(/\r?\n/);
+      if (rawLines.length > 1 && rawLines[rawLines.length - 1] === '') {
+        rawLines.pop();
+      }
+      const matrix = rawLines.map((line) => line.split('\t'));
+      if (matrix.length === 0 || matrix[0].length === 0) return;
+
+      let startRowIdx = 0;
+      let startColIdx = 0;
+
+      if (dragStartCell) {
+        startRowIdx = dragStartCell.rowIndex;
+        startColIdx = dragStartCell.colIndex;
+      } else if (selectedCells.size > 0) {
+        let minR = rows.length;
+        let minC = COLUMN_FIELDS.length;
+
+        selectedCells.forEach((cellKey) => {
+          const [rowId, field] = cellKey.split(':');
+          const rIdx = rows.findIndex((r) => r._id === rowId);
+          const cIdx = COLUMN_FIELDS.indexOf(field);
+          if (rIdx !== -1 && rIdx < minR) minR = rIdx;
+          if (cIdx !== -1 && cIdx < minC) minC = cIdx;
+        });
+
+        if (minR < rows.length) startRowIdx = minR;
+        if (minC < COLUMN_FIELDS.length) startColIdx = minC;
+      } else if (activeRowId) {
+        const rIdx = rows.findIndex((r) => r._id === activeRowId);
+        if (rIdx !== -1) startRowIdx = rIdx;
+      }
+
+      const rowPatches: Record<string, Partial<TrackerRowType>> = {};
+      let pastedCount = 0;
+      const newSelectedCells = new Set<string>();
+
+      matrix.forEach((matrixRow, rOffset) => {
+        const targetRowIdx = startRowIdx + rOffset;
+        if (targetRowIdx >= rows.length) return;
+        const targetRow = rows[targetRowIdx];
+
+        matrixRow.forEach((rawCellVal, cOffset) => {
+          const targetColIdx = startColIdx + cOffset;
+          if (targetColIdx >= COLUMN_FIELDS.length) return;
+          const targetField = COLUMN_FIELDS[targetColIdx];
+          const valStr = rawCellVal.trim();
+
+          if (!rowPatches[targetRow._id]) rowPatches[targetRow._id] = {};
+
+          let applied = false;
+
+          // Apply strict per-column rules & constraints on paste
+          switch (targetField) {
+            case 'company_name': {
+              // Rule: Alphanumeric + standard company symbols (&, -, ., /, etc.)
+              const cleaned = valStr.replace(/[^\w\s.&/,'()\-\.]/gi, '').trim();
+              rowPatches[targetRow._id].company_name = cleaned;
+              applied = true;
+              break;
+            }
+            case 'hr_name': {
+              // Rule: Alphabetics ONLY! Strips digits 0-9 and non-name symbols
+              const cleaned = valStr.replace(/[^a-zA-Z\s.'\-]/g, '').trim();
+              rowPatches[targetRow._id].hr_name = cleaned;
+              applied = true;
+              break;
+            }
+            case 'mobile_number': {
+              // Rule: Must be valid according to Indian mobile / landline TRAI standards
+              if (!valStr) {
+                rowPatches[targetRow._id].mobile_number = '';
+                applied = true;
+              } else {
+                const multiRes = validateAndNormalizeMultiMobile(valStr);
+                if (multiRes.valid) {
+                  rowPatches[targetRow._id].mobile_number = multiRes.normalized;
+                  applied = true;
+                }
+              }
+              break;
+            }
+            case 'email_id': {
+              // Rule: Must be valid professional email satisfying official IANA TLDs
+              if (!valStr) {
+                rowPatches[targetRow._id].email_id = '';
+                applied = true;
+              } else {
+                const multiRes = validateAndNormalizeMultiEmail(valStr);
+                if (multiRes.valid) {
+                  rowPatches[targetRow._id].email_id = multiRes.normalized;
+                  applied = true;
+                }
+              }
+              break;
+            }
+            case 'start_time': {
+              if (!valStr) {
+                rowPatches[targetRow._id].call_start_time = undefined;
+                applied = true;
+              } else {
+                const parsed = smartParseTime(valStr);
+                if (parsed) {
+                  rowPatches[targetRow._id].call_start_time = parsed.iso;
+                  applied = true;
+                }
+              }
+              break;
+            }
+            case 'end_time': {
+              if (!valStr) {
+                rowPatches[targetRow._id].call_end_time = undefined;
+                applied = true;
+              } else {
+                const parsed = smartParseTime(valStr);
+                if (parsed) {
+                  rowPatches[targetRow._id].call_end_time = parsed.iso;
+                  applied = true;
+                }
+              }
+              break;
+            }
+            case 'outcome_status': {
+              if (!valStr) {
+                rowPatches[targetRow._id].outcome_status = null as any;
+                applied = true;
+              } else {
+                const lower = valStr.toLowerCase().replace(/\s+/g, '_');
+                const match = OUTCOMES.find((o) => o.value === lower || o.label.toLowerCase() === valStr.toLowerCase());
+                if (match) {
+                  rowPatches[targetRow._id].outcome_status = match.value;
+                  applied = true;
+                }
+              }
+              break;
+            }
+            case 'follow_up_month': {
+              if (!valStr) {
+                rowPatches[targetRow._id].follow_up_month = null as any;
+                applied = true;
+              } else {
+                const match = MONTHS.find((m) => m.toLowerCase() === valStr.toLowerCase());
+                if (match) {
+                  rowPatches[targetRow._id].follow_up_month = match;
+                  applied = true;
+                }
+              }
+              break;
+            }
+            case 'comments': {
+              rowPatches[targetRow._id].comments = valStr.slice(0, 200);
+              applied = true;
+              break;
+            }
+          }
+
+          if (applied) {
+            pastedCount++;
+            newSelectedCells.add(`${targetRow._id}:${targetField}`);
+          }
+        });
+      });
+
+      if (pastedCount > 0) {
+        triggerHaptic('success');
+        setSelectedCells(newSelectedCells);
+        try {
+          await Promise.all(
+            Object.entries(rowPatches).map(([rowId, patch]) => onRowUpdate(rowId, patch))
+          );
+          toast(`Pasted values into ${pastedCount} cell(s)`, 'success');
+        } catch (err) {
+          console.error('Failed to paste cells', err);
+          toast('Failed to paste into selected cells', 'error');
+        }
+      }
+    },
+    [isReadOnly, dragStartCell, selectedCells, rows, activeRowId, onRowUpdate, toast]
+  );
+
+  // Global Keyboard Shortcuts: Ctrl+C (Copy), Ctrl+V (Paste), Del (Clear), Esc (Deselect)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInputActive =
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.tagName === 'SELECT' ||
+          activeEl.getAttribute('contenteditable') === 'true');
+
+      if (e.key === 'Escape') {
+        if (showCellDeleteConfirm) {
+          e.preventDefault();
+          setShowCellDeleteConfirm(false);
+          return;
+        }
+        if (selectedCells.size > 0) {
+          e.preventDefault();
+          setSelectedCells(new Set());
+          return;
+        }
+      }
+
+      const isCopy = (e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C');
+      const isPaste = (e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V');
+
+      if (isCopy && selectedCells.size > 0 && !isInputActive) {
+        e.preventDefault();
+        handleCopySelectedCells();
+        return;
+      }
+
+      if (isPaste && selectedCells.size > 0 && !isInputActive) {
+        handlePasteSelectedCells();
+        return;
+      }
+
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedCells.size > 0 && !isInputActive) {
+        e.preventDefault();
+        handleRequestCellDelete();
+        return;
+      }
+    };
+
+    const handleWindowPaste = (e: ClipboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInputActive =
+        activeEl &&
+        (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT');
+
+      if (selectedCells.size > 0 && !isInputActive) {
+        const pasteText = e.clipboardData?.getData('text/plain');
+        if (pasteText) {
+          e.preventDefault();
+          handlePasteSelectedCells(pasteText);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('paste', handleWindowPaste);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('paste', handleWindowPaste);
+    };
+  }, [selectedCells.size, showCellDeleteConfirm, handleCopySelectedCells, handlePasteSelectedCells, handleRequestCellDelete]);
 
   const handleToggleSelectMode = useCallback(() => {
     triggerHaptic('selection');
@@ -709,7 +1195,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
       if ((e.key === 'Delete' || e.key === 'Backspace') && !isEditingInput) {
         if (selectedCells.size > 0) {
           e.preventDefault();
-          handleClearSelectedCells();
+          handleRequestCellDelete();
           return;
         }
       }
@@ -762,7 +1248,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
     isSelectMode,
     isDeleteMode,
     handleDeleteSelected,
-    handleClearSelectedCells,
+    handleRequestCellDelete,
     handleToggleDeleteMode,
     handleClearSelection,
     handleCopyAll,
@@ -935,11 +1421,13 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
                 row={row}
                 index={index + 1}
                 isSelected={selectedRowIds.has(row._id)}
+                isActive={activeRowId === row._id}
+                onRowClick={() => setActiveRowId(row._id)}
                 isSelectMode={isSelectMode}
                 isDeleteMode={isDeleteMode}
                 selectionTheme={effectiveTheme}
                 isReadOnly={isReadOnly}
-                onUpdate={(patch) => onRowUpdate(row._id, patch)}
+                onUpdate={(patch) => handleRowUpdateWithAutoAdvance(row._id, patch)}
                 onEdit={onEdit}
                 onDelete={() => onDelete(row._id)}
                 onCall={onCall}
@@ -954,10 +1442,10 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
         </div>
       </div>
 
-      {/* Floating Action Indicator for Selected Cells (Excel / Google Sheets style delete) */}
+      {/* Floating Action Indicator for Selected Cells (Excel / Google Sheets style Copy, Paste, Delete) */}
       {!isReadOnly && selectedCells.size > 0 && (
-        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-40 bg-white/95 dark:bg-[#161D2E]/95 backdrop-blur-md border border-blue-500/40 dark:border-sky-400/40 shadow-2xl rounded-2xl px-4 py-2 flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200">
-          <div className="flex items-center gap-2 pr-2 border-r border-border">
+        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-40 bg-white dark:bg-[#161D2E] border-2 border-slate-300 dark:border-slate-700 shadow-[0_20px_50px_rgba(0,0,0,0.35)] rounded-2xl px-4 py-2 flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-4 duration-200 opacity-100">
+          <div className="flex items-center gap-2 pr-2.5 border-r border-border">
             <span className="w-5 h-5 rounded-full bg-blue-600 dark:bg-sky-500 text-white text-[11px] font-bold flex items-center justify-center shadow-xs">
               {selectedCells.size}
             </span>
@@ -966,23 +1454,80 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
             </span>
           </div>
 
+          {/* Copy Button */}
           <button
             type="button"
-            onClick={handleClearSelectedCells}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
-            title="Press Delete on keyboard or click to clear values from selected cells"
+            onClick={handleCopySelectedCells}
+            className="px-3 py-1 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+            title="Copy selected cell values"
           >
-            <Trash2 size={12} /> Clear Values (Del)
+            Copy
+          </button>
+
+          {/* Paste Button */}
+          <button
+            type="button"
+            onClick={() => handlePasteSelectedCells()}
+            className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+            title="Paste clipboard values"
+          >
+            Paste
+          </button>
+
+          {/* Dustbin Icon Delete Button */}
+          <button
+            type="button"
+            onClick={handleRequestCellDelete}
+            className="w-7 h-7 rounded-xl bg-destructive/15 text-destructive hover:bg-destructive hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs active:scale-95 border border-destructive/20"
+            title="Delete selected cell values"
+          >
+            <Trash2 size={13} strokeWidth={2.2} />
           </button>
 
           <button
             type="button"
             onClick={() => setSelectedCells(new Set())}
-            className="p-1 rounded-lg text-fg-subtle hover:text-fg hover:bg-surface transition-colors cursor-pointer"
+            className="p-1 rounded-lg text-fg-subtle hover:text-fg hover:bg-surface transition-colors cursor-pointer shadow-2xs"
             title="Deselect cells (Esc)"
           >
             <X size={14} />
           </button>
+        </div>
+      )}
+
+      {/* In-App Confirmation Pop-Up Modal for Cell Value Deletion */}
+      {showCellDeleteConfirm && (
+        <div className="fixed inset-0 z-[99999] bg-black/60 flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-[#161D2E] border-2 border-slate-300 dark:border-slate-700 shadow-2xl rounded-2xl p-5 max-w-xs w-full space-y-4 animate-in zoom-in-95 duration-150 relative opacity-100">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-destructive/15 text-destructive flex items-center justify-center shrink-0">
+                <Trash2 size={18} />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-fg">Delete Cell Values?</h3>
+                <p className="text-xs text-fg-subtle mt-0.5">
+                  Are you sure you want to clear values from {selectedCells.size} selected cell{selectedCells.size > 1 ? 's' : ''}?
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/60">
+              <button
+                type="button"
+                onClick={() => setShowCellDeleteConfirm(false)}
+                className="px-3.5 py-1.5 rounded-xl border border-border bg-surface hover:bg-surface-hover text-xs font-semibold text-fg transition-all cursor-pointer shadow-2xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCellDelete}
+                className="px-4 py-1.5 rounded-xl bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+              >
+                OK
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -33,6 +33,12 @@ export interface IUser extends Document {
   role_ids: Types.ObjectId[];
   role_codes: string[];
   assigned_college_ids: Types.ObjectId[];
+  // A small number of Team Leaders (e.g. Malvika Kumar, 22 Sep 2026) oversee every
+  // college rather than a fixed set — set this instead of hand-maintaining a list
+  // that would go stale the moment a new college is added. Consumers that need this
+  // user's real college scope should treat this as "all active colleges, resolved
+  // fresh" rather than trusting a possibly-stale assigned_college_ids.
+  has_all_colleges_access?: boolean;
   weekly_focus_locked?: boolean;
   weekly_focus_week_key?: string;
   weekly_focus_locked_at?: Date | null;
@@ -224,6 +230,10 @@ const UserSchema: Schema<IUser> = new Schema(
         index: true,
       },
     ],
+    has_all_colleges_access: {
+      type: Boolean,
+      default: false,
+    },
     weekly_focus_locked: {
       type: Boolean,
       default: false,

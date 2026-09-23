@@ -181,6 +181,16 @@ export default function DailyTrackerPage() {
         if (col.obj) setSelectedCollegeObj(col.obj);
       }
     });
+
+    const handleCollegeChange = (e: any) => {
+      if (e.detail?.id) {
+        setSelectedCollegeId(e.detail.id);
+        setSelectedCollegeName(e.detail.name || '');
+        if (e.detail.obj) setSelectedCollegeObj(e.detail.obj);
+      }
+    };
+    window.addEventListener('ipoms_college_change', handleCollegeChange);
+    return () => window.removeEventListener('ipoms_college_change', handleCollegeChange);
   }, []);
 
   const isViewingOtherUser = Boolean(viewingCoordinatorId && viewingCoordinatorId !== coordinatorId);

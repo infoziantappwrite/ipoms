@@ -68,7 +68,7 @@ export const DEFAULT_OFFICIAL_COLLEGES: CollegeOccupancy[] = [
   { _id: 'col_ngce', college_code: 'NGCE', college_name: 'Narayanaguru College of Engineering', location: 'Kanyakumari, Tamil Nadu', logo_url: '/college-logos/ngce.png' },
   { _id: 'col_hits', college_code: 'HITS', college_name: 'Hindustan Institute of Technology and Science', location: 'Chennai, Tamil Nadu', logo_url: '/college-logos/hits.png' },
   { _id: 'col_nehru', college_code: 'NEHRU', college_name: 'Nehru Institute of Technology', location: 'Coimbatore, Tamil Nadu', logo_url: '/college-logos/nehru.png' },
-  { _id: 'col_marephra', college_code: 'MAREPHRA', college_name: 'Mar Ephraem College of Engineering and Technology', location: 'Kanyakumari, Tamil Nadu', logo_url: '/college-logos/marephraem.png' },
+  { _id: 'col_marephra', college_code: 'MAREPHRAM', college_name: 'Mar Ephraem College of Engineering and Technology', location: 'Kanyakumari, Tamil Nadu', logo_url: '/college-logos/marephraem.png' },
 ];
 
 /**
@@ -114,10 +114,10 @@ export const DEFAULT_OFFICIAL_ALLOCATIONS: Record<string, string[]> = {
   'seshmitha tamilselvi': ['MCET', 'MEC'],
   'seshmitha tamilselvi r': ['MCET', 'MEC'],
 
-  // Sujitha (Team Leader): NEHRU, MAREPHRA, KPR, HITS, SONA
-  'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
-  'sujitha': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
-  'sujitha s': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
+  // Sujitha (Team Leader): NEHRU, MAREPHRAM, KPR, HITS, SONA
+  'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
+  'sujitha': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
+  'sujitha s': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
 };
 
 /** Resolves default official college IDs for the current user */
@@ -797,8 +797,8 @@ export function setActiveCollege(id: string, name: string, obj?: College | null)
 
 // Official focus college allocations mapping for coordinators and team leaders
 export const DEFAULT_COORDINATOR_COLLEGE_ROSTER: Record<string, string[]> = {
-  'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
-  'sujitha': ['NEHRU', 'MAREPHRA', 'KPR', 'HITS', 'SONA'],
+  'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
+  'sujitha': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
   'seshmitha_tamil@icl.today': ['MCET', 'MEC'],
   'seshmitha': ['MCET', 'MEC'],
   'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
@@ -819,7 +819,7 @@ export async function resolveDefaultCollege(): Promise<{ id: string; name: strin
   const isSujitha = userEmail.includes('sujitha') || userName.includes('sujitha') || /sujitha/i.test(user?.full_name || '');
   const isTamil = userEmail.includes('tamil') || userName.includes('seshmitha') || /tamil/i.test(user?.full_name || '');
 
-  // Safety check: Sujitha handles HITS, NEHRU, KPR, SONA, MAREPHRA. She does NOT handle MCET (MCET is handled by Tamil Selvi).
+  // Safety check: Sujitha handles HITS, NEHRU, KPR, SONA, MAREPHRAM. She does NOT handle MCET (MCET is handled by Tamil Selvi).
   if (isSujitha && (current.obj?.college_code === 'MCET' || /mahalingam|mcet/i.test(current.name))) {
     localStorage.removeItem(ACTIVE_COLLEGE_ID_KEY);
     localStorage.removeItem(ACTIVE_COLLEGE_NAME_KEY);
@@ -829,15 +829,32 @@ export async function resolveDefaultCollege(): Promise<{ id: string; name: strin
     current.obj = null;
   }
 
-  // 1. If coordinator has active focus colleges, prioritize active focus
+  // 1. If user has an active college set in session/localStorage, check if valid and preserve it
+  if (current.id) {
+    if (!(isSujitha && (current.obj?.college_code === 'MCET' || /mahalingam|mcet/i.test(current.name)))) {
+      return current;
+    }
+  }
+
+  // 2. If coordinator has active focus colleges, prioritize active focus
   if (focusedIds.length > 0) {
     const validFocusedIds = isSujitha ? focusedIds.filter(id => id.toUpperCase() !== 'MCET') : focusedIds;
-    const isCurrentInFocus = validFocusedIds.some(
-      (fid) =>
-        fid.toLowerCase() === current.id.toLowerCase() ||
-        (current.obj &&
-          (fid.toLowerCase() === current.obj.college_code.toLowerCase() ||
-            fid.toLowerCase() === current.obj._id.toLowerCase()))
+    const currentCollegeCode = current.obj?.college_code || getCollegeAcronym(current.id || current.name || current.obj);
+    const isCurrentInFocus = current.id && validFocusedIds.some(
+      (fid) => {
+        const fLower = String(fid).toLowerCase().trim();
+        const fCode = fLower.replace(/^col_/i, '');
+        const cIdLower = String(current.id).toLowerCase().trim();
+        const cCodeLower = String(currentCollegeCode).toLowerCase().trim();
+        const cObjIdLower = String(current.obj?._id || '').toLowerCase().trim();
+        return (
+          fLower === cIdLower ||
+          fLower === cCodeLower ||
+          fLower === cObjIdLower ||
+          fCode === cCodeLower ||
+          (fCode && cIdLower.includes(fCode))
+        );
+      }
     );
     if (isCurrentInFocus && current.id) {
       return current;
@@ -851,13 +868,6 @@ export async function resolveDefaultCollege(): Promise<{ id: string; name: strin
     if (firstFocused) {
       setActiveCollege(firstFocused._id, firstFocused.college_name, firstFocused);
       return { id: firstFocused._id, name: firstFocused.college_name, obj: firstFocused };
-    }
-  }
-
-  // 2. Fallback to existing active college if valid
-  if (current.id && current.obj) {
-    if (!(isSujitha && (current.obj.college_code === 'MCET' || /mahalingam|mcet/i.test(current.name)))) {
-      return current;
     }
   }
 

@@ -179,16 +179,16 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
       return;
     }
 
-    // Rule: At a time, maximum 1 college only is allowed to be co-handled with another coordinator or team leader
+    // Rule: At most 2 co-handled/shared colleges allowed per coordinator or team leader
     if (isSharedWithOther) {
-      const alreadyHasShared = colleges.some((c) => {
+      const sharedCount = colleges.filter((c) => {
         if (!isCollegeSelected(c, selectedIds)) return false;
         const occ = getCleanOccupancy(c);
         return occ.isSharedWithOther;
-      });
-      if (alreadyHasShared) {
+      }).length;
+      if (sharedCount >= 2) {
         toast(
-          'At a time, maximum 1 college only is allowed to be co-handled by 2 coordinators or team leader. You already have a co-handled college selected.',
+          'At a time, maximum 2 colleges are allowed to be co-handled by 2 coordinators or team leaders. You already have 2 co-handled colleges selected.',
           'warning'
         );
         return;
@@ -299,7 +299,7 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
             <p className="text-xs text-fg-subtle mt-1 leading-relaxed">
               {isLocked
                 ? 'Your active institutions are saved and locked for the week. Click "Change Selection" anytime to adjust.'
-                : `Select 1 to ${maxAllowedColleges} partner institutions (at most 1 co-handled by 2 people). Click Save to confirm and lock.`}
+                : `Select 1 to ${maxAllowedColleges} partner institutions (at most 2 co-handled by 2 people). Click Save to confirm and lock.`}
             </p>
           </div>
         </div>
@@ -547,7 +547,7 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
 
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-blue-500" />
-            <span>Rule: Minimum 1, Maximum {maxAllowedColleges} colleges per coordinator ({isLeadership ? '5 for Team Leader' : 'up to 1 co-handled'}).</span>
+            <span>Rule: Minimum 1, Maximum {maxAllowedColleges} colleges per coordinator (up to 2 co-handled).</span>
           </div>
         </div>
       </div>

@@ -451,7 +451,7 @@ export const COLLEGE_META_MAP: Record<string, { name: string; location: string; 
   ACET: { name: 'Akshaya College of Engineering and Technology', location: 'Coimbatore, Tamil Nadu', aliases: ['ACET'] },
   NGP: { name: 'Dr. N.G.P. Institute of Technology', location: 'Coimbatore, Tamil Nadu', aliases: ['NGP', 'DRNGP'] },
   MCET: { name: 'Dr. Mahalingam College of Engineering and Technology', location: 'Pollachi, Tamil Nadu', aliases: ['MCET'] },
-  'MAR EPHRAEM': { name: 'Mar Ephraem College of Engineering and Technology', location: 'Marthandam, Tamil Nadu', aliases: ['MAR EPHRAEM', 'MAR', 'MAREPHRA', 'MAREPHRAEM', 'MAR EPHREAM'] },
+  'MAR EPHRAEM': { name: 'Mar Ephraem College of Engineering and Technology', location: 'Marthandam, Tamil Nadu', aliases: ['MAR EPHRAEM', 'MAREPHRAM', 'MAR', 'MAREPHRA', 'MAREPHRAEM', 'MAR EPHREAM'] },
   MEC: { name: 'Muthayammal Engineering College', location: 'Singlandhapuram, Tamil Nadu', aliases: ['MEC', 'MUTHAYAMMAL'] },
 };
 

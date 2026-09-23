@@ -6,7 +6,7 @@ import { apiFetch } from '@/lib/api';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
 import { useToast } from '@/components/ui/Toast';
-import { validateAndNormalizeIndianMobile, validateAndNormalizeEmail } from '@/lib/contactValidation';
+import { validateAndNormalizeMultiMobile, validateAndNormalizeMultiEmail } from '@/lib/contactValidation';
 
 const BATCH_YEARS = ['2027', '2028', '2029', '2030', '2031', '2032', '2033', '2034', '2035'];
 
@@ -17,7 +17,7 @@ interface Props {
   collegeId: string;
   coordinatorId: string;
   onClose: () => void;
-  onAdded: () => void;
+  onAdded: (newRow?: any) => void;
   /** True when collegeId isn't one of the acting coordinator's assigned colleges. */
   isForeignCollege?: boolean;
   collegeName?: string;
@@ -142,23 +142,27 @@ export function AddCompanyModal({
     }
 
     let normalizedContact = '';
+    let mobArr: string[] = [];
     if (contactNumber.trim()) {
-      const res = validateAndNormalizeIndianMobile(contactNumber.trim());
+      const res = validateAndNormalizeMultiMobile(contactNumber.trim());
       if (!res.valid) {
         toast(res.error || 'Invalid Indian mobile number', 'warning');
         return;
       }
       normalizedContact = res.normalized;
+      mobArr = res.normalized ? res.normalized.split(',').map((s) => s.trim()).filter(Boolean) : [];
     }
 
     let normalizedEmail = '';
+    let emailArr: string[] = [];
     if (emailId.trim()) {
-      const res = validateAndNormalizeEmail(emailId.trim());
+      const res = validateAndNormalizeMultiEmail(emailId.trim());
       if (!res.valid) {
         toast(res.error || 'Invalid email address', 'warning');
         return;
       }
       normalizedEmail = res.normalized;
+      emailArr = res.normalized ? res.normalized.split(',').map((s) => s.trim()).filter(Boolean) : [];
     }
 
     if (followUpDate) {
@@ -202,9 +206,9 @@ export function AddCompanyModal({
           coordinator_id: coordinatorId,
           company_name: companyName.trim(),
           contact_number: normalizedContact || undefined,
-          mobile_numbers: normalizedContact ? [normalizedContact] : [],
+          mobile_numbers: mobArr,
           email_id: normalizedEmail || undefined,
-          email_ids: normalizedEmail ? [normalizedEmail] : [],
+          email_ids: emailArr,
           jd_received_date: jdReceivedDate || undefined,
           db_shared_date: dbSharedDate || undefined,
           job_role: jobRole.trim(),
@@ -225,7 +229,7 @@ export function AddCompanyModal({
         if (typeof window !== 'undefined') {
           sessionStorage.removeItem('ipoms_weekly_add_company_draft');
         }
-        onAdded();
+        onAdded(res.data);
         onClose();
       } else {
         if (

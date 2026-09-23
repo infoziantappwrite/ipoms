@@ -17,9 +17,11 @@ import {
 import {
   validateAndNormalizeIndianContact,
   validateAndNormalizeEmail,
+  validateAndNormalizeMultiMobile,
+  validateAndNormalizeMultiEmail,
 } from '@/lib/contactValidation';
 
-const OUTCOMES: { value: CallOutcome; label: string; color: string }[] = [
+export const OUTCOMES: { value: CallOutcome; label: string; color: string }[] = [
   { value: 'jd_received', label: 'JD Received', color: 'text-primary' },
   { value: 'hiring_freezed', label: 'Hiring Freezed', color: 'text-warning' },
   { value: 'hiring_completed', label: 'Hiring Completed', color: 'text-info' },
@@ -63,6 +65,8 @@ interface Props {
   row: TrackerRowType;
   index?: number;
   isSelected?: boolean;
+  isActive?: boolean;
+  onRowClick?: () => void;
   isSelectMode?: boolean;
   isDeleteMode?: boolean;
   selectionTheme?: 'blue' | 'emerald' | 'purple' | 'amber' | 'rose' | 'pink' | 'orange';
@@ -82,6 +86,8 @@ export function TrackerRow({
   row,
   index,
   isSelected,
+  isActive,
+  onRowClick,
   isSelectMode,
   isDeleteMode,
   selectionTheme = 'blue',
@@ -107,13 +113,13 @@ export function TrackerRow({
   const effectiveTheme = isDeleteMode ? 'rose' : selectionTheme;
 
   const rowBgTheme: Record<string, string> = {
-    blue: 'bg-[#EFF6FF] dark:bg-[#1E293B] ring-1 ring-inset ring-blue-500/40',
-    emerald: 'bg-[#ECFDF5] dark:bg-[#132E27] ring-1 ring-inset ring-emerald-500/40',
-    purple: 'bg-[#FAF5FF] dark:bg-[#2D1B4E] ring-1 ring-inset ring-purple-500/40',
-    amber: 'bg-[#FFFBEB] dark:bg-[#2E2310] ring-1 ring-inset ring-amber-500/40',
-    rose: 'bg-[#FEF2F2] dark:bg-[#34141A] ring-1 ring-inset ring-rose-500/40',
-    pink: 'bg-[#FDF2F8] dark:bg-[#381224] ring-1 ring-inset ring-pink-500/40',
-    orange: 'bg-[#FFF7ED] dark:bg-[#331B0E] ring-1 ring-inset ring-orange-500/40',
+    blue: 'bg-[#EFF6FF] dark:bg-[#1E293B]',
+    emerald: 'bg-[#ECFDF5] dark:bg-[#132E27]',
+    purple: 'bg-[#FAF5FF] dark:bg-[#2D1B4E]',
+    amber: 'bg-[#FFFBEB] dark:bg-[#2E2310]',
+    rose: 'bg-[#FEF2F2] dark:bg-[#34141A]',
+    pink: 'bg-[#FDF2F8] dark:bg-[#381224]',
+    orange: 'bg-[#FFF7ED] dark:bg-[#331B0E]',
   };
 
   const rowBg = row.is_skipped
@@ -124,7 +130,7 @@ export function TrackerRow({
 
   const getCellSelectionClass = (field: string) => {
     if (isCellSelected?.(field)) {
-      return 'ring-2 ring-inset ring-blue-500 bg-blue-500/15 dark:bg-blue-500/25';
+      return 'ring-2 ring-inset ring-blue-600 dark:ring-sky-400 bg-[#DBEAFE] dark:bg-[#1E3A8A] text-slate-950 dark:text-white font-medium !opacity-100 shadow-2xs';
     }
     return '';
   };
@@ -282,7 +288,7 @@ export function TrackerRow({
     }
   }, [onUpdate, row.hr_name]);
 
-  // ── Mobile Number blur: validates 10 digits Indian mobile (starts 6-9) & Indian landline (STD code)
+  // ── Mobile Number blur: validates 10 digits Indian mobile & landline (allows comma-separated multiple numbers)
   const handleMobileBlur = useCallback(() => {
     const val = mobileRef.current?.value?.trim() ?? '';
     if (!val) {
@@ -292,7 +298,7 @@ export function TrackerRow({
       return;
     }
 
-    const validation = validateAndNormalizeIndianContact(val);
+    const validation = validateAndNormalizeMultiMobile(val);
     if (validation.valid) {
       if (mobileRef.current) {
         mobileRef.current.value = validation.normalized;
@@ -308,7 +314,7 @@ export function TrackerRow({
     }
   }, [onUpdate, row.mobile_number]);
 
-  // ── Email blur: enforces @ and valid official domain extensions (.com, .org, .in, etc.)
+  // ── Email blur: enforces valid official domain extensions (allows comma-separated multiple emails)
   const handleEmailBlur = useCallback(() => {
     const val = emailRef.current?.value?.trim() ?? '';
     if (!val) {
@@ -318,7 +324,7 @@ export function TrackerRow({
       return;
     }
 
-    const validation = validateAndNormalizeEmail(val);
+    const validation = validateAndNormalizeMultiEmail(val);
     if (validation.valid) {
       if (emailRef.current) {
         emailRef.current.value = validation.normalized;
@@ -406,7 +412,11 @@ export function TrackerRow({
   return (
     <div
       data-row-id={row._id}
-      className={`grid ${gridTemplate} divide-x divide-border/60 min-h-[44px] text-xs ${rowBg} hover:brightness-[0.98] dark:hover:brightness-110 focus-within:brightness-[0.98] dark:focus-within:brightness-110 transition-all group border-b border-border`}
+      className={`grid ${gridTemplate} divide-x divide-border/60 min-h-[44px] text-xs ${rowBg} transition-colors group ${
+        isSelected
+          ? 'border-b border-primary/30'
+          : 'border-b border-border/80'
+      }`}
     >
       {/* S.No / Selection Checkbox (Frozen Col 1) */}
       <div className={`sticky left-0 z-10 ${rowBg} px-1.5 py-2 flex items-center justify-center gap-1.5 select-none transition-colors`}>

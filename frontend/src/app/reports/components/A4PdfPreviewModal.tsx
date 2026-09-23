@@ -29,6 +29,7 @@ import {
   FileText,
   Loader2,
   Sparkles,
+  PhoneCall,
 } from 'lucide-react';
 import { COLLEGE_LOGO_MAP, getCollegeLogoUrl } from '@/lib/collegeLogo';
 import {
@@ -1844,6 +1845,74 @@ export function A4PdfPreviewModal({
                     )}
                   </div>
                 )}
+
+                {/* Calling Activity Summary — calls + duration per handled college
+                    for the report's month, real Daily Tracker numbers (22 Sep 2026). */}
+                {report.included_sections?.calling_activity && report.sections?.calling_activity && (
+                  <div className="space-y-1.5">
+                    <div className="mb-2">
+                      <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
+                        <PhoneCall size={14} className="text-[#007791] shrink-0" /> 10. CALLING ACTIVITY SUMMARY
+                      </h3>
+                      <div className="h-[2px] w-full bg-[#007791] mt-1" />
+                    </div>
+                    {report.sections.calling_activity.length === 0 ? (
+                      <p className="text-[11px] text-slate-400 italic py-1 pl-1">
+                        No colleges resolved for this coordinator's calling activity this month.
+                      </p>
+                    ) : (
+                      <table className="w-full text-[11px] border-collapse table-fixed bg-white">
+                        <colgroup>
+                          <col style={{ width: '38px' }} />
+                          <col style={{ width: '46%' }} />
+                          <col style={{ width: '25%' }} />
+                          <col style={{ width: '27%' }} />
+                        </colgroup>
+                        <thead className="print:table-header-group">
+                          <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                            <th className="py-2 px-1 text-center font-bold">S.No</th>
+                            <th className="py-2 px-2 text-left font-bold">College</th>
+                            <th className="py-2 px-2 text-center font-bold">Calls Made</th>
+                            <th className="py-2 px-2 text-center font-bold">Hours Dedicated</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200/80">
+                          {report.sections.calling_activity.map((r: any, idx: number) => (
+                            <tr
+                              key={idx}
+                              className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
+                            >
+                              <td className="py-2 px-1 text-center font-bold text-[#007791]">
+                                {r.s_no}
+                              </td>
+                              <td className="py-2 px-2 text-left font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
+                                {r.college_name}
+                              </td>
+                              <td className="py-2 px-2 text-center font-bold text-[#0a2540]">
+                                {r.total_calls ?? 0}
+                              </td>
+                              <td className="py-2 px-2 text-center font-bold text-blue-600">
+                                {r.total_duration_formatted || '00m 00s'}
+                              </td>
+                            </tr>
+                          ))}
+                          {report.calling_activity_totals && (
+                            <tr className="bg-blue-50">
+                              <td className="py-2 px-1"></td>
+                              <td className="py-2 px-2 text-left font-bold text-[#0a2540]">TOTAL</td>
+                              <td className="py-2 px-2 text-center font-bold text-[#0a2540]">
+                                {report.calling_activity_totals.total_calls ?? 0}
+                              </td>
+                              <td className="py-2 px-2 text-center font-bold text-blue-600">
+                                {report.calling_activity_totals.total_duration_formatted || '00m 00s'}
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
               </>
             )}
 
@@ -2281,6 +2350,74 @@ export function A4PdfPreviewModal({
                             </td>
                           </tr>
                         ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )}
+
+              {/* Calling Activity Summary — calls + duration per handled college for
+                  the report's month, real Daily Tracker numbers (22 Sep 2026). */}
+              {report.included_sections?.calling_activity && report.sections?.calling_activity && (
+                <div className="space-y-1.5">
+                  <div className="mb-2">
+                    <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
+                      <PhoneCall size={14} className="text-[#007791] shrink-0" /> 6. CALLING ACTIVITY SUMMARY
+                    </h3>
+                    <div className="h-[2px] w-full bg-[#007791] mt-1" />
+                  </div>
+                  {report.sections.calling_activity.length === 0 ? (
+                    <p className="text-[11px] text-slate-400 italic py-1 pl-1">
+                      No colleges resolved for this coordinator's calling activity this month.
+                    </p>
+                  ) : (
+                    <table className="w-full text-[11px] border-collapse table-fixed bg-white">
+                      <colgroup>
+                        <col style={{ width: '38px' }} />
+                        <col style={{ width: '46%' }} />
+                        <col style={{ width: '25%' }} />
+                        <col style={{ width: '27%' }} />
+                      </colgroup>
+                      <thead className="print:table-header-group">
+                        <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                          <th className="py-2 px-1 text-center font-bold">S.No</th>
+                          <th className="py-2 px-2 text-left font-bold">College</th>
+                          <th className="py-2 px-2 text-center font-bold">Calls Made</th>
+                          <th className="py-2 px-2 text-center font-bold">Hours Dedicated</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200/80">
+                        {report.sections.calling_activity.map((r: any, idx: number) => (
+                          <tr
+                            key={idx}
+                            className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
+                          >
+                            <td className="py-2 px-1 text-center font-bold text-[#007791]">
+                              {r.s_no}
+                            </td>
+                            <td className="py-2 px-2 text-left font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
+                              {r.college_name}
+                            </td>
+                            <td className="py-2 px-2 text-center font-bold text-[#0a2540]">
+                              {r.total_calls ?? 0}
+                            </td>
+                            <td className="py-2 px-2 text-center font-bold text-blue-600">
+                              {r.total_duration_formatted || '00m 00s'}
+                            </td>
+                          </tr>
+                        ))}
+                        {report.calling_activity_totals && (
+                          <tr className="bg-blue-50">
+                            <td className="py-2 px-1"></td>
+                            <td className="py-2 px-2 text-left font-bold text-[#0a2540]">TOTAL</td>
+                            <td className="py-2 px-2 text-center font-bold text-[#0a2540]">
+                              {report.calling_activity_totals.total_calls ?? 0}
+                            </td>
+                            <td className="py-2 px-2 text-center font-bold text-blue-600">
+                              {report.calling_activity_totals.total_duration_formatted || '00m 00s'}
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   )}

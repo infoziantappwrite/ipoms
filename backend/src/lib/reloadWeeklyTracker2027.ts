@@ -250,8 +250,8 @@ export async function reloadWeeklyTrackerFrom2027Workbook(customPath?: string): 
       const ALIAS_MAP: Record<string, string> = {
         ACHARIYA: 'ACET',
         KARPAGAM: 'KARPAGAM',
-        'MAR EPHRAEM': 'MAREPHRA',
-        MAR: 'MAREPHRA',
+        'MAR EPHRAEM': 'MAREPHRAM',
+        MAR: 'MAREPHRAM',
         EGS: 'EGS',
         'E.G.S': 'EGS',
         NARAYANAGURU: 'NGCE',

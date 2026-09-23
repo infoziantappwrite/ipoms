@@ -1376,6 +1376,64 @@ export async function generateReportCanvas(
         measuredRows,
       });
     }
+
+    // 6. Calling Activity Summary — calls + duration per handled college for the
+    // report's month, real Daily Tracker numbers (user-requested, 22 Sep 2026).
+    if (report.included_sections?.calling_activity && report.sections?.calling_activity && report.sections.calling_activity.length > 0) {
+      const callRows = report.sections.calling_activity;
+      const totals = report.calling_activity_totals;
+      const headers = ['#', 'College', 'Calls Made', 'Hours Dedicated'];
+      const colWidths = [36, 380, 180, 204];
+      const rawRows: string[][] = callRows.map((r: any) => [
+        String(r.s_no || ''),
+        String(r.college_name || '—'),
+        String(r.total_calls ?? 0),
+        String(r.total_duration_formatted || '00m 00s'),
+      ]);
+      if (totals) {
+        rawRows.push(['', 'TOTAL', String(totals.total_calls ?? 0), String(totals.total_duration_formatted || '00m 00s')]);
+      }
+
+      const measuredRows: MeasuredRow[] = rawRows.map((row: string[], rIdx: number) => {
+        const isTotalRow = totals && rIdx === rawRows.length - 1;
+        let maxLines = 1;
+        const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
+          const colW = colWidths[cIdx];
+          const maxCellW = colW - 14;
+          const font = isTotalRow
+            ? 'bold 12px system-ui, -apple-system, sans-serif'
+            : cIdx === 1
+            ? 'bold 12px system-ui, -apple-system, sans-serif'
+            : cIdx === 0
+            ? '600 12px monospace'
+            : '600 12px system-ui, -apple-system, sans-serif';
+          const fillStyle = isTotalRow
+            ? '#0a2540'
+            : cIdx === 1
+            ? '#0a2540'
+            : cIdx === 0
+            ? '#007791'
+            : '#007791';
+
+          const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
+          if (lines.length > maxLines) maxLines = lines.length;
+          return { lines, font, fillStyle };
+        });
+        const height = Math.max(38, maxLines * 17 + 16);
+        return { cells, height };
+      });
+
+      sectionsToDraw.push({
+        title: '6. CALLING ACTIVITY SUMMARY',
+        badge: `${callRows.length} ${callRows.length === 1 ? 'College' : 'Colleges'}`,
+        accentBg: '#eff6ff',
+        accentBorder: '#bfdbfe',
+        accentText: '#0a2540',
+        headers,
+        colWidths,
+        measuredRows,
+      });
+    }
   }
 
   // 6. Daily Positives & Daily JD Received Sections
