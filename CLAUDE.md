@@ -1671,6 +1671,41 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     not changed:** 69 company names have more than one non-deleted `active_leads` row (case-insensitive),
     and the sync's `activeMap` keeps only the last row per normalised name.
 
+66. **Weekly Tracker "Paste" button, 24 Sep 2026 (user-requested feature, design agreed before building).**
+    A green **Paste** button next to Sync (all roles, incl. Malvika Kumar; disabled until a real college is
+    selected). Flow: (1) tick which columns you are pasting - **Company name is always the first column** (it is
+    the key) plus any of Role, CTC, Contact, Email, Follow-up date, JD received date, DB shared date; presets
+    "Entire" (Company, Role, CTC, Contact, Email) and "Company name only"; (2) paste from Excel/Sheets (tab
+    separated; quoted multi-line cells handled; a header row starting with "Company" is skipped; up to 200
+    rows); (3) preview - the server checks every row and says New / Update / Skipped with the reason; if new
+    companies would be created the user must pick which of the **9 sections** they go into (Apply stays disabled
+    until chosen); nothing is saved until Apply. `POST /api/v1/weekly-tracker/bulk-paste` (new
+    `lib/weeklyPasteRoutes.ts`, registered after the Active Leads routes) serves BOTH the preview
+    (`dry_run:true`) and the save through one planning function so they cannot disagree. Rules: Contact/Email
+    validated by the same Indian mobile/landline + email rules as the screen (`lib/contactRules.ts` is a
+    **mirror of `frontend/src/lib/contactValidation.ts` - change both together**; the older, smaller
+    `lib/contactValidation.ts` is a different file used by `scripts/autoCleanMetadataContacts.ts`);
+    Follow-up date must be today or later (IST), JD-received / DB-shared may be past; dates day-first
+    (DD/MM/YYYY, DD-MM-YYYY, 12 Oct 2026, ISO), invalid/impossible dates refused; Contact, Email and Role are
+    ADDED to what a row has (duplicates skipped, nothing overwritten) and new contacts/emails are also added to
+    the Metadata record (as editing by hand already does); CTC and dates replace the current value; blank
+    cells never erase; a bare CTC "3-6" becomes "3 - 6 LPA". **New rows are created only when no date column is
+    pasted**, and only if the company is in Metadata (same rule as adding by hand); role defaults to "Graduate
+    Trainee" and status to "Added via Paste" (CTC may be blank - shown as a warning). A company already in the
+    college is found by the name the tracker uses (falling back to Metadata's spelling); a company with 2+ rows
+    in one college is refused ("edit them directly"); a company twice in one paste is refused. Foreign-college
+    warning reused (`executeWithForeignCheck`, now with an optional cancel callback) and the college owners get
+    ONE notification for the whole paste. The whole paste is one **undo step** (creates are removed, updates
+    restored from saved "before" values; contacts already added to Metadata are not removed). **Verified:**
+    server previews and a real save/undo with a throwaway Metadata company (all removed afterwards): refused
+    without a section, refused past follow-up date, refused dates for a company not on the tracker, role
+    de-duplicated case-insensitively, phone/email merged and synced to Metadata, undo restored the row; and in
+    a real browser as Mohanaradha on AIHT: step 1/2/3, 9 sections listed, Apply disabled until a section is
+    chosen, 1 valid row applied while an unknown company and a bad phone/email row were skipped, page
+    updated, no errors. **Process slip, fixed before commit:** my first backend validator copy overwrote an
+    existing `lib/contactValidation.ts`; restored from git and the mirror renamed. **Not tested in a browser:**
+    the undo button after a paste, pasting into a college you don't handle (foreign warning), dark mode.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

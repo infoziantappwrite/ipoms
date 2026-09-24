@@ -34,6 +34,7 @@ import { startPositiveSyncReminderJob } from './jobs/positiveSyncReminder';
 import rateLimit from 'express-rate-limit';
 import { registerAuthRoutes } from './lib/authRoutes';
 import { registerActiveLeadRoutes, syncLeadFromDailyTracker } from './lib/activeLeadRoutes';
+import { registerWeeklyPasteRoutes } from './lib/weeklyPasteRoutes';
 import { registerPendingTaskRoutes } from './lib/pendingTaskRoutes';
 import { seedMasterDailyLeads, MASTER_POSITIVES_DATA } from './lib/seedMasterDailyLeads';
 import { seedAugustAllCollegesPositives } from './lib/seedAugustAllCollegesPositives';
@@ -730,6 +731,9 @@ app.use('/api/v1', async (req: Request, res: Response, next: NextFunction) => {
 
 // Register Active Leads routes
 registerActiveLeadRoutes(app);
+
+// Weekly Tracker "Paste" (preview + save share one code path)
+registerWeeklyPasteRoutes(app, { notifyForeignCollegeOwners, getFridayWeekBounds });
 
 // Register Pending Task routes
 registerPendingTaskRoutes(app);
