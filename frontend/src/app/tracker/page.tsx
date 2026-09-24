@@ -194,7 +194,8 @@ export default function DailyTrackerPage() {
 
         // If we only sent copies to another coordinator, our originals are still right here: stay on
         // the current college and refresh. If rows really moved inside our own sheet, follow them.
-        const sharedOnly = mode === 'move' && ((res.data as any)?.shared_count || 0) > 0 && ((res.data as any)?.moved_count || 0) === 0;
+        const rd: any = res.data || {};
+        const sharedOnly = (rd.shared_count || 0) > 0 && (rd.moved_count || 0) === 0 && (rd.copied_count || 0) === 0;
         if (sharedOnly) {
           loadTodayRows();
         } else {

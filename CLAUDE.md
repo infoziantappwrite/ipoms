@@ -1601,6 +1601,23 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     `403`; Malavika deleting her copy left the original untouched. `tsc --noEmit` clean both sides.
     **Not re-checked in a browser this round** (the earlier browser check covered the old Send Back).
 
+62. **"I copied to MCET but can't see it in MCET" - Copy now behaves like Move, 24 Sep 2026
+    (user-reported).** Cause: the Copy button (`mode: 'copy'`) still created the duplicate under the
+    *sender's own* name. But the Daily Tracker page opens any college outside the user's focus as a
+    read-only view of the coordinator who handles it (`tracker/page.tsx`, the "College is outside user
+    focus" branch), so a coordinator's own rows in someone else's college are hidden there - yet they
+    still counted on the sender's dashboard (timing and outcome were copied too). Now
+    `POST /daily-tracker/bulk-move` with `mode: 'copy'` to a college another coordinator handles sends
+    them a timing-less, outcome-less copy exactly like Move (item 61; shared helper `shareCopyWith`),
+    with the same duplicate skip and owner-only check; Copy into a college the sender handles is
+    unchanged (an own copy). The page no longer jumps to the target college after sending copies to
+    someone else. Verified live with throwaway rows (0 left): Copy AIHT->MCET gave Seshmitha
+    (MCET's coordinator) a copy with no timing/outcome tagged `Shared (AIHT / A.Mohanaradha)` and gave
+    Mohanaradha nothing in MCET; Copy AIHT->ACET (both hers) still made her own copy with timing.
+    **Left for the user to decide:** two pre-existing stray rows ("Revature LLC.", 40s, no_response,
+    created 15:54 and 16:11 IST) sit in MCET under Mohanaradha from the old Copy behaviour - hidden on
+    screen but counted in her dashboard totals.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

@@ -2482,10 +2482,88 @@ app.post('/api/v1/daily-tracker/bulk-move', async (req: Request, res: Response) 
 
     const objectIds = row_ids.map((id: string) => new Types.ObjectId(String(id)));
 
+    // Who handles the TARGET college? Placement Coordinator preferred over Team Leader;
+    // all-colleges oversight accounts are ignored.
+    const targetObjectId = new Types.ObjectId(String(target_college_id));
+    const ownerCandidates = await User.find({
+      assigned_college_ids: targetObjectId,
+      is_deleted: { $ne: true },
+      account_status: 'active',
+      has_all_colleges_access: { $ne: true },
+      role_codes: { $in: ['PLACEMENT_COORDINATOR', 'TEAM_LEADER'] },
+    })
+      .select('_id full_name role_codes')
+      .sort({ full_name: 1 })
+      .lean();
+    const coordinatorOwners = ownerCandidates.filter((u: any) => (u.role_codes || []).includes('PLACEMENT_COORDINATOR'));
+    const targetOwners: any[] = coordinatorOwners.length > 0 ? coordinatorOwners : ownerCandidates;
+
+    let sharedCount = 0;
+    let skippedDuplicates = 0;
+    const sharedToNames = new Set<string>();
+
+    // Give `owner` a fresh copy of a contact: details and comments only, NO call timing and NO
+    // outcome (an outcome would count as the receiver's own completed call). Returns false if that
+    // coordinator already has the same company+number on their sheet for that day.
+    const shareCopyWith = async (row: any, owner: any): Promise<boolean> => {
+      const alreadyThere = await DailyTracker.findOne({
+        college_id: targetObjectId,
+        coordinator_id: owner._id,
+        session_date: row.session_date,
+        company_name: { $regex: new RegExp(`^${escapeRegex(String(row.company_name || '').trim())}$`, 'i') },
+        mobile_number: row.mobile_number || '',
+      }).select('_id');
+      if (alreadyThere) return false;
+      await DailyTracker.create({
+        session_date: row.session_date || new Date(),
+        day: row.day,
+        month: row.month,
+        year: row.year,
+        academic_year: (row as any).academic_year || 2026,
+        college_id: targetObjectId,
+        coordinator_id: owner._id,
+        company_id: row.company_id || null,
+        company_name: row.company_name,
+        hr_name: row.hr_name || 'HR Contact',
+        mobile_number: row.mobile_number || '',
+        email_id: row.email_id || '',
+        is_contact_added: (row as any).is_contact_added || false,
+        is_skipped: false,
+        is_promoted_to_weekly: false,
+        is_deleted: false,
+        call_start_time: null,
+        call_end_time: null,
+        duration_seconds: null,
+        outcome_status: null,
+        follow_up_month: null,
+        comments: row.comments || '',
+        original_college_id: row.college_id,
+        original_coordinator_id: row.coordinator_id,
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+      return true;
+    };
+
     if (mode === 'copy') {
       let copiedCount = 0;
       const sourceRows = await DailyTracker.find({ _id: { $in: objectIds }, is_deleted: { $ne: true } });
       for (const src of sourceRows) {
+        if (refuseForeignOwner(req, res, String(src.coordinator_id), 'You can only copy your own tracker rows.')) return;
+      }
+      for (const src of sourceRows) {
+        // A college another coordinator handles: they receive the copy on THEIR sheet (a copy left in
+        // our own name there would be hidden - the tracker opens that college as their sheet).
+        if (targetOwners.length > 0 && !targetOwners.some((u) => String(u._id) === String(src.coordinator_id))) {
+          const owner = targetOwners[0];
+          if (await shareCopyWith(src, owner)) {
+            sharedToNames.add(owner.full_name);
+            sharedCount++;
+          } else {
+            skippedDuplicates++;
+          }
+          continue;
+        }
         await DailyTracker.create({
           session_date: src.session_date || new Date(),
           day: src.day,
@@ -2517,10 +2595,16 @@ app.post('/api/v1/daily-tracker/bulk-move', async (req: Request, res: Response) 
 
       return res.status(200).json({
         success: true,
-        message: `Successfully copied ${copiedCount} company call(s) to ${targetCollege.college_name}`,
+        message: sharedCount > 0 || skippedDuplicates > 0
+          ? `Successfully ${[copiedCount > 0 ? `copied ${copiedCount} call(s) to ${targetCollege.college_name}` : '', sharedCount > 0 ? `sent a copy of ${sharedCount} contact(s) to ${Array.from(sharedToNames).join(', ')}` : '', skippedDuplicates > 0 ? `${skippedDuplicates} already on their sheet, skipped` : ''].filter(Boolean).join('; ')}`
+          : `Successfully copied ${copiedCount} company call(s) to ${targetCollege.college_name}`,
         data: {
           action: 'copy',
-          processed_count: copiedCount,
+          processed_count: copiedCount + sharedCount,
+          copied_count: copiedCount,
+          shared_count: sharedCount,
+          skipped_duplicate_count: skippedDuplicates,
+          shared_to: Array.from(sharedToNames),
           target_college: {
             _id: targetCollege._id,
             college_name: targetCollege.college_name,
@@ -2541,21 +2625,6 @@ app.post('/api/v1/daily-tracker/bulk-move', async (req: Request, res: Response) 
       if (refuseForeignOwner(req, res, String(row.coordinator_id), 'You can only move your own tracker rows.')) return;
     }
 
-    // Who handles the TARGET college? Placement Coordinator preferred over Team Leader;
-    // all-colleges oversight accounts are ignored.
-    const targetObjectId = new Types.ObjectId(String(target_college_id));
-    const ownerCandidates = await User.find({
-      assigned_college_ids: targetObjectId,
-      is_deleted: { $ne: true },
-      account_status: 'active',
-      has_all_colleges_access: { $ne: true },
-      role_codes: { $in: ['PLACEMENT_COORDINATOR', 'TEAM_LEADER'] },
-    })
-      .select('_id full_name role_codes')
-      .sort({ full_name: 1 })
-      .lean();
-    const coordinatorOwners = ownerCandidates.filter((u: any) => (u.role_codes || []).includes('PLACEMENT_COORDINATOR'));
-    const targetOwners: any[] = coordinatorOwners.length > 0 ? coordinatorOwners : ownerCandidates;
 
     // Two different things can happen to a selected row:
     //  1. Target college is one the sender handles (or nobody handles it): a real MOVE inside the
@@ -2565,10 +2634,7 @@ app.post('/api/v1/daily-tracker/bulk-move', async (req: Request, res: Response) 
     //     entry. The receiver may fill in their own times and save it, or delete it; neither
     //     affects the sender.
     let movedCount = 0;
-    let sharedCount = 0;
-    let skippedDuplicates = 0;
     const movedIds: Types.ObjectId[] = [];
-    const sharedToNames = new Set<string>();
 
     for (const row of existingRows) {
       const senderId = String(row.coordinator_id);
@@ -2582,48 +2648,12 @@ app.post('/api/v1/daily-tracker/bulk-move', async (req: Request, res: Response) 
       }
 
       const owner = targetOwners[0];
-      const alreadyThere = await DailyTracker.findOne({
-        college_id: targetObjectId,
-        coordinator_id: owner._id,
-        session_date: row.session_date,
-        company_name: { $regex: new RegExp(`^${escapeRegex(String(row.company_name || '').trim())}$`, 'i') },
-        mobile_number: row.mobile_number || '',
-      }).select('_id');
-      if (alreadyThere) {
+      if (await shareCopyWith(row, owner)) {
+        sharedToNames.add(owner.full_name);
+        sharedCount++;
+      } else {
         skippedDuplicates++;
-        continue;
       }
-
-      await DailyTracker.create({
-        session_date: row.session_date || new Date(),
-        day: row.day,
-        month: row.month,
-        year: row.year,
-        academic_year: (row as any).academic_year || 2026,
-        college_id: targetObjectId,
-        coordinator_id: owner._id,
-        company_id: row.company_id || null,
-        company_name: row.company_name,
-        hr_name: row.hr_name || 'HR Contact',
-        mobile_number: row.mobile_number || '',
-        email_id: row.email_id || '',
-        is_contact_added: (row as any).is_contact_added || false,
-        is_skipped: false,
-        is_promoted_to_weekly: false,
-        is_deleted: false,
-        call_start_time: null,
-        call_end_time: null,
-        duration_seconds: null,
-        outcome_status: null,
-        follow_up_month: null,
-        comments: row.comments || '',
-        original_college_id: row.college_id,
-        original_coordinator_id: row.coordinator_id,
-        created_at: new Date(),
-        updated_at: new Date(),
-      });
-      sharedToNames.add(owner.full_name);
-      sharedCount++;
     }
 
     // Cascade the college change to linked Daily Leads / Weekly Tracker rows - only for rows that
