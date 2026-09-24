@@ -1618,6 +1618,28 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     created 15:54 and 16:11 IST) sit in MCET under Mohanaradha from the old Copy behaviour - hidden on
     screen but counted in her dashboard totals.
 
+63. **Move vs Copy in the Daily Tracker settled, 24 Sep 2026 (user decision - supersedes items 61/62 for
+    Move).** **Copy and Switch:** the sender keeps the original (timing and status intact); if the target
+    college is another coordinator's, they get a copy with no start/end/duration and no status, to fill
+    in or delete. **Move and Switch:** the contact leaves the sender's sheet completely - the sender's
+    calls, minutes, outcome counts, hourly rhythm and log all drop by that row (they are all derived from
+    `daily_tracker`) - and the receiving coordinator gets it as a blank fresh entry (option A: no timing,
+    no status carried over). Moves between colleges the sender handles keep everything, timing included.
+    Linked Daily Leads / Weekly Tracker entries are deliberately **left alone** on Move (they record a
+    result the sender achieved; the tracker row's delete route would have cascade-soft-deleted them, so
+    Move uses a plain `deleteOne`). If the receiver already has the same company+number that day the row is
+    skipped and stays with the sender ("already on their sheet, so kept on yours"); finalized rows are
+    skipped. Both buttons "Switch": afterwards the page opens the target college through the new
+    `selectCollegeWorkspace()` (extracted from the college dropdown), which shows another coordinator's
+    college as their read-only sheet. **One simple confirmation for BOTH buttons** when the target is
+    outside the sender's focus selection: "This college (CODE) is out of your focus. Do you still want to
+    continue?" with Cancel / Continue (Cancel sends nothing). Verified live: API test with throwaway rows
+    (0 left) - own-college move kept `dur=300`; Move to Seshmitha removed it from Mohanaradha, gave her a
+    blank copy, and Mohanaradha's dashboard returned to its pre-test count and seconds (5 calls / 342s);
+    a duplicate Move was refused and the row stayed. Browser: the popup shows for both Copy and Move to
+    MCET and Cancel fires zero `bulk-move` requests. **Not exercised in the browser:** the actual
+    Continue + switch to the other coordinator's read-only sheet (covered only by the API test and code).
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

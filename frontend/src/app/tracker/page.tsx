@@ -171,6 +171,70 @@ export default function DailyTrackerPage() {
     };
   }, []);
 
+  // Switch the working area to a college. A college in my focus opens as my own sheet; one outside my
+  // focus opens as the read-only sheet of the coordinator who handles it.
+  const selectCollegeWorkspace = (col: any) => {
+    setSelectedCollegeId(col._id);
+    setSelectedCollegeName(col.college_name);
+    setSelectedCollegeObj(col);
+
+        // If currently viewing history archive, stay in history mode and load that date's calls for the new college
+        if (isHistoryMode && historyDate) {
+          handleViewHistory(historyDate, col._id);
+          return;
+        }
+
+        // Check if selected college belongs to logged-in user's focus
+        const myFocus = getCoordinatorSelectedColleges();
+        const myFocusSet = new Set(myFocus.map((s) => String(s).toLowerCase().trim()));
+        const isMyFocus =
+          myFocusSet.has(String(col._id).toLowerCase().trim()) ||
+          (col.college_code && myFocusSet.has(String(col.college_code).toLowerCase().trim())) ||
+          (col.college_code && myFocusSet.has(`col_${col.college_code.toLowerCase().trim()}`));
+
+        if (isMyFocus || !coordinatorId) {
+          // Switch to self / Edit Mode
+          setViewingCoordinatorId(coordinatorId);
+          setViewingCoordinatorName('My Calling Sheet');
+          setViewingCoordinatorFocusColleges([]);
+          try {
+            localStorage.setItem('ipoms_daily_tracker_college_id', col._id);
+            localStorage.setItem('ipoms_daily_tracker_college_name', col.college_name);
+            localStorage.setItem('ipoms_daily_tracker_college_obj', JSON.stringify(col));
+          } catch (e) {}
+        } else {
+          // College is outside user focus -> Automatically find assigned coordinator and open in READ-ONLY mode
+          const targetCode = (col.college_code || '').toUpperCase().trim();
+          const targetId = String(col._id).toLowerCase().trim();
+
+          const matchedCoord = allCoordinators.find((coord) => {
+            if (coord._id === coordinatorId) return false;
+            return (
+              coord.focus_colleges?.some(
+                (fc) =>
+                  fc.college_code?.toUpperCase() === targetCode ||
+                  String(fc._id).toLowerCase() === targetId
+              ) ||
+              coord.focus_college_ids?.some(
+                (fcId) =>
+                  String(fcId).toLowerCase() === targetId ||
+                  String(fcId).toUpperCase() === targetCode
+              )
+            );
+          });
+
+          if (matchedCoord) {
+            setViewingCoordinatorId(matchedCoord._id);
+            setViewingCoordinatorName(matchedCoord.full_name);
+            setViewingCoordinatorFocusColleges(matchedCoord.focus_colleges || []);
+          } else {
+            setViewingCoordinatorId('read_only');
+            setViewingCoordinatorName('Read-Only View');
+            setViewingCoordinatorFocusColleges([col]);
+          }
+        }
+  };
+
   const handleConfirmMoveCollege = async (targetCollegeId: string, targetCollegeObj: any, mode: 'move' | 'copy' = 'move') => {
     if (selectedRowIds.length === 0) return;
     try {
@@ -192,28 +256,19 @@ export default function DailyTrackerPage() {
         setSelectedRowIds([]);
         setIsDeleteMode(false);
 
-        // If we only sent copies to another coordinator, our originals are still right here: stay on
-        // the current college and refresh. If rows really moved inside our own sheet, follow them.
-        const rd: any = res.data || {};
-        const sharedOnly = (rd.shared_count || 0) > 0 && (rd.moved_count || 0) === 0 && (rd.copied_count || 0) === 0;
-        if (sharedOnly) {
-          loadTodayRows();
-        } else {
-          // Switch active working area to target college!
-          setSelectedCollegeId(targetCollegeObj._id);
-          setSelectedCollegeName(targetCollegeObj.college_name);
-          if (targetCollegeObj) setSelectedCollegeObj(targetCollegeObj);
+        // "Switch": open the target college. If it is another coordinator's, that opens their sheet
+        // read-only, where the contact now is.
+        if (targetCollegeObj) selectCollegeWorkspace(targetCollegeObj);
 
-          window.dispatchEvent(
-            new CustomEvent('ipoms_college_change', {
-              detail: {
-                id: targetCollegeObj._id,
-                name: targetCollegeObj.college_name,
-                obj: targetCollegeObj,
-              },
-            })
-          );
-        }
+        window.dispatchEvent(
+          new CustomEvent('ipoms_college_change', {
+            detail: {
+              id: targetCollegeObj._id,
+              name: targetCollegeObj.college_name,
+              obj: targetCollegeObj,
+            },
+          })
+        );
       } else {
         toast(res.error?.message || `Failed to ${mode} company calls`, 'error');
       }
@@ -998,65 +1053,7 @@ export default function DailyTrackerPage() {
               }}
               onSelectCollege={(col) => {
                 if (!col) return;
-                setSelectedCollegeId(col._id);
-                setSelectedCollegeName(col.college_name);
-                setSelectedCollegeObj(col);
-
-                // If currently viewing history archive, stay in history mode and load that date's calls for the new college
-                if (isHistoryMode && historyDate) {
-                  handleViewHistory(historyDate, col._id);
-                  return;
-                }
-
-                // Check if selected college belongs to logged-in user's focus
-                const myFocus = getCoordinatorSelectedColleges();
-                const myFocusSet = new Set(myFocus.map((s) => String(s).toLowerCase().trim()));
-                const isMyFocus =
-                  myFocusSet.has(String(col._id).toLowerCase().trim()) ||
-                  (col.college_code && myFocusSet.has(String(col.college_code).toLowerCase().trim())) ||
-                  (col.college_code && myFocusSet.has(`col_${col.college_code.toLowerCase().trim()}`));
-
-                if (isMyFocus || !coordinatorId) {
-                  // Switch to self / Edit Mode
-                  setViewingCoordinatorId(coordinatorId);
-                  setViewingCoordinatorName('My Calling Sheet');
-                  setViewingCoordinatorFocusColleges([]);
-                  try {
-                    localStorage.setItem('ipoms_daily_tracker_college_id', col._id);
-                    localStorage.setItem('ipoms_daily_tracker_college_name', col.college_name);
-                    localStorage.setItem('ipoms_daily_tracker_college_obj', JSON.stringify(col));
-                  } catch (e) {}
-                } else {
-                  // College is outside user focus -> Automatically find assigned coordinator and open in READ-ONLY mode
-                  const targetCode = (col.college_code || '').toUpperCase().trim();
-                  const targetId = String(col._id).toLowerCase().trim();
-
-                  const matchedCoord = allCoordinators.find((coord) => {
-                    if (coord._id === coordinatorId) return false;
-                    return (
-                      coord.focus_colleges?.some(
-                        (fc) =>
-                          fc.college_code?.toUpperCase() === targetCode ||
-                          String(fc._id).toLowerCase() === targetId
-                      ) ||
-                      coord.focus_college_ids?.some(
-                        (fcId) =>
-                          String(fcId).toLowerCase() === targetId ||
-                          String(fcId).toUpperCase() === targetCode
-                      )
-                    );
-                  });
-
-                  if (matchedCoord) {
-                    setViewingCoordinatorId(matchedCoord._id);
-                    setViewingCoordinatorName(matchedCoord.full_name);
-                    setViewingCoordinatorFocusColleges(matchedCoord.focus_colleges || []);
-                  } else {
-                    setViewingCoordinatorId('read_only');
-                    setViewingCoordinatorName('Read-Only View');
-                    setViewingCoordinatorFocusColleges([col]);
-                  }
-                }
+                selectCollegeWorkspace(col);
               }}
             />
 

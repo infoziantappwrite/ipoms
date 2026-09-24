@@ -2634,6 +2634,7 @@ app.post('/api/v1/daily-tracker/bulk-move', async (req: Request, res: Response) 
     //     entry. The receiver may fill in their own times and save it, or delete it; neither
     //     affects the sender.
     let movedCount = 0;
+    let skippedLocked = 0;
     const movedIds: Types.ObjectId[] = [];
 
     for (const row of existingRows) {
@@ -2647,8 +2648,18 @@ app.post('/api/v1/daily-tracker/bulk-move', async (req: Request, res: Response) 
         continue;
       }
 
+      // Another coordinator handles the target college: MOVE hands the contact over completely.
+      // They receive it as a fresh entry (no timing, no status) and it leaves the sender's sheet, so
+      // the sender's calls / minutes / outcome counts drop by one. Linked Daily Leads and Weekly
+      // Tracker entries are deliberately left alone - they record a result the sender achieved.
+      // If the receiver already has the same company+number today, nothing happens (sender keeps it).
+      if ((row as any).is_finalized) {
+        skippedLocked++;
+        continue;
+      }
       const owner = targetOwners[0];
       if (await shareCopyWith(row, owner)) {
+        await DailyTracker.deleteOne({ _id: row._id });
         sharedToNames.add(owner.full_name);
         sharedCount++;
       } else {
@@ -2672,9 +2683,10 @@ app.post('/api/v1/daily-tracker/bulk-move', async (req: Request, res: Response) 
     const parts: string[] = [];
     if (movedCount > 0) parts.push(`moved ${movedCount} call(s) to ${targetCollege.college_name}`);
     if (sharedCount > 0) {
-      parts.push(`sent a copy of ${sharedCount} contact(s) to ${Array.from(sharedToNames).join(', ')} (your originals stay with you)`);
+      parts.push(`moved ${sharedCount} contact(s) to ${Array.from(sharedToNames).join(', ')}'s sheet (removed from yours)`);
     }
-    if (skippedDuplicates > 0) parts.push(`${skippedDuplicates} already on their sheet, skipped`);
+    if (skippedDuplicates > 0) parts.push(`${skippedDuplicates} already on their sheet, so kept on yours`);
+    if (skippedLocked > 0) parts.push(`${skippedLocked} locked (finalized) row(s) skipped`);
 
     return res.status(200).json({
       success: true,
@@ -2684,6 +2696,7 @@ app.post('/api/v1/daily-tracker/bulk-move', async (req: Request, res: Response) 
         processed_count: movedCount + sharedCount,
         moved_count: movedCount,
         shared_count: sharedCount,
+        handed_over_count: sharedCount,
         skipped_duplicate_count: skippedDuplicates,
         shared_to: Array.from(sharedToNames),
         target_college: {

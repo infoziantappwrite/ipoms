@@ -70,7 +70,7 @@ export function MoveCollegeModal({
     const focusCollegeIds = getCoordinatorSelectedColleges();
     const isFocusCollege = focusCollegeIds.includes(String(targetObj._id)) || focusCollegeIds.includes(String(targetObj.college_code));
 
-    if (!isFocusCollege && mode === 'move') {
+    if (!isFocusCollege) {
       // Trigger simple warning confirmation modal
       setPendingAction({ targetId: selectedTargetId, targetObj, mode });
       setShowWarningModal(true);
@@ -196,13 +196,13 @@ export function MoveCollegeModal({
                 <ArrowLeftRight className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-fg">Confirm College Transfer</h4>
-                <p className="text-[11px] text-fg-subtle">Transferring beyond focus selection</p>
+                <h4 className="text-sm font-bold text-fg">Out of your focus</h4>
+                <p className="text-[11px] text-fg-subtle">{pendingAction.mode === 'copy' ? 'Copy' : 'Move'} to another college</p>
               </div>
             </div>
 
             <p className="text-xs text-fg leading-relaxed bg-amber-500/10 border border-amber-500/20 p-3.5 rounded-xl font-medium">
-              Do you still want to transfer these <span className="font-bold underline">{selectedCount} contact(s)</span> to <span className="font-bold">{pendingAction.targetObj.college_name} ({pendingAction.targetObj.college_code})</span> which is completely out of your focus selection college list for today? If another coordinator handles that college they receive a copy (without call timing) and your original stays with you.
+              This college ({pendingAction.targetObj.college_code}) is out of your focus. Do you still want to continue?
             </p>
 
             <div className="flex items-center justify-end gap-2.5 pt-2">
@@ -224,7 +224,7 @@ export function MoveCollegeModal({
                 className="px-5 py-2 rounded-xl bg-primary hover:bg-blue-700 text-primary-foreground text-xs font-bold shadow-md transition-all cursor-pointer flex items-center gap-2"
               >
                 {isLoading ? <Loader2 size={14} className="animate-spin" /> : null}
-                OK
+                Continue
               </button>
             </div>
           </div>
