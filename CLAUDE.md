@@ -1728,6 +1728,27 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     unticked one stayed empty; no page errors. **Not tested:** Add-new-companies through the new UI, the date
     columns through the UI, the Undo button after a paste, dark mode.
 
+68. **Weekly Tracker Paste: the paste box is now a small editable table, 24 Sep 2026 (user decision).**
+    The user asked whether people could type columns separated by double spaces; rejected because values
+    themselves contain spaces ("Data Engineer", "3 - 5 LPA", "98765 43210", company names), one stray space
+    would shift every value into the wrong column, and nothing shows the mistake until preview. Step 3 is now
+    a table: **fill mode** lists the ticked companies down a locked left column with one editable cell per
+    chosen column; **add mode** has a Company name column plus the chosen columns, starts with 6 blank rows,
+    "Add 5 rows" (max 200) and "Clear table". Type into cells (Tab moves right; Enter moves down in fill mode
+    and to the first cell of the next row in add mode; arrow up/down) **or paste from Excel/Sheets**: a
+    multi-cell paste is spread from the clicked cell (a header row starting with "Company" is skipped in add
+    mode; rows beyond the ticked companies / 200 are left out with a note). Cells are checked live and turn
+    red with the reason on hover (contact, email, date formats, follow-up not in the past, "Company name is
+    needed"); a summary line counts them; rows with a problem are skipped, not blocked. Empty rows are not
+    sent. Preview/Apply and every server rule from items 66-67 are unchanged (the client date check mirrors the
+    server's and the server stays the authority). **Verified in a real browser (throwaway companies, all
+    removed):** fill mode - typed "12345" showed a red cell with a reason, a 2-line block pasted into the first
+    cell filled both rows and cleared the red, Apply saved only the 2 ticked companies; add mode - typing a full
+    row with Tab, "4-5" became "4 - 5 LPA", the new company was saved with role/contact/email, a row with no
+    company name was reported and skipped, "Add 5 rows" grew the table, Enter starts the next row at column 1,
+    and no horizontal scroll after narrowing the columns. **Not tested in a browser:** the date columns
+    through the table, the Undo button after a paste, dark mode.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

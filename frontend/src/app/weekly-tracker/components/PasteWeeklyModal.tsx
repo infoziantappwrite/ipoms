@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { X, ClipboardPaste, ArrowLeft, ArrowRight, Loader2, CheckCircle2, AlertTriangle, PlusCircle, RefreshCw, Search, Info } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { X, ClipboardPaste, ArrowLeft, ArrowRight, Loader2, CheckCircle2, AlertTriangle, PlusCircle, RefreshCw, Search, Info, Plus, Eraser } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { validateAndNormalizeMultiMobile, validateAndNormalizeMultiEmail } from '@/lib/contactValidation';
 import type { WeeklyRow } from './WeeklyTable';
 
 /**
@@ -12,7 +13,8 @@ import type { WeeklyRow } from './WeeklyTable';
  *        - add new companies
  *      plus which columns you have.
  *   2. (fill in)  tick the companies you have data for - e.g. 5 of the 15
- *   3. paste - one line per ticked company, in the order shown (or Company + columns for new ones)
+ *   3. a small table: type into the cells or paste from Excel (a pasted block fills the table from the
+ *      clicked cell). Fill mode lists the ticked companies down the left; add mode has a Company name column.
  *   4. preview - the server checks every row; nothing is saved until Apply.
  */
 
@@ -128,6 +130,43 @@ function currentValue(row: WeeklyRow, key: PasteFieldKey): string {
   }
 }
 
+const MONTHS: Record<string, number> = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12 };
+
+/** Day-first dates, same formats the server accepts. Returns an error message or '' when fine. */
+function checkDate(raw: string, mustBeFuture: boolean): string {
+  const v = raw.trim();
+  if (!v) return '';
+  let y = 0, m = 0, d = 0;
+  let mt: RegExpMatchArray | null;
+  if ((mt = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) { y = +mt[1]; m = +mt[2]; d = +mt[3]; }
+  else if ((mt = v.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/))) { d = +mt[1]; m = +mt[2]; y = +mt[3]; }
+  else if ((mt = v.match(/^(\d{1,2})[\s\-\/.]([A-Za-z]{3,9})[\s\-\/.,]+(\d{4})$/))) { d = +mt[1]; m = MONTHS[mt[2].slice(0, 4).toLowerCase()] || MONTHS[mt[2].slice(0, 3).toLowerCase()] || 0; y = +mt[3]; }
+  else return 'Use DD/MM/YYYY, e.g. 30/09/2026';
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (!m || dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return 'Not a real date';
+  if (mustBeFuture) {
+    const today = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
+    const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    if (iso < today) return 'Follow-up date must be today or later';
+  }
+  return '';
+}
+
+function cellIssue(key: string, value: string): string {
+  const v = value.trim();
+  if (!v) return '';
+  if (key === 'contact') { const r = validateAndNormalizeMultiMobile(v); return r.valid ? '' : (r.error || 'Invalid number'); }
+  if (key === 'email') { const r = validateAndNormalizeMultiEmail(v); return r.valid ? '' : (r.error || 'Invalid email'); }
+  if (key === 'follow_up_date') return checkDate(v, true);
+  if (key === 'jd_received_date' || key === 'db_shared_date') return checkDate(v, false);
+  return '';
+}
+
+const COL_WIDTH: Record<string, string> = {
+  company_name: '180px', contact: '115px', email: '165px', job_role: '130px', ctc_lpa: '90px',
+  follow_up_date: '110px', jd_received_date: '110px', db_shared_date: '110px',
+};
+
 type Step = 'setup' | 'pick' | 'paste' | 'preview';
 
 export function PasteWeeklyModal({ collegeId, collegeName, sections, onClose, onApply }: Props) {
@@ -144,7 +183,10 @@ export function PasteWeeklyModal({ collegeId, collegeName, sections, onClose, on
   const [ticked, setTicked] = useState<string[]>([]); // row ids, in list order
   const [search, setSearch] = useState('');
   const [onlyMissing, setOnlyMissing] = useState(false);
-  const [text, setText] = useState('');
+  const [grid, setGrid] = useState<string[][]>([]);
+  const gridSig = useRef('');
+  const cellRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [pasteNote, setPasteNote] = useState('');
   const [payloadRows, setPayloadRows] = useState<PasteRowPayload[]>([]);
   const [results, setResults] = useState<PasteRowResult[]>([]);
   const [summary, setSummary] = useState<{ create: number; update: number; error: number } | null>(null);
@@ -201,65 +243,100 @@ export function PasteWeeklyModal({ collegeId, collegeName, sections, onClose, on
       return Array.from(n);
     });
 
-  // ── paste text -> rows
-  const parsed = useMemo(() => {
-    if (mode === 'fill') return parseTable(text, true);
-    const t = parseTable(text, false);
-    if (t.length && ['company', 'company name', 'company_name'].includes((t[0][0] || '').trim().toLowerCase())) t.shift();
-    return t;
-  }, [text, mode]);
+  // ── the table
+  const gridCols = useMemo(
+    () => [
+      ...(mode === 'add' ? [{ key: 'company_name', label: 'Company name' }] : []),
+      ...orderedFields.map((k) => ({ key: k as string, label: COLUMN_LABEL[k] })),
+    ],
+    [mode, orderedFields]
+  );
+  const nCols = gridCols.length;
+  const MAX_ROWS = 200;
 
-  const countOk = mode === 'fill' ? parsed.length === tickedRows.length : parsed.length > 0;
-  const countNote =
-    mode === 'fill'
-      ? parsed.length === 0
-        ? `Paste ${tickedRows.length} row${tickedRows.length === 1 ? '' : 's'} - one per ticked company.`
-        : parsed.length === tickedRows.length
-        ? `${parsed.length} of ${tickedRows.length} rows - matches`
-        : `${parsed.length} row${parsed.length === 1 ? '' : 's'} pasted but ${tickedRows.length} ticked - they must match`
-      : `${parsed.length} row${parsed.length === 1 ? '' : 's'} detected · a header row starting with "Company" is skipped`;
+  const blankRow = () => Array(nCols).fill('');
+  const buildGrid = () => setGrid(Array.from({ length: mode === 'fill' ? tickedRows.length : 6 }, blankRow));
+
+  const setCell = (r: number, c: number, v: string) =>
+    setGrid((prev) => prev.map((row, i) => (i === r ? row.map((x, j) => (j === c ? v : x)) : row)));
+  const focusCell = (r: number, c: number) => setTimeout(() => cellRefs.current[`${r}:${c}`]?.focus(), 0);
+  const addRows = (n: number) => setGrid((prev) => [...prev, ...Array.from({ length: Math.max(0, Math.min(n, MAX_ROWS - prev.length)) }, blankRow)]);
+
+  const issues = useMemo(() => {
+    const m: Record<string, string> = {};
+    grid.forEach((row, r) => {
+      const filled = row.some((v) => v.trim());
+      row.forEach((v, c) => {
+        const msg = cellIssue(gridCols[c]?.key, v);
+        if (msg) m[`${r}:${c}`] = msg;
+      });
+      if (mode === 'add' && filled && !row[0].trim()) m[`${r}:0`] = 'Company name is needed';
+    });
+    return m;
+  }, [grid, gridCols, mode]);
+  const issueCount = Object.keys(issues).length;
+  const filledRows = useMemo(() => grid.map((row, r) => ({ row, r })).filter((x) => x.row.some((v) => v.trim())), [grid]);
+  const canPreview = filledRows.length > 0 && !loading;
+
+  const handleCellPaste = (e: React.ClipboardEvent<HTMLInputElement>, r: number, c: number) => {
+    const raw = e.clipboardData.getData('text');
+    if (!/[\t\n\r]/.test(raw.replace(/\r?\n$/, ''))) return; // a single value: normal paste into this cell
+    e.preventDefault();
+    let block = parseTable(raw, true);
+    if (mode === 'add' && r === 0 && c === 0 && block.length && ['company', 'company name', 'company_name'].includes((block[0][0] || '').trim().toLowerCase())) block = block.slice(1);
+    if (!block.length) return;
+    const next = grid.map((row) => [...row]);
+    let ignored = 0;
+    block.forEach((cells, i) => {
+      const rr = r + i;
+      if (rr >= MAX_ROWS) { ignored++; return; }
+      if (rr >= next.length) {
+        if (mode === 'fill') { ignored++; return; }
+        while (next.length <= rr) next.push(blankRow());
+      }
+      cells.forEach((v, j) => { if (c + j < nCols) next[rr][c + j] = v.trim(); });
+    });
+    setGrid(next);
+    setPasteNote(ignored > 0 ? `${ignored} pasted row${ignored === 1 ? ' was' : 's were'} left out - ${mode === 'fill' ? `you ticked only ${tickedRows.length} companies` : `the limit is ${MAX_ROWS} rows`}.` : '');
+  };
+
+  const handleCellKey = (e: React.KeyboardEvent<HTMLInputElement>, r: number, c: number) => {
+    if (e.key === 'Enter' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (r + 1 >= grid.length && mode === 'add' && grid.length < MAX_ROWS) addRows(1);
+      // add mode: you type across a row, so Enter starts the next row at its first column;
+      // fill mode: you usually type down one column, so Enter stays in the same column
+      focusCell(Math.min(r + 1, mode === 'add' ? MAX_ROWS - 1 : grid.length - 1), mode === 'add' ? 0 : c);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusCell(Math.max(0, r - 1), c);
+    }
+  };
 
   const runPreview = async () => {
     setMessage('');
-    if (!countOk) return;
-    const sendable: PasteRowPayload[] = [];
-    const shape: Record<number, string> = {};
-    const all: PasteRowPayload[] = [];
-    const nCols = orderedFields.length;
-
-    parsed.forEach((cells, idx) => {
-      const row_no = idx + 1;
+    if (!canPreview) return;
+    const payload: PasteRowPayload[] = filledRows.map(({ row, r }) => {
+      const base: PasteRowPayload =
+        mode === 'fill'
+          ? { row_no: r + 1, row_id: tickedRows[r]?._id, company_name: tickedRows[r]?.company_name || '' }
+          : { row_no: r + 1, company_name: (row[0] || '').trim() };
       const offset = mode === 'add' ? 1 : 0;
-      const expected = nCols + offset;
-      const base: PasteRowPayload = mode === 'fill'
-        ? { row_no, row_id: tickedRows[idx]?._id, company_name: tickedRows[idx]?.company_name || '' }
-        : { row_no, company_name: (cells[0] || '').trim() };
-      orderedFields.forEach((k, i) => { base[k] = (cells[i + offset] || '').trim(); });
-      all.push(base);
-      if (cells.length > expected) {
-        shape[row_no] = `Too many columns (found ${cells.length}, expected ${expected}: ${[...(mode === 'add' ? ['Company name'] : []), ...orderedFields.map((k) => COLUMN_LABEL[k])].join(' | ')})`;
-      } else sendable.push(base);
+      orderedFields.forEach((k, i) => { base[k] = (row[i + offset] || '').trim(); });
+      return base;
     });
-
-    setPayloadRows(all.filter((r) => !shape[r.row_no]));
+    setPayloadRows(payload);
     setLoading(true);
     try {
-      let serverRows: PasteRowResult[] = [];
-      if (sendable.length) {
-        const res: any = await apiFetch('/weekly-tracker/bulk-paste', {
-          method: 'POST',
-          body: JSON.stringify({ college_id: collegeId, section, fields: orderedFields, rows: sendable, dry_run: true }),
-        });
-        if (!res.success) {
-          setMessage(res.error?.message || (typeof res.error === 'string' ? res.error : 'Could not check the pasted rows.'));
-          return;
-        }
-        serverRows = res.data.rows;
-      }
-      const merged: PasteRowResult[] = all.map((r) => {
-        if (shape[r.row_no]) return { row_no: r.row_no, company_name: r.company_name, action: 'error', errors: [shape[r.row_no]], warnings: [], changes: [] };
-        return serverRows.find((x) => x.row_no === r.row_no)!;
+      const res: any = await apiFetch('/weekly-tracker/bulk-paste', {
+        method: 'POST',
+        body: JSON.stringify({ college_id: collegeId, section, fields: orderedFields, rows: payload, dry_run: true }),
       });
+      if (!res.success) {
+        setMessage(res.error?.message || (typeof res.error === 'string' ? res.error : 'Could not check the rows.'));
+        return;
+      }
+      const merged: PasteRowResult[] = res.data.rows;
       setResults(merged);
       setSummary({
         create: merged.filter((m) => m.action === 'create').length,
@@ -268,7 +345,7 @@ export function PasteWeeklyModal({ collegeId, collegeName, sections, onClose, on
       });
       setStep('preview');
     } catch {
-      setMessage('Could not check the pasted rows. Please try again.');
+      setMessage('Could not check the rows. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -299,7 +376,16 @@ export function PasteWeeklyModal({ collegeId, collegeName, sections, onClose, on
   };
   const goNext = () => {
     const i = flow.indexOf(step);
-    if (flow[i + 1]) setStep(flow[i + 1]);
+    const nextStep = flow[i + 1];
+    if (nextStep === 'paste') {
+      const sig = `${mode}|${section}|${orderedFields.join(',')}|${tickedRows.map((r) => r._id).join(',')}`;
+      if (sig !== gridSig.current) {
+        gridSig.current = sig;
+        buildGrid();
+        setPasteNote('');
+      }
+    }
+    if (nextStep) setStep(nextStep);
   };
   const setupOk = orderedFields.length > 0 || mode === 'add';
   const nextDisabled = (step === 'setup' && (!setupOk || (mode === 'fill' && rows.length === 0))) || (step === 'pick' && tickedRows.length === 0);
@@ -464,38 +550,75 @@ export function PasteWeeklyModal({ collegeId, collegeName, sections, onClose, on
             <div className="space-y-2.5">
               {mode === 'fill' ? (
                 <p className="text-xs text-fg-muted">
-                  Paste <b>{orderedFields.map((k) => COLUMN_LABEL[k]).join(' | ')}</b> - <b>one line per ticked company, in the order listed on the left</b>. A blank cell leaves that company unchanged.
+                  Type or paste the <b>{orderedFields.map((k) => COLUMN_LABEL[k]).join(' | ')}</b> next to each company. Leave a cell empty to keep that company as it is.
                 </p>
               ) : (
                 <p className="text-xs text-fg-muted">
-                  Paste <b>{['Company name', ...orderedFields.map((k) => COLUMN_LABEL[k])].join(' | ')}</b> from Excel or Google Sheets, one company per line. New rows go into <b>{sections[section].label}</b>.
+                  Type the new companies below, or paste from Excel / Google Sheets. New rows go into <b>{sections[section].label}</b>.
                 </p>
               )}
-              <div className={mode === 'fill' ? 'grid grid-cols-1 sm:grid-cols-[230px_1fr] gap-3' : ''}>
-                {mode === 'fill' && (
-                  <div className="border border-border rounded-xl overflow-hidden bg-surface-sunken/40">
-                    <p className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-fg-muted border-b border-border">Paste in this order</p>
-                    <ol className="max-h-[36vh] overflow-auto divide-y divide-border/50">
-                      {tickedRows.map((r, i) => (
-                        <li key={r._id} className="flex items-baseline gap-2 px-3 py-1.5 text-[11px]">
-                          <span className="w-4 text-right text-fg-subtle tabular-nums shrink-0">{i + 1}</span>
-                          <span className="font-semibold truncate">{r.company_name}</span>
-                        </li>
+              <div className="border border-border rounded-xl overflow-hidden">
+                <div className="max-h-[42vh] overflow-auto">
+                  <table className="w-full text-[11px] border-collapse">
+                    <thead className="sticky top-0 bg-surface-sunken text-fg-muted uppercase tracking-wider text-[10px] z-10">
+                      <tr>
+                        <th className="py-1.5 px-2 w-8 text-center">#</th>
+                        {mode === 'fill' && <th className="py-1.5 px-2 text-left" style={{ minWidth: 180 }}>Company</th>}
+                        {gridCols.map((c) => (
+                          <th key={c.key} className="py-1.5 px-2 text-left" style={{ minWidth: COL_WIDTH[c.key] }}>{c.label}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {grid.map((row, r) => (
+                        <tr key={r}>
+                          <td className="px-2 text-center text-fg-subtle tabular-nums bg-surface-sunken/40">{r + 1}</td>
+                          {mode === 'fill' && (
+                            <td className="px-2 font-semibold max-w-[220px] truncate bg-surface-sunken/40" title={tickedRows[r]?.company_name}>{tickedRows[r]?.company_name}</td>
+                          )}
+                          {row.map((v, c) => {
+                            const issue = issues[`${r}:${c}`];
+                            return (
+                              <td key={c} className="p-0 border-l border-border/60">
+                                <input
+                                  ref={(el) => { cellRefs.current[`${r}:${c}`] = el; }}
+                                  value={v}
+                                  onChange={(e) => setCell(r, c, e.target.value)}
+                                  onPaste={(e) => handleCellPaste(e, r, c)}
+                                  onKeyDown={(e) => handleCellKey(e, r, c)}
+                                  title={issue || undefined}
+                                  aria-invalid={!!issue}
+                                  aria-label={`${gridCols[c].label}, row ${r + 1}`}
+                                  spellCheck={false}
+                                  className={`w-full h-8 px-2 text-[11px] bg-transparent outline-none focus:bg-primary/5 focus:ring-1 focus:ring-inset focus:ring-primary ${issue ? 'bg-rose-500/10 ring-1 ring-inset ring-rose-500/60 text-rose-700 dark:text-rose-300' : ''}`}
+                                />
+                              </td>
+                            );
+                          })}
+                        </tr>
                       ))}
-                    </ol>
-                  </div>
-                )}
-                <textarea
-                  autoFocus
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder={mode === 'fill' ? `${orderedFields.map((k) => COLUMN_LABEL[k]).join('  |  ')}\n(one line per company)` : ['Company name', ...orderedFields.map((k) => COLUMN_LABEL[k])].join('  |  ')}
-                  rows={mode === 'fill' ? Math.min(14, Math.max(8, tickedRows.length + 2)) : 11}
-                  spellCheck={false}
-                  className="w-full font-mono text-[11px] bg-surface-sunken border border-border-strong focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl p-2.5 outline-none resize-y"
-                />
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <p className={`text-[11px] font-semibold ${mode === 'fill' && parsed.length > 0 && !countOk ? 'text-rose-600 dark:text-rose-400' : 'text-fg-subtle'}`}>{countNote}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {mode === 'add' && (
+                  <button type="button" onClick={() => addRows(5)} disabled={grid.length >= MAX_ROWS} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-border text-fg-muted hover:bg-surface-sunken/60 cursor-pointer disabled:opacity-40">
+                    <Plus size={11} /> Add 5 rows
+                  </button>
+                )}
+                <button type="button" onClick={() => { buildGrid(); setPasteNote(''); }} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-border text-fg-muted hover:bg-surface-sunken/60 cursor-pointer">
+                  <Eraser size={11} /> Clear table
+                </button>
+                <span className="text-[11px] text-fg-subtle ml-auto">
+                  Tab / Enter move between cells · to paste from Excel, click the first cell and press Ctrl+V
+                </span>
+              </div>
+              <p className={`text-[11px] font-semibold ${issueCount > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-fg-subtle'}`}>
+                {filledRows.length} row{filledRows.length === 1 ? '' : 's'} filled
+                {issueCount > 0 && ` · ${issueCount} cell${issueCount === 1 ? '' : 's'} need fixing (hover a red cell to see why) - rows with a problem are skipped`}
+              </p>
+              {pasteNote && <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">{pasteNote}</p>}
               {message && <p className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">{message}</p>}
             </div>
           )}
@@ -561,7 +684,7 @@ export function PasteWeeklyModal({ collegeId, collegeName, sections, onClose, on
             </button>
           )}
           {step === 'paste' && (
-            <button type="button" onClick={runPreview} disabled={loading || !countOk} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+            <button type="button" onClick={runPreview} disabled={!canPreview} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
               {loading ? <Loader2 size={12} className="animate-spin" /> : null} Check &amp; preview <ArrowRight size={12} />
             </button>
           )}
