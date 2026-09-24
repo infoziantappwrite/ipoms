@@ -64,6 +64,10 @@ export interface TrackerRow {
   coordinator_name?: string;
   college_code?: string;
   college_name?: string;
+  original_college_id?: string;
+  original_college_name?: string;
+  original_college_code?: string;
+  original_coordinator_name?: string;
 }
 
 export interface KpiData {
@@ -188,20 +192,27 @@ export default function DailyTrackerPage() {
         setSelectedRowIds([]);
         setIsDeleteMode(false);
 
-        // Switch active working area to target college!
-        setSelectedCollegeId(targetCollegeObj._id);
-        setSelectedCollegeName(targetCollegeObj.college_name);
-        if (targetCollegeObj) setSelectedCollegeObj(targetCollegeObj);
+        // If the contacts went to another coordinator's sheet they are no longer ours to work on
+        // here, so stay on the current college and just refresh. Otherwise follow them to the target.
+        const handedToSomeoneElse = mode === 'move' && ((res.data as any)?.owner_changed_count || 0) > 0;
+        if (handedToSomeoneElse) {
+          loadTodayRows();
+        } else {
+          // Switch active working area to target college!
+          setSelectedCollegeId(targetCollegeObj._id);
+          setSelectedCollegeName(targetCollegeObj.college_name);
+          if (targetCollegeObj) setSelectedCollegeObj(targetCollegeObj);
 
-        window.dispatchEvent(
-          new CustomEvent('ipoms_college_change', {
-            detail: {
-              id: targetCollegeObj._id,
-              name: targetCollegeObj.college_name,
-              obj: targetCollegeObj,
-            },
-          })
-        );
+          window.dispatchEvent(
+            new CustomEvent('ipoms_college_change', {
+              detail: {
+                id: targetCollegeObj._id,
+                name: targetCollegeObj.college_name,
+                obj: targetCollegeObj,
+              },
+            })
+          );
+        }
       } else {
         toast(res.error?.message || `Failed to ${mode} company calls`, 'error');
       }
@@ -892,13 +903,13 @@ export default function DailyTrackerPage() {
               }`}>
                 {isHistoryMode ? (isUpcomingDate ? 'Upcoming Schedule' : 'History Archive') : isViewingOtherUser ? `${viewingCoordinatorName}` : `${monthName} ${yearStr}`}
               </span>
-              {(isHistoryMode || isViewingOtherUser) && (
+              {isHistoryMode && (
                 <span className={`text-micro px-2.5 py-0.5 rounded-full font-bold border ${
-                  isHistoryMode && isUpcomingDate
+                  isUpcomingDate
                     ? 'bg-sky-50 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border-sky-300 dark:border-sky-700/60'
                     : 'bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700/60'
                 }`}>
-                  {isHistoryMode && isUpcomingDate ? 'Upcoming · Read-Only' : isViewingOtherUser && !isHistoryMode ? 'Viewing User · Read-Only' : 'Read-Only'}
+                  {isUpcomingDate ? 'Upcoming · Read-Only' : 'Read-Only'}
                 </span>
               )}
             </div>
@@ -1192,6 +1203,59 @@ export default function DailyTrackerPage() {
                 <FileSpreadsheet size={13} strokeWidth={2.2} />
                 <span>Paste</span>
               </button>
+
+              {/* Return / Send Back Selected Shared Companies to Source College Button */}
+              {selectedRowCount > 0 && selectedRowIds.some((id) => {
+                const r = rows.find((row) => row._id === id);
+                return !!r?.original_college_id;
+              }) && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    triggerHaptic('medium');
+                    const sharedSelectedRows = rows.filter((r) => selectedRowIds.includes(r._id) && r.original_college_id);
+                    if (sharedSelectedRows.length === 0) return;
+
+                    const targetCollegeId = sharedSelectedRows[0].original_college_id;
+                    const targetCollegeName = sharedSelectedRows[0].original_college_name || sharedSelectedRows[0].original_college_code || 'Source College';
+
+                    if (
+                      !confirm(
+                        `Return ${sharedSelectedRows.length} contact(s) back to original source college (${targetCollegeName})?`
+                      )
+                    ) {
+                      return;
+                    }
+
+                    try {
+                      const res = await apiFetch<any>('/daily-tracker/bulk-move', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                          row_ids: sharedSelectedRows.map((r) => r._id),
+                          target_college_id: targetCollegeId,
+                          mode: 'move',
+                          is_return: true,
+                        }),
+                      });
+                      if (res.success) {
+                        toast(`Successfully returned ${sharedSelectedRows.length} contact(s) back to ${targetCollegeName}`, 'success');
+                        setSelectedRowCount(0);
+                        setSelectedRowIds([]);
+                        loadTodayRows();
+                      } else {
+                        toast(res.error?.message || 'Failed to return contacts', 'error');
+                      }
+                    } catch (e) {
+                      toast('Failed to return contacts back to source college', 'error');
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-[0.98] shrink-0 animate-in fade-in duration-150"
+                  title="Send back selected mistakenly shared contacts to their original college"
+                >
+                  <ArrowLeftRight size={13} strokeWidth={2.2} />
+                  <span>Send Back to Source ({selectedRowIds.filter((id) => rows.find((r) => r._id === id)?.original_college_id).length})</span>
+                </button>
+              )}
 
               {/* Move Selected Companies to Another College Button */}
               {selectedRowCount > 0 && (

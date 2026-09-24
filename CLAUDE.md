@@ -1550,6 +1550,33 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     (rgb 192,38,211), tooltip "3 calls . 4m logged | Positive 1 . Not Hiring 0 | Follow Up 0 . JD
     Received 1", no console errors. Dark mode not seen (same `.dark` toggle limitation as item 58).
 
+60. **Daily Tracker contact transfer ("Move to another college") made to actually work, 24 Sep 2026.**
+    Another tool built the feature (out-of-focus warning modal, origin tracking via
+    `original_college_id` / `original_coordinator_id` on `DailyTracker`, a `Shared (CODE)` badge, and a
+    "Send Back to Source" button) and I tested it with marked throwaway rows. Four things were broken and
+    are fixed: (1) **the receiver never saw the contact** - `POST /daily-tracker/bulk-move` changed the
+    college but not `coordinator_id`, and `/daily-tracker/today` only lists a coordinator's own rows. A
+    move now hands the row to the coordinator who handles the TARGET college (Placement Coordinator
+    preferred over Team Leader; all-colleges oversight accounts ignored; if the sender already handles the
+    target it stays with them; if nobody handles it the row stays with the sender). (2) the badge never
+    rendered because `/today` returned no `original_college_code/name` - it now populates them plus
+    `original_coordinator_name`. (3) the Send Back handler called a non-existent `loadDailyTrackerRows`
+    (also a `tsc` error that would have failed a Next build) - now `loadTodayRows()`. (4) Send Back returns
+    the row to the ORIGINAL coordinator and college and clears the markers; only a real change of owner
+    sets the "Shared" marker. After a move to someone else's college the sender's page now stays put and
+    refreshes instead of switching to a college whose rows are no longer theirs. **User decision: call
+    timing (`call_start_time`, `call_end_time`, `duration_seconds`) is deliberately cleared on every
+    transfer** so the receiver starts a fresh entry - this removes the sender's calling minutes for that
+    call and it is NOT restored on Send Back. Still not fixed: `bulk-move` has no ownership check (any
+    logged-in user can move any row by id). **Verified live** (throwaway row, deleted after, 0 left): move
+    AIHT->NGCE puts it on Malavika's sheet with `Shared (AIHT)` / origin coordinator Mohanaradha and hides it
+    from Mohanaradha; Malavika's Send Back returns it to Mohanaradha's AIHT and clears markers; a move
+    between colleges the same person handles changes no owner. In a real browser as Malavika: badge shown,
+    Send Back button appears on selection, confirm names the source college, no page errors. **Process
+    slip, recorded:** my rhythm-bars commit `530a7b9` staged the whole of `server.ts` and so swept in this
+    tool's uncommitted transfer handler while its model fields were still uncommitted (the committed tree
+    would not have compiled); the model, modal, row and page changes are now committed together.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

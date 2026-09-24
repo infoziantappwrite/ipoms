@@ -2038,6 +2038,8 @@ app.get('/api/v1/daily-tracker/today', async (req: Request, res: Response) => {
     const rows = await DailyTracker.find(filter)
       .populate('coordinator_id', 'full_name official_email')
       .populate('college_id', 'college_name college_code logo_url location')
+      .populate('original_college_id', 'college_name college_code')
+      .populate('original_coordinator_id', 'full_name')
       .sort({ created_at: 1 });
 
     // Auto-clean any unfinalized duplicate rows created in the same session
@@ -2086,6 +2088,10 @@ app.get('/api/v1/daily-tracker/today', async (req: Request, res: Response) => {
         }
       }
 
+      // Where a transferred contact came from (badge + "Send Back" target)
+      const origColl = obj.original_college_id as any;
+      const origCoord = obj.original_coordinator_id as any;
+
       return {
         ...obj,
         coordinator_id: coord?._id ?? obj.coordinator_id,
@@ -2093,6 +2099,11 @@ app.get('/api/v1/daily-tracker/today', async (req: Request, res: Response) => {
         college_id: coll?._id ?? obj.college_id,
         college_name: coll?.college_name || undefined,
         college_code: coll?.college_code || undefined,
+        original_college_id: origColl?._id ?? obj.original_college_id ?? null,
+        original_college_name: origColl?.college_name || undefined,
+        original_college_code: origColl?.college_code || undefined,
+        original_coordinator_id: origCoord?._id ?? obj.original_coordinator_id ?? null,
+        original_coordinator_name: origCoord?.full_name || undefined,
         serial_no: idx + 1,
         duration_formatted: row.duration_seconds != null ? formatDuration(row.duration_seconds) : null,
         is_read_only: isReadOnlyRow,
@@ -2525,25 +2536,63 @@ app.post('/api/v1/daily-tracker/bulk-move', async (req: Request, res: Response) 
     // 2. Preserve original_college_id & original_coordinator_id if not already set, so recipient can send them back easily!
     const existingRows = await DailyTracker.find({ _id: { $in: objectIds } });
     let movedCount = 0;
+    let ownerChangedCount = 0;
+
+    // Who should end up owning a moved contact? The coordinator who handles the TARGET college -
+    // otherwise the row stays on the sender's sheet and the receiver never sees it (the Daily
+    // Tracker only lists a coordinator's own rows). Prefer a Placement Coordinator over a Team
+    // Leader; ignore all-colleges oversight accounts. If nobody handles that college yet the row
+    // simply stays with the sender.
+    const targetObjectId = new Types.ObjectId(String(target_college_id));
+    const ownerCandidates = await User.find({
+      assigned_college_ids: targetObjectId,
+      is_deleted: { $ne: true },
+      account_status: 'active',
+      has_all_colleges_access: { $ne: true },
+      role_codes: { $in: ['PLACEMENT_COORDINATOR', 'TEAM_LEADER'] },
+    })
+      .select('_id full_name role_codes')
+      .sort({ full_name: 1 })
+      .lean();
+    const coordinatorOwners = ownerCandidates.filter((u: any) => (u.role_codes || []).includes('PLACEMENT_COORDINATOR'));
+    const targetOwners = coordinatorOwners.length > 0 ? coordinatorOwners : ownerCandidates;
+
+    const returnedToNames = new Set<string>();
 
     for (const row of existingRows) {
       const isReturning = req.body.is_return === true || (row.original_college_id && String(row.original_college_id) === String(target_college_id));
+      // Timing is always cleared on a transfer: the receiving coordinator starts it as a fresh entry.
       const updatePayload: any = {
-        college_id: new Types.ObjectId(String(target_college_id)),
+        college_id: targetObjectId,
         call_start_time: null,
         call_end_time: null,
         duration_seconds: null,
         updated_at: new Date(),
       };
 
+      let newOwnerId: string | null = null;
       if (isReturning) {
-        // Clear original tracking markers on return to original owner
+        // Back to the original owner (if we know who that was), and clear the "shared" markers
+        if (row.original_coordinator_id) newOwnerId = String(row.original_coordinator_id);
         updatePayload.original_college_id = null;
         updatePayload.original_coordinator_id = null;
-      } else if (!row.original_college_id) {
-        // Set origin info on first transfer out of home college
-        updatePayload.original_college_id = row.college_id;
-        updatePayload.original_coordinator_id = row.coordinator_id;
+      } else {
+        const senderId = String(row.coordinator_id);
+        // If the sender already handles the target college the row stays with them
+        const owner = targetOwners.some((u: any) => String(u._id) === senderId) ? null : targetOwners[0];
+        if (owner) newOwnerId = String(owner._id);
+        // Remember where it came from, once, but only if it really changes hands
+        if (newOwnerId && newOwnerId !== senderId && !row.original_college_id) {
+          updatePayload.original_college_id = row.college_id;
+          updatePayload.original_coordinator_id = row.coordinator_id;
+        }
+      }
+
+      if (newOwnerId && newOwnerId !== String(row.coordinator_id)) {
+        updatePayload.coordinator_id = new Types.ObjectId(newOwnerId);
+        ownerChangedCount++;
+        const ownerName = (targetOwners as any[]).find((u) => String(u._id) === newOwnerId)?.full_name;
+        if (ownerName) returnedToNames.add(ownerName);
       }
 
       await DailyTracker.updateOne({ _id: row._id }, { $set: updatePayload });
@@ -2563,10 +2612,13 @@ app.post('/api/v1/daily-tracker/bulk-move', async (req: Request, res: Response) 
 
     return res.status(200).json({
       success: true,
-      message: `Successfully moved ${movedCount} company call(s) to ${targetCollege.college_name}`,
+      message: ownerChangedCount > 0
+        ? `Successfully moved ${movedCount} company call(s) to ${targetCollege.college_name}${returnedToNames.size ? ` - now on ${Array.from(returnedToNames).join(', ')}'s sheet` : ''}`
+        : `Successfully moved ${movedCount} company call(s) to ${targetCollege.college_name}`,
       data: {
         action: 'move',
         processed_count: movedCount,
+        owner_changed_count: ownerChangedCount,
         target_college: {
           _id: targetCollege._id,
           college_name: targetCollege.college_name,
