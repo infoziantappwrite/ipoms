@@ -361,17 +361,11 @@ export default function WeeklyTrackerPage() {
   };
 
   // ── Paste (Company / Role / CTC / Contact / Email / dates) - one undo step for the whole paste
-  const pasteSectionOptions = [
-    { value: 'completed', label: sections?.completed?.title || 'Companies Completed' },
-    { value: 'drive_in_progress', label: sections?.drive_in_progress?.title || 'Drive in Progress' },
-    { value: 'in_drive', label: sections?.in_drive?.title || 'Upcoming Drives' },
-    { value: 'in_progress', label: sections?.in_progress?.title || 'Companies In Progress' },
-    { value: 'pipeline', label: sections?.pipeline?.title || 'Companies in Pipeline' },
-    { value: 'top_companies', label: sections?.top_companies?.title || 'Top Companies' },
-    { value: 'rejected_companies', label: sections?.rejected_companies?.title || 'Rejected Companies' },
-    { value: 'on_hold_by_college', label: sections?.on_hold_by_college?.title || 'Companies On Hold By College' },
-    { value: 'on_hold_by_hr', label: sections?.on_hold_by_hr?.title || 'Companies On Hold By HR' },
-  ];
+  // Paste is used for two sections only. The list shown in the window is what the page already has loaded.
+  const pasteSections = {
+    in_progress: { label: sections?.in_progress?.title || 'Companies In Progress', rows: sections?.in_progress?.rows || [] },
+    pipeline: { label: sections?.pipeline?.title || 'Companies in Pipeline', rows: sections?.pipeline?.rows || [] },
+  };
 
   const postPaste = async (payload: PasteApplyPayload): Promise<{ message?: string; rows: PasteRowResult[] } | null> => {
     const res: any = await apiFetch('/weekly-tracker/bulk-paste', {
@@ -1847,7 +1841,7 @@ export default function WeeklyTrackerPage() {
         <PasteWeeklyModal
           collegeId={selectedCollegeId}
           collegeName={selectedCollegeName}
-          sectionOptions={pasteSectionOptions}
+          sections={pasteSections}
           onClose={() => setIsPasteOpen(false)}
           onApply={handlePasteApply}
         />

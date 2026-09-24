@@ -1706,6 +1706,28 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     existing `lib/contactValidation.ts`; restored from git and the mirror renamed. **Not tested in a browser:**
     the undo button after a paste, pasting into a college you don't handle (foreign warning), dark mode.
 
+67. **Weekly Tracker Paste redesigned around the section and the companies already there, 24 Sep 2026
+    (user decision - supersedes the flow (not the rules) of item 66).** The first version was too large
+    in type and asked for the section last from all 9. Now: **Step 1** asks, in order, (1) which section -
+    only **Companies In Progress** or **Companies in Pipeline** (the two the user uses; the server
+    now accepts only those two), (2) what to do - *Fill in details for companies already here* or *Add new
+    companies*, (3) which columns (Contact, Email, Role, CTC; plus the three dates in fill mode only). **Fill
+    mode Step 2** lists that section's existing companies (taken from what the page already loaded, so no
+    extra request) with checkboxes, search, "Only without contact (n)" and select-all; the user ticks only the
+    companies they have data for (e.g. 5 of 15). **Step 3** shows the ticked companies numbered in list order
+    and asks for one pasted line per company in that order (blank cell = leave that company as it is); the
+    Preview button stays disabled until the pasted line count equals the ticked count. **Add mode** skips the
+    picking: paste Company name + columns, new rows go into the chosen section. **Step 4** is the server
+    preview (New / Update / Skipped with reasons), then Apply. Fill mode addresses rows by exact
+    `row_id` (new optional field on `POST /weekly-tracker/bulk-paste`), so duplicate or differently spelled
+    company names cannot hit the wrong row; every other rule from item 66 is unchanged. UI type moved to the
+    app's own scale (`text-xs` body, `text-[11px]` hints, `text-sm` title). **Verified in a real browser as
+    Mohanaradha with three throwaway companies (all removed):** section question first with two options; list
+    search; ticking 2 of 3 and pasting 2 numbers - a 1-line paste against 2 ticked was blocked with "they must
+    match"; Apply saved numbers on exactly the 2 ticked companies and their Metadata records while the
+    unticked one stayed empty; no page errors. **Not tested:** Add-new-companies through the new UI, the date
+    columns through the UI, the Undo button after a paste, dark mode.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

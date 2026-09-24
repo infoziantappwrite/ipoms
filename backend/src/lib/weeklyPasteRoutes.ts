@@ -24,18 +24,8 @@ import { validateAndNormalizeMultiMobile, validateAndNormalizeMultiEmail } from 
 
 const MAX_ROWS = 200;
 
-// The 9 sections the Weekly Tracker page renders.
-export const PASTE_SECTIONS = [
-  'completed',
-  'drive_in_progress',
-  'in_drive',
-  'in_progress',
-  'pipeline',
-  'top_companies',
-  'rejected_companies',
-  'on_hold_by_college',
-  'on_hold_by_hr',
-] as const;
+// Paste is only used for these two sections (user decision, 24 Sep 2026).
+export const PASTE_SECTIONS = ['in_progress', 'pipeline'] as const;
 
 const PASTE_FIELDS = ['job_role', 'ctc_lpa', 'contact', 'email', 'follow_up_date', 'jd_received_date', 'db_shared_date'] as const;
 type PasteField = (typeof PASTE_FIELDS)[number];
@@ -43,6 +33,8 @@ const DATE_FIELDS: PasteField[] = ['follow_up_date', 'jd_received_date', 'db_sha
 
 interface PasteRowIn {
   row_no: number;
+  /** When given, this exact Weekly Tracker row is updated (used when the user ticks companies from the list). */
+  row_id?: string;
   company_name?: string;
   job_role?: string;
   ctc_lpa?: string;
@@ -197,13 +189,22 @@ export function registerWeeklyPasteRoutes(app: Express, deps: Deps) {
       const { startFriday, endThursday, weekNumber } = deps.getFridayWeekBounds();
 
       for (const r of rows as PasteRowIn[]) {
-        const name = String(r.company_name || '').trim();
+        // A row can be addressed by its exact id (ticked from the list) or by company name (pasted).
+        const rowId = r.row_id && Types.ObjectId.isValid(String(r.row_id)) ? String(r.row_id) : '';
+        let idRow: any = null;
+        let name = String(r.company_name || '').trim();
         const p: PlannedRow = { row_no: r.row_no, company_name: name, action: 'error', errors: [], warnings: [], changes: [] };
         planned.push(p);
 
+        if (rowId) {
+          idRow = await WeeklyTracker.findOne({ _id: rowId, college_id: collegeObjId, is_deleted: { $ne: true } });
+          if (!idRow) { p.errors.push("This company is no longer in this college's tracker - refresh and try again"); continue; }
+          name = idRow.company_name;
+          p.company_name = name;
+        }
         if (!name) { p.errors.push('Company name is empty'); continue; }
-        const key = name.toLowerCase().replace(/\s+/g, ' ');
-        if (seen.has(key)) { p.errors.push('This company appears more than once in the paste'); continue; }
+        const key = rowId ? `id:${rowId}` : name.toLowerCase().replace(/\s+/g, ' ');
+        if (seen.has(key)) { p.errors.push(rowId ? 'This company is ticked more than once' : 'This company appears more than once in the paste'); continue; }
         seen.add(key);
 
         // ── validate every pasted value first (same rules as editing by hand)
@@ -240,7 +241,7 @@ export function registerWeeklyPasteRoutes(app: Express, deps: Deps) {
         // ── find the company's existing row in THIS college by the name the tracker already uses;
         //    only fall back to the Metadata record (which can spell the name differently) if none.
         const nameRx = new RegExp(`^${escapeRegex(name)}$`, 'i');
-        let existingRows: any[] = await WeeklyTracker.find({ college_id: collegeObjId, is_deleted: { $ne: true }, company_name: nameRx });
+        let existingRows: any[] = idRow ? [idRow] : await WeeklyTracker.find({ college_id: collegeObjId, is_deleted: { $ne: true }, company_name: nameRx });
         let meta: any = null;
         if (existingRows.length > 0) {
           meta = (existingRows[0].company_id && (await CompanyMetadata.findById(existingRows[0].company_id))) || (await CompanyMetadata.findOne({ company_name: nameRx, is_deleted: false }));
