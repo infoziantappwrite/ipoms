@@ -387,9 +387,18 @@ export function registerActiveLeadRoutes(app: Express) {
         const rawName = rows[0].company_name.trim();
         const existingLead = activeMap.get(normKey);
 
+        // A company only needs the user's attention when the Weekly Tracker has a role that the Active
+        // Lead row does not already contain. Once roles are merged into the row they stay merged, so
+        // asking again on every sync (the old behaviour: "more than one role" = conflict) was noise.
+        const normRole = (t: string) => t.trim().toLowerCase().replace(/\s+/g, ' ');
         const rolesSet = new Set<string>();
+        const existingRoleKeys = new Set<string>();
+        const weeklyRoleKeys = new Set<string>();
         if (existingLead?.role && existingLead.role !== 'Graduate Trainee') {
-          existingLead.role.split(/[,;/]+/).map((r) => r.trim()).filter(Boolean).forEach((r) => rolesSet.add(r));
+          existingLead.role.split(/[,;/]+/).map((r) => r.trim()).filter(Boolean).forEach((r) => {
+            rolesSet.add(r);
+            existingRoleKeys.add(normRole(r));
+          });
         }
 
         let hasValidCtcRow = false;
@@ -414,7 +423,10 @@ export function registerActiveLeadRoutes(app: Express) {
           }
 
           if (r.job_role && r.job_role.trim()) {
-            r.job_role.split(/[,;/]+/).map((str) => str.trim()).filter(Boolean).forEach((str) => rolesSet.add(str));
+            r.job_role.split(/[,;/]+/).map((str) => str.trim()).filter(Boolean).forEach((str) => {
+              rolesSet.add(str);
+              weeklyRoleKeys.add(normRole(str));
+            });
           }
         }
 
@@ -423,7 +435,8 @@ export function registerActiveLeadRoutes(app: Express) {
           continue;
         }
 
-        if (rolesSet.size > 1) {
+        const hasNewRole = !existingLead || Array.from(weeklyRoleKeys).some((k) => !existingRoleKeys.has(k));
+        if (rolesSet.size > 1 && hasNewRole) {
           const distinctRoles = Array.from(rolesSet);
           conflicts.push({
             company_name: rawName,

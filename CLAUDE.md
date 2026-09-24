@@ -1640,6 +1640,21 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     MCET and Cancel fires zero `bulk-move` requests. **Not exercised in the browser:** the actual
     Continue + switch to the other coordinator's read-only sheet (covered only by the API test and code).
 
+64. **Active Leads "Resolve Multiple Company Roles" popup no longer re-asks about resolved companies,
+    24 Sep 2026 (user question -> fix).** Purpose: Active Leads keeps ONE row per company (identity =
+    normalised company name) while the Weekly Tracker can hold several rows for the same company with
+    different job roles; on sync the user picks whether to merge the roles into that one row or keep a
+    single role. Bug: `POST /active-leads/sync` flagged every company whose Weekly rows had more than one
+    role and never checked whether the Active Lead row already contained them, and nothing is remembered
+    after clicking OK - so the popup came back on every sync (267 companies, of which 258 were already
+    fully merged; Fristine Infotech lists all 5 roles in its Active Lead yet was flagged each time). Now a
+    company is a conflict only if it has more than one role AND the Weekly Tracker has a role (compared
+    trimmed / lower-cased / whitespace-collapsed) missing from the existing Active Lead row, or no
+    Active Lead row exists yet. The apply path (resolutions, merge, keeping the existing role for
+    unflagged companies) is unchanged. Verified with the read-only `check_only` call: 267 -> 9 (all 9
+    genuinely have a new role, e.g. Novatech, NEOMETRIX, Happy Connects); the real (writing) sync was
+    not run. `tsc --noEmit` clean.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map
