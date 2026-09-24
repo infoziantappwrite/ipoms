@@ -48,3 +48,7 @@ backups/
 # a build artifact competing with the compiler for the same directory. See
 # CLAUDE.md §5 item 44/item 3.
 backend/dist/
+
+# Local test credentials/tokens — never commit
+frontend/coord.json
+frontend/coord_token.txt
