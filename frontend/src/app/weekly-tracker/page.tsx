@@ -122,13 +122,30 @@ export default function WeeklyTrackerPage() {
   const [isDeleteConfirmModalOpen, setIsDeleteConfirmModalOpen] = useState(false);
   const [isDossierOpen, setIsDossierOpen] = useState(false);
 
-  const handleToggleSelectRow = (rowId: string) => {
+  // A selection belongs to exactly ONE section. The same company row legitimately
+  // appears in two sections at once (Top Companies rows are also listed in Companies
+  // in Pipeline, sharing one _id), so tracking bare ids made ticking it in one section
+  // tick it in the other too, and made bulk delete guess the section from the ids.
+  // Picking in a different section starts a fresh selection for that section.
+  const [selectionSection, setSelectionSection] = useState<string | null>(null);
+
+  const handleToggleSelectRow = (rowId: string, sectionKey?: string) => {
+    if (sectionKey && selectionSection !== sectionKey) {
+      setSelectionSection(sectionKey);
+      setSelectedRowIds([rowId]);
+      return;
+    }
     setSelectedRowIds((prev) =>
       prev.includes(rowId) ? prev.filter((id) => id !== rowId) : [...prev, rowId]
     );
   };
 
-  const handleToggleSelectSection = (sectionRowIds: string[]) => {
+  const handleToggleSelectSection = (sectionRowIds: string[], sectionKey?: string) => {
+    if (sectionKey && selectionSection !== sectionKey) {
+      setSelectionSection(sectionKey);
+      setSelectedRowIds(Array.from(new Set(sectionRowIds)));
+      return;
+    }
     const allSelected = sectionRowIds.length > 0 && sectionRowIds.every((id) => selectedRowIds.includes(id));
     if (allSelected) {
       setSelectedRowIds((prev) => prev.filter((id) => !sectionRowIds.includes(id)));
@@ -632,8 +649,9 @@ export default function WeeklyTrackerPage() {
   const handleConfirmBulkDelete = async () => {
     if (selectedRowIds.length === 0) return;
     const idsToDelete = [...selectedRowIds];
-    const topCompanyRowIds = new Set((sections?.top_companies?.rows || []).map((r) => r._id));
-    const isTopCompaniesBulk = idsToDelete.length > 0 && idsToDelete.every((id) => topCompanyRowIds.has(id));
+    // The section the user actually ticked in — not inferred from the ids, since a
+    // Pipeline selection of companies that are also Top Companies looks identical.
+    const isTopCompaniesBulk = idsToDelete.length > 0 && selectionSection === 'top_companies';
     setIsDeleteConfirmModalOpen(false);
 
     pushAction({
@@ -1502,6 +1520,7 @@ export default function WeeklyTrackerPage() {
               isGlobalDeleteMode={selectionMode !== null}
               selectionMode={selectionMode}
               globalSelectedRowIds={selectedRowIds}
+              globalSelectionSection={selectionSection}
               onToggleSelectRow={handleToggleSelectRow}
               onToggleSelectSection={handleToggleSelectSection}
               onUpdateRow={handleUpdateRow}
@@ -1525,6 +1544,7 @@ export default function WeeklyTrackerPage() {
               isGlobalDeleteMode={selectionMode !== null}
               selectionMode={selectionMode}
               globalSelectedRowIds={selectedRowIds}
+              globalSelectionSection={selectionSection}
               onToggleSelectRow={handleToggleSelectRow}
               onToggleSelectSection={handleToggleSelectSection}
               onUpdateRow={handleUpdateRow}
@@ -1548,6 +1568,7 @@ export default function WeeklyTrackerPage() {
               isGlobalDeleteMode={selectionMode !== null}
               selectionMode={selectionMode}
               globalSelectedRowIds={selectedRowIds}
+              globalSelectionSection={selectionSection}
               onToggleSelectRow={handleToggleSelectRow}
               onToggleSelectSection={handleToggleSelectSection}
               onUpdateRow={handleUpdateRow}
@@ -1571,6 +1592,7 @@ export default function WeeklyTrackerPage() {
               isGlobalDeleteMode={selectionMode !== null}
               selectionMode={selectionMode}
               globalSelectedRowIds={selectedRowIds}
+              globalSelectionSection={selectionSection}
               onToggleSelectRow={handleToggleSelectRow}
               onToggleSelectSection={handleToggleSelectSection}
               onUpdateRow={handleUpdateRow}
@@ -1594,6 +1616,7 @@ export default function WeeklyTrackerPage() {
               isGlobalDeleteMode={selectionMode !== null}
               selectionMode={selectionMode}
               globalSelectedRowIds={selectedRowIds}
+              globalSelectionSection={selectionSection}
               onToggleSelectRow={handleToggleSelectRow}
               onToggleSelectSection={handleToggleSelectSection}
               onUpdateRow={handleUpdateRow}
@@ -1617,6 +1640,7 @@ export default function WeeklyTrackerPage() {
               isGlobalDeleteMode={selectionMode !== null}
               selectionMode={selectionMode}
               globalSelectedRowIds={selectedRowIds}
+              globalSelectionSection={selectionSection}
               onToggleSelectRow={handleToggleSelectRow}
               onToggleSelectSection={handleToggleSelectSection}
               onUpdateRow={handleUpdateRow}
@@ -1640,6 +1664,7 @@ export default function WeeklyTrackerPage() {
               isGlobalDeleteMode={selectionMode !== null}
               selectionMode={selectionMode}
               globalSelectedRowIds={selectedRowIds}
+              globalSelectionSection={selectionSection}
               onToggleSelectRow={handleToggleSelectRow}
               onToggleSelectSection={handleToggleSelectSection}
               onUpdateRow={handleUpdateRow}
@@ -1663,6 +1688,7 @@ export default function WeeklyTrackerPage() {
               isGlobalDeleteMode={selectionMode !== null}
               selectionMode={selectionMode}
               globalSelectedRowIds={selectedRowIds}
+              globalSelectionSection={selectionSection}
               onToggleSelectRow={handleToggleSelectRow}
               onToggleSelectSection={handleToggleSelectSection}
               onUpdateRow={handleUpdateRow}
@@ -1686,6 +1712,7 @@ export default function WeeklyTrackerPage() {
               isGlobalDeleteMode={selectionMode !== null}
               selectionMode={selectionMode}
               globalSelectedRowIds={selectedRowIds}
+              globalSelectionSection={selectionSection}
               onToggleSelectRow={handleToggleSelectRow}
               onToggleSelectSection={handleToggleSelectSection}
               onUpdateRow={handleUpdateRow}

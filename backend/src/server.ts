@@ -1002,12 +1002,12 @@ export const DEFAULT_OFFICIAL_COORDINATOR_ALLOCATIONS: Record<string, string[]> 
   'lizenya': ['NPR', 'KIOT', 'ACEW'],
   'lizenya r': ['NPR', 'KIOT', 'ACEW'],
 
-  // Megala: NGP, KAMARAJ
-  'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ'],
-  'megala': ['NGP', 'KAMARAJ'],
-  'megaladevi': ['NGP', 'KAMARAJ'],
-  'megaladevi p s': ['NGP', 'KAMARAJ'],
-  'megaladevi ps': ['NGP', 'KAMARAJ'],
+  // Megala: NGP, KAMARAJ, MAREPHRAM
+  'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ', 'MAREPHRAM'],
+  'megala': ['NGP', 'KAMARAJ', 'MAREPHRAM'],
+  'megaladevi': ['NGP', 'KAMARAJ', 'MAREPHRAM'],
+  'megaladevi p s': ['NGP', 'KAMARAJ', 'MAREPHRAM'],
+  'megaladevi ps': ['NGP', 'KAMARAJ', 'MAREPHRAM'],
 
   // Tamil / Seshmitha: MCET, MEC
   'seshmitha_tamil@icl.today': ['MCET', 'MEC'],
@@ -1017,15 +1017,43 @@ export const DEFAULT_OFFICIAL_COORDINATOR_ALLOCATIONS: Record<string, string[]> 
   'seshmitha tamilselvi': ['MCET', 'MEC'],
   'seshmitha tamilselvi r': ['MCET', 'MEC'],
 
-  // Sujitha (Team Leader): NEHRU, MAREPHRAM, KPR, HITS, SONA
-  'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
-  'sujitha': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
-  'sujitha s': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
+  // Sujitha (Team Leader): NEHRU, KPR, HITS, SONA
+  'sujitha_s@infoziant.com': ['NEHRU', 'KPR', 'HITS', 'SONA'],
+  'sujitha': ['NEHRU', 'KPR', 'HITS', 'SONA'],
+  'sujitha s': ['NEHRU', 'KPR', 'HITS', 'SONA'],
 };
 
 // Helper to initialize/sync active roster on startup or demand
 export async function syncActiveCollegesRoster() {
   try {
+    // 1. Ensure old legacy codes like 'MAREPHRA' or variations are updated to official 'MAREPHRAM'
+    // Both of these used to be blanket updateMany calls setting the same unique
+    // `college_code` on every match. If two Mar Ephraem documents existed (legacy
+    // 'MAREPHRA' + a name-matching one), the second write hit E11000 on the unique
+    // college_code index and threw — aborting the WHOLE roster sync, so Mar Ephraem
+    // never became active and vanished from every user's Active College Focus matrix.
+    // Now: pick ONE canonical document, promote just that one, and never let this
+    // step abort the rest of the sync.
+    try {
+      const marCandidates = await College.find({
+        $or: [
+          { college_code: { $in: ['MAREPHRAM', 'MAREPHRA'] } },
+          { college_name: /mar ephraem|mar ephream/i },
+        ],
+      });
+      const canonical =
+        marCandidates.find((c) => c.college_code === 'MAREPHRAM') ||
+        marCandidates.find((c) => c.college_code === 'MAREPHRA') ||
+        marCandidates[0];
+      if (canonical) {
+        canonical.college_code = 'MAREPHRAM';
+        canonical.status = 'active';
+        await canonical.save();
+      }
+    } catch (marErr) {
+      console.warn('[Colleges] Mar Ephraem normalisation skipped:', (marErr as Error).message);
+    }
+
     for (const def of OFFICIAL_COLLEGE_DEFINITIONS) {
       let existing = await College.findOne({
         $or: [
@@ -1173,7 +1201,7 @@ app.get('/api/v1/colleges/focus-matrix', async (req: Request, res: Response) => 
     }
 
     let allColleges = await College.find({ status: 'active' }).sort({ college_code: 1 });
-    if (allColleges.length === 0) {
+    if (allColleges.length < OFFICIAL_COLLEGE_DEFINITIONS.length) {
       await syncActiveCollegesRoster();
       allColleges = await College.find({ status: 'active' }).sort({ college_code: 1 });
       if (allColleges.length === 0) {
@@ -1248,12 +1276,12 @@ app.get('/api/v1/colleges/focus-matrix', async (req: Request, res: Response) => 
 
     // Official focus college allocations mapping for default weekly pre-selection
     const DEFAULT_COORDINATOR_COLLEGE_MAP: Record<string, string[]> = {
-      'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
+      'sujitha_s@infoziant.com': ['NEHRU', 'KPR', 'HITS', 'SONA'],
       'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
       'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
       'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],
       'lizenya_r@infoziant.com': ['NPR', 'KIOT', 'ACEW'],
-      'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ'],
+      'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ', 'MAREPHRAM'],
       'seshmitha_tamil@icl.today': ['MCET', 'MEC'],
     };
 
@@ -1883,8 +1911,8 @@ app.get('/api/v1/coordinators', async (req: Request, res: Response) => {
 
     const DEFAULT_COORDINATOR_COLLEGE_MAP: Record<string, string[]> = {
       // Sujitha
-      'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
-      'sujitha': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
+      'sujitha_s@infoziant.com': ['NEHRU', 'KPR', 'HITS', 'SONA'],
+      'sujitha': ['NEHRU', 'KPR', 'HITS', 'SONA'],
       // Mohana / Mohanaradha
       'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
       'mohana': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
@@ -1900,9 +1928,9 @@ app.get('/api/v1/coordinators', async (req: Request, res: Response) => {
       'lizenya_r@infoziant.com': ['NPR', 'KIOT', 'ACEW'],
       'lizenya': ['NPR', 'KIOT', 'ACEW'],
       // Megaladevi
-      'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ'],
-      'megaladevi': ['NGP', 'KAMARAJ'],
-      'megala': ['NGP', 'KAMARAJ'],
+      'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ', 'MAREPHRAM'],
+      'megaladevi': ['NGP', 'KAMARAJ', 'MAREPHRAM'],
+      'megala': ['NGP', 'KAMARAJ', 'MAREPHRAM'],
       // Seshmitha / Tamilselvi
       'seshmitha_tamil@icl.today': ['MCET', 'MEC'],
       'seshmitha': ['MCET', 'MEC'],
@@ -10807,7 +10835,7 @@ app.post('/api/v1/users/heartbeat', async (req: Request, res: Response) => {
 // Team Leader Dashboard (Spec Section 5.2) — Coordinator Profile Online Activity & Live Performance Matrix
 app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => {
   try {
-    // Ensure Sujitha (Team Leader) has her official focus colleges: HITS, NEHRU, KPR, SONA, MAREPHRA (Sujitha does NOT handle MCET)
+    // Ensure Sujitha (Team Leader) has her official focus colleges: HITS, NEHRU, KPR, SONA (Sujitha does NOT handle MCET)
     const sujithaUser = await User.findOne({
       $or: [
         { official_email: 'sujitha_s@infoziant.com' },
@@ -10819,8 +10847,8 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
     if (sujithaUser) {
       const sujithaColleges = await College.find({
         $or: [
-          { college_code: { $in: ['HITS', 'NEHRU', 'KPR', 'SONA', 'MAREPHRAM', 'MAREPHRA'] } },
-          { college_name: { $in: [/hindustan/i, /nehru/i, /^KPR Institute/i, /^SONA/i, /ephraem/i] } },
+          { college_code: { $in: ['HITS', 'NEHRU', 'KPR', 'SONA'] } },
+          { college_name: { $in: [/hindustan/i, /nehru/i, /^KPR Institute/i, /^SONA/i] } },
         ],
         status: 'active',
       });
@@ -10867,6 +10895,30 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
       tamilUser.assigned_college_ids = targetTamilIds;
       if (!tamilUser.account_status) tamilUser.account_status = 'active';
       await tamilUser.save();
+    }
+
+    // Ensure Megala Devi P S has her official focus colleges: NGP, KAMARAJ, MAREPHRAM
+    const megalaUser = await User.findOne({
+      $or: [
+        { official_email: 'megaladevi_ps@infoziant.com' },
+        { username: 'megaladevi' },
+        { username: 'megala' },
+        { full_name: /megala/i },
+      ],
+      is_deleted: false,
+    });
+    if (megalaUser) {
+      const megalaColleges = await College.find({
+        $or: [
+          { college_code: { $in: ['NGP', 'KAMARAJ', 'MAREPHRAM', 'MAREPHRA'] } },
+          { college_name: { $in: [/N\.?G\.?P\.?/i, /kamaraj/i, /ephraem/i, /ephram/i] } },
+        ],
+        status: 'active',
+      });
+      const targetMegalaIds = megalaColleges.map((c) => c._id);
+      megalaUser.assigned_college_ids = targetMegalaIds;
+      if (!megalaUser.account_status) megalaUser.account_status = 'active';
+      await megalaUser.save();
     }
 
     const coordinators = await User.find({
@@ -14656,12 +14708,12 @@ const ensureDefaultAccounts = async () => {
     // Sujitha handles: HITS, NEHRU, KPR (partially with Mohanaradha), SONA, MAREPHRA
     // Mohanaradha handles: KARPAGAM, AIHT, ACET, KPR (partially with Sujitha)
     const DEFAULT_COORDINATOR_COLLEGE_MAP: Record<string, string[]> = {
-      'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
+      'sujitha_s@infoziant.com': ['NEHRU', 'KPR', 'HITS', 'SONA'],
       'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
       'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
       'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],
       'lizenya_r@infoziant.com': ['NPR', 'KIOT', 'ACEW'],
-      'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ'],
+      'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ', 'MAREPHRAM'],
       'seshmitha_tamil@icl.today': ['MCET', 'MEC'],
     };
 
@@ -14879,6 +14931,9 @@ const startServer = async () => {
   } catch (err) {
     console.error('Reconcile same-day moved leads error:', err);
   }
+
+  // Always ensure official active college roster (21 colleges including MAREPHRAM) is synchronized on boot
+  await syncActiveCollegesRoster();
 
   app.listen(PORT, () => {
     console.log(`🚀 [iPOMS API] Server running on http://localhost:${PORT}`);
