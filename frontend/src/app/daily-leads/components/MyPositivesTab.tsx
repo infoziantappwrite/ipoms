@@ -262,17 +262,17 @@ export function MyPositivesTab({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-[12px] font-medium text-left border-collapse">
+            <table className="w-full table-fixed text-[12px] font-medium text-left border-collapse">
               <thead>
                 <tr className="bg-surface-sunken/80 text-fg-muted font-bold border-b border-border uppercase tracking-wider text-[12px] select-none">
-                  <th className="py-3 px-4 w-12 text-center">S.No</th>
-                  <th className="py-3 px-4 w-28 text-center">Date</th>
-                  <th className="py-3 px-4 w-24 text-center">Time</th>
-                  <th className="py-3 px-4 w-28 text-center">College</th>
-                  <th className="py-3 px-4">Company Name</th>
-                  <th className="py-3 px-4">Job Role</th>
-                  <th className="py-3 px-4 w-28 text-center">CTC</th>
-                  <th className="py-3 px-4">Email ID (Maintain Log)</th>
+                  <th className="py-3 px-[15px] w-12 text-center">S.No</th>
+                  <th className="py-3 px-[15px] w-28 text-center">Date</th>
+                  <th className="py-3 px-[15px] w-24 text-center">Time</th>
+                  <th className="py-3 px-[15px] w-28 text-center">College</th>
+                  <th className="py-3 px-[15px] w-[190px]">Company Name</th>
+                  <th className="py-3 px-[15px] w-[280px]">Job Role</th>
+                  <th className="py-3 px-[15px] w-[250px] text-center">CTC</th>
+                  <th className="py-3 px-[15px] w-[400px]">Email ID (Maintain Log)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
@@ -284,33 +284,33 @@ export function MyPositivesTab({
 
                   return (
                     <tr key={row._id} className="hover:bg-surface-sunken/50 transition-colors">
-                      <td className="py-3 px-4 text-center font-medium text-fg-muted tabular-nums">
+                      <td className="py-3 px-[15px] text-center font-medium text-fg-muted tabular-nums">
                         {idx + 1}
                       </td>
 
-                      <td className="py-3 px-4 text-center font-medium text-indigo-700 dark:text-indigo-300 whitespace-nowrap">
+                      <td className="py-3 px-[15px] text-center font-medium text-indigo-700 dark:text-indigo-300 whitespace-nowrap">
                         {formatLeadDate(row.lead_date)}
                       </td>
 
-                      <td className="py-3 px-4 text-center font-medium text-fg-subtle whitespace-nowrap">
+                      <td className="py-3 px-[15px] text-center font-medium text-fg-subtle whitespace-nowrap">
                         {row.event_time || '10:00 AM'}
                       </td>
 
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-3 px-[15px] text-center">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[12px] font-medium bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20">
                           {collegeCode}
                         </span>
                       </td>
 
-                      <td className="py-3 px-4 font-medium text-fg text-[12px]">
+                      <td className="py-3 px-[15px] font-medium text-fg text-[12px]">
                         {row.company_name}
                       </td>
 
-                      <td className="py-3 px-4 font-medium text-fg text-[12px]">
+                      <td className="py-3 px-[15px] font-medium text-fg text-[12px]">
                         {row.job_role || 'Graduate Trainee'}
                       </td>
 
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-3 px-[15px] text-center">
                         {row.ctc ? (
                           <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[12px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 tabular-nums">
                             {row.ctc}
@@ -320,7 +320,7 @@ export function MyPositivesTab({
                         )}
                       </td>
 
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-[15px]">
                         {editingEmailId === row._id ? (
                           <div className="flex items-center gap-1.5">
                             <input

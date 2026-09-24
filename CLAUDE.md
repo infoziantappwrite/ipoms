@@ -1780,7 +1780,14 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     all eight cells 10px/500. Note: these are hard-coded pixel sizes (the app's token scale is 12/14/16/20);
     done as an explicit user instruction. **Revised the same day:** body cells raised from 10px to **12px medium**
     (headings stay 12px bold, so header and body are now the same size; weight tells them apart). Re-measured:
-    header 12px/700, all eight cells 12px/500.
+    header 12px/700, all eight cells 12px/500. **Column widths (user spec, same day):** cell padding
+    `px-4` (32px) -> `px-[15px]` (30px per column); the table is now `table-fixed` with Job Role **280px**,
+    CTC **250px**, Email **400px**, Company Name **190px** (my choice - not specified - so the table fits a
+    1600px screen without sideways scroll), and the existing S.No 48 / Date 112 / Time 96 / College 112.
+    Measured at 1600px: 48/112/96/112/191/281/251/401 = 1492px, no horizontal scroll. On narrower screens
+    (e.g. 1366px) the table is wider than the screen and scrolls sideways. Long role lists and multiple emails
+    wrap onto a second line instead of widening the column. CTC at 250px is much wider than the badge needs
+    (~60px) - a deliberate user number.
 
 ## 6. Module map
 ## 6. Module map
