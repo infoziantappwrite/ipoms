@@ -8,7 +8,6 @@ import { LeadsTabBar } from './components/LeadsTabBar';
 import { LeadsTable, DailyLeadRow } from './components/LeadsTable';
 import { MyPositivesTab } from './components/MyPositivesTab';
 import { AddLeadModal } from './components/AddLeadModal';
-import { CopyToJdModal } from './components/CopyToJdModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser, roleOf } from '@/lib/session';
@@ -45,7 +44,6 @@ export default function DailyLeadsPage() {
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Copy to JD Modal State
-  const [isCopyToJdModalOpen, setIsCopyToJdModalOpen] = useState(false);
 
   // Data
   const [leads, setLeads] = useState<DailyLeadRow[]>([]);
@@ -545,7 +543,6 @@ export default function DailyLeadsPage() {
         myJdCount={myJdCount}
         selectedCount={selectedIds.length}
         onBulkDelete={canManage ? handleBulkDelete : undefined}
-        onOpenCopyToJdModal={canManage ? () => setIsCopyToJdModalOpen(true) : undefined}
       />
 
       {/* ── Table Workspace ───────────────────────────────────────────────── */}
@@ -599,20 +596,6 @@ export default function DailyLeadsPage() {
         />
       )}
 
-      {/* ── Copy to JD Modal (Checkboxes for College List) ────────────────── */}
-      {isCopyToJdModalOpen && (
-        <CopyToJdModal
-          selectedDate={selectedDate}
-          colleges={colleges}
-          positiveLeads={leads}
-          onClose={() => setIsCopyToJdModalOpen(false)}
-          onCopied={() => {
-            loadLeads();
-            loadSummary();
-            broadcastDailyLeadMutation();
-          }}
-        />
-      )}
 
       {/* ── In-App Warning Delete Confirm Modal ───────────────────────── */}
       <DeleteConfirmModal

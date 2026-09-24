@@ -1,6 +1,6 @@
 'use client';
 
-import { FileSpreadsheet, Plus, Target, Trash2, RefreshCw, Copy, Search, Sparkles, ClipboardList } from 'lucide-react';
+import { FileSpreadsheet, Plus, Target, Trash2, RefreshCw, Search, Sparkles, ClipboardList } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
 import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { SmoothExportDropdown } from '@/components/ui/SmoothExportDropdown';
@@ -29,7 +29,6 @@ interface Props {
   myPositivesCount?: number;
   selectedCount?: number;
   onBulkDelete?: () => void;
-  onOpenCopyToJdModal?: () => void;
 }
 
 export function LeadsHeader({
@@ -55,7 +54,6 @@ export function LeadsHeader({
   myJdCount,
   selectedCount = 0,
   onBulkDelete,
-  onOpenCopyToJdModal,
 }: Props) {
 
   return (
@@ -284,19 +282,6 @@ export function LeadsHeader({
                   {selectedCount}
                 </span>
               )}
-            </button>
-          )}
-
-          {/* Move to JD (Visible on Positives Tab) */}
-          {activeTab === 'positive' && onOpenCopyToJdModal && (
-            <button
-              type="button"
-              onClick={onOpenCopyToJdModal}
-              className="w-9 h-9 flex items-center justify-center bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-xl transition-all shadow-xs cursor-pointer active:scale-[0.992] hover:shadow-amber-500/20 shrink-0"
-              title="Move positive leads to JD Received section for selected colleges"
-              aria-label="Move to JD"
-            >
-              <Copy size={16} strokeWidth={2.2} />
             </button>
           )}
 

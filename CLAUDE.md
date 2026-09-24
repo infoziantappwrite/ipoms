@@ -1793,6 +1793,16 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     far right edge, not a gap between columns). Measured: 1600px -> 48/112/96/112/210/250/130/534 = 1492px,
     1366px -> Email 300px, table 1258px; no horizontal scroll at either size.
 
+71. **Daily Leads bulk "Move to JD" window removed, 24 Sep 2026 (user decision).** The amber copy-icon button
+    on the Positives tab opened `CopyToJdModal` (pick one positive company, tick focus colleges, copy it into
+    JD Received for several colleges at once). With only ~5-10 positives and JDs a day the user judged it
+    unnecessary. Removed: the header button and its prop in `LeadsHeader.tsx`, the state/import/render in
+    `daily-leads/page.tsx`, and `components/CopyToJdModal.tsx` itself. **Kept:** the per-row "Move to JD" button
+    in the Positives table (single-company move), Sync, Add, Delete. **Left in place, now unused by the UI:** the
+    backend `POST /api/v1/daily-leads/copy-to-jd` route (two flows; the modal was its only caller) - it can be
+    deleted in a later cleanup. Verified in a real browser: 0 header "Move to JD" buttons, Sync/Add still
+    present, 6 per-row "Move to JD Received" buttons still present, no page errors; `tsc --noEmit` clean.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map
