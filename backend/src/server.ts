@@ -2519,11 +2519,36 @@ app.post('/api/v1/daily-tracker/bulk-move', async (req: Request, res: Response) 
       });
     }
 
-    // Default Mode: Move (re-assign college_id)
-    const updateRes = await DailyTracker.updateMany(
-      { _id: { $in: objectIds } },
-      { $set: { college_id: new Types.ObjectId(String(target_college_id)), updated_at: new Date() } }
-    );
+    // Mode: Move or Return
+    // When moving contacts across colleges:
+    // 1. Clear timing metrics (start_time, end_time, duration_seconds) so it acts as fresh entry in receiving college sheet
+    // 2. Preserve original_college_id & original_coordinator_id if not already set, so recipient can send them back easily!
+    const existingRows = await DailyTracker.find({ _id: { $in: objectIds } });
+    let movedCount = 0;
+
+    for (const row of existingRows) {
+      const isReturning = req.body.is_return === true || (row.original_college_id && String(row.original_college_id) === String(target_college_id));
+      const updatePayload: any = {
+        college_id: new Types.ObjectId(String(target_college_id)),
+        call_start_time: null,
+        call_end_time: null,
+        duration_seconds: null,
+        updated_at: new Date(),
+      };
+
+      if (isReturning) {
+        // Clear original tracking markers on return to original owner
+        updatePayload.original_college_id = null;
+        updatePayload.original_coordinator_id = null;
+      } else if (!row.original_college_id) {
+        // Set origin info on first transfer out of home college
+        updatePayload.original_college_id = row.college_id;
+        updatePayload.original_coordinator_id = row.coordinator_id;
+      }
+
+      await DailyTracker.updateOne({ _id: row._id }, { $set: updatePayload });
+      movedCount++;
+    }
 
     // Also cascade college_id update to any linked DailyLead or WeeklyTracker records
     await DailyLead.updateMany(
@@ -2538,10 +2563,10 @@ app.post('/api/v1/daily-tracker/bulk-move', async (req: Request, res: Response) 
 
     return res.status(200).json({
       success: true,
-      message: `Successfully moved ${updateRes.modifiedCount} company call(s) to ${targetCollege.college_name}`,
+      message: `Successfully moved ${movedCount} company call(s) to ${targetCollege.college_name}`,
       data: {
         action: 'move',
-        processed_count: updateRes.modifiedCount,
+        processed_count: movedCount,
         target_college: {
           _id: targetCollege._id,
           college_name: targetCollege.college_name,
@@ -9734,6 +9759,7 @@ app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => 
     const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
     const hourlyCalls: number[] = new Array(24).fill(0);
     const hourlyPositives: number[] = new Array(24).fill(0);
+    const hourlyJd: number[] = new Array(24).fill(0);
 
     for (const row of completedTrackerRows) {
       let dur = 0;
@@ -9765,6 +9791,10 @@ app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => 
         hourlyCalls[hour]++;
         if (isPositive) {
           hourlyPositives[hour]++;
+        }
+        // JD Received is tracked on its own so the rhythm bar can show it in a different colour
+        if (row.outcome_status === 'jd_received') {
+          hourlyJd[hour]++;
         }
       }
     }
@@ -9862,6 +9892,7 @@ app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => 
           // zeros, never a placeholder shape.
           hourly_calls: hourlyCalls,
           hourly_positives: hourlyPositives,
+          hourly_jd: hourlyJd,
         },
         kpi_summary: {
           // Company funnel — the coordinator's headline numbers.
@@ -9949,6 +9980,7 @@ app.get('/api/v1/dashboard/coordinator/clock-duration', async (req: Request, res
     };
     const hourlyCalls = new Array(24).fill(0);
     const hourlyPositives = new Array(24).fill(0);
+    const hourlyJd = new Array(24).fill(0);
     const collegeMap = new Map<string, { college_id: string; college_name: string; college_code: string; duration_seconds: number; calls_count: number; positive_count: number }>();
 
     for (const row of completedTrackerRows) {
@@ -9981,6 +10013,10 @@ app.get('/api/v1/dashboard/coordinator/clock-duration', async (req: Request, res
         hourlyCalls[hour]++;
         if (isPositive) {
           hourlyPositives[hour]++;
+        }
+        // JD Received is tracked on its own so the rhythm bar can show it in a different colour
+        if (row.outcome_status === 'jd_received') {
+          hourlyJd[hour]++;
         }
       }
 
@@ -10023,6 +10059,7 @@ app.get('/api/v1/dashboard/coordinator/clock-duration', async (req: Request, res
         outcomes: dayOutcomes,
         hourly_calls: hourlyCalls,
         hourly_positives: hourlyPositives,
+          hourly_jd: hourlyJd,
         college_breakdown: Array.from(collegeMap.values()),
       },
     });
@@ -11274,6 +11311,8 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
     let leaderTodayCalls = 0;
     let leaderTodayPositives = 0;
     const leaderHourlyCalls: number[] = new Array(24).fill(0);
+    const leaderHourlyPositives: number[] = new Array(24).fill(0);
+    const leaderHourlyJd: number[] = new Array(24).fill(0);
     const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
     const POSITIVE_OUTCOMES = ['invite_mail', 'positive', 'callback_requested', 'jd_received'];
 
@@ -11305,7 +11344,10 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
         const stamp = getTrackerCompletionTimestamp(row);
         const t = stamp.getTime();
         if (!isNaN(t)) {
-          leaderHourlyCalls[new Date(t + IST_OFFSET_MS).getUTCHours()]++;
+          const leaderHour = new Date(t + IST_OFFSET_MS).getUTCHours();
+          leaderHourlyCalls[leaderHour]++;
+          if (row.outcome_status === PIPELINE_SYNC_OUTCOME) leaderHourlyPositives[leaderHour]++;
+          if (row.outcome_status === 'jd_received') leaderHourlyJd[leaderHour]++;
         }
       }
     }
@@ -11339,6 +11381,8 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
           avg_call_duration_formatted: leaderAvgInfo.formatted,
           positive_calls_count: leaderTodayPositives,
           hourly_calls: leaderHourlyCalls,
+          hourly_positives: leaderHourlyPositives,
+          hourly_jd: leaderHourlyJd,
         },
         online_summary: {
           total_coordinators: coordinators.length,

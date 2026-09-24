@@ -1520,6 +1520,22 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     Stray `frontend/coord.json` / `coord_token.txt` (an expired coordinator token) were untracked and
     gitignored (files kept on disk; still in old history).
 
+58. **Hourly Rhythm bars now show Invite Mail and JD Received, 24 Sep 2026 (user-requested).** In
+    `CoordinatorClockDurationWidget.tsx` a bar is **green** when any call that hour was an Invite Mail
+    (already the case on the coordinator dashboard) and **fuchsia** when any call that hour was JD
+    Received (previously it fell into the plain indigo bar); an hour with both is split half/half. Fuchsia
+    was chosen because green is taken by Invite Mail, indigo is the default bar, and amber/blue/rose are
+    the Not Hiring / Follow Up / Negative chips. A small legend appears only when a coloured bar exists.
+    It is per viewer's own calls that day, any college (the widget is keyed to the coordinator, not a
+    college), and recomputes daily since the data is "today" (or the selected date). Backend: new
+    `hourly_jd` array beside `hourly_positives` in `/dashboard/coordinator`, `/coordinator/clock-duration`
+    and `/coordinator/duration-history`; the Team Leader dashboard (Sujitha) previously returned neither
+    array, so it now returns both (invite_mail / jd_received only). **Malvika Kumar's dashboard is
+    unchanged** — she gets `CollegeActivityTodayWidget`, not this widget. Verified live as Mohanaradha:
+    12p green (Invite Mail), 2p fuchsia (JD Received), legend shown, no console errors; Sujitha's endpoint
+    returns 24-slot arrays. **Not verified:** dark mode (the app toggles a `.dark` class, which the test
+    browser's colour-scheme setting doesn't trigger) and a split (both-in-one-hour) bar.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map
