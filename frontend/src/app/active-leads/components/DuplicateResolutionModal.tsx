@@ -87,7 +87,18 @@ export function DuplicateResolutionModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic('success');
-    await onConfirm(resolutions);
+    // Every company is shown with "Merge" pre-selected, but that default only exists on screen until the
+    // user clicks something (the state above is built once, before any conflicts are loaded, so it starts
+    // empty). Build the full set here, otherwise Confirm sent {} and nothing was saved.
+    const payload: Record<string, ConflictResolution> = {};
+    conflicts.forEach((c) => {
+      payload[c.company_name] = resolutions[c.company_name] || {
+        action: 'merge',
+        chosen_role: c.suggested_merged_role,
+        chosen_ctc: c.ctc || c.existing_ctc || '',
+      };
+    });
+    await onConfirm(payload);
   };
 
   return (

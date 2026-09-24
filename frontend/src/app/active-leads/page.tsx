@@ -407,14 +407,16 @@ export default function ActiveLeadsPage() {
         }),
       });
 
-      if (res.success) {
+      // The server answers success:true with has_conflicts:true when it received no resolutions and
+      // saved nothing - that is not a resolved sync.
+      if (res.success && !(res as any).has_conflicts) {
         setShowConflictModal(false);
         setConflicts([]);
         await fetchLeads(false);
         broadcastMutation();
         toast('Duplicate conflicts resolved & Active Leads updated successfully!', 'success');
       } else {
-        toast(res.error?.message || 'Failed to update resolved roles', 'error');
+        toast(res.error?.message || 'Nothing was saved - please try again', 'error');
       }
     } catch (err: any) {
       console.error('Confirm resolutions error:', err);

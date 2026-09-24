@@ -1655,6 +1655,22 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     genuinely have a new role, e.g. Novatech, NEOMETRIX, Happy Connects); the real (writing) sync was
     not run. `tsc --noEmit` clean.
 
+65. **"Confirm & Update" in the role-conflict popup saved nothing, 24 Sep 2026 (user-reported, follow-up to
+    item 64).** `DuplicateResolutionModal.tsx` built its `resolutions` state with `useState(() => ...)`
+    from the `conflicts` prop, but the modal is always mounted (page renders it with `conflicts=[]`), so the
+    initializer ran once on an empty list and the state stayed `{}`. The "Merge (Recommended)" choice was
+    only a visual fallback, so unless the user clicked every radio (or "Merge All") Confirm sent
+    `resolutions: {}`. The backend correctly refuses to write without resolutions and answers
+    `success:true, has_conflicts:true`; the page took that `success` as done, closed the popup and toasted
+    "resolved" - nothing was saved, so the next sync flagged the same companies. Fixed both ends: the modal
+    now builds the full set (state entry, else the default merge) at submit, and the page only treats the
+    response as resolved when `has_conflicts` is false (otherwise it shows "Nothing was saved"). Verified in
+    a real browser with the write request blocked: Confirm with no radio touched sends 9 merge resolutions
+    (ELEATION -> "CAE Project Engineer, Graduate Trainee", etc.). The real write was NOT run by me - the
+    user confirms once for real, after which `check_only` should return 0 conflicts. **Separate finding,
+    not changed:** 69 company names have more than one non-deleted `active_leads` row (case-insensitive),
+    and the sync's `activeMap` keeps only the last row per normalised name.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map
