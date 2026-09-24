@@ -1499,6 +1499,27 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     (fix is a major jump to Next 16 — needs its own migration), `@capacitor/cli` moderate.
     `nodemailer` was already on a fixed version (9.1.1).
 
+57. **"My JD" tab added to Daily Leads, 24 Sep 2026 (user-requested).** The header tab strip is now
+    Positives / JD Received / My Positives / **My JD**. My JD is the JD-Received twin of My
+    Positives: every JD (`lead_type=jd_received`) ever recorded for the viewer's handled (focus)
+    colleges, **all-time from the first record** (date filter defaults to "All Dates"), with the same
+    college and date filters, table and count badge. Implemented by giving `MyPositivesTab.tsx` a
+    `leadType` prop (default `'positive'`, so My Positives is unchanged) and a fourth
+    `LeadsHeader.tsx` button; `page.tsx` fetches both all-time lists in `loadSummary` and counts
+    each against the focus set. Both tabs are live views over the saved `daily_leads` rows, not
+    separate copies — a lead deleted from the day tabs leaves them too. **Verified live** as
+    Mohanaradha: My JD showed her 3 AIHT JDs, My Positives still 17. **Known pre-existing quirk,
+    not changed:** `getDefaultOfficialCollegeIdsForUser` needs the cached college list; in a
+    brand-new browser session (cold cache) My Positives/My JD fall back to *all* colleges in the
+    table while the badge shows 0, until the cache warms. `LeadsTabBar.tsx` is imported by
+    `page.tsx` but never rendered (dead), so only `LeadsHeader.tsx` carries the tabs.
+    **Next.js 16 upgrade (same day):** branch `next16-upgrade` (`bc5750e`, pushed) — Next 14.2.35 ->
+    16.3.6, React stays 18.3.1. Clears the critical Next advisory and the `postcss` high; build,
+    typecheck and a light/dark browser comparison of 8 main screens against the current build
+    showed no differences or console errors. Not merged; needs a Vercel preview look first.
+    Stray `frontend/coord.json` / `coord_token.txt` (an expired coordinator token) were untracked and
+    gitignored (files kept on disk; still in old history).
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

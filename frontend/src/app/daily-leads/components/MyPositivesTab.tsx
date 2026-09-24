@@ -16,6 +16,8 @@ interface Props {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   onUpdateRow: (rowId: string, patch: Partial<DailyLeadRow>) => Promise<void>;
+  /** 'positive' = My Positives (default), 'jd_received' = My JD - same all-time, focus-college view. */
+  leadType?: 'positive' | 'jd_received';
 }
 
 function formatLeadDate(dateStr?: string | Date | null): string {
@@ -40,8 +42,10 @@ export function MyPositivesTab({
   searchQuery,
   onSearchChange,
   onUpdateRow,
+  leadType = 'positive',
 }: Props) {
   const { toast } = useToast();
+  const isJd = leadType === 'jd_received';
   const [selectedCollegeId, setSelectedCollegeId] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all'); // 'all' = All Time / All Dates
   const [leads, setLeads] = useState<DailyLeadRow[]>([]);
@@ -91,7 +95,7 @@ export function MyPositivesTab({
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        lead_type: 'positive',
+        lead_type: leadType,
       });
       if (dateFilter !== 'all') {
         params.set('date', dateFilter);
@@ -135,7 +139,7 @@ export function MyPositivesTab({
     } finally {
       setLoading(false);
     }
-  }, [dateFilter, selectedCollegeId, searchQuery, focusColleges]);
+  }, [dateFilter, selectedCollegeId, searchQuery, focusColleges, leadType]);
 
   useEffect(() => {
     loadMyPositives();
@@ -178,7 +182,7 @@ export function MyPositivesTab({
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider truncate">
-                Total Positives Logged
+                {isJd ? 'Total JDs Received' : 'Total Positives Logged'}
               </p>
               <p className="text-sm font-black text-emerald-900 dark:text-emerald-100 tabular-nums leading-tight">
                 {stats.totalPositivesCount}
@@ -221,18 +225,20 @@ export function MyPositivesTab({
       <div className="overflow-hidden bg-surface rounded-2xl border border-border shadow-2xs">
         {loading ? (
           <div className="p-12 text-center text-fg-subtle text-xs font-medium">
-            Loading positive leads history for your colleges...
+            {isJd ? 'Loading JD history for your colleges...' : 'Loading positive leads history for your colleges...'}
           </div>
         ) : leads.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-12 text-center">
             <div className="w-12 h-12 rounded-2xl bg-surface-sunken border border-border text-fg-subtle flex items-center justify-center mb-3">
               <Sparkles size={24} />
             </div>
-            <h3 className="text-sm font-bold text-fg">No Positive Leads Found</h3>
+            <h3 className="text-sm font-bold text-fg">{isJd ? "No JDs Received Found" : "No Positive Leads Found"}</h3>
             <p className="text-xs text-fg-subtle max-w-sm mt-1">
               {dateFilter === 'all'
-                ? 'No positive outcomes or invite emails recorded for the selected colleges yet.'
-                : `No positive outcomes or invite emails recorded on ${dateFilter}. Try selecting "All Dates (All-Time)".`}
+                ? (isJd
+                    ? 'No JDs recorded as received for the selected colleges yet.'
+                    : 'No positive outcomes or invite emails recorded for the selected colleges yet.')
+                : `No ${isJd ? 'JDs received' : 'positive outcomes or invite emails'} recorded on ${dateFilter}. Try selecting "All Dates (All-Time)".`}
             </p>
           </div>
         ) : (

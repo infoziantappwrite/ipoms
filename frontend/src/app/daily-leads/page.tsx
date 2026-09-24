@@ -29,8 +29,8 @@ export default function DailyLeadsPage() {
   const [colleges, setColleges] = useState<{ _id: string; college_name: string; college_code: string }[]>([]);
 
   // Tab State: Always defaults to 'positive' when visiting the Daily Leads module
-  const [activeTab, setActiveTab] = useState<'positive' | 'jd_received' | 'my_positives'>('positive');
-  const activeTabRef = useRef<'positive' | 'jd_received' | 'my_positives'>('positive');
+  const [activeTab, setActiveTab] = useState<'positive' | 'jd_received' | 'my_positives' | 'my_jd'>('positive');
+  const activeTabRef = useRef<'positive' | 'jd_received' | 'my_positives' | 'my_jd'>('positive');
   activeTabRef.current = activeTab;
 
   // Search Query
@@ -55,6 +55,7 @@ export default function DailyLeadsPage() {
     active_colleges_count: 0,
   });
   const [myPositivesCount, setMyPositivesCount] = useState<number>(0);
+  const [myJdCount, setMyJdCount] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [coordinatorId, setCoordinatorId] = useState<string>('');
@@ -128,7 +129,7 @@ export default function DailyLeadsPage() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isDeleteMode]);
 
-  const handleTabChange = (tab: 'positive' | 'jd_received' | 'my_positives') => {
+  const handleTabChange = (tab: 'positive' | 'jd_received' | 'my_positives' | 'my_jd') => {
     if (tab === activeTab) return;
     setActiveTab(tab);
     activeTabRef.current = tab;
@@ -168,9 +169,10 @@ export default function DailyLeadsPage() {
   const loadSummary = useCallback(async () => {
     try {
       const params = new URLSearchParams({ date: selectedDate });
-      const [summaryRes, allPositivesRes] = await Promise.all([
+      const [summaryRes, allPositivesRes, allJdRes] = await Promise.all([
         apiFetch(`/daily-leads/summary?${params.toString()}`),
         apiFetch('/daily-leads?lead_type=positive'),
+        apiFetch('/daily-leads?lead_type=jd_received'),
       ]);
 
       if (summaryRes.success && summaryRes.data) {
@@ -181,32 +183,32 @@ export default function DailyLeadsPage() {
         });
       }
 
+      // All-time count of leads that belong to the viewer's handled (focus) colleges
+      const user = readSessionUser();
+      const isAdminOrLeader =
+        Boolean((user as any)?.has_all_colleges_access) ||
+        (user as any)?.role_codes?.includes('ADMINISTRATOR') ||
+        (user as any)?.role_codes?.includes('ADMIN') ||
+        (user as any)?.role === 'admin';
+      const focusIds = getCoordinatorSelectedColleges();
+      const defaultIds = getDefaultOfficialCollegeIdsForUser(user);
+      const effectiveFocusIds = focusIds.length > 0 ? focusIds : defaultIds;
+      const focusSet = new Set(effectiveFocusIds.map((id) => String(id).toUpperCase()));
+      const countForFocus = (list: DailyLeadRow[]) => {
+        if (isAdminOrLeader) return list.length;
+        return list.filter((l) => {
+          const colObj = typeof l.college_id === 'object' ? l.college_id : null;
+          const colId = String(colObj?._id || l.college_id || '').toUpperCase();
+          const colCode = String(colObj?.college_code || '').toUpperCase();
+          return focusSet.has(colId) || focusSet.has(colCode);
+        }).length;
+      };
+
       if (allPositivesRes.success && allPositivesRes.data) {
-        const rawPositives: DailyLeadRow[] = (allPositivesRes.data as any).leads || [];
-        const user = readSessionUser();
-        const isAdminOrLeader =
-          Boolean((user as any)?.has_all_colleges_access) ||
-          (user as any)?.role_codes?.includes('ADMINISTRATOR') ||
-          (user as any)?.role_codes?.includes('ADMIN') ||
-          (user as any)?.role === 'admin';
-
-        if (isAdminOrLeader) {
-          setMyPositivesCount(rawPositives.length);
-        } else {
-          const focusIds = getCoordinatorSelectedColleges();
-          const defaultIds = getDefaultOfficialCollegeIdsForUser(user);
-          const effectiveFocusIds = focusIds.length > 0 ? focusIds : defaultIds;
-          const focusSet = new Set(effectiveFocusIds.map((id) => String(id).toUpperCase()));
-
-          const count = rawPositives.filter((l) => {
-            const colObj = typeof l.college_id === 'object' ? l.college_id : null;
-            const colId = String(colObj?._id || l.college_id || '').toUpperCase();
-            const colCode = String(colObj?.college_code || '').toUpperCase();
-            return focusSet.has(colId) || focusSet.has(colCode);
-          }).length;
-
-          setMyPositivesCount(count);
-        }
+        setMyPositivesCount(countForFocus((allPositivesRes.data as any).leads || []));
+      }
+      if (allJdRes.success && allJdRes.data) {
+        setMyJdCount(countForFocus((allJdRes.data as any).leads || []));
       }
     } catch (err) {
       console.error('Failed to load leads summary:', err);
@@ -538,6 +540,7 @@ export default function DailyLeadsPage() {
         positivesCount={summary.positives_count}
         jdCount={summary.jd_received_count}
         myPositivesCount={myPositivesCount}
+        myJdCount={myJdCount}
         selectedCount={selectedIds.length}
         onBulkDelete={canManage ? handleBulkDelete : undefined}
         onOpenCopyToJdModal={canManage ? () => setIsCopyToJdModalOpen(true) : undefined}
@@ -545,8 +548,10 @@ export default function DailyLeadsPage() {
 
       {/* ── Table Workspace ───────────────────────────────────────────────── */}
       <div className="flex-1 px-6 py-4">
-        {activeTab === 'my_positives' ? (
+        {activeTab === 'my_positives' || activeTab === 'my_jd' ? (
           <MyPositivesTab
+            key={activeTab}
+            leadType={activeTab === 'my_jd' ? 'jd_received' : 'positive'}
             selectedDate={selectedDate}
             onDateChange={setSelectedDate}
             colleges={colleges}

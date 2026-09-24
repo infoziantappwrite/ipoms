@@ -21,8 +21,9 @@ interface Props {
   isSyncing?: boolean;
   isDeleteMode?: boolean;
   onToggleDeleteMode?: () => void;
-  activeTab?: 'positive' | 'jd_received' | 'my_positives';
-  onTabChange?: (tab: 'positive' | 'jd_received' | 'my_positives') => void;
+  activeTab?: 'positive' | 'jd_received' | 'my_positives' | 'my_jd';
+  onTabChange?: (tab: 'positive' | 'jd_received' | 'my_positives' | 'my_jd') => void;
+  myJdCount?: number;
   positivesCount?: number;
   jdCount?: number;
   myPositivesCount?: number;
@@ -51,6 +52,7 @@ export function LeadsHeader({
   positivesCount = 0,
   jdCount = 0,
   myPositivesCount,
+  myJdCount,
   selectedCount = 0,
   onBulkDelete,
   onOpenCopyToJdModal,
@@ -85,15 +87,17 @@ export function LeadsHeader({
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Tabs: Positives, JD Received & My College Positives — Apple Smooth Sliding Segmented Control */}
           {onTabChange && (
-            <div className="relative grid grid-cols-3 gap-0.5 p-0.5 bg-surface-sunken/80 dark:bg-zinc-900/90 rounded-lg border border-border/80 shadow-2xs shrink-0 select-none">
+            <div className="relative grid grid-cols-4 gap-0.5 p-0.5 bg-surface-sunken/80 dark:bg-zinc-900/90 rounded-lg border border-border/80 shadow-2xs shrink-0 select-none">
               {/* Glider / Smooth Sliding Indicator */}
               <div
-                className={`absolute top-0.5 bottom-0.5 w-[calc((100%-8px)/3)] rounded-md border shadow-xs transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none ${
+                className={`absolute top-0.5 bottom-0.5 w-[calc((100%-10px)/4)] rounded-md border shadow-xs transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none ${
                   activeTab === 'positive'
                     ? 'left-0.5 translate-x-0 bg-white dark:bg-emerald-950/80 border-emerald-500/40 dark:border-emerald-600/50 shadow-emerald-500/10'
                     : activeTab === 'jd_received'
                     ? 'left-0.5 translate-x-[calc(100%+2px)] bg-white dark:bg-blue-950/80 border-blue-500/40 dark:border-blue-600/50 shadow-blue-500/10'
-                    : 'left-0.5 translate-x-[calc(200%+4px)] bg-white dark:bg-indigo-950/80 border-indigo-500/40 dark:border-indigo-600/50 shadow-indigo-500/10'
+                    : activeTab === 'my_positives'
+                    ? 'left-0.5 translate-x-[calc(200%+4px)] bg-white dark:bg-indigo-950/80 border-indigo-500/40 dark:border-indigo-600/50 shadow-indigo-500/10'
+                    : 'left-0.5 translate-x-[calc(300%+6px)] bg-white dark:bg-sky-950/80 border-sky-500/40 dark:border-sky-600/50 shadow-sky-500/10'
                 }`}
               />
 
@@ -170,6 +174,33 @@ export function LeadsHeader({
                     }`}
                   >
                     {myPositivesCount}
+                  </span>
+                )}
+              </button>
+
+              {/* My JD Tab - every JD received for my focus colleges, all-time */}
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic('selection');
+                  onTabChange('my_jd');
+                }}
+                className={`relative z-10 flex items-center justify-center gap-1.5 px-2 py-1 text-xs font-bold transition-colors duration-200 cursor-pointer rounded-md ${
+                  activeTab === 'my_jd'
+                    ? 'text-sky-900 dark:text-sky-200 font-extrabold'
+                    : 'text-fg-subtle hover:text-fg'
+                }`}
+              >
+                <span className="tracking-wide uppercase font-extrabold text-[11px]">My JD</span>
+                {myJdCount !== undefined && (
+                  <span
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-[4px] transition-colors duration-200 tabular-nums shadow-2xs ${
+                      activeTab === 'my_jd'
+                        ? 'bg-sky-600 dark:bg-sky-500 text-white font-black'
+                        : 'bg-surface-sunken dark:bg-zinc-800 text-fg-muted'
+                    }`}
+                  >
+                    {myJdCount}
                   </span>
                 )}
               </button>
