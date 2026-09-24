@@ -12,7 +12,7 @@ import { CopyToJdModal } from './components/CopyToJdModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser, roleOf } from '@/lib/session';
-import { getActiveCollege, setActiveCollege } from '@/lib/collegeSession';
+import { getActiveCollege, setActiveCollege, getCoordinatorSelectedColleges, getDefaultOfficialCollegeIdsForUser } from '@/lib/collegeSession';
 import { exportToXlsx } from '@/lib/exportExcel';
 import { useToast } from '@/components/ui/Toast';
 
@@ -54,6 +54,7 @@ export default function DailyLeadsPage() {
     jd_received_count: 0,
     active_colleges_count: 0,
   });
+  const [myPositivesCount, setMyPositivesCount] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [coordinatorId, setCoordinatorId] = useState<string>('');
@@ -167,13 +168,45 @@ export default function DailyLeadsPage() {
   const loadSummary = useCallback(async () => {
     try {
       const params = new URLSearchParams({ date: selectedDate });
-      const res = await apiFetch(`/daily-leads/summary?${params.toString()}`);
-      if (res.success && res.data) {
-        setSummary((res.data as any).summary || {
+      const [summaryRes, allPositivesRes] = await Promise.all([
+        apiFetch(`/daily-leads/summary?${params.toString()}`),
+        apiFetch('/daily-leads?lead_type=positive'),
+      ]);
+
+      if (summaryRes.success && summaryRes.data) {
+        setSummary((summaryRes.data as any).summary || {
           positives_count: 0,
           jd_received_count: 0,
           active_colleges_count: 0,
         });
+      }
+
+      if (allPositivesRes.success && allPositivesRes.data) {
+        const rawPositives: DailyLeadRow[] = (allPositivesRes.data as any).leads || [];
+        const user = readSessionUser();
+        const isAdminOrLeader =
+          Boolean((user as any)?.has_all_colleges_access) ||
+          (user as any)?.role_codes?.includes('ADMINISTRATOR') ||
+          (user as any)?.role_codes?.includes('ADMIN') ||
+          (user as any)?.role === 'admin';
+
+        if (isAdminOrLeader) {
+          setMyPositivesCount(rawPositives.length);
+        } else {
+          const focusIds = getCoordinatorSelectedColleges();
+          const defaultIds = getDefaultOfficialCollegeIdsForUser(user);
+          const effectiveFocusIds = focusIds.length > 0 ? focusIds : defaultIds;
+          const focusSet = new Set(effectiveFocusIds.map((id) => String(id).toUpperCase()));
+
+          const count = rawPositives.filter((l) => {
+            const colObj = typeof l.college_id === 'object' ? l.college_id : null;
+            const colId = String(colObj?._id || l.college_id || '').toUpperCase();
+            const colCode = String(colObj?.college_code || '').toUpperCase();
+            return focusSet.has(colId) || focusSet.has(colCode);
+          }).length;
+
+          setMyPositivesCount(count);
+        }
       }
     } catch (err) {
       console.error('Failed to load leads summary:', err);
@@ -504,6 +537,7 @@ export default function DailyLeadsPage() {
         onTabChange={handleTabChange}
         positivesCount={summary.positives_count}
         jdCount={summary.jd_received_count}
+        myPositivesCount={myPositivesCount}
         selectedCount={selectedIds.length}
         onBulkDelete={canManage ? handleBulkDelete : undefined}
         onOpenCopyToJdModal={canManage ? () => setIsCopyToJdModalOpen(true) : undefined}

@@ -28,15 +28,15 @@ export function LeadsTabBar({
   return (
     <div className="px-6 border-b border-border flex items-center justify-between gap-4 bg-surface min-h-[48px]">
       {/* ── Left: Tab Buttons — Apple Smooth Sliding Segmented Control ── */}
-      <div className="relative grid grid-cols-3 gap-1 p-1 bg-surface-sunken/80 dark:bg-zinc-900/90 rounded-lg border border-border/80 shadow-2xs shrink-0 select-none">
+      <div className="relative grid grid-cols-3 gap-0.5 p-0.5 bg-surface-sunken/80 dark:bg-zinc-900/90 rounded-lg border border-border/80 shadow-2xs shrink-0 select-none">
         {/* Glider / Smooth Sliding Indicator */}
         <div
-          className={`absolute top-1 bottom-1 w-[calc((100%-16px)/3)] rounded-md border shadow-xs transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none ${
+          className={`absolute top-0.5 bottom-0.5 w-[calc((100%-8px)/3)] rounded-md border shadow-xs transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none ${
             activeTab === 'positive'
-              ? 'left-1 translate-x-0 bg-white dark:bg-emerald-950/80 border-emerald-500/40 dark:border-emerald-600/50 shadow-emerald-500/10'
+              ? 'left-0.5 translate-x-0 bg-white dark:bg-emerald-950/80 border-emerald-500/40 dark:border-emerald-600/50 shadow-emerald-500/10'
               : activeTab === 'jd_received'
-              ? 'left-1 translate-x-[calc(100%+4px)] bg-white dark:bg-blue-950/80 border-blue-500/40 dark:border-blue-600/50 shadow-blue-500/10'
-              : 'left-1 translate-x-[calc(200%+8px)] bg-white dark:bg-indigo-950/80 border-indigo-500/40 dark:border-indigo-600/50 shadow-indigo-500/10'
+              ? 'left-0.5 translate-x-[calc(100%+2px)] bg-white dark:bg-blue-950/80 border-blue-500/40 dark:border-blue-600/50 shadow-blue-500/10'
+              : 'left-0.5 translate-x-[calc(200%+4px)] bg-white dark:bg-indigo-950/80 border-indigo-500/40 dark:border-indigo-600/50 shadow-indigo-500/10'
           }`}
         />
 
@@ -44,21 +44,13 @@ export function LeadsTabBar({
         <button
           type="button"
           onClick={() => onTabChange('positive')}
-          className={`relative z-10 flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-bold transition-colors duration-200 cursor-pointer rounded-md ${
+          className={`relative z-10 flex items-center justify-center gap-1.5 px-2 py-1 text-xs font-bold transition-colors duration-200 cursor-pointer rounded-md ${
             activeTab === 'positive'
               ? 'text-emerald-900 dark:text-emerald-200 font-extrabold'
               : 'text-fg-subtle hover:text-fg'
           }`}
         >
-          <Sparkles
-            size={14}
-            strokeWidth={2.3}
-            className={`transition-colors duration-200 ${
-              activeTab === 'positive' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-zinc-500'
-            }`}
-            aria-hidden
-          />
-          <span className="tracking-wide uppercase font-extrabold">Positives</span>
+          <span className="tracking-wide uppercase font-extrabold text-[11px]">Positives</span>
           <span
             className={`text-[10px] font-bold px-1.5 py-0.5 rounded-[4px] transition-colors duration-200 tabular-nums shadow-2xs ${
               activeTab === 'positive'
@@ -74,21 +66,13 @@ export function LeadsTabBar({
         <button
           type="button"
           onClick={() => onTabChange('jd_received')}
-          className={`relative z-10 flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-bold transition-colors duration-200 cursor-pointer rounded-md ${
+          className={`relative z-10 flex items-center justify-center gap-1.5 px-2 py-1 text-xs font-bold transition-colors duration-200 cursor-pointer rounded-md ${
             activeTab === 'jd_received'
               ? 'text-blue-900 dark:text-blue-200 font-extrabold'
               : 'text-fg-subtle hover:text-fg'
           }`}
         >
-          <ClipboardList
-            size={14}
-            strokeWidth={2.3}
-            className={`transition-colors duration-200 ${
-              activeTab === 'jd_received' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-zinc-500'
-            }`}
-            aria-hidden
-          />
-          <span className="tracking-wide uppercase font-extrabold">JD Received</span>
+          <span className="tracking-wide uppercase font-extrabold text-[11px]">JD Received</span>
           <span
             className={`text-[10px] font-bold px-1.5 py-0.5 rounded-[4px] transition-colors duration-200 tabular-nums shadow-2xs ${
               activeTab === 'jd_received'
@@ -104,21 +88,13 @@ export function LeadsTabBar({
         <button
           type="button"
           onClick={() => onTabChange('my_positives')}
-          className={`relative z-10 flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-bold transition-colors duration-200 cursor-pointer rounded-md ${
+          className={`relative z-10 flex items-center justify-center gap-1.5 px-2 py-1 text-xs font-bold transition-colors duration-200 cursor-pointer rounded-md ${
             activeTab === 'my_positives'
               ? 'text-indigo-900 dark:text-indigo-200 font-extrabold'
               : 'text-fg-subtle hover:text-fg'
           }`}
         >
-          <Sparkles
-            size={14}
-            strokeWidth={2.3}
-            className={`transition-colors duration-200 ${
-              activeTab === 'my_positives' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-zinc-500'
-            }`}
-            aria-hidden
-          />
-          <span className="tracking-wide uppercase font-extrabold">My Positives</span>
+          <span className="tracking-wide uppercase font-extrabold text-[11px]">My Positives</span>
           <span
             className={`text-[10px] font-bold px-1.5 py-0.5 rounded-[4px] transition-colors duration-200 tabular-nums shadow-2xs ${
               activeTab === 'my_positives'
