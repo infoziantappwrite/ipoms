@@ -146,7 +146,7 @@ export function EmailCheckPrompt() {
         </button>
 
         <div className="ipoms-ec-hero" aria-hidden>
-          <svg viewBox="0 0 120 80" width="120" height="80">
+          <svg viewBox="0 0 120 80" width="78" height="52">
             <g className="ipoms-ec-plane">
               <path d="M8 40 L52 22 L40 46 Z" fill="#fff" opacity="0.95" />
               <path d="M40 46 L52 22 L34 40 Z" fill="#bfd0ff" />
@@ -182,21 +182,21 @@ export function EmailCheckPrompt() {
       </div>
 
       <style jsx global>{`
-        .ipoms-ec-backdrop { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px;
+        .ipoms-ec-backdrop { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 16px; overflow: auto;
           background: rgba(15, 23, 42, 0.45); animation: ipoms-ec-fade .25s ease-out both; }
-        .ipoms-ec-card { position: relative; width: min(440px, 100%); border-radius: 20px; overflow: hidden;
+        .ipoms-ec-card { position: relative; width: min(320px, 100%); margin: auto; border-radius: 16px; overflow: hidden;
           background: #ffffff; color: #0f172a; box-shadow: 0 24px 60px rgba(15, 23, 42, .35);
           animation: ipoms-ec-pop .35s cubic-bezier(.2,.9,.3,1.2) both; }
-        .ipoms-ec-x { position: absolute; top: 10px; right: 10px; z-index: 2; display: grid; place-items: center; width: 30px; height: 30px;
+        .ipoms-ec-x { position: absolute; top: 8px; right: 8px; z-index: 2; display: grid; place-items: center; width: 26px; height: 26px;
           border-radius: 999px; border: 0; background: rgba(255,255,255,.18); color: #fff; cursor: pointer; }
         .ipoms-ec-x:hover { background: rgba(255,255,255,.32); }
-        .ipoms-ec-hero { display: grid; place-items: center; padding: 22px 0 14px; background: linear-gradient(135deg, #1E3A8A, #3b5bdb 60%, #5580F5); }
+        .ipoms-ec-hero { display: grid; place-items: center; padding: 12px 0 8px; background: linear-gradient(135deg, #1E3A8A, #3b5bdb 60%, #5580F5); }
         .ipoms-ec-plane { animation: ipoms-ec-fly 2.4s ease-in-out infinite; }
         .ipoms-ec-env { animation: ipoms-ec-bob 2.4s ease-in-out infinite; transform-origin: 84px 51px; }
-        .ipoms-ec-title { margin: 18px 22px 6px; font-size: 18px; font-weight: 700; line-height: 1.3; }
-        .ipoms-ec-sub { margin: 0 22px; font-size: 13.5px; line-height: 1.5; color: #475569; }
-        .ipoms-ec-actions { display: flex; gap: 10px; padding: 18px 22px 22px; }
-        .ipoms-ec-btn { flex: 1; height: 42px; border-radius: 12px; font-size: 14px; font-weight: 600; cursor: pointer; transition: transform .12s ease, filter .12s ease; }
+        .ipoms-ec-title { margin: 12px 16px 4px; font-size: 15px; font-weight: 700; line-height: 1.3; }
+        .ipoms-ec-sub { margin: 0 16px; font-size: 12px; line-height: 1.45; color: #475569; }
+        .ipoms-ec-actions { display: flex; gap: 8px; padding: 12px 16px 16px; }
+        .ipoms-ec-btn { flex: 1; height: 34px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; transition: transform .12s ease, filter .12s ease; }
         .ipoms-ec-btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
         .ipoms-ec-btn:focus-visible, .ipoms-ec-x:focus-visible { outline: 2px solid #5580F5; outline-offset: 2px; }
         .ipoms-ec-yes { border: 0; background: #15803d; color: #fff; }
@@ -204,9 +204,9 @@ export function EmailCheckPrompt() {
         .dark .ipoms-ec-card { background: #141b2b; color: #e5e9f2; }
         .dark .ipoms-ec-sub { color: #a9b3c7; }
         .dark .ipoms-ec-no { color: #e5e9f2; border-color: #56627a; }
-        .ipoms-ec-done { display: grid; place-items: center; gap: 8px; padding: 26px 22px 30px; font-weight: 600; }
+        .ipoms-ec-done { display: grid; place-items: center; gap: 8px; padding: 18px 16px 22px; font-weight: 600; }
         .ipoms-ec-done p { margin: 0; }
-        .ipoms-ec-tick { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 999px; background: #15803d; color: #fff;
+        .ipoms-ec-tick { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 999px; background: #15803d; color: #fff;
           animation: ipoms-ec-pop .4s cubic-bezier(.2,.9,.3,1.4) both; }
         @keyframes ipoms-ec-fade { from { opacity: 0; } to { opacity: 1; } }
         @keyframes ipoms-ec-pop { from { opacity: 0; transform: translateY(14px) scale(.94); } to { opacity: 1; transform: none; } }
