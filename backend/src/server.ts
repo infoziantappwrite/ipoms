@@ -2535,14 +2535,14 @@ app.post('/api/v1/daily-tracker/bulk-move', async (req: Request, res: Response) 
     // 1. Clear timing metrics (start_time, end_time, duration_seconds) so it acts as fresh entry in receiving college sheet
     // 2. Preserve original_college_id & original_coordinator_id if not already set, so recipient can send them back easily!
     const existingRows = await DailyTracker.find({ _id: { $in: objectIds } });
-    let movedCount = 0;
-    let ownerChangedCount = 0;
 
-    // Who should end up owning a moved contact? The coordinator who handles the TARGET college -
-    // otherwise the row stays on the sender's sheet and the receiver never sees it (the Daily
-    // Tracker only lists a coordinator's own rows). Prefer a Placement Coordinator over a Team
-    // Leader; ignore all-colleges oversight accounts. If nobody handles that college yet the row
-    // simply stays with the sender.
+    // Only a row's owner (or a supervisor) may move or share it.
+    for (const row of existingRows) {
+      if (refuseForeignOwner(req, res, String(row.coordinator_id), 'You can only move your own tracker rows.')) return;
+    }
+
+    // Who handles the TARGET college? Placement Coordinator preferred over Team Leader;
+    // all-colleges oversight accounts are ignored.
     const targetObjectId = new Types.ObjectId(String(target_college_id));
     const ownerCandidates = await User.find({
       assigned_college_ids: targetObjectId,
@@ -2555,70 +2555,107 @@ app.post('/api/v1/daily-tracker/bulk-move', async (req: Request, res: Response) 
       .sort({ full_name: 1 })
       .lean();
     const coordinatorOwners = ownerCandidates.filter((u: any) => (u.role_codes || []).includes('PLACEMENT_COORDINATOR'));
-    const targetOwners = coordinatorOwners.length > 0 ? coordinatorOwners : ownerCandidates;
+    const targetOwners: any[] = coordinatorOwners.length > 0 ? coordinatorOwners : ownerCandidates;
 
-    const returnedToNames = new Set<string>();
+    // Two different things can happen to a selected row:
+    //  1. Target college is one the sender handles (or nobody handles it): a real MOVE inside the
+    //     sender's own sheet. Call timing is kept exactly as it was.
+    //  2. Target college belongs to another coordinator: the sender KEEPS the original untouched and
+    //     the receiver gets a COPY of the contact with no call timing and no outcome, as a fresh
+    //     entry. The receiver may fill in their own times and save it, or delete it; neither
+    //     affects the sender.
+    let movedCount = 0;
+    let sharedCount = 0;
+    let skippedDuplicates = 0;
+    const movedIds: Types.ObjectId[] = [];
+    const sharedToNames = new Set<string>();
 
     for (const row of existingRows) {
-      const isReturning = req.body.is_return === true || (row.original_college_id && String(row.original_college_id) === String(target_college_id));
-      // Timing is always cleared on a transfer: the receiving coordinator starts it as a fresh entry.
-      const updatePayload: any = {
+      const senderId = String(row.coordinator_id);
+      const senderHandlesTarget = targetOwners.length === 0 || targetOwners.some((u) => String(u._id) === senderId);
+
+      if (senderHandlesTarget) {
+        await DailyTracker.updateOne({ _id: row._id }, { $set: { college_id: targetObjectId, updated_at: new Date() } });
+        movedIds.push(row._id as Types.ObjectId);
+        movedCount++;
+        continue;
+      }
+
+      const owner = targetOwners[0];
+      const alreadyThere = await DailyTracker.findOne({
         college_id: targetObjectId,
+        coordinator_id: owner._id,
+        session_date: row.session_date,
+        company_name: { $regex: new RegExp(`^${escapeRegex(String(row.company_name || '').trim())}$`, 'i') },
+        mobile_number: row.mobile_number || '',
+      }).select('_id');
+      if (alreadyThere) {
+        skippedDuplicates++;
+        continue;
+      }
+
+      await DailyTracker.create({
+        session_date: row.session_date || new Date(),
+        day: row.day,
+        month: row.month,
+        year: row.year,
+        academic_year: (row as any).academic_year || 2026,
+        college_id: targetObjectId,
+        coordinator_id: owner._id,
+        company_id: row.company_id || null,
+        company_name: row.company_name,
+        hr_name: row.hr_name || 'HR Contact',
+        mobile_number: row.mobile_number || '',
+        email_id: row.email_id || '',
+        is_contact_added: (row as any).is_contact_added || false,
+        is_skipped: false,
+        is_promoted_to_weekly: false,
+        is_deleted: false,
         call_start_time: null,
         call_end_time: null,
         duration_seconds: null,
+        outcome_status: null,
+        follow_up_month: null,
+        comments: row.comments || '',
+        original_college_id: row.college_id,
+        original_coordinator_id: row.coordinator_id,
+        created_at: new Date(),
         updated_at: new Date(),
-      };
-
-      let newOwnerId: string | null = null;
-      if (isReturning) {
-        // Back to the original owner (if we know who that was), and clear the "shared" markers
-        if (row.original_coordinator_id) newOwnerId = String(row.original_coordinator_id);
-        updatePayload.original_college_id = null;
-        updatePayload.original_coordinator_id = null;
-      } else {
-        const senderId = String(row.coordinator_id);
-        // If the sender already handles the target college the row stays with them
-        const owner = targetOwners.some((u: any) => String(u._id) === senderId) ? null : targetOwners[0];
-        if (owner) newOwnerId = String(owner._id);
-        // Remember where it came from, once, but only if it really changes hands
-        if (newOwnerId && newOwnerId !== senderId && !row.original_college_id) {
-          updatePayload.original_college_id = row.college_id;
-          updatePayload.original_coordinator_id = row.coordinator_id;
-        }
-      }
-
-      if (newOwnerId && newOwnerId !== String(row.coordinator_id)) {
-        updatePayload.coordinator_id = new Types.ObjectId(newOwnerId);
-        ownerChangedCount++;
-        const ownerName = (targetOwners as any[]).find((u) => String(u._id) === newOwnerId)?.full_name;
-        if (ownerName) returnedToNames.add(ownerName);
-      }
-
-      await DailyTracker.updateOne({ _id: row._id }, { $set: updatePayload });
-      movedCount++;
+      });
+      sharedToNames.add(owner.full_name);
+      sharedCount++;
     }
 
-    // Also cascade college_id update to any linked DailyLead or WeeklyTracker records
-    await DailyLead.updateMany(
-      { daily_tracker_id: { $in: objectIds } },
-      { $set: { college_id: new Types.ObjectId(String(target_college_id)), updated_at: new Date() } }
-    );
+    // Cascade the college change to linked Daily Leads / Weekly Tracker rows - only for rows that
+    // really moved. A shared copy leaves the sender's original (and everything linked to it) alone.
+    if (movedIds.length > 0) {
+      await DailyLead.updateMany(
+        { daily_tracker_id: { $in: movedIds } },
+        { $set: { college_id: targetObjectId, updated_at: new Date() } }
+      );
+      await WeeklyTracker.updateMany(
+        { daily_tracker_id: { $in: movedIds } },
+        { $set: { college_id: targetObjectId, updated_at: new Date() } }
+      );
+    }
 
-    await WeeklyTracker.updateMany(
-      { daily_tracker_id: { $in: objectIds } },
-      { $set: { college_id: new Types.ObjectId(String(target_college_id)), updated_at: new Date() } }
-    );
+    const parts: string[] = [];
+    if (movedCount > 0) parts.push(`moved ${movedCount} call(s) to ${targetCollege.college_name}`);
+    if (sharedCount > 0) {
+      parts.push(`sent a copy of ${sharedCount} contact(s) to ${Array.from(sharedToNames).join(', ')} (your originals stay with you)`);
+    }
+    if (skippedDuplicates > 0) parts.push(`${skippedDuplicates} already on their sheet, skipped`);
 
     return res.status(200).json({
       success: true,
-      message: ownerChangedCount > 0
-        ? `Successfully moved ${movedCount} company call(s) to ${targetCollege.college_name}${returnedToNames.size ? ` - now on ${Array.from(returnedToNames).join(', ')}'s sheet` : ''}`
-        : `Successfully moved ${movedCount} company call(s) to ${targetCollege.college_name}`,
+      message: parts.length ? `Successfully ${parts.join('; ')}` : 'Nothing to move',
       data: {
         action: 'move',
-        processed_count: movedCount,
-        owner_changed_count: ownerChangedCount,
+        processed_count: movedCount + sharedCount,
+        moved_count: movedCount,
+        shared_count: sharedCount,
+        skipped_duplicate_count: skippedDuplicates,
+        shared_to: Array.from(sharedToNames),
         target_college: {
           _id: targetCollege._id,
           college_name: targetCollege.college_name,

@@ -1577,6 +1577,30 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     tool's uncommitted transfer handler while its model fields were still uncommitted (the committed tree
     would not have compiled); the model, modal, row and page changes are now committed together.
 
+61. **Transfer redesigned as "copy to the receiver", 24 Sep 2026 (user decision - supersedes the
+    hand-over and timing-wipe parts of item 60).** The first version moved the row itself and cleared
+    its call timing, which permanently erased the sender's real calling minutes. Now
+    `POST /daily-tracker/bulk-move` does one of two things per row: (1) target college is one the
+    sender handles (or nobody handles): a real **move** inside the sender's own sheet, **call timing
+    kept**; (2) target college belongs to another coordinator: the sender **keeps the original
+    untouched** and the receiver gets a **copy** of the contact (company, HR, mobile, email, comments)
+    with **no start/end/duration and no outcome** (an outcome would otherwise count as the receiver's
+    own completed call and inflate their dashboard), marked `original_college_id` /
+    `original_coordinator_id` so it shows the `Shared (CODE)` badge. The receiver may fill in their own
+    times and save it or simply delete it; neither affects the sender. A repeat send of the same
+    company+mobile to the same receiver that day is skipped ("already on their sheet"). Linked Daily
+    Leads / Weekly Tracker rows are cascaded only for real moves. **Ownership check added:** only a
+    row's owner or a supervisor may move/share it (`403 FORBIDDEN_NOT_OWNER`), closing the old
+    "anyone can move anyone's rows" gap. **Send Back removed** (with copies there is nothing to send
+    back - the receiver just deletes the copy). The out-of-focus confirmation now also says a copy goes
+    to the other coordinator and the original stays. The owner of a target college is picked as in
+    item 60 (Placement Coordinator over Team Leader, all-colleges oversight accounts ignored).
+    **Verified live** with a throwaway row (0 left): own-college move kept `dur=300`; send to Malavika
+    left Mohanaradha's original intact and gave Malavika a timing-less, outcome-less copy tagged
+    `Shared (ACET / A.Mohanaradha)`; a repeat send was skipped; Malavika moving Mohanaradha's row got
+    `403`; Malavika deleting her copy left the original untouched. `tsc --noEmit` clean both sides.
+    **Not re-checked in a browser this round** (the earlier browser check covered the old Send Back).
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

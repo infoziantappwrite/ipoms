@@ -202,7 +202,7 @@ export function MoveCollegeModal({
             </div>
 
             <p className="text-xs text-fg leading-relaxed bg-amber-500/10 border border-amber-500/20 p-3.5 rounded-xl font-medium">
-              Do you still want to transfer these <span className="font-bold underline">{selectedCount} contact(s)</span> to <span className="font-bold">{pendingAction.targetObj.college_name} ({pendingAction.targetObj.college_code})</span> which is completely out of your focus selection college list for today?
+              Do you still want to transfer these <span className="font-bold underline">{selectedCount} contact(s)</span> to <span className="font-bold">{pendingAction.targetObj.college_name} ({pendingAction.targetObj.college_code})</span> which is completely out of your focus selection college list for today? If another coordinator handles that college they receive a copy (without call timing) and your original stays with you.
             </p>
 
             <div className="flex items-center justify-end gap-2.5 pt-2">
