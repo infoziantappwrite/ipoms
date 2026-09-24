@@ -35,6 +35,7 @@ import rateLimit from 'express-rate-limit';
 import { registerAuthRoutes } from './lib/authRoutes';
 import { registerActiveLeadRoutes, syncLeadFromDailyTracker } from './lib/activeLeadRoutes';
 import { registerWeeklyPasteRoutes } from './lib/weeklyPasteRoutes';
+import { validateAndNormalizeMultiEmail } from './lib/contactRules';
 import { registerPendingTaskRoutes } from './lib/pendingTaskRoutes';
 import { seedMasterDailyLeads, MASTER_POSITIVES_DATA } from './lib/seedMasterDailyLeads';
 import { seedAugustAllCollegesPositives } from './lib/seedAugustAllCollegesPositives';
@@ -6414,6 +6415,7 @@ app.post('/api/v1/daily-leads', async (req: Request, res: Response) => {
       event_time: timeStr,
       lead_date: targetDate,
       remarks: remarks?.trim() || '',
+      email_id: typeof req.body.email_id === 'string' ? req.body.email_id.trim() : '',
     });
 
     const populated = await DailyLead.findById(newLead._id)
@@ -6484,6 +6486,19 @@ app.patch('/api/v1/daily-leads/:id', async (req: Request, res: Response) => {
 
     if (refuseForeignOwner(req, res, String(lead.coordinator_id), 'You can only edit your own leads.')) return;
 
+    if (patchData.email_id !== undefined) {
+      const rawEmail = String(patchData.email_id || '').trim();
+      if (rawEmail) {
+        const v = validateAndNormalizeMultiEmail(rawEmail);
+        if (!v.valid) {
+          return res.status(400).json({ success: false, error: { code: 'INVALID_EMAIL', message: v.error || 'Invalid email address' } });
+        }
+        patchData.email_id = v.normalized;
+      } else {
+        patchData.email_id = '';
+      }
+    }
+
     const allowedFields = [
       'company_name',
       'job_role',
@@ -6492,6 +6507,7 @@ app.patch('/api/v1/daily-leads/:id', async (req: Request, res: Response) => {
       'event_time',
       'remarks',
       'lead_type',
+      'email_id',
     ];
 
     allowedFields.forEach((f) => {
@@ -6649,6 +6665,7 @@ app.post('/api/v1/daily-leads/:id/move-to-jd', async (req: Request, res: Respons
           event_time: '', // Initially empty as requested
           lead_date: effectiveTargetDate,
           remarks: lead.remarks || 'JD Received from earlier Positive',
+          email_id: lead.email_id || '',
           is_jd_received: true,
           is_deleted: false,
         });
@@ -6906,6 +6923,7 @@ app.post('/api/v1/daily-leads/sync-positives', async (req: Request, res: Respons
     const nextDate = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
 
     let syncedCount = 0;
+    let emailFilledCount = 0;
 
     // Pull from DailyTracker calls for this date — Invite Mail is the sole
     // trigger for the Positives tab; JD Received fills when outcome is jd_received.
@@ -6977,22 +6995,38 @@ app.post('/api/v1/daily-leads/sync-positives', async (req: Request, res: Respons
           event_time: callTime,
           lead_date: targetDate,
           remarks: call.comments || `From Daily Tracker: ${(call.outcome_status || '').replace(/_/g, ' ')}`,
+          // the HR email the coordinator already has in the Daily Tracker - so they need not type it again
+          email_id: (call.email_id || '').trim(),
           is_deleted: false,
         });
         syncedCount++;
-      } else if (callTime && (!existing.event_time || existing.event_time === '10:00 AM')) {
-        existing.event_time = callTime;
-        await existing.save();
+      } else {
+        let dirty = false;
+        if (callTime && (!existing.event_time || existing.event_time === '10:00 AM')) {
+          existing.event_time = callTime;
+          dirty = true;
+        }
+        // fill an EMPTY email from the tracker; never overwrite one the coordinator typed
+        const trackerEmail = (call.email_id || '').trim();
+        if (trackerEmail && !(existing as any).email_id && !/email:/i.test(existing.remarks || '')) {
+          (existing as any).email_id = trackerEmail;
+          emailFilledCount++;
+          dirty = true;
+        }
+        if (dirty) await existing.save();
       }
     }
 
     return res.status(200).json({
       success: true,
       message: syncedCount > 0
-        ? `Successfully synced ${syncedCount} positive lead(s) from Daily Tracker for ${date || 'today'}`
+        ? `Successfully synced ${syncedCount} positive lead(s) from Daily Tracker for ${date || 'today'}${emailFilledCount ? ` (${emailFilledCount} email(s) filled in)` : ''}`
+        : emailFilledCount > 0
+        ? `${emailFilledCount} email(s) filled in from Daily Tracker for ${date || 'today'}`
         : `All positive leads from Daily Tracker for ${date || 'today'} are already up to date`,
       data: {
         synced_count: syncedCount,
+        email_filled_count: emailFilledCount,
         date: targetDate,
       },
     });
@@ -7065,6 +7099,7 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req: Request, res: Response) =
             event_time: timeToUse,
             lead_date: targetDate,
             remarks: 'JD Received from Positives',
+            email_id: sourceLead?.email_id || '',
             is_jd_received: true,
             is_deleted: false,
           });
@@ -7149,6 +7184,7 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req: Request, res: Response) =
           event_time: '',
           lead_date: targetDate,
           remarks: lead.remarks || 'JD Received from Positives',
+          email_id: lead.email_id || '',
           is_jd_received: true,
           is_deleted: false,
         });

@@ -28,6 +28,7 @@ export interface IDailyLead extends Document {
 
   // Remarks & Status
   remarks: string;                          // Operational notes / opportunity remarks
+  email_id?: string;                        // HR email - filled from the Daily Tracker at sync, or typed by the coordinator
   is_moved_to_jd: boolean;                  // Set true when 1-click moved to JD Received
   is_jd_received?: boolean;                 // Flag marking lead as having received JD
   is_finalized: boolean;                    // Coordinator day finalization lock
@@ -114,6 +115,11 @@ const DailyLeadSchema: Schema<IDailyLead> = new Schema(
     },
 
     // Remarks & Status
+    email_id: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     remarks: {
       type: String,
       trim: true,

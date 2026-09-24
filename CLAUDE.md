@@ -1749,6 +1749,28 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     and no horizontal scroll after narrowing the columns. **Not tested in a browser:** the date columns
     through the table, the Undo button after a paste, dark mode.
 
+69. **Daily Leads Sync now carries the Daily Tracker email into the lead, 24 Sep 2026 (user-requested).**
+    My Positives / My JD showed "Click to add email" even when the coordinator had already typed the HR email in
+    the Daily Tracker, because `POST /daily-leads/sync-positives` never copied it and the tabs kept an email as
+    the text "Email: x" inside the lead's **remarks**. That storage had a side effect: `PATCH /daily-leads/:id`
+    cascades `remarks` into the linked Weekly Tracker rows' `current_status_text`, so typing an email in My
+    Positives overwrote the Weekly status text with "Email: ...". Now `DailyLead` has its own `email_id`
+    (default ''). Sync: a new lead takes the tracker row's `email_id`; an existing lead whose email is EMPTY
+    (and has no legacy "Email:" remark) is filled from the tracker on the next sync; a typed email is never
+    overwritten; the sync message reports "(n email(s) filled in)". Manual add, Move to JD, and both Copy-to-JD
+    paths carry `email_id`. `PATCH /daily-leads/:id` accepts `email_id` and validates it with the same rules as
+    everywhere else (`lib/contactRules.ts`, 400 `INVALID_EMAIL` otherwise). `MyPositivesTab` shows
+    `email_id`, falling back to the old "Email:" remark text so nothing already typed disappears, saves to
+    `email_id` (with the same validation on screen), and the page bumps a refresh token after Sync so the emails
+    appear without leaving the tab. Users type an email only when the tracker had none. **Verified** with
+    throwaway calls in KARPAGAM (removed): a synced positive got the tracker's email, a JD lead with no tracker
+    email stayed blank, an invalid email got 400, a valid one saved with remarks untouched, re-sync did not
+    overwrite it, an emptied lead was refilled when the tracker gained an email; in a real browser both tabs
+    showed the emails and on-screen editing refused a bad email and saved a good one. **Not done (offered):** a
+    one-time backfill - of 299 active leads, 292 have no email; only 19 are linked to a tracker call that has an
+    email (18 positives, 1 JD); the other 272 are not linked to any tracker call and must be typed by hand or
+    matched some other way. Emails typed earlier via the old remarks route were not migrated (still displayed).
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

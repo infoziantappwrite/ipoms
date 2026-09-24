@@ -56,6 +56,7 @@ export default function DailyLeadsPage() {
   });
   const [myPositivesCount, setMyPositivesCount] = useState<number>(0);
   const [myJdCount, setMyJdCount] = useState<number>(0);
+  const [myTabsRefresh, setMyTabsRefresh] = useState(0);
   const [loading, setLoading] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [coordinatorId, setCoordinatorId] = useState<string>('');
@@ -238,6 +239,7 @@ export default function DailyLeadsPage() {
         );
         await loadLeads(false);
         await loadSummary();
+        setMyTabsRefresh((n) => n + 1);
         broadcastDailyLeadMutation();
       } else {
         toast((res as any)?.error?.message || 'Failed to sync positive leads', 'warning');
@@ -552,6 +554,7 @@ export default function DailyLeadsPage() {
           <MyPositivesTab
             key={activeTab}
             leadType={activeTab === 'my_jd' ? 'jd_received' : 'positive'}
+            refreshToken={myTabsRefresh}
             selectedDate={selectedDate}
             onDateChange={setSelectedDate}
             colleges={colleges}

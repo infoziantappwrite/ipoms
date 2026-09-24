@@ -7,6 +7,7 @@ import { apiFetch } from '@/lib/api';
 import { DailyLeadRow, CollegeOption } from './LeadsTable';
 import { useToast } from '@/components/ui/Toast';
 import { readSessionUser } from '@/lib/session';
+import { validateAndNormalizeMultiEmail } from '@/lib/contactValidation';
 import { getCoordinatorSelectedColleges, getDefaultOfficialCollegeIdsForUser } from '@/lib/collegeSession';
 
 interface Props {
@@ -18,6 +19,8 @@ interface Props {
   onUpdateRow: (rowId: string, patch: Partial<DailyLeadRow>) => Promise<void>;
   /** 'positive' = My Positives (default), 'jd_received' = My JD - same all-time, focus-college view. */
   leadType?: 'positive' | 'jd_received';
+  /** Bumped by the page after Sync, so emails filled in from the Daily Tracker show up straight away. */
+  refreshToken?: number;
 }
 
 function formatLeadDate(dateStr?: string | Date | null): string {
@@ -35,6 +38,12 @@ function formatLeadDate(dateStr?: string | Date | null): string {
   }
 }
 
+/** The HR email of a lead: its own email field, else the older "Email: x" text that used to be kept in remarks. */
+function emailOf(row: DailyLeadRow): string {
+  if (row.email_id && row.email_id.trim()) return row.email_id.trim();
+  return row.remarks?.includes('Email:') ? row.remarks.replace('Email:', '').trim() : '';
+}
+
 export function MyPositivesTab({
   selectedDate,
   onDateChange,
@@ -43,6 +52,7 @@ export function MyPositivesTab({
   onSearchChange,
   onUpdateRow,
   leadType = 'positive',
+  refreshToken = 0,
 }: Props) {
   const { toast } = useToast();
   const isJd = leadType === 'jd_received';
@@ -143,7 +153,7 @@ export function MyPositivesTab({
 
   useEffect(() => {
     loadMyPositives();
-  }, [loadMyPositives]);
+  }, [loadMyPositives, refreshToken]);
 
   // Statistics calculation for the active selection
   const stats = useMemo(() => {
@@ -161,7 +171,16 @@ export function MyPositivesTab({
   // Save Inline Email Edit
   const handleSaveEmail = async (rowId: string) => {
     try {
-      await onUpdateRow(rowId, { remarks: emailValue ? `Email: ${emailValue}` : undefined });
+      const typed = emailValue.trim();
+      if (typed) {
+        const v = validateAndNormalizeMultiEmail(typed);
+        if (!v.valid) {
+          toast(v.error || 'Please enter a valid email address', 'warning');
+          return;
+        }
+      }
+      // saved in the lead's own email field (not in remarks, which also feeds the Weekly Tracker status)
+      await onUpdateRow(rowId, { email_id: typed });
       toast('Email updated successfully', 'success');
       setEditingEmailId(null);
       loadMyPositives();
@@ -324,14 +343,14 @@ export function MyPositivesTab({
                           <div
                             onClick={() => {
                               setEditingEmailId(row._id);
-                              setEmailValue(row.remarks?.includes('Email:') ? row.remarks.replace('Email:', '').trim() : '');
+                              setEmailValue(emailOf(row));
                             }}
                             className="group flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors text-fg-subtle"
                             title="Click to maintain/update email ID"
                           >
                             <Mail size={13} className="text-fg-subtle group-hover:text-primary shrink-0" />
                             <span className="text-xs font-medium underline decoration-dashed underline-offset-2">
-                              {row.remarks?.includes('Email:') ? row.remarks.replace('Email:', '').trim() : 'Click to add email'}
+                              {emailOf(row) || 'Click to add email'}
                             </span>
                           </div>
                         )}
