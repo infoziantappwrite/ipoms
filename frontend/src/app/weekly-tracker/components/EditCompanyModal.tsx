@@ -60,13 +60,29 @@ export function EditCompanyModal({
   });
   const [jobRole, setJobRole] = useState(row.job_role || '');
   const [companyType, setCompanyType] = useState(row.company_type || '');
+  const [ctcUnit, setCtcUnit] = useState<'LPA' | '/ Month' | 'Both'>(() => {
+    if (row.ctc_lpa) {
+      const val = row.ctc_lpa.toLowerCase();
+      if ((val.includes('stipend') || val.includes('month') || val.includes('/m')) && (val.includes('lpa') || val.includes('full time'))) {
+        return 'Both';
+      }
+      if (val.includes('month') || val.includes('stipend') || val.includes('/m')) return '/ Month';
+    }
+    return 'LPA';
+  });
   const [ctcValue, setCtcValue] = useState(() => {
     if (!row.ctc_lpa) return '';
-    return row.ctc_lpa.replace(/LPA|\/ Month/gi, '').trim();
+    return row.ctc_lpa.replace(/LPA|\/ Month|Stipend/gi, '').trim();
   });
-  const [ctcUnit, setCtcUnit] = useState<'LPA' | '/ Month'>(() => {
-    if (row.ctc_lpa && row.ctc_lpa.toLowerCase().includes('month')) return '/ Month';
-    return 'LPA';
+  const [stipendValue, setStipendValue] = useState(() => {
+    if (!row.ctc_lpa) return '';
+    const match = row.ctc_lpa.match(/([\d\.\s\-kK]+)\s*(?:stipend|\/month|month)/i);
+    return match ? match[1].trim() : '';
+  });
+  const [lpaValue, setLpaValue] = useState(() => {
+    if (!row.ctc_lpa) return '';
+    const match = row.ctc_lpa.match(/([\d\.\s\-]+)\s*(?:lpa|full\s*time)/i);
+    return match ? match[1].trim() : '';
   });
   const [eligibleBatch, setEligibleBatch] = useState(row.eligible_batch || '2027');
   const [pipelineSection, setPipelineSection] = useState(row.pipeline_section || 'pipeline');
@@ -105,9 +121,16 @@ export function EditCompanyModal({
       alert('Job Role is mandatory.');
       return;
     }
-    if (!ctcValue.trim()) {
-      alert('CTC is mandatory.');
-      return;
+    if (ctcUnit === 'Both') {
+      if (!stipendValue.trim() && !lpaValue.trim() && !ctcValue.trim()) {
+        alert('CTC / Stipend is mandatory.');
+        return;
+      }
+    } else {
+      if (!ctcValue.trim()) {
+        alert('CTC is mandatory.');
+        return;
+      }
     }
     if (!currentStatusText.trim()) {
       alert('Current Status Remarks & Notes is mandatory.');
@@ -147,9 +170,30 @@ export function EditCompanyModal({
       }
     }
 
-    const formattedCtc = ctcValue.includes('LPA') || ctcValue.toLowerCase().includes('month')
-      ? ctcValue.trim()
-      : `${ctcValue.trim()} ${ctcUnit}`;
+    let formattedCtc = '';
+    if (ctcUnit === 'Both') {
+      const cleanSt = stipendValue.replace(/stipend|\/month|\/m\b/gi, '').trim();
+      const cleanLpa = lpaValue.replace(/lpa/gi, '').trim();
+      if (cleanSt && cleanLpa) {
+        formattedCtc = `${cleanSt} / Month & ${cleanLpa} LPA`;
+      } else if (cleanSt) {
+        formattedCtc = `${cleanSt} / Month`;
+      } else if (cleanLpa) {
+        formattedCtc = `${cleanLpa} LPA`;
+      } else {
+        formattedCtc = ctcValue.trim();
+      }
+    } else if (ctcUnit === '/ Month') {
+      const clean = ctcValue.trim();
+      formattedCtc = clean.toLowerCase().includes('month') || clean.toLowerCase().includes('stipend')
+        ? clean
+        : `${clean} / Month`;
+    } else {
+      const clean = ctcValue.trim();
+      formattedCtc = clean.toLowerCase().includes('lpa')
+        ? clean
+        : `${clean} LPA`;
+    }
 
     setLoading(true);
     triggerHaptic('medium');
@@ -343,25 +387,17 @@ export function EditCompanyModal({
             />
           </div>
 
-          {/* CTC Offered with Unit Switcher */}
+          {/* CTC Offered with Integrated Unit Switcher (LPA | / Month | Both) */}
           <div>
-            <label className="block text-fg font-semibold mb-1.5">
-              CTC Offered <span className="text-rose-500">*</span>
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                required
-                value={ctcValue}
-                onChange={(e) => setCtcValue(e.target.value)}
-                placeholder={ctcUnit === 'LPA' ? 'e.g. 6.5 or 5 - 8' : 'e.g. 15,000 or 25k'}
-                className="flex-1 bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-fg placeholder:text-fg-disabled text-xs transition-all outline-none font-mono"
-              />
-              <div className="flex bg-surface-sunken p-1 rounded-xl border border-border shrink-0 gap-1">
+            <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+              <label className="block text-fg font-semibold text-xs">
+                CTC Offered <span className="text-rose-500">*</span>
+              </label>
+              <div className="flex bg-surface-sunken p-0.5 rounded-xl border border-border shrink-0 gap-0.5 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setCtcUnit('LPA')}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-colors cursor-pointer ${
                     ctcUnit === 'LPA'
                       ? 'bg-primary text-primary-foreground shadow-xs'
                       : 'text-fg-muted hover:text-fg hover:bg-surface-raised'
@@ -372,7 +408,7 @@ export function EditCompanyModal({
                 <button
                   type="button"
                   onClick={() => setCtcUnit('/ Month')}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-colors cursor-pointer ${
                     ctcUnit === '/ Month'
                       ? 'bg-primary text-primary-foreground shadow-xs'
                       : 'text-fg-muted hover:text-fg hover:bg-surface-raised'
@@ -380,8 +416,70 @@ export function EditCompanyModal({
                 >
                   / Month
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setCtcUnit('Both')}
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-colors cursor-pointer ${
+                    ctcUnit === 'Both'
+                      ? 'bg-primary text-primary-foreground shadow-xs'
+                      : 'text-fg-muted hover:text-fg hover:bg-surface-raised'
+                  }`}
+                  title="Enter both Internship Stipend & Full-time LPA"
+                >
+                  Both
+                </button>
               </div>
             </div>
+
+            {ctcUnit === 'Both' ? (
+              <div className="space-y-2 bg-surface-raised/80 p-3 rounded-xl border border-border/80">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-1">
+                      1. Internship Stipend (/ Month)
+                    </label>
+                    <input
+                      type="text"
+                      value={stipendValue}
+                      onChange={(e) => setStipendValue(e.target.value)}
+                      placeholder="e.g. 15,000 or 15k"
+                      className="w-full bg-surface-sunken border border-border focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-3 py-2 text-fg text-xs font-semibold outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">
+                      2. Full-Time Package (LPA)
+                    </label>
+                    <input
+                      type="text"
+                      value={lpaValue}
+                      onChange={(e) => setLpaValue(e.target.value)}
+                      placeholder="e.g. 5 or 6.5 or 5 - 8"
+                      className="w-full bg-surface-sunken border border-border focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl px-3 py-2 text-fg text-xs font-semibold outline-none"
+                    />
+                  </div>
+                </div>
+                {(stipendValue.trim() || lpaValue.trim()) && (
+                  <div className="text-[11px] font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20 flex items-center gap-1.5">
+                    <span className="font-bold text-emerald-600 uppercase text-[10px]">Preview:</span>
+                    <span>
+                      {(stipendValue.trim() ? `${stipendValue.replace(/stipend|\/month|\/m\b/gi, '').trim()} / Month` : '') +
+                        (stipendValue.trim() && lpaValue.trim() ? ' & ' : '') +
+                        (lpaValue.trim() ? `${lpaValue.replace(/lpa/gi, '').trim()} LPA` : '')}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <input
+                type="text"
+                required
+                value={ctcValue}
+                onChange={(e) => setCtcValue(e.target.value)}
+                placeholder={ctcUnit === 'LPA' ? 'e.g. 6.5 or 5 - 8' : 'e.g. 15,000 or 25k'}
+                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-fg placeholder:text-fg-disabled text-xs transition-all outline-none font-mono"
+              />
+            )}
           </div>
 
           {/* Company Type & Pipeline Section */}

@@ -54,7 +54,9 @@ export function AddCompanyModal({
   const [jobRole, setJobRole] = useState(initialDraft?.jobRole || 'Graduate Trainee');
   const [companyType, setCompanyType] = useState(initialDraft?.companyType || '');
   const [ctcValue, setCtcValue] = useState(initialDraft?.ctcValue || '');
-  const [ctcUnit, setCtcUnit] = useState<'LPA' | '/ Month'>(initialDraft?.ctcUnit || 'LPA');
+  const [stipendValue, setStipendValue] = useState(initialDraft?.stipendValue || '');
+  const [lpaValue, setLpaValue] = useState(initialDraft?.lpaValue || '');
+  const [ctcUnit, setCtcUnit] = useState<'LPA' | '/ Month' | 'Both'>(initialDraft?.ctcUnit || 'LPA');
   const [eligibleBatch, setEligibleBatch] = useState(initialDraft?.eligibleBatch || '2027');
   const [pipelineSection, setPipelineSection] = useState(initialDraft?.pipelineSection || 'pipeline');
   const [offersReceived, setOffersReceived] = useState<string>(initialDraft?.offersReceived !== undefined ? String(initialDraft.offersReceived) : '0');
@@ -132,9 +134,16 @@ export function AddCompanyModal({
       toast('Job Role is mandatory.', 'warning');
       return;
     }
-    if (!ctcValue.trim()) {
-      toast('CTC is mandatory.', 'warning');
-      return;
+    if (ctcUnit === 'Both') {
+      if (!stipendValue.trim() && !lpaValue.trim() && !ctcValue.trim()) {
+        toast('CTC / Stipend is mandatory.', 'warning');
+        return;
+      }
+    } else {
+      if (!ctcValue.trim()) {
+        toast('CTC is mandatory.', 'warning');
+        return;
+      }
     }
     if (!currentStatusText.trim()) {
       toast('Current Status Remarks is mandatory.', 'warning');
@@ -193,9 +202,30 @@ export function AddCompanyModal({
       finalOffersCount = num;
     }
 
-    const formattedCtc = ctcValue.includes('LPA') || ctcValue.toLowerCase().includes('month')
-      ? ctcValue.trim()
-      : `${ctcValue.trim()} ${ctcUnit}`;
+    let formattedCtc = '';
+    if (ctcUnit === 'Both') {
+      const cleanSt = stipendValue.replace(/stipend|\/month|\/m\b/gi, '').trim();
+      const cleanLpa = lpaValue.replace(/lpa/gi, '').trim();
+      if (cleanSt && cleanLpa) {
+        formattedCtc = `${cleanSt} / Month & ${cleanLpa} LPA`;
+      } else if (cleanSt) {
+        formattedCtc = `${cleanSt} / Month`;
+      } else if (cleanLpa) {
+        formattedCtc = `${cleanLpa} LPA`;
+      } else {
+        formattedCtc = ctcValue.trim();
+      }
+    } else if (ctcUnit === '/ Month') {
+      const clean = ctcValue.trim();
+      formattedCtc = clean.toLowerCase().includes('month') || clean.toLowerCase().includes('stipend')
+        ? clean
+        : `${clean} / Month`;
+    } else {
+      const clean = ctcValue.trim();
+      formattedCtc = clean.toLowerCase().includes('lpa')
+        ? clean
+        : `${clean} LPA`;
+    }
 
     setLoading(true);
     try {
@@ -429,25 +459,17 @@ export function AddCompanyModal({
             />
           </div>
 
-          {/* CTC Offered with Integrated Unit Switcher */}
+          {/* CTC Offered with Integrated Unit Switcher (LPA | / Month | Both) */}
           <div>
-            <label className="block text-fg font-semibold mb-1.5">
-              CTC Offered <span className="text-rose-500">*</span>
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                required
-                value={ctcValue}
-                onChange={(e) => setCtcValue(e.target.value)}
-                placeholder={ctcUnit === 'LPA' ? 'e.g. 5 or 6.5 or 5 - 8' : 'e.g. 10,000 or 12,000 or 15k'}
-                className="flex-1 bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-fg placeholder:text-fg-disabled text-xs transition-all outline-none"
-              />
-              <div className="flex bg-surface-sunken p-1 rounded-xl border border-border shrink-0 gap-1">
+            <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+              <label className="block text-fg font-semibold text-xs">
+                CTC Offered <span className="text-rose-500">*</span>
+              </label>
+              <div className="flex bg-surface-sunken p-0.5 rounded-xl border border-border shrink-0 gap-0.5 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => setCtcUnit('LPA')}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-colors cursor-pointer ${
                     ctcUnit === 'LPA'
                       ? 'bg-primary text-primary-foreground shadow-xs'
                       : 'text-fg-muted hover:text-fg hover:bg-surface-raised'
@@ -458,7 +480,7 @@ export function AddCompanyModal({
                 <button
                   type="button"
                   onClick={() => setCtcUnit('/ Month')}
-                  className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors cursor-pointer ${
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-colors cursor-pointer ${
                     ctcUnit === '/ Month'
                       ? 'bg-primary text-primary-foreground shadow-xs'
                       : 'text-fg-muted hover:text-fg hover:bg-surface-raised'
@@ -466,8 +488,70 @@ export function AddCompanyModal({
                 >
                   / Month
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setCtcUnit('Both')}
+                  className={`px-2.5 py-1 text-[11px] font-bold rounded-lg transition-colors cursor-pointer ${
+                    ctcUnit === 'Both'
+                      ? 'bg-primary text-primary-foreground shadow-xs'
+                      : 'text-fg-muted hover:text-fg hover:bg-surface-raised'
+                  }`}
+                  title="Enter both Internship Stipend & Full-time LPA"
+                >
+                  Both
+                </button>
               </div>
             </div>
+
+            {ctcUnit === 'Both' ? (
+              <div className="space-y-2 bg-surface-raised/80 p-3 rounded-xl border border-border/80">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-1">
+                      1. Internship Stipend (/ Month)
+                    </label>
+                    <input
+                      type="text"
+                      value={stipendValue}
+                      onChange={(e) => setStipendValue(e.target.value)}
+                      placeholder="e.g. 15,000 or 15k"
+                      className="w-full bg-surface-sunken border border-border focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-3 py-2 text-fg text-xs font-semibold outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">
+                      2. Full-Time Package (LPA)
+                    </label>
+                    <input
+                      type="text"
+                      value={lpaValue}
+                      onChange={(e) => setLpaValue(e.target.value)}
+                      placeholder="e.g. 5 or 6.5 or 5 - 8"
+                      className="w-full bg-surface-sunken border border-border focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 rounded-xl px-3 py-2 text-fg text-xs font-semibold outline-none"
+                    />
+                  </div>
+                </div>
+                {(stipendValue.trim() || lpaValue.trim()) && (
+                  <div className="text-[11px] font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20 flex items-center gap-1.5">
+                    <span className="font-bold text-emerald-600 uppercase text-[10px]">Preview:</span>
+                    <span>
+                      {(stipendValue.trim() ? `${stipendValue.replace(/stipend|\/month|\/m\b/gi, '').trim()} / Month` : '') +
+                        (stipendValue.trim() && lpaValue.trim() ? ' & ' : '') +
+                        (lpaValue.trim() ? `${lpaValue.replace(/lpa/gi, '').trim()} LPA` : '')}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <input
+                type="text"
+                required
+                value={ctcValue}
+                onChange={(e) => setCtcValue(e.target.value)}
+                placeholder={ctcUnit === 'LPA' ? 'e.g. 5 or 6.5 or 5 - 8' : 'e.g. 10,000 or 12,000 or 15k'}
+                className="w-full bg-surface-sunken border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-3.5 py-2.5 text-fg placeholder:text-fg-disabled text-xs transition-all outline-none"
+              />
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">

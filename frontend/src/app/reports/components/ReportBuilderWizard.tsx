@@ -194,6 +194,15 @@ const MONTH_OPTIONS = [
   { value: '2027-05', label: 'May 2027', badge: '31 Days', sublabel: '01 May 2027 – 31 May 2027 • Ends on 31st', start: '2027-05-01', end: '2027-05-31' },
 ];
 
+// Wizard choices are kept in memory only — deliberately NOT in localStorage. They used
+// to be auto-saved under one browser-wide key and restored on load, so a refresh (or a
+// network blip / power cut) brought back half-finished selections, and the next person to
+// log in on the same browser inherited the previous user's college and sections. In memory
+// they survive "Back" from the editor (same page session) but reset on refresh, and are
+// tagged with the user so a different login never sees them.
+let wizardMemory: { userId: string; state: any } | null = null;
+const LEGACY_WIZARD_STORAGE_KEY = 'ipoms_report_builder_wizard_state';
+
 // Was hardcoded to '2026-08' in three places (initial state + two template-switch
 // resets), so opening Month-End on any day after August silently pre-selected an
 // already-passed month. Matches the current calendar month against the fixed
@@ -545,9 +554,13 @@ export function ReportBuilderWizard({
   useEffect(() => {
     if (typeof window === 'undefined' || hasRestoredSavedState) return;
     try {
-      const raw = localStorage.getItem('ipoms_report_builder_wizard_state');
-      if (raw) {
-        const saved = JSON.parse(raw);
+      // Purge what older builds left behind so it can never resurface for anyone.
+      localStorage.removeItem(LEGACY_WIZARD_STORAGE_KEY);
+      const me = readSessionUser();
+      const myId = String(me?._id || me?.id || '');
+      if (wizardMemory && wizardMemory.userId !== myId) wizardMemory = null;
+      if (wizardMemory) {
+        const saved = wizardMemory.state;
         if (saved && typeof saved === 'object') {
           if (saved.templateType && !initialTemplateType) setTemplateType(saved.templateType);
           if (saved.collegeId && !initialCollegeId) setCollegeId(saved.collegeId);
@@ -616,7 +629,8 @@ export function ReportBuilderWizard({
         weeklyMinCtc,
         weeklyIncludeCompetitive,
       };
-      localStorage.setItem('ipoms_report_builder_wizard_state', JSON.stringify(stateToSave));
+      const me = readSessionUser();
+      wizardMemory = { userId: String(me?._id || me?.id || ''), state: stateToSave };
     } catch (err) {
       console.error('[ReportBuilderWizard] Failed to auto-save wizard state:', err);
     }
@@ -1599,7 +1613,26 @@ export function ReportBuilderWizard({
 
       {/* ── Navigation Tabs (Weekly Report, Month-End Report, Pending Tasks, Active Leads, Daily Positives, Daily JD Received) ────────────────── */}
       <div className="flex justify-center pt-2 pb-2">
-        <div className="w-full max-w-6xl bg-surface border border-border p-1.5 rounded-2xl shadow-xs grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-1.5">
+        <div className="w-full max-w-6xl">
+        <div className="flex justify-end mb-1.5">
+        <button
+          type="button"
+          onClick={() => {
+            // Same result as a fresh page load: clear this session's remembered choices,
+            // then reload so every selection returns to its default.
+            wizardMemory = null;
+            try { localStorage.removeItem(LEGACY_WIZARD_STORAGE_KEY); } catch {}
+            window.location.reload();
+          }}
+          title="Start fresh — clear all selections"
+          aria-label="Start fresh — clear all selections"
+          className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-fg-subtle hover:text-fg hover:bg-surface-sunken border border-transparent hover:border-border transition-colors cursor-pointer"
+        >
+          <RotateCcw size={13} aria-hidden />
+          Reset
+        </button>
+        </div>
+        <div className="w-full bg-surface border border-border p-1.5 rounded-2xl shadow-xs grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-1.5">
           <button
             type="button"
             onClick={() => handleCategoryChange('weekly_placement')}
@@ -1677,6 +1710,7 @@ export function ReportBuilderWizard({
             <ClipboardList size={14} strokeWidth={2.2} className="shrink-0" />
             <span className="whitespace-nowrap">Daily JD Received</span>
           </button>
+        </div>
         </div>
       </div>
 
