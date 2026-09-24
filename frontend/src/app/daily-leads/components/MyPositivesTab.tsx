@@ -262,7 +262,7 @@ export function MyPositivesTab({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-[10px] font-medium text-left border-collapse">
+            <table className="w-full text-[12px] font-medium text-left border-collapse">
               <thead>
                 <tr className="bg-surface-sunken/80 text-fg-muted font-bold border-b border-border uppercase tracking-wider text-[12px] select-none">
                   <th className="py-3 px-4 w-12 text-center">S.No</th>
@@ -297,26 +297,26 @@ export function MyPositivesTab({
                       </td>
 
                       <td className="py-3 px-4 text-center">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[12px] font-medium bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20">
                           {collegeCode}
                         </span>
                       </td>
 
-                      <td className="py-3 px-4 font-medium text-fg text-[10px]">
+                      <td className="py-3 px-4 font-medium text-fg text-[12px]">
                         {row.company_name}
                       </td>
 
-                      <td className="py-3 px-4 font-medium text-fg text-[10px]">
+                      <td className="py-3 px-4 font-medium text-fg text-[12px]">
                         {row.job_role || 'Graduate Trainee'}
                       </td>
 
                       <td className="py-3 px-4 text-center">
                         {row.ctc ? (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 tabular-nums">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[12px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 tabular-nums">
                             {row.ctc}
                           </span>
                         ) : (
-                          <span className="text-fg-subtle italic text-[10px]">—</span>
+                          <span className="text-fg-subtle italic text-[12px]">—</span>
                         )}
                       </td>
 
@@ -328,13 +328,13 @@ export function MyPositivesTab({
                               value={emailValue}
                               onChange={(e) => setEmailValue(e.target.value)}
                               placeholder="enter HR email..."
-                              className="h-7 px-2 bg-surface-sunken border border-primary text-[10px] font-medium rounded-lg outline-none w-48"
+                              className="h-7 px-2 bg-surface-sunken border border-primary text-[12px] font-medium rounded-lg outline-none w-48"
                               autoFocus
                             />
                             <button
                               type="button"
                               onClick={() => handleSaveEmail(row._id)}
-                              className="px-2 py-1 bg-primary text-primary-foreground text-[10px] font-medium rounded-lg cursor-pointer"
+                              className="px-2 py-1 bg-primary text-primary-foreground text-[12px] font-medium rounded-lg cursor-pointer"
                             >
                               Save
                             </button>
@@ -349,7 +349,7 @@ export function MyPositivesTab({
                             title="Click to maintain/update email ID"
                           >
                             <Mail size={13} className="text-fg-subtle group-hover:text-primary shrink-0" />
-                            <span className="text-[10px] font-medium underline decoration-dashed underline-offset-2">
+                            <span className="text-[12px] font-medium underline decoration-dashed underline-offset-2">
                               {emailOf(row) || 'Click to add email'}
                             </span>
                           </div>

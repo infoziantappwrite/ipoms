@@ -1778,7 +1778,9 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     extra-bold, CTC/date/S.No bold, time semi-bold, college extra-bold). The two summary cards above the table
     were not changed (10px labels, 14px numbers). Measured in a real browser after the change: header 12px/700,
     all eight cells 10px/500. Note: these are hard-coded pixel sizes (the app's token scale is 12/14/16/20);
-    done as an explicit user instruction.
+    done as an explicit user instruction. **Revised the same day:** body cells raised from 10px to **12px medium**
+    (headings stay 12px bold, so header and body are now the same size; weight tells them apart). Re-measured:
+    header 12px/700, all eight cells 12px/500.
 
 ## 6. Module map
 ## 6. Module map
