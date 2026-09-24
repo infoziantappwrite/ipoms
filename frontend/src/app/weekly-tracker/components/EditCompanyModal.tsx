@@ -59,7 +59,7 @@ export function EditCompanyModal({
     }
   });
   const [jobRole, setJobRole] = useState(row.job_role || '');
-  const [companyType, setCompanyType] = useState(row.company_type || 'IT / Software & Technology');
+  const [companyType, setCompanyType] = useState(row.company_type || '');
   const [ctcValue, setCtcValue] = useState(() => {
     if (!row.ctc_lpa) return '';
     return row.ctc_lpa.replace(/LPA|\/ Month/gi, '').trim();
@@ -392,8 +392,11 @@ export function EditCompanyModal({
                 value={companyType}
                 onChange={setCompanyType}
                 icon={Briefcase}
+                placeholder="Select Company Type"
                 title="Company Industry Type"
                 options={COMPANY_TYPES.map((t) => ({ value: t, label: t }))}
+                searchable={true}
+                searchPlaceholder="Search company type..."
               />
             </div>
 

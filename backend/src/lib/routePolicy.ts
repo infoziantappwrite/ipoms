@@ -95,6 +95,7 @@ const POLICIES: Policy[] = [
   { method: '*',      pattern: /^\/metadata\/import-unique-companies\/?$/, roles: ADMIN },
   { method: '*',      pattern: /^\/metadata\/export-missing-excel\/?$/,   roles: ADMIN },
   { method: '*',      pattern: /^\/metadata\/renumber\/?$/,               roles: ADMIN },
+  { method: 'DELETE', pattern: /^\/metadata\/purge-all\/?$/,          roles: STAFF },
   { method: 'DELETE', pattern: new RegExp(`^/metadata/${ID}/purge/?$`),  roles: STAFF },
   { method: 'POST',   pattern: new RegExp(`^/metadata/${ID}/restore/?$`), roles: STAFF },
   { method: 'POST',   pattern: new RegExp(`^/metadata/bulk-import/?$`),  roles: STAFF },

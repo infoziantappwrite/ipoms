@@ -38,7 +38,7 @@ export interface DailyLeadRow {
 
 interface Props {
   rows: DailyLeadRow[];
-  activeTab: 'positive' | 'jd_received';
+  activeTab: 'positive' | 'jd_received' | 'my_positives';
   colleges: CollegeOption[];
   isDeleteMode?: boolean;
   selectedIds: string[];
@@ -77,7 +77,7 @@ export function LeadsTable({
         </div>
         <div className="space-y-1">
           <h3 className="text-sm font-bold text-fg">
-            No {activeTab === 'positive' ? 'Positive Leads' : 'JD Received Records'} Found
+            No {activeTab === 'positive' ? 'Positive Leads' : activeTab === 'my_positives' ? 'College Positive Logs' : 'JD Received Records'} Found
           </h3>
           <p className="text-xs text-fg-subtle max-w-sm leading-relaxed">
             No opportunities recorded for the selected date. Click <span className="text-indigo-600 dark:text-indigo-400 font-bold">Sync</span> in the header to pull pipeline companies for this date, or <span className="text-primary font-semibold font-mono">+ Add</span>.
@@ -171,7 +171,7 @@ function TableRow({
 }: {
   row: DailyLeadRow;
   index: number;
-  activeTab: 'positive' | 'jd_received';
+  activeTab: 'positive' | 'jd_received' | 'my_positives';
   colleges: CollegeOption[];
   isDeleteMode: boolean;
   isSelected: boolean;

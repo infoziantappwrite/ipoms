@@ -92,6 +92,9 @@ export function BulkPasteModal({ onClose, onSuccess }: Props) {
 
       if (res.success && res.data) {
         setImportResult(res.data);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('ipoms_metadata_updated'));
+        }
         onSuccess();
       } else {
         alert(res.error?.message || 'Bulk import failed. Please try again.');

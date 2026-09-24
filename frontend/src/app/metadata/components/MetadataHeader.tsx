@@ -31,6 +31,11 @@ interface Props {
   totalPages?: number;
   onPageChange?: (p: number) => void;
   canDelete?: boolean;
+  isSelectionMode?: boolean;
+  selectedCount?: number;
+  onToggleSelectionMode?: () => void;
+  onBulkDeleteSelected?: () => void;
+  onEmptyRecycleBin?: () => void;
 }
 
 export function MetadataHeader({
@@ -57,6 +62,11 @@ export function MetadataHeader({
   totalPages,
   onPageChange,
   canDelete = true,
+  isSelectionMode = false,
+  selectedCount = 0,
+  onToggleSelectionMode,
+  onBulkDeleteSelected,
+  onEmptyRecycleBin,
 }: Props) {
   const [inputPage, setInputPage] = useState<string>(String(page ?? 1));
 
@@ -225,25 +235,79 @@ export function MetadataHeader({
             </div>
           )}
 
-          {/* Recycle Bin / Back to Online Toggle */}
+          {/* Delete Dustbin Button: Toggles Multi-Row Deletion & Displays Badge Counter */}
+          {canDelete && !isRecycleBin && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  if (isSelectionMode && selectedCount > 0 && onBulkDeleteSelected) {
+                    onBulkDeleteSelected();
+                  } else if (onToggleSelectionMode) {
+                    onToggleSelectionMode();
+                  }
+                }}
+                className={`relative w-9 h-9 rounded-full flex items-center justify-center cursor-pointer shadow-md transition-all active:scale-[0.95] ${
+                  isSelectionMode
+                    ? 'bg-rose-700 text-white ring-2 ring-rose-500/50'
+                    : 'bg-rose-600 hover:bg-rose-700 text-white hover:shadow-rose-600/30'
+                }`}
+                title={
+                  isSelectionMode
+                    ? selectedCount > 0
+                      ? `Confirm Deletion of ${selectedCount} selected row(s)`
+                      : 'Exit selection mode'
+                    : 'Select Multiple Rows to Delete'
+                }
+                aria-label="Multi-Row Delete"
+              >
+                <Trash2 size={16} strokeWidth={2.2} />
+
+                {/* Notification Badge Counter on Top Corner */}
+                {isSelectionMode && selectedCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-amber-400 text-slate-950 font-mono font-bold text-[10px] rounded-full flex items-center justify-center shadow-xs border border-white dark:border-slate-900 pointer-events-none">
+                    {selectedCount}
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Recycle Bin Controls: Red Dustbin Delete Button & Back to metadata */}
           {canDelete && (
             isRecycleBin ? (
-              <button
-                onClick={onToggleRecycleBin}
-                className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-600 hover:bg-emerald-700 active:scale-[0.992] text-white border border-emerald-500/80 shadow-xs transition-all flex items-center gap-1.5 cursor-pointer ring-2 ring-emerald-500/20"
-                title="Return to Online Metadata Directory"
-                aria-label="Back to Online"
-              >
-                <ArrowLeft size={14} strokeWidth={2.25} /> Back to Online
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onEmptyRecycleBin}
+                  className="w-9 h-9 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center cursor-pointer shadow-md hover:shadow-rose-600/30 transition-all active:scale-[0.95]"
+                  title="Empty All Items in Recycle Bin"
+                  aria-label="Empty Recycle Bin"
+                >
+                  <Trash2 size={16} strokeWidth={2.2} />
+                </button>
+
+                <button
+                  onClick={onToggleRecycleBin}
+                  className="px-4 py-1.5 rounded-full text-xs font-bold bg-emerald-600 hover:bg-emerald-700 active:scale-[0.992] text-white border border-emerald-500/80 shadow-xs transition-all cursor-pointer ring-2 ring-emerald-500/20"
+                  title="Return to Master Metadata Directory"
+                  aria-label="Back to metadata"
+                >
+                  Back to metadata
+                </button>
+              </div>
             ) : (
               <button
                 onClick={onToggleRecycleBin}
-                className="w-9 h-9 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center cursor-pointer shadow-xs transition-all active:scale-[0.992]"
-                title="Recycle Bin (Deleted Contacts)"
+                className="w-9 h-9 rounded-full bg-white hover:bg-slate-50 flex items-center justify-center cursor-pointer shadow-md hover:shadow-emerald-500/20 transition-all active:scale-[0.95] overflow-hidden border border-emerald-500/40 ring-2 ring-emerald-500/10"
+                title="Open Recycle Bin (Deleted Contacts)"
                 aria-label="Recycle Bin"
               >
-                <Trash2 size={16} strokeWidth={2.2} />
+                <img
+                  src="/recycle-bin.gif"
+                  alt="Recycle Bin"
+                  className="w-6 h-6 object-contain bg-white"
+                />
               </button>
             )
           )}

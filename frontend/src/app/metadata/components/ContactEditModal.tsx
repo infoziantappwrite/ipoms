@@ -31,13 +31,12 @@ export function ContactEditModal({
     initialData?.mobile_numbers?.filter((m: string) => m !== initialData?.primary_mobile).join(', ') || ''
   );
   const [primaryEmail, setPrimaryEmail] = useState(initialData?.primary_email || '');
-  const [companyType, setCompanyType] = useState(initialData?.company_type || 'IT / Software & Technology');
+  const [companyType, setCompanyType] = useState(initialData?.company_type || '');
   const [notes, setNotes] = useState(initialData?.notes || '');
   const [loading, setLoading] = useState(false);
 
   const companyTypeOptions = Array.from(
     new Set([
-      'IT / Software & Technology',
       ...(initialData?.company_type ? [initialData.company_type] : []),
       ...COMPANY_TYPES,
     ])
@@ -91,6 +90,9 @@ export function ContactEditModal({
       }
 
       if (res.success) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('ipoms_metadata_updated'));
+        }
         alert(isEditing ? 'Company details updated in Meta Database!' : 'Company contact created successfully in Meta Database!');
         onSuccess();
         onClose();
@@ -179,8 +181,11 @@ export function ContactEditModal({
                 value={companyType}
                 onChange={setCompanyType}
                 icon={Briefcase}
+                placeholder="Select Company Type"
                 title="Company Industry Type"
                 options={companyTypeOptions}
+                searchable={true}
+                searchPlaceholder="Search company type..."
               />
             </div>
           </div>

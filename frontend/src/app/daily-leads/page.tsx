@@ -6,6 +6,7 @@ import { LeadsHeader } from './components/LeadsHeader';
 import type { LeadsSummaryData } from './components/LeadsSummaryStrip';
 import { LeadsTabBar } from './components/LeadsTabBar';
 import { LeadsTable, DailyLeadRow } from './components/LeadsTable';
+import { MyPositivesTab } from './components/MyPositivesTab';
 import { AddLeadModal } from './components/AddLeadModal';
 import { CopyToJdModal } from './components/CopyToJdModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
@@ -28,8 +29,8 @@ export default function DailyLeadsPage() {
   const [colleges, setColleges] = useState<{ _id: string; college_name: string; college_code: string }[]>([]);
 
   // Tab State: Always defaults to 'positive' when visiting the Daily Leads module
-  const [activeTab, setActiveTab] = useState<'positive' | 'jd_received'>('positive');
-  const activeTabRef = useRef<'positive' | 'jd_received'>('positive');
+  const [activeTab, setActiveTab] = useState<'positive' | 'jd_received' | 'my_positives'>('positive');
+  const activeTabRef = useRef<'positive' | 'jd_received' | 'my_positives'>('positive');
   activeTabRef.current = activeTab;
 
   // Search Query
@@ -126,7 +127,7 @@ export default function DailyLeadsPage() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isDeleteMode]);
 
-  const handleTabChange = (tab: 'positive' | 'jd_received') => {
+  const handleTabChange = (tab: 'positive' | 'jd_received' | 'my_positives') => {
     if (tab === activeTab) return;
     setActiveTab(tab);
     activeTabRef.current = tab;
@@ -510,29 +511,40 @@ export default function DailyLeadsPage() {
 
       {/* ── Table Workspace ───────────────────────────────────────────────── */}
       <div className="flex-1 px-6 py-4">
-        <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-xs">
-          <LeadsTable
-            rows={leads}
-            activeTab={activeTab}
+        {activeTab === 'my_positives' ? (
+          <MyPositivesTab
+            selectedDate={selectedDate}
+            onDateChange={setSelectedDate}
             colleges={colleges}
-            isDeleteMode={isDeleteMode}
-            selectedIds={selectedIds}
-            isAllSelected={isAllSelected}
-            onToggleSelect={handleToggleSelect}
-            onToggleSelectAll={handleToggleSelectAll}
-            onClearSelection={handleClearSelection}
-            onBulkDelete={handleBulkDelete}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
             onUpdateRow={handleUpdateRow}
-            onDeleteRow={handleDeleteRow}
-            onMoveToJd={handleMoveToJd}
           />
-        </div>
+        ) : (
+          <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-xs">
+            <LeadsTable
+              rows={leads}
+              activeTab={activeTab}
+              colleges={colleges}
+              isDeleteMode={isDeleteMode}
+              selectedIds={selectedIds}
+              isAllSelected={isAllSelected}
+              onToggleSelect={handleToggleSelect}
+              onToggleSelectAll={handleToggleSelectAll}
+              onClearSelection={handleClearSelection}
+              onBulkDelete={handleBulkDelete}
+              onUpdateRow={handleUpdateRow}
+              onDeleteRow={handleDeleteRow}
+              onMoveToJd={handleMoveToJd}
+            />
+          </div>
+        )}
       </div>
 
       {/* ── Add Entry Modal (Dual Property: Positives vs JD Received) ─────── */}
       {isAddModalOpen && (
         <AddLeadModal
-          initialLeadType={activeTab}
+          initialLeadType={activeTab === 'jd_received' ? 'jd_received' : 'positive'}
           initialCollegeId=""
           initialDate={selectedDate === 'all' ? new Date().toISOString().split('T')[0] : selectedDate}
           coordinatorId={coordinatorId}
