@@ -2,16 +2,18 @@
 
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { apiFetch } from './api';
+import { apiFetch, API_BASE } from './api';
 import { readSessionUser } from './session';
 import { getActiveCollege, getCollegeAcronym } from './collegeSession';
 
-const HEARTBEAT_INTERVAL_MS = 25000; // 25 seconds
+const HEARTBEAT_INTERVAL_MS = 10000; // 10 seconds — the server treats >45s of silence as not-online
 
 /**
  * usePresenceHeartbeat:
  * Automatically broadcasts the user's active college and online presence
- * to the backend every 25s, and immediately on college selection/route changes.
+ * to the backend every 10s, and immediately on college selection/route changes.
+ * On tab close it also tells the server right away (see sendOffline) so the live
+ * coordinator list drops that person immediately rather than after a timeout.
  */
 export function usePresenceHeartbeat() {
   const pathname = usePathname();
@@ -95,13 +97,33 @@ export function usePresenceHeartbeat() {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         const now = Date.now();
-        if (now - lastPingRef.current > 10000) {
+        if (now - lastPingRef.current > 5000) {
           sendHeartbeat();
         }
       }
     };
 
+    // 5. Tab closed / navigated away: say so immediately. keepalive lets the request outlive
+    //    the page (sendBeacon can't carry the Authorization header). A refresh sends this
+    //    too, but the heartbeat fired on the next load puts the user straight back online.
+    const sendOffline = () => {
+      try {
+        const token =
+          (typeof window !== 'undefined' && (sessionStorage.getItem('ipoms_token') || localStorage.getItem('ipoms_token'))) || '';
+        if (!token) return;
+        fetch(`${API_BASE}/users/offline`, {
+          method: 'POST',
+          keepalive: true,
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: '{}',
+        }).catch(() => {});
+      } catch {
+        // best effort only
+      }
+    };
+
     if (typeof window !== 'undefined') {
+      window.addEventListener('pagehide', sendOffline);
       window.addEventListener('ipoms_college_change' as any, handleCollegeChange);
       window.addEventListener('ipoms_focus_updated' as any, handleCollegeChange);
       document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -111,7 +133,8 @@ export function usePresenceHeartbeat() {
       mounted = false;
       if (timer) clearInterval(timer);
       if (typeof window !== 'undefined') {
-        window.removeEventListener('ipoms_college_change' as any, handleCollegeChange);
+        window.removeEventListener('pagehide', sendOffline);
+      window.removeEventListener('ipoms_college_change' as any, handleCollegeChange);
         window.removeEventListener('ipoms_focus_updated' as any, handleCollegeChange);
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       }

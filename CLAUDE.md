@@ -1388,6 +1388,73 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     change is about visibility only. A second Mar Ephraem document, if one exists, was left
     alone rather than deleted.
 
+51. **Report Builder no longer remembers choices across refresh or across users, 24 Sep 2026
+    (user-reported).** `ReportBuilderWizard.tsx` auto-saved the entire wizard (template,
+    college, dates, sections, remarks, …) to one browser-wide `localStorage` key
+    (`ipoms_report_builder_wizard_state`) and restored it on load. So a refresh — network
+    blip, power cut — brought half-finished selections back, and because the key wasn't
+    per-user, **the next person to log in on the same browser inherited the previous user's
+    college and sections**. Now the choices live in a module-level in-memory store tagged with
+    the logged-in user's id: they survive "Back" from the editor within the same page session
+    but reset on refresh, and a different login never sees them. The old `localStorage` key is
+    deleted on load so stale data from earlier builds can't resurface. Also added a small
+    **Reset** icon above the tab bar (same result as a fresh load: clears memory, reloads).
+    Verified in a real browser: a seeded stale key (`daily_positives`) is ignored and purged →
+    opens on Weekly Report with no college, no dates, default sections; picking Month-End then
+    refreshing → back to Weekly Report; Reset via a real mouse click → Weekly Report. First
+    placement of the icon floated above the tab box and real clicks were intercepted by
+    another element (a DOM `.click()` worked, a mouse click didn't) — moved into normal flow.
+    `tsc --noEmit` clean for the reports files.
+
+52. **"Active right now" on the Team Leader dashboards is now genuinely live, 24 Sep 2026
+    (user-requested).** The "Live Coordinator Deployment by College" list and the presence
+    table showed anyone whose last heartbeat was within **3 minutes** (computed with
+    `Math.floor` on whole minutes, so effectively up to ~4), and the client only pinged every
+    25s — so a coordinator who closed the tab, lost power or dropped off the network stayed
+    listed as "active right now" for several minutes. Now: heartbeat every **10s**
+    (`usePresenceHeartbeat.ts`); the server treats **≤45s** since the last beat as `online`,
+    **≤3 min** as `away` (e.g. a backgrounded tab the browser throttles), else `offline`
+    (`presenceFromLastActive()` in `server.ts`, used by both the team-leader matrix and the
+    users listing); a `pagehide` handler sends `POST /users/offline` (`fetch` with
+    `keepalive`, since `sendBeacon` can't carry the Authorization header) so closing the tab
+    removes that person **immediately**; the Team Leader dashboard polls every **3s** (was
+    5s). A plain refresh also fires the offline call, but the first heartbeat on the next load
+    flips the user back online within a second or two. New route policy entry for
+    `/users/offline` (STAFF). Applies to both Malvika's and Sujitha's dashboards (same
+    component/endpoint). **Verified live via the API** using a real account: heartbeat →
+    `online`; `POST /users/offline` → `offline` instantly; heartbeat again → `online`;
+    55s of silence → dropped out of `online` (`away`); heartbeat resumes → `online`.
+    **Not verified in a real browser:** that `pagehide` actually fires the request on tab
+    close (only the endpoint it calls was exercised). **Trade-off worth knowing:** Chrome
+    throttles timers in hidden tabs, so a coordinator whose tracker tab sits in the background
+    for several minutes will read as `away` rather than `online` — deliberate, since the
+    user's requirement is "actively here right now", but it can look like a false drop.
+
+53. **Saved Active College Focus is no longer reverted by hardcoded defaults, 24 Sep 2026
+    (user-reported).** Reducing/changing focus colleges "didn't stick" after a refresh. Cause:
+    six separate backend spots re-wrote users' `assigned_college_ids` from hardcoded lists:
+    **every boot** (`ensureDefaultAccounts`: the `DEFAULT_COORDINATOR_COLLEGE_MAP` loop for
+    all coordinators + a Mohanaradha block), **every Daily Tracker page load**
+    (`GET /daily-tracker/sync-coordinators`, called by `tracker/page.tsx`, reset Mohanaradha),
+    and **every Team Leader dashboard load — now every 3s** (`GET /dashboard/team-leader`
+    reset Sujitha, Tamil/Seshmitha and Megala). So whatever a user saved via `lock-focus` was
+    silently undone the next time any of those ran — the same class as traps 10/29 (a
+    background path rewriting user data). Now every one of them only applies its default when
+    the user has **no** colleges at all (a starting point, never an override). Frontend needed
+    no change: every consumer re-reads the focus when its page opens, and the dashboard
+    consumers already listen to `ipoms_focus_updated` / `ipoms_coordinator_colleges_changed`.
+    **Verified live** (real accounts, shrunk to 2 colleges then restored exactly): Mohanaradha
+    stays at 2 through a Daily Tracker load *and* a forced backend restart; Sujitha stays at 2
+    through a Team Leader dashboard load. **Not fully proven:** Sujitha (after restart) and
+    Megala (within ~5s, with nothing of mine running) still got their defaults re-added by
+    *something else* — consistent with an **older copy of the backend still running against the
+    same database (most likely the deployed one, whose polling Team Leader dashboards trigger
+    it constantly, or another local `npm run dev`)**. Until that copy is redeployed/restarted
+    with this change, users on the deployed site can still see their focus revert.
+    **Also noticed, not changed:** `ensureDefaultAccounts` still re-attributes Daily Tracker
+    rows (admin-owned → Mohanaradha for her 4 colleges) on every boot — another
+    business-data write at startup, contrary to trap 10's rule.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

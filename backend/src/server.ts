@@ -1048,6 +1048,7 @@ export async function syncActiveCollegesRoster() {
       if (canonical) {
         canonical.college_code = 'MAREPHRAM';
         canonical.status = 'active';
+        canonical.logo_url = '/college-logos/marephraem.png';
         await canonical.save();
       }
     } catch (marErr) {
@@ -3520,10 +3521,16 @@ app.all('/api/v1/daily-tracker/sync-coordinators', async (req: Request, res: Res
       const targetCollegeIds = targetCollegeDocs.map((c) => c._id);
 
       if (targetCollegeIds.length > 0) {
-        mohanaDoc.assigned_college_ids = targetCollegeIds;
-        mohanaDoc.weekly_focus_locked = true;
-        mohanaDoc.weekly_focus_week_key = currentWeekMonday;
-        await mohanaDoc.save();
+        // Defaults are only a STARTING point: applied when the user has no colleges at all.
+        // This used to overwrite assigned_college_ids on every boot / dashboard load / tracker
+        // page load, so any focus change a user saved in Active College Focus was silently
+        // reverted to the hardcoded list the next time any of those ran (24 Sep 2026).
+        if (!mohanaDoc.assigned_college_ids || mohanaDoc.assigned_college_ids.length === 0) {
+          mohanaDoc.assigned_college_ids = targetCollegeIds;
+          mohanaDoc.weekly_focus_locked = true;
+          mohanaDoc.weekly_focus_week_key = currentWeekMonday;
+          await mohanaDoc.save();
+        }
 
         const acetDoc = targetCollegeDocs.find((c) => c.college_code === 'ACET');
         if (acetDoc) {
@@ -7353,9 +7360,11 @@ const SERVER_COLLEGE_LOGO_MAP: Record<string, string> = {
   LICET: '/college-logos/layola.png',
   LAYOLA: '/college-logos/layola.png',
   LOYOLA: '/college-logos/layola.png',
-  MAR: '/college-logos/mar ephream.png',
-  'MAR EPHRAEM': '/college-logos/mar ephream.png',
-  'MAR EPHREAM': '/college-logos/mar ephream.png',
+  MAREPHRAM: '/college-logos/marephraem.png',
+  MAREPHRA: '/college-logos/marephraem.png',
+  MAR: '/college-logos/marephraem.png',
+  'MAR EPHRAEM': '/college-logos/marephraem.png',
+  'MAR EPHREAM': '/college-logos/marephraem.png',
   MCET: '/college-logos/MCET.png',
   MAHALINGAM: '/college-logos/MCET.png',
   MEC: '/college-logos/MEC.png',
@@ -10718,6 +10727,33 @@ app.get('/api/v1/dashboard/monthly-calls', async (req: Request, res: Response) =
 });
 
 // ── Real-Time Presence Heartbeat ──
+// Presence, judged from the last heartbeat. The client pings every 10s, so "online" means
+// the tab was heard from in the last 45s (~4 missed beats of slack) - it used to be 3
+// *minutes* with a floor() on whole minutes, so a coordinator who closed the tab, lost power
+// or network stayed listed as "active right now" for up to ~4 minutes. Beyond 45s but within
+// 3 min they show as "away" (e.g. a backgrounded tab the browser is throttling), then offline.
+const PRESENCE_ONLINE_MS = 45_000;
+const PRESENCE_AWAY_MS = 3 * 60_000;
+function presenceFromLastActive(lastActiveMs: number, nowMs: number): { status: 'online' | 'away' | 'offline'; label: string } {
+  const age = nowMs - lastActiveMs;
+  if (age <= PRESENCE_ONLINE_MS) return { status: 'online', label: 'Online' };
+  if (age <= PRESENCE_AWAY_MS) return { status: 'away', label: 'Away' };
+  return { status: 'offline', label: 'Offline' };
+}
+
+// Sent by the browser on tab close / navigation away (pagehide, keepalive) so a coordinator
+// who simply closes the tab drops off the live list immediately instead of after a timeout.
+// The next heartbeat (e.g. after a mere refresh) flips them straight back online.
+app.post('/api/v1/users/offline', async (req: Request, res: Response) => {
+  try {
+    const uid = (req as any).user?.userId;
+    if (uid) {
+      await User.findByIdAndUpdate(uid, { $set: { is_online: false, logged_out_at: new Date() } });
+    }
+  } catch {}
+  return res.status(200).json({ success: true });
+});
+
 app.post('/api/v1/users/heartbeat', async (req: Request, res: Response) => {
   try {
     const authHeader = req.headers.authorization;
@@ -10853,7 +10889,13 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
         status: 'active',
       });
       const targetIds = sujithaColleges.map((c) => c._id);
-      sujithaUser.assigned_college_ids = targetIds;
+      // Defaults are only a STARTING point: applied when the user has no colleges at all.
+      // This used to overwrite assigned_college_ids on every boot / dashboard load / tracker
+      // page load, so any focus change a user saved in Active College Focus was silently
+      // reverted to the hardcoded list the next time any of those ran (24 Sep 2026).
+      if (!sujithaUser.assigned_college_ids || sujithaUser.assigned_college_ids.length === 0) {
+        sujithaUser.assigned_college_ids = targetIds;
+      }
       const mcetCol = await College.findOne({
         $or: [{ college_code: 'MCET' }, { college_name: /mahalingam/i }]
       });
@@ -10892,7 +10934,9 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
         status: 'active',
       });
       const targetTamilIds = tamilColleges.map((c) => c._id);
-      tamilUser.assigned_college_ids = targetTamilIds;
+      if (!tamilUser.assigned_college_ids || tamilUser.assigned_college_ids.length === 0) {
+        tamilUser.assigned_college_ids = targetTamilIds; // starting default only — see Sujitha note above
+      }
       if (!tamilUser.account_status) tamilUser.account_status = 'active';
       await tamilUser.save();
     }
@@ -10916,7 +10960,9 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
         status: 'active',
       });
       const targetMegalaIds = megalaColleges.map((c) => c._id);
-      megalaUser.assigned_college_ids = targetMegalaIds;
+      if (!megalaUser.assigned_college_ids || megalaUser.assigned_college_ids.length === 0) {
+        megalaUser.assigned_college_ids = targetMegalaIds; // starting default only — see Sujitha note above
+      }
       if (!megalaUser.account_status) megalaUser.account_status = 'active';
       await megalaUser.save();
     }
@@ -11103,17 +11149,9 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
           onlineStatus = 'offline';
           onlineStatusLabel = 'Offline';
         } else if (c.last_active_at) {
-          const diffMinutes = Math.floor((nowMs - new Date(c.last_active_at).getTime()) / (1000 * 60));
-          if (diffMinutes <= 3) {
-            onlineStatus = 'online';
-            onlineStatusLabel = 'Online';
-          } else if (diffMinutes <= 15) {
-            onlineStatus = 'away';
-            onlineStatusLabel = 'Away';
-          } else {
-            onlineStatus = 'offline';
-            onlineStatusLabel = 'Offline';
-          }
+          const p = presenceFromLastActive(new Date(c.last_active_at).getTime(), nowMs);
+          onlineStatus = p.status;
+          onlineStatusLabel = p.label;
         }
 
         // Active college is ONLY populated when the coordinator is currently actively ONLINE
@@ -11601,17 +11639,9 @@ app.get('/api/v1/dashboard/admin', async (req: Request, res: Response) => {
         onlineStatus = 'offline';
         onlineStatusLabel = 'Offline';
       } else if (u.last_active_at) {
-        const diffMinutes = Math.floor((nowMs - new Date(u.last_active_at).getTime()) / (1000 * 60));
-        if (diffMinutes <= 3) {
-          onlineStatus = 'online';
-          onlineStatusLabel = 'Online';
-        } else if (diffMinutes <= 15) {
-          onlineStatus = 'away';
-          onlineStatusLabel = 'Away';
-        } else {
-          onlineStatus = 'offline';
-          onlineStatusLabel = 'Offline';
-        }
+        const p = presenceFromLastActive(new Date(u.last_active_at).getTime(), nowMs);
+        onlineStatus = p.status;
+        onlineStatusLabel = p.label;
       }
 
       // Active college is ONLY populated when the coordinator is currently actively ONLINE
@@ -14747,10 +14777,17 @@ const ensureDefaultAccounts = async () => {
         const isTL = coordUser.role_codes?.includes('TEAM_LEADER') || coordUser.official_email === 'sujitha_s@infoziant.com';
         const maxLimit = isTL ? 5 : 4;
         const mappedIds = codes.map((c) => codeMap.get(c.toUpperCase())).filter(Boolean).slice(0, maxLimit);
-        coordUser.assigned_college_ids = mappedIds;
-        coordUser.weekly_focus_locked = true;
-        coordUser.weekly_focus_week_key = currentWeekMonday;
-        if (!coordUser.weekly_focus_locked_at) coordUser.weekly_focus_locked_at = new Date();
+        // Defaults are only a STARTING point: applied when the user has no colleges at all.
+        // This used to overwrite assigned_college_ids on every boot / dashboard load / tracker
+        // page load, so any focus change a user saved in Active College Focus was silently
+        // reverted to the hardcoded list the next time any of those ran (24 Sep 2026).
+        const seedDefaults = !coordUser.assigned_college_ids || coordUser.assigned_college_ids.length === 0;
+        if (seedDefaults) {
+          coordUser.assigned_college_ids = mappedIds;
+          coordUser.weekly_focus_locked = true;
+          coordUser.weekly_focus_week_key = currentWeekMonday;
+          if (!coordUser.weekly_focus_locked_at) coordUser.weekly_focus_locked_at = new Date();
+        }
 
         // If Sujitha has MCET, correct it to NEHRU immediately in MongoDB!
         if (isTL && (coordUser.active_college_code === 'MCET' || (coordUser.active_college_name && /mahalingam|mcet/i.test(coordUser.active_college_name)))) {
@@ -14762,10 +14799,12 @@ const ensureDefaultAccounts = async () => {
           coordUser.active_college_location = primaryCol?.location || '';
         }
         await coordUser.save();
-        await College.updateMany(
-          { _id: { $in: mappedIds } },
-          { $addToSet: { assigned_coordinator_ids: coordUser._id } }
-        );
+        if (seedDefaults) {
+          await College.updateMany(
+            { _id: { $in: mappedIds } },
+            { $addToSet: { assigned_coordinator_ids: coordUser._id } }
+          );
+        }
       }
     }
 
@@ -14788,10 +14827,12 @@ const ensureDefaultAccounts = async () => {
       const targetCollegeIds = targetCollegeDocs.map((c) => c._id);
 
       if (targetCollegeIds.length > 0) {
-        mohanaDoc.assigned_college_ids = targetCollegeIds;
-        mohanaDoc.weekly_focus_locked = true;
-        mohanaDoc.weekly_focus_week_key = currentWeekMonday;
-        await mohanaDoc.save();
+        if (!mohanaDoc.assigned_college_ids || mohanaDoc.assigned_college_ids.length === 0) {
+          mohanaDoc.assigned_college_ids = targetCollegeIds; // starting default only — see note in sync-coordinators
+          mohanaDoc.weekly_focus_locked = true;
+          mohanaDoc.weekly_focus_week_key = currentWeekMonday;
+          await mohanaDoc.save();
+        }
 
         const acetDoc = targetCollegeDocs.find((c) => c.college_code === 'ACET');
         if (acetDoc) {
