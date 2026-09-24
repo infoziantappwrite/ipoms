@@ -10,7 +10,7 @@ export const DEFAULT_COORDINATOR_COLLEGE_ROSTER: { email: string; name: string; 
   {
     name: 'Sujitha S (Sujitha)',
     email: 'sujitha_s@infoziant.com',
-    collegeCodes: ['HITS', 'NEHRU', 'KPR', 'SONA', 'MAREPHRA'],
+    collegeCodes: ['HITS', 'NEHRU', 'KPR', 'SONA'],
   },
   {
     name: 'A.Mohanaradha (Mohana)',
@@ -35,7 +35,7 @@ export const DEFAULT_COORDINATOR_COLLEGE_ROSTER: { email: string; name: string; 
   {
     name: 'Megala Devi P S (Megala)',
     email: 'megaladevi_ps@infoziant.com',
-    collegeCodes: ['NGP', 'KAMARAJ'],
+    collegeCodes: ['NGP', 'KAMARAJ', 'MAREPHRAM'],
   },
   {
     name: 'Seshmitha Tamilselvi R (Tamil)',

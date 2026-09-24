@@ -99,12 +99,12 @@ export const DEFAULT_OFFICIAL_ALLOCATIONS: Record<string, string[]> = {
   'lizenya': ['NPR', 'KIOT', 'ACEW'],
   'lizenya r': ['NPR', 'KIOT', 'ACEW'],
 
-  // Megala: NGP, KAMARAJ
-  'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ'],
-  'megala': ['NGP', 'KAMARAJ'],
-  'megaladevi': ['NGP', 'KAMARAJ'],
-  'megaladevi p s': ['NGP', 'KAMARAJ'],
-  'megaladevi ps': ['NGP', 'KAMARAJ'],
+  // Megala: NGP, KAMARAJ, MAREPHRAM
+  'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ', 'MAREPHRAM'],
+  'megala': ['NGP', 'KAMARAJ', 'MAREPHRAM'],
+  'megaladevi': ['NGP', 'KAMARAJ', 'MAREPHRAM'],
+  'megaladevi p s': ['NGP', 'KAMARAJ', 'MAREPHRAM'],
+  'megaladevi ps': ['NGP', 'KAMARAJ', 'MAREPHRAM'],
 
   // Tamil / Seshmitha: MCET, MEC
   'seshmitha_tamil@icl.today': ['MCET', 'MEC'],
@@ -114,10 +114,10 @@ export const DEFAULT_OFFICIAL_ALLOCATIONS: Record<string, string[]> = {
   'seshmitha tamilselvi': ['MCET', 'MEC'],
   'seshmitha tamilselvi r': ['MCET', 'MEC'],
 
-  // Sujitha (Team Leader): NEHRU, MAREPHRAM, KPR, HITS, SONA
-  'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
-  'sujitha': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
-  'sujitha s': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
+  // Sujitha (Team Leader): NEHRU, KPR, HITS, SONA
+  'sujitha_s@infoziant.com': ['NEHRU', 'KPR', 'HITS', 'SONA'],
+  'sujitha': ['NEHRU', 'KPR', 'HITS', 'SONA'],
+  'sujitha s': ['NEHRU', 'KPR', 'HITS', 'SONA'],
 };
 
 /** Resolves default official college IDs for the current user */
@@ -797,15 +797,15 @@ export function setActiveCollege(id: string, name: string, obj?: College | null)
 
 // Official focus college allocations mapping for coordinators and team leaders
 export const DEFAULT_COORDINATOR_COLLEGE_ROSTER: Record<string, string[]> = {
-  'sujitha_s@infoziant.com': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
-  'sujitha': ['NEHRU', 'MAREPHRAM', 'KPR', 'HITS', 'SONA'],
+  'sujitha_s@infoziant.com': ['NEHRU', 'KPR', 'HITS', 'SONA'],
+  'sujitha': ['NEHRU', 'KPR', 'HITS', 'SONA'],
   'seshmitha_tamil@icl.today': ['MCET', 'MEC'],
   'seshmitha': ['MCET', 'MEC'],
   'mohanaradha_a@infoziant.com': ['KARPAGAM', 'AIHT', 'ACET', 'KPR'],
   'thirisha_r@infoziant.com': ['PSNA', 'DSU', 'SMVEC'],
   'malavika_ramesh@infoziant.com': ['KLU', 'NGCE'],
   'lizenya_r@infoziant.com': ['NPR', 'KIOT', 'ACEW'],
-  'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ'],
+  'megaladevi_ps@infoziant.com': ['NGP', 'KAMARAJ', 'MAREPHRAM'],
 };
 
 export async function resolveDefaultCollege(): Promise<{ id: string; name: string; obj: College | null }> {

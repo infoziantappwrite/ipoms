@@ -32,8 +32,10 @@ interface Props {
   isGlobalDeleteMode?: boolean;
   selectionMode?: 'move' | 'delete' | null;
   globalSelectedRowIds?: string[];
-  onToggleSelectRow?: (rowId: string) => void;
-  onToggleSelectSection?: (rowIds: string[]) => void;
+  /** Which section the global selection was made in; other sections show nothing ticked. */
+  globalSelectionSection?: string | null;
+  onToggleSelectRow?: (rowId: string, sectionKey?: string) => void;
+  onToggleSelectSection?: (rowIds: string[], sectionKey?: string) => void;
   onUpdateRow: (rowId: string, patch: Partial<WeeklyRow>) => Promise<void>;
   onMoveSection: (rowId: string, newSection: string) => Promise<void>;
   onTogglePin: (rowId: string) => Promise<void>;
@@ -145,6 +147,7 @@ export function WeeklySection({
   isGlobalDeleteMode,
   selectionMode,
   globalSelectedRowIds,
+  globalSelectionSection,
   onToggleSelectRow: onGlobalToggleSelectRow,
   onToggleSelectSection: onGlobalToggleSelectSection,
   onUpdateRow,
@@ -199,7 +202,11 @@ export function WeeklySection({
   }, []);
 
   const isDeleteMode = isGlobalDeleteMode !== undefined ? isGlobalDeleteMode : isLocalDeleteMode;
-  const selectedRowIds = isGlobalDeleteMode ? (globalSelectedRowIds || []) : localSelectedRowIds;
+  const selectedRowIds = isGlobalDeleteMode
+    ? globalSelectionSection && globalSelectionSection !== sectionKey
+      ? []
+      : globalSelectedRowIds || []
+    : localSelectedRowIds;
   const sectionSelectedCount = rows.filter((r) => selectedRowIds.includes(r._id)).length;
 
   const config = SECTION_CONFIGS[sectionKey] || {
@@ -213,7 +220,7 @@ export function WeeklySection({
 
   const handleToggleSelectRow = (id: string) => {
     if (isGlobalDeleteMode && onGlobalToggleSelectRow) {
-      onGlobalToggleSelectRow(id);
+      onGlobalToggleSelectRow(id, sectionKey);
     } else {
       setLocalSelectedRowIds((prev) =>
         prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -223,7 +230,7 @@ export function WeeklySection({
 
   const handleToggleSelectAll = () => {
     if (isGlobalDeleteMode && onGlobalToggleSelectSection) {
-      onGlobalToggleSelectSection(rows.map((r) => r._id));
+      onGlobalToggleSelectSection(rows.map((r) => r._id), sectionKey);
     } else {
       if (localSelectedRowIds.length === rows.length) {
         setLocalSelectedRowIds([]);

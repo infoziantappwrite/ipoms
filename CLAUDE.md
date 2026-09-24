@@ -1357,6 +1357,37 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     chasing further; flagged rather than claimed. `tsc --noEmit` clean on both files
     touched (excluding the pre-existing unrelated errors from item 47).
 
+49. **Weekly Tracker row selection is now section-specific, 24 Sep 2026 (user-reported).**
+    Ticking a company in delete/move mode ticked it in every section where it appears. Cause:
+    selection was a flat list of row `_id`s, and Top Companies rows are *also* listed in
+    Companies in Pipeline (the list endpoint pushes them into both), so one `_id` matched
+    both. Worse, bulk delete then *guessed* "this is a Top Companies delete" from whether all
+    selected ids were top companies — so ticking such rows in Pipeline was treated as a Top
+    Companies removal. Now `page.tsx` tracks `selectionSection` (the section the current
+    selection was made in); toggling in a different section starts a fresh selection there,
+    `WeeklySection` shows ticks only when the selection belongs to its own `sectionKey`, and
+    `isTopCompaniesBulk` reads `selectionSection === 'top_companies'` instead of inferring
+    from ids. Backend and delete/move semantics unchanged. Verified in a real browser on a
+    company (Presidio) present in both sections: ticking it in Top Companies →
+    checkbox states `[false, true]`. `tsc --noEmit` clean.
+
+50. **Mar Ephraem missing from the Active College Focus matrix, 24 Sep 2026
+    (user-reported).** `GET /colleges/focus-matrix` returns every *active* college to every
+    user, so "visible to everyone" is purely a question of the college being active. It was
+    not: only 20 of 21 came back. Cause: `syncActiveCollegesRoster()` (runs on every boot)
+    normalised Mar Ephraem with two blanket `updateMany` calls that set the same **unique**
+    `college_code` (`MAREPHRAM`) on every match; with a legacy `MAREPHRA` document plus a
+    name-matching one that threw E11000 (`duplicate key … MAREPHRAM`) and aborted the whole
+    roster sync, so Mar Ephraem was never re-activated. Now it picks one canonical document
+    (already-`MAREPHRAM`, else `MAREPHRA`, else first name match), promotes just that one, and
+    wraps the step in try/catch so it can never abort the rest of the sync. Verified live for
+    all 9 accounts (Administrator, all coordinators, both Team Leaders): each gets 21 colleges
+    including `MAREPHRAM`. **Not touched:** which coordinator "owns" Mar Ephraem by default —
+    another tool was mid-edit moving it from Sujitha to Megala in `collegeSession.ts`,
+    `seedDefaultCoordinatorColleges.ts` and `fixCollegeAssignments.ts` (uncommitted); this
+    change is about visibility only. A second Mar Ephraem document, if one exists, was left
+    alone rather than deleted.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

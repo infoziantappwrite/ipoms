@@ -31,12 +31,12 @@ const ROSTER: Record<string, RegExp[]> = {
   'thirisha_r@infoziant.com': [/^PSNA/i, /dhanalakshmi srinivasan/i, /manakula/i],
   'malavika_ramesh@infoziant.com': [/kalasalingam/i, /narayanaguru/i],
   'lizenya_r@infoziant.com': [/^NPR College/i, /knowledge institute/i, /arunachala/i],
-  'megaladevi_ps@infoziant.com': [/N\.?G\.?P\.?/i, /kamaraj/i],
+  'megaladevi_ps@infoziant.com': [/N\.?G\.?P\.?/i, /kamaraj/i, /ephraem/i, /ephram/i],
   'seshmitha_tamil@icl.today': [/mahalingam/i, /muthayammal/i],
-  // Sujitha is a Team Leader, but genuinely handles these 5 colleges hands-on -
+  // Sujitha is a Team Leader, but genuinely handles these 4 colleges hands-on -
   // treated as their focus owner for warning/notification purposes only. Her
   // Team Leader oversight of every other college is unaffected.
-  'sujitha_s@infoziant.com': [/nehru/i, /ephraem/i, /^KPR Institute/i, /hindustan/i, /^SONA/i],
+  'sujitha_s@infoziant.com': [/nehru/i, /^KPR Institute/i, /hindustan/i, /^SONA/i],
 };
 
 async function main() {
