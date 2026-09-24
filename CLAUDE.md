@@ -1803,6 +1803,26 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     deleted in a later cleanup. Verified in a real browser: 0 header "Move to JD" buttons, Sync/Add still
     present, 6 per-row "Move to JD Received" buttons still present, no page errors; `tsc --noEmit` clean.
 
+72. **"Have you sent all your emails?" reminder, 24 Sep 2026 (user-requested).** Popup for Placement
+    Coordinators and a normal Team Leader (Sujitha); **never** the Administrator or a full-oversight Team
+    Leader (`has_all_colleges_access`, Malvika Kumar). Asked only if the person logged **at least one Invite
+    Mail** today in any of their focus colleges. All decisions are server-side on the IST clock
+    (`backend/src/lib/emailCheckRoutes.ts`, `GET /email-check/status`, `POST /email-check/answer`, collection
+    `email_checks`, one row per person per day). **Evening:** 10-minute windows at 17:00, 17:30, 18:00, 18:30,
+    only to someone active with the app open >= 1 minute; **max 2 prompts a day**, one per window, so a late
+    login (after 17:15) is first asked at 17:30. Close (X/Esc) and "No" are identical - they leave it
+    unanswered so the next window asks again; "Yes, all sent" ends it for the day and a later "No" can never
+    undo it. **Next morning:** past tense ("...for yesterday's positives"), asked once per day and only when the
+    Daily Tracker is opened (never on the dashboard), looking back up to 3 days for a day with positives and no
+    Yes; someone who logs in and out within a minute is therefore asked next morning. Days before
+    `EMAIL_CHECK_START_DATE` (default 2026-09-24) are never asked about. Frontend: `EmailCheckPrompt.tsx`
+    mounted once in `AppShell.tsx`, polls every 30s only 16:55-18:50 IST while the tab is visible, fails
+    silently. Never blocks navigation. Policy entry `/email-check` (STAFF). **Verified:** 26 simulated-time
+    checks against real accounts with throwaway rows (all removed); real-browser run with mocked status
+    responses and a faked clock: no popup in the first minute, appears after, Esc posts nothing, No/Yes post the
+    right payloads, next-day wording only on `/tracker`. **Not verified:** a genuine 5 PM run on the real clock,
+    dark mode. `verify:policy` OK, `tsc --noEmit` clean both sides.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

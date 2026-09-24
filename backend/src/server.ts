@@ -35,6 +35,7 @@ import rateLimit from 'express-rate-limit';
 import { registerAuthRoutes } from './lib/authRoutes';
 import { registerActiveLeadRoutes, syncLeadFromDailyTracker } from './lib/activeLeadRoutes';
 import { registerWeeklyPasteRoutes } from './lib/weeklyPasteRoutes';
+import { registerEmailCheckRoutes } from './lib/emailCheckRoutes';
 import { validateAndNormalizeMultiEmail } from './lib/contactRules';
 import { registerPendingTaskRoutes } from './lib/pendingTaskRoutes';
 import { seedMasterDailyLeads, MASTER_POSITIVES_DATA } from './lib/seedMasterDailyLeads';
@@ -735,6 +736,9 @@ registerActiveLeadRoutes(app);
 
 // Weekly Tracker "Paste" (preview + save share one code path)
 registerWeeklyPasteRoutes(app, { notifyForeignCollegeOwners, getFridayWeekBounds });
+
+// "Have you sent all your emails?" reminder (5 PM / 5:30 PM / next-day)
+registerEmailCheckRoutes(app);
 
 // Register Pending Task routes
 registerPendingTaskRoutes(app);

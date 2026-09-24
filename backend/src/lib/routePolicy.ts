@@ -126,6 +126,8 @@ const POLICIES: Policy[] = [
   { method: 'GET',    pattern: /^\/health\/daily-leads-diagnostics\/?$/, roles: ADMIN },
   { method: 'GET',    pattern: /^\/meta-audit\/?$/,                      roles: ADMIN },
   { method: '*',      pattern: /^\/weekly-tracker(\/.*)?$/,              roles: STAFF },
+  // Eligibility (coordinators + a normal Team Leader, never the Administrator or a full-oversight TL) is enforced inside the handlers.
+  { method: '*',      pattern: /^\/email-check(\/.*)?$/,                  roles: STAFF },
 
   // ── Daily Leads & Active Leads ────────────────────────────────────────────
   // Placement Coordinators, Team Leaders, and Administrators have full
