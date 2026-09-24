@@ -1787,7 +1787,11 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     Measured at 1600px: 48/112/96/112/191/281/251/401 = 1492px, no horizontal scroll. On narrower screens
     (e.g. 1366px) the table is wider than the screen and scrolls sideways. Long role lists and multiple emails
     wrap onto a second line instead of widening the column. CTC at 250px is much wider than the badge needs
-    (~60px) - a deliberate user number.
+    (~60px) - a deliberate user number. **Revised again the same day** ("why so much gap" - the 250px CTC
+    column left the centred badge ~75px of empty space each side): Company Name 210px, Job Role 250px, CTC
+    130px, Email = whatever width is left (no fixed width; left-aligned so the spare width is blank space at the
+    far right edge, not a gap between columns). Measured: 1600px -> 48/112/96/112/210/250/130/534 = 1492px,
+    1366px -> Email 300px, table 1258px; no horizontal scroll at either size.
 
 ## 6. Module map
 ## 6. Module map

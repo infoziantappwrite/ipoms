@@ -269,10 +269,10 @@ export function MyPositivesTab({
                   <th className="py-3 px-[15px] w-28 text-center">Date</th>
                   <th className="py-3 px-[15px] w-24 text-center">Time</th>
                   <th className="py-3 px-[15px] w-28 text-center">College</th>
-                  <th className="py-3 px-[15px] w-[190px]">Company Name</th>
-                  <th className="py-3 px-[15px] w-[280px]">Job Role</th>
-                  <th className="py-3 px-[15px] w-[250px] text-center">CTC</th>
-                  <th className="py-3 px-[15px] w-[400px]">Email ID (Maintain Log)</th>
+                  <th className="py-3 px-[15px] w-[210px]">Company Name</th>
+                  <th className="py-3 px-[15px] w-[250px]">Job Role</th>
+                  <th className="py-3 px-[15px] w-[130px] text-center">CTC</th>
+                  <th className="py-3 px-[15px]">Email ID (Maintain Log)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
