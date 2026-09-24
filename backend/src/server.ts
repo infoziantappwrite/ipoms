@@ -234,7 +234,9 @@ app.get('/api/v1/health', (req: Request, res: Response) => {
 });
 
 // Metadata Contact Audit Endpoint
-app.get('/api/v1/meta-audit', async (req: Request, res: Response) => {
+// Registered ABOVE the global authenticateJWT mount, so it carries its own gate: until
+// 24 Sep 2026 this returned every flagged HR name/phone/email to anonymous callers.
+app.get('/api/v1/meta-audit', authenticateJWT, authorizeRoles('ADMINISTRATOR'), async (req: Request, res: Response) => {
   try {
     const allRecords = await CompanyMetadata.find({ is_deleted: { $ne: true } }).lean();
     const suspiciousRecords: any[] = [];
@@ -314,7 +316,9 @@ app.get('/api/v1/meta-audit', async (req: Request, res: Response) => {
 });
 
 // 1b. Duplicate Company Audit across Active Leads & Master Sources
-app.get('/health/duplicate-audit', async (req: Request, res: Response) => {
+// Same position/problem as /meta-audit above (and outside /api/v1, so the policy table
+// never sees it) — was anonymous, returning the Active Leads duplicate report.
+app.get('/health/duplicate-audit', authenticateJWT, authorizeRoles('ADMINISTRATOR'), async (req: Request, res: Response) => {
   try {
     const leads = await ActiveLead.find({ is_deleted: false }).lean();
     const weeklyTrackers = await WeeklyTracker.find({ is_deleted: false }).select('company_name job_role ctc_lpa pipeline_section academic_year').lean();
@@ -14834,6 +14838,11 @@ const ensureDefaultAccounts = async () => {
           await mohanaDoc.save();
         }
 
+        // Business-data rewrite — opt-in only (REATTRIBUTE_TRACKER_ON_BOOT=true). Boot runs on
+        // every crash-restart, deploy and file save, and these two updates silently overrode
+        // whoever really owned a call (the ACET one moved EVERY row, whoever entered it).
+        // See CLAUDE.md traps 10/29: startup must never mutate business data.
+        if (process.env.REATTRIBUTE_TRACKER_ON_BOOT === 'true') {
         const acetDoc = targetCollegeDocs.find((c) => c.college_code === 'ACET');
         if (acetDoc) {
           await DailyTracker.updateMany(
@@ -14858,6 +14867,7 @@ const ensureDefaultAccounts = async () => {
           },
           { $set: { coordinator_id: mohanaDoc._id } }
         );
+        }
       }
     }
 

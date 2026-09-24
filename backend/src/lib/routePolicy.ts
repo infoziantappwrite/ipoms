@@ -124,6 +124,7 @@ const POLICIES: Policy[] = [
   // mount in server.ts, so it carries its own authenticateJWT/authorizeRoles;
   // this entry keeps it visible to the coverage check.
   { method: 'GET',    pattern: /^\/health\/daily-leads-diagnostics\/?$/, roles: ADMIN },
+  { method: 'GET',    pattern: /^\/meta-audit\/?$/,                      roles: ADMIN },
   { method: '*',      pattern: /^\/weekly-tracker(\/.*)?$/,              roles: STAFF },
 
   // ── Daily Leads & Active Leads ────────────────────────────────────────────
@@ -149,6 +150,8 @@ const POLICIES: Policy[] = [
   // Any staff member may call this; WHICH coordinator's data comes back is
   // decided by ownership scoping in the handler, not here.
   { method: 'GET',    pattern: /^\/dashboard\/coordinator\/?$/,          roles: STAFF },
+  { method: 'GET',    pattern: /^\/dashboard\/coordinator\/clock-duration\/?$/,   roles: STAFF },
+  { method: 'GET',    pattern: /^\/dashboard\/coordinator\/duration-history\/?$/, roles: STAFF },
 
   // ── Assigned Work ─────────────────────────────────────────────────────────
   // Creating an assignment is a Team Leader action (Module 07 §8); acting on

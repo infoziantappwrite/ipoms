@@ -1455,6 +1455,50 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     rows (admin-owned → Mohanaradha for her 4 colleges) on every boot — another
     business-data write at startup, contrary to trap 10's rule.
 
+54. **Saved chips in `MultiTagInput` are now editable in place, 24 Sep 2026 (user-requested).**
+    In Daily Tracker's Add Contact Entry (and every other user of the shared chip input —
+    mobile numbers, HR names, emails), a wrong value committed with Enter could only be fixed
+    by deleting the chip and retyping from scratch. Clicking a chip's **text** (not the ×) now
+    turns it into an inline text box with the caret at the end. Enter/Tab saves, Escape
+    cancels, emptying it removes the entry, blur saves if valid. The edit goes through the
+    same `validator` as a new entry, so a bad number is refused with the same warning and
+    never saved. On blur with an invalid value the original is kept; a duplicate of another
+    chip is also discarded. The × button, Backspace-on-empty, paste and `disabled` behaviour
+    are unchanged (disabled chips are not clickable). Frontend only, `MultiTagInput.tsx` only.
+    `tsc --noEmit` clean for that file. **Not verified in a browser** — the in-app preview was
+    stuck on a blank 0×0 page again (same tooling failure as items 35/38); confirmed only by
+    typecheck and code trace, so click a chip in a real session to check it.
+
+55. ~~**Two anonymous endpoints leaked data, and the calling-time widget 403'd for everyone.**~~
+    **FIXED 24 Sep 2026 (found by a full checkup).** (a) `GET /api/v1/meta-audit`
+    (added in `45d307e`) sat above the `authenticateJWT` mount and returned every flagged
+    company's HR name, phone and email — 487 records — to a caller with no token. (b)
+    `GET /health/duplicate-audit` (no `/api/v1` prefix, so the policy table can't see it
+    either) returned the Active Leads duplicate report, 236 KB, anonymously. Both now carry
+    their own `authenticateJWT, authorizeRoles('ADMINISTRATOR')` (the same pattern as
+    `daily-leads-diagnostics`), and `/meta-audit` also has a policy entry. **Lesson, third
+    time: any route registered above the `app.use('/api/v1', authenticateJWT)` line needs its
+    own middleware; `verify:policy` only proves routes have a policy, not that the gate runs.**
+    (c) `GET /dashboard/coordinator/clock-duration` and `/duration-history` had no policy
+    entry, so default-deny returned 403 to every role and the Dedicated Calling Time widget
+    was dead — added (`STAFF`; handlers already `scopeToSelf`). Verified live: both audit
+    routes anon 401 / coordinator 403 / admin 200; both duration routes coordinator 200
+    with real data. `verify:policy` 108/108, `tsc --noEmit` clean.
+
+56. **Checkup follow-ups, 24 Sep 2026.** (a) ~~Boot rewrote Daily Tracker ownership~~ —
+    `ensureDefaultAccounts` re-attributed **every** ACET row to Mohanaradha (whoever entered
+    it) and every admin-owned row in her other three colleges on each start. Now behind
+    **`REATTRIBUTE_TRACKER_ON_BOOT=true`**, default off (trap 10/29 rule). Rows already moved
+    stay moved; new admin-owned rows for those colleges will no longer be auto-moved.
+    (b) `AddCompanyModal.tsx` (another tool's uncommitted WIP) lost its `companyType` state
+    line, breaking `tsc` in 6 places; restored that one line only — **its other WIP
+    (stipend/LPA "Both" CTC mode) is still uncommitted and unreviewed.** (c) Backend
+    `npm audit fix` (non-breaking, lockfile only): 7 → 3 advisories (express/body-parser/qs/
+    morgan cleared). Remaining and deliberately not forced: `xlsx` high (no upstream fix, both
+    sides), `exceljs`/`uuid` (fix is a *downgrade*), frontend `next` critical/`postcss` high
+    (fix is a major jump to Next 16 — needs its own migration), `@capacitor/cli` moderate.
+    `nodemailer` was already on a fixed version (9.1.1).
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

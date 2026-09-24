@@ -51,6 +51,14 @@ export function MultiTagInput({
   const [hasError, setHasError] = useState(false);
   const internalInputRef = useRef<HTMLInputElement>(null);
 
+  // In-place editing of an existing tag: click a saved number/email/name, fix it, press
+  // Enter. Before this the only way to correct a typo was to delete the whole tag and
+  // retype it from scratch.
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
+  const editingRef = useRef<number | null>(null);
+
   const setCombinedRef = useCallback(
     (element: HTMLInputElement | null) => {
       (internalInputRef as any).current = element;
@@ -116,6 +124,66 @@ export function MultiTagInput({
     internalInputRef.current?.focus();
   };
 
+  const startEdit = (idx: number) => {
+    if (disabled) return;
+    editingRef.current = idx;
+    setEditingIdx(idx);
+    setEditValue(values[idx]);
+    // focus + select-at-end after the inline input mounts
+    setTimeout(() => {
+      const el = editInputRef.current;
+      if (el) {
+        el.focus();
+        const len = el.value.length;
+        el.setSelectionRange(len, len);
+      }
+    }, 0);
+  };
+
+  const cancelEdit = () => {
+    editingRef.current = null;
+    setEditingIdx(null);
+    setEditValue('');
+  };
+
+  // Returns true when the edit is finished (saved, removed or cancelled); false when the
+  // value was invalid and the user should keep fixing it.
+  const commitEdit = (keepOpenOnError: boolean): boolean => {
+    const idx = editingRef.current;
+    if (idx === null) return true;
+    const raw = editValue.trim();
+    if (!raw) {
+      // Emptied out completely = remove this entry
+      onChange(values.filter((_, i) => i !== idx));
+      cancelEdit();
+      return true;
+    }
+    let normalized = type === 'email' ? raw.toLowerCase() : raw;
+    if (validator) {
+      const res = validator(raw);
+      if (!res.valid) {
+        const msg = res.error || `Invalid entry: "${raw}"`;
+        setHasError(true);
+        setTimeout(() => setHasError(false), 2000);
+        if (onError) onError(msg);
+        else toast(msg, 'warning');
+        if (keepOpenOnError) return false;
+        cancelEdit(); // blur with a bad value: keep the original, never save a bad one
+        return true;
+      }
+      normalized = res.normalized;
+    }
+    if (values.some((v, i) => i !== idx && v === normalized)) {
+      cancelEdit(); // would duplicate another entry — keep the original
+      return true;
+    }
+    if (normalized !== values[idx]) {
+      onChange(values.map((v, i) => (i === idx ? normalized : v)));
+    }
+    cancelEdit();
+    return true;
+  };
+
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (disabled) return;
 
@@ -174,14 +242,47 @@ export function MultiTagInput({
       )}
 
       {/* Rendered Tag Badges */}
-      {values.map((tag, idx) => (
+      {values.map((tag, idx) => editingIdx === idx ? (
+        <input
+          key={`edit-${idx}`}
+          ref={editInputRef}
+          type="text"
+          value={editValue}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === 'Tab') {
+              e.preventDefault();
+              if (commitEdit(true)) internalInputRef.current?.focus();
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              e.stopPropagation();
+              cancelEdit();
+              internalInputRef.current?.focus();
+            }
+          }}
+          onBlur={() => commitEdit(false)}
+          size={Math.max(6, editValue.length + 1)}
+          aria-label={`Edit ${tag}`}
+          className={`px-2 py-0.5 rounded-lg bg-surface border border-primary text-primary font-medium text-xs outline-none ring-2 ring-primary/20 ${
+            isMono ? 'font-mono' : ''
+          }`}
+        />
+      ) : (
         <span
           key={`${tag}-${idx}`}
           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary/10 text-primary border border-primary/20 font-medium text-xs select-none transition-all animate-in fade-in zoom-in-95 duration-100 ${
             isMono ? 'font-mono' : ''
           }`}
         >
-          <span className="truncate max-w-[200px]" title={tag}>
+          <span
+            className={`truncate max-w-[200px] ${disabled ? '' : 'cursor-text hover:underline decoration-dotted underline-offset-2'}`}
+            title={disabled ? tag : `${tag} — click to edit`}
+            onClick={(e) => {
+              e.stopPropagation();
+              startEdit(idx);
+            }}
+          >
             {tag}
           </span>
           {!disabled && (
