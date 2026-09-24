@@ -5374,16 +5374,32 @@ app.patch('/api/v1/weekly-tracker/reorder', async (req: Request, res: Response) 
 });
 
 // ── WT-6: DELETE /api/v1/weekly-tracker/:id
-// Soft delete record to recycle bin
+// Soft delete record to recycle bin (or remove from top_companies if requested via ?section=top_companies)
 app.delete('/api/v1/weekly-tracker/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const { section } = req.query;
     const row = await WeeklyTracker.findById(id);
 
     if (!row || row.is_deleted) {
       return res.status(404).json({
         success: false,
         error: { code: 'NOT_FOUND', message: 'Weekly tracker record not found' },
+      });
+    }
+
+    // If deletion is specifically from top_companies section, unpin from top companies
+    // and ensure it stays safely intact in the pipeline section.
+    if (section === 'top_companies') {
+      row.is_pinned_top = false;
+      if (row.pipeline_section === 'top_companies') {
+        row.pipeline_section = 'pipeline';
+      }
+      await row.save();
+      return res.status(200).json({
+        success: true,
+        message: `${row.company_name} removed from Top Companies (retained in Pipeline)`,
+        data: { id: row._id, is_pinned_top: false, pipeline_section: row.pipeline_section },
       });
     }
 
@@ -5440,7 +5456,7 @@ app.delete('/api/v1/weekly-tracker/:id', async (req: Request, res: Response) => 
 // ── WT-6B: POST /api/v1/weekly-tracker/batch-delete
 app.post('/api/v1/weekly-tracker/batch-delete', async (req: Request, res: Response) => {
   try {
-    const { ids } = req.body;
+    const { ids, section } = req.body;
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({
         success: false,
@@ -5451,6 +5467,30 @@ app.post('/api/v1/weekly-tracker/batch-delete', async (req: Request, res: Respon
     const objectIds = ids
       .filter((id: string) => Types.ObjectId.isValid(id))
       .map((id: string) => new Types.ObjectId(id));
+
+    if (section === 'top_companies') {
+      await WeeklyTracker.updateMany(
+        { _id: { $in: objectIds } },
+        {
+          $set: {
+            is_pinned_top: false,
+          },
+        }
+      );
+      await WeeklyTracker.updateMany(
+        { _id: { $in: objectIds }, pipeline_section: 'top_companies' },
+        {
+          $set: {
+            pipeline_section: 'pipeline',
+          },
+        }
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: `${objectIds.length} record(s) removed from Top Companies (retained in Pipeline)`,
+      });
+    }
 
     const rowsToDelete = await WeeklyTracker.find({ _id: { $in: objectIds } });
 
@@ -12588,6 +12628,13 @@ app.post('/api/v1/metadata', async (req: Request, res: Response) => {
 app.patch('/api/v1/metadata/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER', 'TEAM_LEAD', 'PLACEMENT_COORDINATOR', 'COORDINATOR'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    if (!Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_ID', message: 'Invalid metadata ID format' },
+      });
+    }
+
     const {
       company_name,
       hr_name,
@@ -12637,97 +12684,6 @@ app.patch('/api/v1/metadata/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR
   }
 });
 
-// ── MD-4: DELETE /api/v1/metadata/:id
-// Soft delete record to Recycle Bin (Spec Section 17)
-app.delete('/api/v1/metadata/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER', 'TEAM_LEAD', 'PLACEMENT_COORDINATOR', 'COORDINATOR'), async (req: Request, res: Response) => {
-  try {
-    // Only Mohanaradha among coordinators has rights to delete from metadata
-    const user = (req as any).user;
-    const isCoordOnly = user?.roles?.some((r: string) => ['PLACEMENT_COORDINATOR', 'COORDINATOR'].includes(r)) &&
-      !user?.roles?.some((r: string) => ['ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER', 'TEAM_LEAD'].includes(r));
-
-    if (isCoordOnly) {
-      const isMohana =
-        (user?.email || '').toLowerCase().includes('mohanaradha') ||
-        (user?.fullName || '').toLowerCase().includes('mohana');
-      if (!isMohana) {
-        return res.status(403).json({
-          success: false,
-          error: {
-            code: 'FORBIDDEN',
-            message: 'Access Denied: Only A. Mohanaradha among coordinators has authorization to delete from the Master Metadata Database.',
-          },
-        });
-      }
-    }
-
-    const { id } = req.params;
-    const record = await CompanyMetadata.findById(id);
-
-    if (!record) {
-      return res.status(404).json({
-        success: false,
-        error: { code: 'NOT_FOUND', message: 'Metadata record not found' },
-      });
-    }
-
-    record.is_deleted = true;
-    record.deleted_at = new Date();
-    record.deleted_by = (req as any).user?.userId ? new Types.ObjectId((req as any).user.userId) : null;
-    await record.save();
-
-    return res.status(200).json({
-      success: true,
-      message: `Company "${record.company_name}" moved to Recycle Bin`,
-    });
-  } catch (error: any) {
-    return res.status(500).json({
-      success: false,
-      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to soft delete metadata record' },
-    });
-  }
-});
-
-// ── MD-5: POST /api/v1/metadata/:id/restore
-// Restore record from Recycle Bin (Spec Section 17)
-app.post('/api/v1/metadata/:id/restore', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER', 'TEAM_LEAD', 'PLACEMENT_COORDINATOR', 'COORDINATOR'), async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const record = await CompanyMetadata.findById(id);
-
-    if (!record) {
-      return res.status(404).json({
-        success: false,
-        error: { code: 'NOT_FOUND', message: 'Metadata record not found' },
-      });
-    }
-
-    // A coordinator may only restore what they themselves deleted; Admin and
-    // Team Leader (isSupervisor) may restore anything. Records deleted before
-    // this field existed have deleted_by=null, which reads as "unowned" and
-    // is refused for a non-supervisor — the same fail-closed default as
-    // refuseForeignOwner uses everywhere else.
-    if (refuseForeignOwner(req, res, record.deleted_by ? String(record.deleted_by) : undefined,
-      'You can only restore records you deleted yourself.')) return;
-
-    record.is_deleted = false;
-    record.deleted_at = null;
-    record.deleted_by = null;
-    await record.save();
-
-    return res.status(200).json({
-      success: true,
-      message: `Company "${record.company_name}" successfully restored from Recycle Bin`,
-      data: record,
-    });
-  } catch (error: any) {
-    return res.status(500).json({
-      success: false,
-      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to restore metadata record' },
-    });
-  }
-});
-
 // ── MD-6A: DELETE /api/v1/metadata/purge-all
 // Empty Recycle Bin: Permanently purge all soft-deleted records from database at once
 app.delete('/api/v1/metadata/purge-all', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER', 'TEAM_LEAD', 'PLACEMENT_COORDINATOR', 'COORDINATOR'), async (req: Request, res: Response) => {
@@ -12766,6 +12722,111 @@ app.delete('/api/v1/metadata/purge-all', authenticateJWT, authorizeRoles('ADMINI
   }
 });
 
+// ── MD-4: DELETE /api/v1/metadata/:id
+// Soft delete record to Recycle Bin (Spec Section 17)
+app.delete('/api/v1/metadata/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER', 'TEAM_LEAD', 'PLACEMENT_COORDINATOR', 'COORDINATOR'), async (req: Request, res: Response) => {
+  try {
+    // Only Mohanaradha among coordinators has rights to delete from metadata
+    const user = (req as any).user;
+    const isCoordOnly = user?.roles?.some((r: string) => ['PLACEMENT_COORDINATOR', 'COORDINATOR'].includes(r)) &&
+      !user?.roles?.some((r: string) => ['ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER', 'TEAM_LEAD'].includes(r));
+
+    if (isCoordOnly) {
+      const isMohana =
+        (user?.email || '').toLowerCase().includes('mohanaradha') ||
+        (user?.fullName || '').toLowerCase().includes('mohana');
+      if (!isMohana) {
+        return res.status(403).json({
+          success: false,
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Access Denied: Only A. Mohanaradha among coordinators has authorization to delete from the Master Metadata Database.',
+          },
+        });
+      }
+    }
+
+    const { id } = req.params;
+    if (!Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_ID', message: 'Invalid metadata ID format' },
+      });
+    }
+
+    const record = await CompanyMetadata.findById(id);
+
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Metadata record not found' },
+      });
+    }
+
+    record.is_deleted = true;
+    record.deleted_at = new Date();
+    record.deleted_by = (req as any).user?.userId ? new Types.ObjectId((req as any).user.userId) : null;
+    await record.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Company "${record.company_name}" moved to Recycle Bin`,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to soft delete metadata record' },
+    });
+  }
+});
+
+// ── MD-5: POST /api/v1/metadata/:id/restore
+// Restore record from Recycle Bin (Spec Section 17)
+app.post('/api/v1/metadata/:id/restore', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER', 'TEAM_LEAD', 'PLACEMENT_COORDINATOR', 'COORDINATOR'), async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_ID', message: 'Invalid metadata ID format' },
+      });
+    }
+
+    const record = await CompanyMetadata.findById(id);
+
+    if (!record) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Metadata record not found' },
+      });
+    }
+
+    // A coordinator may only restore what they themselves deleted; Admin and
+    // Team Leader (isSupervisor) may restore anything. Records deleted before
+    // this field existed have deleted_by=null, which reads as "unowned" and
+    // is refused for a non-supervisor — the same fail-closed default as
+    // refuseForeignOwner uses everywhere else.
+    if (refuseForeignOwner(req, res, record.deleted_by ? String(record.deleted_by) : undefined,
+      'You can only restore records you deleted yourself.')) return;
+
+    record.is_deleted = false;
+    record.deleted_at = null;
+    record.deleted_by = null;
+    await record.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `Company "${record.company_name}" successfully restored from Recycle Bin`,
+      data: record,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to restore metadata record' },
+    });
+  }
+});
+
 // ── MD-6: DELETE /api/v1/metadata/:id/purge
 // Permanently purge record from database (Spec Section 17)
 app.delete('/api/v1/metadata/:id/purge', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN', 'TEAM_LEADER', 'TEAM_LEAD', 'PLACEMENT_COORDINATOR', 'COORDINATOR'), async (req: Request, res: Response) => {
@@ -12791,6 +12852,13 @@ app.delete('/api/v1/metadata/:id/purge', authenticateJWT, authorizeRoles('ADMINI
     }
 
     const { id } = req.params;
+    if (!Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_ID', message: 'Invalid metadata ID format' },
+      });
+    }
+
     const record = await CompanyMetadata.findByIdAndDelete(id);
 
     if (!record) {

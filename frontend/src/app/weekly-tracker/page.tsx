@@ -510,15 +510,16 @@ export default function WeeklyTrackerPage() {
   };
 
   // ── Delete Row (Soft delete) with Undo / Redo
-  const handleDeleteRow = async (rowId: string, isUndoRedo = false) => {
+  const handleDeleteRow = async (rowId: string, isUndoRedo = false, fromSectionKey?: string) => {
     if (!isUndoRedo && isForeignCollege) {
-      executeWithForeignCheck('delete', () => performDeleteRow(rowId, isUndoRedo));
+      executeWithForeignCheck('delete', () => performDeleteRow(rowId, isUndoRedo, fromSectionKey));
       return;
     }
-    await performDeleteRow(rowId, isUndoRedo);
+    await performDeleteRow(rowId, isUndoRedo, fromSectionKey);
   };
 
-  const performDeleteRow = async (rowId: string, isUndoRedo = false) => {
+  const performDeleteRow = async (rowId: string, isUndoRedo = false, fromSectionKey?: string) => {
+    const isFromTopCompanies = fromSectionKey === 'top_companies';
 
     let deletedRow: WeeklyRow | undefined;
     if (sections) {
@@ -535,47 +536,87 @@ export default function WeeklyTrackerPage() {
 
     if (!isUndoRedo && deletedRow) {
       const companyName = deletedRow.company_name || 'company';
-      pushAction({
-        description: `Delete "${companyName}"`,
-        undo: async () => {
-          await apiFetch(`/weekly-tracker/${rowId}/restore`, { method: 'POST' });
-          await loadWeeklyTracker();
-          await loadKpi();
-          broadcastWeeklyMutation();
-        },
-        redo: async () => {
-          await apiFetch(`/weekly-tracker/${rowId}`, { method: 'DELETE' });
-          await loadWeeklyTracker();
-          await loadKpi();
-          broadcastWeeklyMutation();
-        },
-      });
+      if (isFromTopCompanies) {
+        pushAction({
+          description: `Remove "${companyName}" from Top Companies`,
+          undo: async () => {
+            await apiFetch(`/weekly-tracker/${rowId}/pin`, { method: 'PATCH' });
+            await loadWeeklyTracker();
+            await loadKpi();
+            broadcastWeeklyMutation();
+          },
+          redo: async () => {
+            await apiFetch(`/weekly-tracker/${rowId}?section=top_companies`, { method: 'DELETE' });
+            await loadWeeklyTracker();
+            await loadKpi();
+            broadcastWeeklyMutation();
+          },
+        });
+      } else {
+        pushAction({
+          description: `Delete "${companyName}"`,
+          undo: async () => {
+            await apiFetch(`/weekly-tracker/${rowId}/restore`, { method: 'POST' });
+            await loadWeeklyTracker();
+            await loadKpi();
+            broadcastWeeklyMutation();
+          },
+          redo: async () => {
+            await apiFetch(`/weekly-tracker/${rowId}`, { method: 'DELETE' });
+            await loadWeeklyTracker();
+            await loadKpi();
+            broadcastWeeklyMutation();
+          },
+        });
+      }
     }
 
     // Optimistic removal
     setSections((prev) => {
       if (!prev) return prev;
       const nextState: any = { ...prev };
-      for (const secKey of Object.keys(prev) as (keyof SectionsResponse)[]) {
-        const sec = prev[secKey];
-        if (sec && Array.isArray(sec.rows) && sec.rows.some((r) => r._id === rowId)) {
-          nextState[secKey] = {
-            ...sec,
-            rows: sec.rows.filter((r) => r._id !== rowId),
+      if (isFromTopCompanies) {
+        // ONLY remove from top_companies, KEEP in pipeline (unpinned)
+        if (nextState.top_companies && Array.isArray(nextState.top_companies.rows)) {
+          nextState.top_companies = {
+            ...nextState.top_companies,
+            rows: nextState.top_companies.rows.filter((r: WeeklyRow) => r._id !== rowId),
           };
+        }
+        if (nextState.pipeline && Array.isArray(nextState.pipeline.rows)) {
+          nextState.pipeline = {
+            ...nextState.pipeline,
+            rows: nextState.pipeline.rows.map((r: WeeklyRow) =>
+              r._id === rowId ? { ...r, is_pinned_top: false, pipeline_section: 'pipeline' } : r
+            ),
+          };
+        }
+      } else {
+        for (const secKey of Object.keys(prev) as (keyof SectionsResponse)[]) {
+          const sec = prev[secKey];
+          if (sec && Array.isArray(sec.rows) && sec.rows.some((r) => r._id === rowId)) {
+            nextState[secKey] = {
+              ...sec,
+              rows: sec.rows.filter((r) => r._id !== rowId),
+            };
+          }
         }
       }
       return normalizeAllSections(nextState);
     });
 
     try {
-      const res = await apiFetch(`/weekly-tracker/${rowId}`, {
+      const url = isFromTopCompanies ? `/weekly-tracker/${rowId}?section=top_companies` : `/weekly-tracker/${rowId}`;
+      const res = await apiFetch(url, {
         method: 'DELETE',
       });
       if (res.success) {
         await loadWeeklyTracker();
         await loadKpi();
         broadcastWeeklyMutation();
+        if (isFromTopCompanies && !isUndoRedo) {
+          toast('Removed company from Top Companies (retained in Pipeline)', 'success');
+        }
       }
     } catch (err) {
       console.error('Failed to delete row:', err);
@@ -591,15 +632,26 @@ export default function WeeklyTrackerPage() {
   const handleConfirmBulkDelete = async () => {
     if (selectedRowIds.length === 0) return;
     const idsToDelete = [...selectedRowIds];
+    const topCompanyRowIds = new Set((sections?.top_companies?.rows || []).map((r) => r._id));
+    const isTopCompaniesBulk = idsToDelete.length > 0 && idsToDelete.every((id) => topCompanyRowIds.has(id));
     setIsDeleteConfirmModalOpen(false);
 
     pushAction({
-      description: `Deleted ${idsToDelete.length} company records`,
+      description: isTopCompaniesBulk
+        ? `Removed ${idsToDelete.length} company records from Top Companies`
+        : `Deleted ${idsToDelete.length} company records`,
       undo: async () => {
-        await apiFetch('/weekly-tracker/batch-restore', {
-          method: 'POST',
-          body: JSON.stringify({ ids: idsToDelete }),
-        });
+        if (isTopCompaniesBulk) {
+          await apiFetch('/weekly-tracker/batch-move-section', {
+            method: 'POST',
+            body: JSON.stringify({ row_ids: idsToDelete, pipeline_section: 'top_companies' }),
+          });
+        } else {
+          await apiFetch('/weekly-tracker/batch-restore', {
+            method: 'POST',
+            body: JSON.stringify({ ids: idsToDelete }),
+          });
+        }
         await loadWeeklyTracker();
         await loadKpi();
         broadcastWeeklyMutation();
@@ -607,7 +659,7 @@ export default function WeeklyTrackerPage() {
       redo: async () => {
         await apiFetch('/weekly-tracker/batch-delete', {
           method: 'POST',
-          body: JSON.stringify({ ids: idsToDelete }),
+          body: JSON.stringify({ ids: idsToDelete, section: isTopCompaniesBulk ? 'top_companies' : undefined }),
         });
         await loadWeeklyTracker();
         await loadKpi();
@@ -619,7 +671,7 @@ export default function WeeklyTrackerPage() {
     try {
       const res = await apiFetch('/weekly-tracker/batch-delete', {
         method: 'POST',
-        body: JSON.stringify({ ids: idsToDelete }),
+        body: JSON.stringify({ ids: idsToDelete, section: isTopCompaniesBulk ? 'top_companies' : undefined }),
       });
       if (res.success) {
         setSelectedRowIds([]);
@@ -627,7 +679,12 @@ export default function WeeklyTrackerPage() {
         await loadWeeklyTracker();
         await loadKpi();
         broadcastWeeklyMutation();
-        toast(`Deleted ${idsToDelete.length} company record${idsToDelete.length > 1 ? 's' : ''}`, 'success');
+        toast(
+          isTopCompaniesBulk
+            ? `Removed ${idsToDelete.length} company record${idsToDelete.length > 1 ? 's' : ''} from Top Companies (retained in Pipeline)`
+            : `Deleted ${idsToDelete.length} company record${idsToDelete.length > 1 ? 's' : ''}`,
+          'success'
+        );
       }
     } catch (err) {
       console.error('Failed to bulk delete rows:', err);

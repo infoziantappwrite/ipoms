@@ -2,13 +2,12 @@
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Sparkles, Calendar, Search, Building2, User, Phone, Mail, FileText, CheckCircle2, ChevronDown, Trophy, ArrowRightCircle, Check, Filter } from 'lucide-react';
+import { Sparkles, Calendar, Search, Building2, User, Phone, Mail, FileText, CheckCircle2, ChevronDown, Trophy, ArrowRightCircle, Check, Filter, Clock } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { SmoothDatePicker } from '@/components/ui/SmoothDatePicker';
 import { DailyLeadRow, CollegeOption } from './LeadsTable';
 import { useToast } from '@/components/ui/Toast';
-
-import { getCoordinatorSelectedColleges } from '@/lib/collegeSession';
+import { readSessionUser } from '@/lib/session';
+import { getCoordinatorSelectedColleges, getDefaultOfficialCollegeIdsForUser } from '@/lib/collegeSession';
 
 interface Props {
   selectedDate: string;
@@ -17,6 +16,21 @@ interface Props {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   onUpdateRow: (rowId: string, patch: Partial<DailyLeadRow>) => Promise<void>;
+}
+
+function formatLeadDate(dateStr?: string | Date | null): string {
+  if (!dateStr) return '—';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return String(dateStr);
+    return d.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  } catch {
+    return String(dateStr);
+  }
 }
 
 export function MyPositivesTab({
@@ -29,15 +43,38 @@ export function MyPositivesTab({
 }: Props) {
   const { toast } = useToast();
   const [selectedCollegeId, setSelectedCollegeId] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState<string>('all'); // 'all' = All Time / All Dates
   const [leads, setLeads] = useState<DailyLeadRow[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [editingEmailId, setEditingEmailId] = useState<string | null>(null);
   const [emailValue, setEmailValue] = useState<string>('');
 
-  // Filter colleges to only show user's focus colleges
+  // Filter colleges to only show user's focus/handled colleges
   const focusColleges = useMemo(() => {
+    const user = readSessionUser();
+    const isAdminOrLeader =
+      Boolean((user as any)?.has_all_colleges_access) ||
+      (user as any)?.role_codes?.includes('ADMINISTRATOR') ||
+      (user as any)?.role_codes?.includes('ADMIN') ||
+      (user as any)?.role === 'admin';
+
     const focusIds = getCoordinatorSelectedColleges();
-    if (focusIds.length === 0) return colleges;
+    if (focusIds.length === 0) {
+      if (isAdminOrLeader) return colleges;
+      const defaultIds = getDefaultOfficialCollegeIdsForUser(user);
+      if (defaultIds.length > 0) {
+        const filtered = colleges.filter((c) =>
+          defaultIds.some(
+            (fid) =>
+              fid === c._id ||
+              fid === c.college_code ||
+              fid.toUpperCase() === (c.college_code || '').toUpperCase()
+          )
+        );
+        if (filtered.length > 0) return filtered;
+      }
+      return colleges;
+    }
     const filtered = colleges.filter((c) =>
       focusIds.some(
         (fid) =>
@@ -49,14 +86,16 @@ export function MyPositivesTab({
     return filtered.length > 0 ? filtered : colleges;
   }, [colleges]);
 
-  // Fetch Positives for the selected date & college
+  // Fetch Positives for the selected college and date filter (defaults to all-time cumulative)
   const loadMyPositives = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        date: selectedDate,
         lead_type: 'positive',
       });
+      if (dateFilter !== 'all') {
+        params.set('date', dateFilter);
+      }
       if (selectedCollegeId !== 'all') {
         params.set('college_id', selectedCollegeId);
       }
@@ -67,25 +106,36 @@ export function MyPositivesTab({
       const res = await apiFetch(`/daily-leads?${params.toString()}`);
       if (res.success && res.data) {
         const rawLeads: DailyLeadRow[] = (res.data as any).leads || [];
-        const focusIds = new Set(focusColleges.map((fc) => String(fc._id)));
-        const focusCodes = new Set(focusColleges.map((fc) => (fc.college_code || '').toUpperCase()).filter(Boolean));
+        const user = readSessionUser();
+        const isAdminOrLeader =
+          Boolean((user as any)?.has_all_colleges_access) ||
+          (user as any)?.role_codes?.includes('ADMINISTRATOR') ||
+          (user as any)?.role_codes?.includes('ADMIN') ||
+          (user as any)?.role === 'admin';
 
-        const filteredByFocus = rawLeads.filter((l) => {
-          const colObj = typeof l.college_id === 'object' ? l.college_id : null;
-          const colId = colObj ? String(colObj._id) : String(l.college_id || '');
-          const colCode = (colObj?.college_code || '').toUpperCase();
+        if (isAdminOrLeader && selectedCollegeId === 'all') {
+          setLeads(rawLeads);
+        } else {
+          const focusIds = new Set(focusColleges.map((fc) => String(fc._id)));
+          const focusCodes = new Set(focusColleges.map((fc) => (fc.college_code || '').toUpperCase()).filter(Boolean));
 
-          return focusIds.has(colId) || (colCode && focusCodes.has(colCode));
-        });
+          const filteredByFocus = rawLeads.filter((l) => {
+            const colObj = typeof l.college_id === 'object' ? l.college_id : null;
+            const colId = colObj ? String(colObj._id) : String(l.college_id || '');
+            const colCode = (colObj?.college_code || '').toUpperCase();
 
-        setLeads(filteredByFocus);
+            return focusIds.has(colId) || (colCode && focusCodes.has(colCode));
+          });
+
+          setLeads(filteredByFocus);
+        }
       }
     } catch (err) {
       console.error('Failed to load my positives:', err);
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, selectedCollegeId, searchQuery, focusColleges]);
+  }, [dateFilter, selectedCollegeId, searchQuery, focusColleges]);
 
   useEffect(() => {
     loadMyPositives();
@@ -93,13 +143,13 @@ export function MyPositivesTab({
 
   // Statistics calculation for the active selection
   const stats = useMemo(() => {
-    const todayPositivesCount = leads.length;
+    const totalPositivesCount = leads.length;
     const uniqueCollegesCount = new Set(
       leads.map((l) => (typeof l.college_id === 'object' ? l.college_id?._id : l.college_id)).filter(Boolean)
     ).size;
 
     return {
-      todayPositivesCount,
+      totalPositivesCount,
       uniqueCollegesCount,
     };
   }, [leads]);
@@ -121,17 +171,17 @@ export function MyPositivesTab({
       {/* ── Single Unified Header & Filter Control Bar ────────────────────────── */}
       <div className="bg-surface rounded-2xl border border-border p-3 shadow-2xs">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-center">
-          {/* Section 1: Today's Positives */}
+          {/* Section 1: Total Positives Logged */}
           <div className="flex items-center gap-2.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-2 w-full h-11">
             <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
               <Trophy size={15} strokeWidth={2.5} />
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider truncate">
-                Today's Positives Logged
+                Total Positives Logged
               </p>
               <p className="text-sm font-black text-emerald-900 dark:text-emerald-100 tabular-nums leading-tight">
-                {stats.todayPositivesCount}
+                {stats.totalPositivesCount}
               </p>
             </div>
           </div>
@@ -146,25 +196,17 @@ export function MyPositivesTab({
                 Focus Colleges Handled
               </p>
               <p className="text-sm font-black text-indigo-900 dark:text-indigo-100 tabular-nums leading-tight">
-                {selectedCollegeId === 'all' ? stats.uniqueCollegesCount : 1}
+                {selectedCollegeId === 'all' ? (stats.uniqueCollegesCount || focusColleges.length) : 1}
               </p>
             </div>
           </div>
 
-          {/* Section 3: Selected Date */}
-          <div className="flex items-center gap-2.5 bg-purple-500/10 border border-purple-500/20 rounded-xl px-3 py-2 w-full h-11">
-            <div className="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
-              <Calendar size={15} strokeWidth={2.5} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wider truncate">
-                Selected Date
-              </p>
-              <p className="text-xs font-bold text-purple-900 dark:text-purple-100 leading-tight truncate">
-                {selectedDate === 'all' ? 'All Dates' : selectedDate}
-              </p>
-            </div>
-          </div>
+          {/* Section 3: Date Filter Dropdown Selector (All Dates vs Selected Date) */}
+          <DateFilterCustomDropdown
+            dateFilter={dateFilter}
+            onSelectDateFilter={setDateFilter}
+            selectedDate={selectedDate}
+          />
 
           {/* Section 4: Focus College Custom Soft Solid Dropdown Selector */}
           <FocusCollegeCustomDropdown
@@ -179,7 +221,7 @@ export function MyPositivesTab({
       <div className="overflow-hidden bg-surface rounded-2xl border border-border shadow-2xs">
         {loading ? (
           <div className="p-12 text-center text-fg-subtle text-xs font-medium">
-            Loading positive logs for selected college date...
+            Loading positive leads history for your colleges...
           </div>
         ) : leads.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-12 text-center">
@@ -188,7 +230,9 @@ export function MyPositivesTab({
             </div>
             <h3 className="text-sm font-bold text-fg">No Positive Leads Found</h3>
             <p className="text-xs text-fg-subtle max-w-sm mt-1">
-              No positive outcomes or invite emails recorded for this college on the selected date.
+              {dateFilter === 'all'
+                ? 'No positive outcomes or invite emails recorded for the selected colleges yet.'
+                : `No positive outcomes or invite emails recorded on ${dateFilter}. Try selecting "All Dates (All-Time)".`}
             </p>
           </div>
         ) : (
@@ -197,12 +241,12 @@ export function MyPositivesTab({
               <thead>
                 <tr className="bg-surface-sunken/80 text-fg-muted font-bold border-b border-border uppercase tracking-wider text-[10px] select-none">
                   <th className="py-3 px-4 w-12 text-center">S.No</th>
-                  <th className="py-3 px-4 w-28 text-center">Time</th>
+                  <th className="py-3 px-4 w-28 text-center">Date</th>
+                  <th className="py-3 px-4 w-24 text-center">Time</th>
                   <th className="py-3 px-4 w-28 text-center">College</th>
                   <th className="py-3 px-4">Company Name</th>
                   <th className="py-3 px-4">Job Role</th>
                   <th className="py-3 px-4 w-28 text-center">CTC</th>
-                  <th className="py-3 px-4">Coordinator / HR Details</th>
                   <th className="py-3 px-4">Email ID (Maintain Log)</th>
                 </tr>
               </thead>
@@ -212,7 +256,6 @@ export function MyPositivesTab({
                     typeof row.college_id === 'object'
                       ? row.college_id?.college_code || row.college_id?.college_name
                       : 'COLLEGE';
-                  const coordinatorName = row.coordinator_id?.full_name || 'Placement Team';
 
                   return (
                     <tr key={row._id} className="hover:bg-surface-sunken/50 transition-colors">
@@ -220,7 +263,11 @@ export function MyPositivesTab({
                         {idx + 1}
                       </td>
 
-                      <td className="py-3 px-4 text-center font-semibold text-fg-subtle">
+                      <td className="py-3 px-4 text-center font-bold text-indigo-700 dark:text-indigo-300 whitespace-nowrap">
+                        {formatLeadDate(row.lead_date)}
+                      </td>
+
+                      <td className="py-3 px-4 text-center font-semibold text-fg-subtle whitespace-nowrap">
                         {row.event_time || '10:00 AM'}
                       </td>
 
@@ -248,10 +295,6 @@ export function MyPositivesTab({
                         )}
                       </td>
 
-                      <td className="py-3 px-4 text-xs">
-                        <div className="font-bold text-fg">{coordinatorName}</div>
-                      </td>
-
                       <td className="py-3 px-4">
                         {editingEmailId === row._id ? (
                           <div className="flex items-center gap-1.5">
@@ -266,7 +309,7 @@ export function MyPositivesTab({
                             <button
                               type="button"
                               onClick={() => handleSaveEmail(row._id)}
-                              className="px-2 py-1 bg-primary text-primary-foreground text-[10px] font-bold rounded-lg"
+                              className="px-2 py-1 bg-primary text-primary-foreground text-[10px] font-bold rounded-lg cursor-pointer"
                             >
                               Save
                             </button>
@@ -299,6 +342,155 @@ export function MyPositivesTab({
   );
 }
 
+interface DateDropdownProps {
+  dateFilter: string;
+  onSelectDateFilter: (d: string) => void;
+  selectedDate: string;
+}
+
+function DateFilterCustomDropdown({ dateFilter, onSelectDateFilter, selectedDate }: DateDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number; width: number; ready: boolean }>({
+    top: 0,
+    left: 0,
+    width: 200,
+    ready: false,
+  });
+
+  const updateCoords = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setCoords({
+      top: rect.bottom + 6,
+      left: rect.left,
+      width: Math.max(rect.width, 220),
+      ready: true,
+    });
+  }, []);
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isOpen) {
+      setIsOpen(false);
+      return;
+    }
+    updateCoords();
+    setIsOpen(true);
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        triggerRef.current &&
+        !triggerRef.current.contains(e.target as Node) &&
+        popoverRef.current &&
+        !popoverRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  const label = dateFilter === 'all' ? 'All Dates (All-Time)' : `Date: ${dateFilter}`;
+
+  return (
+    <div className="relative w-full h-11">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={handleToggle}
+        className={`w-full h-11 px-3 rounded-xl border flex items-center justify-between text-xs font-bold transition-all cursor-pointer select-none ${
+          dateFilter !== 'all'
+            ? 'bg-purple-500/15 border-purple-500/30 text-purple-700 dark:text-purple-300 ring-1 ring-purple-500/20'
+            : 'bg-purple-500/10 border-purple-500/20 text-purple-900 dark:text-purple-100 hover:bg-purple-500/15'
+        }`}
+      >
+        <div className="flex items-center gap-2 truncate">
+          <Calendar size={15} className="text-purple-600 dark:text-purple-400 shrink-0" />
+          <span className="truncate">{label}</span>
+        </div>
+        <ChevronDown
+          size={14}
+          className={`text-purple-600 dark:text-purple-400 shrink-0 transition-transform duration-200 ${
+            isOpen ? 'rotate-180' : ''
+          }`}
+        />
+      </button>
+
+      {isOpen &&
+        coords.ready &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={popoverRef}
+            style={{
+              position: 'fixed',
+              top: `${coords.top}px`,
+              left: `${coords.left}px`,
+              width: `${coords.width}px`,
+              zIndex: 99999,
+            }}
+            className="bg-white dark:bg-[#161D2E] border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150 text-fg select-none"
+          >
+            <div className="px-3.5 py-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/50 flex items-center justify-between text-[11px] font-extrabold text-purple-600 dark:text-purple-400 uppercase tracking-wider">
+              <span className="flex items-center gap-1.5">
+                <Calendar size={13} /> Timeline View
+              </span>
+            </div>
+
+            <div className="p-1.5 space-y-1 bg-white dark:bg-[#161D2E]">
+              {/* All Dates Option */}
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectDateFilter('all');
+                  setIsOpen(false);
+                }}
+                className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between font-bold transition-colors cursor-pointer ${
+                  dateFilter === 'all'
+                    ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 font-extrabold'
+                    : 'hover:bg-slate-100 dark:hover:bg-slate-800/80 text-fg'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-purple-600" />
+                  <span>All Dates (All-Time)</span>
+                </div>
+                {dateFilter === 'all' && <Check size={14} className="text-purple-600 dark:text-purple-400" />}
+              </button>
+
+              {/* Selected Date Option */}
+              <button
+                type="button"
+                onClick={() => {
+                  onSelectDateFilter(selectedDate);
+                  setIsOpen(false);
+                }}
+                className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between font-bold transition-colors cursor-pointer ${
+                  dateFilter === selectedDate
+                    ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 font-extrabold'
+                    : 'hover:bg-slate-100 dark:hover:bg-slate-800/80 text-fg'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-purple-400" />
+                  <span>Selected Date ({selectedDate})</span>
+                </div>
+                {dateFilter === selectedDate && <Check size={14} className="text-purple-600 dark:text-purple-400" />}
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
+    </div>
+  );
+}
+
 interface DropdownProps {
   selectedCollegeId: string;
   onSelect: (id: string) => void;
@@ -317,7 +509,7 @@ function FocusCollegeCustomDropdown({ selectedCollegeId, onSelect, colleges }: D
   });
 
   const selectedColObj = colleges.find((c) => c._id === selectedCollegeId);
-  const selectedLabel = selectedCollegeId === 'all' ? 'All Focus Colleges' : selectedColObj?.college_code || selectedColObj?.college_name || 'College';
+  const selectedLabel = selectedCollegeId === 'all' ? 'All Handled Colleges' : selectedColObj?.college_code || selectedColObj?.college_name || 'College';
 
   const updateCoords = useCallback(() => {
     if (!triggerRef.current) return;
@@ -400,7 +592,7 @@ function FocusCollegeCustomDropdown({ selectedCollegeId, onSelect, colleges }: D
             {/* Soft Header */}
             <div className="px-3.5 py-2.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/50 flex items-center justify-between text-[11px] font-extrabold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
               <span className="flex items-center gap-1.5">
-                <Building2 size={13} /> Filter Focus College
+                <Building2 size={13} /> Filter Handled College
               </span>
               <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400 font-bold">
                 {colleges.length}
@@ -424,7 +616,7 @@ function FocusCollegeCustomDropdown({ selectedCollegeId, onSelect, colleges }: D
               >
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-                  <span>All Focus Colleges</span>
+                  <span>All Handled Colleges</span>
                 </div>
                 {selectedCollegeId === 'all' && <Check size={14} className="text-blue-600 dark:text-blue-400" />}
               </button>

@@ -80,7 +80,7 @@ interface Props {
   onUpdateRow: (rowId: string, patch: Partial<WeeklyRow>) => Promise<void>;
   onMoveSection: (rowId: string, newSection: string) => Promise<void>;
   onTogglePin: (rowId: string) => Promise<void>;
-  onDeleteRow: (rowId: string) => Promise<void>;
+  onDeleteRow: (rowId: string) => Promise<void> | void;
   onReorderRows?: (newRows: WeeklyRow[]) => void;
   onMoveRowCrossSection?: (
     rowId: string,
@@ -712,7 +712,7 @@ function TableRow({
   onUpdateRow: (id: string, updates: Partial<WeeklyRow>) => Promise<void>;
   onMoveSection: (id: string, targetSection: string) => Promise<void>;
   onTogglePin: (id: string) => Promise<void>;
-  onDeleteRow: (id: string) => Promise<void>;
+  onDeleteRow: (id: string) => Promise<void> | void;
   onEditRow?: (row: WeeklyRow) => void;
   dynamicEmailWidth: number;
   sNoLeft: number;

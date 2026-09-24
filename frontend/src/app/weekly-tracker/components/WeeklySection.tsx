@@ -37,7 +37,7 @@ interface Props {
   onUpdateRow: (rowId: string, patch: Partial<WeeklyRow>) => Promise<void>;
   onMoveSection: (rowId: string, newSection: string) => Promise<void>;
   onTogglePin: (rowId: string) => Promise<void>;
-  onDeleteRow: (rowId: string) => Promise<void>;
+  onDeleteRow: (rowId: string, isUndoRedo?: boolean, fromSectionKey?: string) => Promise<void> | void;
   onReorderRows?: (sectionKey: string, newRows: WeeklyRow[]) => Promise<void> | void;
   onMoveRowCrossSection?: (
     rowId: string,
@@ -246,10 +246,10 @@ export function WeeklySection({
     try {
       await apiFetch('/weekly-tracker/batch-delete', {
         method: 'POST',
-        body: JSON.stringify({ ids: selectedRowIds }),
+        body: JSON.stringify({ ids: selectedRowIds, section: sectionKey }),
       });
       for (const id of selectedRowIds) {
-        await onDeleteRow(id);
+        await onDeleteRow(id, false, sectionKey);
       }
       setLocalSelectedRowIds([]);
       setIsLocalDeleteMode(false);
@@ -409,7 +409,7 @@ export function WeeklySection({
           onUpdateRow={onUpdateRow}
           onMoveSection={onMoveSection}
           onTogglePin={onTogglePin}
-          onDeleteRow={onDeleteRow}
+          onDeleteRow={async (rowId) => { await onDeleteRow(rowId, false, sectionKey); }}
           onReorderRows={(newRows) => onReorderRows && onReorderRows(sectionKey, newRows)}
           onMoveRowCrossSection={onMoveRowCrossSection}
           onEditRow={(row) => setEditingRow(row)}
@@ -422,7 +422,7 @@ export function WeeklySection({
           row={editingRow}
           onClose={() => setEditingRow(null)}
           onUpdated={onUpdateRow}
-          onDeleted={onDeleteRow}
+          onDeleted={async (rowId) => { await onDeleteRow(rowId, false, sectionKey); }}
         />
       )}
 
