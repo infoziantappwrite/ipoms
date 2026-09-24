@@ -1771,6 +1771,15 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     email (18 positives, 1 JD); the other 272 are not linked to any tracker call and must be typed by hand or
     matched some other way. Emails typed earlier via the old remarks route were not migrated (still displayed).
 
+70. **My Positives / My JD table type set to the user's spec, 24 Sep 2026 (user decision).** One component
+    (`MyPositivesTab.tsx`) renders both tabs. Column headings are now **12px uppercase bold**; every body cell -
+    S.No, Date, Time, College badge, Company name, Job role, CTC badge, Email (and its edit box / Save) - is
+    **10px, weight medium (500)**. Before: headings 10px; body 12px with mixed weights (company name 14px
+    extra-bold, CTC/date/S.No bold, time semi-bold, college extra-bold). The two summary cards above the table
+    were not changed (10px labels, 14px numbers). Measured in a real browser after the change: header 12px/700,
+    all eight cells 10px/500. Note: these are hard-coded pixel sizes (the app's token scale is 12/14/16/20);
+    done as an explicit user instruction.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map
