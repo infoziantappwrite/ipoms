@@ -10657,6 +10657,8 @@ app.get('/api/v1/dashboard/monthly-calls', async (req: Request, res: Response) =
             }).select('duration_seconds session_date created_at day month year call_start_time call_end_time outcome_status').lean();
 
             const dailyCalls: number[] = new Array(daysInMonth).fill(0);
+            // JD Received per day - shown on its own (it sits in the Other Progress bucket otherwise)
+            const dailyJd: number[] = new Array(daysInMonth).fill(0);
             // Per-day outcome counts, same buckets as the outcome mix. Only the four
             // the dashboard shows; Other Progress / no outcome stay inside calls.
             const shownBuckets = ['positive', 'not_hiring', 'negative', 'follow_up'] as const;
@@ -10706,6 +10708,7 @@ app.get('/api/v1/dashboard/monthly-calls', async (req: Request, res: Response) =
 
               if (d && d >= 1 && d <= daysInMonth) {
                 dailyCalls[d - 1]++;
+                if ((row as any).outcome_status === 'jd_received') dailyJd[d - 1]++;
                 const bucket = OUTCOME_BUCKET[String((row as any).outcome_status || '')];
                 if (bucket && bucket in dailyOutcomes) {
                   dailyOutcomes[bucket as keyof typeof dailyOutcomes][d - 1]++;
@@ -10731,6 +10734,7 @@ app.get('/api/v1/dashboard/monthly-calls', async (req: Request, res: Response) =
               daily: dailyCalls,
               daily_duration: dailyDurationMins,
               daily_outcomes: dailyOutcomes,
+              daily_jd: dailyJd,
               total: dailyCalls.reduce((a, b) => a + b, 0),
               total_duration_minutes: dailyDurationMins.reduce((a, b) => a + b, 0),
             };

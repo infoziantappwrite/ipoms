@@ -1536,6 +1536,20 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     returns 24-slot arrays. **Not verified:** dark mode (the app toggles a `.dark` class, which the test
     browser's colour-scheme setting doesn't trigger) and a split (both-in-one-hour) bar.
 
+59. **Monthly Call Trend: JD Received day squares + tooltip, 24 Sep 2026 (user-requested).** The hover
+    tooltip on a day square now lists exactly Positive, Not Hiring, Follow Up and **JD Received**
+    (JD Received replaces Negative there). A day with at least one JD Received call for that campus is
+    drawn **fuchsia** instead of its blue heat shade (same fuchsia as the JD bars in the Hourly Rhythm,
+    item 58), with a "JD received" entry added to the legend and the JD count added to the cell's
+    aria-label. Backend: `GET /dashboard/monthly-calls` series now include `daily_jd` (per-day count of
+    `outcome_status === 'jd_received'`; JD otherwise sits in the un-shown Other Progress bucket).
+    **Deliberately unchanged:** the outcome columns on the right of the strip (Positive / Not Hiring /
+    Negative / Follow Up) still show Negative — only the tooltip was asked to change; tell me if the
+    columns should swap too. Applies to every dashboard that renders `CoordinatorCollegeKpiCards`
+    (coordinators, Sujitha, Malvika). Verified live as Mohanaradha: AIHT on 24 Sept drawn fuchsia
+    (rgb 192,38,211), tooltip "3 calls . 4m logged | Positive 1 . Not Hiring 0 | Follow Up 0 . JD
+    Received 1", no console errors. Dark mode not seen (same `.dark` toggle limitation as item 58).
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map
