@@ -199,6 +199,10 @@ export function registerAuthRoutes(app: Express) {
 
       if (!rawInput) return fail(res, 400, 'IDENTIFIER_REQUIRED', 'Enter your official email address or username.');
       if (!password) return fail(res, 400, 'PASSWORD_REQUIRED', 'Enter your password.');
+      // No real address, username or password is this long; refuse before any lookup, hashing or audit write.
+      if (rawInput.length > 254 || password.length > 128) {
+        return fail(res, 400, 'INPUT_TOO_LONG', 'That email/username or password is too long.');
+      }
 
       const isEmail = rawInput.includes('@');
       let user = null;

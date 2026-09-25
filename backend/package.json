@@ -29,9 +29,11 @@
   "author": "Infoziant",
   "license": "ISC",
   "dependencies": {
+    "@types/compression": "^1.8.1",
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^8.0.1",
     "bcryptjs": "^3.0.3",
+    "compression": "^1.8.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

@@ -2090,6 +2090,32 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     production build is unverified this session. (11) Still open from before: rotate the secrets that are in git
     history, `recycle_bin` / `import_processing_history` unbuilt, 3 missing crons, `server.ts` monolith.
 
+81. **Hardening pass 1 of the production-readiness list, 25 Sep 2026 (user-approved order: items 1, 6, 7, 9, 10
+    of item 80).** **Correction to item 80:** a login rate limiter already existed (`authLimiter`, AUD-C-03) but
+    was set to **500 failed attempts / 15 min / IP** - effectively none, which is why 15 rapid bad logins never
+    got a 429. Now: **sign-in 30 failed / 15 min / IP** (successes don't count; each account also keeps its own
+    3-strike lockout), and a separate tighter limiter of **8 / 15 min** on `request-otp`, `verify-otp` and
+    `reset-password` (each sends or checks an emailed code). **Body limits:** the single 25 MB parser in front of
+    everything is gone. `/api/v1/auth/*` and `/health/*` parse **20 KB** max; the authenticated API parses
+    **10 MB** but only *after* `authenticateJWT` + `authorizeRoute` (new parser mounted right below
+    `authorizeRoute`), so an anonymous caller can no longer make the server buffer megabytes. Oversize -> clean
+    `413 PAYLOAD_TOO_LARGE`, bad JSON -> `400 BAD_JSON`. **If a legitimate bulk import ever fails with 413, raise the
+    10 MB on that one route rather than globally.** **Login** refuses an identifier over 254 chars or a password
+    over 128 with `400 INPUT_TOO_LONG` before any lookup/hash/audit write. **Audit writer** (`lib/audit.ts`) now
+    clips email to 254, summary to 1000, user-agent to 300 and any `changes` snapshot over 20 KB to a preview - the
+    3 MB-audit-row bug can't recur. **Compression** (`compression` middleware): `/colleges` 22 KB -> 3 KB gzip.
+    **`GET /settings`** returns only `{settings}` to coordinators; system-health / storage / organisation /
+    data-quality / growth blocks are Administrator + Team Leader only (`isSupervisor`). **Request ids:** every
+    response carries `x-request-id` (a valid incoming one is reused), every access-log line prints it (development
+    line via `morgan`; **production prints one JSON object per request** - `request_id, method, path, status, ms,
+    bytes, ip`), and error bodies include `requestId`; 500s no longer leak internal messages in production.
+    **Verified live:** 3 MB and 25 KB login bodies 413, 300-char email 400, malformed JSON 400, anonymous 5 MB to
+    the API 401, signed-in 5 MB accepted / 12 MB 413, coordinator `/settings` = `settings` only while the admin
+    still gets all six blocks, request id on a 404, 30th bad login = first 429; `tsc` clean. **Found, not fixed
+    (pre-existing):** the Weekly Tracker page's first request sometimes carries the placeholder college id
+    `col_karpagam` (from the cached fallback list), which the handlers answer with `500` (Mongoose CastError)
+    instead of `400`; the page then refetches with the real id so users don't notice.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

@@ -5,6 +5,8 @@ import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import compression from 'compression';
+import { randomUUID } from 'crypto';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
@@ -133,10 +135,49 @@ app.use(
     exposedHeaders: ['Authorization', 'Set-Cookie'],
   })
 );
-app.use(express.json({ limit: '25mb' }));
-app.use(express.urlencoded({ limit: '25mb', extended: true }));
+// Compress JSON / text responses (the all-college Weekly Tracker is ~1 MB raw).
+app.use(compression());
+
+// Request id: reuse a sane incoming x-request-id (a load balancer may set one), else make one. It is echoed
+// on the response, printed in every access-log line and included in error bodies so one failing request
+// can be traced end to end.
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const incoming = String(req.headers['x-request-id'] || '');
+  const id = /^[A-Za-z0-9._-]{8,64}$/.test(incoming) ? incoming : randomUUID();
+  (req as any).requestId = id;
+  res.setHeader('x-request-id', id);
+  next();
+});
+
+// Body parsing. Unauthenticated routes get a TINY limit; the authenticated API gets a larger one, but only
+// AFTER the JWT and role checks (see the parser mounted below `authorizeRoute`), so an anonymous caller can
+// no longer make the server buffer and parse megabytes before being refused. (Was one 25 MB parser in front
+// of everything: a 3 MB "email" sent to /auth/login was accepted, parsed and written to the audit log.)
+app.use(['/api/v1/auth', '/health'], express.json({ limit: '20kb' }));
+app.use(['/api/v1/auth', '/health'], express.urlencoded({ limit: '20kb', extended: true }));
 app.use(cookieParser());
-app.use(morgan('dev'));
+
+// Access log. Development keeps the readable `morgan('dev')` line (now with the request id); production
+// prints one JSON object per request so a log service can filter on any field.
+morgan.token('rid', (req: any) => req.requestId || '-');
+if (process.env.NODE_ENV === 'production') {
+  app.use(
+    morgan((tokens: any, req: any, res: any) =>
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        request_id: tokens.rid(req, res),
+        method: tokens.method(req, res),
+        path: tokens.url(req, res),
+        status: Number(tokens.status(req, res)),
+        ms: Number(tokens['response-time'](req, res)),
+        bytes: Number(tokens.res(req, res, 'content-length')) || 0,
+        ip: req.ip,
+      })
+    )
+  );
+} else {
+  app.use(morgan(':rid :method :url :status :response-time ms - :res[content-length]'));
+}
 
 // ── Shared Helpers ───────────────────────────────────────────────────────────
 
@@ -664,7 +705,10 @@ app.get('/api/v1/weekly-tracker/sync-inspection', async (req: Request, res: Resp
 // 2. Authentication Login Endpoint & Rate Limiting (AUD-C-03)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes window
-  max: 500, // Generous allowance for concurrent coordinator logins across shared office IPs
+  // FAILED attempts per IP. Was 500 - effectively no limit (15 rapid bad logins were never slowed). 30
+  // still leaves room for a whole office behind one address mistyping a password now and then, while
+  // making password guessing across many accounts impractical; each account also has its own lockout.
+  max: 30,
   skipSuccessfulRequests: true, // Do not count successful sign-ins against rate limits
   standardHeaders: true,
   legacyHeaders: false,
@@ -677,8 +721,20 @@ const authLimiter = rateLimit({
   },
 });
 
+// One-time-password requests send an email each time, so they get a much tighter budget than sign-in.
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: { code: 'TOO_MANY_REQUESTS', message: 'Too many code requests from this IP. Please wait a few minutes and try again.' },
+  },
+});
+
 app.use('/api/v1/auth/login', authLimiter);
-app.use('/api/v1/auth/request-otp', authLimiter);
+app.use(['/api/v1/auth/request-otp', '/api/v1/auth/verify-otp', '/api/v1/auth/reset-password'], otpLimiter);
 app.use('/api/v1/auth/signup', authLimiter);
 
 // Auth routes (sign-in, lockout, OTP reset) live in lib/authRoutes.ts
@@ -703,6 +759,11 @@ app.use('/api/v1', (req: Request, res: Response, next: NextFunction) => {
 });
 
 app.use('/api/v1', authorizeRoute);
+
+// Authenticated API body parser (auth + role already passed). 10 MB comfortably covers the largest real
+// payloads (bulk imports of thousands of rows); it used to be 25 MB for every caller, signed in or not.
+app.use('/api/v1', express.json({ limit: '10mb' }));
+app.use('/api/v1', express.urlencoded({ limit: '10mb', extended: true }));
 
 // A full-oversight Team Leader (`has_all_colleges_access`, e.g. Malvika Kumar) monitors every college and
 // does not place calls, so the Daily Tracker is READ-ONLY for that account. The screen already hides every
@@ -14291,7 +14352,9 @@ app.get('/api/v1/settings', authenticateJWT, async (req: Request, res: Response)
 
     return res.status(200).json({
       success: true,
-      data: {
+      // Coordinators only need the season / targets; system health, storage and organisation counts are for
+      // Administrators and Team Leaders.
+      data: !isSupervisor(req) ? { settings } : {
         settings,
         system_health: {
           status: healthStatus,
@@ -14817,12 +14880,22 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
       error: { code: 'ORIGIN_NOT_ALLOWED', message: 'This origin is not permitted to access the API.' },
     });
   }
-  console.error('❌ [Unhandled Server Error]:', err);
+  const requestId = (req as any).requestId;
+  // body-parser refusals are the caller's problem, not a server fault
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({ success: false, error: { code: 'PAYLOAD_TOO_LARGE', message: 'The request is too large.', requestId } });
+  }
+  if (err?.type === 'entity.parse.failed') {
+    return res.status(400).json({ success: false, error: { code: 'BAD_JSON', message: 'The request body is not valid JSON.', requestId } });
+  }
+  console.error(`❌ [Unhandled Server Error] request ${requestId || '-'}:`, err);
   return res.status(500).json({
     success: false,
     error: {
       code: 'INTERNAL_SERVER_ERROR',
-      message: err.message || 'Internal server error',
+      // Internal messages can name collections, paths or queries - keep them out of production responses.
+      message: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message || 'Internal server error',
+      requestId,
     },
   });
 });
