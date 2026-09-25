@@ -2136,6 +2136,23 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     (delete the `node_modules` junction first, not through it). Note the repo has TWO next configs
     (`next.config.mjs` proxy/rewrites and `next.config.mobile.js` static export) - the build above used the default.
 
+83. **Next 16 upgrade rehearsed in isolation, 25 Sep 2026 (item 2 of the production list) - NOT adopted.** Nothing in
+    the real repo or its running dev server changed. Done in a git worktree `C:\Temp\ipoms_next16` on the local
+    branch `next16-merge-check` (= current `ipomsbranch3` + a clean merge of `next16-upgrade`; the upgrade only
+    touches `frontend/package.json`, `package-lock.json` and `tsconfig.json` - `jsx` becomes `react-jsx`, formatting
+    only) with its own `npm ci`. Results: `tsc` clean, `next build` passes (25 static pages), `npm audit --omit=dev`
+    goes from 6 findings incl. **1 critical** to 4 (3 moderate, 1 high = `xlsx`), and a real-browser sweep of 9
+    pages (dashboard, tracker, weekly tracker, daily leads, active leads, metadata, reports, settings, profile) on
+    Next 14 (:3000) vs Next 16 (:3100) gave **identical page text** and only ~245 differing pixels per screen (the
+    Next dev-mode "N" badge; the dashboard's 0.17% is its live clock), same console/HTTP results, Shift+M dialog
+    works on both. **Things to know before adopting:** (a) Next 16's dev server **writes `AGENTS.md` and
+    `CLAUDE.md` into `frontend/`** on first start (`agentRules: false` in `next.config.mjs` turns it off) - they
+    would show up in `git status`; (b) `"lint": "next lint"` no longer exists in Next 16 - the script must be
+    replaced by plain ESLint or removed; (c) Turbopack is the default bundler; first compile of each page in dev is
+    slower; (d) Node >= 20.9 is required on Vercel; (e) the dev-mode "N" indicator appears bottom-left. Adopting =
+    merge `next16-merge-check` (or `next16-upgrade`) into `ipomsbranch3`, `npm install` in `frontend/`, restart the
+    frontend dev server; rollback = revert the merge and `npm install` again.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map
