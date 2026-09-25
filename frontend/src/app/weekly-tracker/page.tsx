@@ -7,7 +7,7 @@ import { WeeklyHeader } from './components/WeeklyHeader';
 import { WeeklySection } from './components/WeeklySection';
 import { AddCompanyModal } from './components/AddCompanyModal';
 import { BulkMoveModal } from './components/BulkMoveModal';
-import { MoveChoiceModal, TransferCollegePicker, TransferSectionPicker, TransferConfirmModal } from './components/TransferModal';
+import { MoveChoiceModal, TransferCollegePicker, TransferConfirmModal } from './components/TransferModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { ForeignCollegeWarningModal } from './components/ForeignCollegeWarningModal';
 import { PasteWeeklyModal, PasteApplyPayload, PasteRowResult } from './components/PasteWeeklyModal';
@@ -121,7 +121,7 @@ export default function WeeklyTrackerPage() {
   const [selectionMode, setSelectionMode] = useState<'move' | 'delete' | 'transfer' | null>(null);
   // Send companies to another college (Move / Copy)
   const [isMoveChoiceOpen, setIsMoveChoiceOpen] = useState(false);
-  const [transferStep, setTransferStep] = useState<'college' | 'section' | null>(null);
+  const [transferStep, setTransferStep] = useState<'college' | null>(null);
   const [transferTarget, setTransferTarget] = useState<{ id: string; code: string; name: string } | null>(null);
   const [isTransferConfirmOpen, setIsTransferConfirmOpen] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
@@ -1127,14 +1127,6 @@ export default function WeeklyTrackerPage() {
   };
 
   // ── Send companies to another college (Move / Copy) ──────────────────
-  const TRANSFER_SECTION_KEYS = [
-    'completed', 'drive_in_progress', 'in_drive', 'in_progress', 'pipeline',
-    'top_companies', 'rejected_companies', 'on_hold_by_college', 'on_hold_by_hr',
-  ];
-  const transferSectionOptions = TRANSFER_SECTION_KEYS
-    .map((key) => ({ key, title: (sections as any)?.[key]?.title || key, count: ((sections as any)?.[key]?.rows || []).length }))
-    .filter((o) => o.count > 0);
-
   // "Move / Copy Companies" (menu or Shift+M): first ask within this college, or to another college
   const handleOpenMoveChoiceRef = useRef<(() => void) | null>(null);
   const handleOpenMoveChoice = () => {
@@ -1159,14 +1151,11 @@ export default function WeeklyTrackerPage() {
   };
 
   const handlePickTransferCollege = (c: { id: string; code: string; name: string }) => {
+    // College picked: go straight to ticking companies (the section is taken from where they tick)
     setTransferTarget(c);
-    setTransferStep('section');
-  };
-
-  const handlePickTransferSection = (key: string) => {
     setTransferStep(null);
     setSelectionMode('transfer');
-    setSelectionSection(key);
+    setSelectionSection(null);
     setSelectedRowIds([]);
   };
 
@@ -1978,16 +1967,6 @@ export default function WeeklyTrackerPage() {
         myCollegeIds={myCollegeIds}
         onClose={() => setTransferStep(null)}
         onPick={handlePickTransferCollege}
-      />
-      <TransferSectionPicker
-        isOpen={transferStep === 'section'}
-        targetCode={transferTarget?.code || ''}
-        options={transferSectionOptions}
-        onClose={() => {
-          setTransferStep(null);
-          setTransferTarget(null);
-        }}
-        onPick={handlePickTransferSection}
       />
       <TransferConfirmModal
         isOpen={isTransferConfirmOpen}

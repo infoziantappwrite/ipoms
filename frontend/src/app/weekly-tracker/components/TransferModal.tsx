@@ -9,7 +9,6 @@ import { triggerHaptic } from '@/lib/haptics';
  * The dialogs for "Move / Copy Companies" in the Weekly Tracker:
  *   MoveChoiceModal        - within this college (move between sections) or to another college (copy)
  *   TransferCollegePicker  - pick ONE receiving college
- *   TransferSectionPicker  - which section to copy from
  *   TransferConfirmModal   - "Are you sure?" before anything is sent
  * Copying to another college never changes the sender's rows; the receiver gets only Company, Role, CTC,
  * Contact and Email, in the same section and order.
@@ -226,55 +225,7 @@ export function TransferCollegePicker({
   );
 }
 
-// ── 3. Which section to copy from? ───────────────────────────────────────────
-export interface TransferSectionOption {
-  key: string;
-  title: string;
-  count: number;
-}
-
-export function TransferSectionPicker({
-  isOpen,
-  targetCode,
-  options,
-  onClose,
-  onPick,
-}: {
-  isOpen: boolean;
-  targetCode: string;
-  options: TransferSectionOption[];
-  onClose: () => void;
-  onPick: (key: string) => void;
-}) {
-  useEscape(isOpen, onClose);
-  if (!isOpen) return null;
-  return (
-    <Shell icon={<Layers size={16} strokeWidth={2.2} />} title={`Copy to ${targetCode}`} subtitle="Which section are the companies in?" onClose={onClose}>
-      <div className="p-3 max-h-[60vh] overflow-y-auto space-y-1.5">
-        {options.length === 0 && <p className="text-xs text-fg-subtle p-3">There are no companies in any section yet.</p>}
-        {options.map((o) => (
-          <button
-            key={o.key}
-            type="button"
-            onClick={() => {
-              triggerHaptic('selection');
-              onPick(o.key);
-            }}
-            className="w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border border-border bg-surface hover:bg-surface-raised hover:border-primary/50 text-left transition-colors cursor-pointer"
-          >
-            <span className="flex items-center gap-2 text-xs font-semibold text-fg">
-              <Layers size={14} className="text-fg-subtle" />
-              {o.title}
-            </span>
-            <span className="text-[11px] font-bold text-fg-subtle tabular-nums">{o.count}</span>
-          </button>
-        ))}
-      </div>
-    </Shell>
-  );
-}
-
-// ── 4. Are you sure? ─────────────────────────────────────────────────────────
+// ── 3. Are you sure? ─────────────────────────────────────────────────────────
 export function TransferConfirmModal({
   isOpen,
   count,

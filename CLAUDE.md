@@ -2057,6 +2057,14 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     **Copy confirmation dialog polish, 25 Sep 2026 (user request):** title is now "Copy company" (not "Copy 1
     company"), the dialog is wider (`max-w-4xl`, same font sizes) so the sentences stay on one line; the copy /
     switch / sender-toast / receiver-toast behaviour is unchanged.
+    **Section question removed, 25 Sep 2026 (user request):** after picking the receiving college the tick boxes
+    open straight away in every section (the "which section?" dialog is gone); the section a company is copied
+    into is simply the one it was ticked in (selection stays section-specific, item 49). Flow is now: Shift+M /
+    menu -> Within/Another college -> college -> tick -> Copy (n) -> confirm -> copied + switch. Verified in a
+    real browser: no section dialog, 33 checkboxes visible at once, header "Copy (0)", confirm dialog opens
+    after ticking one; nothing was sent (cancelled). **Known behaviour explained to the user:** a company the
+    target already has in ANY section (even a collapsed one, e.g. Rejected Companies) is skipped, and the page
+    still switches; suggested (not built) a single warning and no switch when everything is skipped.
 
 ## 6. Module map
 ## 6. Module map
