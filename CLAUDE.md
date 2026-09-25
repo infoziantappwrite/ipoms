@@ -1856,6 +1856,13 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     scroll / AM-PM all move the selection and the preview line together, a past time disables "Set
     reminder", the payload carries the right `remind_at`, Esc layers correctly, and there is no horizontal
     scroll on mobile.
+    **Fits any window height, 25 Sep 2026 (user-reported: the picker's bottom was cut off in a short
+    window).** With the picker open the card was ~640px tall, taller than a small browser window, so its lower
+    part ran off-screen. The card is now capped at the window height minus 32px (`100dvh`), is a flex column
+    whose body scrolls inside it if it still cannot fit, and was tightened (smaller hero and icon, 34px wheel
+    rows, tighter gaps) to **486px with the picker open**. Measured in a real browser: at window heights
+    820 / 700 / 600 the card is exactly centred (equal space above and below) with the Set reminder button
+    fully visible and no inner scrolling; at 480 it keeps a 16px margin and scrolls inside itself.
 
 ## 6. Module map
 ## 6. Module map

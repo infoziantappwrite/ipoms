@@ -32,7 +32,7 @@ interface Decision {
 const POLL_MS = 45_000;
 const READY_AFTER_MS = 60_000; // the app must have been open for a minute (login+logout in a minute -> next morning)
 const SHOWN_CALLS = 3;
-const ITEM = 40; // one row of a picker wheel
+const ITEM = 34; // one row of a picker wheel
 
 /** Minutes after IST midnight, whatever the browser's own timezone is. */
 function istNowMinutes(): number {
@@ -299,7 +299,7 @@ export function EmailCheckPrompt() {
 
         <div className="ipoms-ec-hero" aria-hidden>
           <span className="ipoms-ec-halo" />
-          <svg viewBox="0 0 128 62" width="104" height="50">
+          <svg viewBox="0 0 128 62" width="88" height="43">
             {/* the letter, rising out of the envelope */}
             <g className="ipoms-ec-letter">
               <rect x="44" y="4" width="40" height="30" rx="4" fill="#e8eefc" />
@@ -389,23 +389,24 @@ export function EmailCheckPrompt() {
         .ipoms-ec-backdrop { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center;
           padding: 16px; overflow: auto; background: rgba(15, 23, 42, .45); animation: ipoms-ec-fade .25s ease-out both; }
         .ipoms-ec-card { position: relative; width: min(400px, 100%); margin: auto; border-radius: 20px; overflow: hidden;
+          display: flex; flex-direction: column; max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px);
           background: #fff; color: #0f172a; font-family: inherit; box-shadow: 0 24px 60px rgba(15, 23, 42, .35);
           animation: ipoms-ec-pop .35s cubic-bezier(.16,1,.3,1) both; }
         .ipoms-ec-x { position: absolute; top: 9px; right: 9px; z-index: 2; display: grid; place-items: center; width: 28px; height: 28px;
           border: 0; border-radius: 999px; background: rgba(255,255,255,.18); color: #fff; cursor: pointer; transition: background .15s ease; }
         .ipoms-ec-x:hover { background: rgba(255,255,255,.34); }
 
-        .ipoms-ec-hero { position: relative; display: grid; place-items: center; padding: 14px 0 10px; overflow: hidden;
+        .ipoms-ec-hero { position: relative; flex: none; display: grid; place-items: center; padding: 10px 0 6px; overflow: hidden;
           background: linear-gradient(135deg, #16307A, #2F4DB0 55%, #5580F5); }
         .ipoms-ec-halo { position: absolute; width: 150px; height: 150px; border-radius: 999px; background: rgba(255,255,255,.12);
           animation: ipoms-ec-halo 3.2s ease-in-out infinite; }
         .ipoms-ec-letter { animation: ipoms-ec-lift 3.2s ease-in-out infinite; }
 
-        .ipoms-ec-body { padding: 14px 18px 18px; }
+        .ipoms-ec-body { padding: 12px 18px 16px; overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
         .ipoms-ec-title { margin: 0 0 3px; font-size: 16px; font-weight: 700; line-height: 1.3; letter-spacing: -.01em; }
         .ipoms-ec-sub { margin: 0; font-size: 12px; line-height: 1.45; color: #64748b; }
 
-        .ipoms-ec-list { list-style: none; margin: 11px 0 0; padding: 7px 10px; display: flex; flex-direction: column; gap: 6px;
+        .ipoms-ec-list { list-style: none; margin: 9px 0 0; padding: 7px 10px; display: flex; flex-direction: column; gap: 6px;
           border-radius: 12px; background: #f1f5f9; }
         .ipoms-ec-list li { display: flex; align-items: center; gap: 7px; font-size: 12px; }
         .ipoms-ec-co { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -413,8 +414,8 @@ export function EmailCheckPrompt() {
         .ipoms-ec-at { flex: none; color: #64748b; font-size: 11px; font-variant-numeric: tabular-nums; }
         .ipoms-ec-more { color: #64748b; font-size: 11px; }
 
-        .ipoms-ec-actions { display: flex; gap: 9px; margin-top: 13px; }
-        .ipoms-ec-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px;
+        .ipoms-ec-actions { display: flex; gap: 9px; margin-top: 11px; }
+        .ipoms-ec-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 38px;
           border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
           transition: transform .14s cubic-bezier(.16,1,.3,1), filter .14s ease, border-color .14s ease, background .14s ease; }
         .ipoms-ec-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.04); }
@@ -424,17 +425,17 @@ export function EmailCheckPrompt() {
         .ipoms-ec-yes { border: 0; background: #15803d; color: #fff; box-shadow: 0 6px 14px rgba(21,128,61,.24); }
         .ipoms-ec-pick { border: 1.5px solid #cbd5e1; background: #fff; color: #0f172a; }
         .ipoms-ec-pick.is-open { border-color: #1E3A8A; background: #eef2ff; color: #1E3A8A; }
-        .ipoms-ec-set { width: 100%; margin-top: 11px; border: 0; background: #1E3A8A; color: #fff; box-shadow: 0 6px 14px rgba(30,58,138,.24); }
+        .ipoms-ec-set { width: 100%; margin-top: 8px; border: 0; background: #1E3A8A; color: #fff; box-shadow: 0 6px 14px rgba(30,58,138,.24); }
 
-        .ipoms-ec-picker { margin-top: 12px; padding-top: 12px; border-top: 1px solid #eef1f6; animation: ipoms-ec-reveal .26s cubic-bezier(.2,.9,.3,1) both; }
+        .ipoms-ec-picker { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eef1f6; animation: ipoms-ec-reveal .26s cubic-bezier(.2,.9,.3,1) both; }
         .ipoms-ec-quick { display: flex; gap: 7px; }
         .ipoms-ec-qchip { flex: 1; height: 32px; border-radius: 999px; border: 1px solid #e2e8f0; background: #fff; color: #334155;
           font-family: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all .14s ease; }
         .ipoms-ec-qchip:hover { border-color: #1E3A8A; color: #1E3A8A; }
         .ipoms-ec-qchip.is-on { background: #1E3A8A; border-color: #1E3A8A; color: #fff; box-shadow: 0 5px 12px rgba(30,58,138,.26); }
 
-        .ipoms-ec-wheels { position: relative; display: flex; align-items: center; justify-content: center; gap: 2px; margin-top: 11px;
-          padding: 6px 10px; border-radius: 16px; background: #f8fafc; border: 1px solid #e8edf4; box-shadow: inset 0 1px 3px rgba(15,23,42,.05); }
+        .ipoms-ec-wheels { position: relative; display: flex; align-items: center; justify-content: center; gap: 2px; margin-top: 9px;
+          padding: 4px 10px; border-radius: 16px; background: #f8fafc; border: 1px solid #e8edf4; box-shadow: inset 0 1px 3px rgba(15,23,42,.05); }
         .ipoms-ec-band { position: absolute; left: 10px; right: 10px; top: 50%; height: ${ITEM}px; transform: translateY(-50%);
           border-radius: 12px; background: #e8eeff; pointer-events: none; }
         .ipoms-ec-wheel { position: relative; z-index: 1; width: 74px; height: ${ITEM * 3}px; overflow-y: auto; scroll-snap-type: y mandatory;
@@ -456,7 +457,7 @@ export function EmailCheckPrompt() {
           font-family: inherit; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; color: #64748b; cursor: pointer; transition: color .2s ease; }
         .ipoms-ec-mer button.is-on { color: #fff; }
 
-        .ipoms-ec-preview { margin: 10px 0 0; font-size: 11.5px; line-height: 1.4; color: #1E3A8A; font-weight: 600; text-align: center; }
+        .ipoms-ec-preview { margin: 8px 0 0; font-size: 11.5px; line-height: 1.4; color: #1E3A8A; font-weight: 600; text-align: center; }
         .ipoms-ec-preview.is-bad { color: #b91c1c; }
 
         .ipoms-ec-done { display: grid; place-items: center; gap: 9px; padding: 20px 18px 24px; font-size: 13px; font-weight: 600; text-align: center; }
