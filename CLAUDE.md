@@ -2031,6 +2031,30 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     `tsc` clean both sides. **Not tested in a browser:** Move (only its API), Malvika/Sujitha accounts, dark
     mode, the foreign-college amber note.
 
+79. **Weekly Tracker "Move / Copy Companies" reworked to copy-only, one entry point, 25 Sep 2026
+    (user decision - supersedes the UI and the Move half of item 78).** The extra arrows icon beside the dustbin
+    is gone; the existing **"Move Companies"** item in the three-dots menu is now **"Move / Copy Companies"** and
+    **Shift+M** opens the same thing. It first asks: **Within this college** (the old tick-and-move-between-sections
+    flow, unchanged) or **To another college**. The other-college flow is: pick ONE college (own focus colleges
+    first, badged "Your focus" / "Other login") -> pick the section -> tick companies -> **Copy (n)** (the only
+    button in the header in this mode; Esc leaves it) -> "Are you sure you want to copy..." -> copied, then the page
+    **switches to the receiving college** so the sender can check it. **It only copies:** the sender's rows are never
+    touched (the backend now refuses any mode but `copy` - the Move branch was removed); the receiver still gets only
+    Company, Role, CTC, Contact, Email in the same section and order, everything else blank. **Toasts:** the sender
+    sees "N companies copied to MCET"; the receiving coordinator(s) get a `system_update` notification titled
+    "Weekly Tracker copy received" (message "One data received from AIHT College" / "N data received from ...", the
+    college **acronym**) and `IncomingCopyToast.tsx` (mounted in `AppShell`, polls every 15 s + on tab focus, needs a
+    visible tab) shows it as a toast once and marks it read; recipients are the target college's handling
+    coordinator(s) (Placement Coordinator preferred, oversight accounts and the sender excluded). **Undo / Redo
+    icons removed from the Weekly Tracker header** (user: Ctrl+Z / Ctrl+Y still work - the hook's keyboard shortcuts
+    are unchanged). **Verified:** real browser as Mohanaradha - no undo/redo/arrows icons; Shift+M shows the two-way
+    choice; AIHT -> MCET copy of 2 rows sent one correct POST; only "Copy (2)" in the header; MCET got blank-status
+    copies and AIHT kept everything; a second browser as Seshmitha (MCET, `seshmitha_tamil@icl.today`) showed the
+    toast "One data received from AIHT College" bottom-right, the notification then read and not repeated; the
+    sender is not notified. `tsc` clean both sides. **Not tested:** "Within this college" after the new choice
+    dialog, dark mode, Malvika/Sujitha accounts, a receiver who is offline (they see it on next open, and it also
+    sits in the bell list).
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

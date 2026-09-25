@@ -5,11 +5,8 @@ import {
   CalendarDays,
   Trash2,
   Search,
-  Undo2,
-  Redo2,
   RefreshCw,
   ClipboardPaste,
-  ArrowRightLeft,
   Copy,
   ChevronsUp,
   ChevronsDown,
@@ -45,8 +42,8 @@ interface Props {
   selectedCount?: number;
   onStartMoveMode?: () => void;
   onStartDeleteMode?: () => void;
-  onStartTransferMode?: () => void;
-  onExecuteTransfer?: (mode: 'move' | 'copy') => void;
+  onExecuteTransfer?: () => void;
+  transferTargetCode?: string;
   onCancelSelection?: () => void;
   onExecuteMove?: () => void;
   onExecuteBulkDelete?: () => void;
@@ -83,8 +80,8 @@ export function WeeklyHeader({
   selectedCount = 0,
   onStartMoveMode,
   onStartDeleteMode,
-  onStartTransferMode,
   onExecuteTransfer,
+  transferTargetCode,
   onCancelSelection,
   onExecuteMove,
   onExecuteBulkDelete,
@@ -255,44 +252,22 @@ export function WeeklyHeader({
               </div>
             ) : selectionMode === 'transfer' ? (
               <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-                {/* Send to another college: tick companies, then Move or Copy */}
-                <span className="hidden lg:inline text-[11px] font-semibold text-fg-subtle">Tick the companies to send</span>
+                {/* Copy to another college: tick companies, then Copy (Esc leaves this mode) */}
+                <span className="hidden lg:inline text-[11px] font-semibold text-fg-subtle">
+                  Tick the companies to copy{transferTargetCode ? ` to ${transferTargetCode}` : ''}
+                </span>
                 <button
                   type="button"
                   disabled={(selectedCount || 0) === 0}
                   onClick={() => {
                     triggerHaptic('medium');
-                    onExecuteTransfer?.('move');
-                  }}
-                  className="h-8 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl flex items-center gap-1.5 text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
-                  title="Move the ticked companies to another college (they leave this tracker)"
-                >
-                  <ArrowRightLeft size={13} strokeWidth={2.4} />
-                  <span>Move ({selectedCount || 0})</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={(selectedCount || 0) === 0}
-                  onClick={() => {
-                    triggerHaptic('medium');
-                    onExecuteTransfer?.('copy');
+                    onExecuteTransfer?.();
                   }}
                   className="h-8 px-3 bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white rounded-xl flex items-center gap-1.5 text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
-                  title="Copy the ticked companies to another college (you keep yours)"
+                  title="Copy the ticked companies to the other college (you keep yours). Esc to cancel."
                 >
                   <Copy size={13} strokeWidth={2.4} />
                   <span>Copy ({selectedCount || 0})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    triggerHaptic('light');
-                    onCancelSelection?.();
-                  }}
-                  className="h-8 px-2.5 bg-surface-sunken hover:bg-surface-raised border border-border text-fg rounded-xl flex items-center text-xs font-semibold transition-colors cursor-pointer shrink-0"
-                  title="Cancel Selection (Esc)"
-                >
-                  Cancel
                 </button>
               </div>
             ) : selectionMode === 'delete' ? (
@@ -311,38 +286,6 @@ export function WeeklyHeader({
                 </button>
               </div>
             ) : null
-          )}
-
-          {/* Undo / Redo Buttons */}
-          {selectedCollegeId && (
-            <div className="flex items-center gap-1 border-r border-zinc-200 dark:border-zinc-800 pr-2 mr-0.5">
-              <button
-                type="button"
-                disabled={!canUndo}
-                onClick={() => {
-                  triggerHaptic('medium');
-                  onUndo?.();
-                }}
-                title="Undo (Ctrl+Z)"
-                aria-label="Undo last action"
-                className="w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900/50 dark:hover:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 border border-zinc-200 dark:border-zinc-700/80 shadow-2xs active:scale-[0.95] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-zinc-700"
-              >
-                <Undo2 size={15} strokeWidth={2.2} />
-              </button>
-              <button
-                type="button"
-                disabled={!canRedo}
-                onClick={() => {
-                  triggerHaptic('medium');
-                  onRedo?.();
-                }}
-                title="Redo (Ctrl+Y)"
-                aria-label="Redo action"
-                className="w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900/50 dark:hover:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 border border-zinc-200 dark:border-zinc-700/80 shadow-2xs active:scale-[0.95] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-zinc-700"
-              >
-                <Redo2 size={15} strokeWidth={2.2} />
-              </button>
-            </div>
           )}
 
           {/* Collapse / Expand All Sections Toggle */}
@@ -402,28 +345,6 @@ export function WeeklyHeader({
               </span>
             )}
           </button>
-
-          {/* Send companies to another college (Move / Copy) */}
-          {onStartTransferMode && (
-            <button
-              type="button"
-              disabled={!/^[a-f0-9]{24}$/i.test(selectedCollegeId || '')}
-              onClick={() => {
-                triggerHaptic('selection');
-                if (selectionMode === 'transfer') onCancelSelection?.();
-                else onStartTransferMode();
-              }}
-              className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95] ${
-                selectionMode === 'transfer'
-                  ? 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border-indigo-400 dark:border-indigo-700 ring-2 ring-indigo-500/20'
-                  : 'bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/80'
-              }`}
-              title="Move or copy companies to another college"
-              aria-label="Move or copy companies to another college"
-            >
-              <ArrowRightLeft size={16} strokeWidth={2.2} />
-            </button>
-          )}
 
           {/* Paste companies / contacts / emails / dates from Excel */}
           {onOpenPaste && (

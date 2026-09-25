@@ -3,24 +3,24 @@ import { Types } from 'mongoose';
 import { WeeklyTracker } from '../models/WeeklyTracker';
 import { College } from '../models/College';
 import { User } from '../models/User';
+import { Notification } from '../models/Notification';
 import { getCurrentAcademicYear, getCurrentGraduatingBatchYear } from './academicYear';
 
 /**
  * POST /api/v1/weekly-tracker/transfer
  *
- * Send companies from one college's Weekly Tracker to another college's (user-requested, 25 Sep 2026).
- *   mode 'copy' - the sender keeps the row exactly as it is.
- *   mode 'move' - the sender's row is removed (soft-deleted, recoverable from the recycle bin; the linked
- *                 Daily Leads / Daily Tracker rows are deliberately left alone, they record what the sender did).
- *                 Moving out of Top Companies only un-pins, matching what deleting from that section does.
+ * COPY companies from one college's Weekly Tracker to another college's (user-requested, 25 Sep 2026;
+ * it was Move + Copy at first, changed to copy-only the same day). The sender's rows are never changed.
  *
- * Either way the RECEIVER gets a fresh row with ONLY Company name, Role, CTC, Contact and Email. Status,
- * dates, notes and counts start empty so the receiving coordinator fills them in for their own college.
- * The row lands in the same section it was sent from, and in the order the sender listed it. A company the
- * target college already has (same name, any section) is skipped and, on a move, stays with the sender.
+ * The RECEIVER gets a fresh row with ONLY Company name, Role, CTC, Contact and Email. Status, dates,
+ * notes and counts start empty so the receiving coordinator fills them in for their own college. The row
+ * lands in the same section it was copied from, and in the order the sender listed it. A company the
+ * target college already has (same name, any section) is skipped. The receiving coordinator(s) get an
+ * in-app notification ("One data received from ACET College") that the client shows as a toast.
  */
 
 const MAX_IDS = 200;
+export const WEEKLY_COPY_NOTIFICATION_TITLE = 'Weekly Tracker copy received';
 
 interface Deps {
   notifyForeignCollegeOwners: (actorUserId: string | undefined, collegeId: any, companyName: string, action: 'created' | 'updated' | 'deleted') => Promise<void>;
@@ -35,8 +35,8 @@ export function registerWeeklyTransferRoutes(app: Express, deps: Deps) {
       const { ids, target_college_id, mode, section } = req.body || {};
       const userId = req.user?.userId;
 
-      if (mode !== 'move' && mode !== 'copy') {
-        return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Choose Move or Copy.' } });
+      if (mode !== 'copy') {
+        return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Only copying to another college is supported.' } });
       }
       if (!Array.isArray(ids) || ids.length === 0) {
         return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Select at least one company.' } });
@@ -84,6 +84,7 @@ export function registerWeeklyTransferRoutes(app: Express, deps: Deps) {
         has_all_colleges_access: { $ne: true },
         role_codes: { $in: ['PLACEMENT_COORDINATOR', 'TEAM_LEADER'] },
       }).select('_id role_codes').sort({ full_name: 1 }).lean();
+      const sourceCollege: any = await College.findById(found[0].college_id).select('college_code college_name').lean();
       const coordOwners = ownerCandidates.filter((u) => (u.role_codes || []).includes('PLACEMENT_COORDINATOR'));
       const receiver = (coordOwners[0] || ownerCandidates[0])?._id || new Types.ObjectId(String(userId));
 
@@ -117,7 +118,7 @@ export function registerWeeklyTransferRoutes(app: Express, deps: Deps) {
       for (const src of ordered) {
         const key = norm(src.company_name);
         if (inTarget.has(key)) {
-          skipped.push({ company_name: src.company_name, reason: `already in ${targetCollege.college_code || targetCollege.college_name}` + (mode === 'move' ? ', so it stays with you' : '') });
+          skipped.push({ company_name: src.company_name, reason: `already in ${targetCollege.college_code || targetCollege.college_name}` });
           continue;
         }
         const sec = src.pipeline_section;
@@ -147,19 +148,36 @@ export function registerWeeklyTransferRoutes(app: Express, deps: Deps) {
         sentNames.push(src.company_name);
       }
 
-      if (mode === 'move' && sentIds.length > 0) {
-        if (fromTop) {
-          await WeeklyTracker.updateMany({ _id: { $in: sentIds } }, { $set: { is_pinned_top: false } });
-          await WeeklyTracker.updateMany({ _id: { $in: sentIds }, pipeline_section: 'top_companies' }, { $set: { pipeline_section: 'pipeline' } });
-        } else {
-          await WeeklyTracker.updateMany({ _id: { $in: sentIds } }, { $set: { is_deleted: true, deleted_at: new Date() } });
-        }
-      }
-
       if (sentNames.length > 0) {
         const label = sentNames.length === 1 ? sentNames[0] : `${sentNames[0]} and ${sentNames.length - 1} more`;
         deps.notifyForeignCollegeOwners(userId, targetObjId, label, 'created');
-        if (mode === 'move') deps.notifyForeignCollegeOwners(userId, new Types.ObjectId(sourceCollegeId), label, 'deleted');
+
+        // Tell the receiving coordinator(s) in the app: "One data received from ACET College".
+        try {
+          const recipients = (coordOwners.length ? coordOwners : ownerCandidates)
+            .map((u) => u._id)
+            .filter((id: any) => String(id) !== String(userId));
+          if (recipients.length > 0) {
+            const from = sourceCollege?.college_code || sourceCollege?.college_name || 'another college';
+            const n = sentNames.length;
+            await Notification.create({
+              notification_type: 'system_update',
+              sender_id: new Types.ObjectId(String(userId)),
+              sender_role: 'system',
+              audience_type: 'individual',
+              target_user_ids: recipients,
+              target_college_id: targetObjId,
+              title: WEEKLY_COPY_NOTIFICATION_TITLE,
+              message: `${n === 1 ? 'One' : n} data received from ${from} College`,
+              icon_type: 'announcement',
+              priority: 'medium',
+              action_url: '/weekly-tracker',
+              requires_acknowledgment: false,
+            });
+          }
+        } catch (e: any) {
+          console.error('[weekly-transfer] notify receiver failed:', e?.message || e);
+        }
       }
 
       return res.status(200).json({
@@ -167,7 +185,7 @@ export function registerWeeklyTransferRoutes(app: Express, deps: Deps) {
         message:
           sentNames.length === 0
             ? 'Nothing was sent.'
-            : `${sentNames.length} compan${sentNames.length === 1 ? 'y' : 'ies'} ${mode === 'move' ? 'moved' : 'copied'} to ${targetCollege.college_code || targetCollege.college_name}.`,
+            : `${sentNames.length === 1 ? 'One company' : `${sentNames.length} companies`} copied to ${targetCollege.college_code || targetCollege.college_name}.`,
         sent: sentNames.length,
         skipped,
         target: { _id: String(targetCollege._id), college_name: targetCollege.college_name, college_code: targetCollege.college_code },
