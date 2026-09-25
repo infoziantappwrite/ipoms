@@ -2695,7 +2695,7 @@ export function ReportBuilderWizard({
                   <Building2 size={16} className="text-indigo-600 shrink-0" />
                   <div>
                     <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
-                      Target Colleges for Month-End Report & Calling Activity
+                      Focus College Call Activity
                     </h2>
                     <p className="text-[11px] text-fg-subtle mt-0.5">
                       Select which of your handled institutions should appear in the Month-End Calling Activity Summary and report totals. Unticked colleges will be omitted.
@@ -2708,7 +2708,7 @@ export function ReportBuilderWizard({
                 </div>
               </div>
 
-              <div className="border border-border rounded-xl p-3.5 bg-surface-sunken/40 space-y-3">
+              <div className="border border-border rounded-xl p-3 bg-surface-sunken/40 space-y-2.5">
                 {/* Quick Action Ribbon */}
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -2742,7 +2742,7 @@ export function ReportBuilderWizard({
                     type="text"
                     value={monthEndCollegeSearch}
                     onChange={(e) => setMonthEndCollegeSearch(e.target.value)}
-                    placeholder="Search college by name, code or city…"
+                    placeholder="Search college by acronym, code or name…"
                     className="w-full pl-8 pr-3 py-1.5 bg-surface border border-border rounded-lg text-xs text-fg outline-none focus:border-indigo-500 placeholder:text-fg-disabled"
                   />
                   <Search size={13} className="absolute left-2.5 top-2.5 text-fg-disabled pointer-events-none" />
@@ -2757,22 +2757,26 @@ export function ReportBuilderWizard({
                   )}
                 </div>
 
-                {/* Scrollable Checkbox List */}
-                <div className="max-h-56 overflow-y-auto pr-1 space-y-1 divide-y divide-border/40 border border-border rounded-lg bg-surface p-1.5 [scrollbar-width:thin]">
+                {/* Compact Checkbox Grid for College Acronyms */}
+                <div className="max-h-44 overflow-y-auto pr-1 border border-border rounded-lg bg-surface p-2 [scrollbar-width:thin]">
                   {filteredMonthEndColleges.length === 0 ? (
-                    <p className="text-center py-4 text-xs text-fg-disabled italic">No institutions match search</p>
+                    <p className="text-center py-3 text-xs text-fg-disabled italic">No institutions match search</p>
                   ) : (
-                    filteredMonthEndColleges.map((c: any) => {
-                      const isSelected = monthEndSelectedCollegeIds.includes(c._id);
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5">
+                      {filteredMonthEndColleges.map((c: any) => {
+                        const isSelected = monthEndSelectedCollegeIds.includes(c._id);
+                        const acronym = c.college_code || c.college_name;
 
-                      return (
-                        <label
-                          key={c._id}
-                          className={`flex items-center justify-between gap-2 p-2 rounded-md hover:bg-surface-sunken cursor-pointer transition-colors ${
-                            isSelected ? 'bg-indigo-500/5 font-medium' : 'opacity-70 hover:opacity-100'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
+                        return (
+                          <label
+                            key={c._id}
+                            title={`${c.college_name} (${acronym})`}
+                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer transition-all select-none ${
+                              isSelected
+                                ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs'
+                                : 'bg-surface border-border/80 text-fg-muted hover:border-indigo-300 hover:text-fg opacity-80'
+                            }`}
+                          >
                             <input
                               type="checkbox"
                               checked={isSelected}
@@ -2782,20 +2786,15 @@ export function ReportBuilderWizard({
                                   isSelected ? prev.filter((id) => id !== c._id) : [...prev, c._id]
                                 );
                               }}
-                              className="w-4 h-4 rounded border-border text-indigo-600 focus:ring-indigo-500 accent-indigo-600 cursor-pointer shrink-0"
+                              className="w-3.5 h-3.5 rounded border-border text-indigo-600 focus:ring-indigo-500 accent-indigo-600 cursor-pointer shrink-0"
                             />
-                            <span className={`text-xs truncate ${isSelected ? 'text-fg font-bold' : 'text-fg-muted'}`}>
-                              {c.college_name}
+                            <span className="font-mono font-bold text-[11px] tracking-wide truncate">
+                              {acronym}
                             </span>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-surface-sunken border border-border text-fg-subtle font-semibold">
-                              {c.college_code}
-                            </span>
-                          </div>
-                        </label>
-                      );
-                    })
+                          </label>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
 

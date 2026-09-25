@@ -52,11 +52,25 @@ export interface ReportCanvasOptions {
   size?: ImageExportSize;
 }
 
+/** First page only (kept for callers that want a single canvas). */
 export async function generateReportCanvas(
   report: any,
   options?: ReportCanvasOptions
 ): Promise<HTMLCanvasElement | null> {
-  if (!report) return null;
+  const pages = await generateReportCanvases(report, options);
+  return pages[0] || null;
+}
+
+/**
+ * Draws the report as one canvas per page. A report that fits one A4 page (or is small enough to be
+ * fitted to its content) gives one canvas; a longer one is split into A4-proportioned pages, breaking
+ * only BETWEEN rows and repeating the section title + table header at the top of every continued page.
+ */
+export async function generateReportCanvases(
+  report: any,
+  options?: ReportCanvasOptions
+): Promise<HTMLCanvasElement[]> {
+  if (!report) return [];
 
   const collegeName = report.branding?.college_name || 'Consolidated Partner Institutions';
   const collegeCode = (report.branding?.college_code || 'iPOMS').toUpperCase();
@@ -66,7 +80,7 @@ export async function generateReportCanvas(
   const W = 860;
   const PADDING = 30;
   const CONTENT_W = W - PADDING * 2; // 800px
-  const SCALE = 2.5; // High-DPI output resolution
+  const BASE_SCALE = 4; // High-DPI output resolution (lowered per page only if a canvas would be enormous)
 
   const loadImg = (url: string): Promise<HTMLImageElement | null> => {
     return new Promise((resolve) => {
@@ -1511,6 +1525,7 @@ export async function generateReportCanvas(
     }
   }
 
+  const yBeforeSections = totalH;
   // Calculate total sections height
   sectionsToDraw.forEach((sec) => {
     if (sec.title) {
@@ -1559,36 +1574,82 @@ export async function generateReportCanvas(
   const exportSize: ImageExportSize = options?.size || 'auto';
   const A4_PAGE_H = Math.round(W * (297 / 210)); // 1216px
   let finalCanvasH: number;
+  // A report that runs past one A4 sheet is split into A4 pages (rows never cut in half).
+  const paginate =
+    exportSize === 'a4' ||
+    (exportSize === 'auto' && !singleHeroLead && totalH > A4_PAGE_H);
 
-  if (exportSize === 'a4') {
-    const totalPages = Math.max(1, Math.ceil(totalH / A4_PAGE_H));
-    finalCanvasH = totalPages * A4_PAGE_H;
+  // Page flow shared by the measuring pass below and the drawing pass, so they cannot disagree.
+  const bottomReserve = PADDING + (hasFooter ? 44 : 0);
+  const pageOf = (y: number) => Math.floor(y / A4_PAGE_H);
+  const fits = (y: number, h: number) => y + h <= (pageOf(y) + 1) * A4_PAGE_H - bottomReserve;
+  const nextPageY = (y: number) => (pageOf(y) + 1) * A4_PAGE_H + PADDING;
+
+  let pageCount = 1;
+  if (paginate) {
+    let sy = yBeforeSections;
+    sectionsToDraw.forEach((sec) => {
+      const titleH = sec.title ? 34 : 0;
+      const firstH = sec.measuredRows.length ? sec.measuredRows[0].height : 34;
+      if (!fits(sy, titleH + 34 + firstH)) sy = nextPageY(sy);
+      sy += titleH + 34;
+      if (sec.measuredRows.length === 0) {
+        sy += 34;
+      } else {
+        sec.measuredRows.forEach((r) => {
+          if (!fits(sy, r.height)) sy = nextPageY(sy) + titleH + 34;
+          sy += r.height;
+        });
+      }
+      sy += 22;
+    });
+    if (hasObservations) {
+      if (!fits(sy, obsBoxH)) sy = nextPageY(sy);
+      sy += obsBoxH + 18;
+    }
+    pageCount = Math.max(1, pageOf(sy - 1) + 1);
+    finalCanvasH = pageCount * A4_PAGE_H;
   } else if (exportSize === 'square') {
     finalCanvasH = Math.max(W, totalH);
   } else if (exportSize === 'compact') {
     finalCanvasH = totalH;
+  } else if (singleHeroLead || totalH <= 750) {
+    // Small report: fit the canvas to its content (ideal for WhatsApp / mobile)
+    finalCanvasH = totalH;
   } else {
-    // 'auto' mode:
-    // If single company / compact report, fit canvas to content (ideal for WhatsApp / mobile)
-    // If larger multi-page report, enforce standard A4 sheet dimensions
-    if (singleHeroLead || totalH <= 750) {
-      finalCanvasH = totalH;
-    } else {
-      const totalPages = Math.max(1, Math.ceil(totalH / A4_PAGE_H));
-      finalCanvasH = totalPages * A4_PAGE_H;
-    }
+    // Between "small" and one full sheet: exactly one A4 page
+    finalCanvasH = A4_PAGE_H;
   }
 
-  // Create High-Res Canvas maintaining full A4 sheet dimensions
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(W * SCALE);
-  canvas.height = Math.round(finalCanvasH * SCALE);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-
-  ctx.scale(SCALE, SCALE);
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
+  // One canvas per page, all at the same (sharp) scale. Drawing always uses one continuous "virtual"
+  // Y; usePage() shifts the transform so a page break simply moves Y onto the next canvas.
+  const pageH = paginate ? A4_PAGE_H : finalCanvasH;
+  const SCALE = Math.min(BASE_SCALE, 16000 / pageH);
+  const pageCanvases: HTMLCanvasElement[] = [];
+  let ctx!: CanvasRenderingContext2D;
+  const usePage = (idx: number) => {
+    if (!pageCanvases[idx]) {
+      const c = document.createElement('canvas');
+      c.width = Math.round(W * SCALE);
+      c.height = Math.round(pageH * SCALE);
+      const cx = c.getContext('2d');
+      if (!cx) return false;
+      cx.fillStyle = '#ffffff';
+      cx.fillRect(0, 0, c.width, c.height);
+      pageCanvases[idx] = c;
+    }
+    const cx = pageCanvases[idx].getContext('2d');
+    if (!cx) return false;
+    cx.setTransform(SCALE, 0, 0, SCALE, 0, -idx * pageH * SCALE);
+    cx.imageSmoothingEnabled = true;
+    cx.imageSmoothingQuality = 'high';
+    ctx = cx;
+    return true;
+  };
+  for (let i = 0; i < pageCount; i++) {
+    if (!usePage(i)) return [];
+  }
+  usePage(0);
 
   // Helper: Round Rectangle
   const drawRoundRect = (
@@ -1622,10 +1683,6 @@ export async function generateReportCanvas(
       ctx.stroke();
     }
   };
-
-  // Background
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, W, finalCanvasH);
 
   let currentY = PADDING;
 
@@ -1742,13 +1799,21 @@ export async function generateReportCanvas(
   }
 
   // Render Section Tables
+  const breakPage = () => {
+    currentY = nextPageY(currentY);
+    usePage(pageOf(currentY));
+  };
   sectionsToDraw.forEach((sec) => {
+    const tableHeaderH = 34;
+    const titleH = sec.title ? 34 : 0;
+    const drawSectionHead = (continued: boolean) => {
+      const secTitle = continued && sec.title ? `${sec.title} (continued)` : sec.title;
     if (sec.title) {
       // Title
       ctx.textAlign = 'left';
       ctx.fillStyle = '#0a2540';
       ctx.font = 'bold 15px system-ui, -apple-system, sans-serif';
-      ctx.fillText(sec.title, PADDING, currentY + 16);
+      ctx.fillText(secTitle, PADDING, currentY + 16);
 
       // Accent line
       ctx.fillStyle = '#007791';
@@ -1756,8 +1821,6 @@ export async function generateReportCanvas(
 
       currentY += 34;
     }
-    const tableTopY = currentY;
-    const tableHeaderH = 34;
 
     // Header Background
     ctx.fillStyle = '#0a2540';
@@ -1803,6 +1866,13 @@ export async function generateReportCanvas(
 
     currentY += tableHeaderH;
 
+    };
+    if (paginate) {
+      const firstH = sec.measuredRows.length ? sec.measuredRows[0].height : 34;
+      if (!fits(currentY, titleH + tableHeaderH + firstH)) breakPage();
+    }
+    drawSectionHead(false);
+
     // Rows
     if (sec.measuredRows.length === 0) {
       const emptyH = 34;
@@ -1815,6 +1885,10 @@ export async function generateReportCanvas(
       currentY += emptyH;
     } else {
       sec.measuredRows.forEach((mRow, rIdx) => {
+        if (paginate && !fits(currentY, mRow.height)) {
+          breakPage();
+          drawSectionHead(true);
+        }
         const rowBg = mRow.bg || (report.template_type === 'pending_tasks' ? '#ffffff' : (rIdx % 2 === 0 ? '#f0f7f9' : '#ffffff'));
         const rowH = mRow.height;
         ctx.fillStyle = rowBg;
@@ -1861,20 +1935,13 @@ export async function generateReportCanvas(
         });
 
         currentY += rowH;
-      });
-    }
 
-    // Dividers
-    ctx.strokeStyle = '#e2e8f0';
-    ctx.lineWidth = 1;
-
-    let rowYTracker = tableTopY + tableHeaderH;
-    if (sec.measuredRows.length > 0) {
-      sec.measuredRows.forEach((mRow) => {
-        rowYTracker += mRow.height;
+        // Divider under the row
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(PADDING, rowYTracker);
-        ctx.lineTo(PADDING + CONTENT_W, rowYTracker);
+        ctx.moveTo(PADDING, currentY);
+        ctx.lineTo(PADDING + CONTENT_W, currentY);
         ctx.stroke();
       });
     }
@@ -2013,6 +2080,7 @@ export async function generateReportCanvas(
 
   // Observations Box
   if (hasObservations) {
+    if (paginate && !fits(currentY, obsBoxH)) breakPage();
     drawRoundRect(PADDING, currentY, CONTENT_W, obsBoxH, 6, '#f8fafc', '#e2e8f0', 1);
     ctx.textAlign = 'left';
     ctx.fillStyle = '#0f172a';
@@ -2029,50 +2097,67 @@ export async function generateReportCanvas(
     currentY += obsBoxH + 18;
   }
 
-  // Footer
-  if (hasFooter) {
-    const footerY = Math.max(currentY + 20, finalCanvasH - PADDING - 24);
-    ctx.strokeStyle = '#e2e8f0';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(PADDING, footerY);
-    ctx.lineTo(W - PADDING, footerY);
-    ctx.stroke();
+  // Footer (every page of a split report; "Page n of N" when there is more than one)
+  for (let pi = 0; pi < pageCount; pi++) {
+    usePage(pi);
+    const isLast = pi === pageCount - 1;
+    if (hasFooter) {
+      const footerY = paginate
+        ? (pi + 1) * A4_PAGE_H - PADDING - 24
+        : Math.max(currentY + 20, finalCanvasH - PADDING - 24);
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(PADDING, footerY);
+      ctx.lineTo(W - PADDING, footerY);
+      ctx.stroke();
 
-    const footerTextY = footerY + 20;
-    ctx.fillStyle = '#64748b';
-    ctx.font = '500 11.5px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('© 2026 Infoziant. All rights reserved.', PADDING, footerTextY);
+      const footerTextY = footerY + 20;
+      ctx.fillStyle = '#64748b';
+      ctx.font = '500 11.5px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('© 2026 Infoziant. All rights reserved.', PADDING, footerTextY);
 
-    if (Boolean(report.generated_by || report.branding?.prepared_by)) {
-      ctx.textAlign = 'right';
-      ctx.fillStyle = '#0f172a';
+      if (isLast && Boolean(report.generated_by || report.branding?.prepared_by)) {
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 11.5px system-ui, -apple-system, sans-serif';
+        ctx.fillText(`Prepared by: ${report.generated_by || report.branding?.prepared_by}`, W - PADDING, footerTextY);
+      }
+      if (pageCount > 1) {
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#64748b';
+        ctx.font = 'bold 11.5px system-ui, -apple-system, sans-serif';
+        ctx.fillText(`Page ${pi + 1} of ${pageCount}`, W / 2, footerTextY);
+      }
+    } else if (pageCount > 1) {
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#64748b';
       ctx.font = 'bold 11.5px system-ui, -apple-system, sans-serif';
-      ctx.fillText(`Prepared by: ${report.generated_by || report.branding?.prepared_by}`, W - PADDING, footerTextY);
+      ctx.fillText(`Page ${pi + 1} of ${pageCount}`, W / 2, (pi + 1) * A4_PAGE_H - PADDING);
     }
   }
 
-  return canvas;
+  return pageCanvases;
 }
 
 export async function exportReportAsImage(report: any, options?: ReportCanvasOptions): Promise<void> {
-  const canvas = await generateReportCanvas(report, options);
-  if (!canvas) return;
+  const pages = await generateReportCanvases(report, options);
+  if (!pages.length) return;
 
   const fileName = getReportExportBaseFileName(report);
-  canvas.toBlob(
-    (blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${fileName}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    },
-    'image/png'
-  );
+  for (let i = 0; i < pages.length; i++) {
+    const blob: Blob | null = await new Promise((resolve) => pages[i].toBlob(resolve, 'image/png'));
+    if (!blob) continue;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = pages.length > 1 ? `${fileName}_page-${i + 1}-of-${pages.length}.png` : `${fileName}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    // a short gap so the browser accepts several downloads in a row
+    if (i < pages.length - 1) await new Promise((r) => setTimeout(r, 350));
+  }
 }

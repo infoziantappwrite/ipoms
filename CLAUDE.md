@@ -1979,6 +1979,27 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     **Not verified:** Daily JD Received with data (that day returned no rows; code mirrors Positives), the
     Administrator account, actual PNG/PDF files.
 
+77. **Report image export: sharper (4x) and split into A4 pages, 25 Sep 2026 (user-requested).** The image
+    download was one very tall PNG at 2.5x (~2150 px wide) that WhatsApp then re-compressed. Now
+    `reportCanvasRenderer.ts` renders at **4x** (3440 px wide; scale is lowered only if one canvas would
+    exceed ~16,000 px tall) and, when a report runs past one A4 sheet, **splits it into A4-proportioned pages
+    (860x1216 -> 3440x4864)**: rows are never cut in half, every continued page repeats the section title
+    "(continued)" and the table header (Company Name / Role / CTC ...), each page has the footer with
+    "Page n of N", "Prepared by" on the last. Small reports (<=750 px of content, and single-company cards)
+    stay ONE content-fitted image; between that and one sheet it is one A4 page; the "Compact" and "Square"
+    size buttons keep their old single-image behaviour, "A4" always paginates. New
+    `generateReportCanvases()` (array; `generateReportCanvas()` kept, returns page 1); the page flow uses one
+    shared `fits()/nextPageY()` in a measuring pass and the drawing pass so they cannot disagree; row divider
+    lines are now drawn per row (the old separate pass could not follow a page break). The previewer
+    (`A4PdfPreviewModal.tsx`) shows every page ("Image 1 of N") and **Save Image downloads one file per page**
+    (`name_page-1-of-3.png`, 350 ms apart; the browser may ask once to allow multiple downloads).
+    **Verified in a real browser:** DSU Weekly -> 4 pages, all exactly 3440x4864 (ratio 1.414), page 2 starts with
+    "COMPANIES IN PIPELINE (continued)" + the header row, last page ends with observations + footer; Month-End ->
+    2 pages; Daily Positives -> 1 image 3440x1432; no page errors; `tsc` clean. **Not verified:** actual
+    downloaded files / WhatsApp, Active Leads with hundreds of rows (that run timed out on a selector, untested),
+    the **PDF**, which is unchanged and still the browser print path. WhatsApp still compresses a photo: send
+    as **Document** for full sharpness.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map
