@@ -11,6 +11,7 @@
     "seed:admin": "ts-node src/scripts/seedRolesAndAdmin.ts",
     "unlock": "ts-node src/scripts/unlockUser.ts",
     "verify:policy": "ts-node src/scripts/verifyRoutePolicy.ts",
+    "test": "node --require ts-node/register/transpile-only --test \"tests/**/*.test.ts\"",
     "fix:roles": "ts-node src/scripts/fixRoleCodes.ts",
     "seed:nehru": "ts-node src/scripts/runWeeklySnapshot.ts nehru",
     "seed:hits": "ts-node src/scripts/runWeeklySnapshot.ts hits",

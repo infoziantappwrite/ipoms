@@ -2116,6 +2116,26 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     `col_karpagam` (from the cached fallback list), which the handlers answer with `500` (Mongoose CastError)
     instead of `400`; the page then refetches with the real id so users don't notice.
 
+82. **First automated tests + a verified production build, 25 Sep 2026 (item 5 of the production list).**
+    **`npm test` in `backend/`** now runs 34 black-box API tests (`backend/tests/api.test.ts`, Node's built-in
+    test runner, **no new dependency**) against a RUNNING server (`TEST_BASE_URL`, default localhost:5000; standard
+    accounts/password from section 2). They are **read-only** apart from signing in, so they are safe against the
+    shared database, and they deliberately stay far below the login rate limit (a limit test would lock the test
+    machine's own IP out for 15 minutes). Covered: security headers + request id, foreign-origin refusal, gzip,
+    13 protected routes all refused anonymously, forged `alg:none` token, generic wrong-password answer, login
+    input-length / oversize / bad-JSON handling, operator objects in the login body, self-registration disabled,
+    anonymous large body refused before parsing, coordinator 403 on `/users`, `/meta-audit`,
+    `/health/duplicate-audit`, `/dashboard/admin`, settings change and self role-escalation, `/settings` scoping
+    (coordinator = `settings` only, admin = all blocks), coordinator scoping on daily leads / notifications, and the
+    weekly tracker / daily tracker / coordinator dashboard still loading (incl. a regex-character search). All 34
+    pass. **Not covered (still a gap against the spec's 80% goal):** anything that writes (trackers, imports,
+    paste, copy-to-college), the frontend (a Playwright config exists but no specs were written), the cron jobs,
+    and the email-check rules. **Production build:** `next build` passes (26 static pages, First Load JS 87 kB
+    shared, largest route `/daily-leads` 233 kB) - run in a **temporary copy** at `C:\Temp\ipoms_build` (a junction
+    to this repo's `node_modules`) so the live dev server's `.next` was not wiped; that folder can be deleted
+    (delete the `node_modules` junction first, not through it). Note the repo has TWO next configs
+    (`next.config.mjs` proxy/rewrites and `next.config.mobile.js` static export) - the build above used the default.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map
