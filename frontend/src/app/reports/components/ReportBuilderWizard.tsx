@@ -2440,7 +2440,7 @@ export function ReportBuilderWizard({
                           <div className="flex items-center gap-2">
                             <sec.icon size={15} className={sec.colorClass} />
                             <h3 className="text-xs font-bold text-fg tracking-wide uppercase">
-                              {pendingActiveTab === 'all' ? `${secIdx + 1}. ` : ''}
+                              
                               {sec.title}
                             </h3>
                             <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-surface border border-border text-fg-muted font-bold">

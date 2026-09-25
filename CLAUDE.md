@@ -1962,6 +1962,23 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     touched the Weekly/Daily Tracker; `tsc --noEmit` clean. **Not verified:** an actual PNG / PDF file opened
     after a rename (only the strings drawn on the canvas were checked), and printing on paper.
 
+76. **No section numbers in any report; titles and column headings editable in the preview for every
+    report type, 25 Sep 2026 (user-requested; extends item 75).** Removed the "1." / "2." prefixes from
+    Month-End (incl. the A4 "10. CALLING ACTIVITY SUMMARY"), Pending Tasks (`{secIdx + 1}.`), the multi-college
+    Weekly college headings, the Excel/print HTML builder, and the Pending Tasks tabs in the builder, on all
+    four surfaces (`NativeReportEditor.tsx`, `A4PdfPreviewModal.tsx`, `reportCanvasRenderer.ts`,
+    `ReportBuilderWizard.tsx`). Editable (same `report.section_titles` / `report.column_headings` mechanism,
+    presentation-only, reset on regenerate): **Month-End** (6 titles + headings), **Pending Tasks** (key
+    `pending_<section key>`), **Active Leads** (title + headings; columns use FIXED slots 0 S.No, 1 Company,
+    2 Colleges, 3 Role, 4 CTC so hiding a column never shifts a rename), **Daily Positives / Daily JD Received**
+    (headings, keys `daily_positives` / `daily_jd`; these have no section title beyond the report title, which
+    was already editable). **Still not covered:** the Excel export prints defaults, multi-college Weekly
+    headings, empty-state lines. **Verified in a real browser** (coordinator; Malvika for Pending): 0 numbered
+    headings; a renamed title and column reached the screen, the A4 preview and the words drawn on the export
+    canvas for Month-End, Pending, Active Leads and Daily Positives; no tracker requests; `tsc` clean.
+    **Not verified:** Daily JD Received with data (that day returned no rows; code mirrors Positives), the
+    Administrator account, actual PNG/PDF files.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map
