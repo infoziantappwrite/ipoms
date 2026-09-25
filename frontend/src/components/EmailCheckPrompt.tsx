@@ -390,7 +390,7 @@ export function EmailCheckPrompt() {
           padding: 16px; overflow: auto; background: rgba(15, 23, 42, .45); animation: ipoms-ec-fade .25s ease-out both; }
         .ipoms-ec-card { position: relative; width: min(400px, 100%); margin: auto; border-radius: 20px; overflow: hidden;
           background: #fff; color: #0f172a; font-family: inherit; box-shadow: 0 24px 60px rgba(15, 23, 42, .35);
-          animation: ipoms-ec-pop .35s cubic-bezier(.2,.9,.3,1.2) both; }
+          animation: ipoms-ec-pop .35s cubic-bezier(.16,1,.3,1) both; }
         .ipoms-ec-x { position: absolute; top: 9px; right: 9px; z-index: 2; display: grid; place-items: center; width: 28px; height: 28px;
           border: 0; border-radius: 999px; background: rgba(255,255,255,.18); color: #fff; cursor: pointer; transition: background .15s ease; }
         .ipoms-ec-x:hover { background: rgba(255,255,255,.34); }
@@ -416,7 +416,7 @@ export function EmailCheckPrompt() {
         .ipoms-ec-actions { display: flex; gap: 9px; margin-top: 13px; }
         .ipoms-ec-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px;
           border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
-          transition: transform .14s cubic-bezier(.2,.9,.3,1.2), filter .14s ease, border-color .14s ease, background .14s ease; }
+          transition: transform .14s cubic-bezier(.16,1,.3,1), filter .14s ease, border-color .14s ease, background .14s ease; }
         .ipoms-ec-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.04); }
         .ipoms-ec-btn:active:not(:disabled) { transform: translateY(0) scale(.985); }
         .ipoms-ec-btn:disabled { opacity: .45; cursor: not-allowed; }
@@ -445,13 +445,13 @@ export function EmailCheckPrompt() {
         .ipoms-ec-pad { height: ${ITEM}px; }
         .ipoms-ec-item { height: ${ITEM}px; line-height: ${ITEM}px; scroll-snap-align: center; cursor: pointer; user-select: none;
           font-size: 17px; font-weight: 600; color: #94a3b8; font-variant-numeric: tabular-nums;
-          transition: color .18s ease, transform .18s cubic-bezier(.2,.9,.3,1.2), opacity .18s ease; opacity: .75; }
+          transition: color .18s ease, transform .18s cubic-bezier(.16,1,.3,1), opacity .18s ease; opacity: .75; }
         .ipoms-ec-item.is-on { color: #1E3A8A; font-weight: 800; transform: scale(1.12); opacity: 1; }
         .ipoms-ec-colon { position: relative; z-index: 1; font-size: 17px; font-weight: 800; color: #1E3A8A; padding-bottom: 2px; }
         .ipoms-ec-mer { position: relative; z-index: 1; display: flex; flex-direction: column; margin-left: 10px; padding: 3px;
           border-radius: 12px; background: #eaeff7; }
         .ipoms-ec-merthumb { position: absolute; left: 3px; right: 3px; top: 3px; height: calc(50% - 3px); border-radius: 9px;
-          background: #1E3A8A; box-shadow: 0 3px 8px rgba(30,58,138,.3); transition: transform .24s cubic-bezier(.2,.9,.3,1.2); }
+          background: #1E3A8A; box-shadow: 0 3px 8px rgba(30,58,138,.3); transition: transform .24s cubic-bezier(.16,1,.3,1); }
         .ipoms-ec-mer button { position: relative; z-index: 1; width: 46px; height: 30px; border: 0; background: transparent;
           font-family: inherit; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; color: #64748b; cursor: pointer; transition: color .2s ease; }
         .ipoms-ec-mer button.is-on { color: #fff; }
@@ -462,7 +462,7 @@ export function EmailCheckPrompt() {
         .ipoms-ec-done { display: grid; place-items: center; gap: 9px; padding: 20px 18px 24px; font-size: 13px; font-weight: 600; text-align: center; }
         .ipoms-ec-done p { margin: 0; }
         .ipoms-ec-tick { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 999px; background: #15803d; color: #fff;
-          animation: ipoms-ec-pop .4s cubic-bezier(.2,.9,.3,1.4) both; }
+          animation: ipoms-ec-pop .4s cubic-bezier(.16,1,.3,1) both; }
 
         .dark .ipoms-ec-card { background: #141b2b; color: #e5e9f2; }
         .dark .ipoms-ec-sub, .dark .ipoms-ec-at, .dark .ipoms-ec-more { color: #a9b3c7; }
