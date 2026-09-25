@@ -2066,6 +2066,30 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     target already has in ANY section (even a collapsed one, e.g. Rejected Companies) is skipped, and the page
     still switches; suggested (not built) a single warning and no switch when everything is skipped.
 
+80. **Production-readiness audit, 25 Sep 2026 (user-requested; run against the local backend, which uses the
+    PRODUCTION database - read-only probes except one self-inflicted write, below).** **Verdict: not ready for a
+    real production launch yet - fine as an internal pilot.** *Passes:* both `tsc` clean, `verify:policy` 100% (every
+    endpoint has a policy), security headers all present, CORS rejects foreign origins, 13 protected routes all
+    401 anonymously, forged `alg:none` JWT 401, NoSQL-operator login 401, regex-special search 200, coordinator
+    blocked from `/users`, `/meta-audit`, `/health/duplicate-audit`. *Per-college screens are fast:* weekly tracker
+    per college p50 341 ms (33 KB), KPI 213 ms, Daily Tracker today 102 ms, metadata page 209 ms, colleges 189 ms.
+    *Gaps found:* (1) **no rate limiting** - 15 rapid bad logins all 401, never 429 (known release-gate item 6);
+    (2) **no response compression** (no `compression` middleware) - the unfiltered `/weekly-tracker` is 1 MB, Daily
+    Leads 250 KB, all sent raw; (3) `express.json({limit:'25mb'})` is far above what any route needs;
+    (4) **failed-login audit rows store the attacker-supplied email / message with no length cap** - my own probe
+    (a 3 MB "email") wrote a 3 MB `FAILED_LOGIN` row that made `GET /dashboard/admin` return 6 MB and take 8-16 s.
+    **I deleted exactly that one row** (`6ab697ed3029cc393b3bff92`, 3,000,000 x "a", created 15:49 UTC on 25 Sep) -
+    dashboard back to 28 KB / ~1 s. The code fix (truncate in the audit write; cap the login body) is NOT done;
+    anyone can repeat this against the deployed API until it is. (5) `GET /settings` returns system-health, storage
+    and organisation counts to **coordinators** too (policy is STAFF for GET); low risk, consider admin-only.
+    (6) No `x-request-id` / structured logs. (7) `GET /dashboard/team-leader` ~2.2 s and `/dashboard/coordinator`
+    ~0.8 s (p50); unfiltered `/weekly-tracker` 1.3 s p50 with spikes to 18 s under concurrency (no `.lean()`).
+    (8) `npm audit` (prod deps): `xlsx` **high, no fix upstream** (both sides); frontend `next` 14.x **critical** -
+    the fix is the pushed `next16-upgrade` branch (`bc5750e`), not merged; two moderates. (9) **Zero automated
+    tests.** (10) **`next build` was NOT run** (it wipes `.next` and would have killed the live dev server), so a
+    production build is unverified this session. (11) Still open from before: rotate the secrets that are in git
+    history, `recycle_bin` / `import_processing_history` unbuilt, 3 missing crons, `server.ts` monolith.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map
