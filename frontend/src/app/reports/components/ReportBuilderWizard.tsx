@@ -1234,6 +1234,11 @@ export function ReportBuilderWizard({
   const handleCategoryChange = (newType: string) => {
     setTemplateType(newType);
     setValidationErrors([]);
+    // The two Daily templates force a graduating batch (2027). Leaving one for any other report must not
+    // carry that batch along - it silently filtered the weekly report to a single batch.
+    if (newType !== 'daily_positives' && newType !== 'daily_jd_received') {
+      setAcademicYear('all');
+    }
     if (newType === 'pending_tasks') {
       setSections({
         pending_tasks: true,
@@ -1535,7 +1540,7 @@ export function ReportBuilderWizard({
     return [
       {
         key: 'completed_companies',
-        label: '1. Companies Completed',
+        label: 'Companies Completed',
         icon: CheckCircle2,
         desc: 'Finished drives with confirmed placed student counts',
         companies: filteredWeeklyCompanies.completed,
@@ -1543,7 +1548,7 @@ export function ReportBuilderWizard({
       },
       {
         key: 'drive_in_progress',
-        label: '2. Drive in Progress',
+        label: 'Drive in Progress',
         icon: Zap,
         desc: 'Placement drives currently taking place / evaluation underway',
         companies: filteredWeeklyCompanies.drive_in_progress,
@@ -1551,7 +1556,7 @@ export function ReportBuilderWizard({
       },
       {
         key: 'companies_in_drive',
-        label: '3. Upcoming Drives',
+        label: 'Upcoming Drives',
         icon: Calendar,
         desc: 'Scheduled campus placement drives actively upcoming or confirmed',
         companies: filteredWeeklyCompanies.in_drive,
@@ -1559,7 +1564,7 @@ export function ReportBuilderWizard({
       },
       {
         key: 'in_progress',
-        label: '4. Companies In Progress',
+        label: 'Companies In Progress',
         icon: Clock,
         desc: 'Active ongoing interview evaluation rounds',
         companies: filteredWeeklyCompanies.in_progress,
@@ -1567,7 +1572,7 @@ export function ReportBuilderWizard({
       },
       {
         key: 'pipeline',
-        label: '5. Companies In Pipeline',
+        label: 'Companies In Pipeline',
         icon: Layers,
         desc: 'Upcoming scheduled drives and confirmed tech partnerships',
         companies: filteredWeeklyCompanies.pipeline,
@@ -1575,7 +1580,7 @@ export function ReportBuilderWizard({
       },
       {
         key: 'top_companies',
-        label: '6. Top Companies',
+        label: 'Top Companies',
         icon: Sparkles,
         desc: 'Premier high-CTC partner organizations',
         companies: filteredWeeklyCompanies.top_companies || [],
@@ -1583,7 +1588,7 @@ export function ReportBuilderWizard({
       },
       {
         key: 'rejected_companies',
-        label: '7. Rejected Companies',
+        label: 'Rejected Companies',
         icon: XCircle,
         desc: 'Companies with employer declines or ineligible criteria',
         companies: filteredWeeklyCompanies.rejected_companies || [],
@@ -1591,7 +1596,7 @@ export function ReportBuilderWizard({
       },
       {
         key: 'on_hold_by_college',
-        label: '8. Companies On Hold By College',
+        label: 'Companies On Hold By College',
         icon: Clock,
         desc: 'Placement drives placed on hold by college management / TPO',
         companies: filteredWeeklyCompanies.on_hold_by_college || [],
@@ -1599,7 +1604,7 @@ export function ReportBuilderWizard({
       },
       {
         key: 'on_hold_by_hr',
-        label: '9. Companies On Hold By HR',
+        label: 'Companies On Hold By HR',
         icon: Clock,
         desc: 'Placement drives placed on hold by corporate HR partners',
         companies: filteredWeeklyCompanies.on_hold_by_hr || [],
@@ -1814,7 +1819,8 @@ export function ReportBuilderWizard({
                       );
                       let selectOptions = prioritizedColleges.map((c: any) => ({
                         value: c._id,
-                        label: `[${c.college_code}] ${c.college_name}`,
+                        // the dropdown draws the code badge itself - the label must NOT repeat it
+                        label: c.college_name,
                         badge: c.college_code,
                         isPinned: Boolean(c.isPinned || c.is_selected_by_me),
                       }));
@@ -2434,7 +2440,7 @@ export function ReportBuilderWizard({
                           <div className="flex items-center gap-2">
                             <sec.icon size={15} className={sec.colorClass} />
                             <h3 className="text-xs font-bold text-fg tracking-wide uppercase">
-                              {pendingActiveTab === 'all' ? `${secIdx + 1}. ` : ''}
+                              
                               {sec.title}
                             </h3>
                             <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-surface border border-border text-fg-muted font-bold">

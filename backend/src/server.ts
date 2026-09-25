@@ -143,6 +143,24 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/**
+ * The "Graduating Academic Batch" filter on the report builder means a BATCH (2027), but a weekly row
+ * carries two different years: `academic_year` is the SEASON it was created in (2026 since the season
+ * switch, item 37) and `eligible_batch` is the graduating batch ("2027 Batch"). Matching only
+ * `academic_year` silently dropped every row created after the season changed - 138 of 995 rows, incl.
+ * a coordinator's newest top companies. So a batch filter matches EITHER field. Returns a clause to be
+ * AND-ed into a filter (`$and`), never assigned to `academic_year`, so callers' own `$or` still works.
+ */
+function batchOrYearClause(year: any): any {
+  const y = String(year ?? '').trim();
+  const yearVals: any[] = [y];
+  if (Number.isFinite(Number(y)) && y !== '') yearVals.push(Number(y));
+  if (/^\d{4}$/.test(y)) {
+    return { $or: [{ academic_year: { $in: yearVals } }, { eligible_batch: new RegExp(`(^|\\D)${y}(\\D|$)`) }] };
+  }
+  return { academic_year: { $in: yearVals } };
+}
+
 // Get today's operational calendar date as midnight UTC with 12:00 AM (00:00:00 IST) cutoff
 // Refreshes every morning early at 12:00 AM midnight IST
 function getTodayDate(): Date {
@@ -684,6 +702,29 @@ app.use('/api/v1', (req: Request, res: Response, next: NextFunction) => {
 });
 
 app.use('/api/v1', authorizeRoute);
+
+// A full-oversight Team Leader (`has_all_colleges_access`, e.g. Malvika Kumar) monitors every college and
+// does not place calls, so the Daily Tracker is READ-ONLY for that account. The screen already hides every
+// editing control; this makes the server refuse too, so nothing can change through a stray request.
+// Reads (GET) and the read-only duplicate check are untouched.
+app.use('/api/v1/daily-tracker', async (req: Request, res: Response, next: NextFunction) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  if (req.path === '/check-metadata-batch') return next();
+  const uid = (req as any).user?.userId;
+  if (!uid || !Types.ObjectId.isValid(String(uid))) return next();
+  try {
+    const u: any = await User.findById(uid).select('has_all_colleges_access').lean();
+    if (u?.has_all_colleges_access) {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'READ_ONLY_MONITOR', message: 'This account monitors the Daily Tracker and cannot change it.' },
+      });
+    }
+  } catch {
+    /* never block a coordinator because of a lookup error */
+  }
+  return next();
+});
 
 // ── Maintenance Mode Enforcement Gate ──
 app.use('/api/v1', async (req: Request, res: Response, next: NextFunction) => {
@@ -1912,7 +1953,7 @@ app.post('/api/v1/colleges/unlock-focus', async (req: Request, res: Response) =>
 // 5. Coordinators List Endpoint (With mapped focus colleges)
 app.get('/api/v1/coordinators', async (req: Request, res: Response) => {
   try {
-    const allColleges = await College.find({ status: 'active', is_deleted: false }).select(
+    const allColleges = await College.find({ status: 'active', is_deleted: { $ne: true } }).select(
       '_id college_name college_code location logo_url'
     );
     const coordinators = await User.find({
@@ -1921,7 +1962,7 @@ app.get('/api/v1/coordinators', async (req: Request, res: Response) => {
       full_name: { $nin: ['Administrator', 'Admin', 'administrator', 'admin'] },
       account_status: 'active',
       is_deleted: false,
-    }).select('full_name official_email username primary_mobile presence_status');
+    }).select('full_name official_email username primary_mobile presence_status assigned_college_ids has_all_colleges_access');
 
     const DEFAULT_COORDINATOR_COLLEGE_MAP: Record<string, string[]> = {
       // Sujitha
@@ -1972,7 +2013,15 @@ app.get('/api/v1/coordinators', async (req: Request, res: Response) => {
           }
         }
       }
-      const matchedColleges = defaultCodes && defaultCodes.length > 0
+      // A full-oversight Team Leader holds every college but HANDLES none - never list her as the handler.
+      // Everyone else: their real assigned colleges (the source of truth since items 32/53); the hardcoded
+      // map above is only a starting point for a person who has none yet.
+      const assignedIds = ((coord as any).assigned_college_ids || []).map((x: any) => String(x));
+      const matchedColleges = (coord as any).has_all_colleges_access
+        ? []
+        : assignedIds.length > 0
+        ? allColleges.filter((col) => assignedIds.includes(String(col._id)))
+        : defaultCodes && defaultCodes.length > 0
         ? allColleges.filter((col) =>
             defaultCodes!.some(
               (cd) =>
@@ -4318,8 +4367,7 @@ app.get('/api/v1/weekly-tracker', async (req: Request, res: Response) => {
     }
 
     if (academic_year && academic_year !== 'all') {
-      const numYear = Number(academic_year);
-      filter.academic_year = { $in: [numYear, String(academic_year)] };
+      filter.$and = [...(filter.$and || []), batchOrYearClause(academic_year)];
     }
 
     if (company_type && company_type !== 'all') {
@@ -7803,7 +7851,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
           wtFilter.college_id = { $in: queryIds };
         }
         if (academic_year && academic_year !== 'all') {
-          wtFilter.academic_year = Number(academic_year) || academic_year;
+          wtFilter.$and = [...(wtFilter.$and || []), batchOrYearClause(academic_year)];
         }
 
         const weeklyRows = await WeeklyTracker.find(wtFilter).sort({ order_index: 1, created_at: -1 });
@@ -9026,7 +9074,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
             is_deleted: { $ne: true },
           };
           if (academic_year && academic_year !== 'all') {
-            cFilter.academic_year = { $in: [academic_year, Number(academic_year), String(academic_year)] };
+            cFilter.$and = [...(cFilter.$and || []), batchOrYearClause(academic_year)];
           }
 
           let [cCompleted, cDriveInProgress, cInDrive, cInProgress] = await Promise.all([
@@ -9036,8 +9084,8 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
             WeeklyTracker.find({ ...cFilter, pipeline_section: 'in_progress' }).sort({ created_at: -1 }),
           ]);
 
-          if (cCompleted.length === 0 && cDriveInProgress.length === 0 && cInDrive.length === 0 && cInProgress.length === 0 && cFilter.academic_year) {
-            delete cFilter.academic_year;
+          if (cCompleted.length === 0 && cDriveInProgress.length === 0 && cInDrive.length === 0 && cInProgress.length === 0 && cFilter.$and) {
+            delete cFilter.$and;
             [cCompleted, cDriveInProgress, cInDrive, cInProgress] = await Promise.all([
               WeeklyTracker.find({ ...cFilter, pipeline_section: 'completed' }).sort({ created_at: -1 }),
               WeeklyTracker.find({ ...cFilter, pipeline_section: 'drive_in_progress' }).sort({ created_at: -1 }),
@@ -9193,8 +9241,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
     const dlFilter: any = { is_deleted: { $ne: true } };
 
     if (academic_year && academic_year !== 'all') {
-      const yearQueries: any[] = [academic_year, Number(academic_year), String(academic_year)].filter(Boolean);
-      wtFilter.academic_year = { $in: yearQueries };
+      wtFilter.$and = [...(wtFilter.$and || []), batchOrYearClause(academic_year)];
     }
 
     if (college_id && college_id !== 'all') {
@@ -9266,10 +9313,10 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       rejectedCompaniesRows.length === 0 &&
       onHoldByCollegeRows.length === 0 &&
       onHoldByHrRows.length === 0 &&
-      wtFilter.academic_year
+      wtFilter.$and
     ) {
       const fallbackFilter = { ...wtFilter };
-      delete fallbackFilter.academic_year;
+      delete fallbackFilter.$and;
       const [fCompleted, fDriveInProgress, fInDrive, fInProgress, fPipeline, fTopCompanies, fRejectedCompanies, fOnHoldByCollege, fOnHoldByHr] = await Promise.all([
         WeeklyTracker.find({ ...fallbackFilter, pipeline_section: 'completed' }).sort({ created_at: -1 }),
         WeeklyTracker.find({ ...fallbackFilter, pipeline_section: 'drive_in_progress' }).sort({ created_at: -1 }),

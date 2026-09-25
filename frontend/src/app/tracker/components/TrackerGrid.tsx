@@ -631,7 +631,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
     [isReadOnly, dragStartCell, selectedCells, rows, activeRowId, onRowUpdate, toast]
   );
 
-  // Global Keyboard Shortcuts: Ctrl+C (Copy), Ctrl+V (Paste), Del (Clear), Esc (Deselect)
+  // Global Keyboard Shortcuts: Ctrl+C (Copy) and Esc (Deselect) only
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeEl = document.activeElement;
@@ -664,40 +664,15 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
         return;
       }
 
-      if (isPaste && selectedCells.size > 0 && !isInputActive) {
-        handlePasteSelectedCells();
-        return;
-      }
-
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedCells.size > 0 && !isInputActive) {
-        e.preventDefault();
-        handleRequestCellDelete();
-        return;
-      }
-    };
-
-    const handleWindowPaste = (e: ClipboardEvent) => {
-      const activeEl = document.activeElement;
-      const isInputActive =
-        activeEl &&
-        (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT');
-
-      if (selectedCells.size > 0 && !isInputActive) {
-        const pasteText = e.clipboardData?.getData('text/plain');
-        if (pasteText) {
-          e.preventDefault();
-          handlePasteSelectedCells(pasteText);
-        }
-      }
+      // Pasting into, or clearing, a multi-cell selection is intentionally NOT supported (Copy only).
+      void isPaste;
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('paste', handleWindowPaste);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('paste', handleWindowPaste);
     };
-  }, [selectedCells.size, showCellDeleteConfirm, handleCopySelectedCells, handlePasteSelectedCells, handleRequestCellDelete]);
+  }, [selectedCells.size, showCellDeleteConfirm, handleCopySelectedCells]);
 
   const handleToggleSelectMode = useCallback(() => {
     triggerHaptic('selection');
@@ -1442,7 +1417,8 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
         </div>
       </div>
 
-      {/* Floating Action Indicator for Selected Cells (Excel / Google Sheets style Copy, Paste, Delete) */}
+      {/* Floating Action Indicator for Selected Cells - COPY ONLY (user decision: cells are never pasted into or
+          cleared from a multi-selection; values are edited one cell at a time) */}
       {!isReadOnly && selectedCells.size > 0 && (
         <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-40 bg-white dark:bg-[#161D2E] border-2 border-slate-300 dark:border-slate-700 shadow-[0_20px_50px_rgba(0,0,0,0.35)] rounded-2xl px-4 py-2 flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-4 duration-200 opacity-100">
           <div className="flex items-center gap-2 pr-2.5 border-r border-border">
@@ -1462,26 +1438,6 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
             title="Copy selected cell values"
           >
             Copy
-          </button>
-
-          {/* Paste Button */}
-          <button
-            type="button"
-            onClick={() => handlePasteSelectedCells()}
-            className="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
-            title="Paste clipboard values"
-          >
-            Paste
-          </button>
-
-          {/* Dustbin Icon Delete Button */}
-          <button
-            type="button"
-            onClick={handleRequestCellDelete}
-            className="w-7 h-7 rounded-xl bg-destructive/15 text-destructive hover:bg-destructive hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-2xs active:scale-95 border border-destructive/20"
-            title="Delete selected cell values"
-          >
-            <Trash2 size={13} strokeWidth={2.2} />
           </button>
 
           <button

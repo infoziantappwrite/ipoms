@@ -1,4 +1,5 @@
 import { getCollegeLogoUrl } from '@/lib/collegeLogo';
+import { sectionTitle, applyColumnHeadings, columnHeading } from './reportOverrides';
 
 function getCleanPeriod(period?: string): string {
   if (!period) return '';
@@ -338,12 +339,12 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: `${secIdx + 1}. ${sec.title}`,
+        title: sectionTitle(report, `pending_${sec.key}`, sec.title),
         badge: `${sec.list.length} Companies`,
         accentBg: sec.accentBg,
         accentBorder: sec.accentBorder,
         accentText: '#0a2540',
-        headers,
+        headers: applyColumnHeadings(report, `pending_${sec.key}`, headers),
         colWidths,
         measuredRows,
       });
@@ -398,7 +399,7 @@ export async function generateReportCanvas(
         });
 
         sectionsToDraw.push({
-          title: `${cIdx + 1}. ${colData.college_name.toUpperCase()} — COMPLETED`,
+          title: `${colData.college_name.toUpperCase()} — COMPLETED`,
           badge: `${compRows.length} Drives`,
           accentBg: '#ecfdf5',
           accentBorder: '#a7f3d0',
@@ -451,7 +452,7 @@ export async function generateReportCanvas(
         });
 
         sectionsToDraw.push({
-          title: `${cIdx + 1}. ${colData.college_name.toUpperCase()} — DRIVE IN PROGRESS`,
+          title: `${colData.college_name.toUpperCase()} — DRIVE IN PROGRESS`,
           badge: `${dipRows.length} Drives`,
           accentBg: '#fffbeb',
           accentBorder: '#fde68a',
@@ -504,7 +505,7 @@ export async function generateReportCanvas(
         });
 
         sectionsToDraw.push({
-          title: `${cIdx + 1}. ${colData.college_name.toUpperCase()} — UPCOMING DRIVES`,
+          title: `${colData.college_name.toUpperCase()} — UPCOMING DRIVES`,
           badge: `${upRows.length} Drives`,
           accentBg: '#eef2ff',
           accentBorder: '#c7d2fe',
@@ -557,7 +558,7 @@ export async function generateReportCanvas(
         });
 
         sectionsToDraw.push({
-          title: `${cIdx + 1}. ${colData.college_name.toUpperCase()} — IN PROGRESS`,
+          title: `${colData.college_name.toUpperCase()} — IN PROGRESS`,
           badge: `${ipRows.length} Drives`,
           accentBg: '#eff6ff',
           accentBorder: '#bfdbfe',
@@ -575,7 +576,7 @@ export async function generateReportCanvas(
     // 1. Completed
     if (report.included_sections?.completed_companies && report.sections?.completed_companies) {
       const cRows = report.sections.completed_companies;
-      const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status', 'Offers Received'];
+      const headers = applyColumnHeadings(report, 'completed_companies', ['#', 'Company Name', 'Role', 'CTC', 'Status', 'Offers Received']);
       const colWidths = [36, 200, 174, 90, 180, 120];
       const rawRows = cRows.map((r: any) => [
         String(r.s_no || ''),
@@ -617,7 +618,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '1. COMPANIES COMPLETED',
+        title: sectionTitle(report, 'completed_companies', 'COMPANIES COMPLETED'),
         badge: `${cRows.length} Drives`,
         accentBg: '#ecfdf5',
         accentBorder: '#a7f3d0',
@@ -631,7 +632,7 @@ export async function generateReportCanvas(
     // 2. Drive In Progress
     if (report.included_sections?.drive_in_progress !== false && report.sections?.drive_in_progress && report.sections.drive_in_progress.length > 0) {
       const dipRows = report.sections.drive_in_progress;
-      const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Follow-up'];
+      const headers = applyColumnHeadings(report, 'drive_in_progress', ['#', 'Company Name', 'Role', 'CTC', 'Status / Follow-up']);
       const colWidths = [36, 224, 200, 110, 230];
       const rawRows = dipRows.map((r: any) => [
         String(r.s_no || ''),
@@ -670,7 +671,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '2. DRIVE IN PROGRESS',
+        title: sectionTitle(report, 'drive_in_progress', 'DRIVE IN PROGRESS'),
         badge: `${dipRows.length} Drives`,
         accentBg: '#fffbeb',
         accentBorder: '#fde68a',
@@ -685,7 +686,7 @@ export async function generateReportCanvas(
     const upCanvasRows = report.sections?.companies_in_drive || report.sections?.upcoming_drives;
     if (report.included_sections?.companies_in_drive !== false && upCanvasRows && upCanvasRows.length > 0) {
       const cidRows = upCanvasRows;
-      const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Drive Date'];
+      const headers = applyColumnHeadings(report, 'upcoming_drives', ['#', 'Company Name', 'Role', 'CTC', 'Status / Drive Date']);
       const colWidths = [36, 224, 200, 110, 230];
       const rawRows = cidRows.map((r: any) => [
         String(r.s_no || ''),
@@ -724,7 +725,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '3. UPCOMING DRIVES',
+        title: sectionTitle(report, 'upcoming_drives', 'UPCOMING DRIVES'),
         badge: `${cidRows.length} Drives`,
         accentBg: '#eef2ff',
         accentBorder: '#c7d2fe',
@@ -738,7 +739,7 @@ export async function generateReportCanvas(
     // 4. In Progress Drives
     if (report.included_sections?.in_progress && report.sections?.in_progress) {
       const ipRows = report.sections.in_progress;
-      const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
+      const headers = applyColumnHeadings(report, 'in_progress', ['#', 'Company Name', 'Role', 'CTC', 'Status']);
       const colWidths = [36, 224, 200, 110, 230];
       const rawRows = ipRows.map((r: any) => [
         String(r.s_no || ''),
@@ -777,7 +778,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '4. COMPANIES IN PROGRESS',
+        title: sectionTitle(report, 'in_progress', 'COMPANIES IN PROGRESS'),
         badge: `${ipRows.length} Drives`,
         accentBg: '#eff6ff',
         accentBorder: '#bfdbfe',
@@ -791,7 +792,7 @@ export async function generateReportCanvas(
     // 5. Pipeline
     if (report.included_sections?.pipeline && report.sections?.pipeline) {
       const pRows = report.sections.pipeline;
-      const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
+      const headers = applyColumnHeadings(report, 'pipeline', ['#', 'Company Name', 'Role', 'CTC', 'Status']);
       const colWidths = [36, 224, 200, 110, 230];
       const rawRows = pRows.map((r: any) => [
         String(r.s_no || ''),
@@ -830,7 +831,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '5. COMPANIES IN PIPELINE',
+        title: sectionTitle(report, 'pipeline', 'COMPANIES IN PIPELINE'),
         badge: `${pRows.length} Leads`,
         accentBg: '#ecfeff',
         accentBorder: '#a5f3fc',
@@ -844,7 +845,7 @@ export async function generateReportCanvas(
     // 6. Top Companies
     if (report.included_sections?.top_companies && report.sections?.top_companies) {
       const topRows = report.sections.top_companies;
-      const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
+      const headers = applyColumnHeadings(report, 'top_companies', ['#', 'Company Name', 'Role', 'CTC', 'Status']);
       const colWidths = [36, 224, 200, 110, 230];
       const rawRows = topRows.map((r: any) => [
         String(r.s_no || ''),
@@ -883,7 +884,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '6. TOP COMPANIES',
+        title: sectionTitle(report, 'top_companies', 'TOP COMPANIES'),
         badge: `${topRows.length} Companies`,
         accentBg: '#fefce8',
         accentBorder: '#fef08a',
@@ -897,7 +898,7 @@ export async function generateReportCanvas(
     // 7. Rejected Companies
     const rejRows = report.sections?.rejected_companies || report.sections?.rejected_by_hr;
     if ((report.included_sections?.rejected_companies || report.included_sections?.rejected_by_hr) && rejRows && rejRows.length > 0) {
-      const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Reason'];
+      const headers = applyColumnHeadings(report, 'rejected_companies', ['#', 'Company Name', 'Role', 'CTC', 'Status / Reason']);
       const colWidths = [36, 224, 200, 110, 230];
       const rawRows = rejRows.map((r: any) => [
         String(r.s_no || ''),
@@ -936,7 +937,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '7. REJECTED COMPANIES',
+        title: sectionTitle(report, 'rejected_companies', 'REJECTED COMPANIES'),
         badge: `${rejRows.length} Companies`,
         accentBg: '#fff1f2',
         accentBorder: '#fecdd3',
@@ -950,7 +951,7 @@ export async function generateReportCanvas(
     // 8. On Hold by College
     const holdCollegeRows = report.sections?.on_hold_by_college || report.sections?.rejected_by_college;
     if ((report.included_sections?.on_hold_by_college || report.included_sections?.rejected_by_college) && holdCollegeRows && holdCollegeRows.length > 0) {
-      const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Reason'];
+      const headers = applyColumnHeadings(report, 'on_hold_by_college', ['#', 'Company Name', 'Role', 'CTC', 'Status / Reason']);
       const colWidths = [36, 224, 200, 110, 230];
       const rawRows = holdCollegeRows.map((r: any) => [
         String(r.s_no || ''),
@@ -989,7 +990,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '8. COMPANIES ON HOLD BY COLLEGE',
+        title: sectionTitle(report, 'on_hold_by_college', 'COMPANIES ON HOLD BY COLLEGE'),
         badge: `${holdCollegeRows.length} Companies`,
         accentBg: '#fffbeb',
         accentBorder: '#fde68a',
@@ -1003,7 +1004,7 @@ export async function generateReportCanvas(
     // 9. On Hold by HR
     if (report.included_sections?.on_hold_by_hr && report.sections?.on_hold_by_hr && report.sections.on_hold_by_hr.length > 0) {
       const holdHrRows = report.sections.on_hold_by_hr;
-      const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Reason'];
+      const headers = applyColumnHeadings(report, 'on_hold_by_hr', ['#', 'Company Name', 'Role', 'CTC', 'Status / Reason']);
       const colWidths = [36, 224, 200, 110, 230];
       const rawRows = holdHrRows.map((r: any) => [
         String(r.s_no || ''),
@@ -1042,7 +1043,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '9. COMPANIES ON HOLD BY HR',
+        title: sectionTitle(report, 'on_hold_by_hr', 'COMPANIES ON HOLD BY HR'),
         badge: `${holdHrRows.length} Companies`,
         accentBg: '#fff1f2',
         accentBorder: '#fecdd3',
@@ -1057,7 +1058,7 @@ export async function generateReportCanvas(
   // 4. Active Leads
   if (report.template_type === 'active_leads' && report.included_sections?.active_leads && report.sections?.active_leads) {
     const alRows = report.sections.active_leads;
-    const headers = ['#', 'Company Name', 'Role', 'CTC'];
+    const headers = [columnHeading(report, 'active_leads', 0, '#'), columnHeading(report, 'active_leads', 1, 'Company Name'), columnHeading(report, 'active_leads', 3, 'Role'), columnHeading(report, 'active_leads', 4, 'CTC')];
     const colWidths = [36, 270, 304, 190];
     const rawRows = alRows.map((r: any) => [
       String(r.s_no || ''),
@@ -1096,7 +1097,7 @@ export async function generateReportCanvas(
 
     const canvasTitle = `ACTIVE CORPORATE LEADS — ${String(report.kpi_summary?.graduating_year || report.academic_year || '2027').toUpperCase()}`;
     sectionsToDraw.push({
-      title: canvasTitle,
+      title: sectionTitle(report, 'active_leads', canvasTitle),
       badge: `${alRows.length} Leads`,
       accentBg: '#ecfdf5',
       accentBorder: '#a7f3d0',
@@ -1112,7 +1113,7 @@ export async function generateReportCanvas(
     // 1. Completed
     if (report.included_sections?.completed_companies && report.sections?.completed_companies) {
       const compRows = report.sections.completed_companies;
-      const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status', 'Offers'];
+      const headers = applyColumnHeadings(report, 'completed_companies', ['#', 'Company Name', 'Role', 'CTC', 'Status', 'Offers']);
       const colWidths = [36, 204, 180, 100, 180, 100];
       const rawRows = compRows.map((r: any) => [
         String(r.s_no || ''),
@@ -1154,7 +1155,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '1. COMPANIES COMPLETED',
+        title: sectionTitle(report, 'completed_companies', 'COMPANIES COMPLETED'),
         badge: `${compRows.length} Companies`,
         accentBg: '#ecfdf5',
         accentBorder: '#a7f3d0',
@@ -1168,7 +1169,7 @@ export async function generateReportCanvas(
     // 2. JD Received
     if (report.included_sections?.company_conversions && report.sections?.company_conversions) {
       const convRows = report.sections.company_conversions;
-      const headers = ['#', 'Company Name', 'Role', 'CTC', 'JD Received Date'];
+      const headers = applyColumnHeadings(report, 'jd_received', ['#', 'Company Name', 'Role', 'CTC', 'JD Received Date']);
       const colWidths = [36, 234, 210, 110, 210];
       const rawRows = convRows.map((r: any) => [
         String(r.s_no || ''),
@@ -1207,7 +1208,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '2. JD RECEIVED COMPANIES',
+        title: sectionTitle(report, 'jd_received', 'JD RECEIVED COMPANIES'),
         badge: `${convRows.length} Companies`,
         accentBg: '#ecfdf5',
         accentBorder: '#a7f3d0',
@@ -1221,7 +1222,7 @@ export async function generateReportCanvas(
     // 3. In Drive
     const inDriveCanvasRows = report.sections?.companies_in_drive || report.sections?.company_drives_scheduled;
     if ((report.included_sections?.companies_in_drive || report.included_sections?.company_drives_scheduled) && inDriveCanvasRows) {
-      const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
+      const headers = applyColumnHeadings(report, 'companies_in_drive', ['#', 'Company Name', 'Role', 'CTC', 'Status']);
       const colWidths = [36, 224, 200, 110, 230];
       const rawRows = inDriveCanvasRows.map((r: any) => [
         String(r.s_no || ''),
@@ -1260,7 +1261,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '3. COMPANIES IN DRIVE',
+        title: sectionTitle(report, 'companies_in_drive', 'COMPANIES IN DRIVE'),
         badge: `${inDriveCanvasRows.length} Companies`,
         accentBg: '#eef2ff',
         accentBorder: '#c7d2fe',
@@ -1274,7 +1275,7 @@ export async function generateReportCanvas(
     // 4. On Hold by TPO
     if (report.included_sections?.on_hold_by_college && report.sections?.on_hold_by_college && report.sections.on_hold_by_college.length > 0) {
       const holdRows = report.sections.on_hold_by_college;
-      const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Remarks'];
+      const headers = applyColumnHeadings(report, 'on_hold_by_college', ['#', 'Company Name', 'Role', 'CTC', 'Status / Remarks']);
       const colWidths = [36, 224, 200, 110, 230];
       const rawRows = holdRows.map((r: any) => [
         String(r.s_no || ''),
@@ -1313,7 +1314,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '4. COMPANIES ON HOLD BY TPO',
+        title: sectionTitle(report, 'on_hold_by_college', 'COMPANIES ON HOLD BY TPO'),
         badge: `${holdRows.length} Companies`,
         accentBg: '#fffbeb',
         accentBorder: '#fde68a',
@@ -1327,7 +1328,7 @@ export async function generateReportCanvas(
     // 5. On Hold by HR
     if (report.included_sections?.on_hold_by_hr && report.sections?.on_hold_by_hr && report.sections.on_hold_by_hr.length > 0) {
       const holdHrRows = report.sections.on_hold_by_hr;
-      const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Remarks'];
+      const headers = applyColumnHeadings(report, 'on_hold_by_hr', ['#', 'Company Name', 'Role', 'CTC', 'Status / Remarks']);
       const colWidths = [36, 224, 200, 110, 230];
       const rawRows = holdHrRows.map((r: any) => [
         String(r.s_no || ''),
@@ -1366,7 +1367,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '5. COMPANIES ON HOLD BY HR',
+        title: sectionTitle(report, 'on_hold_by_hr', 'COMPANIES ON HOLD BY HR'),
         badge: `${holdHrRows.length} Companies`,
         accentBg: '#fff1f2',
         accentBorder: '#fecdd3',
@@ -1382,7 +1383,7 @@ export async function generateReportCanvas(
     if (report.included_sections?.calling_activity && report.sections?.calling_activity && report.sections.calling_activity.length > 0) {
       const callRows = report.sections.calling_activity;
       const totals = report.calling_activity_totals;
-      const headers = ['#', 'College', 'Calls Made', 'Hours Dedicated'];
+      const headers = applyColumnHeadings(report, 'calling_activity', ['#', 'College', 'Calls Made', 'Hours Dedicated']);
       const colWidths = [36, 380, 180, 204];
       const rawRows: string[][] = callRows.map((r: any) => [
         String(r.s_no || ''),
@@ -1424,7 +1425,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '6. CALLING ACTIVITY SUMMARY',
+        title: sectionTitle(report, 'calling_activity', 'CALLING ACTIVITY SUMMARY'),
         badge: `${callRows.length} ${callRows.length === 1 ? 'College' : 'Colleges'}`,
         accentBg: '#eff6ff',
         accentBorder: '#bfdbfe',
@@ -1450,7 +1451,7 @@ export async function generateReportCanvas(
       };
       totalH += 278 + 20;
     } else {
-      const headers = ['#', 'Company Name', 'Role / Designation', 'CTC', 'Time', 'College', 'Coordinator'];
+      const headers = applyColumnHeadings(report, isPos ? 'daily_positives' : 'daily_jd', ['#', 'Company Name', 'Role / Designation', 'CTC', 'Time', 'College', 'Coordinator']);
       // Total content width: 800px (34 + 210 + 175 + 85 + 75 + 80 + 141 = 800)
       const colWidths = [34, 210, 175, 85, 75, 80, 141];
       const rawRows = leads.map((r: any, idx: number) => [

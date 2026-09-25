@@ -1857,6 +1857,128 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     self-declaration - the app cannot see whether an email was really sent; a per-person view for Team
     Leaders/Administrator was suggested and not built.
 
+73. **Weekly report showed fewer companies on one coordinator's laptop, 25 Sep 2026 (user-reported;
+    Thirisha R / DSU: 30 pipeline and 10 top companies, report showed 6 top).** Same login on every other
+    laptop was correct. Cause, verified against the live data: **the report's "Graduating Academic Batch"
+    filter compared a BATCH (2027) against `academic_year`, which is the SEASON a row was created in.**
+    Since the season switch (item 37) rows created after ~21 Sep carry `academic_year: 2026` but
+    `eligible_batch: "2027 Batch"`, so a 2027 filter silently dropped every such row - **138 of 995 weekly
+    rows org-wide**, incl. DSU's four newest top companies (ST Lumax, 8OL Robotics, SPK power, Avaali) -
+    exactly 10 -> 6. Why only her browser: the two **Daily** report templates force the batch to `2027`
+    (`getDefaultGraduatingBatch()`), and (a) `handleCategoryChange` never reset it when she moved on to the
+    Weekly report, and (b) the pre-item-51 build also saved it in `localStorage`
+    (`ipoms_report_builder_wizard_state`), which sign-out, refresh and a restart do not clear - so her
+    browser restored 2027 for every weekly report while a fresh laptop defaulted to All Batches. **Fixes:**
+    (1) server: new `batchOrYearClause()` in `server.ts` - a 4-digit batch filter now matches `academic_year`
+    **or** `eligible_batch`; applied (AND-ed via `$and`, so callers' own `$or` still works) to
+    `GET /weekly-tracker` and the three `POST /reports/generate` weekly paths (single college, multi
+    college, pending-tasks fallback); the "empty -> retry without year" fallbacks delete `$and`.
+    **This alone fixes Thirisha with no change on her laptop once the backend is deployed.** (2) frontend:
+    `handleCategoryChange` resets the batch to `all` for every non-daily template. (3) the college dropdown
+    printed the code twice (`[DSU] [DSU] Dhanalakshmi...`) because `SmoothSelect` draws the `badge` itself and
+    the option label also began with `[CODE]` - the label is now the college name only (search by code still
+    works: the search also checks the badge); this is the one selector all six report types use.
+    **Verified:** live DSU report via `POST /reports/generate` - `academic_year=all` and `=2027` both return
+    30 pipeline / 10 top / 6 in progress (2027 previously returned 26 / 6 / 5); `=2026` returns only the 4+1
+    season rows; real browser: Daily Positives shows "2027 Batch", switching to Weekly shows "All Batches",
+    dropdown rows show one `[CODE]`; `tsc --noEmit` clean both sides. **Not changed (same latent mismatch,
+    lower impact):** `weekly-tracker/kpi`, the export route, `analytics/*` and the active-leads batch filters
+    still compare a batch to `academic_year`. **Honest gap:** the user said pipeline showed 28; this cause
+    predicts 26 (top 6 matches exactly) - worth asking her to re-count. **Until deployed,** the manual fix on
+    her laptop is to set "Graduating Academic Batch" to "All Batches" in the Report Builder.
+
+74. **Weekly report section numbers removed; Daily Tracker cell bar is Copy-only; Daily Tracker is read-only
+    for the monitoring Team Leader, 25 Sep 2026 (three user requests).**
+    **(a) Weekly report headings + builder checklist no longer numbered.** "1. COMPANIES COMPLETED ... 9. ON HOLD
+    BY HR" looked wrong whenever only some sections were ticked (1, 2 and 6 showed). Removed the numbers - title
+    and icon only - from every place the WEEKLY report draws them: the on-screen editor
+    (`NativeReportEditor.tsx`, single and multi-college), its print/export HTML builder, the A4 preview
+    (`A4PdfPreviewModal.tsx`), the image/PDF renderer (`reportCanvasRenderer.ts`) and the "sections to include"
+    checklist in `ReportBuilderWizard.tsx`. **Deliberately NOT changed:** the **Month-End** report headings
+    (still "1. COMPANIES COMPLETED ... 6. CALLING ACTIVITY SUMMARY" on screen, in the A4 preview and the
+    renderer; its builder checklist was already unnumbered) and the Weekly Tracker module's own move/edit
+    dialogs - the user named the weekly report only. Say the word and Month-End follows.
+    **(b) Daily Tracker multi-cell bar is Copy only, for everyone.** Selecting cells used to offer Copy, Paste
+    and Delete. Now the bar is "N Cells Selected - Copy - close". The **keyboard paths are gone too**
+    (Ctrl+V into a selection, the window paste listener, Delete/Backspace clearing a selection) - removing
+    only the buttons would have left them working. Editing a single cell is unchanged; the toolbar "Paste"
+    (bulk contacts) is a different feature and is unchanged. The cell-delete confirmation modal and the paste/
+    delete handlers are now unreachable dead code left in `TrackerGrid.tsx`.
+    **(c) A full-oversight Team Leader (`has_all_colleges_access`, Malvika Kumar) sees the Daily Tracker
+    READ-ONLY.** Client: `lib/useFullAccessViewer.ts` (new) + `tracker/page.tsx` - `isMonitor` forces
+    `isEffectiveReadOnly`, so the existing read-only machinery hides Paste / delete bin / actions menu / Set
+    Time / every editable cell, and hides "Back to My Sheet". A monitoring account never works a sheet of its
+    own: choosing a college opens **the sheet of the coordinator who handles it**, read-only (first load and
+    each change of college). Server (defence in depth, the real enforcement): a guard after `authorizeRoute`
+    refuses every non-GET under `/api/v1/daily-tracker` with `403 READ_ONLY_MONITOR` for such an account
+    (only the read-only `check-metadata-batch` is exempt). The login response now carries
+    `has_all_colleges_access` (it did not before, so **every client-side check on that flag in the app was
+    silently false** - incl. my own in `EmailCheckPrompt.tsx`, where the server check still protected it);
+    an already-open session looks the flag up once from `/profile/:id` and stores it.
+    **Bug found and fixed on the way:** `GET /coordinators` filtered colleges with `is_deleted: false`, a field
+    `College` does not have (trap 7), so it matched nothing and **every coordinator came back with empty
+    focus data** - the "find the coordinator who handles this college" lookup behind the outside-my-focus
+    read-only view (items 60-63) had never actually worked and silently fell back to an empty "Read-Only
+    View". Fixed (`$ne: true`), and it now lists each person's **real `assigned_college_ids`** (hardcoded map
+    only for someone with none; a full-access account is listed as handling nothing so she is never picked as
+    a college's handler). **Side effect worth knowing:** that outside-focus view of another coordinator's live
+    sheet now genuinely works for coordinators too.
+    **Verified:** live as Malvika - login carries the flag; POST manual-row / bulk-move / bulk-paste /
+    save-progress / load-contacts, PATCH and both DELETEs all `READ_ONLY_MONITOR`, GET history/today `200`;
+    as Mohanaradha the same routes are NOT blocked (`NOT_FOUND` for a missing row). Real browser as Malvika:
+    header "Viewing Malavika Ramesh T K's calling sheet ... Read-Only Mode", 0 Paste / bin / Set Time /
+    editable cells, clicking a cell shows no action bar, zero data-changing requests, the handler's 11 live
+    rows are visible. Real browser as a coordinator with two marked throwaway rows (removed): dragging two
+    cells shows exactly "2 Cells Selected - Copy - close", the Copy button puts "Test HR / Test HR" on the
+    clipboard, Ctrl+V and Delete send nothing. Weekly report: checklist and preview show 0 numbered headings,
+    the plain titles present. `tsc --noEmit` clean both sides, `verify:policy` OK. **Not verified:** the
+    A4/PDF/image exports were checked by code change only (same one-line title edits), not opened; the
+    college selector on Malvika's read-only sheet still reads "- Select College -" (cosmetic).
+
+75. **Weekly report: section titles and column headings are editable in the preview, 25 Sep 2026
+    (user-requested; everyone incl. Malvika Kumar and the Administrator).** In the generated **single-college
+    Weekly Placement report** every section title ("DRIVE IN PROGRESS" ...) and every table column heading
+    ("Company Name", "Role", ...) can be clicked and retyped - Enter or clicking away saves, clearing it
+    restores the default. **Presentation only:** the rename lives on the generated report object
+    (`report.section_titles`, `report.column_headings`) exactly like the already-editable report title
+    (`report_title`) - it never reaches the Weekly Tracker data, the Report Builder, its section checklist, or
+    any saved setting, and a regenerated report starts from the defaults again. New shared helper
+    `reports/lib/reportOverrides.ts` (`sectionTitle`, `columnHeading`, `applyColumnHeadings`,
+    `withSectionTitle`, `withColumnHeading`); a column is addressed by its position in that section's table, so
+    renaming "Company Name" in one table leaves the other eight untouched. **What reads it:** the on-screen
+    preview (`NativeReportEditor.tsx`, editable `EditableLabel`: 9 titles + 46 headings), the A4 preview
+    (`A4PdfPreviewModal.tsx`) and the image / PDF canvas renderer (`reportCanvasRenderer.ts`), so what is
+    edited is what gets saved as image or PDF. Typed text is kept exactly as typed (no forced capitals);
+    the look is unchanged until something is edited (hover tint + a tooltip only, hidden in print).
+    **Deliberately not covered:** the **multi-college Weekly** report (its headings embed each college's name),
+    **Month-End** and the other report types, the **Excel export** (its own HTML builder in
+    `NativeReportEditor.tsx` still prints the defaults), and the small italic "No ... recorded" empty-state
+    lines. The default text differs a little between surfaces (e.g. the A4 preview says "Offers", the image
+    says "Offers Received", the image uses "#" where the screen says "S.No"); a rename replaces all of them
+    with the one word typed. **Verified in a real browser** as a coordinator, Malvika Kumar and the
+    Administrator: 9 editable titles and 25 headings on an AIHT report; renaming a title and one column
+    updated the screen, the A4 preview and the words drawn on the export canvas (182 strings drawn, both
+    present), left the other tables' headings alone, an emptied title restored its default, and no request
+    touched the Weekly/Daily Tracker; `tsc --noEmit` clean. **Not verified:** an actual PNG / PDF file opened
+    after a rename (only the strings drawn on the canvas were checked), and printing on paper.
+
+76. **No section numbers in any report; titles and column headings editable in the preview for every
+    report type, 25 Sep 2026 (user-requested; extends item 75).** Removed the "1." / "2." prefixes from
+    Month-End (incl. the A4 "10. CALLING ACTIVITY SUMMARY"), Pending Tasks (`{secIdx + 1}.`), the multi-college
+    Weekly college headings, the Excel/print HTML builder, and the Pending Tasks tabs in the builder, on all
+    four surfaces (`NativeReportEditor.tsx`, `A4PdfPreviewModal.tsx`, `reportCanvasRenderer.ts`,
+    `ReportBuilderWizard.tsx`). Editable (same `report.section_titles` / `report.column_headings` mechanism,
+    presentation-only, reset on regenerate): **Month-End** (6 titles + headings), **Pending Tasks** (key
+    `pending_<section key>`), **Active Leads** (title + headings; columns use FIXED slots 0 S.No, 1 Company,
+    2 Colleges, 3 Role, 4 CTC so hiding a column never shifts a rename), **Daily Positives / Daily JD Received**
+    (headings, keys `daily_positives` / `daily_jd`; these have no section title beyond the report title, which
+    was already editable). **Still not covered:** the Excel export prints defaults, multi-college Weekly
+    headings, empty-state lines. **Verified in a real browser** (coordinator; Malvika for Pending): 0 numbered
+    headings; a renamed title and column reached the screen, the A4 preview and the words drawn on the export
+    canvas for Month-End, Pending, Active Leads and Daily Positives; no tracker requests; `tsc` clean.
+    **Not verified:** Daily JD Received with data (that day returned no rows; code mirrors Positives), the
+    Administrator account, actual PNG/PDF files.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map
