@@ -1803,78 +1803,54 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     deleted in a later cleanup. Verified in a real browser: 0 header "Move to JD" buttons, Sync/Add still
     present, 6 per-row "Move to JD Received" buttons still present, no page errors; `tsc --noEmit` clean.
 
-72. **"Have you sent the email?" reminder, 24-25 Sep 2026 (user-requested; the 25 Sep redesign below
-    supersedes the fixed 5:00/5:30 PM windows of the first build).** Popup for Placement Coordinators and a
+72. **"Did you send all the emails for today's positives?" question, 24-25 Sep 2026 (user-requested;
+    redesigned three times - THIS is the final version, agreed line by line with the user on 25 Sep).**
+    Earlier builds used fixed 5:00/5:30 PM windows, then a 15-minute timer per Invite Mail call with a
+    30-minute retry; the user judged both too much ("we're confusing a lot... avoid multiple popups") and
+    removed them. **There are now NO popups during the working day.** Who: Placement Coordinators and a
     normal Team Leader (Sujitha); **never** the Administrator or a full-oversight Team Leader
-    (`has_all_colleges_access`, Malvika Kumar). **Trigger is now each call, not the clock:** every Daily
-    Tracker row whose outcome is Invite Mail starts its own **15-minute** timer, counted from
-    `call_end_time` (falling back to `call_start_time`, then `created_at`). Whatever is due at that moment
-    is asked about in **one** prompt listing the companies (user's choice - a 10-positive day must not mean
-    10 popups); a call logged later still gets its own 15-minute timer, even after an earlier "Yes".
-    **Three answers:** "Yes, sent" confirms exactly the calls shown and they are never asked about again
-    (the day is marked `status:'yes'` once nothing is left); **"Not yet" opens a time picker** and the
-    coordinator sets the moment themselves - a chosen time silences everything until then, which is the
-    whole point of the redesign; closing (X/Esc) is the old "No" - it comes back **once, 30 minutes
-    later**, and after a second close it is left alone for the day (a brand-new call still breaks through,
-    since it was never dismissed). **Next morning** is unchanged in spirit: anything still unconfirmed is
-    asked in past tense, once per day, only when the Daily Tracker is opened, looking back up to 3 days -
-    so someone who logs in and out in under a minute, or never answered, is still caught.
-    Server-side on the IST clock throughout (`backend/src/lib/emailCheckRoutes.ts`; `GET
-    /email-check/status?kind=due|next_day`, `POST /email-check/answer {check_date, answer: yes|no|snooze,
-    kind, call_ids[], remind_at:'HH:MM'}`; collection `email_checks`, one row per person per day, holding
-    `confirmed_call_ids` / `dismissed_call_ids` / `dismissals` / `snooze_until`). A past `remind_at` is
-    refused both on screen and on the server. **`EMAIL_CHECK_START_DATE` (default `2026-09-26`) is the
-    go-live guard** - days before it are never asked about; without it the first morning quizzes everyone
-    about calls made before the feature existed (this was caught by a test that found real unconfirmed
-    24 Sep calls). **Set it to the real deploy day.**
-    Frontend `EmailCheckPrompt.tsx` (mounted once in `AppShell.tsx`): 330px card centred on screen, navy
-    gradient header with the drawn plane/envelope, the due calls listed with college chip and call time
-    (3 shown, then "and n more"), and a time picker panel with 15 min / 30 min / 1 hour chips, a styled
-    time field, and a plain-language preview line. Polls every 45s while the tab is visible, 08:00-23:00
-    IST, and on tab-focus; needs the app open >= 1 minute; fails silently and never blocks navigation.
-    Policy entry `/email-check` (STAFF). **Verified:** 32 simulated-time checks against real accounts with
-    throwaway rows, all removed (15-min boundary, batching, per-call confirm, a new call after a "Yes",
-    snooze accepted/refused/honoured, the 30-minute retry and the two-dismissal cap, next-morning, and the
-    two-tab guard); real-browser run, light and dark, desktop and 390px, with mocked status responses and a
-    faked clock - popup only after a minute, correct copy for 1 vs many, picker chips and past-time refusal,
-    and the exact payloads for yes / no / snooze. **Not verified:** a genuine end-to-end run on the real
-    clock (15 real minutes after a real call). `verify:policy` OK, `tsc --noEmit` clean both sides.
-    **Picker redesigned in place, 25 Sep 2026 (user: "old classic model... smooth like 2026").** The
-    native `<input type="time">` was rendering Chrome's own three-column dropdown - that was the "classic"
-    look, not our CSS. Replaced with a custom control and the two-step flow collapsed into one: the card is
-    now **400px** wide and carries **[Yes, sent] [Pick time]** side by side, so the option to choose a time
-    is visible immediately; "Pick time" expands the picker **inside the same card** with the question still
-    on screen (no second screen). The picker is three quick chips (in 15 min / 30 min / 1 hour), then two
-    **snap-scrolling wheels** (hours 1-12, minutes in 5s) with a highlighted centre band, a fade mask top
-    and bottom, and a sliding AM/PM pill. Each wheel responds to mouse wheel, touch drag, a click on a row,
-    and Arrow Up/Down, and is a proper `listbox`/`option` for screen readers; rows are 40px. Esc now closes
-    the picker first and only dismisses the reminder on a second press. Hero icon redrawn as an envelope
-    with a letter lifting out of it, on a pulsing halo - **deliberately not a Gmail or Outlook mark**: those
-    are trademarks and this popup is not a Gmail/Outlook integration, so imitating either logo would be
-    brand misuse (drop in an official asset if a real integration ever needs one). Verified in a real
-    browser, light and dark, 1300px and 390px: card 400px, picker opens inline, chips / row-tap / wheel-
-    scroll / AM-PM all move the selection and the preview line together, a past time disables "Set
-    reminder", the payload carries the right `remind_at`, Esc layers correctly, and there is no horizontal
-    scroll on mobile.
-    **Fits any window height, 25 Sep 2026 (user-reported: the picker's bottom was cut off in a short
-    window).** With the picker open the card was ~640px tall, taller than a small browser window, so its lower
-    part ran off-screen. The card is now capped at the window height minus 32px (`100dvh`), is a flex column
-    whose body scrolls inside it if it still cannot fit, and was tightened (smaller hero and icon, 34px wheel
-    rows, tighter gaps) to **486px with the picker open**. Measured in a real browser: at window heights
-    820 / 700 / 600 the card is exactly centred (equal space above and below) with the Set reminder button
-    fully visible and no inner scrolling; at 480 it keeps a 16px margin and scrolls inside itself.
-    **Next-morning question is now immediate, 25 Sep 2026 (user decision).** It used to wait about a minute
-    after the Daily Tracker was opened; it is now asked ~1 second after arriving on `/tracker` (a beat for
-    the page to settle), and still only there - never on the dashboard. The one-minute "app must have been
-    open" gate now applies only to the 15-minute reminders (it exists to skip someone who logs in and
-    straight out). Rules as the user restated them: a "Yes" on the day means it is never asked about again,
-    including the next morning; closing with the X without answering means the Daily Tracker asks about it
-    the next time they open it; each Invite Mail call names its company in the list. **Note - kept as
-    built, flagged:** a same-day X/close still comes back once after 30 minutes (chosen earlier via the
-    "ask once more" option) before deferring to the next morning; the latest message does not say to
-    drop that. Verified in a real browser: dashboard ~3s after login shows nothing and makes no next-day
-    request; opening the Daily Tracker shows the past-tense question ("Did you send this email from
-    yesterday?", "IBM - AIHT - 2:05 pm") about 2 seconds after navigation with the app open under a minute.
+    (`has_all_colleges_access`, Malvika Kumar). What it is about: Invite Mail calls (the "positive"
+    outcome) logged **today** in the person's focus colleges. **Monday-Friday only**, decided on the
+    server's IST clock (`backend/src/lib/emailCheckRoutes.ts`).
+    **The four moments** (`GET /email-check/status?kind=`): (1) **`signout`** - they click Sign out **at or
+    after 5:00 PM** (before 5 PM: nothing is asked, and the client does not even call the server);
+    (2) **`login`** - the first time the app opens in a browser session, after 5 PM (covers "signed out at
+    5:10, back at 6:45" and "signed out before 5, back at 9 PM"); (3) **`timed`** - the time the person
+    picked themselves has arrived; (4) **`next_day`** - the moment they open the **Daily Tracker** on a
+    later working day, for any of the last **3 working days** (weekends/holidays do not use up the
+    lookback) that was never confirmed; once per day, past tense ("...for yesterday's / Friday's positives").
+    **Rules:** at most **two evening questions per day** whatever their source, then nothing more even on a
+    9:30 PM login; **Yes** = the day is finished (`status:'yes'`), never asked again today or tomorrow, and
+    a later "no" cannot undo it (user decision: calls stop at 6 PM so nothing is waited for; known narrow
+    edge - a call logged 5-6 PM *after* a Yes is not re-asked); **close / Esc / "Not yet"** = unconfirmed,
+    so tomorrow's Daily Tracker asks; **Pick time** = "ask me again at this time today" and is the second
+    evening question (shown if they are still in the app then, else at their next login after it); a chosen
+    time in the past is refused on screen and on the server. Sign-out is **never blocked**: whatever the
+    answer - or if the server is slow (3 s cap) or errors - it carries on. Two tabs asking at once are
+    de-duplicated by an atomic claim on `email_checks` (unique per person per day).
+    **Wiring:** `UserSignOutButton.tsx` (the one shared sign-out button, ~17 pages) awaits
+    `runSignOutGate()` from `lib/emailCheckGate.ts`; `EmailCheckPrompt.tsx` (mounted once in
+    `AppShell.tsx`) registers the gate. Checks are queued, not dropped (a login check and a picked-time
+    check can start together). `sessionStorage` marks (`ipoms_ec_login_checked`, `ipoms_ec_timed_at`) are
+    written **when the timer fires**, not up front - React dev mounts effects twice and an early mark made
+    the login check silently never run (found in testing). UI: 400px centred card (capped to the window
+    height and scrolling inside itself on very short windows), envelope icon (deliberately not a Gmail/
+    Outlook mark - trademarks), the day's companies listed with college chip and call time, **Yes, sent** /
+    **Pick time** side by side, the picker opens **inline** (3 quick chips + two snap-scrolling wheels + AM/PM
+    pill), "You will be signed out after this." on the sign-out version, no Pick time on the morning version.
+    **`EMAIL_CHECK_START_DATE` (default `2026-09-26`) is the go-live guard** - earlier days are never asked
+    about; **set it to the real deploy day**. Policy entry `/email-check` (STAFF); `verify:policy` OK.
+    **Verified:** 37 simulated-time checks against real accounts with throwaway rows (all removed) covering
+    every rule above, incl. weekend, 4:59 PM vs 5:00 PM, the two-a-day cap, Yes surviving a later "no",
+    Wednesday-yes/Thursday-no working-day lookback, and the go-live guard; a real-browser run with a faked
+    clock and mocked server for all eight flows (quiet all day; sign-out at 4:45 goes straight through with
+    zero server calls; sign-out at 5:10 asks first, then Yes / Esc / Pick time each still sign out with the
+    right payload; evening login asks once and a refresh does not ask again; picked time fires at its
+    moment and not 30 s before; the morning question appears ~1 s after opening `/tracker`); and the live
+    routes over HTTP (bad answer 400, past time 400, no token 401, nothing written). **Not verified:** a
+    genuine 5 PM sign-out on the real clock, dark mode of this final version (the picker was checked in
+    dark earlier), and the actual sign-out from every one of the ~17 pages (one shared component, but only
+    exercised on the dashboard).
 
 ## 6. Module map
 ## 6. Module map

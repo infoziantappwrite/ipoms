@@ -6,37 +6,38 @@ import { DailyTracker, PIPELINE_SYNC_OUTCOME } from '../models/DailyTracker';
 import { EmailCheck } from '../models/EmailCheck';
 
 /**
- * "Have you sent the email?" reminder, driven by the calls themselves.
+ * "Did you send the emails for today's positives?" - asked at a few deliberate moments only, never
+ * as a stream of popups during the working day.
  *
  * Who: Placement Coordinators and a normal Team Leader (Sujitha). NOT the Administrator and NOT a
  * full-oversight Team Leader (`has_all_colleges_access`, i.e. Malvika Kumar).
+ * What it is about: Invite Mail calls (the "positive" outcome) logged today in their focus colleges.
+ * When: Monday-Friday only, on the SERVER clock (IST).
  *
- * When: every Daily Tracker call whose outcome is Invite Mail starts its own 15-minute timer, counted
- * from the end of that call (falling back to its start time, then to when the row was created). Whatever
- * is due at that moment is asked about together in one prompt, so a busy day is not a stream of popups.
+ *   1. They click Sign out at or after 5:00 PM        ("signout")
+ *   2. They log in again later the same day, after 5 PM ("login") - e.g. signed out at 5:10, back at 6:45,
+ *      or signed out before 5 and came back at 9 PM
+ *   3. The time they picked themselves has arrived     ("timed")
+ *   4. Tomorrow, the moment they open the Daily Tracker ("next_day"), for any day in the last 3 working
+ *      days that was never confirmed.
  *
- * The three answers:
- *   - "Yes, sent"       - those calls are confirmed and never asked about again.
- *   - "Remind me at ..." - the coordinator picks the time themselves; nothing is shown until then.
- *   - closed / not yet   - asked once more 30 minutes later, then left alone for the day.
- * Anything still unconfirmed at the end of the day is asked about, in past tense, the next time that
- * person opens the Daily Tracker (up to 3 days back).
+ * At most TWO evening questions per day, whichever moments they come from. "Yes" ends the day for good
+ * (calls stop at 6 PM, so there is nothing to wait for). Closing / Esc / "No" leaves the day unconfirmed,
+ * so the next morning's Daily Tracker asks. Signing out before 5 PM asks nothing: tomorrow covers it.
  *
- * All times come from the SERVER clock (IST), never the browser's. The decision function is exported and
- * takes the time as an argument so every rule can be tested without waiting for the real clock.
+ * The decision function is exported and takes the time as an argument so every rule can be tested
+ * without waiting for the real clock.
  */
 
 const IST_MS = 5.5 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** How long after a call ends before the reminder is due. */
-const DUE_AFTER_MIN = 15;
-/** A prompt that was closed without an answer or a chosen time comes back once, this much later. */
-const RETRY_AFTER_MIN = 30;
-const MAX_DISMISSALS = 2;
-/** Two tabs polling at the same instant must not both pop the same reminder. */
+/** Evening questions start here (minutes after IST midnight). */
+const EVENING_FROM_MIN = 17 * 60;
+const MAX_EVENING_ASKS = 2;
+/** Two tabs polling in the same instant must not both pop the same question. */
 const PROMPT_GAP_MS = 60 * 1000;
-const LOOKBACK_DAYS = 3;
-// The feature starts on this IST day: days before it are never asked about (nobody could have answered
+const LOOKBACK_WORKING_DAYS = 3;
+// The feature starts on this IST day: earlier days are never asked about (nobody could have answered
 // them), so the first morning after launch does not quiz everyone about calls made before it existed.
 // Set EMAIL_CHECK_START_DATE to the real go-live day if that is not this one.
 const START_DATE = process.env.EMAIL_CHECK_START_DATE || '2026-09-26';
@@ -44,13 +45,24 @@ const START_DATE = process.env.EMAIL_CHECK_START_DATE || '2026-09-26';
 export function istDay(ms: number): string {
   return new Date(ms + IST_MS).toISOString().slice(0, 10);
 }
+function istMinutes(ms: number): number {
+  const d = new Date(ms + IST_MS);
+  return d.getUTCHours() * 60 + d.getUTCMinutes();
+}
 /** session_date is stored as midnight UTC of the IST day. */
 function dayBounds(dateStr: string): Date {
   return new Date(`${dateStr}T00:00:00.000Z`);
 }
 /** Real UTC instant of IST midnight on that day - the base for "HH:MM IST on this date". */
 function istMidnightMs(dateStr: string): number {
-  return new Date(`${dateStr}T00:00:00.000Z`).getTime() - IST_MS;
+  return dayBounds(dateStr).getTime() - IST_MS;
+}
+function addDays(dateStr: string, n: number): string {
+  return new Date(dayBounds(dateStr).getTime() + n * DAY_MS).toISOString().slice(0, 10);
+}
+function isWeekday(dateStr: string): boolean {
+  const d = dayBounds(dateStr).getUTCDay();
+  return d >= 1 && d <= 5;
 }
 function weekdayName(dateStr: string): string {
   return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dayBounds(dateStr).getUTCDay()];
@@ -84,10 +96,6 @@ export interface InviteCall {
   id: string;
   company: string;
   college: string;
-  /** When the call happened (ms). */
-  at: number;
-  /** When this call's reminder falls due (ms). */
-  due_at: number;
   time_label: string;
 }
 
@@ -111,24 +119,20 @@ async function inviteMailCalls(el: Eligible, dateStr: string): Promise<InviteCal
   return rows
     .map((r) => {
       const at = new Date(r.call_end_time || r.call_start_time || r.created_at).getTime();
-      return {
-        id: String(r._id),
-        company: r.company_name || 'this company',
-        college: code.get(String(r.college_id)) || '',
-        at,
-        due_at: at + DUE_AFTER_MIN * 60 * 1000,
-        time_label: istClockLabel(at),
-      };
+      return { id: String(r._id), company: r.company_name || 'this company', college: code.get(String(r.college_id)) || '', at, time_label: istClockLabel(at) };
     })
-    .sort((a, b) => a.at - b.at);
+    .sort((a, b) => a.at - b.at)
+    .map(({ at: _at, ...c }) => c);
 }
+
+export type EmailCheckKind = 'signout' | 'login' | 'timed' | 'next_day';
 
 export interface EmailCheckDecision {
   show: boolean;
-  kind?: 'due' | 'next_day';
+  kind?: EmailCheckKind;
   check_date?: string;
   when_label?: string;          // 'today' | 'yesterday' | 'Friday'
-  prompt_no?: number;
+  ask_no?: number;              // which evening question of the day this is (1 or 2)
   calls?: InviteCall[];         // the calls being asked about
   colleges?: { code: string; count: number }[];
 }
@@ -142,96 +146,94 @@ function groupByCollege(calls: InviteCall[]): { code: string; count: number }[] 
     .sort((a, b) => b.count - a.count);
 }
 
-/** `ready` = the browser says the tab is visible and the person has had the app open for a minute. */
 export async function decideEmailCheck(
   userId: string | undefined,
-  kind: 'due' | 'evening' | 'next_day',
-  ready: boolean,
+  kind: EmailCheckKind,
   nowMs: number = Date.now()
 ): Promise<EmailCheckDecision> {
   const NO: EmailCheckDecision = { show: false };
-  if (!ready) return NO;
   const el = await eligibleUser(userId);
   if (!el) return NO;
   const today = istDay(nowMs);
+  if (!isWeekday(today)) return NO; // Monday-Friday only
 
-  // ───────────────────────── due now (15 minutes after the call) ─────────────────────────
-  if (kind !== 'next_day') {
-    const calls = await inviteMailCalls(el, today);
-    if (calls.length === 0) return NO;
+  // ───────────────────────── tomorrow, on the Daily Tracker ─────────────────────────
+  if (kind === 'next_day') {
+    if (await EmailCheck.exists({ coordinator_id: el.id, next_day_prompted_on: today })) return NO; // once per day
 
-    const rec: any = await EmailCheck.findOne({ coordinator_id: el.id, check_date: today }).lean();
-    const confirmed = new Set((rec?.confirmed_call_ids || []).map(String));
-    const due = calls.filter((c) => c.due_at <= nowMs && !confirmed.has(c.id));
-    if (due.length === 0) return NO;
+    let d = today;
+    let seen = 0;
+    while (seen < LOOKBACK_WORKING_DAYS) {
+      d = addDays(d, -1);
+      if (d < START_DATE) break; // older days predate the feature
+      if (!isWeekday(d)) continue; // weekends and holidays do not use up the lookback
+      seen++;
+      const rec: any = await EmailCheck.findOne({ coordinator_id: el.id, check_date: d }).lean();
+      if (rec?.status === 'yes') continue; // that whole day was confirmed
+      const calls = await inviteMailCalls(el, d);
+      if (calls.length === 0) continue;
 
-    // A time the coordinator chose for themselves wins over everything else.
-    if (rec?.snooze_until && nowMs < new Date(rec.snooze_until).getTime()) return NO;
-
-    const dismissed = new Set((rec?.dismissed_call_ids || []).map(String));
-    const fresh = due.filter((c) => !dismissed.has(c.id));
-    if (fresh.length === 0) {
-      // Nothing new - this is the one retry after a close / "not yet".
-      if ((rec?.dismissals || 0) >= MAX_DISMISSALS) return NO;
-      const since = rec?.dismissed_at ? nowMs - new Date(rec.dismissed_at).getTime() : Number.POSITIVE_INFINITY;
-      if (since < RETRY_AFTER_MIN * 60 * 1000) return NO;
+      await EmailCheck.updateOne(
+        { coordinator_id: el.id, check_date: d },
+        { $set: { next_day_prompted_on: today }, $setOnInsert: { status: 'pending', prompts: 0, last_moment: -1, dismissals: 0 } },
+        { upsert: true }
+      );
+      return {
+        show: true,
+        kind: 'next_day',
+        check_date: d,
+        when_label: d === addDays(today, -1) ? 'yesterday' : weekdayName(d),
+        calls,
+        colleges: groupByCollege(calls),
+      };
     }
-
-    // Claim the prompt: an existing row whose last prompt is recent fails the filter, the upsert then
-    // collides with the unique index and throws - so a second tab in the same instant stays quiet.
-    let promptNo = 1;
-    try {
-      const claimed: any = await EmailCheck.findOneAndUpdate(
-        {
-          coordinator_id: el.id,
-          check_date: today,
-          $or: [{ last_prompt_at: { $exists: false } }, { last_prompt_at: null }, { last_prompt_at: { $lt: new Date(nowMs - PROMPT_GAP_MS) } }],
-        },
-        { $inc: { prompts: 1 }, $set: { last_prompt_at: new Date(nowMs) }, $setOnInsert: { status: 'pending', last_moment: -1, dismissals: 0 } },
-        { new: true, upsert: true }
-      ).lean();
-      promptNo = claimed?.prompts || 1;
-    } catch {
-      return NO;
-    }
-
-    return { show: true, kind: 'due', check_date: today, when_label: 'today', prompt_no: promptNo, calls: due, colleges: groupByCollege(due) };
+    return NO;
   }
 
-  // ───────────────────────── next day (Daily Tracker opened) ─────────────────────────
-  if (await EmailCheck.exists({ coordinator_id: el.id, next_day_prompted_on: today })) return NO; // once per day
+  // ───────────────────────── this evening ─────────────────────────
+  if (istMinutes(nowMs) < EVENING_FROM_MIN) return NO; // before 5 PM nothing is asked, tomorrow covers it
 
-  for (let back = 1; back <= LOOKBACK_DAYS; back++) {
-    const d = istDay(nowMs - back * DAY_MS);
-    if (d < START_DATE) break; // older days predate the feature
-    const rec: any = await EmailCheck.findOne({ coordinator_id: el.id, check_date: d }).lean();
-    if (rec?.status === 'yes') continue; // that whole day was confirmed
-    const calls = await inviteMailCalls(el, d);
-    if (calls.length === 0) continue;
-    const confirmed = new Set((rec?.confirmed_call_ids || []).map(String));
-    const pending = calls.filter((c) => !confirmed.has(c.id));
-    if (pending.length === 0) continue;
+  const rec: any = await EmailCheck.findOne({ coordinator_id: el.id, check_date: today }).lean();
+  if (rec?.status === 'yes') return NO; // already confirmed - that is all for the day
+  if ((rec?.prompts || 0) >= MAX_EVENING_ASKS) return NO; // two questions a day is the limit
 
-    await EmailCheck.updateOne(
-      { coordinator_id: el.id, check_date: d },
-      { $set: { next_day_prompted_on: today }, $setOnInsert: { status: 'pending', prompts: 0, last_moment: -1, dismissals: 0 } },
-      { upsert: true }
-    );
-    return {
-      show: true,
-      kind: 'next_day',
-      check_date: d,
-      when_label: back === 1 ? 'yesterday' : weekdayName(d),
-      calls: pending,
-      colleges: groupByCollege(pending),
-    };
+  const snoozeAt = rec?.snooze_until ? new Date(rec.snooze_until).getTime() : null;
+  if (snoozeAt !== null && nowMs < snoozeAt) return NO; // they chose a time - wait for it
+  if (kind === 'timed' && snoozeAt === null) return NO; // "timed" only ever fires for a chosen time
+
+  const calls = await inviteMailCalls(el, today);
+  if (calls.length === 0) return NO;
+
+  // Claim this question atomically. If a second tab claims in the same instant the upsert collides
+  // with the unique index and throws, so exactly one of them shows it.
+  let askNo = 1;
+  try {
+    const claimed: any = await EmailCheck.findOneAndUpdate(
+      {
+        coordinator_id: el.id,
+        check_date: today,
+        prompts: { $lt: MAX_EVENING_ASKS },
+        $or: [{ last_prompt_at: { $exists: false } }, { last_prompt_at: null }, { last_prompt_at: { $lt: new Date(nowMs - PROMPT_GAP_MS) } }],
+      },
+      {
+        $inc: { prompts: 1 },
+        $set: { last_prompt_at: new Date(nowMs) },
+        $unset: { snooze_until: '' },
+        $setOnInsert: { status: 'pending', last_moment: -1, dismissals: 0 },
+      },
+      { new: true, upsert: true }
+    ).lean();
+    askNo = claimed?.prompts || 1;
+  } catch {
+    return NO;
   }
-  return NO;
+
+  return { show: true, kind, check_date: today, when_label: 'today', ask_no: askNo, calls, colleges: groupByCollege(calls) };
 }
 
 export interface AnswerInput {
   answer: 'yes' | 'no' | 'snooze';
-  kind: 'due' | 'next_day';
+  kind: EmailCheckKind;
   call_ids?: string[];
   /** 'HH:MM' in IST, for answer === 'snooze'. Must be later today. */
   remind_at?: string;
@@ -253,25 +255,27 @@ export async function recordEmailCheckAnswer(
   if (!el) return { ok: false, error: 'NOT_ELIGIBLE' };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(checkDate)) return { ok: false, error: 'BAD_DATE' };
   const today = istDay(nowMs);
-  const oldest = istDay(nowMs - (LOOKBACK_DAYS + 1) * DAY_MS);
+  const oldest = addDays(today, -7);
   if (checkDate > today || checkDate < oldest) return { ok: false, error: 'BAD_DATE' };
 
   const ids = (input.call_ids || []).filter((i) => Types.ObjectId.isValid(i)).map((i) => new Types.ObjectId(i));
   const base = { coordinator_id: el.id, check_date: checkDate };
-  // `dismissals` is deliberately left out - the "no" branch $inc's it, and Mongo refuses to have
-  // both $inc and $setOnInsert touch one field.
+  // `dismissals` is deliberately left out of $setOnInsert - the "no" branch $inc's it, and Mongo refuses to
+  // have both $inc and $setOnInsert touch one field.
   const onInsert = { $setOnInsert: { prompts: 0, last_moment: -1 } };
+  const existing: any = await EmailCheck.findOne(base).lean();
+  if (existing?.status === 'yes') return { ok: true }; // never downgrade a confirmation
 
   if (input.answer === 'snooze') {
+    // A chosen time only makes sense for today's evening question.
+    if (checkDate !== today) return { ok: false, error: 'BAD_DATE' };
     const m = /^(\d{1,2}):(\d{2})$/.exec(String(input.remind_at || ''));
     if (!m) return { ok: false, error: 'BAD_TIME' };
     const h = Number(m[1]);
     const min = Number(m[2]);
     if (h > 23 || min > 59) return { ok: false, error: 'BAD_TIME' };
-    // Always a time later on the day the reminder belongs to.
     const at = istMidnightMs(today) + (h * 60 + min) * 60 * 1000;
     if (at <= nowMs) return { ok: false, error: 'TIME_IN_PAST' };
-    if (at - nowMs > DAY_MS) return { ok: false, error: 'BAD_TIME' };
     await EmailCheck.updateOne(
       base,
       { $set: { snooze_until: new Date(at), snooze_set_at: new Date(nowMs), status: 'pending' }, ...onInsert },
@@ -294,34 +298,30 @@ export async function recordEmailCheckAnswer(
     return { ok: true };
   }
 
-  // yes - confirm these calls; the day counts as done once nothing is left over.
+  // yes - the whole day is confirmed
   await EmailCheck.updateOne(
     base,
     {
-      $set: { answered_at: new Date(nowMs), answered_kind: input.kind === 'next_day' ? 'next_day' : 'due' },
+      $set: { status: 'yes', answered_at: new Date(nowMs), answered_kind: input.kind === 'next_day' ? 'next_day' : 'due' },
       $addToSet: { confirmed_call_ids: { $each: ids } },
       $unset: { snooze_until: '' },
       ...onInsert,
     },
     { upsert: true }
   );
-  const rec: any = await EmailCheck.findOne(base).lean();
-  const confirmed = new Set((rec?.confirmed_call_ids || []).map(String));
-  const calls = await inviteMailCalls(el, checkDate);
-  const allDone = calls.length > 0 && calls.every((c) => confirmed.has(c.id));
-  await EmailCheck.updateOne(base, { $set: { status: allDone ? 'yes' : 'pending' } });
   return { ok: true };
 }
+
+const KINDS: EmailCheckKind[] = ['signout', 'login', 'timed', 'next_day'];
 
 export function registerEmailCheckRoutes(app: Express) {
   app.get('/api/v1/email-check/status', async (req: Request, res: Response) => {
     try {
-      const kind = req.query.kind === 'next_day' ? 'next_day' : 'due';
-      const ready = req.query.ready === '1' || req.query.ready === 'true';
-      const decision = await decideEmailCheck((req as any).user?.userId, kind, ready);
+      const kind = KINDS.includes(req.query.kind as EmailCheckKind) ? (req.query.kind as EmailCheckKind) : 'login';
+      const decision = await decideEmailCheck((req as any).user?.userId, kind);
       return res.json({ success: true, data: decision });
     } catch (err: any) {
-      // never let this feature get in anyone's way
+      // never let this feature get in anyone's way - least of all sign-out or login
       console.error('GET /email-check/status error:', err?.message);
       return res.json({ success: true, data: { show: false } });
     }
@@ -338,7 +338,7 @@ export function registerEmailCheckRoutes(app: Express) {
         String(check_date || ''),
         {
           answer,
-          kind: kind === 'next_day' ? 'next_day' : 'due',
+          kind: KINDS.includes(kind) ? kind : 'signout',
           call_ids: Array.isArray(call_ids) ? call_ids.map(String) : [],
           remind_at: typeof remind_at === 'string' ? remind_at : undefined,
         }

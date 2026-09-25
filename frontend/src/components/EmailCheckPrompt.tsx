@@ -8,12 +8,17 @@ import { apiFetch } from '@/lib/api';
 import { readSessionUser, roleOf } from '@/lib/session';
 
 /**
- * "Have you sent the email?" reminder.
+ * "Did you send all the emails for today's positives?"
  *
- * Every Invite Mail call starts its own 15-minute timer on the server; this component only asks about
- * whatever the server says is due, and reports the answer back. The coordinator can confirm, or open the
- * time picker in place and choose when to be reminded. It never blocks navigation and fails silently.
+ * Asked only at a few deliberate moments, all decided by the server (IST clock): when the person clicks
+ * Sign out at or after 5 PM, when they log in again later the same evening, at a time they picked
+ * themselves, and the next morning on the Daily Tracker. No popups during the working day.
+ * It never blocks navigation or sign-out, and fails silently.
  */
+
+import { registerSignOutGate } from '@/lib/emailCheckGate';
+
+type Kind = 'signout' | 'login' | 'timed' | 'next_day';
 
 interface InviteCall {
   id: string;
@@ -23,16 +28,18 @@ interface InviteCall {
 }
 interface Decision {
   show: boolean;
-  kind?: 'due' | 'next_day';
+  kind?: Kind;
   check_date?: string;
   when_label?: string;
   calls?: InviteCall[];
 }
 
-const POLL_MS = 45_000;
-const READY_AFTER_MS = 60_000; // the app must have been open for a minute (login+logout in a minute -> next morning)
 const SHOWN_CALLS = 3;
 const ITEM = 34; // one row of a picker wheel
+const EVENING_FROM = 17 * 60; // 5 PM IST, in minutes
+const SIGNOUT_LOOKUP_MS = 3000; // never keep someone waiting to sign out
+const LOGIN_MARK = 'ipoms_ec_login_checked';
+const TIMED_MARK = 'ipoms_ec_timed_at';
 
 /** Minutes after IST midnight, whatever the browser's own timezone is. */
 function istNowMinutes(): number {
@@ -134,9 +141,13 @@ export function EmailCheckPrompt() {
   const [pickTime, setPickTime] = useState('');
   const [quick, setQuick] = useState<number | null>(null);
   const [err, setErr] = useState('');
-  const openedAt = useRef<number>(Date.now());
-  const busy = useRef(false);
+  const chain = useRef<Promise<void>>(Promise.resolve());
   const nextDayAsked = useRef(false);
+  const decisionRef = useRef<Decision | null>(null);
+  /** Resolves the Sign out button's wait once the person has answered (or closed) the popup. */
+  const gateResolve = useRef<(() => void) | null>(null);
+
+  useEffect(() => { decisionRef.current = decision; }, [decision]);
 
   const eligible = useCallback(() => {
     const user: any = readSessionUser();
@@ -146,53 +157,95 @@ export function EmailCheckPrompt() {
     return true;
   }, []);
 
+  const open = useCallback((d: Decision) => {
+    decisionRef.current = d;
+    setDecision(d);
+    setPicking(false);
+    setQuick(null);
+    setErr('');
+    setDone('');
+    setPickTime(toHHMM(istNowMinutes() + 30));
+  }, []);
+
+  const release = useCallback(() => {
+    const r = gateResolve.current;
+    gateResolve.current = null;
+    if (r) r();
+  }, []);
+
+  const close = useCallback(() => {
+    decisionRef.current = null;
+    setDecision(null);
+    release();
+  }, [release]);
+
+  // Checks run one after another, never dropped: a login check and a picked-time check can start in the
+  // same instant, and the second must still get its turn (the server makes sure only one of them shows).
   const check = useCallback(
-    async (kind: 'due' | 'next_day') => {
-      if (busy.current || decision) return;
-      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
-      if (!eligible()) return;
-      // The one-minute wait only protects the 15-minute reminders from someone who logs in and straight
-      // out. The next-morning question is asked the moment they open the Daily Tracker.
-      if (kind === 'due' && Date.now() - openedAt.current < READY_AFTER_MS) return;
-      busy.current = true;
-      try {
-        const res = await apiFetch<Decision>(`/email-check/status?kind=${kind}&ready=1`);
-        if (res?.success && res.data?.show) {
-          setDecision(res.data);
-          setPicking(false);
-          setQuick(null);
-          setErr('');
-          setDone('');
-          setPickTime(toHHMM(istNowMinutes() + 30));
-        }
-      } catch {
-        /* silent */
-      } finally {
-        busy.current = false;
-      }
+    (kind: Kind) => {
+      chain.current = chain.current
+        .then(async () => {
+          if (decisionRef.current) return;
+          if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+          if (!eligible()) return;
+          const res = await apiFetch<Decision>(`/email-check/status?kind=${kind}`);
+          if (res?.success && res.data?.show) open(res.data);
+        })
+        .catch(() => {
+          /* silent */
+        });
+      return chain.current;
     },
-    [decision, eligible]
+    [eligible, open]
   );
 
-  // A call can fall due at any point in the working day, so this runs through it.
+  // Sign out: the shared button awaits this. After 5 PM it may ask first; before 5 PM, or if anything
+  // goes wrong or takes too long, it lets sign-out straight through.
   useEffect(() => {
-    const tick = () => {
-      const mins = istNowMinutes();
-      if (mins >= 8 * 60 && mins <= 23 * 60) check('due');
-    };
-    const id = window.setInterval(tick, POLL_MS);
-    const first = window.setTimeout(tick, READY_AFTER_MS + 500);
-    const onVisible = () => { if (document.visibilityState === 'visible') tick(); };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => {
-      window.clearInterval(id);
-      window.clearTimeout(first);
-      document.removeEventListener('visibilitychange', onVisible);
-    };
+    registerSignOutGate(async () => {
+      if (!eligible() || istNowMinutes() < EVENING_FROM) return;
+      const res: any = await Promise.race([
+        apiFetch<Decision>('/email-check/status?kind=signout'),
+        new Promise((resolve) => window.setTimeout(() => resolve(null), SIGNOUT_LOOKUP_MS)),
+      ]).catch(() => null);
+      if (!res?.success || !res.data?.show) return;
+      await new Promise<void>((resolve) => {
+        gateResolve.current = resolve;
+        open(res.data);
+      });
+    });
+    return () => registerSignOutGate(null);
+  }, [eligible, open]);
+
+  // Logging in: the first time the app opens in a browser session, after 5 PM, it may ask once.
+  useEffect(() => {
+    let already = false;
+    try { already = sessionStorage.getItem(LOGIN_MARK) === '1'; } catch { /* ignore */ }
+    if (already) return;
+    // The mark is written when the timer actually fires, not up front: React mounts effects twice in
+    // development, and marking early would make the second mount think this had already been done.
+    const t = window.setTimeout(() => {
+      try { sessionStorage.setItem(LOGIN_MARK, '1'); } catch { /* ignore */ }
+      if (istNowMinutes() >= EVENING_FROM) check('login');
+    }, 1500);
+    return () => window.clearTimeout(t);
   }, [check]);
 
-  // Next morning: asked as soon as the Daily Tracker is opened (a moment for the page to settle), and
-  // only there - never on the dashboard. The server allows it once per day.
+  // A time the person picked: ask the server again when it arrives (kept in sessionStorage so a refresh
+  // does not lose it). The server is the judge - this only asks it at the right moment.
+  const armTimed = useCallback(() => {
+    let at = 0;
+    try { at = Number(sessionStorage.getItem(TIMED_MARK) || 0); } catch { /* ignore */ }
+    if (!at) return () => {};
+    const fire = () => { try { sessionStorage.removeItem(TIMED_MARK); } catch { /* ignore */ } check('timed'); };
+    const wait = Math.max(800, at - Date.now() + 500);
+    const t = window.setTimeout(fire, wait);
+    return () => window.clearTimeout(t);
+  }, [check]);
+  useEffect(() => armTimed(), [armTimed]);
+
+  // Tomorrow morning: asked as soon as the Daily Tracker is opened (a moment for the page to settle),
+  // and only there. The server allows it once per day.
   useEffect(() => {
     if (pathname !== '/tracker' || nextDayAsked.current) return;
     const t = window.setTimeout(() => {
@@ -202,29 +255,26 @@ export function EmailCheckPrompt() {
     return () => window.clearTimeout(t);
   }, [pathname, check]);
 
-  const send = useCallback(
-    async (body: Record<string, unknown>) => {
-      const d = decision;
-      if (!d) return { success: false } as any;
-      return apiFetch('/email-check/answer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ check_date: d.check_date, kind: d.kind, call_ids: (d.calls || []).map((c) => c.id), ...body }),
-      }).catch(() => ({ success: false } as any));
-    },
-    [decision]
-  );
+  const send = useCallback(async (body: Record<string, unknown>) => {
+    const d = decisionRef.current;
+    if (!d) return { success: false } as any;
+    return apiFetch('/email-check/answer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ check_date: d.check_date, kind: d.kind, call_ids: (d.calls || []).map((c) => c.id), ...body }),
+    }).catch(() => ({ success: false } as any));
+  }, []);
 
   const finish = useCallback((msg: string) => {
     setDone(msg);
-    window.setTimeout(() => setDecision(null), 1600);
-  }, []);
+    window.setTimeout(() => close(), 1500);
+  }, [close]);
 
-  /** Closing and Esc mean the same thing: not now, ask me again later. */
+  /** Closing, Esc and "Not yet" mean the same thing: not confirmed - tomorrow's Daily Tracker will ask. */
   const dismiss = useCallback(() => {
     void send({ answer: 'no' });
-    setDecision(null);
-  }, [send]);
+    close();
+  }, [send, close]);
 
   const confirmSent = useCallback(() => {
     void send({ answer: 'yes' });
@@ -235,9 +285,18 @@ export function EmailCheckPrompt() {
     if (!pickTime) return;
     setErr('');
     const res: any = await send({ answer: 'snooze', remind_at: pickTime });
-    if (res?.success) finish(`Reminder set for ${res?.data?.remind_at_label || clockLabel(pickTime)}`);
-    else setErr(res?.error?.message || 'Could not set that reminder.');
-  }, [pickTime, send, finish]);
+    if (res?.success) {
+      try {
+        // remember when to check again, in the browser's own clock
+        const delta = (minsOf(pickTime) - istNowMinutes()) * 60000;
+        sessionStorage.setItem(TIMED_MARK, String(Date.now() + delta));
+      } catch { /* ignore */ }
+      finish(`Reminder set for ${res?.data?.remind_at_label || clockLabel(pickTime)}`);
+      window.setTimeout(() => armTimed(), 0);
+    } else {
+      setErr(res?.error?.message || 'Could not set that reminder.');
+    }
+  }, [pickTime, send, finish, armTimed]);
 
   useEffect(() => {
     if (!decision) return;
@@ -274,21 +333,18 @@ export function EmailCheckPrompt() {
   if (!decision) return null;
 
   const calls = decision.calls || [];
-  const many = calls.length > 1;
+  const n = calls.length;
   const isNext = decision.kind === 'next_day';
+  const isSignOut = decision.kind === 'signout';
   const when = decision.when_label || 'today';
   const title = isNext
-    ? `Did you send ${many ? 'these emails' : 'this email'} from ${when}?`
-    : many
-    ? 'Have you sent these emails?'
-    : 'Have you sent this email?';
+    ? `Did you send all the emails for ${when === 'yesterday' ? "yesterday's" : `${when}'s`} positives?`
+    : "Did you send all the emails for today's positives?";
   const subtitle = isNext
-    ? many
-      ? `${calls.length} Invite Mail calls from ${when} were never confirmed.`
-      : `Invite Mail logged ${when} at ${calls[0]?.time_label || ''}, still not confirmed.`
-    : many
-    ? `${calls.length} Invite Mail calls, logged 15 minutes ago or more.`
-    : `Invite Mail logged at ${calls[0]?.time_label || ''}.`;
+    ? `${n} Invite Mail ${n === 1 ? 'call' : 'calls'} from ${when} ${n === 1 ? 'is' : 'are'} still not confirmed.`
+    : decision.kind === 'timed'
+    ? `You asked to be reminded now. ${n} Invite Mail ${n === 1 ? 'call' : 'calls'} today.`
+    : `${n} Invite Mail ${n === 1 ? 'call' : 'calls'} today.`;
 
   return (
     <div className="ipoms-ec-backdrop" role="presentation">
@@ -338,17 +394,22 @@ export function EmailCheckPrompt() {
 
             <div className="ipoms-ec-actions">
               <button type="button" className="ipoms-ec-btn ipoms-ec-yes" onClick={confirmSent}>Yes, sent</button>
-              <button
-                type="button"
-                className={`ipoms-ec-btn ipoms-ec-pick${picking ? ' is-open' : ''}`}
-                onClick={() => setPicking((p) => !p)}
-                aria-expanded={picking}
-              >
-                <Clock3 size={14} strokeWidth={2.2} aria-hidden /> Pick time
-              </button>
+              {isNext ? (
+                <button type="button" className="ipoms-ec-btn ipoms-ec-pick" onClick={dismiss}>Not yet</button>
+              ) : (
+                <button
+                  type="button"
+                  className={`ipoms-ec-btn ipoms-ec-pick${picking ? ' is-open' : ''}`}
+                  onClick={() => setPicking((p) => !p)}
+                  aria-expanded={picking}
+                >
+                  <Clock3 size={14} strokeWidth={2.2} aria-hidden /> Pick time
+                </button>
+              )}
             </div>
+            {isSignOut && !picking && <p className="ipoms-ec-note">You will be signed out after this.</p>}
 
-            {picking && (
+            {picking && !isNext && (
               <div className="ipoms-ec-picker">
                 <div className="ipoms-ec-quick">
                   {[15, 30, 60].map((m) => (
@@ -459,6 +520,7 @@ export function EmailCheckPrompt() {
           font-family: inherit; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; color: #64748b; cursor: pointer; transition: color .2s ease; }
         .ipoms-ec-mer button.is-on { color: #fff; }
 
+        .ipoms-ec-note { margin: 8px 0 0; font-size: 10.5px; color: #64748b; text-align: center; }
         .ipoms-ec-preview { margin: 8px 0 0; font-size: 11.5px; line-height: 1.4; color: #1E3A8A; font-weight: 600; text-align: center; }
         .ipoms-ec-preview.is-bad { color: #b91c1c; }
 
@@ -486,6 +548,7 @@ export function EmailCheckPrompt() {
         .dark .ipoms-ec-merthumb { background: #5580F5; }
         .dark .ipoms-ec-mer button { color: #a9b3c7; }
         .dark .ipoms-ec-mer button.is-on { color: #0b1120; }
+        .dark .ipoms-ec-note { color: #a9b3c7; }
         .dark .ipoms-ec-preview { color: #9fb6ff; }
         .dark .ipoms-ec-preview.is-bad { color: #fca5a5; }
 
