@@ -1857,6 +1857,36 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     self-declaration - the app cannot see whether an email was really sent; a per-person view for Team
     Leaders/Administrator was suggested and not built.
 
+73. **Weekly report showed fewer companies on one coordinator's laptop, 25 Sep 2026 (user-reported;
+    Thirisha R / DSU: 30 pipeline and 10 top companies, report showed 6 top).** Same login on every other
+    laptop was correct. Cause, verified against the live data: **the report's "Graduating Academic Batch"
+    filter compared a BATCH (2027) against `academic_year`, which is the SEASON a row was created in.**
+    Since the season switch (item 37) rows created after ~21 Sep carry `academic_year: 2026` but
+    `eligible_batch: "2027 Batch"`, so a 2027 filter silently dropped every such row - **138 of 995 weekly
+    rows org-wide**, incl. DSU's four newest top companies (ST Lumax, 8OL Robotics, SPK power, Avaali) -
+    exactly 10 -> 6. Why only her browser: the two **Daily** report templates force the batch to `2027`
+    (`getDefaultGraduatingBatch()`), and (a) `handleCategoryChange` never reset it when she moved on to the
+    Weekly report, and (b) the pre-item-51 build also saved it in `localStorage`
+    (`ipoms_report_builder_wizard_state`), which sign-out, refresh and a restart do not clear - so her
+    browser restored 2027 for every weekly report while a fresh laptop defaulted to All Batches. **Fixes:**
+    (1) server: new `batchOrYearClause()` in `server.ts` - a 4-digit batch filter now matches `academic_year`
+    **or** `eligible_batch`; applied (AND-ed via `$and`, so callers' own `$or` still works) to
+    `GET /weekly-tracker` and the three `POST /reports/generate` weekly paths (single college, multi
+    college, pending-tasks fallback); the "empty -> retry without year" fallbacks delete `$and`.
+    **This alone fixes Thirisha with no change on her laptop once the backend is deployed.** (2) frontend:
+    `handleCategoryChange` resets the batch to `all` for every non-daily template. (3) the college dropdown
+    printed the code twice (`[DSU] [DSU] Dhanalakshmi...`) because `SmoothSelect` draws the `badge` itself and
+    the option label also began with `[CODE]` - the label is now the college name only (search by code still
+    works: the search also checks the badge); this is the one selector all six report types use.
+    **Verified:** live DSU report via `POST /reports/generate` - `academic_year=all` and `=2027` both return
+    30 pipeline / 10 top / 6 in progress (2027 previously returned 26 / 6 / 5); `=2026` returns only the 4+1
+    season rows; real browser: Daily Positives shows "2027 Batch", switching to Weekly shows "All Batches",
+    dropdown rows show one `[CODE]`; `tsc --noEmit` clean both sides. **Not changed (same latent mismatch,
+    lower impact):** `weekly-tracker/kpi`, the export route, `analytics/*` and the active-leads batch filters
+    still compare a batch to `academic_year`. **Honest gap:** the user said pipeline showed 28; this cause
+    predicts 26 (top 6 matches exactly) - worth asking her to re-count. **Until deployed,** the manual fix on
+    her laptop is to set "Graduating Academic Batch" to "All Batches" in the Report Builder.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

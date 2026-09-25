@@ -1234,6 +1234,11 @@ export function ReportBuilderWizard({
   const handleCategoryChange = (newType: string) => {
     setTemplateType(newType);
     setValidationErrors([]);
+    // The two Daily templates force a graduating batch (2027). Leaving one for any other report must not
+    // carry that batch along - it silently filtered the weekly report to a single batch.
+    if (newType !== 'daily_positives' && newType !== 'daily_jd_received') {
+      setAcademicYear('all');
+    }
     if (newType === 'pending_tasks') {
       setSections({
         pending_tasks: true,
@@ -1814,7 +1819,8 @@ export function ReportBuilderWizard({
                       );
                       let selectOptions = prioritizedColleges.map((c: any) => ({
                         value: c._id,
-                        label: `[${c.college_code}] ${c.college_name}`,
+                        // the dropdown draws the code badge itself - the label must NOT repeat it
+                        label: c.college_name,
                         badge: c.college_code,
                         isPinned: Boolean(c.isPinned || c.is_selected_by_me),
                       }));
