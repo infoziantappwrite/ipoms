@@ -1839,6 +1839,23 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     faked clock - popup only after a minute, correct copy for 1 vs many, picker chips and past-time refusal,
     and the exact payloads for yes / no / snooze. **Not verified:** a genuine end-to-end run on the real
     clock (15 real minutes after a real call). `verify:policy` OK, `tsc --noEmit` clean both sides.
+    **Picker redesigned in place, 25 Sep 2026 (user: "old classic model... smooth like 2026").** The
+    native `<input type="time">` was rendering Chrome's own three-column dropdown - that was the "classic"
+    look, not our CSS. Replaced with a custom control and the two-step flow collapsed into one: the card is
+    now **400px** wide and carries **[Yes, sent] [Pick time]** side by side, so the option to choose a time
+    is visible immediately; "Pick time" expands the picker **inside the same card** with the question still
+    on screen (no second screen). The picker is three quick chips (in 15 min / 30 min / 1 hour), then two
+    **snap-scrolling wheels** (hours 1-12, minutes in 5s) with a highlighted centre band, a fade mask top
+    and bottom, and a sliding AM/PM pill. Each wheel responds to mouse wheel, touch drag, a click on a row,
+    and Arrow Up/Down, and is a proper `listbox`/`option` for screen readers; rows are 40px. Esc now closes
+    the picker first and only dismisses the reminder on a second press. Hero icon redrawn as an envelope
+    with a letter lifting out of it, on a pulsing halo - **deliberately not a Gmail or Outlook mark**: those
+    are trademarks and this popup is not a Gmail/Outlook integration, so imitating either logo would be
+    brand misuse (drop in an official asset if a real integration ever needs one). Verified in a real
+    browser, light and dark, 1300px and 390px: card 400px, picker opens inline, chips / row-tap / wheel-
+    scroll / AM-PM all move the selection and the preview line together, a past time disables "Set
+    reminder", the payload carries the right `remind_at`, Esc layers correctly, and there is no horizontal
+    scroll on mobile.
 
 ## 6. Module map
 ## 6. Module map

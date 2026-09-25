@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { X, Check, ArrowLeft, AlarmClock } from 'lucide-react';
+import { X, Check, Clock3 } from 'lucide-react';
 
 import { apiFetch } from '@/lib/api';
 import { readSessionUser, roleOf } from '@/lib/session';
@@ -11,8 +11,8 @@ import { readSessionUser, roleOf } from '@/lib/session';
  * "Have you sent the email?" reminder.
  *
  * Every Invite Mail call starts its own 15-minute timer on the server; this component only asks about
- * whatever the server says is due, and reports the answer back. The coordinator can confirm, or pick
- * their own time to be reminded at. It never blocks navigation and stays silent on any error.
+ * whatever the server says is due, and reports the answer back. The coordinator can confirm, or open the
+ * time picker in place and choose when to be reminded. It never blocks navigation and fails silently.
  */
 
 interface InviteCall {
@@ -27,12 +27,12 @@ interface Decision {
   check_date?: string;
   when_label?: string;
   calls?: InviteCall[];
-  colleges?: { code: string; count: number }[];
 }
 
 const POLL_MS = 45_000;
 const READY_AFTER_MS = 60_000; // the app must have been open for a minute (login+logout in a minute -> next morning)
 const SHOWN_CALLS = 3;
+const ITEM = 40; // one row of a picker wheel
 
 /** Minutes after IST midnight, whatever the browser's own timezone is. */
 function istNowMinutes(): number {
@@ -44,20 +44,93 @@ function istNowMinutes(): number {
     return -1;
   }
 }
-const hhmm = (mins: number) => `${String(Math.floor((mins % 1440) / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
-/** 18:30 -> "6:30 pm" */
+/** Minutes after midnight -> 'HH:MM', rounded up to the next 5 so it lands on the picker's steps. */
+const toHHMM = (mins: number) => {
+  const m = Math.min(23 * 60 + 55, Math.ceil((mins % 1440) / 5) * 5);
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+};
+const minsOf = (v: string) => {
+  const [h, m] = v.split(':').map(Number);
+  return Number.isNaN(h) || Number.isNaN(m) ? -1 : h * 60 + m;
+};
+/** '18:30' -> '6:30 pm' */
 function clockLabel(v: string): string {
   const [h, m] = v.split(':').map(Number);
   if (Number.isNaN(h) || Number.isNaN(m)) return v;
   return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
 }
 
+const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
+const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
+
+/** A snap-scrolling column. Scroll it, drag it, click a row, or use the arrow keys. */
+function Wheel({ items, index, onIndex, label }: { items: string[]; index: number; onIndex: (i: number) => void; label: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const settle = useRef<number>();
+  const fromScroll = useRef(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (fromScroll.current) {
+      fromScroll.current = false;
+      return;
+    }
+    if (Math.round(el.scrollTop / ITEM) !== index) el.scrollTo({ top: index * ITEM, behavior: el.scrollTop === 0 && index === 0 ? 'auto' : 'smooth' });
+  }, [index]);
+
+  // start on the right row without animating in
+  useEffect(() => {
+    const el = ref.current;
+    if (el) el.scrollTop = index * ITEM;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onScroll = () => {
+    window.clearTimeout(settle.current);
+    settle.current = window.setTimeout(() => {
+      const el = ref.current;
+      if (!el) return;
+      const i = Math.max(0, Math.min(items.length - 1, Math.round(el.scrollTop / ITEM)));
+      if (i !== index) {
+        fromScroll.current = true;
+        onIndex(i);
+      }
+    }, 90);
+  };
+
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      onIndex(Math.max(0, Math.min(items.length - 1, index + (e.key === 'ArrowDown' ? 1 : -1))));
+    }
+  };
+
+  return (
+    <div className="ipoms-ec-wheel" ref={ref} onScroll={onScroll} onKeyDown={onKey} tabIndex={0} role="listbox" aria-label={label}>
+      <div className="ipoms-ec-pad" />
+      {items.map((it, i) => (
+        <div
+          key={it}
+          role="option"
+          aria-selected={i === index}
+          className={`ipoms-ec-item${i === index ? ' is-on' : ''}`}
+          onClick={() => onIndex(i)}
+        >
+          {it}
+        </div>
+      ))}
+      <div className="ipoms-ec-pad" />
+    </div>
+  );
+}
+
 export function EmailCheckPrompt() {
   const rawPath = usePathname() || '';
   const pathname = rawPath.length > 1 ? rawPath.replace(/\/$/, '') : rawPath;
   const [decision, setDecision] = useState<Decision | null>(null);
-  const [view, setView] = useState<'ask' | 'snooze' | 'done'>('ask');
-  const [doneMsg, setDoneMsg] = useState('');
+  const [picking, setPicking] = useState(false);
+  const [done, setDone] = useState('');
   const [pickTime, setPickTime] = useState('');
   const [quick, setQuick] = useState<number | null>(null);
   const [err, setErr] = useState('');
@@ -84,10 +157,11 @@ export function EmailCheckPrompt() {
         const res = await apiFetch<Decision>(`/email-check/status?kind=${kind}&ready=1`);
         if (res?.success && res.data?.show) {
           setDecision(res.data);
-          setView('ask');
+          setPicking(false);
           setQuick(null);
           setErr('');
-          setPickTime(hhmm(istNowMinutes() + 30));
+          setDone('');
+          setPickTime(toHHMM(istNowMinutes() + 30));
         }
       } catch {
         /* silent */
@@ -140,12 +214,11 @@ export function EmailCheckPrompt() {
   );
 
   const finish = useCallback((msg: string) => {
-    setDoneMsg(msg);
-    setView('done');
+    setDone(msg);
     window.setTimeout(() => setDecision(null), 1600);
   }, []);
 
-  /** Closing, Esc and "Not yet" with no time all mean the same thing: ask me again later. */
+  /** Closing and Esc mean the same thing: not now, ask me again later. */
   const dismiss = useCallback(() => {
     void send({ answer: 'no' });
     setDecision(null);
@@ -166,18 +239,35 @@ export function EmailCheckPrompt() {
 
   useEffect(() => {
     if (!decision) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && view !== 'done') dismiss(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || done) return;
+      if (picking) setPicking(false);
+      else dismiss();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [decision, view, dismiss]);
+  }, [decision, picking, done, dismiss]);
 
   const nowMins = istNowMinutes();
-  const timeIsPast = useMemo(() => {
-    if (!pickTime) return false;
-    const [h, m] = pickTime.split(':').map(Number);
-    return h * 60 + m <= nowMins;
-    // nowMins is read at render; the Set button re-checks on the server anyway.
-  }, [pickTime, nowMins]);
+  const chosen = minsOf(pickTime);
+  const timeIsPast = chosen >= 0 && chosen <= nowMins;
+
+  // wheel positions derived from the single source of truth, pickTime
+  const { hourIdx, minIdx, isPm } = useMemo(() => {
+    const h24 = Math.floor(Math.max(0, chosen) / 60);
+    return {
+      hourIdx: ((h24 % 12) + 11) % 12, // 0 -> "12", 13 -> "01"
+      minIdx: Math.round((Math.max(0, chosen) % 60) / 5) % 12,
+      isPm: h24 >= 12,
+    };
+  }, [chosen]);
+
+  const setParts = useCallback((h12: number, min: number, pm: boolean) => {
+    const h24 = (h12 % 12) + (pm ? 12 : 0);
+    setPickTime(`${String(h24).padStart(2, '0')}:${String(min).padStart(2, '0')}`);
+    setQuick(null);
+    setErr('');
+  }, []);
 
   if (!decision) return null;
 
@@ -186,15 +276,14 @@ export function EmailCheckPrompt() {
   const isNext = decision.kind === 'next_day';
   const when = decision.when_label || 'today';
   const title = isNext
-    ? `Did you send ${many ? 'these emails' : 'this email'} from ${when === 'yesterday' ? 'yesterday' : when}?`
+    ? `Did you send ${many ? 'these emails' : 'this email'} from ${when}?`
     : many
     ? 'Have you sent these emails?'
     : 'Have you sent this email?';
-  const dayWord = when === 'yesterday' ? 'yesterday' : when;
   const subtitle = isNext
     ? many
-      ? `${calls.length} Invite Mail calls from ${dayWord} were never confirmed.`
-      : `Invite Mail logged ${dayWord} at ${calls[0]?.time_label || ''}, still not confirmed.`
+      ? `${calls.length} Invite Mail calls from ${when} were never confirmed.`
+      : `Invite Mail logged ${when} at ${calls[0]?.time_label || ''}, still not confirmed.`
     : many
     ? `${calls.length} Invite Mail calls, logged 15 minutes ago or more.`
     : `Invite Mail logged at ${calls[0]?.time_label || ''}.`;
@@ -202,41 +291,38 @@ export function EmailCheckPrompt() {
   return (
     <div className="ipoms-ec-backdrop" role="presentation">
       <div className="ipoms-ec-card" role="dialog" aria-modal="true" aria-labelledby="ipoms-ec-title">
-        {view === 'snooze' && (
-          <button type="button" className="ipoms-ec-back" onClick={() => { setView('ask'); setErr(''); }} aria-label="Back">
-            <ArrowLeft size={15} strokeWidth={2.2} aria-hidden />
-          </button>
-        )}
-        {view !== 'done' && (
+        {!done && (
           <button type="button" className="ipoms-ec-x" onClick={dismiss} aria-label="Close">
             <X size={15} strokeWidth={2.2} aria-hidden />
           </button>
         )}
 
         <div className="ipoms-ec-hero" aria-hidden>
-          <svg viewBox="0 0 120 80" width="74" height="49">
-            <g className="ipoms-ec-plane">
-              <path d="M8 40 L52 22 L40 46 Z" fill="#fff" opacity="0.95" />
-              <path d="M40 46 L52 22 L34 40 Z" fill="#bfd0ff" />
+          <span className="ipoms-ec-halo" />
+          <svg viewBox="0 0 128 62" width="104" height="50">
+            {/* the letter, rising out of the envelope */}
+            <g className="ipoms-ec-letter">
+              <rect x="44" y="4" width="40" height="30" rx="4" fill="#e8eefc" />
+              <rect x="50" y="12" width="28" height="3" rx="1.5" fill="#9db0dc" />
+              <rect x="50" y="19" width="20" height="3" rx="1.5" fill="#bcc9e8" />
             </g>
-            <g className="ipoms-ec-env">
-              <rect x="58" y="34" width="52" height="34" rx="5" fill="#fff" />
-              <path d="M58 38 L84 55 L110 38" fill="none" stroke="#1E3A8A" strokeWidth="2.4" strokeLinejoin="round" />
-            </g>
+            {/* envelope */}
+            <rect x="30" y="22" width="68" height="36" rx="6" fill="#fff" />
+            <path d="M30 27 L64 49 L98 27" fill="none" stroke="#1E3A8A" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M30 53 L52 38 M98 53 L76 38" fill="none" stroke="#c3d0ec" strokeWidth="2.2" strokeLinecap="round" />
           </svg>
         </div>
 
-        {view === 'done' && (
+        {done ? (
           <div className="ipoms-ec-done">
             <span className="ipoms-ec-tick"><Check size={24} strokeWidth={3} aria-hidden /></span>
-            <p>{doneMsg}</p>
+            <p>{done}</p>
           </div>
-        )}
-
-        {view === 'ask' && (
+        ) : (
           <div className="ipoms-ec-body">
             <h2 id="ipoms-ec-title" className="ipoms-ec-title">{title}</h2>
             <p className="ipoms-ec-sub">{subtitle}</p>
+
             <ul className="ipoms-ec-list">
               {calls.slice(0, SHOWN_CALLS).map((c) => (
                 <li key={c.id}>
@@ -247,46 +333,54 @@ export function EmailCheckPrompt() {
               ))}
               {calls.length > SHOWN_CALLS && <li className="ipoms-ec-more">and {calls.length - SHOWN_CALLS} more</li>}
             </ul>
+
             <div className="ipoms-ec-actions">
               <button type="button" className="ipoms-ec-btn ipoms-ec-yes" onClick={confirmSent}>Yes, sent</button>
-              <button type="button" className="ipoms-ec-btn ipoms-ec-no" onClick={() => setView('snooze')}>
-                <AlarmClock size={14} strokeWidth={2.2} aria-hidden /> Not yet
+              <button
+                type="button"
+                className={`ipoms-ec-btn ipoms-ec-pick${picking ? ' is-open' : ''}`}
+                onClick={() => setPicking((p) => !p)}
+                aria-expanded={picking}
+              >
+                <Clock3 size={14} strokeWidth={2.2} aria-hidden /> Pick time
               </button>
             </div>
-          </div>
-        )}
 
-        {view === 'snooze' && (
-          <div className="ipoms-ec-body">
-            <h2 id="ipoms-ec-title" className="ipoms-ec-title">Remind me at</h2>
-            <p className="ipoms-ec-sub">Pick when you will have sent {many ? 'them' : 'it'}. Nothing shows up before that.</p>
-            <div className="ipoms-ec-quick">
-              {[15, 30, 60].map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className={`ipoms-ec-qchip${quick === m ? ' is-on' : ''}`}
-                  onClick={() => { setQuick(m); setPickTime(hhmm(istNowMinutes() + m)); setErr(''); }}
-                >
-                  {m === 60 ? '1 hour' : `${m} min`}
+            {picking && (
+              <div className="ipoms-ec-picker">
+                <div className="ipoms-ec-quick">
+                  {[15, 30, 60].map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      className={`ipoms-ec-qchip${quick === m ? ' is-on' : ''}`}
+                      onClick={() => { setPickTime(toHHMM(istNowMinutes() + m)); setQuick(m); setErr(''); }}
+                    >
+                      {m === 60 ? 'in 1 hour' : `in ${m} min`}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="ipoms-ec-wheels">
+                  <span className="ipoms-ec-band" aria-hidden />
+                  <Wheel items={HOURS} index={hourIdx} label="Hour" onIndex={(i) => setParts(i + 1, Number(MINUTES[minIdx]), isPm)} />
+                  <span className="ipoms-ec-colon" aria-hidden>:</span>
+                  <Wheel items={MINUTES} index={minIdx} label="Minute" onIndex={(i) => setParts(hourIdx + 1, i * 5, isPm)} />
+                  <div className="ipoms-ec-mer" role="group" aria-label="AM or PM">
+                    <span className="ipoms-ec-merthumb" style={{ transform: isPm ? 'translateY(100%)' : 'none' }} aria-hidden />
+                    <button type="button" className={!isPm ? 'is-on' : ''} onClick={() => setParts(hourIdx + 1, Number(MINUTES[minIdx]), false)} aria-pressed={!isPm}>AM</button>
+                    <button type="button" className={isPm ? 'is-on' : ''} onClick={() => setParts(hourIdx + 1, Number(MINUTES[minIdx]), true)} aria-pressed={isPm}>PM</button>
+                  </div>
+                </div>
+
+                <p className={`ipoms-ec-preview${timeIsPast || err ? ' is-bad' : ''}`} aria-live="polite">
+                  {err || (timeIsPast ? 'That time has already passed today.' : `You will be reminded at ${clockLabel(pickTime)} today.`)}
+                </p>
+                <button type="button" className="ipoms-ec-btn ipoms-ec-set" onClick={setReminder} disabled={timeIsPast}>
+                  Set reminder
                 </button>
-              ))}
-            </div>
-            <div className="ipoms-ec-or"><span>or choose a time</span></div>
-            <div className="ipoms-ec-timefield">
-              <input
-                type="time"
-                value={pickTime}
-                onChange={(e) => { setPickTime(e.target.value); setQuick(null); setErr(''); }}
-                aria-label="Reminder time"
-              />
-            </div>
-            <p className={`ipoms-ec-preview${timeIsPast || err ? ' is-bad' : ''}`}>
-              {err || (timeIsPast ? 'Choose a time later than now.' : pickTime ? `You will be reminded at ${clockLabel(pickTime)} today.` : 'Choose a time.')}
-            </p>
-            <div className="ipoms-ec-actions">
-              <button type="button" className="ipoms-ec-btn ipoms-ec-yes" onClick={setReminder} disabled={!pickTime || timeIsPast}>Set reminder</button>
-            </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -294,81 +388,112 @@ export function EmailCheckPrompt() {
       <style jsx global>{`
         .ipoms-ec-backdrop { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center;
           padding: 16px; overflow: auto; background: rgba(15, 23, 42, .45); animation: ipoms-ec-fade .25s ease-out both; }
-        .ipoms-ec-card { position: relative; width: min(330px, 100%); margin: auto; border-radius: 18px; overflow: hidden;
+        .ipoms-ec-card { position: relative; width: min(400px, 100%); margin: auto; border-radius: 20px; overflow: hidden;
           background: #fff; color: #0f172a; font-family: inherit; box-shadow: 0 24px 60px rgba(15, 23, 42, .35);
           animation: ipoms-ec-pop .35s cubic-bezier(.2,.9,.3,1.2) both; }
-        .ipoms-ec-x, .ipoms-ec-back { position: absolute; top: 8px; z-index: 2; display: grid; place-items: center; width: 26px; height: 26px;
-          border: 0; border-radius: 999px; background: rgba(255,255,255,.18); color: #fff; cursor: pointer; }
-        .ipoms-ec-x { right: 8px; }
-        .ipoms-ec-back { left: 8px; }
-        .ipoms-ec-x:hover, .ipoms-ec-back:hover { background: rgba(255,255,255,.34); }
-        .ipoms-ec-hero { display: grid; place-items: center; padding: 12px 0 8px; background: linear-gradient(135deg, #1E3A8A, #2F4DB0 58%, #5580F5); }
-        .ipoms-ec-plane { animation: ipoms-ec-fly 2.4s ease-in-out infinite; }
-        .ipoms-ec-env { animation: ipoms-ec-bob 2.4s ease-in-out infinite; transform-origin: 84px 51px; }
-        .ipoms-ec-body { padding: 12px 16px 16px; animation: ipoms-ec-slide .22s ease-out both; }
-        .ipoms-ec-title { margin: 0 0 3px; font-size: 15px; font-weight: 700; line-height: 1.3; letter-spacing: -.01em; }
-        .ipoms-ec-sub { margin: 0; font-size: 11.5px; line-height: 1.45; color: #64748b; }
+        .ipoms-ec-x { position: absolute; top: 9px; right: 9px; z-index: 2; display: grid; place-items: center; width: 28px; height: 28px;
+          border: 0; border-radius: 999px; background: rgba(255,255,255,.18); color: #fff; cursor: pointer; transition: background .15s ease; }
+        .ipoms-ec-x:hover { background: rgba(255,255,255,.34); }
 
-        .ipoms-ec-list { list-style: none; margin: 10px 0 0; padding: 6px 8px; display: flex; flex-direction: column; gap: 5px;
-          border-radius: 10px; background: #f1f5f9; }
-        .ipoms-ec-list li { display: flex; align-items: center; gap: 6px; font-size: 11.5px; }
+        .ipoms-ec-hero { position: relative; display: grid; place-items: center; padding: 14px 0 10px; overflow: hidden;
+          background: linear-gradient(135deg, #16307A, #2F4DB0 55%, #5580F5); }
+        .ipoms-ec-halo { position: absolute; width: 150px; height: 150px; border-radius: 999px; background: rgba(255,255,255,.12);
+          animation: ipoms-ec-halo 3.2s ease-in-out infinite; }
+        .ipoms-ec-letter { animation: ipoms-ec-lift 3.2s ease-in-out infinite; }
+
+        .ipoms-ec-body { padding: 14px 18px 18px; }
+        .ipoms-ec-title { margin: 0 0 3px; font-size: 16px; font-weight: 700; line-height: 1.3; letter-spacing: -.01em; }
+        .ipoms-ec-sub { margin: 0; font-size: 12px; line-height: 1.45; color: #64748b; }
+
+        .ipoms-ec-list { list-style: none; margin: 11px 0 0; padding: 7px 10px; display: flex; flex-direction: column; gap: 6px;
+          border-radius: 12px; background: #f1f5f9; }
+        .ipoms-ec-list li { display: flex; align-items: center; gap: 7px; font-size: 12px; }
         .ipoms-ec-co { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .ipoms-ec-chip { flex: none; padding: 1px 6px; border-radius: 999px; background: #e0e7ff; color: #1E3A8A; font-size: 9.5px; font-weight: 700; letter-spacing: .02em; }
-        .ipoms-ec-at { flex: none; color: #64748b; font-size: 10.5px; font-variant-numeric: tabular-nums; }
-        .ipoms-ec-more { color: #64748b; font-size: 10.5px; }
+        .ipoms-ec-chip { flex: none; padding: 1px 7px; border-radius: 999px; background: #e0e7ff; color: #1E3A8A; font-size: 10px; font-weight: 700; letter-spacing: .02em; }
+        .ipoms-ec-at { flex: none; color: #64748b; font-size: 11px; font-variant-numeric: tabular-nums; }
+        .ipoms-ec-more { color: #64748b; font-size: 11px; }
 
-        .ipoms-ec-quick { display: flex; gap: 6px; margin: 12px 0 0; }
-        .ipoms-ec-qchip { flex: 1; height: 30px; border-radius: 9px; border: 1px solid #dbe2ec; background: #fff; color: #1e293b;
-          font-family: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; box-shadow: 0 1px 2px rgba(15,23,42,.06);
-          transition: transform .12s ease, border-color .12s ease, background .12s ease; }
-        .ipoms-ec-qchip:hover { transform: translateY(-1px); border-color: #1E3A8A; }
-        .ipoms-ec-qchip.is-on { background: #1E3A8A; border-color: #1E3A8A; color: #fff; box-shadow: 0 4px 10px rgba(30,58,138,.28); }
-        .ipoms-ec-or { display: flex; align-items: center; gap: 8px; margin: 12px 0 8px; color: #94a3b8; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
-        .ipoms-ec-or::before, .ipoms-ec-or::after { content: ''; flex: 1; height: 1px; background: #e6ebf2; }
-        .ipoms-ec-timefield { display: flex; align-items: center; height: 38px; padding: 0 10px; border-radius: 10px;
-          border: 1px solid #dbe2ec; background: #f8fafc; color: #64748b; box-shadow: inset 0 1px 2px rgba(15,23,42,.05); }
-        .ipoms-ec-timefield:focus-within { border-color: #1E3A8A; box-shadow: 0 0 0 3px rgba(30,58,138,.14); }
-        .ipoms-ec-timefield input { flex: 1; min-width: 0; border: 0; background: transparent; color: #0f172a; font-family: inherit;
-          font-size: 14px; font-weight: 700; letter-spacing: .01em; outline: none; font-variant-numeric: tabular-nums; }
-        .ipoms-ec-preview { margin: 8px 0 0; font-size: 10.5px; line-height: 1.4; color: #1E3A8A; font-weight: 600; }
+        .ipoms-ec-actions { display: flex; gap: 9px; margin-top: 13px; }
+        .ipoms-ec-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px;
+          border-radius: 12px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+          transition: transform .14s cubic-bezier(.2,.9,.3,1.2), filter .14s ease, border-color .14s ease, background .14s ease; }
+        .ipoms-ec-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.04); }
+        .ipoms-ec-btn:active:not(:disabled) { transform: translateY(0) scale(.985); }
+        .ipoms-ec-btn:disabled { opacity: .45; cursor: not-allowed; }
+        .ipoms-ec-btn:focus-visible, .ipoms-ec-x:focus-visible, .ipoms-ec-qchip:focus-visible, .ipoms-ec-wheel:focus-visible, .ipoms-ec-mer button:focus-visible { outline: 2px solid #5580F5; outline-offset: 2px; }
+        .ipoms-ec-yes { border: 0; background: #15803d; color: #fff; box-shadow: 0 6px 14px rgba(21,128,61,.24); }
+        .ipoms-ec-pick { border: 1.5px solid #cbd5e1; background: #fff; color: #0f172a; }
+        .ipoms-ec-pick.is-open { border-color: #1E3A8A; background: #eef2ff; color: #1E3A8A; }
+        .ipoms-ec-set { width: 100%; margin-top: 11px; border: 0; background: #1E3A8A; color: #fff; box-shadow: 0 6px 14px rgba(30,58,138,.24); }
+
+        .ipoms-ec-picker { margin-top: 12px; padding-top: 12px; border-top: 1px solid #eef1f6; animation: ipoms-ec-reveal .26s cubic-bezier(.2,.9,.3,1) both; }
+        .ipoms-ec-quick { display: flex; gap: 7px; }
+        .ipoms-ec-qchip { flex: 1; height: 32px; border-radius: 999px; border: 1px solid #e2e8f0; background: #fff; color: #334155;
+          font-family: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all .14s ease; }
+        .ipoms-ec-qchip:hover { border-color: #1E3A8A; color: #1E3A8A; }
+        .ipoms-ec-qchip.is-on { background: #1E3A8A; border-color: #1E3A8A; color: #fff; box-shadow: 0 5px 12px rgba(30,58,138,.26); }
+
+        .ipoms-ec-wheels { position: relative; display: flex; align-items: center; justify-content: center; gap: 2px; margin-top: 11px;
+          padding: 6px 10px; border-radius: 16px; background: #f8fafc; border: 1px solid #e8edf4; box-shadow: inset 0 1px 3px rgba(15,23,42,.05); }
+        .ipoms-ec-band { position: absolute; left: 10px; right: 10px; top: 50%; height: ${ITEM}px; transform: translateY(-50%);
+          border-radius: 12px; background: #e8eeff; pointer-events: none; }
+        .ipoms-ec-wheel { position: relative; z-index: 1; width: 74px; height: ${ITEM * 3}px; overflow-y: auto; scroll-snap-type: y mandatory;
+          scrollbar-width: none; -ms-overflow-style: none; text-align: center; outline: none;
+          -webkit-mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent);
+          mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent); }
+        .ipoms-ec-wheel::-webkit-scrollbar { display: none; }
+        .ipoms-ec-pad { height: ${ITEM}px; }
+        .ipoms-ec-item { height: ${ITEM}px; line-height: ${ITEM}px; scroll-snap-align: center; cursor: pointer; user-select: none;
+          font-size: 17px; font-weight: 600; color: #94a3b8; font-variant-numeric: tabular-nums;
+          transition: color .18s ease, transform .18s cubic-bezier(.2,.9,.3,1.2), opacity .18s ease; opacity: .75; }
+        .ipoms-ec-item.is-on { color: #1E3A8A; font-weight: 800; transform: scale(1.12); opacity: 1; }
+        .ipoms-ec-colon { position: relative; z-index: 1; font-size: 17px; font-weight: 800; color: #1E3A8A; padding-bottom: 2px; }
+        .ipoms-ec-mer { position: relative; z-index: 1; display: flex; flex-direction: column; margin-left: 10px; padding: 3px;
+          border-radius: 12px; background: #eaeff7; }
+        .ipoms-ec-merthumb { position: absolute; left: 3px; right: 3px; top: 3px; height: calc(50% - 3px); border-radius: 9px;
+          background: #1E3A8A; box-shadow: 0 3px 8px rgba(30,58,138,.3); transition: transform .24s cubic-bezier(.2,.9,.3,1.2); }
+        .ipoms-ec-mer button { position: relative; z-index: 1; width: 46px; height: 30px; border: 0; background: transparent;
+          font-family: inherit; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; color: #64748b; cursor: pointer; transition: color .2s ease; }
+        .ipoms-ec-mer button.is-on { color: #fff; }
+
+        .ipoms-ec-preview { margin: 10px 0 0; font-size: 11.5px; line-height: 1.4; color: #1E3A8A; font-weight: 600; text-align: center; }
         .ipoms-ec-preview.is-bad { color: #b91c1c; }
 
-        .ipoms-ec-actions { display: flex; gap: 8px; margin-top: 12px; }
-        .ipoms-ec-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 34px;
-          border-radius: 10px; font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
-          transition: transform .12s ease, filter .12s ease; }
-        .ipoms-ec-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.05); }
-        .ipoms-ec-btn:disabled { opacity: .5; cursor: not-allowed; }
-        .ipoms-ec-btn:focus-visible, .ipoms-ec-x:focus-visible, .ipoms-ec-back:focus-visible, .ipoms-ec-qchip:focus-visible { outline: 2px solid #5580F5; outline-offset: 2px; }
-        .ipoms-ec-yes { border: 0; background: #15803d; color: #fff; box-shadow: 0 4px 10px rgba(21,128,61,.25); }
-        .ipoms-ec-no { border: 1.5px solid #cbd5e1; background: transparent; color: #0f172a; }
-
-        .ipoms-ec-done { display: grid; place-items: center; gap: 8px; padding: 18px 16px 22px; font-size: 12.5px; font-weight: 600; text-align: center; }
+        .ipoms-ec-done { display: grid; place-items: center; gap: 9px; padding: 20px 18px 24px; font-size: 13px; font-weight: 600; text-align: center; }
         .ipoms-ec-done p { margin: 0; }
-        .ipoms-ec-tick { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 999px; background: #15803d; color: #fff;
+        .ipoms-ec-tick { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 999px; background: #15803d; color: #fff;
           animation: ipoms-ec-pop .4s cubic-bezier(.2,.9,.3,1.4) both; }
 
         .dark .ipoms-ec-card { background: #141b2b; color: #e5e9f2; }
         .dark .ipoms-ec-sub, .dark .ipoms-ec-at, .dark .ipoms-ec-more { color: #a9b3c7; }
         .dark .ipoms-ec-list { background: #1b2436; }
         .dark .ipoms-ec-chip { background: #27365a; color: #b9c9ff; }
-        .dark .ipoms-ec-qchip { background: #1b2436; border-color: #56627a; color: #e5e9f2; }
+        .dark .ipoms-ec-pick { background: #1b2436; border-color: #56627a; color: #e5e9f2; }
+        .dark .ipoms-ec-pick.is-open { background: #22305a; border-color: #5580F5; color: #cfdcff; }
+        .dark .ipoms-ec-set { background: #5580F5; color: #0b1120; }
+        .dark .ipoms-ec-picker { border-top-color: #2b364c; }
+        .dark .ipoms-ec-qchip { background: #1b2436; border-color: #56627a; color: #d5dbe8; }
         .dark .ipoms-ec-qchip.is-on { background: #5580F5; border-color: #5580F5; color: #0b1120; }
-        .dark .ipoms-ec-or { color: #7c8899; }
-        .dark .ipoms-ec-or::before, .dark .ipoms-ec-or::after { background: #2b364c; }
-        .dark .ipoms-ec-timefield { background: #1b2436; border-color: #56627a; color: #a9b3c7; }
-        .dark .ipoms-ec-timefield input { color: #e5e9f2; color-scheme: dark; }
+        .dark .ipoms-ec-wheels { background: #1b2436; border-color: #2b364c; }
+        .dark .ipoms-ec-band { background: #26324c; }
+        .dark .ipoms-ec-item { color: #8b95aa; }
+        .dark .ipoms-ec-item.is-on { color: #cfdcff; }
+        .dark .ipoms-ec-colon { color: #cfdcff; }
+        .dark .ipoms-ec-mer { background: #26324c; }
+        .dark .ipoms-ec-merthumb { background: #5580F5; }
+        .dark .ipoms-ec-mer button { color: #a9b3c7; }
+        .dark .ipoms-ec-mer button.is-on { color: #0b1120; }
         .dark .ipoms-ec-preview { color: #9fb6ff; }
         .dark .ipoms-ec-preview.is-bad { color: #fca5a5; }
-        .dark .ipoms-ec-no { color: #e5e9f2; border-color: #56627a; }
 
         @keyframes ipoms-ec-fade { from { opacity: 0; } to { opacity: 1; } }
         @keyframes ipoms-ec-pop { from { opacity: 0; transform: translateY(14px) scale(.94); } to { opacity: 1; transform: none; } }
-        @keyframes ipoms-ec-slide { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: none; } }
-        @keyframes ipoms-ec-fly { 0%, 100% { transform: translate(0, 2px); } 50% { transform: translate(10px, -4px); } }
-        @keyframes ipoms-ec-bob { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        @keyframes ipoms-ec-reveal { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+        @keyframes ipoms-ec-lift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3.5px); } }
+        @keyframes ipoms-ec-halo { 0%, 100% { transform: scale(.82); opacity: .35; } 50% { transform: scale(1); opacity: .6; } }
         @media (prefers-reduced-motion: reduce) {
-          .ipoms-ec-backdrop, .ipoms-ec-card, .ipoms-ec-plane, .ipoms-ec-env, .ipoms-ec-tick, .ipoms-ec-body { animation: none !important; }
+          .ipoms-ec-backdrop, .ipoms-ec-card, .ipoms-ec-letter, .ipoms-ec-halo, .ipoms-ec-tick, .ipoms-ec-picker { animation: none !important; }
+          .ipoms-ec-wheel { scroll-behavior: auto; }
         }
       `}</style>
     </div>
