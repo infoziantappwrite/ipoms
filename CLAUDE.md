@@ -2054,6 +2054,9 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     sender is not notified. `tsc` clean both sides. **Not tested:** "Within this college" after the new choice
     dialog, dark mode, Malvika/Sujitha accounts, a receiver who is offline (they see it on next open, and it also
     sits in the bell list).
+    **Copy confirmation dialog polish, 25 Sep 2026 (user request):** title is now "Copy company" (not "Copy 1
+    company"), the dialog is wider (`max-w-4xl`, same font sizes) so the sentences stay on one line; the copy /
+    switch / sender-toast / receiver-toast behaviour is unchanged.
 
 ## 6. Module map
 ## 6. Module map

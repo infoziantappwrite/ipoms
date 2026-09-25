@@ -33,6 +33,7 @@ function Shell({
   onClose,
   children,
   closeDisabled,
+  wide,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -40,10 +41,11 @@ function Shell({
   onClose: () => void;
   children: React.ReactNode;
   closeDisabled?: boolean;
+  wide?: boolean;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-      <div role="dialog" aria-modal="true" className="w-full max-w-md bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden">
+      <div role="dialog" aria-modal="true" className={`w-full ${wide ? 'max-w-4xl' : 'max-w-md'} bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden`}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-surface-raised">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center">{icon}</div>
@@ -299,10 +301,11 @@ export function TransferConfirmModal({
   return (
     <Shell
       icon={<Copy size={16} strokeWidth={2.2} />}
-      title={`Copy ${count} compan${count === 1 ? 'y' : 'ies'}`}
+      title="Copy company"
       subtitle={`From ${sourceCode} · ${sectionTitle}`}
       onClose={onClose}
       closeDisabled={busy}
+      wide
     >
       <div className="p-5 space-y-3">
         <p className="text-sm text-fg leading-relaxed">
