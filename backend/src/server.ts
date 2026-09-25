@@ -703,6 +703,29 @@ app.use('/api/v1', (req: Request, res: Response, next: NextFunction) => {
 
 app.use('/api/v1', authorizeRoute);
 
+// A full-oversight Team Leader (`has_all_colleges_access`, e.g. Malvika Kumar) monitors every college and
+// does not place calls, so the Daily Tracker is READ-ONLY for that account. The screen already hides every
+// editing control; this makes the server refuse too, so nothing can change through a stray request.
+// Reads (GET) and the read-only duplicate check are untouched.
+app.use('/api/v1/daily-tracker', async (req: Request, res: Response, next: NextFunction) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  if (req.path === '/check-metadata-batch') return next();
+  const uid = (req as any).user?.userId;
+  if (!uid || !Types.ObjectId.isValid(String(uid))) return next();
+  try {
+    const u: any = await User.findById(uid).select('has_all_colleges_access').lean();
+    if (u?.has_all_colleges_access) {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'READ_ONLY_MONITOR', message: 'This account monitors the Daily Tracker and cannot change it.' },
+      });
+    }
+  } catch {
+    /* never block a coordinator because of a lookup error */
+  }
+  return next();
+});
+
 // ── Maintenance Mode Enforcement Gate ──
 app.use('/api/v1', async (req: Request, res: Response, next: NextFunction) => {
   // Never block public endpoints, health checks, auth flows, or settings
@@ -1930,7 +1953,7 @@ app.post('/api/v1/colleges/unlock-focus', async (req: Request, res: Response) =>
 // 5. Coordinators List Endpoint (With mapped focus colleges)
 app.get('/api/v1/coordinators', async (req: Request, res: Response) => {
   try {
-    const allColleges = await College.find({ status: 'active', is_deleted: false }).select(
+    const allColleges = await College.find({ status: 'active', is_deleted: { $ne: true } }).select(
       '_id college_name college_code location logo_url'
     );
     const coordinators = await User.find({
@@ -1939,7 +1962,7 @@ app.get('/api/v1/coordinators', async (req: Request, res: Response) => {
       full_name: { $nin: ['Administrator', 'Admin', 'administrator', 'admin'] },
       account_status: 'active',
       is_deleted: false,
-    }).select('full_name official_email username primary_mobile presence_status');
+    }).select('full_name official_email username primary_mobile presence_status assigned_college_ids has_all_colleges_access');
 
     const DEFAULT_COORDINATOR_COLLEGE_MAP: Record<string, string[]> = {
       // Sujitha
@@ -1990,7 +2013,15 @@ app.get('/api/v1/coordinators', async (req: Request, res: Response) => {
           }
         }
       }
-      const matchedColleges = defaultCodes && defaultCodes.length > 0
+      // A full-oversight Team Leader holds every college but HANDLES none - never list her as the handler.
+      // Everyone else: their real assigned colleges (the source of truth since items 32/53); the hardcoded
+      // map above is only a starting point for a person who has none yet.
+      const assignedIds = ((coord as any).assigned_college_ids || []).map((x: any) => String(x));
+      const matchedColleges = (coord as any).has_all_colleges_access
+        ? []
+        : assignedIds.length > 0
+        ? allColleges.filter((col) => assignedIds.includes(String(col._id)))
+        : defaultCodes && defaultCodes.length > 0
         ? allColleges.filter((col) =>
             defaultCodes!.some(
               (cd) =>

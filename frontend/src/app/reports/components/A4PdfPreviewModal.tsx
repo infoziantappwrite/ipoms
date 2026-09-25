@@ -1037,7 +1037,7 @@ export function A4PdfPreviewModal({
                       <div>
                         <div className="mb-1.5">
                           <h4 className="text-[12px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                            <Trophy size={13} className="text-[#007791] shrink-0" /> 1. COMPANIES
+                            <Trophy size={13} className="text-[#007791] shrink-0" /> COMPANIES
                             COMPLETED {hasCompleted ? `(${colData.completed_companies.length})` : ''}
                           </h4>
                           <div className="h-[2px] w-full bg-[#007791] mt-0.5" />
@@ -1104,7 +1104,7 @@ export function A4PdfPreviewModal({
                         <div>
                           <div className="mb-1.5">
                             <h4 className="text-[12px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                              <Flame size={13} className="text-[#007791] shrink-0" /> 2. DRIVE IN
+                              <Flame size={13} className="text-[#007791] shrink-0" /> DRIVE IN
                               PROGRESS (
                               {(colData.drive_in_progress || colData.drive_in_progress_companies)
                                 .length}
@@ -1166,7 +1166,7 @@ export function A4PdfPreviewModal({
                         <div>
                           <div className="mb-1.5">
                             <h4 className="text-[12px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                              <Rocket size={13} className="text-[#007791] shrink-0" /> 3. UPCOMING
+                              <Rocket size={13} className="text-[#007791] shrink-0" /> UPCOMING
                               DRIVES (
                               {(colData.upcoming_drives || colData.companies_in_drive).length})
                             </h4>
@@ -1224,7 +1224,7 @@ export function A4PdfPreviewModal({
                       <div>
                         <div className="mb-1.5">
                           <h4 className="text-[12px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                            <TrendingUp size={13} className="text-[#007791] shrink-0" /> 4. IN
+                            <TrendingUp size={13} className="text-[#007791] shrink-0" /> IN
                             PROGRESS ({colData.in_progress.length})
                           </h4>
                           <div className="h-[2px] w-full bg-[#007791] mt-0.5" />
@@ -1291,7 +1291,7 @@ export function A4PdfPreviewModal({
                     <div className="space-y-1.5">
                       <div className="mb-2">
                         <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                          <Trophy size={14} className="text-[#007791] shrink-0" /> 1. COMPANIES
+                          <Trophy size={14} className="text-[#007791] shrink-0" /> COMPANIES
                           COMPLETED
                         </h3>
                         <div className="h-[2px] w-full bg-[#007791] mt-1" />
@@ -1359,7 +1359,7 @@ export function A4PdfPreviewModal({
                     <div className="space-y-1.5">
                       <div className="mb-2">
                         <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                          <Flame size={14} className="text-[#007791] shrink-0" /> 2. DRIVE IN
+                          <Flame size={14} className="text-[#007791] shrink-0" /> DRIVE IN
                           PROGRESS
                         </h3>
                         <div className="h-[2px] w-full bg-[#007791] mt-1" />
@@ -1417,7 +1417,7 @@ export function A4PdfPreviewModal({
                     <div className="space-y-1.5">
                       <div className="mb-2">
                         <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                          <Rocket size={14} className="text-[#007791] shrink-0" /> 3. UPCOMING
+                          <Rocket size={14} className="text-[#007791] shrink-0" /> UPCOMING
                           DRIVES
                         </h3>
                         <div className="h-[2px] w-full bg-[#007791] mt-1" />
@@ -1474,7 +1474,7 @@ export function A4PdfPreviewModal({
                   <div className="space-y-1.5">
                     <div className="mb-2">
                       <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                        <TrendingUp size={14} className="text-[#007791] shrink-0" /> 4. COMPANIES IN
+                        <TrendingUp size={14} className="text-[#007791] shrink-0" /> COMPANIES IN
                         PROGRESS
                       </h3>
                       <div className="h-[2px] w-full bg-[#007791] mt-1" />
@@ -1535,7 +1535,7 @@ export function A4PdfPreviewModal({
                   <div className="space-y-1.5">
                     <div className="mb-2">
                       <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                        <Inbox size={14} className="text-[#007791] shrink-0" /> 5. COMPANIES IN
+                        <Inbox size={14} className="text-[#007791] shrink-0" /> COMPANIES IN
                         PIPELINE
                       </h3>
                       <div className="h-[2px] w-full bg-[#007791] mt-1" />
@@ -1596,7 +1596,7 @@ export function A4PdfPreviewModal({
                   <div className="space-y-1.5">
                     <div className="mb-2">
                       <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                        <Star size={14} className="text-[#007791] shrink-0" /> 6. TOP COMPANIES
+                        <Star size={14} className="text-[#007791] shrink-0" /> TOP COMPANIES
                       </h3>
                       <div className="h-[2px] w-full bg-[#007791] mt-1" />
                     </div>
@@ -1658,7 +1658,7 @@ export function A4PdfPreviewModal({
                     <div className="space-y-1.5">
                       <div className="mb-2">
                         <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                          <XCircle size={14} className="text-[#007791] shrink-0" /> 7. REJECTED
+                          <XCircle size={14} className="text-[#007791] shrink-0" /> REJECTED
                           COMPANIES
                         </h3>
                         <div className="h-[2px] w-full bg-[#007791] mt-1" />
@@ -1726,7 +1726,7 @@ export function A4PdfPreviewModal({
                     <div className="space-y-1.5">
                       <div className="mb-2">
                         <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                          <Clock size={14} className="text-[#007791] shrink-0" /> 8. ON HOLD BY
+                          <Clock size={14} className="text-[#007791] shrink-0" /> ON HOLD BY
                           COLLEGE
                         </h3>
                         <div className="h-[2px] w-full bg-[#007791] mt-1" />
@@ -1791,7 +1791,7 @@ export function A4PdfPreviewModal({
                   <div className="space-y-1.5">
                     <div className="mb-2">
                       <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                        <Clock size={14} className="text-[#007791] shrink-0" /> 9. ON HOLD BY HR
+                        <Clock size={14} className="text-[#007791] shrink-0" /> ON HOLD BY HR
                       </h3>
                       <div className="h-[2px] w-full bg-[#007791] mt-1" />
                     </div>

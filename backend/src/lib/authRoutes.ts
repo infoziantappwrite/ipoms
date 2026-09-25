@@ -137,6 +137,7 @@ function publicUser(user: any) {
     official_email: user.official_email,
     role_codes: user.role_codes,
     assigned_college_ids: user.assigned_college_ids || [],
+    has_all_colleges_access: Boolean(user.has_all_colleges_access),
     weekly_focus_locked: Boolean(user.weekly_focus_locked),
     weekly_focus_week_key: user.weekly_focus_week_key || '',
     profile_photo_url: user.profile_photo_url || '',

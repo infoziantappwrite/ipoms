@@ -1887,6 +1887,54 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     predicts 26 (top 6 matches exactly) - worth asking her to re-count. **Until deployed,** the manual fix on
     her laptop is to set "Graduating Academic Batch" to "All Batches" in the Report Builder.
 
+74. **Weekly report section numbers removed; Daily Tracker cell bar is Copy-only; Daily Tracker is read-only
+    for the monitoring Team Leader, 25 Sep 2026 (three user requests).**
+    **(a) Weekly report headings + builder checklist no longer numbered.** "1. COMPANIES COMPLETED ... 9. ON HOLD
+    BY HR" looked wrong whenever only some sections were ticked (1, 2 and 6 showed). Removed the numbers - title
+    and icon only - from every place the WEEKLY report draws them: the on-screen editor
+    (`NativeReportEditor.tsx`, single and multi-college), its print/export HTML builder, the A4 preview
+    (`A4PdfPreviewModal.tsx`), the image/PDF renderer (`reportCanvasRenderer.ts`) and the "sections to include"
+    checklist in `ReportBuilderWizard.tsx`. **Deliberately NOT changed:** the **Month-End** report headings
+    (still "1. COMPANIES COMPLETED ... 6. CALLING ACTIVITY SUMMARY" on screen, in the A4 preview and the
+    renderer; its builder checklist was already unnumbered) and the Weekly Tracker module's own move/edit
+    dialogs - the user named the weekly report only. Say the word and Month-End follows.
+    **(b) Daily Tracker multi-cell bar is Copy only, for everyone.** Selecting cells used to offer Copy, Paste
+    and Delete. Now the bar is "N Cells Selected - Copy - close". The **keyboard paths are gone too**
+    (Ctrl+V into a selection, the window paste listener, Delete/Backspace clearing a selection) - removing
+    only the buttons would have left them working. Editing a single cell is unchanged; the toolbar "Paste"
+    (bulk contacts) is a different feature and is unchanged. The cell-delete confirmation modal and the paste/
+    delete handlers are now unreachable dead code left in `TrackerGrid.tsx`.
+    **(c) A full-oversight Team Leader (`has_all_colleges_access`, Malvika Kumar) sees the Daily Tracker
+    READ-ONLY.** Client: `lib/useFullAccessViewer.ts` (new) + `tracker/page.tsx` - `isMonitor` forces
+    `isEffectiveReadOnly`, so the existing read-only machinery hides Paste / delete bin / actions menu / Set
+    Time / every editable cell, and hides "Back to My Sheet". A monitoring account never works a sheet of its
+    own: choosing a college opens **the sheet of the coordinator who handles it**, read-only (first load and
+    each change of college). Server (defence in depth, the real enforcement): a guard after `authorizeRoute`
+    refuses every non-GET under `/api/v1/daily-tracker` with `403 READ_ONLY_MONITOR` for such an account
+    (only the read-only `check-metadata-batch` is exempt). The login response now carries
+    `has_all_colleges_access` (it did not before, so **every client-side check on that flag in the app was
+    silently false** - incl. my own in `EmailCheckPrompt.tsx`, where the server check still protected it);
+    an already-open session looks the flag up once from `/profile/:id` and stores it.
+    **Bug found and fixed on the way:** `GET /coordinators` filtered colleges with `is_deleted: false`, a field
+    `College` does not have (trap 7), so it matched nothing and **every coordinator came back with empty
+    focus data** - the "find the coordinator who handles this college" lookup behind the outside-my-focus
+    read-only view (items 60-63) had never actually worked and silently fell back to an empty "Read-Only
+    View". Fixed (`$ne: true`), and it now lists each person's **real `assigned_college_ids`** (hardcoded map
+    only for someone with none; a full-access account is listed as handling nothing so she is never picked as
+    a college's handler). **Side effect worth knowing:** that outside-focus view of another coordinator's live
+    sheet now genuinely works for coordinators too.
+    **Verified:** live as Malvika - login carries the flag; POST manual-row / bulk-move / bulk-paste /
+    save-progress / load-contacts, PATCH and both DELETEs all `READ_ONLY_MONITOR`, GET history/today `200`;
+    as Mohanaradha the same routes are NOT blocked (`NOT_FOUND` for a missing row). Real browser as Malvika:
+    header "Viewing Malavika Ramesh T K's calling sheet ... Read-Only Mode", 0 Paste / bin / Set Time /
+    editable cells, clicking a cell shows no action bar, zero data-changing requests, the handler's 11 live
+    rows are visible. Real browser as a coordinator with two marked throwaway rows (removed): dragging two
+    cells shows exactly "2 Cells Selected - Copy - close", the Copy button puts "Test HR / Test HR" on the
+    clipboard, Ctrl+V and Delete send nothing. Weekly report: checklist and preview show 0 numbered headings,
+    the plain titles present. `tsc --noEmit` clean both sides, `verify:policy` OK. **Not verified:** the
+    A4/PDF/image exports were checked by code change only (same one-line title edits), not opened; the
+    college selector on Malvika's read-only sheet still reads "- Select College -" (cosmetic).
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

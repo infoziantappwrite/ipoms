@@ -13,6 +13,7 @@ import { AutoSaveBadge } from '@/components/ui/AutoSaveBadge';
 import { AlertTriangle, ArrowLeftRight, BookOpen, CalendarDays, CheckCircle2, ClipboardList, Cloud, FileSpreadsheet, Loader2, PhoneCall, Plus, Save, Search, Trash2, Upload, User, Users } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { readSessionUser, roleOf } from '@/lib/session';
+import { useFullAccessViewer } from '@/lib/useFullAccessViewer';
 import { getCoordinatorSelectedColleges } from '@/lib/collegeSession';
 import { ManualAddRowModal } from './components/ManualAddRowModal';
 import { EditTrackerRowModal } from './components/EditTrackerRowModal';
@@ -139,6 +140,8 @@ export default function DailyTrackerPage() {
   const { toast } = useToast();
 
   const isSupervisorUser = ['team_leader', 'admin', 'administrator'].includes(userRole.toLowerCase());
+  // Malvika Kumar-type account: monitors every college, places no calls -> the whole tracker is read-only.
+  const isMonitor = useFullAccessViewer();
 
   // ── Global Undo / Redo Hook ──
   const { pushAction, undo, redo, canUndo, canRedo } = useUndoRedo({
@@ -192,7 +195,9 @@ export default function DailyTrackerPage() {
           (col.college_code && myFocusSet.has(String(col.college_code).toLowerCase().trim())) ||
           (col.college_code && myFocusSet.has(`col_${col.college_code.toLowerCase().trim()}`));
 
-        if (isMyFocus || !coordinatorId) {
+        // A monitoring account never works a sheet of its own: every college opens the sheet of the
+        // coordinator who handles it, read-only.
+        if ((isMyFocus && !isMonitor) || !coordinatorId) {
           // Switch to self / Edit Mode
           setViewingCoordinatorId(coordinatorId);
           setViewingCoordinatorName('My Calling Sheet');
@@ -311,7 +316,19 @@ export default function DailyTrackerPage() {
   }, []);
 
   const isViewingOtherUser = Boolean(viewingCoordinatorId && viewingCoordinatorId !== coordinatorId);
-  const isEffectiveReadOnly = isHistoryMode || isViewingOtherUser;
+  const isEffectiveReadOnly = isHistoryMode || isViewingOtherUser || isMonitor;
+
+  // For a monitoring account, open the selected college as the handling coordinator's read-only sheet - on
+  // first load and whenever the college changes - instead of her own (empty) sheet.
+  const monitorOpenedFor = useRef('');
+  useEffect(() => {
+    if (!isMonitor || !selectedCollegeObj || allCoordinators.length === 0) return;
+    const id = String((selectedCollegeObj as any)._id || '');
+    if (!id || monitorOpenedFor.current === id) return;
+    monitorOpenedFor.current = id;
+    selectCollegeWorkspace(selectedCollegeObj);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMonitor, selectedCollegeObj, allCoordinators]);
 
   // ── Derive today's title (e.g. "August Tracker 2026")
   const today = new Date();
@@ -1076,7 +1093,7 @@ export default function DailyTrackerPage() {
             {!isHistoryMode ? (
               <>
                 {/* Back to My Sheet button if viewing another user in today session */}
-                {isViewingOtherUser && (
+                {isViewingOtherUser && !isMonitor && (
                   <button
                     type="button"
                     onClick={() => {

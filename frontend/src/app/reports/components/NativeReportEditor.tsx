@@ -463,7 +463,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
 
           if (colData.completed_companies && colData.completed_companies.length > 0) {
             html += `
-              <tr><td colspan="6" class="sec-header" style="background:#ecfdf5; color:#065f46;">1. COMPANIES COMPLETED (${colData.completed_companies.length})</td></tr>
+              <tr><td colspan="6" class="sec-header" style="background:#ecfdf5; color:#065f46;">COMPANIES COMPLETED (${colData.completed_companies.length})</td></tr>
               <tr>
                 <th style="width:38px; text-align:center;">#</th>
                 <th>Company Name</th>
@@ -489,7 +489,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
 
           if (colData.drive_in_progress && colData.drive_in_progress.length > 0) {
             html += `
-              <tr><td colspan="6" class="sec-header" style="background:#fffbeb; color:#92400e;">2. DRIVE IN PROGRESS (${colData.drive_in_progress.length})</td></tr>
+              <tr><td colspan="6" class="sec-header" style="background:#fffbeb; color:#92400e;">DRIVE IN PROGRESS (${colData.drive_in_progress.length})</td></tr>
               <tr>
                 <th style="width:38px; text-align:center;">#</th>
                 <th>Company Name</th>
@@ -513,7 +513,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
 
           if (colData.companies_in_drive && colData.companies_in_drive.length > 0) {
             html += `
-              <tr><td colspan="6" class="sec-header" style="background:#eef2ff; color:#3730a3;">3. UPCOMING DRIVES (${colData.companies_in_drive.length})</td></tr>
+              <tr><td colspan="6" class="sec-header" style="background:#eef2ff; color:#3730a3;">UPCOMING DRIVES (${colData.companies_in_drive.length})</td></tr>
               <tr>
                 <th style="width:38px; text-align:center;">#</th>
                 <th>Company Name</th>
@@ -537,7 +537,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
 
           if (colData.in_progress && colData.in_progress.length > 0) {
             html += `
-              <tr><td colspan="6" class="sec-header" style="background:#eff6ff; color:#1e40af;">4. COMPANIES IN PROGRESS (${colData.in_progress.length})</td></tr>
+              <tr><td colspan="6" class="sec-header" style="background:#eff6ff; color:#1e40af;">COMPANIES IN PROGRESS (${colData.in_progress.length})</td></tr>
               <tr>
                 <th style="width:38px; text-align:center;">#</th>
                 <th>Company Name</th>
@@ -569,7 +569,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         // Section 1: Companies Completed
         if (report.sections?.completed_companies && report.sections.completed_companies.length > 0) {
         html += `
-          <tr><td colspan="6" class="sec-header">1. COMPANIES COMPLETED (${report.sections.completed_companies.length} Drives)</td></tr>
+          <tr><td colspan="6" class="sec-header">COMPANIES COMPLETED (${report.sections.completed_companies.length} Drives)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -597,7 +597,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
     // Section 2: Drive in Progress
     if (report.sections?.drive_in_progress && report.sections.drive_in_progress.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header" style="background:#fffbeb; color:#92400e;">2. DRIVE IN PROGRESS (${report.sections.drive_in_progress.length} Drives)</td></tr>
+        <tr><td colspan="5" class="sec-header" style="background:#fffbeb; color:#92400e;">DRIVE IN PROGRESS (${report.sections.drive_in_progress.length} Drives)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -624,7 +624,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
     const upDrives = report.sections?.companies_in_drive || report.sections?.upcoming_drives;
     if (upDrives && upDrives.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header" style="background:#eef2ff; color:#3730a3;">3. UPCOMING DRIVES (${upDrives.length} Drives)</td></tr>
+        <tr><td colspan="5" class="sec-header" style="background:#eef2ff; color:#3730a3;">UPCOMING DRIVES (${upDrives.length} Drives)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -650,7 +650,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
     // Section 4: Companies In Progress
     if (report.sections?.in_progress && report.sections.in_progress.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header">4. COMPANIES IN PROGRESS (${report.sections.in_progress.length} Drives)</td></tr>
+        <tr><td colspan="5" class="sec-header">COMPANIES IN PROGRESS (${report.sections.in_progress.length} Drives)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -676,7 +676,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
     // Section 5: Companies in Pipeline
     if (report.sections?.pipeline && report.sections.pipeline.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header">5. COMPANIES IN PIPELINE (${report.sections.pipeline.length} Leads)</td></tr>
+        <tr><td colspan="5" class="sec-header">COMPANIES IN PIPELINE (${report.sections.pipeline.length} Leads)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -702,7 +702,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
     // Section 6: Top Companies
     if (report.sections?.top_companies && report.sections.top_companies.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header">6. TOP COMPANIES (${report.sections.top_companies.length} Companies)</td></tr>
+        <tr><td colspan="5" class="sec-header">TOP COMPANIES (${report.sections.top_companies.length} Companies)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -729,7 +729,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
     const rejRows = report.sections?.rejected_companies || report.sections?.rejected_by_hr;
     if (rejRows && rejRows.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header" style="background:#fef2f2; color:#991b1b;">7. REJECTED COMPANIES (${rejRows.length} Declined)</td></tr>
+        <tr><td colspan="5" class="sec-header" style="background:#fef2f2; color:#991b1b;">REJECTED COMPANIES (${rejRows.length} Declined)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -756,7 +756,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
     const holdColRows = report.sections?.on_hold_by_college || report.sections?.rejected_by_college;
     if (holdColRows && holdColRows.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header" style="background:#fff7ed; color:#9a3412;">8. COMPANIES ON HOLD BY COLLEGE (${holdColRows.length} Holds)</td></tr>
+        <tr><td colspan="5" class="sec-header" style="background:#fff7ed; color:#9a3412;">COMPANIES ON HOLD BY COLLEGE (${holdColRows.length} Holds)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -783,7 +783,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
     const holdHrRows = report.sections?.on_hold_by_hr;
     if (holdHrRows && holdHrRows.length > 0) {
       html += `
-        <tr><td colspan="5" class="sec-header" style="background:#f1f5f9; color:#334155;">9. COMPANIES ON HOLD BY HR (${holdHrRows.length} Holds)</td></tr>
+        <tr><td colspan="5" class="sec-header" style="background:#f1f5f9; color:#334155;">COMPANIES ON HOLD BY HR (${holdHrRows.length} Holds)</td></tr>
         <tr>
           <th style="width:38px; text-align:center;">#</th>
           <th>Company Name</th>
@@ -1522,7 +1522,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     <div className="space-y-1.5">
                       <div className="mb-1.5">
                         <h4 className="text-[12px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                          <Trophy size={13} className="text-[#007791] shrink-0" /> 1. COMPANIES COMPLETED {hasCompleted ? `(${colData.completed_companies.length})` : ''}
+                          <Trophy size={13} className="text-[#007791] shrink-0" /> COMPANIES COMPLETED {hasCompleted ? `(${colData.completed_companies.length})` : ''}
                         </h4>
                         <div className="h-[2px] w-full bg-[#007791] mt-0.5" />
                       </div>
@@ -1574,7 +1574,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     <div className="space-y-1.5">
                       <div className="mb-1.5">
                         <h4 className="text-[12px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                          <Zap size={13} className="text-[#007791] shrink-0" /> 2. DRIVE IN PROGRESS ({(colData.drive_in_progress || colData.drive_in_progress_companies).length})
+                          <Zap size={13} className="text-[#007791] shrink-0" /> DRIVE IN PROGRESS ({(colData.drive_in_progress || colData.drive_in_progress_companies).length})
                         </h4>
                         <div className="h-[2px] w-full bg-[#007791] mt-0.5" />
                       </div>
@@ -1617,7 +1617,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     <div className="space-y-1.5">
                       <div className="mb-1.5">
                         <h4 className="text-[12px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                          <Flame size={13} className="text-[#007791] shrink-0" /> 3. UPCOMING DRIVES ({(colData.upcoming_drives || colData.companies_in_drive).length})
+                          <Flame size={13} className="text-[#007791] shrink-0" /> UPCOMING DRIVES ({(colData.upcoming_drives || colData.companies_in_drive).length})
                         </h4>
                         <div className="h-[2px] w-full bg-[#007791] mt-0.5" />
                       </div>
@@ -1660,7 +1660,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     <div className="space-y-1.5">
                       <div className="mb-1.5">
                         <h4 className="text-[12px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                          <Clock size={13} className="text-[#007791] shrink-0" /> 4. IN PROGRESS {hasProgress ? `(${colData.in_progress.length})` : ''}
+                          <Clock size={13} className="text-[#007791] shrink-0" /> IN PROGRESS {hasProgress ? `(${colData.in_progress.length})` : ''}
                         </h4>
                         <div className="h-[2px] w-full bg-[#007791] mt-0.5" />
                       </div>
@@ -1720,7 +1720,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <div className="space-y-1.5">
                 <div className="mb-2">
                   <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                    <Trophy size={14} className="text-[#007791] shrink-0" /> 1. COMPANIES COMPLETED
+                    <Trophy size={14} className="text-[#007791] shrink-0" /> COMPANIES COMPLETED
                   </h3>
                   <div className="h-[2px] w-full bg-[#007791] mt-1" />
                 </div>
@@ -1800,7 +1800,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <div className="space-y-1.5">
                 <div className="mb-2">
                   <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                    <Zap size={14} className="text-[#007791] shrink-0" /> 2. DRIVE IN PROGRESS
+                    <Zap size={14} className="text-[#007791] shrink-0" /> DRIVE IN PROGRESS
                   </h3>
                   <div className="h-[2px] w-full bg-[#007791] mt-1" />
                 </div>
@@ -1871,7 +1871,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <div className="space-y-1.5">
                 <div className="mb-2">
                   <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                    <Flame size={14} className="text-[#007791] shrink-0" /> 3. UPCOMING DRIVES
+                    <Flame size={14} className="text-[#007791] shrink-0" /> UPCOMING DRIVES
                   </h3>
                   <div className="h-[2px] w-full bg-[#007791] mt-1" />
                 </div>
@@ -1945,7 +1945,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <div className="space-y-1.5">
                 <div className="mb-2">
                   <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                    <Rocket size={14} className="text-[#007791] shrink-0" /> 4. COMPANIES IN PROGRESS
+                    <Rocket size={14} className="text-[#007791] shrink-0" /> COMPANIES IN PROGRESS
                   </h3>
                   <div className="h-[2px] w-full bg-[#007791] mt-1" />
                 </div>
@@ -2016,7 +2016,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <div className="space-y-1.5">
                 <div className="mb-2">
                   <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                    <Inbox size={14} className="text-[#007791] shrink-0" /> 5. COMPANIES IN PIPELINE
+                    <Inbox size={14} className="text-[#007791] shrink-0" /> COMPANIES IN PIPELINE
                   </h3>
                   <div className="h-[2px] w-full bg-[#007791] mt-1" />
                 </div>
@@ -2087,7 +2087,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <div className="space-y-1.5">
                 <div className="mb-2">
                   <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                    <Star size={14} className="text-[#007791] shrink-0" /> 6. TOP COMPANIES
+                    <Star size={14} className="text-[#007791] shrink-0" /> TOP COMPANIES
                   </h3>
                   <div className="h-[2px] w-full bg-[#007791] mt-1" />
                 </div>
@@ -2158,7 +2158,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <div className="space-y-1.5">
                 <div className="mb-2">
                   <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                    <XCircle size={14} className="text-[#007791] shrink-0" /> 7. REJECTED COMPANIES
+                    <XCircle size={14} className="text-[#007791] shrink-0" /> REJECTED COMPANIES
                   </h3>
                   <div className="h-[2px] w-full bg-[#007791] mt-1" />
                 </div>
@@ -2232,7 +2232,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <div className="space-y-1.5">
                 <div className="mb-2">
                   <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                    <Clock size={14} className="text-[#007791] shrink-0" /> 8. COMPANIES ON HOLD BY COLLEGE
+                    <Clock size={14} className="text-[#007791] shrink-0" /> COMPANIES ON HOLD BY COLLEGE
                   </h3>
                   <div className="h-[2px] w-full bg-[#007791] mt-1" />
                 </div>
@@ -2306,7 +2306,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <div className="space-y-1.5">
                 <div className="mb-2">
                   <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                    <Clock size={14} className="text-[#007791] shrink-0" /> 9. COMPANIES ON HOLD BY HR
+                    <Clock size={14} className="text-[#007791] shrink-0" /> COMPANIES ON HOLD BY HR
                   </h3>
                   <div className="h-[2px] w-full bg-[#007791] mt-1" />
                 </div>

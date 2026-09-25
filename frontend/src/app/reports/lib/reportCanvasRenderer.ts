@@ -617,7 +617,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '1. COMPANIES COMPLETED',
+        title: 'COMPANIES COMPLETED',
         badge: `${cRows.length} Drives`,
         accentBg: '#ecfdf5',
         accentBorder: '#a7f3d0',
@@ -670,7 +670,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '2. DRIVE IN PROGRESS',
+        title: 'DRIVE IN PROGRESS',
         badge: `${dipRows.length} Drives`,
         accentBg: '#fffbeb',
         accentBorder: '#fde68a',
@@ -724,7 +724,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '3. UPCOMING DRIVES',
+        title: 'UPCOMING DRIVES',
         badge: `${cidRows.length} Drives`,
         accentBg: '#eef2ff',
         accentBorder: '#c7d2fe',
@@ -777,7 +777,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '4. COMPANIES IN PROGRESS',
+        title: 'COMPANIES IN PROGRESS',
         badge: `${ipRows.length} Drives`,
         accentBg: '#eff6ff',
         accentBorder: '#bfdbfe',
@@ -830,7 +830,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '5. COMPANIES IN PIPELINE',
+        title: 'COMPANIES IN PIPELINE',
         badge: `${pRows.length} Leads`,
         accentBg: '#ecfeff',
         accentBorder: '#a5f3fc',
@@ -883,7 +883,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '6. TOP COMPANIES',
+        title: 'TOP COMPANIES',
         badge: `${topRows.length} Companies`,
         accentBg: '#fefce8',
         accentBorder: '#fef08a',
@@ -936,7 +936,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '7. REJECTED COMPANIES',
+        title: 'REJECTED COMPANIES',
         badge: `${rejRows.length} Companies`,
         accentBg: '#fff1f2',
         accentBorder: '#fecdd3',
@@ -989,7 +989,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '8. COMPANIES ON HOLD BY COLLEGE',
+        title: 'COMPANIES ON HOLD BY COLLEGE',
         badge: `${holdCollegeRows.length} Companies`,
         accentBg: '#fffbeb',
         accentBorder: '#fde68a',
@@ -1042,7 +1042,7 @@ export async function generateReportCanvas(
       });
 
       sectionsToDraw.push({
-        title: '9. COMPANIES ON HOLD BY HR',
+        title: 'COMPANIES ON HOLD BY HR',
         badge: `${holdHrRows.length} Companies`,
         accentBg: '#fff1f2',
         accentBorder: '#fecdd3',
