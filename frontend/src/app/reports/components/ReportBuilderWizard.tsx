@@ -1032,6 +1032,59 @@ export function ReportBuilderWizard({
     });
   };
 
+  const handleFullReset = () => {
+    wizardMemory = null;
+    try {
+      localStorage.removeItem(LEGACY_WIZARD_STORAGE_KEY);
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    } catch {}
+
+    setCollegeId('');
+    setAcademicYear('all');
+    setWeeklyTargetMode('single');
+    setSelectedGroupCollegeIds([]);
+    setGroupSearchQuery('');
+
+    setDailyReportDate(new Date().toISOString().split('T')[0]);
+    setActiveLeadStreams({ jd_received: true, pipeline: true });
+    setActiveLeadsColumns({ colleges: true, role: true, ctc: true });
+
+    setIncludePreparedBy(templateType !== 'active_leads');
+    setPreparedByName(readSessionUser()?.full_name || 'Placement Coordinator');
+
+    setPendingTaskSections({
+      drive_in_progress: true,
+      companies_in_drive: true,
+      company_in_progress: true,
+    });
+    setPendingActiveTab('all');
+    setPendingSelectedIds(new Set());
+    setHighlightedTaskIds(new Set());
+    setHighlightColor('#fef08a');
+    setHighlightColorMap({});
+
+    setSelectedMonth(getCurrentMonthOption().value);
+    setStartDate('');
+    setEndDate('');
+    setWeekLabel('');
+    setTheme('blue');
+    setCustomRemarks('');
+
+    setMonthEndSelectedCollegeIds([]);
+    setMonthEndCollegeSearch('');
+    setValidationErrors([]);
+
+    setWeeklyMinCtc(null);
+    setWeeklyIncludeCompetitive(false);
+    setWeeklyCompanySearch('');
+    setWeeklyCompanyType('all');
+    setWeeklyStatusFilter('all');
+    setWeeklyActivePreviewTab('all');
+    setWeeklyExcludedIds(new Set());
+  };
+
   const handleResetWeeklyFilters = () => {
     setWeeklyMinCtc(null);
     setWeeklyIncludeCompetitive(false);
@@ -1622,15 +1675,9 @@ export function ReportBuilderWizard({
         <div className="flex justify-end mb-1.5">
         <button
           type="button"
-          onClick={() => {
-            // Same result as a fresh page load: clear this session's remembered choices,
-            // then reload so every selection returns to its default.
-            wizardMemory = null;
-            try { localStorage.removeItem(LEGACY_WIZARD_STORAGE_KEY); } catch {}
-            window.location.reload();
-          }}
-          title="Start fresh — clear all selections"
-          aria-label="Start fresh — clear all selections"
+          onClick={handleFullReset}
+          title="Start fresh — clear all selections and input fields"
+          aria-label="Start fresh — clear all selections and input fields"
           className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-fg-subtle hover:text-fg hover:bg-surface-sunken border border-transparent hover:border-border transition-colors cursor-pointer"
         >
           <RotateCcw size={13} aria-hidden />
