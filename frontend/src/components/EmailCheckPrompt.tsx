@@ -151,7 +151,9 @@ export function EmailCheckPrompt() {
       if (busy.current || decision) return;
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
       if (!eligible()) return;
-      if (Date.now() - openedAt.current < READY_AFTER_MS) return;
+      // The one-minute wait only protects the 15-minute reminders from someone who logs in and straight
+      // out. The next-morning question is asked the moment they open the Daily Tracker.
+      if (kind === 'due' && Date.now() - openedAt.current < READY_AFTER_MS) return;
       busy.current = true;
       try {
         const res = await apiFetch<Decision>(`/email-check/status?kind=${kind}&ready=1`);
@@ -189,14 +191,14 @@ export function EmailCheckPrompt() {
     };
   }, [check]);
 
-  // Next morning: only when the Daily Tracker is opened, once per page session.
+  // Next morning: asked as soon as the Daily Tracker is opened (a moment for the page to settle), and
+  // only there - never on the dashboard. The server allows it once per day.
   useEffect(() => {
     if (pathname !== '/tracker' || nextDayAsked.current) return;
-    const wait = Math.max(1500, READY_AFTER_MS - (Date.now() - openedAt.current) + 500);
     const t = window.setTimeout(() => {
       nextDayAsked.current = true;
       check('next_day');
-    }, wait);
+    }, 900);
     return () => window.clearTimeout(t);
   }, [pathname, check]);
 

@@ -1863,6 +1863,18 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     rows, tighter gaps) to **486px with the picker open**. Measured in a real browser: at window heights
     820 / 700 / 600 the card is exactly centred (equal space above and below) with the Set reminder button
     fully visible and no inner scrolling; at 480 it keeps a 16px margin and scrolls inside itself.
+    **Next-morning question is now immediate, 25 Sep 2026 (user decision).** It used to wait about a minute
+    after the Daily Tracker was opened; it is now asked ~1 second after arriving on `/tracker` (a beat for
+    the page to settle), and still only there - never on the dashboard. The one-minute "app must have been
+    open" gate now applies only to the 15-minute reminders (it exists to skip someone who logs in and
+    straight out). Rules as the user restated them: a "Yes" on the day means it is never asked about again,
+    including the next morning; closing with the X without answering means the Daily Tracker asks about it
+    the next time they open it; each Invite Mail call names its company in the list. **Note - kept as
+    built, flagged:** a same-day X/close still comes back once after 30 minutes (chosen earlier via the
+    "ask once more" option) before deferring to the next morning; the latest message does not say to
+    drop that. Verified in a real browser: dashboard ~3s after login shows nothing and makes no next-day
+    request; opening the Daily Tracker shows the past-tense question ("Did you send this email from
+    yesterday?", "IBM - AIHT - 2:05 pm") about 2 seconds after navigation with the app open under a minute.
 
 ## 6. Module map
 ## 6. Module map
