@@ -7,6 +7,7 @@ import { WeeklyHeader } from './components/WeeklyHeader';
 import { WeeklySection } from './components/WeeklySection';
 import { AddCompanyModal } from './components/AddCompanyModal';
 import { BulkMoveModal } from './components/BulkMoveModal';
+import { TransferSectionPicker, TransferCollegeModal } from './components/TransferModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { ForeignCollegeWarningModal } from './components/ForeignCollegeWarningModal';
 import { PasteWeeklyModal, PasteApplyPayload, PasteRowResult } from './components/PasteWeeklyModal';
@@ -117,7 +118,11 @@ export default function WeeklyTrackerPage() {
   });
 
   // ── Global Move / Delete Selection Mode State ──
-  const [selectionMode, setSelectionMode] = useState<'move' | 'delete' | null>(null);
+  const [selectionMode, setSelectionMode] = useState<'move' | 'delete' | 'transfer' | null>(null);
+  // Send companies to another college (Move / Copy)
+  const [isTransferPickerOpen, setIsTransferPickerOpen] = useState(false);
+  const [transferMode, setTransferMode] = useState<'move' | 'copy' | null>(null);
+  const [isTransferring, setIsTransferring] = useState(false);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
@@ -246,8 +251,14 @@ export default function WeeklyTrackerPage() {
   }, [academicYear, weekOffset, companyTypeFilter]);
 
   // ── Load Weekly Tracker Sections
+  // The college the page is showing right now; a slow response for a college the user has since left
+  // (e.g. after Move/Copy & switch) must not overwrite the current one.
+  const latestCollegeRef = useRef(selectedCollegeId);
+  latestCollegeRef.current = selectedCollegeId;
+
   const loadWeeklyTracker = useCallback(async () => {
     if (!selectedCollegeId) return;
+    const requestedCollegeId = selectedCollegeId;
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -259,6 +270,7 @@ export default function WeeklyTrackerPage() {
       if (companyTypeFilter !== 'all') params.set('company_type', companyTypeFilter);
 
       const res = await apiFetch(`/weekly-tracker?${params.toString()}`);
+      if (latestCollegeRef.current !== requestedCollegeId) return;
       if (res.success && res.data) {
         const normalized = normalizeAllSections((res.data as any).sections);
         setSections(normalized);
@@ -1102,10 +1114,73 @@ export default function WeeklyTrackerPage() {
   };
 
   const handleCancelSelection = () => {
+    setIsTransferPickerOpen(false);
+    setTransferMode(null);
     setSelectionMode(null);
     setSelectedRowIds([]);
     setIsBulkMoveModalOpen(false);
     setIsDeleteConfirmModalOpen(false);
+  };
+
+  // ── Send companies to another college (Move / Copy) ──────────────────
+  const TRANSFER_SECTION_KEYS = [
+    'completed', 'drive_in_progress', 'in_drive', 'in_progress', 'pipeline',
+    'top_companies', 'rejected_companies', 'on_hold_by_college', 'on_hold_by_hr',
+  ];
+  const transferSectionOptions = TRANSFER_SECTION_KEYS
+    .map((key) => ({ key, title: (sections as any)?.[key]?.title || key, count: ((sections as any)?.[key]?.rows || []).length }))
+    .filter((o) => o.count > 0);
+
+  const handleStartTransferMode = () => {
+    setSelectionMode(null);
+    setSelectedRowIds([]);
+    setIsTransferPickerOpen(true);
+  };
+
+  const handlePickTransferSection = (key: string) => {
+    setIsTransferPickerOpen(false);
+    setSelectionMode('transfer');
+    setSelectionSection(key);
+    setSelectedRowIds([]);
+  };
+
+  const handleExecuteTransfer = (mode: 'move' | 'copy') => {
+    if (selectedRowIds.length === 0) return;
+    setTransferMode(mode);
+  };
+
+  const handleConfirmTransfer = async (target: { id: string; code: string; name: string }) => {
+    if (!transferMode || !selectionSection || selectedRowIds.length === 0) return;
+    // Send them in the order they are listed in the section, so the receiver sees the same order.
+    const listed: any[] = (sections as any)?.[selectionSection]?.rows || [];
+    const ids = listed.filter((r) => selectedRowIds.includes(r._id)).map((r) => r._id);
+    setIsTransferring(true);
+    try {
+      const res: any = await apiFetch('/weekly-tracker/transfer', {
+        method: 'POST',
+        body: JSON.stringify({ ids, target_college_id: target.id, mode: transferMode, section: selectionSection }),
+      });
+      if (res?.success) {
+        const skipped: { company_name: string; reason: string }[] = res.skipped || [];
+        toast(res.message || 'Done', res.sent > 0 ? 'success' : 'error');
+        if (skipped.length > 0) {
+          toast(`Skipped ${skipped.length}: ${skipped.slice(0, 3).map((s) => s.company_name).join(', ')}${skipped.length > 3 ? '…' : ''} (already at ${target.code})`, 'error');
+        }
+        setTransferMode(null);
+        setSelectionMode(null);
+        setSelectedRowIds([]);
+        broadcastWeeklyMutation();
+        // "Copy / Move and switch": open the college they were sent to
+        setSelectedCollegeId(target.id);
+        setSelectedCollegeName(target.name);
+      } else {
+        toast(res?.error?.message || 'Could not send the companies. Please try again.', 'error');
+      }
+    } catch (err: any) {
+      toast(err?.message || 'Could not send the companies. Please try again.', 'error');
+    } finally {
+      setIsTransferring(false);
+    }
   };
 
   const handleExecuteMove = () => {
@@ -1545,6 +1620,8 @@ export default function WeeklyTrackerPage() {
           selectedCount={selectedRowIds.length}
           onStartMoveMode={handleStartMoveMode}
           onStartDeleteMode={handleStartDeleteMode}
+          onStartTransferMode={handleStartTransferMode}
+          onExecuteTransfer={handleExecuteTransfer}
           onCancelSelection={handleCancelSelection}
           onExecuteMove={handleExecuteMove}
           onExecuteBulkDelete={handleRequestBulkDelete}
@@ -1856,6 +1933,26 @@ export default function WeeklyTrackerPage() {
           onConfirmMove={handleBulkMoveSection}
         />
       )}
+
+      {/* ── Send to another college: section picker + college / confirm ─────── */}
+      <TransferSectionPicker
+        isOpen={isTransferPickerOpen}
+        options={transferSectionOptions}
+        onClose={() => setIsTransferPickerOpen(false)}
+        onPick={handlePickTransferSection}
+      />
+      <TransferCollegeModal
+        isOpen={transferMode !== null}
+        mode={transferMode || 'copy'}
+        count={selectedRowIds.length}
+        sectionTitle={(sections as any)?.[selectionSection || '']?.title || ''}
+        sourceCollegeId={selectedCollegeId}
+        sourceCode={selectedCollegeName}
+        myCollegeIds={myCollegeIds}
+        busy={isTransferring}
+        onClose={() => setTransferMode(null)}
+        onConfirm={handleConfirmTransfer}
+      />
 
       {/* ── Delete Confirmation In-App Modal ───────────────────────────────── */}
       <DeleteConfirmModal

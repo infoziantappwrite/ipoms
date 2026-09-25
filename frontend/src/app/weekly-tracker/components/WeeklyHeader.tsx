@@ -9,6 +9,8 @@ import {
   Redo2,
   RefreshCw,
   ClipboardPaste,
+  ArrowRightLeft,
+  Copy,
   ChevronsUp,
   ChevronsDown,
 } from 'lucide-react';
@@ -39,10 +41,12 @@ interface Props {
   isExporting?: boolean;
   searchQuery?: string;
   onSearchChange?: (q: string) => void;
-  selectionMode?: 'move' | 'delete' | null;
+  selectionMode?: 'move' | 'delete' | 'transfer' | null;
   selectedCount?: number;
   onStartMoveMode?: () => void;
   onStartDeleteMode?: () => void;
+  onStartTransferMode?: () => void;
+  onExecuteTransfer?: (mode: 'move' | 'copy') => void;
   onCancelSelection?: () => void;
   onExecuteMove?: () => void;
   onExecuteBulkDelete?: () => void;
@@ -79,6 +83,8 @@ export function WeeklyHeader({
   selectedCount = 0,
   onStartMoveMode,
   onStartDeleteMode,
+  onStartTransferMode,
+  onExecuteTransfer,
   onCancelSelection,
   onExecuteMove,
   onExecuteBulkDelete,
@@ -247,6 +253,48 @@ export function WeeklyHeader({
                   Cancel
                 </button>
               </div>
+            ) : selectionMode === 'transfer' ? (
+              <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                {/* Send to another college: tick companies, then Move or Copy */}
+                <span className="hidden lg:inline text-[11px] font-semibold text-fg-subtle">Tick the companies to send</span>
+                <button
+                  type="button"
+                  disabled={(selectedCount || 0) === 0}
+                  onClick={() => {
+                    triggerHaptic('medium');
+                    onExecuteTransfer?.('move');
+                  }}
+                  className="h-8 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl flex items-center gap-1.5 text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
+                  title="Move the ticked companies to another college (they leave this tracker)"
+                >
+                  <ArrowRightLeft size={13} strokeWidth={2.4} />
+                  <span>Move ({selectedCount || 0})</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={(selectedCount || 0) === 0}
+                  onClick={() => {
+                    triggerHaptic('medium');
+                    onExecuteTransfer?.('copy');
+                  }}
+                  className="h-8 px-3 bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white rounded-xl flex items-center gap-1.5 text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
+                  title="Copy the ticked companies to another college (you keep yours)"
+                >
+                  <Copy size={13} strokeWidth={2.4} />
+                  <span>Copy ({selectedCount || 0})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic('light');
+                    onCancelSelection?.();
+                  }}
+                  className="h-8 px-2.5 bg-surface-sunken hover:bg-surface-raised border border-border text-fg rounded-xl flex items-center text-xs font-semibold transition-colors cursor-pointer shrink-0"
+                  title="Cancel Selection (Esc)"
+                >
+                  Cancel
+                </button>
+              </div>
             ) : selectionMode === 'delete' ? (
               <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
                 {/* Delete Mode Active: Cancel button */}
@@ -355,6 +403,28 @@ export function WeeklyHeader({
             )}
           </button>
 
+          {/* Send companies to another college (Move / Copy) */}
+          {onStartTransferMode && (
+            <button
+              type="button"
+              disabled={!/^[a-f0-9]{24}$/i.test(selectedCollegeId || '')}
+              onClick={() => {
+                triggerHaptic('selection');
+                if (selectionMode === 'transfer') onCancelSelection?.();
+                else onStartTransferMode();
+              }}
+              className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 border shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95] ${
+                selectionMode === 'transfer'
+                  ? 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border-indigo-400 dark:border-indigo-700 ring-2 ring-indigo-500/20'
+                  : 'bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/80'
+              }`}
+              title="Move or copy companies to another college"
+              aria-label="Move or copy companies to another college"
+            >
+              <ArrowRightLeft size={16} strokeWidth={2.2} />
+            </button>
+          )}
+
           {/* Paste companies / contacts / emails / dates from Excel */}
           {onOpenPaste && (
             <button
@@ -382,7 +452,7 @@ export function WeeklyHeader({
                 triggerHaptic('selection');
                 onSyncDailyPositives();
               }}
-              className="relative h-8 px-2.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer select-none shrink-0 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80 shadow-2xs text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]"
+              className="relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80 shadow-2xs text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]"
               title="Sync positive leads from Daily Leads into Companies in Pipeline"
               aria-label="Sync Daily Positives"
             >
@@ -391,7 +461,6 @@ export function WeeklyHeader({
                 strokeWidth={2.4}
                 className={isSyncing ? 'animate-spin text-amber-600 dark:text-amber-400' : 'text-amber-600 dark:text-amber-400'}
               />
-              <span className="hidden sm:inline font-bold">Sync</span>
             </button>
           )}
 

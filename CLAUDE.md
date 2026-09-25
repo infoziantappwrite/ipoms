@@ -2000,6 +2000,37 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     the **PDF**, which is unchanged and still the browser print path. WhatsApp still compresses a photo: send
     as **Document** for full sharpness.
 
+78. **Weekly Tracker: Move / Copy companies to another college; Sync is icon-only, 25 Sep 2026
+    (user-requested; everyone incl. Malvika Kumar, Sujitha and all coordinators).** The amber **Sync** button
+    is now just its icon (the tooltip still explains it). A new indigo **arrows icon next to the dustbin** starts
+    "send to another college": (1) a small dialog asks **which section** the companies are in (only sections
+    that have rows, with counts); (2) the page enters tick mode for that section - the header shows
+    **Move (n) / Copy (n) / Cancel**; ticking in a different section restarts the selection there (item 49);
+    (3) Move or Copy opens a dialog listing every other college (own focus colleges first, badged "Your focus" /
+    "Other login", searchable); (4) after picking one, an explicit **"Are you sure you want to move/copy N
+    companies from X to Y?"** step, with an extra amber note when Y is not one of the user's focus colleges;
+    (5) "Yes, move/copy & switch" sends it and then **opens the receiving college**.
+    **What the receiver gets (user decision, both Move and Copy):** ONLY Company name, Role, CTC, Contact and
+    Email, **in the same section and the sender's order**; status, dates, notes and counts start empty (the new
+    row is tagged with the current season/batch and the receiving college's handling coordinator, Placement
+    Coordinator preferred over Team Leader, all-colleges oversight accounts ignored, else the sender). **Copy**:
+    the sender's row is untouched. **Move**: the sender's row is soft-deleted (recoverable from the recycle bin)
+    - linked Daily Leads / Daily Tracker rows are deliberately NOT cascaded; moving out of Top Companies only
+    un-pins, like deleting from that section. A company the target already has (same name, any section) is
+    **skipped** and, on a move, stays with the sender; the toast lists what was skipped. Owners of the receiving
+    college (and, on a move, the sending one) get ONE foreign-college email via the existing
+    `notifyForeignCollegeOwners()`. Backend `POST /api/v1/weekly-tracker/transfer`
+    (`lib/weeklyTransferRoutes.ts`, covered by the existing `/weekly-tracker` STAFF policy). **Not built:** undo /
+    redo for a transfer (use the recycle bin for a move; delete the copy for a copy). **Also fixed:** the page
+    could show one college's rows under another college's name because a slow response for the college just
+    left overwrote the new one - `loadWeeklyTracker` now ignores a response for a college that is no longer
+    selected. **Verified:** live API with throwaway AIHT rows (all removed) - same-college refused, Copy keeps
+    the sender and gives ACET blank status/dates, order kept, a repeat is skipped, Move soft-deletes the sender;
+    real browser as Mohanaradha - Sync has no text, picker lists sections, tick mode shows Move/Copy, the
+    confirm step names both colleges, one POST with the right body, page switches to ACET showing ACET's rows;
+    `tsc` clean both sides. **Not tested in a browser:** Move (only its API), Malvika/Sujitha accounts, dark
+    mode, the foreign-college amber note.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map
