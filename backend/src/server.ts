@@ -11204,101 +11204,115 @@ app.post('/api/v1/users/heartbeat', async (req: Request, res: Response) => {
 // Team Leader Dashboard (Spec Section 5.2) — Coordinator Profile Online Activity & Live Performance Matrix
 app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => {
   try {
-    // Ensure Sujitha (Team Leader) has her official focus colleges: HITS, NEHRU, KPR, SONA (Sujitha does NOT handle MCET)
-    const sujithaUser = await User.findOne({
-      $or: [
-        { official_email: 'sujitha_s@infoziant.com' },
-        { username: 'sujitha' },
-        { full_name: /sujitha/i },
-      ],
-      is_deleted: false,
-    });
-    if (sujithaUser) {
-      const sujithaColleges = await College.find({
-        $or: [
-          { college_code: { $in: ['HITS', 'NEHRU', 'KPR', 'SONA'] } },
-          { college_name: { $in: [/hindustan/i, /nehru/i, /^KPR Institute/i, /^SONA/i] } },
-        ],
-        status: 'active',
-      });
-      const targetIds = sujithaColleges.map((c) => c._id);
-      // Defaults are only a STARTING point: applied when the user has no colleges at all.
-      // This used to overwrite assigned_college_ids on every boot / dashboard load / tracker
-      // page load, so any focus change a user saved in Active College Focus was silently
-      // reverted to the hardcoded list the next time any of those ran (24 Sep 2026).
-      if (!sujithaUser.assigned_college_ids || sujithaUser.assigned_college_ids.length === 0) {
-        sujithaUser.assigned_college_ids = targetIds;
-      }
-      const mcetCol = await College.findOne({
-        $or: [{ college_code: 'MCET' }, { college_name: /mahalingam/i }]
-      });
-      const isMcetActive =
-        sujithaUser.active_college_code?.toUpperCase() === 'MCET' ||
-        (sujithaUser.active_college_name && /mahalingam|mcet/i.test(sujithaUser.active_college_name)) ||
-        (mcetCol && sujithaUser.active_college_id && String(sujithaUser.active_college_id) === String(mcetCol._id));
+    // Starting focus colleges for three named accounts. Defaults are only a STARTING point: applied when the
+    // user has no colleges at all. This used to overwrite assigned_college_ids on every boot / dashboard load /
+    // tracker page load, so any focus change a user saved in Active College Focus was silently reverted to the
+    // hardcoded list the next time any of those ran (24 Sep 2026).
+    //
+    // Performance (25 Sep 2026): this dashboard is polled every 3 seconds by every open Team Leader tab and used
+    // to spend ~7 sequential database round trips here (3 user lookups, 3 college lookups, an MCET lookup) even
+    // though nothing changes once the accounts have colleges. Now the three accounts are looked up IN PARALLEL and
+    // colleges are only queried in the rare case they are actually needed.
 
-      if (isMcetActive) {
-        const primary = sujithaColleges.find(c => c.college_code === 'NEHRU' || c.college_code === 'HITS') || sujithaColleges[0];
-        if (primary) {
-          sujithaUser.active_college_id = primary._id;
-          sujithaUser.active_college_code = primary.college_code;
-          sujithaUser.active_college_name = primary.college_name;
-          sujithaUser.active_college_location = primary.location || '';
+    // Sujitha (Team Leader): HITS, NEHRU, KPR, SONA (she does NOT handle MCET)
+    const ensureSujitha = async () => {
+      const u = await User.findOne({
+        $or: [
+          { official_email: 'sujitha_s@infoziant.com' },
+          { username: 'sujitha' },
+          { full_name: /sujitha/i },
+        ],
+        is_deleted: false,
+      });
+      if (!u) return null;
+      const hasNoColleges = !u.assigned_college_ids || u.assigned_college_ids.length === 0;
+      let isMcetActive = Boolean(
+        u.active_college_code?.toUpperCase() === 'MCET' ||
+        (u.active_college_name && /mahalingam|mcet/i.test(u.active_college_name))
+      );
+      if (!isMcetActive && u.active_college_id) {
+        const mcetCol = await College.findOne({
+          $or: [{ college_code: 'MCET' }, { college_name: /mahalingam/i }],
+        }).select('_id');
+        isMcetActive = Boolean(mcetCol && String(u.active_college_id) === String(mcetCol._id));
+      }
+      if (hasNoColleges || isMcetActive) {
+        const sujithaColleges = await College.find({
+          $or: [
+            { college_code: { $in: ['HITS', 'NEHRU', 'KPR', 'SONA'] } },
+            { college_name: { $in: [/hindustan/i, /nehru/i, /^KPR Institute/i, /^SONA/i] } },
+          ],
+          status: 'active',
+        });
+        if (hasNoColleges) u.assigned_college_ids = sujithaColleges.map((c) => c._id);
+        if (isMcetActive) {
+          const primary = sujithaColleges.find((c) => c.college_code === 'NEHRU' || c.college_code === 'HITS') || sujithaColleges[0];
+          if (primary) {
+            u.active_college_id = primary._id;
+            u.active_college_code = primary.college_code;
+            u.active_college_name = primary.college_name;
+            u.active_college_location = primary.location || '';
+          }
         }
       }
-      await sujithaUser.save();
-    }
+      if (u.isModified()) await u.save();
+      return u;
+    };
 
-    // Ensure Tamil Selvi (Seshmitha Tamilselvi R) has her official focus colleges: MCET, MEC
-    const tamilUser = await User.findOne({
-      $or: [
-        { official_email: 'seshmitha_tamil@icl.today' },
-        { username: 'seshmitha' },
-        { full_name: /tamil/i },
-      ],
-      is_deleted: false,
-    });
-    if (tamilUser) {
-      const tamilColleges = await College.find({
+    // Seshmitha Tamilselvi R: MCET, MEC
+    const ensureTamil = async () => {
+      const u = await User.findOne({
         $or: [
-          { college_code: { $in: ['MCET', 'MEC'] } },
-          { college_name: { $in: [/mahalingam/i, /muthayammal/i] } },
+          { official_email: 'seshmitha_tamil@icl.today' },
+          { username: 'seshmitha' },
+          { full_name: /tamil/i },
         ],
-        status: 'active',
+        is_deleted: false,
       });
-      const targetTamilIds = tamilColleges.map((c) => c._id);
-      if (!tamilUser.assigned_college_ids || tamilUser.assigned_college_ids.length === 0) {
-        tamilUser.assigned_college_ids = targetTamilIds; // starting default only — see Sujitha note above
+      if (!u) return null;
+      if (!u.assigned_college_ids || u.assigned_college_ids.length === 0) {
+        const cols = await College.find({
+          $or: [
+            { college_code: { $in: ['MCET', 'MEC'] } },
+            { college_name: { $in: [/mahalingam/i, /muthayammal/i] } },
+          ],
+          status: 'active',
+        });
+        u.assigned_college_ids = cols.map((c) => c._id);
       }
-      if (!tamilUser.account_status) tamilUser.account_status = 'active';
-      await tamilUser.save();
-    }
+      if (!u.account_status) u.account_status = 'active';
+      if (u.isModified()) await u.save();
+      return u;
+    };
 
-    // Ensure Megala Devi P S has her official focus colleges: NGP, KAMARAJ, MAREPHRAM
-    const megalaUser = await User.findOne({
-      $or: [
-        { official_email: 'megaladevi_ps@infoziant.com' },
-        { username: 'megaladevi' },
-        { username: 'megala' },
-        { full_name: /megala/i },
-      ],
-      is_deleted: false,
-    });
-    if (megalaUser) {
-      const megalaColleges = await College.find({
+    // Megala Devi P S: NGP, KAMARAJ, MAREPHRAM
+    const ensureMegala = async () => {
+      const u = await User.findOne({
         $or: [
-          { college_code: { $in: ['NGP', 'KAMARAJ', 'MAREPHRAM', 'MAREPHRA'] } },
-          { college_name: { $in: [/N\.?G\.?P\.?/i, /kamaraj/i, /ephraem/i, /ephram/i] } },
+          { official_email: 'megaladevi_ps@infoziant.com' },
+          { username: 'megaladevi' },
+          { username: 'megala' },
+          { full_name: /megala/i },
         ],
-        status: 'active',
+        is_deleted: false,
       });
-      const targetMegalaIds = megalaColleges.map((c) => c._id);
-      if (!megalaUser.assigned_college_ids || megalaUser.assigned_college_ids.length === 0) {
-        megalaUser.assigned_college_ids = targetMegalaIds; // starting default only — see Sujitha note above
+      if (!u) return null;
+      if (!u.assigned_college_ids || u.assigned_college_ids.length === 0) {
+        const cols = await College.find({
+          $or: [
+            { college_code: { $in: ['NGP', 'KAMARAJ', 'MAREPHRAM', 'MAREPHRA'] } },
+            { college_name: { $in: [/N\.?G\.?P\.?/i, /kamaraj/i, /ephraem/i, /ephram/i] } },
+          ],
+          status: 'active',
+        });
+        u.assigned_college_ids = cols.map((c) => c._id);
       }
-      if (!megalaUser.account_status) megalaUser.account_status = 'active';
-      await megalaUser.save();
-    }
+      if (!u.account_status) u.account_status = 'active';
+      if (u.isModified()) await u.save();
+      return u;
+    };
+
+    const [sujithaUser] = await Promise.all([ensureSujitha(), ensureTamil(), ensureMegala()]);
 
     const coordinators = await User.find({
       $or: [
@@ -11405,7 +11419,8 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
     }
 
     // Per-coordinator live profile & activity telemetry
-    const teamMatrix = await Promise.all(
+    const [teamMatrix, totalDispatchedAssignments, completedAssignments] = await Promise.all([
+      Promise.all(
       coordinators.map(async (c) => {
         const [todayTrackerRows, jds, pendingWork, latestCall] = await Promise.all([
           DailyTracker.find({
@@ -11575,10 +11590,10 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
           performance_status: calls >= 25 ? 'on_track' : calls > 0 ? 'active' : 'pending',
         };
       })
-    );
-
-    const totalDispatchedAssignments = await AssignedWork.countDocuments({ is_deleted: false });
-    const completedAssignments = await AssignedWork.countDocuments({ is_completed: true, is_deleted: false });
+      ),
+      AssignedWork.countDocuments({ is_deleted: false }),
+      AssignedWork.countDocuments({ is_completed: true, is_deleted: false }),
+    ]);
 
     // Count online coordinators and calling durations
     const onlineCount = teamMatrix.filter((m) => m.online_status === 'online').length;

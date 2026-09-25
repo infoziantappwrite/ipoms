@@ -2162,6 +2162,29 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     `turbopack.root` in `next.config.mjs` if it bothers anyone. The temporary worktree/branch
     `next16-merge-check` was removed.
 
+84. **Excel library fixed and dashboard speed-up, 25 Sep 2026 (items 4 and 8 of the production list).**
+    **`xlsx`:** the "no fix available" `npm audit` message is only because the npm-registry copy of SheetJS stopped at
+    0.18.5; the maintainers publish the fixed **0.20.3** from their own server. Both `backend/` and `frontend/` now
+    depend on `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` (lockfile pins the integrity hash) - a
+    drop-in, **no code changed**. `npm audit --omit=dev` no longer reports any high/critical on either side (only a
+    moderate `uuid`). Verified: both `tsc` clean, `next build` passes, a real-browser Metadata -> Export -> Excel
+    downloaded a valid workbook (3,746 rows, correct headers), the backend read a local workbook and round-tripped a
+    written one. **Trade-off to know:** the dependency now comes from `cdn.sheetjs.com`, so `npm install` (and the
+    Vercel build) must be able to reach it. **Runtime exposure was low anyway:** the backend has no file upload
+    (no multer); it only reads workbooks from fixed local paths, and the frontend only WRITES workbooks.
+    **Speed:** `GET /dashboard/team-leader` (polled every 3 s by every open Team Leader tab) spent ~7 sequential
+    database round trips per call re-checking three accounts' default colleges even though nothing changes. Those
+    three lookups now run in parallel and colleges are queried only when actually needed (behaviour identical:
+    defaults still apply only to an account with NO colleges), and the two assignment counts run in the same batch
+    as the per-coordinator queries. Single-call time **1,068 ms -> ~706 ms**. Other single-user timings (already
+    fine): weekly tracker one college 238 ms, all colleges 409 ms (already `.lean()`), coordinator dashboard
+    283 ms, admin dashboard ~0.7-0.9 s (was 6 MB / 8-16 s before the audit-row fix in item 80), daily leads 395 ms.
+    With 8 simultaneous requests the slowest was 2.5 s (all-college weekly tracker), 3.2 s (Team Leader dashboard)
+    - the earlier 18 s spike was the oversized audit row, gone. **Not done (would be the next step):** the Team
+    Leader dashboard still issues ~4 queries per coordinator; turning those into a few aggregates would cut its
+    load further but is a bigger rewrite. 34/34 API tests still pass; Sujitha's and Malvika's dashboards still
+    load with the right data.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map
