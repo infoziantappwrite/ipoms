@@ -24,6 +24,7 @@ export interface DailyLeadRow {
   ctc: string;
   eligible_batch: string;
   remarks?: string;
+  email_id?: string;
   coordinator_id?: {
     _id: string;
     full_name: string;

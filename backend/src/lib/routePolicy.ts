@@ -124,7 +124,10 @@ const POLICIES: Policy[] = [
   // mount in server.ts, so it carries its own authenticateJWT/authorizeRoles;
   // this entry keeps it visible to the coverage check.
   { method: 'GET',    pattern: /^\/health\/daily-leads-diagnostics\/?$/, roles: ADMIN },
+  { method: 'GET',    pattern: /^\/meta-audit\/?$/,                      roles: ADMIN },
   { method: '*',      pattern: /^\/weekly-tracker(\/.*)?$/,              roles: STAFF },
+  // Eligibility (coordinators + a normal Team Leader, never the Administrator or a full-oversight TL) is enforced inside the handlers.
+  { method: '*',      pattern: /^\/email-check(\/.*)?$/,                  roles: STAFF },
 
   // ── Daily Leads & Active Leads ────────────────────────────────────────────
   // Placement Coordinators, Team Leaders, and Administrators have full
@@ -149,6 +152,8 @@ const POLICIES: Policy[] = [
   // Any staff member may call this; WHICH coordinator's data comes back is
   // decided by ownership scoping in the handler, not here.
   { method: 'GET',    pattern: /^\/dashboard\/coordinator\/?$/,          roles: STAFF },
+  { method: 'GET',    pattern: /^\/dashboard\/coordinator\/clock-duration\/?$/,   roles: STAFF },
+  { method: 'GET',    pattern: /^\/dashboard\/coordinator\/duration-history\/?$/, roles: STAFF },
 
   // ── Assigned Work ─────────────────────────────────────────────────────────
   // Creating an assignment is a Team Leader action (Module 07 §8); acting on
@@ -168,6 +173,7 @@ const POLICIES: Policy[] = [
   { method: 'DELETE', pattern: new RegExp(`^/users/${ID}/?$`),           roles: ADMIN },
   { method: 'PATCH',  pattern: new RegExp(`^/users/${ID}/?$`),           roles: TL_ADMIN },
   { method: 'POST',   pattern: /^\/users\/heartbeat\/?$/,                roles: STAFF },
+  { method: 'POST',   pattern: /^\/users\/offline\/?$/,                  roles: STAFF },
   { method: 'POST',   pattern: /^\/users\/?$/,                           roles: TL_ADMIN },
   // Coordinators must not enumerate other coordinators (Module 08 §18).
   { method: 'GET',    pattern: /^\/users\/?$/,                           roles: TL_ADMIN },

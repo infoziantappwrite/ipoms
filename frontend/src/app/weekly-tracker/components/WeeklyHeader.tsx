@@ -8,6 +8,7 @@ import {
   Undo2,
   Redo2,
   RefreshCw,
+  ClipboardPaste,
   ChevronsUp,
   ChevronsDown,
 } from 'lucide-react';
@@ -28,6 +29,7 @@ interface Props {
   academicYear?: string;
   onAcademicYearChange?: (yr: string) => void;
   onOpenAddModal?: () => void;
+  onOpenPaste?: () => void;
   onSyncDailyPositives?: () => void;
   isSyncing?: boolean;
   onSaveProgress?: () => void;
@@ -63,6 +65,7 @@ export function WeeklyHeader({
   academicYear = 'all',
   onAcademicYearChange,
   onOpenAddModal,
+  onOpenPaste,
   onSyncDailyPositives,
   isSyncing = false,
   onSaveProgress,
@@ -351,6 +354,24 @@ export function WeeklyHeader({
               </span>
             )}
           </button>
+
+          {/* Paste companies / contacts / emails / dates from Excel */}
+          {onOpenPaste && (
+            <button
+              type="button"
+              disabled={!/^[a-f0-9]{24}$/i.test(selectedCollegeId || '')}
+              onClick={() => {
+                triggerHaptic('selection');
+                onOpenPaste();
+              }}
+              className="relative h-8 px-2.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer select-none shrink-0 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 shadow-2xs text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]"
+              title="Paste companies, roles, CTC, contacts, emails or dates from Excel (select a college first)"
+              aria-label="Paste"
+            >
+              <ClipboardPaste size={13} strokeWidth={2.4} />
+              <span className="hidden sm:inline font-bold">Paste</span>
+            </button>
+          )}
 
           {/* Standalone Quick Sync Daily Positives Button */}
           {onSyncDailyPositives && (

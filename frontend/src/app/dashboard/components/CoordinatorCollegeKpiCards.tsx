@@ -30,6 +30,8 @@ interface MonthlySeries {
   daily: number[];
   daily_duration?: number[];
   daily_outcomes?: Record<ShownBucket, number[]>;
+  /** JD Received calls per day. Their day squares turn a different colour from the blue scale. */
+  daily_jd?: number[];
   total: number;
   total_duration_minutes?: number;
 }
@@ -253,6 +255,7 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
           --ipoms-hm-zero: #f1efe8;
           --ipoms-hm-stripe: #e1e0d9;
           --ipoms-hm-today: #0b0b0b;
+          --ipoms-hm-jd: #c026d3;
         }
         :global(.dark) {
           --ipoms-oc-positive: #0ea271;
@@ -267,6 +270,7 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
           --ipoms-hm-zero: #2c2c2a;
           --ipoms-hm-stripe: #383835;
           --ipoms-hm-today: #f0efec;
+          --ipoms-hm-jd: #e879f9;
         }
         :global(.ipoms-sw) {
           display: inline-block;
@@ -404,6 +408,10 @@ function MonthChart({
     const arr = s.daily_outcomes?.[key] ?? [];
     return day === 'month' ? sum(arr, lastDay) : arr[day - 1] || 0;
   };
+  const jdAt = (s: MonthlySeries, day: number | 'month') => {
+    const arr = s.daily_jd ?? [];
+    return day === 'month' ? sum(arr, lastDay) : arr[day - 1] || 0;
+  };
   const callsAt = (s: MonthlySeries, day: number | 'month') =>
     day === 'month' ? sum(s.daily, lastDay) : s.daily[day - 1] || 0;
 
@@ -435,6 +443,9 @@ function MonthChart({
           </span>
           <span>More</span>
           <span className="inline-flex items-center gap-1.5 ml-2">
+            <i className="ipoms-hm-cell ipoms-hm-key" style={{ background: 'var(--ipoms-hm-jd)' }} /> JD received
+          </span>
+          <span className="inline-flex items-center gap-1.5">
             <i className="ipoms-hm-cell ipoms-hm-key ipoms-hm-future" /> Not yet
           </span>
           {todayDay && (
@@ -503,6 +514,7 @@ function MonthChart({
                     (hover && hover.row === row && hover.day === m.day) || scope === m.day ? 'ipoms-hm-hot' : '',
                   ].join(' ');
                   const dCalls = s.daily[i] || 0;
+                  const dJd = jdAt(s, m.day);
                   const mins = s.daily_duration?.[i] || 0;
                   const tipLines = future
                     ? [`${s.college_code} · ${m.label}`, 'Not yet']
@@ -510,7 +522,7 @@ function MonthChart({
                         `${s.college_code} · ${m.label}`,
                         `${plural(dCalls)} · ${fmtMins(mins)} logged`,
                         `Positive ${outcomeAt(s, 'positive', m.day)} · Not Hiring ${outcomeAt(s, 'not_hiring', m.day)}`,
-                        `Negative ${outcomeAt(s, 'negative', m.day)} · Follow Up ${outcomeAt(s, 'follow_up', m.day)}`,
+                        `Follow Up ${outcomeAt(s, 'follow_up', m.day)} · JD Received ${jdAt(s, m.day)}`,
                       ];
                   return (
                     <button
@@ -519,10 +531,16 @@ function MonthChart({
                       role="gridcell"
                       disabled={future}
                       aria-label={`${s.college_code}, ${m.label}: ${
-                        future ? 'not yet' : `${plural(dCalls)}, ${fmtMins(mins)} logged`
+                        future ? 'not yet' : `${plural(dCalls)}, ${fmtMins(mins)} logged${dJd > 0 ? `, ${dJd} JD received` : ''}`
                       }`}
                       className={cls}
-                      style={!future && v > 0 ? { background: `var(${HEAT_STEPS[step(v)]})` } : undefined}
+                      style={
+                        !future && dJd > 0
+                          ? { background: 'var(--ipoms-hm-jd)' }
+                          : !future && v > 0
+                          ? { background: `var(${HEAT_STEPS[step(v)]})` }
+                          : undefined
+                      }
                       onClick={() => selectDay(m.day)}
                       onMouseEnter={(e) => {
                         setHover({ row, day: m.day });

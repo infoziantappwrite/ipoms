@@ -7,6 +7,7 @@ import { apiFetch } from '@/lib/api';
 import { DailyLeadRow, CollegeOption } from './LeadsTable';
 import { useToast } from '@/components/ui/Toast';
 import { readSessionUser } from '@/lib/session';
+import { validateAndNormalizeMultiEmail } from '@/lib/contactValidation';
 import { getCoordinatorSelectedColleges, getDefaultOfficialCollegeIdsForUser } from '@/lib/collegeSession';
 
 interface Props {
@@ -16,6 +17,10 @@ interface Props {
   searchQuery: string;
   onSearchChange: (q: string) => void;
   onUpdateRow: (rowId: string, patch: Partial<DailyLeadRow>) => Promise<void>;
+  /** 'positive' = My Positives (default), 'jd_received' = My JD - same all-time, focus-college view. */
+  leadType?: 'positive' | 'jd_received';
+  /** Bumped by the page after Sync, so emails filled in from the Daily Tracker show up straight away. */
+  refreshToken?: number;
 }
 
 function formatLeadDate(dateStr?: string | Date | null): string {
@@ -33,6 +38,12 @@ function formatLeadDate(dateStr?: string | Date | null): string {
   }
 }
 
+/** The HR email of a lead: its own email field, else the older "Email: x" text that used to be kept in remarks. */
+function emailOf(row: DailyLeadRow): string {
+  if (row.email_id && row.email_id.trim()) return row.email_id.trim();
+  return row.remarks?.includes('Email:') ? row.remarks.replace('Email:', '').trim() : '';
+}
+
 export function MyPositivesTab({
   selectedDate,
   onDateChange,
@@ -40,8 +51,11 @@ export function MyPositivesTab({
   searchQuery,
   onSearchChange,
   onUpdateRow,
+  leadType = 'positive',
+  refreshToken = 0,
 }: Props) {
   const { toast } = useToast();
+  const isJd = leadType === 'jd_received';
   const [selectedCollegeId, setSelectedCollegeId] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all'); // 'all' = All Time / All Dates
   const [leads, setLeads] = useState<DailyLeadRow[]>([]);
@@ -91,7 +105,7 @@ export function MyPositivesTab({
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        lead_type: 'positive',
+        lead_type: leadType,
       });
       if (dateFilter !== 'all') {
         params.set('date', dateFilter);
@@ -135,11 +149,11 @@ export function MyPositivesTab({
     } finally {
       setLoading(false);
     }
-  }, [dateFilter, selectedCollegeId, searchQuery, focusColleges]);
+  }, [dateFilter, selectedCollegeId, searchQuery, focusColleges, leadType]);
 
   useEffect(() => {
     loadMyPositives();
-  }, [loadMyPositives]);
+  }, [loadMyPositives, refreshToken]);
 
   // Statistics calculation for the active selection
   const stats = useMemo(() => {
@@ -157,7 +171,16 @@ export function MyPositivesTab({
   // Save Inline Email Edit
   const handleSaveEmail = async (rowId: string) => {
     try {
-      await onUpdateRow(rowId, { remarks: emailValue ? `Email: ${emailValue}` : undefined });
+      const typed = emailValue.trim();
+      if (typed) {
+        const v = validateAndNormalizeMultiEmail(typed);
+        if (!v.valid) {
+          toast(v.error || 'Please enter a valid email address', 'warning');
+          return;
+        }
+      }
+      // saved in the lead's own email field (not in remarks, which also feeds the Weekly Tracker status)
+      await onUpdateRow(rowId, { email_id: typed });
       toast('Email updated successfully', 'success');
       setEditingEmailId(null);
       loadMyPositives();
@@ -178,7 +201,7 @@ export function MyPositivesTab({
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider truncate">
-                Total Positives Logged
+                {isJd ? 'Total JDs Received' : 'Total Positives Logged'}
               </p>
               <p className="text-sm font-black text-emerald-900 dark:text-emerald-100 tabular-nums leading-tight">
                 {stats.totalPositivesCount}
@@ -221,33 +244,35 @@ export function MyPositivesTab({
       <div className="overflow-hidden bg-surface rounded-2xl border border-border shadow-2xs">
         {loading ? (
           <div className="p-12 text-center text-fg-subtle text-xs font-medium">
-            Loading positive leads history for your colleges...
+            {isJd ? 'Loading JD history for your colleges...' : 'Loading positive leads history for your colleges...'}
           </div>
         ) : leads.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-12 text-center">
             <div className="w-12 h-12 rounded-2xl bg-surface-sunken border border-border text-fg-subtle flex items-center justify-center mb-3">
               <Sparkles size={24} />
             </div>
-            <h3 className="text-sm font-bold text-fg">No Positive Leads Found</h3>
+            <h3 className="text-sm font-bold text-fg">{isJd ? "No JDs Received Found" : "No Positive Leads Found"}</h3>
             <p className="text-xs text-fg-subtle max-w-sm mt-1">
               {dateFilter === 'all'
-                ? 'No positive outcomes or invite emails recorded for the selected colleges yet.'
-                : `No positive outcomes or invite emails recorded on ${dateFilter}. Try selecting "All Dates (All-Time)".`}
+                ? (isJd
+                    ? 'No JDs recorded as received for the selected colleges yet.'
+                    : 'No positive outcomes or invite emails recorded for the selected colleges yet.')
+                : `No ${isJd ? 'JDs received' : 'positive outcomes or invite emails'} recorded on ${dateFilter}. Try selecting "All Dates (All-Time)".`}
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left border-collapse">
+            <table className="w-full table-fixed text-[12px] font-medium text-left border-collapse">
               <thead>
-                <tr className="bg-surface-sunken/80 text-fg-muted font-bold border-b border-border uppercase tracking-wider text-[10px] select-none">
-                  <th className="py-3 px-4 w-12 text-center">S.No</th>
-                  <th className="py-3 px-4 w-28 text-center">Date</th>
-                  <th className="py-3 px-4 w-24 text-center">Time</th>
-                  <th className="py-3 px-4 w-28 text-center">College</th>
-                  <th className="py-3 px-4">Company Name</th>
-                  <th className="py-3 px-4">Job Role</th>
-                  <th className="py-3 px-4 w-28 text-center">CTC</th>
-                  <th className="py-3 px-4">Email ID (Maintain Log)</th>
+                <tr className="bg-surface-sunken/80 text-fg-muted font-bold border-b border-border uppercase tracking-wider text-[12px] select-none">
+                  <th className="py-3 px-[15px] w-12 text-center">S.No</th>
+                  <th className="py-3 px-[15px] w-28 text-center">Date</th>
+                  <th className="py-3 px-[15px] w-24 text-center">Time</th>
+                  <th className="py-3 px-[15px] w-28 text-center">College</th>
+                  <th className="py-3 px-[15px] w-[210px]">Company Name</th>
+                  <th className="py-3 px-[15px] w-[250px]">Job Role</th>
+                  <th className="py-3 px-[15px] w-[130px] text-center">CTC</th>
+                  <th className="py-3 px-[15px]">Email ID (Maintain Log)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
@@ -259,43 +284,43 @@ export function MyPositivesTab({
 
                   return (
                     <tr key={row._id} className="hover:bg-surface-sunken/50 transition-colors">
-                      <td className="py-3 px-4 text-center font-bold text-fg-muted tabular-nums">
+                      <td className="py-3 px-[15px] text-center font-medium text-fg-muted tabular-nums">
                         {idx + 1}
                       </td>
 
-                      <td className="py-3 px-4 text-center font-bold text-indigo-700 dark:text-indigo-300 whitespace-nowrap">
+                      <td className="py-3 px-[15px] text-center font-medium text-indigo-700 dark:text-indigo-300 whitespace-nowrap">
                         {formatLeadDate(row.lead_date)}
                       </td>
 
-                      <td className="py-3 px-4 text-center font-semibold text-fg-subtle whitespace-nowrap">
+                      <td className="py-3 px-[15px] text-center font-medium text-fg-subtle whitespace-nowrap">
                         {row.event_time || '10:00 AM'}
                       </td>
 
-                      <td className="py-3 px-4 text-center">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20">
+                      <td className="py-3 px-[15px] text-center">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[12px] font-medium bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20">
                           {collegeCode}
                         </span>
                       </td>
 
-                      <td className="py-3 px-4 font-extrabold text-fg text-sm">
+                      <td className="py-3 px-[15px] font-medium text-fg text-[12px]">
                         {row.company_name}
                       </td>
 
-                      <td className="py-3 px-4 font-medium text-fg">
+                      <td className="py-3 px-[15px] font-medium text-fg text-[12px]">
                         {row.job_role || 'Graduate Trainee'}
                       </td>
 
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-3 px-[15px] text-center">
                         {row.ctc ? (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 tabular-nums">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[12px] font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 tabular-nums">
                             {row.ctc}
                           </span>
                         ) : (
-                          <span className="text-fg-subtle italic text-xs">—</span>
+                          <span className="text-fg-subtle italic text-[12px]">—</span>
                         )}
                       </td>
 
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-[15px]">
                         {editingEmailId === row._id ? (
                           <div className="flex items-center gap-1.5">
                             <input
@@ -303,13 +328,13 @@ export function MyPositivesTab({
                               value={emailValue}
                               onChange={(e) => setEmailValue(e.target.value)}
                               placeholder="enter HR email..."
-                              className="h-7 px-2 bg-surface-sunken border border-primary text-xs rounded-lg outline-none w-48"
+                              className="h-7 px-2 bg-surface-sunken border border-primary text-[12px] font-medium rounded-lg outline-none w-48"
                               autoFocus
                             />
                             <button
                               type="button"
                               onClick={() => handleSaveEmail(row._id)}
-                              className="px-2 py-1 bg-primary text-primary-foreground text-[10px] font-bold rounded-lg cursor-pointer"
+                              className="px-2 py-1 bg-primary text-primary-foreground text-[12px] font-medium rounded-lg cursor-pointer"
                             >
                               Save
                             </button>
@@ -318,14 +343,14 @@ export function MyPositivesTab({
                           <div
                             onClick={() => {
                               setEditingEmailId(row._id);
-                              setEmailValue(row.remarks?.includes('Email:') ? row.remarks.replace('Email:', '').trim() : '');
+                              setEmailValue(emailOf(row));
                             }}
                             className="group flex items-center gap-1.5 cursor-pointer hover:text-primary transition-colors text-fg-subtle"
                             title="Click to maintain/update email ID"
                           >
                             <Mail size={13} className="text-fg-subtle group-hover:text-primary shrink-0" />
-                            <span className="text-xs font-medium underline decoration-dashed underline-offset-2">
-                              {row.remarks?.includes('Email:') ? row.remarks.replace('Email:', '').trim() : 'Click to add email'}
+                            <span className="text-[12px] font-medium underline decoration-dashed underline-offset-2">
+                              {emailOf(row) || 'Click to add email'}
                             </span>
                           </div>
                         )}

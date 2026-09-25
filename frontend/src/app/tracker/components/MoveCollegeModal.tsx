@@ -19,6 +19,8 @@ interface Props {
   onConfirm: (targetCollegeId: string, targetCollege: CollegeOption, mode: 'move' | 'copy') => Promise<void>;
 }
 
+import { getCoordinatorSelectedColleges } from '@/lib/collegeSession';
+
 export function MoveCollegeModal({
   isOpen,
   selectedCount,
@@ -30,9 +32,15 @@ export function MoveCollegeModal({
   const [selectedTargetId, setSelectedTargetId] = useState<string>('');
   const [loadingMode, setLoadingMode] = useState<'move' | 'copy' | null>(null);
   const [fetchingColleges, setFetchingColleges] = useState(false);
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{ targetId: string; targetObj: CollegeOption; mode: 'move' | 'copy' } | null>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setShowWarningModal(false);
+      setPendingAction(null);
+      return;
+    }
     setFetchingColleges(true);
     apiFetch<any>('/colleges')
       .then((res) => {
@@ -58,9 +66,26 @@ export function MoveCollegeModal({
     const targetObj = colleges.find((c) => String(c._id) === String(selectedTargetId));
     if (!targetObj) return;
 
+    // Check if target college is within current user's pre-selected focus colleges
+    const focusCollegeIds = getCoordinatorSelectedColleges();
+    const isFocusCollege = focusCollegeIds.includes(String(targetObj._id)) || focusCollegeIds.includes(String(targetObj.college_code));
+
+    if (!isFocusCollege) {
+      // Trigger simple warning confirmation modal
+      setPendingAction({ targetId: selectedTargetId, targetObj, mode });
+      setShowWarningModal(true);
+      return;
+    }
+
+    await executeAction(selectedTargetId, targetObj, mode);
+  };
+
+  const executeAction = async (targetId: string, targetObj: CollegeOption, mode: 'move' | 'copy') => {
     setLoadingMode(mode);
     try {
-      await onConfirm(selectedTargetId, targetObj, mode);
+      await onConfirm(targetId, targetObj, mode);
+      setShowWarningModal(false);
+      setPendingAction(null);
       onClose();
     } catch (err) {
       console.error(`[MoveCollegeModal] ${mode} error:`, err);
@@ -161,6 +186,50 @@ export function MoveCollegeModal({
         </div>
 
       </div>
+
+      {/* Out-of-Focus College Transfer Warning Confirmation Modal */}
+      {showWarningModal && pendingAction && (
+        <div className="fixed inset-0 z-60 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-surface text-fg rounded-2xl w-full max-w-md border border-amber-500/30 shadow-2xl p-6 space-y-4 animate-scaleIn">
+            <div className="flex items-center gap-3 text-amber-500">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                <ArrowLeftRight className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-fg">Out of your focus</h4>
+                <p className="text-[11px] text-fg-subtle">{pendingAction.mode === 'copy' ? 'Copy' : 'Move'} to another college</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-fg leading-relaxed bg-amber-500/10 border border-amber-500/20 p-3.5 rounded-xl font-medium">
+              This college ({pendingAction.targetObj.college_code}) is out of your focus. Do you still want to continue?
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowWarningModal(false);
+                  setPendingAction(null);
+                }}
+                disabled={isLoading}
+                className="px-4 py-2 rounded-xl bg-surface-sunken hover:bg-surface-raised text-fg-muted hover:text-fg text-xs font-semibold transition-all cursor-pointer border border-border"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => executeAction(pendingAction.targetId, pendingAction.targetObj, pendingAction.mode)}
+                disabled={isLoading}
+                className="px-5 py-2 rounded-xl bg-primary hover:bg-blue-700 text-primary-foreground text-xs font-bold shadow-md transition-all cursor-pointer flex items-center gap-2"
+              >
+                {isLoading ? <Loader2 size={14} className="animate-spin" /> : null}
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

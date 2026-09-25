@@ -52,11 +52,11 @@ export const COLLEGE_LOGO_MAP: Record<string, string> = {
   LICET: '/college-logos/layola.png',
   LAYOLA: '/college-logos/layola.png',
   LOYOLA: '/college-logos/layola.png',
-  MAREPHRAM: '/college-logos/mar ephream.png',
-  MAREPHRA: '/college-logos/mar ephream.png',
-  MAR: '/college-logos/mar ephream.png',
-  'MAR EPHRAEM': '/college-logos/mar ephream.png',
-  'MAR EPHREAM': '/college-logos/mar ephream.png',
+  MAREPHRAM: '/college-logos/marephraem.png',
+  MAREPHRA: '/college-logos/marephraem.png',
+  MAR: '/college-logos/marephraem.png',
+  'MAR EPHRAEM': '/college-logos/marephraem.png',
+  'MAR EPHREAM': '/college-logos/marephraem.png',
   MCET: '/college-logos/MCET.png',
   MAHALINGAM: '/college-logos/MCET.png',
   MEC: '/college-logos/MEC.png',
@@ -139,7 +139,7 @@ export function getCollegeLogoUrl(
   if (cleanName.includes('avs')) return '/college-logos/avs.png';
   if (cleanName.includes('aaa')) return '/college-logos/aaa.png';
   if (cleanName.includes('kgisl')) return '/college-logos/kgisl.png';
-  if (cleanName.includes('mar ephraem') || cleanName.includes('mar ephream')) return '/college-logos/mar ephream.png';
+  if (cleanName.includes('mar ephraem') || cleanName.includes('mar ephream')) return '/college-logos/marephraem.png';
   if (cleanName.includes('akshaya') || cleanName.includes('acet')) return '/college-logos/acet.png';
   if (cleanName.includes('anand') || cleanName.includes('aiht')) return '/college-logos/aiht.png';
   if (cleanName.includes('npr')) return '/college-logos/npr.png';

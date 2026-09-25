@@ -601,6 +601,14 @@ export function TrackerRow({
             className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg font-semibold transition-colors cursor-text text-xs outline-none"
           />
         )}
+        {row.original_college_code && (
+          <span
+            title={`Received from ${row.original_college_name || row.original_college_code}${row.original_coordinator_name ? ` (${row.original_coordinator_name})` : ''}`}
+            className="ml-1 px-1.5 py-0.5 text-[9.5px] font-bold rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0"
+          >
+            Shared ({row.original_college_code})
+          </span>
+        )}
       </div>
 
       {/* HR Name (Editable) */}

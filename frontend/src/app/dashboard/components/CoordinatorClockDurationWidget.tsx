@@ -31,6 +31,8 @@ interface ClockDurationData {
   hourly_calls?: number[];
   /** 24 slots, index = IST hour. Positive calls converted in that hour. */
   hourly_positives?: number[];
+  /** 24 slots, index = IST hour. Calls whose outcome is JD Received in that hour. */
+  hourly_jd?: number[];
   college_breakdown?: Array<{
     college_id: string;
     college_name: string;
@@ -186,11 +188,13 @@ export function CoordinatorClockDurationWidget({ clockData, coordinatorName }: P
   /**
    * Hourly rhythm window (10am to 7pm default, extends if calls recorded outside).
    */
-  const { bars, peak, hasAnyCalls } = useMemo(() => {
+  const { bars, peak, hasAnyCalls, hasInvite, hasJd } = useMemo(() => {
     const raw = effectiveData?.hourly_calls;
     const rawPos = effectiveData?.hourly_positives;
+    const rawJd = effectiveData?.hourly_jd;
     const counts = Array.isArray(raw) && raw.length === 24 ? raw : new Array(24).fill(0);
     const posCounts = Array.isArray(rawPos) && rawPos.length === 24 ? rawPos : new Array(24).fill(0);
+    const jdCounts = Array.isArray(rawJd) && rawJd.length === 24 ? rawJd : new Array(24).fill(0);
 
     let firstWithCalls = -1;
     let lastWithCalls = -1;
@@ -204,17 +208,19 @@ export function CoordinatorClockDurationWidget({ clockData, coordinatorName }: P
     const startHour = firstWithCalls === -1 ? 10 : Math.min(10, firstWithCalls);
     const endHour = lastWithCalls === -1 ? 19 : Math.max(19, lastWithCalls);
 
-    const list: { hour: number; count: number; positiveCount: number }[] = [];
+    const list: { hour: number; count: number; positiveCount: number; jdCount: number }[] = [];
     for (let h = startHour; h <= endHour; h++) {
-      list.push({ hour: h, count: counts[h], positiveCount: posCounts[h] || 0 });
+      list.push({ hour: h, count: counts[h], positiveCount: posCounts[h] || 0, jdCount: jdCounts[h] || 0 });
     }
 
     return {
       bars: list,
       peak: Math.max(1, ...list.map((b) => b.count)),
       hasAnyCalls: counts.some((c) => c > 0),
+      hasInvite: list.some((b) => b.positiveCount > 0),
+      hasJd: list.some((b) => b.jdCount > 0),
     };
-  }, [effectiveData?.hourly_calls, effectiveData?.hourly_positives]);
+  }, [effectiveData?.hourly_calls, effectiveData?.hourly_positives, effectiveData?.hourly_jd]);
 
   const nowFraction = useMemo(() => {
     if (!isSelectedToday || bars.length === 0) return null;
@@ -409,17 +415,20 @@ export function CoordinatorClockDurationWidget({ clockData, coordinatorName }: P
             {bars.map((b, i) => {
               const isNow = isSelectedToday && b.hour === nowHour;
               const isFuture = isSelectedToday && b.hour > nowHour;
-              const isPositive = b.positiveCount > 0;
+              // Invite Mail = green, JD Received = fuchsia, both in the same hour = split bar
+              const hasInviteHere = b.positiveCount > 0;
+              const hasJdHere = b.jdCount > 0;
+              const tone = hasInviteHere && hasJdHere ? ' is-both' : hasInviteHere ? ' is-positive' : hasJdHere ? ' is-jd' : '';
               const heightPct = hasAnyCalls ? Math.max(6, (b.count / peak) * 100) : 6;
               return (
                 <div
                   key={b.hour}
-                  className={`ipoms-spark-bar${isPositive ? ' is-positive' : ''}${isNow ? ' is-now' : ''}${isFuture ? ' is-future' : ''}${!hasAnyCalls && !isFuture ? ' is-idle' : ''}`}
+                  className={`ipoms-spark-bar${tone}${isNow ? ' is-now' : ''}${isFuture ? ' is-future' : ''}${!hasAnyCalls && !isFuture ? ' is-idle' : ''}`}
                   style={{
                     height: `${heightPct}%`,
                     animationDelay: !hasAnyCalls && !isFuture ? `${i * 0.14}s` : `${0.1 + i * 0.05}s`,
                   }}
-                  title={`${hourLabel(b.hour)} — ${b.count} ${b.count === 1 ? 'call' : 'calls'}${isPositive ? ` · ${b.positiveCount} converted positive ✨` : ''}`}
+                  title={`${hourLabel(b.hour)} — ${b.count} ${b.count === 1 ? 'call' : 'calls'}${hasInviteHere ? ` · ${b.positiveCount} Invite Mail` : ''}${hasJdHere ? ` · ${b.jdCount} JD Received` : ''}`}
                 />
               );
             })}
@@ -439,6 +448,13 @@ export function CoordinatorClockDurationWidget({ clockData, coordinatorName }: P
               </span>
             ))}
           </div>
+
+          {(hasInvite || hasJd) && (
+            <div className="ipoms-spark-legend" aria-label="Bar colours">
+              {hasInvite && <span><i className="ipoms-legend-dot is-invite" />Invite Mail</span>}
+              {hasJd && <span><i className="ipoms-legend-dot is-jd" />JD Received</span>}
+            </div>
+          )}
 
           {!hasAnyCalls && (
             <p className="text-[10.5px] text-fg-subtle mt-2 lg:text-right italic">
@@ -714,6 +730,34 @@ export function CoordinatorClockDurationWidget({ clockData, coordinatorName }: P
           background: linear-gradient(180deg, #6ee7b7, #10b981);
           box-shadow: 0 0 12px rgba(16, 185, 129, 0.55);
         }
+        /* JD Received: fuchsia, deliberately distinct from Invite Mail green and the default indigo */
+        .ipoms-spark-bar.is-jd {
+          background: linear-gradient(180deg, #e879f9, #c026d3);
+          box-shadow: 0 0 10px rgba(192, 38, 211, 0.4);
+        }
+        :global(.dark) .ipoms-spark-bar.is-jd {
+          background: linear-gradient(180deg, #f0abfc, #d946ef);
+          box-shadow: 0 0 12px rgba(217, 70, 239, 0.5);
+        }
+        /* Invite Mail and JD Received in the same hour: top half fuchsia, bottom half green */
+        .ipoms-spark-bar.is-both {
+          background: linear-gradient(180deg, #d946ef 50%, #10b981 50%);
+          box-shadow: 0 0 10px rgba(16, 185, 129, 0.35);
+        }
+        .ipoms-spark-legend {
+          display: flex;
+          gap: 14px;
+          justify-content: flex-end;
+          margin-top: 8px;
+          font-size: 10.5px;
+          font-weight: 600;
+          color: rgb(var(--fg-subtle));
+        }
+        .ipoms-spark-legend span { display: inline-flex; align-items: center; gap: 5px; }
+        .ipoms-legend-dot { width: 8px; height: 8px; border-radius: 9999px; display: inline-block; }
+        .ipoms-legend-dot.is-invite { background: #10b981; }
+        .ipoms-legend-dot.is-jd { background: #c026d3; }
+        :global(.dark) .ipoms-legend-dot.is-jd { background: #e879f9; }
         .ipoms-spark-bar.is-future {
           background: linear-gradient(180deg, rgb(var(--border)), rgb(var(--border-strong)));
           opacity: 0.45;
@@ -723,7 +767,7 @@ export function CoordinatorClockDurationWidget({ clockData, coordinatorName }: P
             ipoms-grow 900ms cubic-bezier(0.22, 1, 0.36, 1) backwards,
             ipoms-glow 2.4s ease-in-out 1.2s infinite;
         }
-        .ipoms-spark-bar.is-now:not(.is-positive) {
+        .ipoms-spark-bar.is-now:not(.is-positive):not(.is-jd):not(.is-both) {
           background: linear-gradient(180deg, #818cf8, #4f46e5);
         }
         @keyframes ipoms-grow {

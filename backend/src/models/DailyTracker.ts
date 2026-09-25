@@ -72,6 +72,10 @@ export interface IDailyTracker extends Document {
   // Duplicate guard — tracks if a warning was already acknowledged for this row
   duplicate_acknowledged: boolean;
 
+  // Transfer tracking
+  original_college_id?: Types.ObjectId;      // FK → colleges (where contact originally came from)
+  original_coordinator_id?: Types.ObjectId;  // FK → users (who originally handled this contact)
+
   // System timestamps
   created_at: Date;
   updated_at: Date;
@@ -248,6 +252,20 @@ const DailyTrackerSchema: Schema<IDailyTracker> = new Schema(
     duplicate_acknowledged: {
       type: Boolean,
       default: false,
+    },
+
+    // ── Transfer tracking
+    original_college_id: {
+      type: Schema.Types.ObjectId,
+      ref: 'College',
+      default: null,
+      index: true,
+    },
+    original_coordinator_id: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
     },
   },
   {

@@ -9,6 +9,7 @@ import { AddCompanyModal } from './components/AddCompanyModal';
 import { BulkMoveModal } from './components/BulkMoveModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { ForeignCollegeWarningModal } from './components/ForeignCollegeWarningModal';
+import { PasteWeeklyModal, PasteApplyPayload, PasteRowResult } from './components/PasteWeeklyModal';
 import { CollegeDossierModal } from '@/components/college/CollegeDossierModal';
 import type { WeeklyRow } from './components/WeeklyTable';
 import { apiFetch, apiFetchBlob } from '@/lib/api';
@@ -101,6 +102,7 @@ export default function WeeklyTrackerPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [companyTypeFilter, setCompanyTypeFilter] = useState('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isPasteOpen, setIsPasteOpen] = useState(false);
   const [draftToAdd, setDraftToAdd] = useState<any | null>(null);
   const [coordinatorId, setCoordinatorId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
@@ -340,21 +342,87 @@ export default function WeeklyTrackerPage() {
   const [pendingForeignAction, setPendingForeignAction] = useState<{
     actionText: string;
     onConfirm: () => void | Promise<void>;
+    onCancel?: () => void;
   } | null>(null);
 
-  const executeWithForeignCheck = (actionText: string, actionFn: () => void | Promise<void>) => {
+  const executeWithForeignCheck = (actionText: string, actionFn: () => void | Promise<void>, onCancel?: () => void) => {
     if (!isForeignCollege) {
       actionFn();
       return;
     }
     setPendingForeignAction({
       actionText,
+      onCancel,
       onConfirm: async () => {
         setPendingForeignAction(null);
         await actionFn();
       },
     });
   };
+
+  // ── Paste (Company / Role / CTC / Contact / Email / dates) - one undo step for the whole paste
+  // Paste is used for two sections only. The list shown in the window is what the page already has loaded.
+  const pasteSections = {
+    in_progress: { label: sections?.in_progress?.title || 'Companies In Progress', rows: sections?.in_progress?.rows || [] },
+    pipeline: { label: sections?.pipeline?.title || 'Companies in Pipeline', rows: sections?.pipeline?.rows || [] },
+  };
+
+  const postPaste = async (payload: PasteApplyPayload): Promise<{ message?: string; rows: PasteRowResult[] } | null> => {
+    const res: any = await apiFetch('/weekly-tracker/bulk-paste', {
+      method: 'POST',
+      body: JSON.stringify({ college_id: selectedCollegeId, ...payload, dry_run: false }),
+    });
+    if (!res.success) {
+      toast(res.error?.message || (typeof res.error === 'string' ? res.error : 'Paste failed'), 'error');
+      return null;
+    }
+    return { message: res.message, rows: res.data.rows as PasteRowResult[] };
+  };
+
+  const performPasteApply = async (payload: PasteApplyPayload): Promise<{ rows: PasteRowResult[] } | null> => {
+    const first = await postPaste(payload);
+    if (!first) return null;
+    let current = first.rows;
+    const savedCount = current.filter((r) => r.applied).length;
+    toast(first.message || `Pasted ${savedCount} row(s)`, savedCount > 0 ? 'success' : 'info');
+    await loadWeeklyTracker();
+    await loadKpi();
+    if (savedCount > 0) {
+      const undoOnce = async () => {
+        for (const r of current) {
+          if (!r.applied || !r.row_id) continue;
+          if (r.action === 'create') {
+            await performDeleteRow(r.row_id, true);
+          } else if (r.before) {
+            await apiFetch(`/weekly-tracker/${r.row_id}`, { method: 'PATCH', body: JSON.stringify({ ...r.before, is_undo: true }) });
+          }
+        }
+        await loadWeeklyTracker();
+        await loadKpi();
+      };
+      pushAction({
+        description: `Pasted ${savedCount} row${savedCount === 1 ? '' : 's'}`,
+        undo: undoOnce,
+        redo: async () => {
+          const again = await postPaste(payload);
+          if (again) current = again.rows; // new ids if rows were re-created, so the next undo targets them
+          await loadWeeklyTracker();
+          await loadKpi();
+        },
+      });
+    }
+    return { rows: first.rows };
+  };
+
+  // Asks the "not your assigned college" question first when needed; resolves null if the user backs out.
+  const handlePasteApply = (payload: PasteApplyPayload) =>
+    new Promise<{ rows: PasteRowResult[] } | null>((resolve) => {
+      executeWithForeignCheck(
+        'paste into',
+        async () => resolve(await performPasteApply(payload)),
+        () => resolve(null)
+      );
+    });
 
   // ── Row Patch (Inline Edit) with Undo / Redo
   const handleUpdateRow = async (rowId: string, patch: Partial<WeeklyRow>, isUndoRedo = false) => {
@@ -1464,6 +1532,7 @@ export default function WeeklyTrackerPage() {
           academicYear={academicYear}
           onAcademicYearChange={setAcademicYear}
           onOpenAddModal={() => setIsAddModalOpen(true)}
+          onOpenPaste={() => setIsPasteOpen(true)}
           onSyncDailyPositives={handleSyncDailyPositives}
           isSyncing={isSyncing}
           onSaveProgress={handleSaveAll}
@@ -1767,6 +1836,17 @@ export default function WeeklyTrackerPage() {
         />
       )}
 
+      {/* ── Paste Modal ─────────────────────────────────────────────────── */}
+      {isPasteOpen && selectedCollegeId && (
+        <PasteWeeklyModal
+          collegeId={selectedCollegeId}
+          collegeName={selectedCollegeName}
+          sections={pasteSections}
+          onClose={() => setIsPasteOpen(false)}
+          onApply={handlePasteApply}
+        />
+      )}
+
       {/* ── Bulk Move Modal ──────────────────────────────────────────────── */}
       {isBulkMoveModalOpen && (
         <BulkMoveModal
@@ -1800,7 +1880,10 @@ export default function WeeklyTrackerPage() {
         isOpen={pendingForeignAction !== null}
         collegeName={selectedCollegeName || 'This Institution'}
         actionText={pendingForeignAction?.actionText}
-        onClose={() => setPendingForeignAction(null)}
+        onClose={() => {
+          pendingForeignAction?.onCancel?.();
+          setPendingForeignAction(null);
+        }}
         onConfirm={() => {
           if (pendingForeignAction?.onConfirm) {
             pendingForeignAction.onConfirm();

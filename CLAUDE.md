@@ -1388,6 +1388,475 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     change is about visibility only. A second Mar Ephraem document, if one exists, was left
     alone rather than deleted.
 
+51. **Report Builder no longer remembers choices across refresh or across users, 24 Sep 2026
+    (user-reported).** `ReportBuilderWizard.tsx` auto-saved the entire wizard (template,
+    college, dates, sections, remarks, …) to one browser-wide `localStorage` key
+    (`ipoms_report_builder_wizard_state`) and restored it on load. So a refresh — network
+    blip, power cut — brought half-finished selections back, and because the key wasn't
+    per-user, **the next person to log in on the same browser inherited the previous user's
+    college and sections**. Now the choices live in a module-level in-memory store tagged with
+    the logged-in user's id: they survive "Back" from the editor within the same page session
+    but reset on refresh, and a different login never sees them. The old `localStorage` key is
+    deleted on load so stale data from earlier builds can't resurface. Also added a small
+    **Reset** icon above the tab bar (same result as a fresh load: clears memory, reloads).
+    Verified in a real browser: a seeded stale key (`daily_positives`) is ignored and purged →
+    opens on Weekly Report with no college, no dates, default sections; picking Month-End then
+    refreshing → back to Weekly Report; Reset via a real mouse click → Weekly Report. First
+    placement of the icon floated above the tab box and real clicks were intercepted by
+    another element (a DOM `.click()` worked, a mouse click didn't) — moved into normal flow.
+    `tsc --noEmit` clean for the reports files.
+
+52. **"Active right now" on the Team Leader dashboards is now genuinely live, 24 Sep 2026
+    (user-requested).** The "Live Coordinator Deployment by College" list and the presence
+    table showed anyone whose last heartbeat was within **3 minutes** (computed with
+    `Math.floor` on whole minutes, so effectively up to ~4), and the client only pinged every
+    25s — so a coordinator who closed the tab, lost power or dropped off the network stayed
+    listed as "active right now" for several minutes. Now: heartbeat every **10s**
+    (`usePresenceHeartbeat.ts`); the server treats **≤45s** since the last beat as `online`,
+    **≤3 min** as `away` (e.g. a backgrounded tab the browser throttles), else `offline`
+    (`presenceFromLastActive()` in `server.ts`, used by both the team-leader matrix and the
+    users listing); a `pagehide` handler sends `POST /users/offline` (`fetch` with
+    `keepalive`, since `sendBeacon` can't carry the Authorization header) so closing the tab
+    removes that person **immediately**; the Team Leader dashboard polls every **3s** (was
+    5s). A plain refresh also fires the offline call, but the first heartbeat on the next load
+    flips the user back online within a second or two. New route policy entry for
+    `/users/offline` (STAFF). Applies to both Malvika's and Sujitha's dashboards (same
+    component/endpoint). **Verified live via the API** using a real account: heartbeat →
+    `online`; `POST /users/offline` → `offline` instantly; heartbeat again → `online`;
+    55s of silence → dropped out of `online` (`away`); heartbeat resumes → `online`.
+    **Not verified in a real browser:** that `pagehide` actually fires the request on tab
+    close (only the endpoint it calls was exercised). **Trade-off worth knowing:** Chrome
+    throttles timers in hidden tabs, so a coordinator whose tracker tab sits in the background
+    for several minutes will read as `away` rather than `online` — deliberate, since the
+    user's requirement is "actively here right now", but it can look like a false drop.
+
+53. **Saved Active College Focus is no longer reverted by hardcoded defaults, 24 Sep 2026
+    (user-reported).** Reducing/changing focus colleges "didn't stick" after a refresh. Cause:
+    six separate backend spots re-wrote users' `assigned_college_ids` from hardcoded lists:
+    **every boot** (`ensureDefaultAccounts`: the `DEFAULT_COORDINATOR_COLLEGE_MAP` loop for
+    all coordinators + a Mohanaradha block), **every Daily Tracker page load**
+    (`GET /daily-tracker/sync-coordinators`, called by `tracker/page.tsx`, reset Mohanaradha),
+    and **every Team Leader dashboard load — now every 3s** (`GET /dashboard/team-leader`
+    reset Sujitha, Tamil/Seshmitha and Megala). So whatever a user saved via `lock-focus` was
+    silently undone the next time any of those ran — the same class as traps 10/29 (a
+    background path rewriting user data). Now every one of them only applies its default when
+    the user has **no** colleges at all (a starting point, never an override). Frontend needed
+    no change: every consumer re-reads the focus when its page opens, and the dashboard
+    consumers already listen to `ipoms_focus_updated` / `ipoms_coordinator_colleges_changed`.
+    **Verified live** (real accounts, shrunk to 2 colleges then restored exactly): Mohanaradha
+    stays at 2 through a Daily Tracker load *and* a forced backend restart; Sujitha stays at 2
+    through a Team Leader dashboard load. **Not fully proven:** Sujitha (after restart) and
+    Megala (within ~5s, with nothing of mine running) still got their defaults re-added by
+    *something else* — consistent with an **older copy of the backend still running against the
+    same database (most likely the deployed one, whose polling Team Leader dashboards trigger
+    it constantly, or another local `npm run dev`)**. Until that copy is redeployed/restarted
+    with this change, users on the deployed site can still see their focus revert.
+    **Also noticed, not changed:** `ensureDefaultAccounts` still re-attributes Daily Tracker
+    rows (admin-owned → Mohanaradha for her 4 colleges) on every boot — another
+    business-data write at startup, contrary to trap 10's rule.
+
+54. **Saved chips in `MultiTagInput` are now editable in place, 24 Sep 2026 (user-requested).**
+    In Daily Tracker's Add Contact Entry (and every other user of the shared chip input —
+    mobile numbers, HR names, emails), a wrong value committed with Enter could only be fixed
+    by deleting the chip and retyping from scratch. Clicking a chip's **text** (not the ×) now
+    turns it into an inline text box with the caret at the end. Enter/Tab saves, Escape
+    cancels, emptying it removes the entry, blur saves if valid. The edit goes through the
+    same `validator` as a new entry, so a bad number is refused with the same warning and
+    never saved. On blur with an invalid value the original is kept; a duplicate of another
+    chip is also discarded. The × button, Backspace-on-empty, paste and `disabled` behaviour
+    are unchanged (disabled chips are not clickable). Frontend only, `MultiTagInput.tsx` only.
+    `tsc --noEmit` clean for that file. **Not verified in a browser** — the in-app preview was
+    stuck on a blank 0×0 page again (same tooling failure as items 35/38); confirmed only by
+    typecheck and code trace, so click a chip in a real session to check it.
+
+55. ~~**Two anonymous endpoints leaked data, and the calling-time widget 403'd for everyone.**~~
+    **FIXED 24 Sep 2026 (found by a full checkup).** (a) `GET /api/v1/meta-audit`
+    (added in `45d307e`) sat above the `authenticateJWT` mount and returned every flagged
+    company's HR name, phone and email — 487 records — to a caller with no token. (b)
+    `GET /health/duplicate-audit` (no `/api/v1` prefix, so the policy table can't see it
+    either) returned the Active Leads duplicate report, 236 KB, anonymously. Both now carry
+    their own `authenticateJWT, authorizeRoles('ADMINISTRATOR')` (the same pattern as
+    `daily-leads-diagnostics`), and `/meta-audit` also has a policy entry. **Lesson, third
+    time: any route registered above the `app.use('/api/v1', authenticateJWT)` line needs its
+    own middleware; `verify:policy` only proves routes have a policy, not that the gate runs.**
+    (c) `GET /dashboard/coordinator/clock-duration` and `/duration-history` had no policy
+    entry, so default-deny returned 403 to every role and the Dedicated Calling Time widget
+    was dead — added (`STAFF`; handlers already `scopeToSelf`). Verified live: both audit
+    routes anon 401 / coordinator 403 / admin 200; both duration routes coordinator 200
+    with real data. `verify:policy` 108/108, `tsc --noEmit` clean.
+
+56. **Checkup follow-ups, 24 Sep 2026.** (a) ~~Boot rewrote Daily Tracker ownership~~ —
+    `ensureDefaultAccounts` re-attributed **every** ACET row to Mohanaradha (whoever entered
+    it) and every admin-owned row in her other three colleges on each start. Now behind
+    **`REATTRIBUTE_TRACKER_ON_BOOT=true`**, default off (trap 10/29 rule). Rows already moved
+    stay moved; new admin-owned rows for those colleges will no longer be auto-moved.
+    (b) `AddCompanyModal.tsx` (another tool's uncommitted WIP) lost its `companyType` state
+    line, breaking `tsc` in 6 places; restored that one line only — **its other WIP
+    (stipend/LPA "Both" CTC mode) is still uncommitted and unreviewed.** (c) Backend
+    `npm audit fix` (non-breaking, lockfile only): 7 → 3 advisories (express/body-parser/qs/
+    morgan cleared). Remaining and deliberately not forced: `xlsx` high (no upstream fix, both
+    sides), `exceljs`/`uuid` (fix is a *downgrade*), frontend `next` critical/`postcss` high
+    (fix is a major jump to Next 16 — needs its own migration), `@capacitor/cli` moderate.
+    `nodemailer` was already on a fixed version (9.1.1).
+
+57. **"My JD" tab added to Daily Leads, 24 Sep 2026 (user-requested).** The header tab strip is now
+    Positives / JD Received / My Positives / **My JD**. My JD is the JD-Received twin of My
+    Positives: every JD (`lead_type=jd_received`) ever recorded for the viewer's handled (focus)
+    colleges, **all-time from the first record** (date filter defaults to "All Dates"), with the same
+    college and date filters, table and count badge. Implemented by giving `MyPositivesTab.tsx` a
+    `leadType` prop (default `'positive'`, so My Positives is unchanged) and a fourth
+    `LeadsHeader.tsx` button; `page.tsx` fetches both all-time lists in `loadSummary` and counts
+    each against the focus set. Both tabs are live views over the saved `daily_leads` rows, not
+    separate copies — a lead deleted from the day tabs leaves them too. **Verified live** as
+    Mohanaradha: My JD showed her 3 AIHT JDs, My Positives still 17. **Known pre-existing quirk,
+    not changed:** `getDefaultOfficialCollegeIdsForUser` needs the cached college list; in a
+    brand-new browser session (cold cache) My Positives/My JD fall back to *all* colleges in the
+    table while the badge shows 0, until the cache warms. `LeadsTabBar.tsx` is imported by
+    `page.tsx` but never rendered (dead), so only `LeadsHeader.tsx` carries the tabs.
+    **Next.js 16 upgrade (same day):** branch `next16-upgrade` (`bc5750e`, pushed) — Next 14.2.35 ->
+    16.3.6, React stays 18.3.1. Clears the critical Next advisory and the `postcss` high; build,
+    typecheck and a light/dark browser comparison of 8 main screens against the current build
+    showed no differences or console errors. Not merged; needs a Vercel preview look first.
+    Stray `frontend/coord.json` / `coord_token.txt` (an expired coordinator token) were untracked and
+    gitignored (files kept on disk; still in old history).
+
+58. **Hourly Rhythm bars now show Invite Mail and JD Received, 24 Sep 2026 (user-requested).** In
+    `CoordinatorClockDurationWidget.tsx` a bar is **green** when any call that hour was an Invite Mail
+    (already the case on the coordinator dashboard) and **fuchsia** when any call that hour was JD
+    Received (previously it fell into the plain indigo bar); an hour with both is split half/half. Fuchsia
+    was chosen because green is taken by Invite Mail, indigo is the default bar, and amber/blue/rose are
+    the Not Hiring / Follow Up / Negative chips. A small legend appears only when a coloured bar exists.
+    It is per viewer's own calls that day, any college (the widget is keyed to the coordinator, not a
+    college), and recomputes daily since the data is "today" (or the selected date). Backend: new
+    `hourly_jd` array beside `hourly_positives` in `/dashboard/coordinator`, `/coordinator/clock-duration`
+    and `/coordinator/duration-history`; the Team Leader dashboard (Sujitha) previously returned neither
+    array, so it now returns both (invite_mail / jd_received only). **Malvika Kumar's dashboard is
+    unchanged** — she gets `CollegeActivityTodayWidget`, not this widget. Verified live as Mohanaradha:
+    12p green (Invite Mail), 2p fuchsia (JD Received), legend shown, no console errors; Sujitha's endpoint
+    returns 24-slot arrays. **Not verified:** dark mode (the app toggles a `.dark` class, which the test
+    browser's colour-scheme setting doesn't trigger) and a split (both-in-one-hour) bar.
+
+59. **Monthly Call Trend: JD Received day squares + tooltip, 24 Sep 2026 (user-requested).** The hover
+    tooltip on a day square now lists exactly Positive, Not Hiring, Follow Up and **JD Received**
+    (JD Received replaces Negative there). A day with at least one JD Received call for that campus is
+    drawn **fuchsia** instead of its blue heat shade (same fuchsia as the JD bars in the Hourly Rhythm,
+    item 58), with a "JD received" entry added to the legend and the JD count added to the cell's
+    aria-label. Backend: `GET /dashboard/monthly-calls` series now include `daily_jd` (per-day count of
+    `outcome_status === 'jd_received'`; JD otherwise sits in the un-shown Other Progress bucket).
+    **Deliberately unchanged:** the outcome columns on the right of the strip (Positive / Not Hiring /
+    Negative / Follow Up) still show Negative — only the tooltip was asked to change; tell me if the
+    columns should swap too. Applies to every dashboard that renders `CoordinatorCollegeKpiCards`
+    (coordinators, Sujitha, Malvika). Verified live as Mohanaradha: AIHT on 24 Sept drawn fuchsia
+    (rgb 192,38,211), tooltip "3 calls . 4m logged | Positive 1 . Not Hiring 0 | Follow Up 0 . JD
+    Received 1", no console errors. Dark mode not seen (same `.dark` toggle limitation as item 58).
+
+60. **Daily Tracker contact transfer ("Move to another college") made to actually work, 24 Sep 2026.**
+    Another tool built the feature (out-of-focus warning modal, origin tracking via
+    `original_college_id` / `original_coordinator_id` on `DailyTracker`, a `Shared (CODE)` badge, and a
+    "Send Back to Source" button) and I tested it with marked throwaway rows. Four things were broken and
+    are fixed: (1) **the receiver never saw the contact** - `POST /daily-tracker/bulk-move` changed the
+    college but not `coordinator_id`, and `/daily-tracker/today` only lists a coordinator's own rows. A
+    move now hands the row to the coordinator who handles the TARGET college (Placement Coordinator
+    preferred over Team Leader; all-colleges oversight accounts ignored; if the sender already handles the
+    target it stays with them; if nobody handles it the row stays with the sender). (2) the badge never
+    rendered because `/today` returned no `original_college_code/name` - it now populates them plus
+    `original_coordinator_name`. (3) the Send Back handler called a non-existent `loadDailyTrackerRows`
+    (also a `tsc` error that would have failed a Next build) - now `loadTodayRows()`. (4) Send Back returns
+    the row to the ORIGINAL coordinator and college and clears the markers; only a real change of owner
+    sets the "Shared" marker. After a move to someone else's college the sender's page now stays put and
+    refreshes instead of switching to a college whose rows are no longer theirs. **User decision: call
+    timing (`call_start_time`, `call_end_time`, `duration_seconds`) is deliberately cleared on every
+    transfer** so the receiver starts a fresh entry - this removes the sender's calling minutes for that
+    call and it is NOT restored on Send Back. Still not fixed: `bulk-move` has no ownership check (any
+    logged-in user can move any row by id). **Verified live** (throwaway row, deleted after, 0 left): move
+    AIHT->NGCE puts it on Malavika's sheet with `Shared (AIHT)` / origin coordinator Mohanaradha and hides it
+    from Mohanaradha; Malavika's Send Back returns it to Mohanaradha's AIHT and clears markers; a move
+    between colleges the same person handles changes no owner. In a real browser as Malavika: badge shown,
+    Send Back button appears on selection, confirm names the source college, no page errors. **Process
+    slip, recorded:** my rhythm-bars commit `530a7b9` staged the whole of `server.ts` and so swept in this
+    tool's uncommitted transfer handler while its model fields were still uncommitted (the committed tree
+    would not have compiled); the model, modal, row and page changes are now committed together.
+
+61. **Transfer redesigned as "copy to the receiver", 24 Sep 2026 (user decision - supersedes the
+    hand-over and timing-wipe parts of item 60).** The first version moved the row itself and cleared
+    its call timing, which permanently erased the sender's real calling minutes. Now
+    `POST /daily-tracker/bulk-move` does one of two things per row: (1) target college is one the
+    sender handles (or nobody handles): a real **move** inside the sender's own sheet, **call timing
+    kept**; (2) target college belongs to another coordinator: the sender **keeps the original
+    untouched** and the receiver gets a **copy** of the contact (company, HR, mobile, email, comments)
+    with **no start/end/duration and no outcome** (an outcome would otherwise count as the receiver's
+    own completed call and inflate their dashboard), marked `original_college_id` /
+    `original_coordinator_id` so it shows the `Shared (CODE)` badge. The receiver may fill in their own
+    times and save it or simply delete it; neither affects the sender. A repeat send of the same
+    company+mobile to the same receiver that day is skipped ("already on their sheet"). Linked Daily
+    Leads / Weekly Tracker rows are cascaded only for real moves. **Ownership check added:** only a
+    row's owner or a supervisor may move/share it (`403 FORBIDDEN_NOT_OWNER`), closing the old
+    "anyone can move anyone's rows" gap. **Send Back removed** (with copies there is nothing to send
+    back - the receiver just deletes the copy). The out-of-focus confirmation now also says a copy goes
+    to the other coordinator and the original stays. The owner of a target college is picked as in
+    item 60 (Placement Coordinator over Team Leader, all-colleges oversight accounts ignored).
+    **Verified live** with a throwaway row (0 left): own-college move kept `dur=300`; send to Malavika
+    left Mohanaradha's original intact and gave Malavika a timing-less, outcome-less copy tagged
+    `Shared (ACET / A.Mohanaradha)`; a repeat send was skipped; Malavika moving Mohanaradha's row got
+    `403`; Malavika deleting her copy left the original untouched. `tsc --noEmit` clean both sides.
+    **Not re-checked in a browser this round** (the earlier browser check covered the old Send Back).
+
+62. **"I copied to MCET but can't see it in MCET" - Copy now behaves like Move, 24 Sep 2026
+    (user-reported).** Cause: the Copy button (`mode: 'copy'`) still created the duplicate under the
+    *sender's own* name. But the Daily Tracker page opens any college outside the user's focus as a
+    read-only view of the coordinator who handles it (`tracker/page.tsx`, the "College is outside user
+    focus" branch), so a coordinator's own rows in someone else's college are hidden there - yet they
+    still counted on the sender's dashboard (timing and outcome were copied too). Now
+    `POST /daily-tracker/bulk-move` with `mode: 'copy'` to a college another coordinator handles sends
+    them a timing-less, outcome-less copy exactly like Move (item 61; shared helper `shareCopyWith`),
+    with the same duplicate skip and owner-only check; Copy into a college the sender handles is
+    unchanged (an own copy). The page no longer jumps to the target college after sending copies to
+    someone else. Verified live with throwaway rows (0 left): Copy AIHT->MCET gave Seshmitha
+    (MCET's coordinator) a copy with no timing/outcome tagged `Shared (AIHT / A.Mohanaradha)` and gave
+    Mohanaradha nothing in MCET; Copy AIHT->ACET (both hers) still made her own copy with timing.
+    **Left for the user to decide:** two pre-existing stray rows ("Revature LLC.", 40s, no_response,
+    created 15:54 and 16:11 IST) sit in MCET under Mohanaradha from the old Copy behaviour - hidden on
+    screen but counted in her dashboard totals.
+
+63. **Move vs Copy in the Daily Tracker settled, 24 Sep 2026 (user decision - supersedes items 61/62 for
+    Move).** **Copy and Switch:** the sender keeps the original (timing and status intact); if the target
+    college is another coordinator's, they get a copy with no start/end/duration and no status, to fill
+    in or delete. **Move and Switch:** the contact leaves the sender's sheet completely - the sender's
+    calls, minutes, outcome counts, hourly rhythm and log all drop by that row (they are all derived from
+    `daily_tracker`) - and the receiving coordinator gets it as a blank fresh entry (option A: no timing,
+    no status carried over). Moves between colleges the sender handles keep everything, timing included.
+    Linked Daily Leads / Weekly Tracker entries are deliberately **left alone** on Move (they record a
+    result the sender achieved; the tracker row's delete route would have cascade-soft-deleted them, so
+    Move uses a plain `deleteOne`). If the receiver already has the same company+number that day the row is
+    skipped and stays with the sender ("already on their sheet, so kept on yours"); finalized rows are
+    skipped. Both buttons "Switch": afterwards the page opens the target college through the new
+    `selectCollegeWorkspace()` (extracted from the college dropdown), which shows another coordinator's
+    college as their read-only sheet. **One simple confirmation for BOTH buttons** when the target is
+    outside the sender's focus selection: "This college (CODE) is out of your focus. Do you still want to
+    continue?" with Cancel / Continue (Cancel sends nothing). Verified live: API test with throwaway rows
+    (0 left) - own-college move kept `dur=300`; Move to Seshmitha removed it from Mohanaradha, gave her a
+    blank copy, and Mohanaradha's dashboard returned to its pre-test count and seconds (5 calls / 342s);
+    a duplicate Move was refused and the row stayed. Browser: the popup shows for both Copy and Move to
+    MCET and Cancel fires zero `bulk-move` requests. **Not exercised in the browser:** the actual
+    Continue + switch to the other coordinator's read-only sheet (covered only by the API test and code).
+
+64. **Active Leads "Resolve Multiple Company Roles" popup no longer re-asks about resolved companies,
+    24 Sep 2026 (user question -> fix).** Purpose: Active Leads keeps ONE row per company (identity =
+    normalised company name) while the Weekly Tracker can hold several rows for the same company with
+    different job roles; on sync the user picks whether to merge the roles into that one row or keep a
+    single role. Bug: `POST /active-leads/sync` flagged every company whose Weekly rows had more than one
+    role and never checked whether the Active Lead row already contained them, and nothing is remembered
+    after clicking OK - so the popup came back on every sync (267 companies, of which 258 were already
+    fully merged; Fristine Infotech lists all 5 roles in its Active Lead yet was flagged each time). Now a
+    company is a conflict only if it has more than one role AND the Weekly Tracker has a role (compared
+    trimmed / lower-cased / whitespace-collapsed) missing from the existing Active Lead row, or no
+    Active Lead row exists yet. The apply path (resolutions, merge, keeping the existing role for
+    unflagged companies) is unchanged. Verified with the read-only `check_only` call: 267 -> 9 (all 9
+    genuinely have a new role, e.g. Novatech, NEOMETRIX, Happy Connects); the real (writing) sync was
+    not run. `tsc --noEmit` clean.
+
+65. **"Confirm & Update" in the role-conflict popup saved nothing, 24 Sep 2026 (user-reported, follow-up to
+    item 64).** `DuplicateResolutionModal.tsx` built its `resolutions` state with `useState(() => ...)`
+    from the `conflicts` prop, but the modal is always mounted (page renders it with `conflicts=[]`), so the
+    initializer ran once on an empty list and the state stayed `{}`. The "Merge (Recommended)" choice was
+    only a visual fallback, so unless the user clicked every radio (or "Merge All") Confirm sent
+    `resolutions: {}`. The backend correctly refuses to write without resolutions and answers
+    `success:true, has_conflicts:true`; the page took that `success` as done, closed the popup and toasted
+    "resolved" - nothing was saved, so the next sync flagged the same companies. Fixed both ends: the modal
+    now builds the full set (state entry, else the default merge) at submit, and the page only treats the
+    response as resolved when `has_conflicts` is false (otherwise it shows "Nothing was saved"). Verified in
+    a real browser with the write request blocked: Confirm with no radio touched sends 9 merge resolutions
+    (ELEATION -> "CAE Project Engineer, Graduate Trainee", etc.). The real write was NOT run by me - the
+    user confirms once for real, after which `check_only` should return 0 conflicts. **Separate finding,
+    not changed:** 69 company names have more than one non-deleted `active_leads` row (case-insensitive),
+    and the sync's `activeMap` keeps only the last row per normalised name.
+
+66. **Weekly Tracker "Paste" button, 24 Sep 2026 (user-requested feature, design agreed before building).**
+    A green **Paste** button next to Sync (all roles, incl. Malvika Kumar; disabled until a real college is
+    selected). Flow: (1) tick which columns you are pasting - **Company name is always the first column** (it is
+    the key) plus any of Role, CTC, Contact, Email, Follow-up date, JD received date, DB shared date; presets
+    "Entire" (Company, Role, CTC, Contact, Email) and "Company name only"; (2) paste from Excel/Sheets (tab
+    separated; quoted multi-line cells handled; a header row starting with "Company" is skipped; up to 200
+    rows); (3) preview - the server checks every row and says New / Update / Skipped with the reason; if new
+    companies would be created the user must pick which of the **9 sections** they go into (Apply stays disabled
+    until chosen); nothing is saved until Apply. `POST /api/v1/weekly-tracker/bulk-paste` (new
+    `lib/weeklyPasteRoutes.ts`, registered after the Active Leads routes) serves BOTH the preview
+    (`dry_run:true`) and the save through one planning function so they cannot disagree. Rules: Contact/Email
+    validated by the same Indian mobile/landline + email rules as the screen (`lib/contactRules.ts` is a
+    **mirror of `frontend/src/lib/contactValidation.ts` - change both together**; the older, smaller
+    `lib/contactValidation.ts` is a different file used by `scripts/autoCleanMetadataContacts.ts`);
+    Follow-up date must be today or later (IST), JD-received / DB-shared may be past; dates day-first
+    (DD/MM/YYYY, DD-MM-YYYY, 12 Oct 2026, ISO), invalid/impossible dates refused; Contact, Email and Role are
+    ADDED to what a row has (duplicates skipped, nothing overwritten) and new contacts/emails are also added to
+    the Metadata record (as editing by hand already does); CTC and dates replace the current value; blank
+    cells never erase; a bare CTC "3-6" becomes "3 - 6 LPA". **New rows are created only when no date column is
+    pasted**, and only if the company is in Metadata (same rule as adding by hand); role defaults to "Graduate
+    Trainee" and status to "Added via Paste" (CTC may be blank - shown as a warning). A company already in the
+    college is found by the name the tracker uses (falling back to Metadata's spelling); a company with 2+ rows
+    in one college is refused ("edit them directly"); a company twice in one paste is refused. Foreign-college
+    warning reused (`executeWithForeignCheck`, now with an optional cancel callback) and the college owners get
+    ONE notification for the whole paste. The whole paste is one **undo step** (creates are removed, updates
+    restored from saved "before" values; contacts already added to Metadata are not removed). **Verified:**
+    server previews and a real save/undo with a throwaway Metadata company (all removed afterwards): refused
+    without a section, refused past follow-up date, refused dates for a company not on the tracker, role
+    de-duplicated case-insensitively, phone/email merged and synced to Metadata, undo restored the row; and in
+    a real browser as Mohanaradha on AIHT: step 1/2/3, 9 sections listed, Apply disabled until a section is
+    chosen, 1 valid row applied while an unknown company and a bad phone/email row were skipped, page
+    updated, no errors. **Process slip, fixed before commit:** my first backend validator copy overwrote an
+    existing `lib/contactValidation.ts`; restored from git and the mirror renamed. **Not tested in a browser:**
+    the undo button after a paste, pasting into a college you don't handle (foreign warning), dark mode.
+
+67. **Weekly Tracker Paste redesigned around the section and the companies already there, 24 Sep 2026
+    (user decision - supersedes the flow (not the rules) of item 66).** The first version was too large
+    in type and asked for the section last from all 9. Now: **Step 1** asks, in order, (1) which section -
+    only **Companies In Progress** or **Companies in Pipeline** (the two the user uses; the server
+    now accepts only those two), (2) what to do - *Fill in details for companies already here* or *Add new
+    companies*, (3) which columns (Contact, Email, Role, CTC; plus the three dates in fill mode only). **Fill
+    mode Step 2** lists that section's existing companies (taken from what the page already loaded, so no
+    extra request) with checkboxes, search, "Only without contact (n)" and select-all; the user ticks only the
+    companies they have data for (e.g. 5 of 15). **Step 3** shows the ticked companies numbered in list order
+    and asks for one pasted line per company in that order (blank cell = leave that company as it is); the
+    Preview button stays disabled until the pasted line count equals the ticked count. **Add mode** skips the
+    picking: paste Company name + columns, new rows go into the chosen section. **Step 4** is the server
+    preview (New / Update / Skipped with reasons), then Apply. Fill mode addresses rows by exact
+    `row_id` (new optional field on `POST /weekly-tracker/bulk-paste`), so duplicate or differently spelled
+    company names cannot hit the wrong row; every other rule from item 66 is unchanged. UI type moved to the
+    app's own scale (`text-xs` body, `text-[11px]` hints, `text-sm` title). **Verified in a real browser as
+    Mohanaradha with three throwaway companies (all removed):** section question first with two options; list
+    search; ticking 2 of 3 and pasting 2 numbers - a 1-line paste against 2 ticked was blocked with "they must
+    match"; Apply saved numbers on exactly the 2 ticked companies and their Metadata records while the
+    unticked one stayed empty; no page errors. **Not tested:** Add-new-companies through the new UI, the date
+    columns through the UI, the Undo button after a paste, dark mode.
+
+68. **Weekly Tracker Paste: the paste box is now a small editable table, 24 Sep 2026 (user decision).**
+    The user asked whether people could type columns separated by double spaces; rejected because values
+    themselves contain spaces ("Data Engineer", "3 - 5 LPA", "98765 43210", company names), one stray space
+    would shift every value into the wrong column, and nothing shows the mistake until preview. Step 3 is now
+    a table: **fill mode** lists the ticked companies down a locked left column with one editable cell per
+    chosen column; **add mode** has a Company name column plus the chosen columns, starts with 6 blank rows,
+    "Add 5 rows" (max 200) and "Clear table". Type into cells (Tab moves right; Enter moves down in fill mode
+    and to the first cell of the next row in add mode; arrow up/down) **or paste from Excel/Sheets**: a
+    multi-cell paste is spread from the clicked cell (a header row starting with "Company" is skipped in add
+    mode; rows beyond the ticked companies / 200 are left out with a note). Cells are checked live and turn
+    red with the reason on hover (contact, email, date formats, follow-up not in the past, "Company name is
+    needed"); a summary line counts them; rows with a problem are skipped, not blocked. Empty rows are not
+    sent. Preview/Apply and every server rule from items 66-67 are unchanged (the client date check mirrors the
+    server's and the server stays the authority). **Verified in a real browser (throwaway companies, all
+    removed):** fill mode - typed "12345" showed a red cell with a reason, a 2-line block pasted into the first
+    cell filled both rows and cleared the red, Apply saved only the 2 ticked companies; add mode - typing a full
+    row with Tab, "4-5" became "4 - 5 LPA", the new company was saved with role/contact/email, a row with no
+    company name was reported and skipped, "Add 5 rows" grew the table, Enter starts the next row at column 1,
+    and no horizontal scroll after narrowing the columns. **Not tested in a browser:** the date columns
+    through the table, the Undo button after a paste, dark mode.
+
+69. **Daily Leads Sync now carries the Daily Tracker email into the lead, 24 Sep 2026 (user-requested).**
+    My Positives / My JD showed "Click to add email" even when the coordinator had already typed the HR email in
+    the Daily Tracker, because `POST /daily-leads/sync-positives` never copied it and the tabs kept an email as
+    the text "Email: x" inside the lead's **remarks**. That storage had a side effect: `PATCH /daily-leads/:id`
+    cascades `remarks` into the linked Weekly Tracker rows' `current_status_text`, so typing an email in My
+    Positives overwrote the Weekly status text with "Email: ...". Now `DailyLead` has its own `email_id`
+    (default ''). Sync: a new lead takes the tracker row's `email_id`; an existing lead whose email is EMPTY
+    (and has no legacy "Email:" remark) is filled from the tracker on the next sync; a typed email is never
+    overwritten; the sync message reports "(n email(s) filled in)". Manual add, Move to JD, and both Copy-to-JD
+    paths carry `email_id`. `PATCH /daily-leads/:id` accepts `email_id` and validates it with the same rules as
+    everywhere else (`lib/contactRules.ts`, 400 `INVALID_EMAIL` otherwise). `MyPositivesTab` shows
+    `email_id`, falling back to the old "Email:" remark text so nothing already typed disappears, saves to
+    `email_id` (with the same validation on screen), and the page bumps a refresh token after Sync so the emails
+    appear without leaving the tab. Users type an email only when the tracker had none. **Verified** with
+    throwaway calls in KARPAGAM (removed): a synced positive got the tracker's email, a JD lead with no tracker
+    email stayed blank, an invalid email got 400, a valid one saved with remarks untouched, re-sync did not
+    overwrite it, an emptied lead was refilled when the tracker gained an email; in a real browser both tabs
+    showed the emails and on-screen editing refused a bad email and saved a good one. **Not done (offered):** a
+    one-time backfill - of 299 active leads, 292 have no email; only 19 are linked to a tracker call that has an
+    email (18 positives, 1 JD); the other 272 are not linked to any tracker call and must be typed by hand or
+    matched some other way. Emails typed earlier via the old remarks route were not migrated (still displayed).
+
+70. **My Positives / My JD table type set to the user's spec, 24 Sep 2026 (user decision).** One component
+    (`MyPositivesTab.tsx`) renders both tabs. Column headings are now **12px uppercase bold**; every body cell -
+    S.No, Date, Time, College badge, Company name, Job role, CTC badge, Email (and its edit box / Save) - is
+    **10px, weight medium (500)**. Before: headings 10px; body 12px with mixed weights (company name 14px
+    extra-bold, CTC/date/S.No bold, time semi-bold, college extra-bold). The two summary cards above the table
+    were not changed (10px labels, 14px numbers). Measured in a real browser after the change: header 12px/700,
+    all eight cells 10px/500. Note: these are hard-coded pixel sizes (the app's token scale is 12/14/16/20);
+    done as an explicit user instruction. **Revised the same day:** body cells raised from 10px to **12px medium**
+    (headings stay 12px bold, so header and body are now the same size; weight tells them apart). Re-measured:
+    header 12px/700, all eight cells 12px/500. **Column widths (user spec, same day):** cell padding
+    `px-4` (32px) -> `px-[15px]` (30px per column); the table is now `table-fixed` with Job Role **280px**,
+    CTC **250px**, Email **400px**, Company Name **190px** (my choice - not specified - so the table fits a
+    1600px screen without sideways scroll), and the existing S.No 48 / Date 112 / Time 96 / College 112.
+    Measured at 1600px: 48/112/96/112/191/281/251/401 = 1492px, no horizontal scroll. On narrower screens
+    (e.g. 1366px) the table is wider than the screen and scrolls sideways. Long role lists and multiple emails
+    wrap onto a second line instead of widening the column. CTC at 250px is much wider than the badge needs
+    (~60px) - a deliberate user number. **Revised again the same day** ("why so much gap" - the 250px CTC
+    column left the centred badge ~75px of empty space each side): Company Name 210px, Job Role 250px, CTC
+    130px, Email = whatever width is left (no fixed width; left-aligned so the spare width is blank space at the
+    far right edge, not a gap between columns). Measured: 1600px -> 48/112/96/112/210/250/130/534 = 1492px,
+    1366px -> Email 300px, table 1258px; no horizontal scroll at either size.
+
+71. **Daily Leads bulk "Move to JD" window removed, 24 Sep 2026 (user decision).** The amber copy-icon button
+    on the Positives tab opened `CopyToJdModal` (pick one positive company, tick focus colleges, copy it into
+    JD Received for several colleges at once). With only ~5-10 positives and JDs a day the user judged it
+    unnecessary. Removed: the header button and its prop in `LeadsHeader.tsx`, the state/import/render in
+    `daily-leads/page.tsx`, and `components/CopyToJdModal.tsx` itself. **Kept:** the per-row "Move to JD" button
+    in the Positives table (single-company move), Sync, Add, Delete. **Left in place, now unused by the UI:** the
+    backend `POST /api/v1/daily-leads/copy-to-jd` route (two flows; the modal was its only caller) - it can be
+    deleted in a later cleanup. Verified in a real browser: 0 header "Move to JD" buttons, Sync/Add still
+    present, 6 per-row "Move to JD Received" buttons still present, no page errors; `tsc --noEmit` clean.
+
+72. **"Did you send all the emails for today's positives?" question, 24-25 Sep 2026 (user-requested;
+    redesigned four times - THIS is the final version, agreed with the user line by line on 25 Sep).**
+    Earlier builds used fixed 5:00/5:30 PM windows, then a 15-minute timer per Invite Mail call with a
+    30-minute retry; the user removed both ("we're confusing a lot... avoid multiple popups"). **There are
+    NO popups during the working day.** Who: Placement Coordinators and a normal Team Leader (Sujitha);
+    **never** the Administrator or a full-oversight Team Leader (`has_all_colleges_access`, Malvika Kumar).
+    About: Invite Mail calls (the "positive" outcome) in the person's focus colleges. **Monday-Friday only**,
+    on the server's IST clock (`backend/src/lib/emailCheckRoutes.ts`; `GET /email-check/status?kind=`,
+    `POST /email-check/answer`; collection `email_checks`, one row per person per day).
+    **TODAY's positives - closable, with Pick time:** (1) `signout` - they click Sign out **at or after
+    5:00 PM** (before 5 PM nothing is asked and the client does not even call the server); (2) `login` - the
+    first time the app opens in a browser session, after 5 PM; (3) `timed` - the time they picked for today
+    arrives. **At most two of these per day.** **Yes** = the day is finished (`status:'yes'`), a later "no"
+    cannot undo it (calls stop at 6 PM; known narrow edge: a call logged 5-6 PM *after* a Yes is not
+    re-asked). **Close / Esc** = unconfirmed, so tomorrow's question follows. **Pick time** now chooses a
+    **date and a time**: **Today**, or the **next working day** (Monday if today is Friday) - nothing else is
+    offered (server refuses any other date with `BAD_DATE`). Picking the next working day means **nothing at
+    all is asked for the rest of today** (no sign-out, no login question).
+    **YESTERDAY's positives - the PREVIOUS WORKING DAY only - are STRICT (user decision):** the question has
+    **Yes only**: no Pick time, no X, Esc and clicking outside do nothing, and the **Daily Tracker stays
+    locked until they answer**. It appears (4) `next_day` - **the moment the Daily Tracker is opened, every
+    time it is opened, until Yes** (no once-a-day limit) - and (5) `timed` - at the date+time they picked,
+    **on ANY page/module** (the server hands back `remind_at`; a light client timer asks again then).
+    Safeguards the user approved: a **"Leave the Daily Tracker"** link (goes to the Dashboard; the tracker
+    stays locked) so nobody is trapped, and **fail-open** - if the server errors or is slow, the popup is
+    skipped and nobody is locked out. **Older days are never asked about**, so a day's positives are settled
+    today or on the next working day and never dragged on: someone who does not open the Daily Tracker on
+    that next working day simply drops that day (Tuesday asks about Monday, never Friday). A picked time
+    for a past day is impossible. Sign-out is **never blocked** (3 s cap, any error -> straight through).
+    **Wiring:** `UserSignOutButton.tsx` (the one shared sign-out button, ~17 pages) awaits
+    `runSignOutGate()` (`lib/emailCheckGate.ts`); `EmailCheckPrompt.tsx` (mounted once in `AppShell.tsx`)
+    registers the gate. Checks are queued, not dropped. The `sessionStorage` login mark is written when its
+    timer fires, not up front (React dev mounts effects twice; an early mark made the login check silently
+    never run). UI: 400px centred card (capped to the window height), envelope icon (deliberately not a
+    Gmail/Outlook mark - trademarks), the day's companies with college chip and call time, **Yes, sent** /
+    **Pick time** side by side, inline picker: **Today / next-working-day cards** (with dates), 3 quick
+    chips, two snap-scrolling wheels + AM/PM pill, all in medium type (14-15px wheel rows, 12-13px chips).
+    **`EMAIL_CHECK_START_DATE` (default `2026-09-26`) is the go-live guard** - earlier days are never asked
+    about; **set it to the real deploy day**. Policy entry `/email-check` (STAFF); `verify:policy` OK.
+    **Verified:** 41 simulated-time checks against real accounts with throwaway rows (all removed) - 5:00 PM
+    boundary, two-a-day cap, Yes surviving a later "no", strict question repeating on every tracker open,
+    only-the-previous-working-day (Friday asked on Monday, dropped on Tuesday, weekend skipped), pick-for-
+    tomorrow silencing the rest of today and firing strictly at that time on any page, a time picked for a
+    past day refused, go-live guard, weekend silence; a real-browser run with a faked clock and mocked server
+    (Pick time -> Monday card -> 10:30 payload then sign-out; strict question with no X / Esc and outside-
+    click doing nothing; Leave link records nothing and the question returns on re-entry; picked time firing
+    on Weekly Tracker not before it; a 500 from the server leaves the tracker usable; Esc on today's
+    sign-out still signs out); live routes over HTTP (bad date 400, past-day snooze 400, no token 401,
+    nothing written). **Not verified:** a genuine 5 PM sign-out or a real 10:30 AM reminder on the real
+    clock, dark mode of this final version, sign-out from all ~17 pages (one shared component, exercised on
+    the dashboard only), and the Daily Tracker lock on a phone-width screen. **Known limit:** "Yes" is a
+    self-declaration - the app cannot see whether an email was really sent; a per-person view for Team
+    Leaders/Administrator was suggested and not built.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

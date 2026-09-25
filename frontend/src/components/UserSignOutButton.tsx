@@ -7,6 +7,7 @@ import { readSessionUser, type SessionUser } from '@/lib/session';
 import { apiFetch } from '@/lib/api';
 
 import { clearAllCollegeSessionState } from '@/lib/collegeSession';
+import { runSignOutGate } from '@/lib/emailCheckGate';
 
 interface Props {
   className?: string;
@@ -24,6 +25,10 @@ export function UserSignOutButton({ className = '' }: Props) {
   const handleSignOut = async () => {
     if (isSigningOut) return;
     setIsSigningOut(true);
+
+    // After 5 PM the "did you send today's emails?" question may appear first. Whatever the answer -
+    // or if it fails - sign-out carries on.
+    await runSignOutGate();
 
     const currentUser = user || readSessionUser();
     const uid = currentUser?._id || currentUser?.id;

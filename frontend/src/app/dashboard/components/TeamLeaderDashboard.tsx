@@ -41,13 +41,13 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Live Auto-Refresh every 5 seconds for real-time coordinator presence & deployment monitoring
+  // Live Auto-Refresh every 3 seconds for real-time coordinator presence & deployment monitoring
   useEffect(() => {
     const timer = setInterval(() => {
       if (typeof onRefresh === 'function') {
         onRefresh();
       }
-    }, 5000);
+    }, 3000);
     return () => clearInterval(timer);
   }, [onRefresh]);
 

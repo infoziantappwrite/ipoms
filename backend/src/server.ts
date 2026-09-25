@@ -34,6 +34,9 @@ import { startPositiveSyncReminderJob } from './jobs/positiveSyncReminder';
 import rateLimit from 'express-rate-limit';
 import { registerAuthRoutes } from './lib/authRoutes';
 import { registerActiveLeadRoutes, syncLeadFromDailyTracker } from './lib/activeLeadRoutes';
+import { registerWeeklyPasteRoutes } from './lib/weeklyPasteRoutes';
+import { registerEmailCheckRoutes } from './lib/emailCheckRoutes';
+import { validateAndNormalizeMultiEmail } from './lib/contactRules';
 import { registerPendingTaskRoutes } from './lib/pendingTaskRoutes';
 import { seedMasterDailyLeads, MASTER_POSITIVES_DATA } from './lib/seedMasterDailyLeads';
 import { seedAugustAllCollegesPositives } from './lib/seedAugustAllCollegesPositives';
@@ -234,7 +237,9 @@ app.get('/api/v1/health', (req: Request, res: Response) => {
 });
 
 // Metadata Contact Audit Endpoint
-app.get('/api/v1/meta-audit', async (req: Request, res: Response) => {
+// Registered ABOVE the global authenticateJWT mount, so it carries its own gate: until
+// 24 Sep 2026 this returned every flagged HR name/phone/email to anonymous callers.
+app.get('/api/v1/meta-audit', authenticateJWT, authorizeRoles('ADMINISTRATOR'), async (req: Request, res: Response) => {
   try {
     const allRecords = await CompanyMetadata.find({ is_deleted: { $ne: true } }).lean();
     const suspiciousRecords: any[] = [];
@@ -314,7 +319,9 @@ app.get('/api/v1/meta-audit', async (req: Request, res: Response) => {
 });
 
 // 1b. Duplicate Company Audit across Active Leads & Master Sources
-app.get('/health/duplicate-audit', async (req: Request, res: Response) => {
+// Same position/problem as /meta-audit above (and outside /api/v1, so the policy table
+// never sees it) — was anonymous, returning the Active Leads duplicate report.
+app.get('/health/duplicate-audit', authenticateJWT, authorizeRoles('ADMINISTRATOR'), async (req: Request, res: Response) => {
   try {
     const leads = await ActiveLead.find({ is_deleted: false }).lean();
     const weeklyTrackers = await WeeklyTracker.find({ is_deleted: false }).select('company_name job_role ctc_lpa pipeline_section academic_year').lean();
@@ -727,6 +734,12 @@ app.use('/api/v1', async (req: Request, res: Response, next: NextFunction) => {
 // Register Active Leads routes
 registerActiveLeadRoutes(app);
 
+// Weekly Tracker "Paste" (preview + save share one code path)
+registerWeeklyPasteRoutes(app, { notifyForeignCollegeOwners, getFridayWeekBounds });
+
+// "Have you sent all your emails?" reminder (5 PM / 5:30 PM / next-day)
+registerEmailCheckRoutes(app);
+
 // Register Pending Task routes
 registerPendingTaskRoutes(app);
 
@@ -1048,6 +1061,7 @@ export async function syncActiveCollegesRoster() {
       if (canonical) {
         canonical.college_code = 'MAREPHRAM';
         canonical.status = 'active';
+        canonical.logo_url = '/college-logos/marephraem.png';
         await canonical.save();
       }
     } catch (marErr) {
@@ -2033,6 +2047,8 @@ app.get('/api/v1/daily-tracker/today', async (req: Request, res: Response) => {
     const rows = await DailyTracker.find(filter)
       .populate('coordinator_id', 'full_name official_email')
       .populate('college_id', 'college_name college_code logo_url location')
+      .populate('original_college_id', 'college_name college_code')
+      .populate('original_coordinator_id', 'full_name')
       .sort({ created_at: 1 });
 
     // Auto-clean any unfinalized duplicate rows created in the same session
@@ -2081,6 +2097,10 @@ app.get('/api/v1/daily-tracker/today', async (req: Request, res: Response) => {
         }
       }
 
+      // Where a transferred contact came from (badge + "Send Back" target)
+      const origColl = obj.original_college_id as any;
+      const origCoord = obj.original_coordinator_id as any;
+
       return {
         ...obj,
         coordinator_id: coord?._id ?? obj.coordinator_id,
@@ -2088,6 +2108,11 @@ app.get('/api/v1/daily-tracker/today', async (req: Request, res: Response) => {
         college_id: coll?._id ?? obj.college_id,
         college_name: coll?.college_name || undefined,
         college_code: coll?.college_code || undefined,
+        original_college_id: origColl?._id ?? obj.original_college_id ?? null,
+        original_college_name: origColl?.college_name || undefined,
+        original_college_code: origColl?.college_code || undefined,
+        original_coordinator_id: origCoord?._id ?? obj.original_coordinator_id ?? null,
+        original_coordinator_name: origCoord?.full_name || undefined,
         serial_no: idx + 1,
         duration_formatted: row.duration_seconds != null ? formatDuration(row.duration_seconds) : null,
         is_read_only: isReadOnlyRow,
@@ -2466,10 +2491,88 @@ app.post('/api/v1/daily-tracker/bulk-move', async (req: Request, res: Response) 
 
     const objectIds = row_ids.map((id: string) => new Types.ObjectId(String(id)));
 
+    // Who handles the TARGET college? Placement Coordinator preferred over Team Leader;
+    // all-colleges oversight accounts are ignored.
+    const targetObjectId = new Types.ObjectId(String(target_college_id));
+    const ownerCandidates = await User.find({
+      assigned_college_ids: targetObjectId,
+      is_deleted: { $ne: true },
+      account_status: 'active',
+      has_all_colleges_access: { $ne: true },
+      role_codes: { $in: ['PLACEMENT_COORDINATOR', 'TEAM_LEADER'] },
+    })
+      .select('_id full_name role_codes')
+      .sort({ full_name: 1 })
+      .lean();
+    const coordinatorOwners = ownerCandidates.filter((u: any) => (u.role_codes || []).includes('PLACEMENT_COORDINATOR'));
+    const targetOwners: any[] = coordinatorOwners.length > 0 ? coordinatorOwners : ownerCandidates;
+
+    let sharedCount = 0;
+    let skippedDuplicates = 0;
+    const sharedToNames = new Set<string>();
+
+    // Give `owner` a fresh copy of a contact: details and comments only, NO call timing and NO
+    // outcome (an outcome would count as the receiver's own completed call). Returns false if that
+    // coordinator already has the same company+number on their sheet for that day.
+    const shareCopyWith = async (row: any, owner: any): Promise<boolean> => {
+      const alreadyThere = await DailyTracker.findOne({
+        college_id: targetObjectId,
+        coordinator_id: owner._id,
+        session_date: row.session_date,
+        company_name: { $regex: new RegExp(`^${escapeRegex(String(row.company_name || '').trim())}$`, 'i') },
+        mobile_number: row.mobile_number || '',
+      }).select('_id');
+      if (alreadyThere) return false;
+      await DailyTracker.create({
+        session_date: row.session_date || new Date(),
+        day: row.day,
+        month: row.month,
+        year: row.year,
+        academic_year: (row as any).academic_year || 2026,
+        college_id: targetObjectId,
+        coordinator_id: owner._id,
+        company_id: row.company_id || null,
+        company_name: row.company_name,
+        hr_name: row.hr_name || 'HR Contact',
+        mobile_number: row.mobile_number || '',
+        email_id: row.email_id || '',
+        is_contact_added: (row as any).is_contact_added || false,
+        is_skipped: false,
+        is_promoted_to_weekly: false,
+        is_deleted: false,
+        call_start_time: null,
+        call_end_time: null,
+        duration_seconds: null,
+        outcome_status: null,
+        follow_up_month: null,
+        comments: row.comments || '',
+        original_college_id: row.college_id,
+        original_coordinator_id: row.coordinator_id,
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+      return true;
+    };
+
     if (mode === 'copy') {
       let copiedCount = 0;
       const sourceRows = await DailyTracker.find({ _id: { $in: objectIds }, is_deleted: { $ne: true } });
       for (const src of sourceRows) {
+        if (refuseForeignOwner(req, res, String(src.coordinator_id), 'You can only copy your own tracker rows.')) return;
+      }
+      for (const src of sourceRows) {
+        // A college another coordinator handles: they receive the copy on THEIR sheet (a copy left in
+        // our own name there would be hidden - the tracker opens that college as their sheet).
+        if (targetOwners.length > 0 && !targetOwners.some((u) => String(u._id) === String(src.coordinator_id))) {
+          const owner = targetOwners[0];
+          if (await shareCopyWith(src, owner)) {
+            sharedToNames.add(owner.full_name);
+            sharedCount++;
+          } else {
+            skippedDuplicates++;
+          }
+          continue;
+        }
         await DailyTracker.create({
           session_date: src.session_date || new Date(),
           day: src.day,
@@ -2501,10 +2604,16 @@ app.post('/api/v1/daily-tracker/bulk-move', async (req: Request, res: Response) 
 
       return res.status(200).json({
         success: true,
-        message: `Successfully copied ${copiedCount} company call(s) to ${targetCollege.college_name}`,
+        message: sharedCount > 0 || skippedDuplicates > 0
+          ? `Successfully ${[copiedCount > 0 ? `copied ${copiedCount} call(s) to ${targetCollege.college_name}` : '', sharedCount > 0 ? `sent a copy of ${sharedCount} contact(s) to ${Array.from(sharedToNames).join(', ')}` : '', skippedDuplicates > 0 ? `${skippedDuplicates} already on their sheet, skipped` : ''].filter(Boolean).join('; ')}`
+          : `Successfully copied ${copiedCount} company call(s) to ${targetCollege.college_name}`,
         data: {
           action: 'copy',
-          processed_count: copiedCount,
+          processed_count: copiedCount + sharedCount,
+          copied_count: copiedCount,
+          shared_count: sharedCount,
+          skipped_duplicate_count: skippedDuplicates,
+          shared_to: Array.from(sharedToNames),
           target_college: {
             _id: targetCollege._id,
             college_name: targetCollege.college_name,
@@ -2514,29 +2623,91 @@ app.post('/api/v1/daily-tracker/bulk-move', async (req: Request, res: Response) 
       });
     }
 
-    // Default Mode: Move (re-assign college_id)
-    const updateRes = await DailyTracker.updateMany(
-      { _id: { $in: objectIds } },
-      { $set: { college_id: new Types.ObjectId(String(target_college_id)), updated_at: new Date() } }
-    );
+    // Mode: Move or Return
+    // When moving contacts across colleges:
+    // 1. Clear timing metrics (start_time, end_time, duration_seconds) so it acts as fresh entry in receiving college sheet
+    // 2. Preserve original_college_id & original_coordinator_id if not already set, so recipient can send them back easily!
+    const existingRows = await DailyTracker.find({ _id: { $in: objectIds } });
 
-    // Also cascade college_id update to any linked DailyLead or WeeklyTracker records
-    await DailyLead.updateMany(
-      { daily_tracker_id: { $in: objectIds } },
-      { $set: { college_id: new Types.ObjectId(String(target_college_id)), updated_at: new Date() } }
-    );
+    // Only a row's owner (or a supervisor) may move or share it.
+    for (const row of existingRows) {
+      if (refuseForeignOwner(req, res, String(row.coordinator_id), 'You can only move your own tracker rows.')) return;
+    }
 
-    await WeeklyTracker.updateMany(
-      { daily_tracker_id: { $in: objectIds } },
-      { $set: { college_id: new Types.ObjectId(String(target_college_id)), updated_at: new Date() } }
-    );
+
+    // Two different things can happen to a selected row:
+    //  1. Target college is one the sender handles (or nobody handles it): a real MOVE inside the
+    //     sender's own sheet. Call timing is kept exactly as it was.
+    //  2. Target college belongs to another coordinator: the sender KEEPS the original untouched and
+    //     the receiver gets a COPY of the contact with no call timing and no outcome, as a fresh
+    //     entry. The receiver may fill in their own times and save it, or delete it; neither
+    //     affects the sender.
+    let movedCount = 0;
+    let skippedLocked = 0;
+    const movedIds: Types.ObjectId[] = [];
+
+    for (const row of existingRows) {
+      const senderId = String(row.coordinator_id);
+      const senderHandlesTarget = targetOwners.length === 0 || targetOwners.some((u) => String(u._id) === senderId);
+
+      if (senderHandlesTarget) {
+        await DailyTracker.updateOne({ _id: row._id }, { $set: { college_id: targetObjectId, updated_at: new Date() } });
+        movedIds.push(row._id as Types.ObjectId);
+        movedCount++;
+        continue;
+      }
+
+      // Another coordinator handles the target college: MOVE hands the contact over completely.
+      // They receive it as a fresh entry (no timing, no status) and it leaves the sender's sheet, so
+      // the sender's calls / minutes / outcome counts drop by one. Linked Daily Leads and Weekly
+      // Tracker entries are deliberately left alone - they record a result the sender achieved.
+      // If the receiver already has the same company+number today, nothing happens (sender keeps it).
+      if ((row as any).is_finalized) {
+        skippedLocked++;
+        continue;
+      }
+      const owner = targetOwners[0];
+      if (await shareCopyWith(row, owner)) {
+        await DailyTracker.deleteOne({ _id: row._id });
+        sharedToNames.add(owner.full_name);
+        sharedCount++;
+      } else {
+        skippedDuplicates++;
+      }
+    }
+
+    // Cascade the college change to linked Daily Leads / Weekly Tracker rows - only for rows that
+    // really moved. A shared copy leaves the sender's original (and everything linked to it) alone.
+    if (movedIds.length > 0) {
+      await DailyLead.updateMany(
+        { daily_tracker_id: { $in: movedIds } },
+        { $set: { college_id: targetObjectId, updated_at: new Date() } }
+      );
+      await WeeklyTracker.updateMany(
+        { daily_tracker_id: { $in: movedIds } },
+        { $set: { college_id: targetObjectId, updated_at: new Date() } }
+      );
+    }
+
+    const parts: string[] = [];
+    if (movedCount > 0) parts.push(`moved ${movedCount} call(s) to ${targetCollege.college_name}`);
+    if (sharedCount > 0) {
+      parts.push(`moved ${sharedCount} contact(s) to ${Array.from(sharedToNames).join(', ')}'s sheet (removed from yours)`);
+    }
+    if (skippedDuplicates > 0) parts.push(`${skippedDuplicates} already on their sheet, so kept on yours`);
+    if (skippedLocked > 0) parts.push(`${skippedLocked} locked (finalized) row(s) skipped`);
 
     return res.status(200).json({
       success: true,
-      message: `Successfully moved ${updateRes.modifiedCount} company call(s) to ${targetCollege.college_name}`,
+      message: parts.length ? `Successfully ${parts.join('; ')}` : 'Nothing to move',
       data: {
         action: 'move',
-        processed_count: updateRes.modifiedCount,
+        processed_count: movedCount + sharedCount,
+        moved_count: movedCount,
+        shared_count: sharedCount,
+        handed_over_count: sharedCount,
+        skipped_duplicate_count: skippedDuplicates,
+        shared_to: Array.from(sharedToNames),
         target_college: {
           _id: targetCollege._id,
           college_name: targetCollege.college_name,
@@ -3520,10 +3691,16 @@ app.all('/api/v1/daily-tracker/sync-coordinators', async (req: Request, res: Res
       const targetCollegeIds = targetCollegeDocs.map((c) => c._id);
 
       if (targetCollegeIds.length > 0) {
-        mohanaDoc.assigned_college_ids = targetCollegeIds;
-        mohanaDoc.weekly_focus_locked = true;
-        mohanaDoc.weekly_focus_week_key = currentWeekMonday;
-        await mohanaDoc.save();
+        // Defaults are only a STARTING point: applied when the user has no colleges at all.
+        // This used to overwrite assigned_college_ids on every boot / dashboard load / tracker
+        // page load, so any focus change a user saved in Active College Focus was silently
+        // reverted to the hardcoded list the next time any of those ran (24 Sep 2026).
+        if (!mohanaDoc.assigned_college_ids || mohanaDoc.assigned_college_ids.length === 0) {
+          mohanaDoc.assigned_college_ids = targetCollegeIds;
+          mohanaDoc.weekly_focus_locked = true;
+          mohanaDoc.weekly_focus_week_key = currentWeekMonday;
+          await mohanaDoc.save();
+        }
 
         const acetDoc = targetCollegeDocs.find((c) => c.college_code === 'ACET');
         if (acetDoc) {
@@ -6242,6 +6419,7 @@ app.post('/api/v1/daily-leads', async (req: Request, res: Response) => {
       event_time: timeStr,
       lead_date: targetDate,
       remarks: remarks?.trim() || '',
+      email_id: typeof req.body.email_id === 'string' ? req.body.email_id.trim() : '',
     });
 
     const populated = await DailyLead.findById(newLead._id)
@@ -6312,6 +6490,19 @@ app.patch('/api/v1/daily-leads/:id', async (req: Request, res: Response) => {
 
     if (refuseForeignOwner(req, res, String(lead.coordinator_id), 'You can only edit your own leads.')) return;
 
+    if (patchData.email_id !== undefined) {
+      const rawEmail = String(patchData.email_id || '').trim();
+      if (rawEmail) {
+        const v = validateAndNormalizeMultiEmail(rawEmail);
+        if (!v.valid) {
+          return res.status(400).json({ success: false, error: { code: 'INVALID_EMAIL', message: v.error || 'Invalid email address' } });
+        }
+        patchData.email_id = v.normalized;
+      } else {
+        patchData.email_id = '';
+      }
+    }
+
     const allowedFields = [
       'company_name',
       'job_role',
@@ -6320,6 +6511,7 @@ app.patch('/api/v1/daily-leads/:id', async (req: Request, res: Response) => {
       'event_time',
       'remarks',
       'lead_type',
+      'email_id',
     ];
 
     allowedFields.forEach((f) => {
@@ -6477,6 +6669,7 @@ app.post('/api/v1/daily-leads/:id/move-to-jd', async (req: Request, res: Respons
           event_time: '', // Initially empty as requested
           lead_date: effectiveTargetDate,
           remarks: lead.remarks || 'JD Received from earlier Positive',
+          email_id: lead.email_id || '',
           is_jd_received: true,
           is_deleted: false,
         });
@@ -6734,6 +6927,7 @@ app.post('/api/v1/daily-leads/sync-positives', async (req: Request, res: Respons
     const nextDate = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
 
     let syncedCount = 0;
+    let emailFilledCount = 0;
 
     // Pull from DailyTracker calls for this date — Invite Mail is the sole
     // trigger for the Positives tab; JD Received fills when outcome is jd_received.
@@ -6805,22 +6999,38 @@ app.post('/api/v1/daily-leads/sync-positives', async (req: Request, res: Respons
           event_time: callTime,
           lead_date: targetDate,
           remarks: call.comments || `From Daily Tracker: ${(call.outcome_status || '').replace(/_/g, ' ')}`,
+          // the HR email the coordinator already has in the Daily Tracker - so they need not type it again
+          email_id: (call.email_id || '').trim(),
           is_deleted: false,
         });
         syncedCount++;
-      } else if (callTime && (!existing.event_time || existing.event_time === '10:00 AM')) {
-        existing.event_time = callTime;
-        await existing.save();
+      } else {
+        let dirty = false;
+        if (callTime && (!existing.event_time || existing.event_time === '10:00 AM')) {
+          existing.event_time = callTime;
+          dirty = true;
+        }
+        // fill an EMPTY email from the tracker; never overwrite one the coordinator typed
+        const trackerEmail = (call.email_id || '').trim();
+        if (trackerEmail && !(existing as any).email_id && !/email:/i.test(existing.remarks || '')) {
+          (existing as any).email_id = trackerEmail;
+          emailFilledCount++;
+          dirty = true;
+        }
+        if (dirty) await existing.save();
       }
     }
 
     return res.status(200).json({
       success: true,
       message: syncedCount > 0
-        ? `Successfully synced ${syncedCount} positive lead(s) from Daily Tracker for ${date || 'today'}`
+        ? `Successfully synced ${syncedCount} positive lead(s) from Daily Tracker for ${date || 'today'}${emailFilledCount ? ` (${emailFilledCount} email(s) filled in)` : ''}`
+        : emailFilledCount > 0
+        ? `${emailFilledCount} email(s) filled in from Daily Tracker for ${date || 'today'}`
         : `All positive leads from Daily Tracker for ${date || 'today'} are already up to date`,
       data: {
         synced_count: syncedCount,
+        email_filled_count: emailFilledCount,
         date: targetDate,
       },
     });
@@ -6893,6 +7103,7 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req: Request, res: Response) =
             event_time: timeToUse,
             lead_date: targetDate,
             remarks: 'JD Received from Positives',
+            email_id: sourceLead?.email_id || '',
             is_jd_received: true,
             is_deleted: false,
           });
@@ -6977,6 +7188,7 @@ app.post('/api/v1/daily-leads/copy-to-jd', async (req: Request, res: Response) =
           event_time: '',
           lead_date: targetDate,
           remarks: lead.remarks || 'JD Received from Positives',
+          email_id: lead.email_id || '',
           is_jd_received: true,
           is_deleted: false,
         });
@@ -7353,9 +7565,11 @@ const SERVER_COLLEGE_LOGO_MAP: Record<string, string> = {
   LICET: '/college-logos/layola.png',
   LAYOLA: '/college-logos/layola.png',
   LOYOLA: '/college-logos/layola.png',
-  MAR: '/college-logos/mar ephream.png',
-  'MAR EPHRAEM': '/college-logos/mar ephream.png',
-  'MAR EPHREAM': '/college-logos/mar ephream.png',
+  MAREPHRAM: '/college-logos/marephraem.png',
+  MAREPHRA: '/college-logos/marephraem.png',
+  MAR: '/college-logos/marephraem.png',
+  'MAR EPHRAEM': '/college-logos/marephraem.png',
+  'MAR EPHREAM': '/college-logos/marephraem.png',
   MCET: '/college-logos/MCET.png',
   MAHALINGAM: '/college-logos/MCET.png',
   MEC: '/college-logos/MEC.png',
@@ -9721,6 +9935,7 @@ app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => 
     const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
     const hourlyCalls: number[] = new Array(24).fill(0);
     const hourlyPositives: number[] = new Array(24).fill(0);
+    const hourlyJd: number[] = new Array(24).fill(0);
 
     for (const row of completedTrackerRows) {
       let dur = 0;
@@ -9752,6 +9967,10 @@ app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => 
         hourlyCalls[hour]++;
         if (isPositive) {
           hourlyPositives[hour]++;
+        }
+        // JD Received is tracked on its own so the rhythm bar can show it in a different colour
+        if (row.outcome_status === 'jd_received') {
+          hourlyJd[hour]++;
         }
       }
     }
@@ -9849,6 +10068,7 @@ app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => 
           // zeros, never a placeholder shape.
           hourly_calls: hourlyCalls,
           hourly_positives: hourlyPositives,
+          hourly_jd: hourlyJd,
         },
         kpi_summary: {
           // Company funnel — the coordinator's headline numbers.
@@ -9936,6 +10156,7 @@ app.get('/api/v1/dashboard/coordinator/clock-duration', async (req: Request, res
     };
     const hourlyCalls = new Array(24).fill(0);
     const hourlyPositives = new Array(24).fill(0);
+    const hourlyJd = new Array(24).fill(0);
     const collegeMap = new Map<string, { college_id: string; college_name: string; college_code: string; duration_seconds: number; calls_count: number; positive_count: number }>();
 
     for (const row of completedTrackerRows) {
@@ -9968,6 +10189,10 @@ app.get('/api/v1/dashboard/coordinator/clock-duration', async (req: Request, res
         hourlyCalls[hour]++;
         if (isPositive) {
           hourlyPositives[hour]++;
+        }
+        // JD Received is tracked on its own so the rhythm bar can show it in a different colour
+        if (row.outcome_status === 'jd_received') {
+          hourlyJd[hour]++;
         }
       }
 
@@ -10010,6 +10235,7 @@ app.get('/api/v1/dashboard/coordinator/clock-duration', async (req: Request, res
         outcomes: dayOutcomes,
         hourly_calls: hourlyCalls,
         hourly_positives: hourlyPositives,
+          hourly_jd: hourlyJd,
         college_breakdown: Array.from(collegeMap.values()),
       },
     });
@@ -10607,6 +10833,8 @@ app.get('/api/v1/dashboard/monthly-calls', async (req: Request, res: Response) =
             }).select('duration_seconds session_date created_at day month year call_start_time call_end_time outcome_status').lean();
 
             const dailyCalls: number[] = new Array(daysInMonth).fill(0);
+            // JD Received per day - shown on its own (it sits in the Other Progress bucket otherwise)
+            const dailyJd: number[] = new Array(daysInMonth).fill(0);
             // Per-day outcome counts, same buckets as the outcome mix. Only the four
             // the dashboard shows; Other Progress / no outcome stay inside calls.
             const shownBuckets = ['positive', 'not_hiring', 'negative', 'follow_up'] as const;
@@ -10656,6 +10884,7 @@ app.get('/api/v1/dashboard/monthly-calls', async (req: Request, res: Response) =
 
               if (d && d >= 1 && d <= daysInMonth) {
                 dailyCalls[d - 1]++;
+                if ((row as any).outcome_status === 'jd_received') dailyJd[d - 1]++;
                 const bucket = OUTCOME_BUCKET[String((row as any).outcome_status || '')];
                 if (bucket && bucket in dailyOutcomes) {
                   dailyOutcomes[bucket as keyof typeof dailyOutcomes][d - 1]++;
@@ -10681,6 +10910,7 @@ app.get('/api/v1/dashboard/monthly-calls', async (req: Request, res: Response) =
               daily: dailyCalls,
               daily_duration: dailyDurationMins,
               daily_outcomes: dailyOutcomes,
+              daily_jd: dailyJd,
               total: dailyCalls.reduce((a, b) => a + b, 0),
               total_duration_minutes: dailyDurationMins.reduce((a, b) => a + b, 0),
             };
@@ -10718,6 +10948,33 @@ app.get('/api/v1/dashboard/monthly-calls', async (req: Request, res: Response) =
 });
 
 // ── Real-Time Presence Heartbeat ──
+// Presence, judged from the last heartbeat. The client pings every 10s, so "online" means
+// the tab was heard from in the last 45s (~4 missed beats of slack) - it used to be 3
+// *minutes* with a floor() on whole minutes, so a coordinator who closed the tab, lost power
+// or network stayed listed as "active right now" for up to ~4 minutes. Beyond 45s but within
+// 3 min they show as "away" (e.g. a backgrounded tab the browser is throttling), then offline.
+const PRESENCE_ONLINE_MS = 45_000;
+const PRESENCE_AWAY_MS = 3 * 60_000;
+function presenceFromLastActive(lastActiveMs: number, nowMs: number): { status: 'online' | 'away' | 'offline'; label: string } {
+  const age = nowMs - lastActiveMs;
+  if (age <= PRESENCE_ONLINE_MS) return { status: 'online', label: 'Online' };
+  if (age <= PRESENCE_AWAY_MS) return { status: 'away', label: 'Away' };
+  return { status: 'offline', label: 'Offline' };
+}
+
+// Sent by the browser on tab close / navigation away (pagehide, keepalive) so a coordinator
+// who simply closes the tab drops off the live list immediately instead of after a timeout.
+// The next heartbeat (e.g. after a mere refresh) flips them straight back online.
+app.post('/api/v1/users/offline', async (req: Request, res: Response) => {
+  try {
+    const uid = (req as any).user?.userId;
+    if (uid) {
+      await User.findByIdAndUpdate(uid, { $set: { is_online: false, logged_out_at: new Date() } });
+    }
+  } catch {}
+  return res.status(200).json({ success: true });
+});
+
 app.post('/api/v1/users/heartbeat', async (req: Request, res: Response) => {
   try {
     const authHeader = req.headers.authorization;
@@ -10853,7 +11110,13 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
         status: 'active',
       });
       const targetIds = sujithaColleges.map((c) => c._id);
-      sujithaUser.assigned_college_ids = targetIds;
+      // Defaults are only a STARTING point: applied when the user has no colleges at all.
+      // This used to overwrite assigned_college_ids on every boot / dashboard load / tracker
+      // page load, so any focus change a user saved in Active College Focus was silently
+      // reverted to the hardcoded list the next time any of those ran (24 Sep 2026).
+      if (!sujithaUser.assigned_college_ids || sujithaUser.assigned_college_ids.length === 0) {
+        sujithaUser.assigned_college_ids = targetIds;
+      }
       const mcetCol = await College.findOne({
         $or: [{ college_code: 'MCET' }, { college_name: /mahalingam/i }]
       });
@@ -10892,7 +11155,9 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
         status: 'active',
       });
       const targetTamilIds = tamilColleges.map((c) => c._id);
-      tamilUser.assigned_college_ids = targetTamilIds;
+      if (!tamilUser.assigned_college_ids || tamilUser.assigned_college_ids.length === 0) {
+        tamilUser.assigned_college_ids = targetTamilIds; // starting default only — see Sujitha note above
+      }
       if (!tamilUser.account_status) tamilUser.account_status = 'active';
       await tamilUser.save();
     }
@@ -10916,7 +11181,9 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
         status: 'active',
       });
       const targetMegalaIds = megalaColleges.map((c) => c._id);
-      megalaUser.assigned_college_ids = targetMegalaIds;
+      if (!megalaUser.assigned_college_ids || megalaUser.assigned_college_ids.length === 0) {
+        megalaUser.assigned_college_ids = targetMegalaIds; // starting default only — see Sujitha note above
+      }
       if (!megalaUser.account_status) megalaUser.account_status = 'active';
       await megalaUser.save();
     }
@@ -11103,17 +11370,9 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
           onlineStatus = 'offline';
           onlineStatusLabel = 'Offline';
         } else if (c.last_active_at) {
-          const diffMinutes = Math.floor((nowMs - new Date(c.last_active_at).getTime()) / (1000 * 60));
-          if (diffMinutes <= 3) {
-            onlineStatus = 'online';
-            onlineStatusLabel = 'Online';
-          } else if (diffMinutes <= 15) {
-            onlineStatus = 'away';
-            onlineStatusLabel = 'Away';
-          } else {
-            onlineStatus = 'offline';
-            onlineStatusLabel = 'Offline';
-          }
+          const p = presenceFromLastActive(new Date(c.last_active_at).getTime(), nowMs);
+          onlineStatus = p.status;
+          onlineStatusLabel = p.label;
         }
 
         // Active college is ONLY populated when the coordinator is currently actively ONLINE
@@ -11232,6 +11491,8 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
     let leaderTodayCalls = 0;
     let leaderTodayPositives = 0;
     const leaderHourlyCalls: number[] = new Array(24).fill(0);
+    const leaderHourlyPositives: number[] = new Array(24).fill(0);
+    const leaderHourlyJd: number[] = new Array(24).fill(0);
     const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
     const POSITIVE_OUTCOMES = ['invite_mail', 'positive', 'callback_requested', 'jd_received'];
 
@@ -11263,7 +11524,10 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
         const stamp = getTrackerCompletionTimestamp(row);
         const t = stamp.getTime();
         if (!isNaN(t)) {
-          leaderHourlyCalls[new Date(t + IST_OFFSET_MS).getUTCHours()]++;
+          const leaderHour = new Date(t + IST_OFFSET_MS).getUTCHours();
+          leaderHourlyCalls[leaderHour]++;
+          if (row.outcome_status === PIPELINE_SYNC_OUTCOME) leaderHourlyPositives[leaderHour]++;
+          if (row.outcome_status === 'jd_received') leaderHourlyJd[leaderHour]++;
         }
       }
     }
@@ -11297,6 +11561,8 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
           avg_call_duration_formatted: leaderAvgInfo.formatted,
           positive_calls_count: leaderTodayPositives,
           hourly_calls: leaderHourlyCalls,
+          hourly_positives: leaderHourlyPositives,
+          hourly_jd: leaderHourlyJd,
         },
         online_summary: {
           total_coordinators: coordinators.length,
@@ -11601,17 +11867,9 @@ app.get('/api/v1/dashboard/admin', async (req: Request, res: Response) => {
         onlineStatus = 'offline';
         onlineStatusLabel = 'Offline';
       } else if (u.last_active_at) {
-        const diffMinutes = Math.floor((nowMs - new Date(u.last_active_at).getTime()) / (1000 * 60));
-        if (diffMinutes <= 3) {
-          onlineStatus = 'online';
-          onlineStatusLabel = 'Online';
-        } else if (diffMinutes <= 15) {
-          onlineStatus = 'away';
-          onlineStatusLabel = 'Away';
-        } else {
-          onlineStatus = 'offline';
-          onlineStatusLabel = 'Offline';
-        }
+        const p = presenceFromLastActive(new Date(u.last_active_at).getTime(), nowMs);
+        onlineStatus = p.status;
+        onlineStatusLabel = p.label;
       }
 
       // Active college is ONLY populated when the coordinator is currently actively ONLINE
@@ -14747,10 +15005,17 @@ const ensureDefaultAccounts = async () => {
         const isTL = coordUser.role_codes?.includes('TEAM_LEADER') || coordUser.official_email === 'sujitha_s@infoziant.com';
         const maxLimit = isTL ? 5 : 4;
         const mappedIds = codes.map((c) => codeMap.get(c.toUpperCase())).filter(Boolean).slice(0, maxLimit);
-        coordUser.assigned_college_ids = mappedIds;
-        coordUser.weekly_focus_locked = true;
-        coordUser.weekly_focus_week_key = currentWeekMonday;
-        if (!coordUser.weekly_focus_locked_at) coordUser.weekly_focus_locked_at = new Date();
+        // Defaults are only a STARTING point: applied when the user has no colleges at all.
+        // This used to overwrite assigned_college_ids on every boot / dashboard load / tracker
+        // page load, so any focus change a user saved in Active College Focus was silently
+        // reverted to the hardcoded list the next time any of those ran (24 Sep 2026).
+        const seedDefaults = !coordUser.assigned_college_ids || coordUser.assigned_college_ids.length === 0;
+        if (seedDefaults) {
+          coordUser.assigned_college_ids = mappedIds;
+          coordUser.weekly_focus_locked = true;
+          coordUser.weekly_focus_week_key = currentWeekMonday;
+          if (!coordUser.weekly_focus_locked_at) coordUser.weekly_focus_locked_at = new Date();
+        }
 
         // If Sujitha has MCET, correct it to NEHRU immediately in MongoDB!
         if (isTL && (coordUser.active_college_code === 'MCET' || (coordUser.active_college_name && /mahalingam|mcet/i.test(coordUser.active_college_name)))) {
@@ -14762,10 +15027,12 @@ const ensureDefaultAccounts = async () => {
           coordUser.active_college_location = primaryCol?.location || '';
         }
         await coordUser.save();
-        await College.updateMany(
-          { _id: { $in: mappedIds } },
-          { $addToSet: { assigned_coordinator_ids: coordUser._id } }
-        );
+        if (seedDefaults) {
+          await College.updateMany(
+            { _id: { $in: mappedIds } },
+            { $addToSet: { assigned_coordinator_ids: coordUser._id } }
+          );
+        }
       }
     }
 
@@ -14788,11 +15055,18 @@ const ensureDefaultAccounts = async () => {
       const targetCollegeIds = targetCollegeDocs.map((c) => c._id);
 
       if (targetCollegeIds.length > 0) {
-        mohanaDoc.assigned_college_ids = targetCollegeIds;
-        mohanaDoc.weekly_focus_locked = true;
-        mohanaDoc.weekly_focus_week_key = currentWeekMonday;
-        await mohanaDoc.save();
+        if (!mohanaDoc.assigned_college_ids || mohanaDoc.assigned_college_ids.length === 0) {
+          mohanaDoc.assigned_college_ids = targetCollegeIds; // starting default only — see note in sync-coordinators
+          mohanaDoc.weekly_focus_locked = true;
+          mohanaDoc.weekly_focus_week_key = currentWeekMonday;
+          await mohanaDoc.save();
+        }
 
+        // Business-data rewrite — opt-in only (REATTRIBUTE_TRACKER_ON_BOOT=true). Boot runs on
+        // every crash-restart, deploy and file save, and these two updates silently overrode
+        // whoever really owned a call (the ACET one moved EVERY row, whoever entered it).
+        // See CLAUDE.md traps 10/29: startup must never mutate business data.
+        if (process.env.REATTRIBUTE_TRACKER_ON_BOOT === 'true') {
         const acetDoc = targetCollegeDocs.find((c) => c.college_code === 'ACET');
         if (acetDoc) {
           await DailyTracker.updateMany(
@@ -14817,6 +15091,7 @@ const ensureDefaultAccounts = async () => {
           },
           { $set: { coordinator_id: mohanaDoc._id } }
         );
+        }
       }
     }
 
