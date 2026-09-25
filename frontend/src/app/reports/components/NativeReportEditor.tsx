@@ -33,6 +33,7 @@ import {
 import { A4PdfPreviewModal, type PreviewMode } from './A4PdfPreviewModal';
 import { COLLEGE_LOGO_MAP, getCollegeLogoUrl } from '@/lib/collegeLogo';
 import { exportReportAsImage } from '../lib/reportCanvasRenderer';
+import { sectionTitle, columnHeading, withSectionTitle, withColumnHeading } from '../lib/reportOverrides';
 
 
 export function getCleanPeriod(period?: string): string {
@@ -200,6 +201,40 @@ function EditableReportCell({
   );
 }
 
+/**
+ * An inline-editable title / column heading for the report PREVIEW. Presentation only: it renames what this
+ * generated report shows and exports. Enter or clicking away saves; clearing it restores the default.
+ */
+function EditableLabel({ value, onCommit, className = '' }: { value: string; onCommit: (v: string) => void; className?: string }) {
+  return (
+    <span
+      contentEditable
+      suppressContentEditableWarning
+      spellCheck={false}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          (e.currentTarget as HTMLElement).blur();
+        }
+      }}
+      onPaste={(e) => {
+        e.preventDefault();
+        const t = e.clipboardData.getData('text/plain').replace(/\s+/g, ' ');
+        document.execCommand('insertText', false, t);
+      }}
+      onBlur={(e) => {
+        const t = e.currentTarget.innerText.replace(/\s+/g, ' ').trim();
+        if (!t) e.currentTarget.innerText = value; // an emptied label goes back to its default
+        onCommit(t);
+      }}
+      className={`outline-none cursor-text rounded-sm px-0.5 hover:bg-primary/10 focus:bg-primary/10 focus:ring-1 focus:ring-primary/40 print:hover:bg-transparent print:focus:bg-transparent print:focus:ring-0 ${className}`}
+      title="Click to rename - changes this report only"
+    >
+      {value}
+    </span>
+  );
+}
+
 interface NativeReportEditorProps {
   reportData: any;
   onBackToBuilder?: () => void;
@@ -291,6 +326,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       </div>
     );
   }
+
+  // Renaming a section title / column heading in the preview (presentation only - see lib/reportOverrides)
+  const handleSectionTitle = (key: string, value: string) => setReport((prev: any) => withSectionTitle(prev, key, value));
+  const handleColumnHeading = (key: string, index: number, value: string) =>
+    setReport((prev: any) => withColumnHeading(prev, key, index, value));
 
   // Cell editing helper for presentation tables
   const handleUpdateCell = (sectionKey: string, rowIndex: number, field: string, value: any) => {
@@ -1720,7 +1760,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <div className="space-y-1.5">
                 <div className="mb-2">
                   <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                    <Trophy size={14} className="text-[#007791] shrink-0" /> COMPANIES COMPLETED
+                    <Trophy size={14} className="text-[#007791] shrink-0" /> <EditableLabel value={sectionTitle(report, 'completed_companies', 'COMPANIES COMPLETED')} onCommit={(v) => handleSectionTitle('completed_companies', v)} />
                   </h3>
                   <div className="h-[2px] w-full bg-[#007791] mt-1" />
                 </div>
@@ -1739,12 +1779,12 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                       </colgroup>
                       <thead>
                         <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                          <th className="py-2 px-1 text-center font-bold">S.No</th>
-                          <th className="py-2 px-3 text-center font-bold">Company Name</th>
-                          <th className="py-2 px-3 text-center font-bold">Role</th>
-                          <th className="py-2 px-2 text-center font-bold">CTC</th>
-                          <th className="py-2 px-3 text-center font-bold">Status</th>
-                          <th className="py-2 px-2 text-center font-bold">Offers Received</th>
+                          <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'completed_companies', 0, 'S.No')} onCommit={(v) => handleColumnHeading('completed_companies', 0, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'completed_companies', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('completed_companies', 1, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'completed_companies', 2, 'Role')} onCommit={(v) => handleColumnHeading('completed_companies', 2, v)} /></th>
+                          <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'completed_companies', 3, 'CTC')} onCommit={(v) => handleColumnHeading('completed_companies', 3, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'completed_companies', 4, 'Status')} onCommit={(v) => handleColumnHeading('completed_companies', 4, v)} /></th>
+                          <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'completed_companies', 5, 'Offers Received')} onCommit={(v) => handleColumnHeading('completed_companies', 5, v)} /></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
@@ -1800,7 +1840,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <div className="space-y-1.5">
                 <div className="mb-2">
                   <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                    <Zap size={14} className="text-[#007791] shrink-0" /> DRIVE IN PROGRESS
+                    <Zap size={14} className="text-[#007791] shrink-0" /> <EditableLabel value={sectionTitle(report, 'drive_in_progress', 'DRIVE IN PROGRESS')} onCommit={(v) => handleSectionTitle('drive_in_progress', v)} />
                   </h3>
                   <div className="h-[2px] w-full bg-[#007791] mt-1" />
                 </div>
@@ -1818,11 +1858,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                       </colgroup>
                       <thead>
                         <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                          <th className="py-2 px-1 text-center font-bold">S.No</th>
-                          <th className="py-2 px-3 text-center font-bold">Company Name</th>
-                          <th className="py-2 px-3 text-center font-bold">Role</th>
-                          <th className="py-2 px-2 text-center font-bold">CTC</th>
-                          <th className="py-2 px-3 text-center font-bold">Status / Drive Progress</th>
+                          <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'drive_in_progress', 0, 'S.No')} onCommit={(v) => handleColumnHeading('drive_in_progress', 0, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'drive_in_progress', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('drive_in_progress', 1, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'drive_in_progress', 2, 'Role')} onCommit={(v) => handleColumnHeading('drive_in_progress', 2, v)} /></th>
+                          <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'drive_in_progress', 3, 'CTC')} onCommit={(v) => handleColumnHeading('drive_in_progress', 3, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'drive_in_progress', 4, 'Status / Drive Progress')} onCommit={(v) => handleColumnHeading('drive_in_progress', 4, v)} /></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
@@ -1871,7 +1911,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <div className="space-y-1.5">
                 <div className="mb-2">
                   <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                    <Flame size={14} className="text-[#007791] shrink-0" /> UPCOMING DRIVES
+                    <Flame size={14} className="text-[#007791] shrink-0" /> <EditableLabel value={sectionTitle(report, 'upcoming_drives', 'UPCOMING DRIVES')} onCommit={(v) => handleSectionTitle('upcoming_drives', v)} />
                   </h3>
                   <div className="h-[2px] w-full bg-[#007791] mt-1" />
                 </div>
@@ -1889,11 +1929,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                       </colgroup>
                       <thead>
                         <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                          <th className="py-2 px-1 text-center font-bold">S.No</th>
-                          <th className="py-2 px-3 text-center font-bold">Company Name</th>
-                          <th className="py-2 px-3 text-center font-bold">Role</th>
-                          <th className="py-2 px-2 text-center font-bold">CTC</th>
-                          <th className="py-2 px-3 text-center font-bold">Status / Drive Date</th>
+                          <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'upcoming_drives', 0, 'S.No')} onCommit={(v) => handleColumnHeading('upcoming_drives', 0, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'upcoming_drives', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('upcoming_drives', 1, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'upcoming_drives', 2, 'Role')} onCommit={(v) => handleColumnHeading('upcoming_drives', 2, v)} /></th>
+                          <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'upcoming_drives', 3, 'CTC')} onCommit={(v) => handleColumnHeading('upcoming_drives', 3, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'upcoming_drives', 4, 'Status / Drive Date')} onCommit={(v) => handleColumnHeading('upcoming_drives', 4, v)} /></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
@@ -1945,7 +1985,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <div className="space-y-1.5">
                 <div className="mb-2">
                   <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                    <Rocket size={14} className="text-[#007791] shrink-0" /> COMPANIES IN PROGRESS
+                    <Rocket size={14} className="text-[#007791] shrink-0" /> <EditableLabel value={sectionTitle(report, 'in_progress', 'COMPANIES IN PROGRESS')} onCommit={(v) => handleSectionTitle('in_progress', v)} />
                   </h3>
                   <div className="h-[2px] w-full bg-[#007791] mt-1" />
                 </div>
@@ -1963,11 +2003,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                       </colgroup>
                       <thead>
                         <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                          <th className="py-2 px-1 text-center font-bold">S.No</th>
-                          <th className="py-2 px-3 text-center font-bold">Company Name</th>
-                          <th className="py-2 px-3 text-center font-bold">Role</th>
-                          <th className="py-2 px-2 text-center font-bold">CTC</th>
-                          <th className="py-2 px-3 text-center font-bold">Status</th>
+                          <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'in_progress', 0, 'S.No')} onCommit={(v) => handleColumnHeading('in_progress', 0, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'in_progress', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('in_progress', 1, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'in_progress', 2, 'Role')} onCommit={(v) => handleColumnHeading('in_progress', 2, v)} /></th>
+                          <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'in_progress', 3, 'CTC')} onCommit={(v) => handleColumnHeading('in_progress', 3, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'in_progress', 4, 'Status')} onCommit={(v) => handleColumnHeading('in_progress', 4, v)} /></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
@@ -2016,7 +2056,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <div className="space-y-1.5">
                 <div className="mb-2">
                   <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                    <Inbox size={14} className="text-[#007791] shrink-0" /> COMPANIES IN PIPELINE
+                    <Inbox size={14} className="text-[#007791] shrink-0" /> <EditableLabel value={sectionTitle(report, 'pipeline', 'COMPANIES IN PIPELINE')} onCommit={(v) => handleSectionTitle('pipeline', v)} />
                   </h3>
                   <div className="h-[2px] w-full bg-[#007791] mt-1" />
                 </div>
@@ -2034,11 +2074,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                       </colgroup>
                       <thead>
                         <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                          <th className="py-2 px-1 text-center font-bold">S.No</th>
-                          <th className="py-2 px-3 text-center font-bold">Company Name</th>
-                          <th className="py-2 px-3 text-center font-bold">Role</th>
-                          <th className="py-2 px-2 text-center font-bold">CTC</th>
-                          <th className="py-2 px-3 text-center font-bold">Status</th>
+                          <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'pipeline', 0, 'S.No')} onCommit={(v) => handleColumnHeading('pipeline', 0, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'pipeline', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('pipeline', 1, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'pipeline', 2, 'Role')} onCommit={(v) => handleColumnHeading('pipeline', 2, v)} /></th>
+                          <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'pipeline', 3, 'CTC')} onCommit={(v) => handleColumnHeading('pipeline', 3, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'pipeline', 4, 'Status')} onCommit={(v) => handleColumnHeading('pipeline', 4, v)} /></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
@@ -2087,7 +2127,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <div className="space-y-1.5">
                 <div className="mb-2">
                   <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                    <Star size={14} className="text-[#007791] shrink-0" /> TOP COMPANIES
+                    <Star size={14} className="text-[#007791] shrink-0" /> <EditableLabel value={sectionTitle(report, 'top_companies', 'TOP COMPANIES')} onCommit={(v) => handleSectionTitle('top_companies', v)} />
                   </h3>
                   <div className="h-[2px] w-full bg-[#007791] mt-1" />
                 </div>
@@ -2105,11 +2145,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                       </colgroup>
                       <thead>
                         <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                          <th className="py-2 px-1 text-center font-bold">S.No</th>
-                          <th className="py-2 px-3 text-center font-bold">Company Name</th>
-                          <th className="py-2 px-3 text-center font-bold">Role</th>
-                          <th className="py-2 px-2 text-center font-bold">CTC</th>
-                          <th className="py-2 px-3 text-center font-bold">Status</th>
+                          <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'top_companies', 0, 'S.No')} onCommit={(v) => handleColumnHeading('top_companies', 0, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'top_companies', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('top_companies', 1, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'top_companies', 2, 'Role')} onCommit={(v) => handleColumnHeading('top_companies', 2, v)} /></th>
+                          <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'top_companies', 3, 'CTC')} onCommit={(v) => handleColumnHeading('top_companies', 3, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'top_companies', 4, 'Status')} onCommit={(v) => handleColumnHeading('top_companies', 4, v)} /></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
@@ -2158,7 +2198,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <div className="space-y-1.5">
                 <div className="mb-2">
                   <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                    <XCircle size={14} className="text-[#007791] shrink-0" /> REJECTED COMPANIES
+                    <XCircle size={14} className="text-[#007791] shrink-0" /> <EditableLabel value={sectionTitle(report, 'rejected_companies', 'REJECTED COMPANIES')} onCommit={(v) => handleSectionTitle('rejected_companies', v)} />
                   </h3>
                   <div className="h-[2px] w-full bg-[#007791] mt-1" />
                 </div>
@@ -2176,11 +2216,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                       </colgroup>
                       <thead>
                         <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                          <th className="py-2 px-1 text-center font-bold">S.No</th>
-                          <th className="py-2 px-3 text-center font-bold">Company Name</th>
-                          <th className="py-2 px-3 text-center font-bold">Role</th>
-                          <th className="py-2 px-2 text-center font-bold">CTC</th>
-                          <th className="py-2 px-3 text-center font-bold">Status / Reason</th>
+                          <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'rejected_companies', 0, 'S.No')} onCommit={(v) => handleColumnHeading('rejected_companies', 0, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'rejected_companies', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('rejected_companies', 1, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'rejected_companies', 2, 'Role')} onCommit={(v) => handleColumnHeading('rejected_companies', 2, v)} /></th>
+                          <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'rejected_companies', 3, 'CTC')} onCommit={(v) => handleColumnHeading('rejected_companies', 3, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'rejected_companies', 4, 'Status / Reason')} onCommit={(v) => handleColumnHeading('rejected_companies', 4, v)} /></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
@@ -2232,7 +2272,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <div className="space-y-1.5">
                 <div className="mb-2">
                   <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                    <Clock size={14} className="text-[#007791] shrink-0" /> COMPANIES ON HOLD BY COLLEGE
+                    <Clock size={14} className="text-[#007791] shrink-0" /> <EditableLabel value={sectionTitle(report, 'on_hold_by_college', 'COMPANIES ON HOLD BY COLLEGE')} onCommit={(v) => handleSectionTitle('on_hold_by_college', v)} />
                   </h3>
                   <div className="h-[2px] w-full bg-[#007791] mt-1" />
                 </div>
@@ -2250,11 +2290,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                       </colgroup>
                       <thead>
                         <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                          <th className="py-2 px-1 text-center font-bold">S.No</th>
-                          <th className="py-2 px-3 text-center font-bold">Company Name</th>
-                          <th className="py-2 px-3 text-center font-bold">Role</th>
-                          <th className="py-2 px-2 text-center font-bold">CTC</th>
-                          <th className="py-2 px-3 text-center font-bold">Status / Reason</th>
+                          <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_college', 0, 'S.No')} onCommit={(v) => handleColumnHeading('on_hold_by_college', 0, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_college', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('on_hold_by_college', 1, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_college', 2, 'Role')} onCommit={(v) => handleColumnHeading('on_hold_by_college', 2, v)} /></th>
+                          <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_college', 3, 'CTC')} onCommit={(v) => handleColumnHeading('on_hold_by_college', 3, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_college', 4, 'Status / Reason')} onCommit={(v) => handleColumnHeading('on_hold_by_college', 4, v)} /></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
@@ -2306,7 +2346,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
               <div className="space-y-1.5">
                 <div className="mb-2">
                   <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                    <Clock size={14} className="text-[#007791] shrink-0" /> COMPANIES ON HOLD BY HR
+                    <Clock size={14} className="text-[#007791] shrink-0" /> <EditableLabel value={sectionTitle(report, 'on_hold_by_hr', 'COMPANIES ON HOLD BY HR')} onCommit={(v) => handleSectionTitle('on_hold_by_hr', v)} />
                   </h3>
                   <div className="h-[2px] w-full bg-[#007791] mt-1" />
                 </div>
@@ -2324,11 +2364,11 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                       </colgroup>
                       <thead>
                         <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                          <th className="py-2 px-1 text-center font-bold">S.No</th>
-                          <th className="py-2 px-3 text-center font-bold">Company Name</th>
-                          <th className="py-2 px-3 text-center font-bold">Role</th>
-                          <th className="py-2 px-2 text-center font-bold">CTC</th>
-                          <th className="py-2 px-3 text-center font-bold">Status / Reason</th>
+                          <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_hr', 0, 'S.No')} onCommit={(v) => handleColumnHeading('on_hold_by_hr', 0, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_hr', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('on_hold_by_hr', 1, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_hr', 2, 'Role')} onCommit={(v) => handleColumnHeading('on_hold_by_hr', 2, v)} /></th>
+                          <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_hr', 3, 'CTC')} onCommit={(v) => handleColumnHeading('on_hold_by_hr', 3, v)} /></th>
+                          <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_hr', 4, 'Status / Reason')} onCommit={(v) => handleColumnHeading('on_hold_by_hr', 4, v)} /></th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">

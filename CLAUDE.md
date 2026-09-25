@@ -1935,6 +1935,33 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     A4/PDF/image exports were checked by code change only (same one-line title edits), not opened; the
     college selector on Malvika's read-only sheet still reads "- Select College -" (cosmetic).
 
+75. **Weekly report: section titles and column headings are editable in the preview, 25 Sep 2026
+    (user-requested; everyone incl. Malvika Kumar and the Administrator).** In the generated **single-college
+    Weekly Placement report** every section title ("DRIVE IN PROGRESS" ...) and every table column heading
+    ("Company Name", "Role", ...) can be clicked and retyped - Enter or clicking away saves, clearing it
+    restores the default. **Presentation only:** the rename lives on the generated report object
+    (`report.section_titles`, `report.column_headings`) exactly like the already-editable report title
+    (`report_title`) - it never reaches the Weekly Tracker data, the Report Builder, its section checklist, or
+    any saved setting, and a regenerated report starts from the defaults again. New shared helper
+    `reports/lib/reportOverrides.ts` (`sectionTitle`, `columnHeading`, `applyColumnHeadings`,
+    `withSectionTitle`, `withColumnHeading`); a column is addressed by its position in that section's table, so
+    renaming "Company Name" in one table leaves the other eight untouched. **What reads it:** the on-screen
+    preview (`NativeReportEditor.tsx`, editable `EditableLabel`: 9 titles + 46 headings), the A4 preview
+    (`A4PdfPreviewModal.tsx`) and the image / PDF canvas renderer (`reportCanvasRenderer.ts`), so what is
+    edited is what gets saved as image or PDF. Typed text is kept exactly as typed (no forced capitals);
+    the look is unchanged until something is edited (hover tint + a tooltip only, hidden in print).
+    **Deliberately not covered:** the **multi-college Weekly** report (its headings embed each college's name),
+    **Month-End** and the other report types, the **Excel export** (its own HTML builder in
+    `NativeReportEditor.tsx` still prints the defaults), and the small italic "No ... recorded" empty-state
+    lines. The default text differs a little between surfaces (e.g. the A4 preview says "Offers", the image
+    says "Offers Received", the image uses "#" where the screen says "S.No"); a rename replaces all of them
+    with the one word typed. **Verified in a real browser** as a coordinator, Malvika Kumar and the
+    Administrator: 9 editable titles and 25 headings on an AIHT report; renaming a title and one column
+    updated the screen, the A4 preview and the words drawn on the export canvas (182 strings drawn, both
+    present), left the other tables' headings alone, an emptied title restored its default, and no request
+    touched the Weekly/Daily Tracker; `tsc --noEmit` clean. **Not verified:** an actual PNG / PDF file opened
+    after a rename (only the strings drawn on the canvas were checked), and printing on paper.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

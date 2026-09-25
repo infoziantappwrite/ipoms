@@ -38,6 +38,7 @@ import {
   getReportExportBaseFileName,
   type ImageExportSize,
 } from '../lib/reportCanvasRenderer';
+import { sectionTitle, columnHeading } from '../lib/reportOverrides';
 
 function getCleanPeriod(period?: string): string {
   if (!period) return '';
@@ -1291,8 +1292,7 @@ export function A4PdfPreviewModal({
                     <div className="space-y-1.5">
                       <div className="mb-2">
                         <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                          <Trophy size={14} className="text-[#007791] shrink-0" /> COMPANIES
-                          COMPLETED
+                          <Trophy size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'completed_companies', 'COMPANIES COMPLETED')}
                         </h3>
                         <div className="h-[2px] w-full bg-[#007791] mt-1" />
                       </div>
@@ -1312,12 +1312,12 @@ export function A4PdfPreviewModal({
                           </colgroup>
                           <thead className="print:table-header-group">
                             <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                              <th className="py-2 px-1 text-center font-bold">S.No</th>
-                              <th className="py-2 px-2 text-center font-bold">Company Name</th>
-                              <th className="py-2 px-2 text-center font-bold">Role</th>
-                              <th className="py-2 px-2 text-center font-bold">CTC</th>
-                              <th className="py-2 px-2 text-center font-bold">Status</th>
-                              <th className="py-2 px-1 text-center font-bold">Offers</th>
+                              <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'completed_companies', 0, 'S.No')}</th>
+                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'completed_companies', 1, 'Company Name')}</th>
+                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'completed_companies', 2, 'Role')}</th>
+                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'completed_companies', 3, 'CTC')}</th>
+                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'completed_companies', 4, 'Status')}</th>
+                              <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'completed_companies', 5, 'Offers')}</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-200/80">
@@ -1359,8 +1359,7 @@ export function A4PdfPreviewModal({
                     <div className="space-y-1.5">
                       <div className="mb-2">
                         <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                          <Flame size={14} className="text-[#007791] shrink-0" /> DRIVE IN
-                          PROGRESS
+                          <Flame size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'drive_in_progress', 'DRIVE IN PROGRESS')}
                         </h3>
                         <div className="h-[2px] w-full bg-[#007791] mt-1" />
                       </div>
@@ -1374,11 +1373,11 @@ export function A4PdfPreviewModal({
                         </colgroup>
                         <thead className="print:table-header-group">
                           <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                            <th className="py-2 px-1 text-center font-bold">S.No</th>
-                            <th className="py-2 px-2 text-center font-bold">Company Name</th>
-                            <th className="py-2 px-2 text-center font-bold">Role</th>
-                            <th className="py-2 px-2 text-center font-bold">CTC</th>
-                            <th className="py-2 px-2 text-center font-bold">Status / Follow-up</th>
+                            <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'drive_in_progress', 0, 'S.No')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'drive_in_progress', 1, 'Company Name')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'drive_in_progress', 2, 'Role')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'drive_in_progress', 3, 'CTC')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'drive_in_progress', 4, 'Status / Follow-up')}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200/80">
@@ -1417,8 +1416,7 @@ export function A4PdfPreviewModal({
                     <div className="space-y-1.5">
                       <div className="mb-2">
                         <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                          <Rocket size={14} className="text-[#007791] shrink-0" /> UPCOMING
-                          DRIVES
+                          <Rocket size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'upcoming_drives', 'UPCOMING DRIVES')}
                         </h3>
                         <div className="h-[2px] w-full bg-[#007791] mt-1" />
                       </div>
@@ -1432,11 +1430,11 @@ export function A4PdfPreviewModal({
                         </colgroup>
                         <thead className="print:table-header-group">
                           <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                            <th className="py-2 px-1 text-center font-bold">S.No</th>
-                            <th className="py-2 px-2 text-center font-bold">Company Name</th>
-                            <th className="py-2 px-2 text-center font-bold">Role</th>
-                            <th className="py-2 px-2 text-center font-bold">CTC</th>
-                            <th className="py-2 px-2 text-center font-bold">Status / Drive Date</th>
+                            <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'upcoming_drives', 0, 'S.No')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'upcoming_drives', 1, 'Company Name')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'upcoming_drives', 2, 'Role')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'upcoming_drives', 3, 'CTC')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'upcoming_drives', 4, 'Status / Drive Date')}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200/80">
@@ -1474,8 +1472,7 @@ export function A4PdfPreviewModal({
                   <div className="space-y-1.5">
                     <div className="mb-2">
                       <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                        <TrendingUp size={14} className="text-[#007791] shrink-0" /> COMPANIES IN
-                        PROGRESS
+                        <TrendingUp size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'in_progress', 'COMPANIES IN PROGRESS')}
                       </h3>
                       <div className="h-[2px] w-full bg-[#007791] mt-1" />
                     </div>
@@ -1494,11 +1491,11 @@ export function A4PdfPreviewModal({
                         </colgroup>
                         <thead className="print:table-header-group">
                           <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                            <th className="py-2 px-1 text-center font-bold">S.No</th>
-                            <th className="py-2 px-2 text-center font-bold">Company Name</th>
-                            <th className="py-2 px-2 text-center font-bold">Role</th>
-                            <th className="py-2 px-2 text-center font-bold">CTC</th>
-                            <th className="py-2 px-2 text-center font-bold">Status</th>
+                            <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'in_progress', 0, 'S.No')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'in_progress', 1, 'Company Name')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'in_progress', 2, 'Role')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'in_progress', 3, 'CTC')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'in_progress', 4, 'Status')}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200/80">
@@ -1535,8 +1532,7 @@ export function A4PdfPreviewModal({
                   <div className="space-y-1.5">
                     <div className="mb-2">
                       <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                        <Inbox size={14} className="text-[#007791] shrink-0" /> COMPANIES IN
-                        PIPELINE
+                        <Inbox size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'pipeline', 'COMPANIES IN PIPELINE')}
                       </h3>
                       <div className="h-[2px] w-full bg-[#007791] mt-1" />
                     </div>
@@ -1555,11 +1551,11 @@ export function A4PdfPreviewModal({
                         </colgroup>
                         <thead className="print:table-header-group">
                           <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                            <th className="py-2 px-1 text-center font-bold">S.No</th>
-                            <th className="py-2 px-2 text-center font-bold">Company Name</th>
-                            <th className="py-2 px-2 text-center font-bold">Role</th>
-                            <th className="py-2 px-2 text-center font-bold">CTC</th>
-                            <th className="py-2 px-2 text-center font-bold">Status</th>
+                            <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'pipeline', 0, 'S.No')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'pipeline', 1, 'Company Name')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'pipeline', 2, 'Role')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'pipeline', 3, 'CTC')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'pipeline', 4, 'Status')}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200/80">
@@ -1596,7 +1592,7 @@ export function A4PdfPreviewModal({
                   <div className="space-y-1.5">
                     <div className="mb-2">
                       <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                        <Star size={14} className="text-[#007791] shrink-0" /> TOP COMPANIES
+                        <Star size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'top_companies', 'TOP COMPANIES')}
                       </h3>
                       <div className="h-[2px] w-full bg-[#007791] mt-1" />
                     </div>
@@ -1615,11 +1611,11 @@ export function A4PdfPreviewModal({
                         </colgroup>
                         <thead className="print:table-header-group">
                           <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                            <th className="py-2 px-1 text-center font-bold">S.No</th>
-                            <th className="py-2 px-2 text-center font-bold">Company Name</th>
-                            <th className="py-2 px-2 text-center font-bold">Role</th>
-                            <th className="py-2 px-2 text-center font-bold">CTC</th>
-                            <th className="py-2 px-2 text-center font-bold">Status</th>
+                            <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'top_companies', 0, 'S.No')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'top_companies', 1, 'Company Name')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'top_companies', 2, 'Role')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'top_companies', 3, 'CTC')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'top_companies', 4, 'Status')}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200/80">
@@ -1658,8 +1654,7 @@ export function A4PdfPreviewModal({
                     <div className="space-y-1.5">
                       <div className="mb-2">
                         <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                          <XCircle size={14} className="text-[#007791] shrink-0" /> REJECTED
-                          COMPANIES
+                          <XCircle size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'rejected_companies', 'REJECTED COMPANIES')}
                         </h3>
                         <div className="h-[2px] w-full bg-[#007791] mt-1" />
                       </div>
@@ -1679,11 +1674,11 @@ export function A4PdfPreviewModal({
                           </colgroup>
                           <thead className="print:table-header-group">
                             <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                              <th className="py-2 px-1 text-center font-bold">S.No</th>
-                              <th className="py-2 px-2 text-center font-bold">Company Name</th>
-                              <th className="py-2 px-2 text-center font-bold">Role</th>
-                              <th className="py-2 px-2 text-center font-bold">CTC</th>
-                              <th className="py-2 px-2 text-center font-bold">Status / Reason</th>
+                              <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'rejected_companies', 0, 'S.No')}</th>
+                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'rejected_companies', 1, 'Company Name')}</th>
+                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'rejected_companies', 2, 'Role')}</th>
+                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'rejected_companies', 3, 'CTC')}</th>
+                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'rejected_companies', 4, 'Status / Reason')}</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-200/80">
@@ -1726,8 +1721,7 @@ export function A4PdfPreviewModal({
                     <div className="space-y-1.5">
                       <div className="mb-2">
                         <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                          <Clock size={14} className="text-[#007791] shrink-0" /> ON HOLD BY
-                          COLLEGE
+                          <Clock size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'on_hold_by_college', 'ON HOLD BY COLLEGE')}
                         </h3>
                         <div className="h-[2px] w-full bg-[#007791] mt-1" />
                       </div>
@@ -1747,11 +1741,11 @@ export function A4PdfPreviewModal({
                           </colgroup>
                           <thead className="print:table-header-group">
                             <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                              <th className="py-2 px-1 text-center font-bold">S.No</th>
-                              <th className="py-2 px-2 text-center font-bold">Company Name</th>
-                              <th className="py-2 px-2 text-center font-bold">Role</th>
-                              <th className="py-2 px-2 text-center font-bold">CTC</th>
-                              <th className="py-2 px-2 text-center font-bold">Status / Reason</th>
+                              <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'on_hold_by_college', 0, 'S.No')}</th>
+                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_college', 1, 'Company Name')}</th>
+                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_college', 2, 'Role')}</th>
+                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_college', 3, 'CTC')}</th>
+                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_college', 4, 'Status / Reason')}</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-200/80">
@@ -1791,7 +1785,7 @@ export function A4PdfPreviewModal({
                   <div className="space-y-1.5">
                     <div className="mb-2">
                       <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                        <Clock size={14} className="text-[#007791] shrink-0" /> ON HOLD BY HR
+                        <Clock size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'on_hold_by_hr', 'ON HOLD BY HR')}
                       </h3>
                       <div className="h-[2px] w-full bg-[#007791] mt-1" />
                     </div>
@@ -1810,11 +1804,11 @@ export function A4PdfPreviewModal({
                         </colgroup>
                         <thead className="print:table-header-group">
                           <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                            <th className="py-2 px-1 text-center font-bold">S.No</th>
-                            <th className="py-2 px-2 text-center font-bold">Company Name</th>
-                            <th className="py-2 px-2 text-center font-bold">Role</th>
-                            <th className="py-2 px-2 text-center font-bold">CTC</th>
-                            <th className="py-2 px-2 text-center font-bold">Status / Reason</th>
+                            <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'on_hold_by_hr', 0, 'S.No')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_hr', 1, 'Company Name')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_hr', 2, 'Role')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_hr', 3, 'CTC')}</th>
+                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_hr', 4, 'Status / Reason')}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200/80">
