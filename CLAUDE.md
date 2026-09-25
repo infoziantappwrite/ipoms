@@ -2152,6 +2152,15 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     slower; (d) Node >= 20.9 is required on Vercel; (e) the dev-mode "N" indicator appears bottom-left. Adopting =
     merge `next16-merge-check` (or `next16-upgrade`) into `ipomsbranch3`, `npm install` in `frontend/`, restart the
     frontend dev server; rollback = revert the merge and `npm install` again.
+    **ADOPTED locally the same day (user: "yes start localhost 3000"):** `next16-upgrade` merged into `ipomsbranch3`
+    (`896d12e`), `frontend/` reinstalled on **Next 16.3.6**, dev server restarted. Follow-ups: `agentRules: false`
+    added to `frontend/next.config.mjs` (no `AGENTS.md`/`CLAUDE.md` generated); the `"lint": "next lint"` script was
+    removed (the project has no ESLint config or dependency, so it never ran anyway). Re-verified on the real
+    :3000: both `tsc` clean, 34/34 API tests, 9-page sweep identical to before, Weekly report image = 4 exact A4
+    pages, copy dialog OK. **Still NOT pushed to GitHub / Vercel.** Harmless dev warning: Next infers the workspace
+    root because there are lockfiles above the repo (`C:\Projects\package-lock.json`) - silence with
+    `turbopack.root` in `next.config.mjs` if it bothers anyone. The temporary worktree/branch
+    `next16-merge-check` was removed.
 
 ## 6. Module map
 ## 6. Module map
