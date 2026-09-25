@@ -1803,25 +1803,42 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     deleted in a later cleanup. Verified in a real browser: 0 header "Move to JD" buttons, Sync/Add still
     present, 6 per-row "Move to JD Received" buttons still present, no page errors; `tsc --noEmit` clean.
 
-72. **"Have you sent all your emails?" reminder, 24 Sep 2026 (user-requested).** Popup for Placement
-    Coordinators and a normal Team Leader (Sujitha); **never** the Administrator or a full-oversight Team
-    Leader (`has_all_colleges_access`, Malvika Kumar). Asked only if the person logged **at least one Invite
-    Mail** today in any of their focus colleges. All decisions are server-side on the IST clock
-    (`backend/src/lib/emailCheckRoutes.ts`, `GET /email-check/status`, `POST /email-check/answer`, collection
-    `email_checks`, one row per person per day). **Evening:** 10-minute windows at 17:00, 17:30, 18:00, 18:30,
-    only to someone active with the app open >= 1 minute; **max 2 prompts a day**, one per window, so a late
-    login (after 17:15) is first asked at 17:30. Close (X/Esc) and "No" are identical - they leave it
-    unanswered so the next window asks again; "Yes, all sent" ends it for the day and a later "No" can never
-    undo it. **Next morning:** past tense ("...for yesterday's positives"), asked once per day and only when the
-    Daily Tracker is opened (never on the dashboard), looking back up to 3 days for a day with positives and no
-    Yes; someone who logs in and out within a minute is therefore asked next morning. Days before
-    `EMAIL_CHECK_START_DATE` (default 2026-09-24) are never asked about. Frontend: `EmailCheckPrompt.tsx`
-    mounted once in `AppShell.tsx`, polls every 30s only 16:55-18:50 IST while the tab is visible, fails
-    silently. Never blocks navigation. Policy entry `/email-check` (STAFF). **Verified:** 26 simulated-time
-    checks against real accounts with throwaway rows (all removed); real-browser run with mocked status
-    responses and a faked clock: no popup in the first minute, appears after, Esc posts nothing, No/Yes post the
-    right payloads, next-day wording only on `/tracker`. **Not verified:** a genuine 5 PM run on the real clock,
-    dark mode. `verify:policy` OK, `tsc --noEmit` clean both sides.
+72. **"Have you sent the email?" reminder, 24-25 Sep 2026 (user-requested; the 25 Sep redesign below
+    supersedes the fixed 5:00/5:30 PM windows of the first build).** Popup for Placement Coordinators and a
+    normal Team Leader (Sujitha); **never** the Administrator or a full-oversight Team Leader
+    (`has_all_colleges_access`, Malvika Kumar). **Trigger is now each call, not the clock:** every Daily
+    Tracker row whose outcome is Invite Mail starts its own **15-minute** timer, counted from
+    `call_end_time` (falling back to `call_start_time`, then `created_at`). Whatever is due at that moment
+    is asked about in **one** prompt listing the companies (user's choice - a 10-positive day must not mean
+    10 popups); a call logged later still gets its own 15-minute timer, even after an earlier "Yes".
+    **Three answers:** "Yes, sent" confirms exactly the calls shown and they are never asked about again
+    (the day is marked `status:'yes'` once nothing is left); **"Not yet" opens a time picker** and the
+    coordinator sets the moment themselves - a chosen time silences everything until then, which is the
+    whole point of the redesign; closing (X/Esc) is the old "No" - it comes back **once, 30 minutes
+    later**, and after a second close it is left alone for the day (a brand-new call still breaks through,
+    since it was never dismissed). **Next morning** is unchanged in spirit: anything still unconfirmed is
+    asked in past tense, once per day, only when the Daily Tracker is opened, looking back up to 3 days -
+    so someone who logs in and out in under a minute, or never answered, is still caught.
+    Server-side on the IST clock throughout (`backend/src/lib/emailCheckRoutes.ts`; `GET
+    /email-check/status?kind=due|next_day`, `POST /email-check/answer {check_date, answer: yes|no|snooze,
+    kind, call_ids[], remind_at:'HH:MM'}`; collection `email_checks`, one row per person per day, holding
+    `confirmed_call_ids` / `dismissed_call_ids` / `dismissals` / `snooze_until`). A past `remind_at` is
+    refused both on screen and on the server. **`EMAIL_CHECK_START_DATE` (default `2026-09-26`) is the
+    go-live guard** - days before it are never asked about; without it the first morning quizzes everyone
+    about calls made before the feature existed (this was caught by a test that found real unconfirmed
+    24 Sep calls). **Set it to the real deploy day.**
+    Frontend `EmailCheckPrompt.tsx` (mounted once in `AppShell.tsx`): 330px card centred on screen, navy
+    gradient header with the drawn plane/envelope, the due calls listed with college chip and call time
+    (3 shown, then "and n more"), and a time picker panel with 15 min / 30 min / 1 hour chips, a styled
+    time field, and a plain-language preview line. Polls every 45s while the tab is visible, 08:00-23:00
+    IST, and on tab-focus; needs the app open >= 1 minute; fails silently and never blocks navigation.
+    Policy entry `/email-check` (STAFF). **Verified:** 32 simulated-time checks against real accounts with
+    throwaway rows, all removed (15-min boundary, batching, per-call confirm, a new call after a "Yes",
+    snooze accepted/refused/honoured, the 30-minute retry and the two-dismissal cap, next-morning, and the
+    two-tab guard); real-browser run, light and dark, desktop and 390px, with mocked status responses and a
+    faked clock - popup only after a minute, correct copy for 1 vs many, picker chips and past-time refusal,
+    and the exact payloads for yes / no / snooze. **Not verified:** a genuine end-to-end run on the real
+    clock (15 real minutes after a real call). `verify:policy` OK, `tsc --noEmit` clean both sides.
 
 ## 6. Module map
 ## 6. Module map
