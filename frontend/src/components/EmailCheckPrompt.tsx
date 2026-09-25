@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { X, Check, Clock3 } from 'lucide-react';
 
 import { apiFetch } from '@/lib/api';
@@ -10,10 +10,11 @@ import { readSessionUser, roleOf } from '@/lib/session';
 /**
  * "Did you send all the emails for today's positives?"
  *
- * Asked only at a few deliberate moments, all decided by the server (IST clock): when the person clicks
- * Sign out at or after 5 PM, when they log in again later the same evening, at a time they picked
- * themselves, and the next morning on the Daily Tracker. No popups during the working day.
- * It never blocks navigation or sign-out, and fails silently.
+ * Every decision is made by the server (IST clock). TODAY's positives are asked at sign-out after 5 PM,
+ * at a later login, or at a time the person picked - closable, with "Pick time" (today, or the next
+ * working day). YESTERDAY's positives (the previous working day only) are STRICT: Yes is the only way
+ * through - no close, no Pick time - and the Daily Tracker stays locked until they answer, with a
+ * "Leave the Daily Tracker" link so nobody is ever trapped. It never blocks sign-out and fails open.
  */
 
 import { registerSignOutGate } from '@/lib/emailCheckGate';
@@ -29,9 +30,12 @@ interface InviteCall {
 interface Decision {
   show: boolean;
   kind?: Kind;
+  strict?: boolean;
   check_date?: string;
   when_label?: string;
   calls?: InviteCall[];
+  remind_at?: number;
+  next_working_day?: string;
 }
 
 const SHOWN_CALLS = 3;
@@ -39,7 +43,7 @@ const ITEM = 34; // one row of a picker wheel
 const EVENING_FROM = 17 * 60; // 5 PM IST, in minutes
 const SIGNOUT_LOOKUP_MS = 3000; // never keep someone waiting to sign out
 const LOGIN_MARK = 'ipoms_ec_login_checked';
-const TIMED_MARK = 'ipoms_ec_timed_at';
+const ARM_POLL_MS = 20_000;
 
 /** Minutes after IST midnight, whatever the browser's own timezone is. */
 function istNowMinutes(): number {
@@ -65,6 +69,29 @@ function clockLabel(v: string): string {
   const [h, m] = v.split(':').map(Number);
   if (Number.isNaN(h) || Number.isNaN(m)) return v;
   return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`;
+}
+
+/** Today's date in IST, 'YYYY-MM-DD'. */
+function istToday(): string {
+  try {
+    const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+    const g = (t: string) => p.find((x) => x.type === t)?.value || '';
+    return `${g('year')}-${g('month')}-${g('day')}`;
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+const addDaysStr = (d: string, n: number) => new Date(new Date(`${d}T00:00:00Z`).getTime() + n * 86400000).toISOString().slice(0, 10);
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** 'Tomorrow' or the weekday name, plus a short date like 'Mon 28 Sep'. */
+function dayLabels(dateStr: string): { name: string; short: string } {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  const wd = WEEKDAYS[d.getUTCDay()];
+  return {
+    name: dateStr === addDaysStr(istToday(), 1) ? 'Tomorrow' : wd,
+    short: `${wd.slice(0, 3)} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`,
+  };
 }
 
 const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
@@ -133,17 +160,21 @@ function Wheel({ items, index, onIndex, label }: { items: string[]; index: numbe
 }
 
 export function EmailCheckPrompt() {
+  const router = useRouter();
   const rawPath = usePathname() || '';
   const pathname = rawPath.length > 1 ? rawPath.replace(/\/$/, '') : rawPath;
   const [decision, setDecision] = useState<Decision | null>(null);
   const [picking, setPicking] = useState(false);
+  const [pickDay, setPickDay] = useState<'today' | 'next'>('today');
   const [done, setDone] = useState('');
   const [pickTime, setPickTime] = useState('');
-  const [quick, setQuick] = useState<number | null>(null);
+  const [quick, setQuick] = useState<string | null>(null);
   const [err, setErr] = useState('');
   const chain = useRef<Promise<void>>(Promise.resolve());
   const nextDayAsked = useRef(false);
   const decisionRef = useRef<Decision | null>(null);
+  /** When the person picked a time: the server tells us, and we ask again then. */
+  const armAt = useRef<number | null>(null);
   /** Resolves the Sign out button's wait once the person has answered (or closed) the popup. */
   const gateResolve = useRef<(() => void) | null>(null);
 
@@ -161,6 +192,7 @@ export function EmailCheckPrompt() {
     decisionRef.current = d;
     setDecision(d);
     setPicking(false);
+    setPickDay('today');
     setQuick(null);
     setErr('');
     setDone('');
@@ -189,7 +221,9 @@ export function EmailCheckPrompt() {
           if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
           if (!eligible()) return;
           const res = await apiFetch<Decision>(`/email-check/status?kind=${kind}`);
-          if (res?.success && res.data?.show) open(res.data);
+          if (!res?.success) return; // fail open: never lock anyone because of an error
+          if (res.data?.show) open(res.data);
+          else if (res.data?.remind_at) armAt.current = res.data.remind_at;
         })
         .catch(() => {
           /* silent */
@@ -222,7 +256,7 @@ export function EmailCheckPrompt() {
     let already = false;
     try { already = sessionStorage.getItem(LOGIN_MARK) === '1'; } catch { /* ignore */ }
     if (already) return;
-    // The mark is written when the timer actually fires, not up front: React mounts effects twice in
+    // The mark is written when the timer fires, not up front: React mounts effects twice in
     // development, and marking early would make the second mount think this had already been done.
     const t = window.setTimeout(() => {
       try { sessionStorage.setItem(LOGIN_MARK, '1'); } catch { /* ignore */ }
@@ -231,23 +265,38 @@ export function EmailCheckPrompt() {
     return () => window.clearTimeout(t);
   }, [check]);
 
-  // A time the person picked: ask the server again when it arrives (kept in sessionStorage so a refresh
-  // does not lose it). The server is the judge - this only asks it at the right moment.
-  const armTimed = useCallback(() => {
-    let at = 0;
-    try { at = Number(sessionStorage.getItem(TIMED_MARK) || 0); } catch { /* ignore */ }
-    if (!at) return () => {};
-    const fire = () => { try { sessionStorage.removeItem(TIMED_MARK); } catch { /* ignore */ } check('timed'); };
-    const wait = Math.max(800, at - Date.now() + 500);
-    const t = window.setTimeout(fire, wait);
-    return () => window.clearTimeout(t);
-  }, [check]);
-  useEffect(() => armTimed(), [armTimed]);
-
-  // Tomorrow morning: asked as soon as the Daily Tracker is opened (a moment for the page to settle),
-  // and only there. The server allows it once per day.
+  // A time the person picked (today or the next working day). On every page load the server says whether
+  // one is due or when it is; a light local timer then asks again at that moment - on ANY page.
   useEffect(() => {
-    if (pathname !== '/tracker' || nextDayAsked.current) return;
+    const t = window.setTimeout(() => check('timed'), 1200);
+    const id = window.setInterval(() => {
+      if (armAt.current !== null && Date.now() >= armAt.current) {
+        armAt.current = null;
+        check('timed');
+      }
+    }, ARM_POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && armAt.current !== null && Date.now() >= armAt.current) {
+        armAt.current = null;
+        check('timed');
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearTimeout(t);
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [check]);
+
+  // Yesterday's positives: asked the moment the Daily Tracker is opened, every time it is opened, until the
+  // person says Yes (the server decides; it answers nothing once they have).
+  useEffect(() => {
+    if (pathname !== '/tracker') {
+      nextDayAsked.current = false;
+      return;
+    }
+    if (nextDayAsked.current) return;
     const t = window.setTimeout(() => {
       nextDayAsked.current = true;
       check('next_day');
@@ -270,8 +319,10 @@ export function EmailCheckPrompt() {
     window.setTimeout(() => close(), 1500);
   }, [close]);
 
-  /** Closing, Esc and "Not yet" mean the same thing: not confirmed - tomorrow's Daily Tracker will ask. */
+  /** Closing and Esc: for today's positives, not confirmed - tomorrow's Daily Tracker will ask.
+   *  A strict question about a past day cannot be closed at all. */
   const dismiss = useCallback(() => {
+    if (decisionRef.current?.strict) return;
     void send({ answer: 'no' });
     close();
   }, [send, close]);
@@ -281,27 +332,34 @@ export function EmailCheckPrompt() {
     finish('Thank you - noted.');
   }, [send, finish]);
 
+  /** The strict question's only exit besides Yes: leave the Daily Tracker (it stays locked). */
+  const leaveTracker = useCallback(() => {
+    close();
+    router.push('/dashboard');
+  }, [close, router]);
+
   const setReminder = useCallback(async () => {
-    if (!pickTime) return;
+    const d = decisionRef.current;
+    if (!pickTime || !d) return;
     setErr('');
-    const res: any = await send({ answer: 'snooze', remind_at: pickTime });
+    const today = istToday();
+    const remindDate = pickDay === 'next' && d.next_working_day ? d.next_working_day : today;
+    const res: any = await send({ answer: 'snooze', remind_at: pickTime, remind_date: remindDate });
     if (res?.success) {
-      try {
-        // remember when to check again, in the browser's own clock
-        const delta = (minsOf(pickTime) - istNowMinutes()) * 60000;
-        sessionStorage.setItem(TIMED_MARK, String(Date.now() + delta));
-      } catch { /* ignore */ }
-      finish(`Reminder set for ${res?.data?.remind_at_label || clockLabel(pickTime)}`);
-      window.setTimeout(() => armTimed(), 0);
+      if (res?.data?.remind_at_ms) armAt.current = res.data.remind_at_ms;
+      const label = res?.data?.remind_at_label || clockLabel(pickTime);
+      const dn = dayLabels(remindDate).name;
+      finish(remindDate === today ? `Reminder set for ${label}` : `Reminder set for ${dn === 'Tomorrow' ? 'tomorrow' : dn} ${label}`);
     } else {
       setErr(res?.error?.message || 'Could not set that reminder.');
     }
-  }, [pickTime, send, finish, armTimed]);
+  }, [pickTime, pickDay, send, finish]);
 
   useEffect(() => {
     if (!decision) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || done) return;
+      if (decision.strict) return; // cannot be closed
       if (picking) setPicking(false);
       else dismiss();
     };
@@ -311,7 +369,7 @@ export function EmailCheckPrompt() {
 
   const nowMins = istNowMinutes();
   const chosen = minsOf(pickTime);
-  const timeIsPast = chosen >= 0 && chosen <= nowMins;
+  const timeIsPast = pickDay === 'today' && chosen >= 0 && chosen <= nowMins;
 
   // wheel positions derived from the single source of truth, pickTime
   const { hourIdx, minIdx, isPm } = useMemo(() => {
@@ -330,26 +388,43 @@ export function EmailCheckPrompt() {
     setErr('');
   }, []);
 
+  const chooseDay = useCallback((day: 'today' | 'next') => {
+    setPickDay(day);
+    setQuick(null);
+    setErr('');
+    setPickTime(day === 'next' ? '10:30' : toHHMM(istNowMinutes() + 30));
+  }, []);
+
   if (!decision) return null;
 
   const calls = decision.calls || [];
   const n = calls.length;
-  const isNext = decision.kind === 'next_day';
+  const strict = !!decision.strict;
   const isSignOut = decision.kind === 'signout';
   const when = decision.when_label || 'today';
-  const title = isNext
+  const nextDay = decision.next_working_day ? dayLabels(decision.next_working_day) : null;
+  const title = strict
     ? `Did you send all the emails for ${when === 'yesterday' ? "yesterday's" : `${when}'s`} positives?`
     : "Did you send all the emails for today's positives?";
-  const subtitle = isNext
+  const subtitle = strict
     ? `${n} Invite Mail ${n === 1 ? 'call' : 'calls'} from ${when} ${n === 1 ? 'is' : 'are'} still not confirmed.`
     : decision.kind === 'timed'
     ? `You asked to be reminded now. ${n} Invite Mail ${n === 1 ? 'call' : 'calls'} today.`
     : `${n} Invite Mail ${n === 1 ? 'call' : 'calls'} today.`;
+  const quickPicks = pickDay === 'today'
+    ? [{ k: '15', label: 'in 15 min', v: () => toHHMM(istNowMinutes() + 15) }, { k: '30', label: 'in 30 min', v: () => toHHMM(istNowMinutes() + 30) }, { k: '60', label: 'in 1 hour', v: () => toHHMM(istNowMinutes() + 60) }]
+    : [{ k: '9', label: '9:00 am', v: () => '09:00' }, { k: '1030', label: '10:30 am', v: () => '10:30' }, { k: '14', label: '2:00 pm', v: () => '14:00' }];
+  const previewText = err
+    || (timeIsPast
+      ? 'That time has already passed today.'
+      : pickDay === 'today'
+      ? `You will be reminded at ${clockLabel(pickTime)} today.`
+      : `You will be reminded at ${clockLabel(pickTime)} ${nextDay && nextDay.name !== 'Tomorrow' ? `on ${nextDay.name}` : 'tomorrow'}. Nothing else is asked today.`);
 
   return (
     <div className="ipoms-ec-backdrop" role="presentation">
       <div className="ipoms-ec-card" role="dialog" aria-modal="true" aria-labelledby="ipoms-ec-title">
-        {!done && (
+        {!done && !strict && (
           <button type="button" className="ipoms-ec-x" onClick={dismiss} aria-label="Close">
             <X size={15} strokeWidth={2.2} aria-hidden />
           </button>
@@ -394,9 +469,7 @@ export function EmailCheckPrompt() {
 
             <div className="ipoms-ec-actions">
               <button type="button" className="ipoms-ec-btn ipoms-ec-yes" onClick={confirmSent}>Yes, sent</button>
-              {isNext ? (
-                <button type="button" className="ipoms-ec-btn ipoms-ec-pick" onClick={dismiss}>Not yet</button>
-              ) : (
+              {!strict && (
                 <button
                   type="button"
                   className={`ipoms-ec-btn ipoms-ec-pick${picking ? ' is-open' : ''}`}
@@ -407,19 +480,34 @@ export function EmailCheckPrompt() {
                 </button>
               )}
             </div>
+            {strict && <p className="ipoms-ec-note">Please confirm to continue.</p>}
+            {strict && pathname === '/tracker' && (
+              <button type="button" className="ipoms-ec-leave" onClick={leaveTracker}>Leave the Daily Tracker</button>
+            )}
             {isSignOut && !picking && <p className="ipoms-ec-note">You will be signed out after this.</p>}
 
-            {picking && !isNext && (
+            {picking && !strict && (
               <div className="ipoms-ec-picker">
+                {nextDay && (
+                  <div className="ipoms-ec-days" role="group" aria-label="Remind me on">
+                    <button type="button" className={`ipoms-ec-day${pickDay === 'today' ? ' is-on' : ''}`} onClick={() => chooseDay('today')} aria-pressed={pickDay === 'today'}>
+                      <b>Today</b><span>{dayLabels(istToday()).short}</span>
+                    </button>
+                    <button type="button" className={`ipoms-ec-day${pickDay === 'next' ? ' is-on' : ''}`} onClick={() => chooseDay('next')} aria-pressed={pickDay === 'next'}>
+                      <b>{nextDay.name}</b><span>{nextDay.short}</span>
+                    </button>
+                  </div>
+                )}
+
                 <div className="ipoms-ec-quick">
-                  {[15, 30, 60].map((m) => (
+                  {quickPicks.map((q) => (
                     <button
-                      key={m}
+                      key={q.k}
                       type="button"
-                      className={`ipoms-ec-qchip${quick === m ? ' is-on' : ''}`}
-                      onClick={() => { setPickTime(toHHMM(istNowMinutes() + m)); setQuick(m); setErr(''); }}
+                      className={`ipoms-ec-qchip${quick === q.k ? ' is-on' : ''}`}
+                      onClick={() => { setPickTime(q.v()); setQuick(q.k); setErr(''); }}
                     >
-                      {m === 60 ? 'in 1 hour' : `in ${m} min`}
+                      {q.label}
                     </button>
                   ))}
                 </div>
@@ -436,9 +524,7 @@ export function EmailCheckPrompt() {
                   </div>
                 </div>
 
-                <p className={`ipoms-ec-preview${timeIsPast || err ? ' is-bad' : ''}`} aria-live="polite">
-                  {err || (timeIsPast ? 'That time has already passed today.' : `You will be reminded at ${clockLabel(pickTime)} today.`)}
-                </p>
+                <p className={`ipoms-ec-preview${timeIsPast || err ? ' is-bad' : ''}`} aria-live="polite">{previewText}</p>
                 <button type="button" className="ipoms-ec-btn ipoms-ec-set" onClick={setReminder} disabled={timeIsPast}>
                   Set reminder
                 </button>
@@ -491,9 +577,19 @@ export function EmailCheckPrompt() {
         .ipoms-ec-set { width: 100%; margin-top: 8px; border: 0; background: #1E3A8A; color: #fff; box-shadow: 0 6px 14px rgba(30,58,138,.24); }
 
         .ipoms-ec-picker { margin-top: 10px; padding-top: 10px; border-top: 1px solid #eef1f6; animation: ipoms-ec-reveal .26s cubic-bezier(.2,.9,.3,1) both; }
+        .ipoms-ec-days { display: flex; gap: 8px; margin-bottom: 9px; }
+        .ipoms-ec-day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 7px 6px; border-radius: 12px;
+          border: 1.5px solid #e2e8f0; background: #fff; color: #334155; font-family: inherit; cursor: pointer;
+          transition: transform .14s cubic-bezier(.16,1,.3,1), border-color .14s ease, background .14s ease, box-shadow .14s ease; }
+        .ipoms-ec-day b { font-size: 13px; font-weight: 700; }
+        .ipoms-ec-day span { font-size: 11px; color: #64748b; font-variant-numeric: tabular-nums; }
+        .ipoms-ec-day:hover { transform: translateY(-1px); border-color: #1E3A8A; }
+        .ipoms-ec-day.is-on { border-color: #1E3A8A; background: #eef2ff; box-shadow: 0 4px 12px rgba(30,58,138,.16); }
+        .ipoms-ec-day.is-on b { color: #1E3A8A; }
+        .ipoms-ec-day:focus-visible { outline: 2px solid #5580F5; outline-offset: 2px; }
         .ipoms-ec-quick { display: flex; gap: 7px; }
         .ipoms-ec-qchip { flex: 1; height: 32px; border-radius: 999px; border: 1px solid #e2e8f0; background: #fff; color: #334155;
-          font-family: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all .14s ease; }
+          font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .14s ease; }
         .ipoms-ec-qchip:hover { border-color: #1E3A8A; color: #1E3A8A; }
         .ipoms-ec-qchip.is-on { background: #1E3A8A; border-color: #1E3A8A; color: #fff; box-shadow: 0 5px 12px rgba(30,58,138,.26); }
 
@@ -508,18 +604,21 @@ export function EmailCheckPrompt() {
         .ipoms-ec-wheel::-webkit-scrollbar { display: none; }
         .ipoms-ec-pad { height: ${ITEM}px; }
         .ipoms-ec-item { height: ${ITEM}px; line-height: ${ITEM}px; scroll-snap-align: center; cursor: pointer; user-select: none;
-          font-size: 17px; font-weight: 600; color: #94a3b8; font-variant-numeric: tabular-nums;
+          font-size: 14px; font-weight: 600; color: #94a3b8; font-variant-numeric: tabular-nums;
           transition: color .18s ease, transform .18s cubic-bezier(.16,1,.3,1), opacity .18s ease; opacity: .75; }
-        .ipoms-ec-item.is-on { color: #1E3A8A; font-weight: 800; transform: scale(1.12); opacity: 1; }
-        .ipoms-ec-colon { position: relative; z-index: 1; font-size: 17px; font-weight: 800; color: #1E3A8A; padding-bottom: 2px; }
+        .ipoms-ec-item.is-on { color: #1E3A8A; font-weight: 700; font-size: 15px; opacity: 1; }
+        .ipoms-ec-colon { position: relative; z-index: 1; font-size: 15px; font-weight: 700; color: #1E3A8A; padding-bottom: 2px; }
         .ipoms-ec-mer { position: relative; z-index: 1; display: flex; flex-direction: column; margin-left: 10px; padding: 3px;
           border-radius: 12px; background: #eaeff7; }
         .ipoms-ec-merthumb { position: absolute; left: 3px; right: 3px; top: 3px; height: calc(50% - 3px); border-radius: 9px;
           background: #1E3A8A; box-shadow: 0 3px 8px rgba(30,58,138,.3); transition: transform .24s cubic-bezier(.16,1,.3,1); }
         .ipoms-ec-mer button { position: relative; z-index: 1; width: 46px; height: 30px; border: 0; background: transparent;
-          font-family: inherit; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; color: #64748b; cursor: pointer; transition: color .2s ease; }
+          font-family: inherit; font-size: 12px; font-weight: 700; letter-spacing: .03em; color: #64748b; cursor: pointer; transition: color .2s ease; }
         .ipoms-ec-mer button.is-on { color: #fff; }
 
+        .ipoms-ec-leave { display: block; margin: 6px auto 0; padding: 4px 8px; border: 0; background: transparent; color: #1E3A8A;
+          font-family: inherit; font-size: 12px; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+        .ipoms-ec-leave:focus-visible { outline: 2px solid #5580F5; outline-offset: 2px; border-radius: 6px; }
         .ipoms-ec-note { margin: 8px 0 0; font-size: 10.5px; color: #64748b; text-align: center; }
         .ipoms-ec-preview { margin: 8px 0 0; font-size: 11.5px; line-height: 1.4; color: #1E3A8A; font-weight: 600; text-align: center; }
         .ipoms-ec-preview.is-bad { color: #b91c1c; }
@@ -549,6 +648,11 @@ export function EmailCheckPrompt() {
         .dark .ipoms-ec-mer button { color: #a9b3c7; }
         .dark .ipoms-ec-mer button.is-on { color: #0b1120; }
         .dark .ipoms-ec-note { color: #a9b3c7; }
+        .dark .ipoms-ec-leave { color: #9fb6ff; }
+        .dark .ipoms-ec-day { background: #1b2436; border-color: #56627a; color: #d5dbe8; }
+        .dark .ipoms-ec-day span { color: #a9b3c7; }
+        .dark .ipoms-ec-day.is-on { background: #22305a; border-color: #5580F5; }
+        .dark .ipoms-ec-day.is-on b { color: #cfdcff; }
         .dark .ipoms-ec-preview { color: #9fb6ff; }
         .dark .ipoms-ec-preview.is-bad { color: #fca5a5; }
 

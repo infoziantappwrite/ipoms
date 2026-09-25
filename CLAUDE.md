@@ -1804,53 +1804,58 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     present, 6 per-row "Move to JD Received" buttons still present, no page errors; `tsc --noEmit` clean.
 
 72. **"Did you send all the emails for today's positives?" question, 24-25 Sep 2026 (user-requested;
-    redesigned three times - THIS is the final version, agreed line by line with the user on 25 Sep).**
+    redesigned four times - THIS is the final version, agreed with the user line by line on 25 Sep).**
     Earlier builds used fixed 5:00/5:30 PM windows, then a 15-minute timer per Invite Mail call with a
-    30-minute retry; the user judged both too much ("we're confusing a lot... avoid multiple popups") and
-    removed them. **There are now NO popups during the working day.** Who: Placement Coordinators and a
-    normal Team Leader (Sujitha); **never** the Administrator or a full-oversight Team Leader
-    (`has_all_colleges_access`, Malvika Kumar). What it is about: Invite Mail calls (the "positive"
-    outcome) logged **today** in the person's focus colleges. **Monday-Friday only**, decided on the
-    server's IST clock (`backend/src/lib/emailCheckRoutes.ts`).
-    **The four moments** (`GET /email-check/status?kind=`): (1) **`signout`** - they click Sign out **at or
-    after 5:00 PM** (before 5 PM: nothing is asked, and the client does not even call the server);
-    (2) **`login`** - the first time the app opens in a browser session, after 5 PM (covers "signed out at
-    5:10, back at 6:45" and "signed out before 5, back at 9 PM"); (3) **`timed`** - the time the person
-    picked themselves has arrived; (4) **`next_day`** - the moment they open the **Daily Tracker** on a
-    later working day, for any of the last **3 working days** (weekends/holidays do not use up the
-    lookback) that was never confirmed; once per day, past tense ("...for yesterday's / Friday's positives").
-    **Rules:** at most **two evening questions per day** whatever their source, then nothing more even on a
-    9:30 PM login; **Yes** = the day is finished (`status:'yes'`), never asked again today or tomorrow, and
-    a later "no" cannot undo it (user decision: calls stop at 6 PM so nothing is waited for; known narrow
-    edge - a call logged 5-6 PM *after* a Yes is not re-asked); **close / Esc / "Not yet"** = unconfirmed,
-    so tomorrow's Daily Tracker asks; **Pick time** = "ask me again at this time today" and is the second
-    evening question (shown if they are still in the app then, else at their next login after it); a chosen
-    time in the past is refused on screen and on the server. Sign-out is **never blocked**: whatever the
-    answer - or if the server is slow (3 s cap) or errors - it carries on. Two tabs asking at once are
-    de-duplicated by an atomic claim on `email_checks` (unique per person per day).
+    30-minute retry; the user removed both ("we're confusing a lot... avoid multiple popups"). **There are
+    NO popups during the working day.** Who: Placement Coordinators and a normal Team Leader (Sujitha);
+    **never** the Administrator or a full-oversight Team Leader (`has_all_colleges_access`, Malvika Kumar).
+    About: Invite Mail calls (the "positive" outcome) in the person's focus colleges. **Monday-Friday only**,
+    on the server's IST clock (`backend/src/lib/emailCheckRoutes.ts`; `GET /email-check/status?kind=`,
+    `POST /email-check/answer`; collection `email_checks`, one row per person per day).
+    **TODAY's positives - closable, with Pick time:** (1) `signout` - they click Sign out **at or after
+    5:00 PM** (before 5 PM nothing is asked and the client does not even call the server); (2) `login` - the
+    first time the app opens in a browser session, after 5 PM; (3) `timed` - the time they picked for today
+    arrives. **At most two of these per day.** **Yes** = the day is finished (`status:'yes'`), a later "no"
+    cannot undo it (calls stop at 6 PM; known narrow edge: a call logged 5-6 PM *after* a Yes is not
+    re-asked). **Close / Esc** = unconfirmed, so tomorrow's question follows. **Pick time** now chooses a
+    **date and a time**: **Today**, or the **next working day** (Monday if today is Friday) - nothing else is
+    offered (server refuses any other date with `BAD_DATE`). Picking the next working day means **nothing at
+    all is asked for the rest of today** (no sign-out, no login question).
+    **YESTERDAY's positives - the PREVIOUS WORKING DAY only - are STRICT (user decision):** the question has
+    **Yes only**: no Pick time, no X, Esc and clicking outside do nothing, and the **Daily Tracker stays
+    locked until they answer**. It appears (4) `next_day` - **the moment the Daily Tracker is opened, every
+    time it is opened, until Yes** (no once-a-day limit) - and (5) `timed` - at the date+time they picked,
+    **on ANY page/module** (the server hands back `remind_at`; a light client timer asks again then).
+    Safeguards the user approved: a **"Leave the Daily Tracker"** link (goes to the Dashboard; the tracker
+    stays locked) so nobody is trapped, and **fail-open** - if the server errors or is slow, the popup is
+    skipped and nobody is locked out. **Older days are never asked about**, so a day's positives are settled
+    today or on the next working day and never dragged on: someone who does not open the Daily Tracker on
+    that next working day simply drops that day (Tuesday asks about Monday, never Friday). A picked time
+    for a past day is impossible. Sign-out is **never blocked** (3 s cap, any error -> straight through).
     **Wiring:** `UserSignOutButton.tsx` (the one shared sign-out button, ~17 pages) awaits
-    `runSignOutGate()` from `lib/emailCheckGate.ts`; `EmailCheckPrompt.tsx` (mounted once in
-    `AppShell.tsx`) registers the gate. Checks are queued, not dropped (a login check and a picked-time
-    check can start together). `sessionStorage` marks (`ipoms_ec_login_checked`, `ipoms_ec_timed_at`) are
-    written **when the timer fires**, not up front - React dev mounts effects twice and an early mark made
-    the login check silently never run (found in testing). UI: 400px centred card (capped to the window
-    height and scrolling inside itself on very short windows), envelope icon (deliberately not a Gmail/
-    Outlook mark - trademarks), the day's companies listed with college chip and call time, **Yes, sent** /
-    **Pick time** side by side, the picker opens **inline** (3 quick chips + two snap-scrolling wheels + AM/PM
-    pill), "You will be signed out after this." on the sign-out version, no Pick time on the morning version.
+    `runSignOutGate()` (`lib/emailCheckGate.ts`); `EmailCheckPrompt.tsx` (mounted once in `AppShell.tsx`)
+    registers the gate. Checks are queued, not dropped. The `sessionStorage` login mark is written when its
+    timer fires, not up front (React dev mounts effects twice; an early mark made the login check silently
+    never run). UI: 400px centred card (capped to the window height), envelope icon (deliberately not a
+    Gmail/Outlook mark - trademarks), the day's companies with college chip and call time, **Yes, sent** /
+    **Pick time** side by side, inline picker: **Today / next-working-day cards** (with dates), 3 quick
+    chips, two snap-scrolling wheels + AM/PM pill, all in medium type (14-15px wheel rows, 12-13px chips).
     **`EMAIL_CHECK_START_DATE` (default `2026-09-26`) is the go-live guard** - earlier days are never asked
     about; **set it to the real deploy day**. Policy entry `/email-check` (STAFF); `verify:policy` OK.
-    **Verified:** 37 simulated-time checks against real accounts with throwaway rows (all removed) covering
-    every rule above, incl. weekend, 4:59 PM vs 5:00 PM, the two-a-day cap, Yes surviving a later "no",
-    Wednesday-yes/Thursday-no working-day lookback, and the go-live guard; a real-browser run with a faked
-    clock and mocked server for all eight flows (quiet all day; sign-out at 4:45 goes straight through with
-    zero server calls; sign-out at 5:10 asks first, then Yes / Esc / Pick time each still sign out with the
-    right payload; evening login asks once and a refresh does not ask again; picked time fires at its
-    moment and not 30 s before; the morning question appears ~1 s after opening `/tracker`); and the live
-    routes over HTTP (bad answer 400, past time 400, no token 401, nothing written). **Not verified:** a
-    genuine 5 PM sign-out on the real clock, dark mode of this final version (the picker was checked in
-    dark earlier), and the actual sign-out from every one of the ~17 pages (one shared component, but only
-    exercised on the dashboard).
+    **Verified:** 41 simulated-time checks against real accounts with throwaway rows (all removed) - 5:00 PM
+    boundary, two-a-day cap, Yes surviving a later "no", strict question repeating on every tracker open,
+    only-the-previous-working-day (Friday asked on Monday, dropped on Tuesday, weekend skipped), pick-for-
+    tomorrow silencing the rest of today and firing strictly at that time on any page, a time picked for a
+    past day refused, go-live guard, weekend silence; a real-browser run with a faked clock and mocked server
+    (Pick time -> Monday card -> 10:30 payload then sign-out; strict question with no X / Esc and outside-
+    click doing nothing; Leave link records nothing and the question returns on re-entry; picked time firing
+    on Weekly Tracker not before it; a 500 from the server leaves the tracker usable; Esc on today's
+    sign-out still signs out); live routes over HTTP (bad date 400, past-day snooze 400, no token 401,
+    nothing written). **Not verified:** a genuine 5 PM sign-out or a real 10:30 AM reminder on the real
+    clock, dark mode of this final version, sign-out from all ~17 pages (one shared component, exercised on
+    the dashboard only), and the Daily Tracker lock on a phone-width screen. **Known limit:** "Yes" is a
+    self-declaration - the app cannot see whether an email was really sent; a per-person view for Team
+    Leaders/Administrator was suggested and not built.
 
 ## 6. Module map
 ## 6. Module map
