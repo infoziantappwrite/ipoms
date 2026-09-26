@@ -12,6 +12,7 @@ import { isFocusLockedToday } from '@/lib/collegeSession';
 import { useToast } from '@/components/ui/Toast';
 import { usePresenceHeartbeat } from '@/lib/usePresenceHeartbeat';
 import { EmailCheckPrompt } from './EmailCheckPrompt';
+import { IncomingCopyToast } from './IncomingCopyToast';
 
 import { readSessionUser, roleOf } from '@/lib/session';
 
@@ -114,6 +115,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main id="main" className="flex flex-1 flex-col">{children}</main>
       </div>
       <EmailCheckPrompt />
+      <IncomingCopyToast />
     </div>
   );
 }

@@ -1979,6 +1979,212 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     **Not verified:** Daily JD Received with data (that day returned no rows; code mirrors Positives), the
     Administrator account, actual PNG/PDF files.
 
+77. **Report image export: sharper (4x) and split into A4 pages, 25 Sep 2026 (user-requested).** The image
+    download was one very tall PNG at 2.5x (~2150 px wide) that WhatsApp then re-compressed. Now
+    `reportCanvasRenderer.ts` renders at **4x** (3440 px wide; scale is lowered only if one canvas would
+    exceed ~16,000 px tall) and, when a report runs past one A4 sheet, **splits it into A4-proportioned pages
+    (860x1216 -> 3440x4864)**: rows are never cut in half, every continued page repeats the section title
+    "(continued)" and the table header (Company Name / Role / CTC ...), each page has the footer with
+    "Page n of N", "Prepared by" on the last. Small reports (<=750 px of content, and single-company cards)
+    stay ONE content-fitted image; between that and one sheet it is one A4 page; the "Compact" and "Square"
+    size buttons keep their old single-image behaviour, "A4" always paginates. New
+    `generateReportCanvases()` (array; `generateReportCanvas()` kept, returns page 1); the page flow uses one
+    shared `fits()/nextPageY()` in a measuring pass and the drawing pass so they cannot disagree; row divider
+    lines are now drawn per row (the old separate pass could not follow a page break). The previewer
+    (`A4PdfPreviewModal.tsx`) shows every page ("Image 1 of N") and **Save Image downloads one file per page**
+    (`name_page-1-of-3.png`, 350 ms apart; the browser may ask once to allow multiple downloads).
+    **Verified in a real browser:** DSU Weekly -> 4 pages, all exactly 3440x4864 (ratio 1.414), page 2 starts with
+    "COMPANIES IN PIPELINE (continued)" + the header row, last page ends with observations + footer; Month-End ->
+    2 pages; Daily Positives -> 1 image 3440x1432; no page errors; `tsc` clean. **Not verified:** actual
+    downloaded files / WhatsApp, Active Leads with hundreds of rows (that run timed out on a selector, untested),
+    the **PDF**, which is unchanged and still the browser print path. WhatsApp still compresses a photo: send
+    as **Document** for full sharpness.
+
+78. **Weekly Tracker: Move / Copy companies to another college; Sync is icon-only, 25 Sep 2026
+    (user-requested; everyone incl. Malvika Kumar, Sujitha and all coordinators).** The amber **Sync** button
+    is now just its icon (the tooltip still explains it). A new indigo **arrows icon next to the dustbin** starts
+    "send to another college": (1) a small dialog asks **which section** the companies are in (only sections
+    that have rows, with counts); (2) the page enters tick mode for that section - the header shows
+    **Move (n) / Copy (n) / Cancel**; ticking in a different section restarts the selection there (item 49);
+    (3) Move or Copy opens a dialog listing every other college (own focus colleges first, badged "Your focus" /
+    "Other login", searchable); (4) after picking one, an explicit **"Are you sure you want to move/copy N
+    companies from X to Y?"** step, with an extra amber note when Y is not one of the user's focus colleges;
+    (5) "Yes, move/copy & switch" sends it and then **opens the receiving college**.
+    **What the receiver gets (user decision, both Move and Copy):** ONLY Company name, Role, CTC, Contact and
+    Email, **in the same section and the sender's order**; status, dates, notes and counts start empty (the new
+    row is tagged with the current season/batch and the receiving college's handling coordinator, Placement
+    Coordinator preferred over Team Leader, all-colleges oversight accounts ignored, else the sender). **Copy**:
+    the sender's row is untouched. **Move**: the sender's row is soft-deleted (recoverable from the recycle bin)
+    - linked Daily Leads / Daily Tracker rows are deliberately NOT cascaded; moving out of Top Companies only
+    un-pins, like deleting from that section. A company the target already has (same name, any section) is
+    **skipped** and, on a move, stays with the sender; the toast lists what was skipped. Owners of the receiving
+    college (and, on a move, the sending one) get ONE foreign-college email via the existing
+    `notifyForeignCollegeOwners()`. Backend `POST /api/v1/weekly-tracker/transfer`
+    (`lib/weeklyTransferRoutes.ts`, covered by the existing `/weekly-tracker` STAFF policy). **Not built:** undo /
+    redo for a transfer (use the recycle bin for a move; delete the copy for a copy). **Also fixed:** the page
+    could show one college's rows under another college's name because a slow response for the college just
+    left overwrote the new one - `loadWeeklyTracker` now ignores a response for a college that is no longer
+    selected. **Verified:** live API with throwaway AIHT rows (all removed) - same-college refused, Copy keeps
+    the sender and gives ACET blank status/dates, order kept, a repeat is skipped, Move soft-deletes the sender;
+    real browser as Mohanaradha - Sync has no text, picker lists sections, tick mode shows Move/Copy, the
+    confirm step names both colleges, one POST with the right body, page switches to ACET showing ACET's rows;
+    `tsc` clean both sides. **Not tested in a browser:** Move (only its API), Malvika/Sujitha accounts, dark
+    mode, the foreign-college amber note.
+
+79. **Weekly Tracker "Move / Copy Companies" reworked to copy-only, one entry point, 25 Sep 2026
+    (user decision - supersedes the UI and the Move half of item 78).** The extra arrows icon beside the dustbin
+    is gone; the existing **"Move Companies"** item in the three-dots menu is now **"Move / Copy Companies"** and
+    **Shift+M** opens the same thing. It first asks: **Within this college** (the old tick-and-move-between-sections
+    flow, unchanged) or **To another college**. The other-college flow is: pick ONE college (own focus colleges
+    first, badged "Your focus" / "Other login") -> pick the section -> tick companies -> **Copy (n)** (the only
+    button in the header in this mode; Esc leaves it) -> "Are you sure you want to copy..." -> copied, then the page
+    **switches to the receiving college** so the sender can check it. **It only copies:** the sender's rows are never
+    touched (the backend now refuses any mode but `copy` - the Move branch was removed); the receiver still gets only
+    Company, Role, CTC, Contact, Email in the same section and order, everything else blank. **Toasts:** the sender
+    sees "N companies copied to MCET"; the receiving coordinator(s) get a `system_update` notification titled
+    "Weekly Tracker copy received" (message "One data received from AIHT College" / "N data received from ...", the
+    college **acronym**) and `IncomingCopyToast.tsx` (mounted in `AppShell`, polls every 15 s + on tab focus, needs a
+    visible tab) shows it as a toast once and marks it read; recipients are the target college's handling
+    coordinator(s) (Placement Coordinator preferred, oversight accounts and the sender excluded). **Undo / Redo
+    icons removed from the Weekly Tracker header** (user: Ctrl+Z / Ctrl+Y still work - the hook's keyboard shortcuts
+    are unchanged). **Verified:** real browser as Mohanaradha - no undo/redo/arrows icons; Shift+M shows the two-way
+    choice; AIHT -> MCET copy of 2 rows sent one correct POST; only "Copy (2)" in the header; MCET got blank-status
+    copies and AIHT kept everything; a second browser as Seshmitha (MCET, `seshmitha_tamil@icl.today`) showed the
+    toast "One data received from AIHT College" bottom-right, the notification then read and not repeated; the
+    sender is not notified. `tsc` clean both sides. **Not tested:** "Within this college" after the new choice
+    dialog, dark mode, Malvika/Sujitha accounts, a receiver who is offline (they see it on next open, and it also
+    sits in the bell list).
+    **Copy confirmation dialog polish, 25 Sep 2026 (user request):** title is now "Copy company" (not "Copy 1
+    company"), the dialog is wider (`max-w-4xl`, same font sizes) so the sentences stay on one line; the copy /
+    switch / sender-toast / receiver-toast behaviour is unchanged.
+    **Section question removed, 25 Sep 2026 (user request):** after picking the receiving college the tick boxes
+    open straight away in every section (the "which section?" dialog is gone); the section a company is copied
+    into is simply the one it was ticked in (selection stays section-specific, item 49). Flow is now: Shift+M /
+    menu -> Within/Another college -> college -> tick -> Copy (n) -> confirm -> copied + switch. Verified in a
+    real browser: no section dialog, 33 checkboxes visible at once, header "Copy (0)", confirm dialog opens
+    after ticking one; nothing was sent (cancelled). **Known behaviour explained to the user:** a company the
+    target already has in ANY section (even a collapsed one, e.g. Rejected Companies) is skipped, and the page
+    still switches; suggested (not built) a single warning and no switch when everything is skipped.
+
+80. **Production-readiness audit, 25 Sep 2026 (user-requested; run against the local backend, which uses the
+    PRODUCTION database - read-only probes except one self-inflicted write, below).** **Verdict: not ready for a
+    real production launch yet - fine as an internal pilot.** *Passes:* both `tsc` clean, `verify:policy` 100% (every
+    endpoint has a policy), security headers all present, CORS rejects foreign origins, 13 protected routes all
+    401 anonymously, forged `alg:none` JWT 401, NoSQL-operator login 401, regex-special search 200, coordinator
+    blocked from `/users`, `/meta-audit`, `/health/duplicate-audit`. *Per-college screens are fast:* weekly tracker
+    per college p50 341 ms (33 KB), KPI 213 ms, Daily Tracker today 102 ms, metadata page 209 ms, colleges 189 ms.
+    *Gaps found:* (1) **no rate limiting** - 15 rapid bad logins all 401, never 429 (known release-gate item 6);
+    (2) **no response compression** (no `compression` middleware) - the unfiltered `/weekly-tracker` is 1 MB, Daily
+    Leads 250 KB, all sent raw; (3) `express.json({limit:'25mb'})` is far above what any route needs;
+    (4) **failed-login audit rows store the attacker-supplied email / message with no length cap** - my own probe
+    (a 3 MB "email") wrote a 3 MB `FAILED_LOGIN` row that made `GET /dashboard/admin` return 6 MB and take 8-16 s.
+    **I deleted exactly that one row** (`6ab697ed3029cc393b3bff92`, 3,000,000 x "a", created 15:49 UTC on 25 Sep) -
+    dashboard back to 28 KB / ~1 s. The code fix (truncate in the audit write; cap the login body) is NOT done;
+    anyone can repeat this against the deployed API until it is. (5) `GET /settings` returns system-health, storage
+    and organisation counts to **coordinators** too (policy is STAFF for GET); low risk, consider admin-only.
+    (6) No `x-request-id` / structured logs. (7) `GET /dashboard/team-leader` ~2.2 s and `/dashboard/coordinator`
+    ~0.8 s (p50); unfiltered `/weekly-tracker` 1.3 s p50 with spikes to 18 s under concurrency (no `.lean()`).
+    (8) `npm audit` (prod deps): `xlsx` **high, no fix upstream** (both sides); frontend `next` 14.x **critical** -
+    the fix is the pushed `next16-upgrade` branch (`bc5750e`), not merged; two moderates. (9) **Zero automated
+    tests.** (10) **`next build` was NOT run** (it wipes `.next` and would have killed the live dev server), so a
+    production build is unverified this session. (11) Still open from before: rotate the secrets that are in git
+    history, `recycle_bin` / `import_processing_history` unbuilt, 3 missing crons, `server.ts` monolith.
+
+81. **Hardening pass 1 of the production-readiness list, 25 Sep 2026 (user-approved order: items 1, 6, 7, 9, 10
+    of item 80).** **Correction to item 80:** a login rate limiter already existed (`authLimiter`, AUD-C-03) but
+    was set to **500 failed attempts / 15 min / IP** - effectively none, which is why 15 rapid bad logins never
+    got a 429. Now: **sign-in 30 failed / 15 min / IP** (successes don't count; each account also keeps its own
+    3-strike lockout), and a separate tighter limiter of **8 / 15 min** on `request-otp`, `verify-otp` and
+    `reset-password` (each sends or checks an emailed code). **Body limits:** the single 25 MB parser in front of
+    everything is gone. `/api/v1/auth/*` and `/health/*` parse **20 KB** max; the authenticated API parses
+    **10 MB** but only *after* `authenticateJWT` + `authorizeRoute` (new parser mounted right below
+    `authorizeRoute`), so an anonymous caller can no longer make the server buffer megabytes. Oversize -> clean
+    `413 PAYLOAD_TOO_LARGE`, bad JSON -> `400 BAD_JSON`. **If a legitimate bulk import ever fails with 413, raise the
+    10 MB on that one route rather than globally.** **Login** refuses an identifier over 254 chars or a password
+    over 128 with `400 INPUT_TOO_LONG` before any lookup/hash/audit write. **Audit writer** (`lib/audit.ts`) now
+    clips email to 254, summary to 1000, user-agent to 300 and any `changes` snapshot over 20 KB to a preview - the
+    3 MB-audit-row bug can't recur. **Compression** (`compression` middleware): `/colleges` 22 KB -> 3 KB gzip.
+    **`GET /settings`** returns only `{settings}` to coordinators; system-health / storage / organisation /
+    data-quality / growth blocks are Administrator + Team Leader only (`isSupervisor`). **Request ids:** every
+    response carries `x-request-id` (a valid incoming one is reused), every access-log line prints it (development
+    line via `morgan`; **production prints one JSON object per request** - `request_id, method, path, status, ms,
+    bytes, ip`), and error bodies include `requestId`; 500s no longer leak internal messages in production.
+    **Verified live:** 3 MB and 25 KB login bodies 413, 300-char email 400, malformed JSON 400, anonymous 5 MB to
+    the API 401, signed-in 5 MB accepted / 12 MB 413, coordinator `/settings` = `settings` only while the admin
+    still gets all six blocks, request id on a 404, 30th bad login = first 429; `tsc` clean. **Found, not fixed
+    (pre-existing):** the Weekly Tracker page's first request sometimes carries the placeholder college id
+    `col_karpagam` (from the cached fallback list), which the handlers answer with `500` (Mongoose CastError)
+    instead of `400`; the page then refetches with the real id so users don't notice.
+
+82. **First automated tests + a verified production build, 25 Sep 2026 (item 5 of the production list).**
+    **`npm test` in `backend/`** now runs 34 black-box API tests (`backend/tests/api.test.ts`, Node's built-in
+    test runner, **no new dependency**) against a RUNNING server (`TEST_BASE_URL`, default localhost:5000; standard
+    accounts/password from section 2). They are **read-only** apart from signing in, so they are safe against the
+    shared database, and they deliberately stay far below the login rate limit (a limit test would lock the test
+    machine's own IP out for 15 minutes). Covered: security headers + request id, foreign-origin refusal, gzip,
+    13 protected routes all refused anonymously, forged `alg:none` token, generic wrong-password answer, login
+    input-length / oversize / bad-JSON handling, operator objects in the login body, self-registration disabled,
+    anonymous large body refused before parsing, coordinator 403 on `/users`, `/meta-audit`,
+    `/health/duplicate-audit`, `/dashboard/admin`, settings change and self role-escalation, `/settings` scoping
+    (coordinator = `settings` only, admin = all blocks), coordinator scoping on daily leads / notifications, and the
+    weekly tracker / daily tracker / coordinator dashboard still loading (incl. a regex-character search). All 34
+    pass. **Not covered (still a gap against the spec's 80% goal):** anything that writes (trackers, imports,
+    paste, copy-to-college), the frontend (a Playwright config exists but no specs were written), the cron jobs,
+    and the email-check rules. **Production build:** `next build` passes (26 static pages, First Load JS 87 kB
+    shared, largest route `/daily-leads` 233 kB) - run in a **temporary copy** at `C:\Temp\ipoms_build` (a junction
+    to this repo's `node_modules`) so the live dev server's `.next` was not wiped; that folder can be deleted
+    (delete the `node_modules` junction first, not through it). Note the repo has TWO next configs
+    (`next.config.mjs` proxy/rewrites and `next.config.mobile.js` static export) - the build above used the default.
+
+83. **Next 16 upgrade rehearsed in isolation, 25 Sep 2026 (item 2 of the production list) - NOT adopted.** Nothing in
+    the real repo or its running dev server changed. Done in a git worktree `C:\Temp\ipoms_next16` on the local
+    branch `next16-merge-check` (= current `ipomsbranch3` + a clean merge of `next16-upgrade`; the upgrade only
+    touches `frontend/package.json`, `package-lock.json` and `tsconfig.json` - `jsx` becomes `react-jsx`, formatting
+    only) with its own `npm ci`. Results: `tsc` clean, `next build` passes (25 static pages), `npm audit --omit=dev`
+    goes from 6 findings incl. **1 critical** to 4 (3 moderate, 1 high = `xlsx`), and a real-browser sweep of 9
+    pages (dashboard, tracker, weekly tracker, daily leads, active leads, metadata, reports, settings, profile) on
+    Next 14 (:3000) vs Next 16 (:3100) gave **identical page text** and only ~245 differing pixels per screen (the
+    Next dev-mode "N" badge; the dashboard's 0.17% is its live clock), same console/HTTP results, Shift+M dialog
+    works on both. **Things to know before adopting:** (a) Next 16's dev server **writes `AGENTS.md` and
+    `CLAUDE.md` into `frontend/`** on first start (`agentRules: false` in `next.config.mjs` turns it off) - they
+    would show up in `git status`; (b) `"lint": "next lint"` no longer exists in Next 16 - the script must be
+    replaced by plain ESLint or removed; (c) Turbopack is the default bundler; first compile of each page in dev is
+    slower; (d) Node >= 20.9 is required on Vercel; (e) the dev-mode "N" indicator appears bottom-left. Adopting =
+    merge `next16-merge-check` (or `next16-upgrade`) into `ipomsbranch3`, `npm install` in `frontend/`, restart the
+    frontend dev server; rollback = revert the merge and `npm install` again.
+    **ADOPTED locally the same day (user: "yes start localhost 3000"):** `next16-upgrade` merged into `ipomsbranch3`
+    (`896d12e`), `frontend/` reinstalled on **Next 16.3.6**, dev server restarted. Follow-ups: `agentRules: false`
+    added to `frontend/next.config.mjs` (no `AGENTS.md`/`CLAUDE.md` generated); the `"lint": "next lint"` script was
+    removed (the project has no ESLint config or dependency, so it never ran anyway). Re-verified on the real
+    :3000: both `tsc` clean, 34/34 API tests, 9-page sweep identical to before, Weekly report image = 4 exact A4
+    pages, copy dialog OK. **Still NOT pushed to GitHub / Vercel.** Harmless dev warning: Next infers the workspace
+    root because there are lockfiles above the repo (`C:\Projects\package-lock.json`) - silence with
+    `turbopack.root` in `next.config.mjs` if it bothers anyone. The temporary worktree/branch
+    `next16-merge-check` was removed.
+
+84. **Excel library fixed and dashboard speed-up, 25 Sep 2026 (items 4 and 8 of the production list).**
+    **`xlsx`:** the "no fix available" `npm audit` message is only because the npm-registry copy of SheetJS stopped at
+    0.18.5; the maintainers publish the fixed **0.20.3** from their own server. Both `backend/` and `frontend/` now
+    depend on `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` (lockfile pins the integrity hash) - a
+    drop-in, **no code changed**. `npm audit --omit=dev` no longer reports any high/critical on either side (only a
+    moderate `uuid`). Verified: both `tsc` clean, `next build` passes, a real-browser Metadata -> Export -> Excel
+    downloaded a valid workbook (3,746 rows, correct headers), the backend read a local workbook and round-tripped a
+    written one. **Trade-off to know:** the dependency now comes from `cdn.sheetjs.com`, so `npm install` (and the
+    Vercel build) must be able to reach it. **Runtime exposure was low anyway:** the backend has no file upload
+    (no multer); it only reads workbooks from fixed local paths, and the frontend only WRITES workbooks.
+    **Speed:** `GET /dashboard/team-leader` (polled every 3 s by every open Team Leader tab) spent ~7 sequential
+    database round trips per call re-checking three accounts' default colleges even though nothing changes. Those
+    three lookups now run in parallel and colleges are queried only when actually needed (behaviour identical:
+    defaults still apply only to an account with NO colleges), and the two assignment counts run in the same batch
+    as the per-coordinator queries. Single-call time **1,068 ms -> ~706 ms**. Other single-user timings (already
+    fine): weekly tracker one college 238 ms, all colleges 409 ms (already `.lean()`), coordinator dashboard
+    283 ms, admin dashboard ~0.7-0.9 s (was 6 MB / 8-16 s before the audit-row fix in item 80), daily leads 395 ms.
+    With 8 simultaneous requests the slowest was 2.5 s (all-college weekly tracker), 3.2 s (Team Leader dashboard)
+    - the earlier 18 s spike was the oversized audit row, gone. **Not done (would be the next step):** the Team
+    Leader dashboard still issues ~4 queries per coordinator; turning those into a few aggregates would cut its
+    load further but is a bigger rewrite. 34/34 API tests still pass; Sujitha's and Malvika's dashboards still
+    load with the right data.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

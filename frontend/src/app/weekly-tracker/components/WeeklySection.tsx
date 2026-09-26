@@ -30,7 +30,7 @@ interface Props {
   summaryMetric?: string;
   rows: WeeklyRow[];
   isGlobalDeleteMode?: boolean;
-  selectionMode?: 'move' | 'delete' | null;
+  selectionMode?: 'move' | 'delete' | 'transfer' | null;
   globalSelectedRowIds?: string[];
   /** Which section the global selection was made in; other sections show nothing ticked. */
   globalSelectionSection?: string | null;

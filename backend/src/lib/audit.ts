@@ -39,6 +39,23 @@ function describeDevice(ua = ''): string {
   return `${browser} / ${os} / ${form}`;
 }
 
+/** Audit rows hold text a caller controls (the email typed at a login form, a summary built from it). Without a cap
+ *  one request could write megabytes into a row that every admin dashboard load then had to ship. */
+const clip = (v: unknown, max: number): string => {
+  const s = String(v ?? '');
+  return s.length > max ? s.slice(0, max) + `…[+${s.length - max} chars]` : s;
+};
+
+function clipSnapshot(v: Record<string, unknown> | null | undefined): Record<string, unknown> | null {
+  if (!v) return null;
+  try {
+    const json = JSON.stringify(v);
+    return json.length <= 20_000 ? v : { truncated: true, preview: json.slice(0, 2000), original_chars: json.length };
+  } catch {
+    return { truncated: true };
+  }
+}
+
 export async function writeAudit(input: AuditInput): Promise<void> {
   try {
     const ua = input.req?.headers['user-agent'] ?? '';
@@ -49,13 +66,13 @@ export async function writeAudit(input: AuditInput): Promise<void> {
       entity_id: input.entityId ?? null,
       performed_by: input.performedBy ?? null,
       performed_by_role: input.performedByRole ?? 'system',
-      performed_by_email: input.performedByEmail ?? '',
+      performed_by_email: clip(input.performedByEmail, 254),
       module_name: input.module,
       severity: input.severity ?? 'info',
-      summary_message: input.summary,
-      changes_snapshot: input.changes ?? null,
+      summary_message: clip(input.summary, 1000),
+      changes_snapshot: clipSnapshot(input.changes),
       ip_address: input.req?.ip ?? null,
-      user_agent: ua || null,
+      user_agent: ua ? clip(ua, 300) : null,
       device_info: ua ? describeDevice(String(ua)) : null,
     });
   } catch (err) {

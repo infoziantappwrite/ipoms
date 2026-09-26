@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 import { COLLEGE_LOGO_MAP, getCollegeLogoUrl } from '@/lib/collegeLogo';
 import {
-  generateReportCanvas,
+  generateReportCanvases,
   exportReportAsImage,
   getReportExportBaseFileName,
   type ImageExportSize,
@@ -92,7 +92,7 @@ export function A4PdfPreviewModal({
   const [logoFailed, setLogoFailed] = useState(false);
   const [paperPages, setPaperPages] = useState(1);
   const [imageSize, setImageSize] = useState<ImageExportSize>('auto');
-  const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [imageSrcs, setImageSrcs] = useState<string[]>([]);
   const [imageLoading, setImageLoading] = useState(false);
   const paperRef = useRef<HTMLDivElement>(null);
 
@@ -147,12 +147,10 @@ export function A4PdfPreviewModal({
     let isMounted = true;
     setImageLoading(true);
 
-    generateReportCanvas(report, { size: imageSize })
-      .then((canvas) => {
+    generateReportCanvases(report, { size: imageSize })
+      .then((canvases) => {
         if (!isMounted) return;
-        if (canvas) {
-          setImageSrc(canvas.toDataURL('image/png'));
-        }
+        setImageSrcs(canvases.map((c) => c.toDataURL('image/png')));
         setImageLoading(false);
       })
       .catch((err) => {
@@ -186,14 +184,19 @@ export function A4PdfPreviewModal({
   const collegeLogoUrl = getCollegeLogoUrl(collegeCode, collegeName, report.branding?.college_logo);
 
   const handleDownloadImage = async () => {
-    if (imageSrc) {
+    if (imageSrcs.length) {
       const fileName = getReportExportBaseFileName(report);
-      const a = document.createElement('a');
-      a.href = imageSrc;
-      a.download = `${fileName}.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      for (let i = 0; i < imageSrcs.length; i++) {
+        const a = document.createElement('a');
+        a.href = imageSrcs[i];
+        a.download =
+          imageSrcs.length > 1 ? `${fileName}_page-${i + 1}-of-${imageSrcs.length}.png` : `${fileName}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        // a short gap so the browser accepts several downloads in a row
+        if (i < imageSrcs.length - 1) await new Promise((r) => setTimeout(r, 350));
+      }
     } else {
       await exportReportAsImage(report, { size: imageSize });
     }
@@ -2715,7 +2718,7 @@ export function A4PdfPreviewModal({
       );
     }
 
-    if (!imageSrc) {
+    if (!imageSrcs.length) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[400px] h-full text-slate-400 gap-2 py-16">
           <ImageIcon size={32} className="text-slate-600" />
@@ -2735,12 +2738,21 @@ export function A4PdfPreviewModal({
           }}
           className="transition-transform duration-150 flex flex-col items-center"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={imageSrc}
-            alt="Report Preview"
-            className="w-full h-auto bg-white rounded-sm shadow-xl shadow-slate-900/10 dark:shadow-[0_20px_50px_rgba(0,0,0,0.6)] border border-slate-200 dark:border-slate-700/80"
-          />
+          {imageSrcs.map((src, i) => (
+            <div key={i} className={`w-full ${i > 0 ? 'mt-4' : ''}`}>
+              {imageSrcs.length > 1 && (
+                <p className="text-[10px] font-bold text-slate-500 mb-1 text-center">
+                  Image {i + 1} of {imageSrcs.length}
+                </p>
+              )}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={src}
+                alt={`Report Preview ${i + 1}`}
+                className="w-full h-auto bg-white rounded-sm shadow-xl shadow-slate-900/10 dark:shadow-[0_20px_50px_rgba(0,0,0,0.6)] border border-slate-200 dark:border-slate-700/80"
+              />
+            </div>
+          ))}
         </div>
       </div>
     );

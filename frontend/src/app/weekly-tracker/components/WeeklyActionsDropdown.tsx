@@ -134,7 +134,7 @@ export function WeeklyActionsDropdown({
                   <div className="w-5 h-5 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
                     <ArrowRightLeft size={12} strokeWidth={2.2} />
                   </div>
-                  <span>Move Companies</span>
+                  <span>Move / Copy Companies</span>
                 </div>
                 <kbd className="text-[9px] font-mono text-fg-subtle bg-surface-sunken border border-border px-1 py-0.2 rounded">
                   Shift+M

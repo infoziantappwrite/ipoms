@@ -5,6 +5,8 @@ import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import compression from 'compression';
+import { randomUUID } from 'crypto';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
@@ -35,6 +37,7 @@ import rateLimit from 'express-rate-limit';
 import { registerAuthRoutes } from './lib/authRoutes';
 import { registerActiveLeadRoutes, syncLeadFromDailyTracker } from './lib/activeLeadRoutes';
 import { registerWeeklyPasteRoutes } from './lib/weeklyPasteRoutes';
+import { registerWeeklyTransferRoutes } from './lib/weeklyTransferRoutes';
 import { registerEmailCheckRoutes } from './lib/emailCheckRoutes';
 import { validateAndNormalizeMultiEmail } from './lib/contactRules';
 import { registerPendingTaskRoutes } from './lib/pendingTaskRoutes';
@@ -132,10 +135,49 @@ app.use(
     exposedHeaders: ['Authorization', 'Set-Cookie'],
   })
 );
-app.use(express.json({ limit: '25mb' }));
-app.use(express.urlencoded({ limit: '25mb', extended: true }));
+// Compress JSON / text responses (the all-college Weekly Tracker is ~1 MB raw).
+app.use(compression());
+
+// Request id: reuse a sane incoming x-request-id (a load balancer may set one), else make one. It is echoed
+// on the response, printed in every access-log line and included in error bodies so one failing request
+// can be traced end to end.
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const incoming = String(req.headers['x-request-id'] || '');
+  const id = /^[A-Za-z0-9._-]{8,64}$/.test(incoming) ? incoming : randomUUID();
+  (req as any).requestId = id;
+  res.setHeader('x-request-id', id);
+  next();
+});
+
+// Body parsing. Unauthenticated routes get a TINY limit; the authenticated API gets a larger one, but only
+// AFTER the JWT and role checks (see the parser mounted below `authorizeRoute`), so an anonymous caller can
+// no longer make the server buffer and parse megabytes before being refused. (Was one 25 MB parser in front
+// of everything: a 3 MB "email" sent to /auth/login was accepted, parsed and written to the audit log.)
+app.use(['/api/v1/auth', '/health'], express.json({ limit: '20kb' }));
+app.use(['/api/v1/auth', '/health'], express.urlencoded({ limit: '20kb', extended: true }));
 app.use(cookieParser());
-app.use(morgan('dev'));
+
+// Access log. Development keeps the readable `morgan('dev')` line (now with the request id); production
+// prints one JSON object per request so a log service can filter on any field.
+morgan.token('rid', (req: any) => req.requestId || '-');
+if (process.env.NODE_ENV === 'production') {
+  app.use(
+    morgan((tokens: any, req: any, res: any) =>
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        request_id: tokens.rid(req, res),
+        method: tokens.method(req, res),
+        path: tokens.url(req, res),
+        status: Number(tokens.status(req, res)),
+        ms: Number(tokens['response-time'](req, res)),
+        bytes: Number(tokens.res(req, res, 'content-length')) || 0,
+        ip: req.ip,
+      })
+    )
+  );
+} else {
+  app.use(morgan(':rid :method :url :status :response-time ms - :res[content-length]'));
+}
 
 // ── Shared Helpers ───────────────────────────────────────────────────────────
 
@@ -663,7 +705,10 @@ app.get('/api/v1/weekly-tracker/sync-inspection', async (req: Request, res: Resp
 // 2. Authentication Login Endpoint & Rate Limiting (AUD-C-03)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes window
-  max: 500, // Generous allowance for concurrent coordinator logins across shared office IPs
+  // FAILED attempts per IP. Was 500 - effectively no limit (15 rapid bad logins were never slowed). 30
+  // still leaves room for a whole office behind one address mistyping a password now and then, while
+  // making password guessing across many accounts impractical; each account also has its own lockout.
+  max: 30,
   skipSuccessfulRequests: true, // Do not count successful sign-ins against rate limits
   standardHeaders: true,
   legacyHeaders: false,
@@ -676,8 +721,20 @@ const authLimiter = rateLimit({
   },
 });
 
+// One-time-password requests send an email each time, so they get a much tighter budget than sign-in.
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: { code: 'TOO_MANY_REQUESTS', message: 'Too many code requests from this IP. Please wait a few minutes and try again.' },
+  },
+});
+
 app.use('/api/v1/auth/login', authLimiter);
-app.use('/api/v1/auth/request-otp', authLimiter);
+app.use(['/api/v1/auth/request-otp', '/api/v1/auth/verify-otp', '/api/v1/auth/reset-password'], otpLimiter);
 app.use('/api/v1/auth/signup', authLimiter);
 
 // Auth routes (sign-in, lockout, OTP reset) live in lib/authRoutes.ts
@@ -702,6 +759,11 @@ app.use('/api/v1', (req: Request, res: Response, next: NextFunction) => {
 });
 
 app.use('/api/v1', authorizeRoute);
+
+// Authenticated API body parser (auth + role already passed). 10 MB comfortably covers the largest real
+// payloads (bulk imports of thousands of rows); it used to be 25 MB for every caller, signed in or not.
+app.use('/api/v1', express.json({ limit: '10mb' }));
+app.use('/api/v1', express.urlencoded({ limit: '10mb', extended: true }));
 
 // A full-oversight Team Leader (`has_all_colleges_access`, e.g. Malvika Kumar) monitors every college and
 // does not place calls, so the Daily Tracker is READ-ONLY for that account. The screen already hides every
@@ -777,6 +839,9 @@ registerActiveLeadRoutes(app);
 
 // Weekly Tracker "Paste" (preview + save share one code path)
 registerWeeklyPasteRoutes(app, { notifyForeignCollegeOwners, getFridayWeekBounds });
+
+// Weekly Tracker "Move / Copy to another college"
+registerWeeklyTransferRoutes(app, { notifyForeignCollegeOwners, getFridayWeekBounds });
 
 // "Have you sent all your emails?" reminder (5 PM / 5:30 PM / next-day)
 registerEmailCheckRoutes(app);
@@ -11139,101 +11204,115 @@ app.post('/api/v1/users/heartbeat', async (req: Request, res: Response) => {
 // Team Leader Dashboard (Spec Section 5.2) — Coordinator Profile Online Activity & Live Performance Matrix
 app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => {
   try {
-    // Ensure Sujitha (Team Leader) has her official focus colleges: HITS, NEHRU, KPR, SONA (Sujitha does NOT handle MCET)
-    const sujithaUser = await User.findOne({
-      $or: [
-        { official_email: 'sujitha_s@infoziant.com' },
-        { username: 'sujitha' },
-        { full_name: /sujitha/i },
-      ],
-      is_deleted: false,
-    });
-    if (sujithaUser) {
-      const sujithaColleges = await College.find({
-        $or: [
-          { college_code: { $in: ['HITS', 'NEHRU', 'KPR', 'SONA'] } },
-          { college_name: { $in: [/hindustan/i, /nehru/i, /^KPR Institute/i, /^SONA/i] } },
-        ],
-        status: 'active',
-      });
-      const targetIds = sujithaColleges.map((c) => c._id);
-      // Defaults are only a STARTING point: applied when the user has no colleges at all.
-      // This used to overwrite assigned_college_ids on every boot / dashboard load / tracker
-      // page load, so any focus change a user saved in Active College Focus was silently
-      // reverted to the hardcoded list the next time any of those ran (24 Sep 2026).
-      if (!sujithaUser.assigned_college_ids || sujithaUser.assigned_college_ids.length === 0) {
-        sujithaUser.assigned_college_ids = targetIds;
-      }
-      const mcetCol = await College.findOne({
-        $or: [{ college_code: 'MCET' }, { college_name: /mahalingam/i }]
-      });
-      const isMcetActive =
-        sujithaUser.active_college_code?.toUpperCase() === 'MCET' ||
-        (sujithaUser.active_college_name && /mahalingam|mcet/i.test(sujithaUser.active_college_name)) ||
-        (mcetCol && sujithaUser.active_college_id && String(sujithaUser.active_college_id) === String(mcetCol._id));
+    // Starting focus colleges for three named accounts. Defaults are only a STARTING point: applied when the
+    // user has no colleges at all. This used to overwrite assigned_college_ids on every boot / dashboard load /
+    // tracker page load, so any focus change a user saved in Active College Focus was silently reverted to the
+    // hardcoded list the next time any of those ran (24 Sep 2026).
+    //
+    // Performance (25 Sep 2026): this dashboard is polled every 3 seconds by every open Team Leader tab and used
+    // to spend ~7 sequential database round trips here (3 user lookups, 3 college lookups, an MCET lookup) even
+    // though nothing changes once the accounts have colleges. Now the three accounts are looked up IN PARALLEL and
+    // colleges are only queried in the rare case they are actually needed.
 
-      if (isMcetActive) {
-        const primary = sujithaColleges.find(c => c.college_code === 'NEHRU' || c.college_code === 'HITS') || sujithaColleges[0];
-        if (primary) {
-          sujithaUser.active_college_id = primary._id;
-          sujithaUser.active_college_code = primary.college_code;
-          sujithaUser.active_college_name = primary.college_name;
-          sujithaUser.active_college_location = primary.location || '';
+    // Sujitha (Team Leader): HITS, NEHRU, KPR, SONA (she does NOT handle MCET)
+    const ensureSujitha = async () => {
+      const u = await User.findOne({
+        $or: [
+          { official_email: 'sujitha_s@infoziant.com' },
+          { username: 'sujitha' },
+          { full_name: /sujitha/i },
+        ],
+        is_deleted: false,
+      });
+      if (!u) return null;
+      const hasNoColleges = !u.assigned_college_ids || u.assigned_college_ids.length === 0;
+      let isMcetActive = Boolean(
+        u.active_college_code?.toUpperCase() === 'MCET' ||
+        (u.active_college_name && /mahalingam|mcet/i.test(u.active_college_name))
+      );
+      if (!isMcetActive && u.active_college_id) {
+        const mcetCol = await College.findOne({
+          $or: [{ college_code: 'MCET' }, { college_name: /mahalingam/i }],
+        }).select('_id');
+        isMcetActive = Boolean(mcetCol && String(u.active_college_id) === String(mcetCol._id));
+      }
+      if (hasNoColleges || isMcetActive) {
+        const sujithaColleges = await College.find({
+          $or: [
+            { college_code: { $in: ['HITS', 'NEHRU', 'KPR', 'SONA'] } },
+            { college_name: { $in: [/hindustan/i, /nehru/i, /^KPR Institute/i, /^SONA/i] } },
+          ],
+          status: 'active',
+        });
+        if (hasNoColleges) u.assigned_college_ids = sujithaColleges.map((c) => c._id);
+        if (isMcetActive) {
+          const primary = sujithaColleges.find((c) => c.college_code === 'NEHRU' || c.college_code === 'HITS') || sujithaColleges[0];
+          if (primary) {
+            u.active_college_id = primary._id;
+            u.active_college_code = primary.college_code;
+            u.active_college_name = primary.college_name;
+            u.active_college_location = primary.location || '';
+          }
         }
       }
-      await sujithaUser.save();
-    }
+      if (u.isModified()) await u.save();
+      return u;
+    };
 
-    // Ensure Tamil Selvi (Seshmitha Tamilselvi R) has her official focus colleges: MCET, MEC
-    const tamilUser = await User.findOne({
-      $or: [
-        { official_email: 'seshmitha_tamil@icl.today' },
-        { username: 'seshmitha' },
-        { full_name: /tamil/i },
-      ],
-      is_deleted: false,
-    });
-    if (tamilUser) {
-      const tamilColleges = await College.find({
+    // Seshmitha Tamilselvi R: MCET, MEC
+    const ensureTamil = async () => {
+      const u = await User.findOne({
         $or: [
-          { college_code: { $in: ['MCET', 'MEC'] } },
-          { college_name: { $in: [/mahalingam/i, /muthayammal/i] } },
+          { official_email: 'seshmitha_tamil@icl.today' },
+          { username: 'seshmitha' },
+          { full_name: /tamil/i },
         ],
-        status: 'active',
+        is_deleted: false,
       });
-      const targetTamilIds = tamilColleges.map((c) => c._id);
-      if (!tamilUser.assigned_college_ids || tamilUser.assigned_college_ids.length === 0) {
-        tamilUser.assigned_college_ids = targetTamilIds; // starting default only — see Sujitha note above
+      if (!u) return null;
+      if (!u.assigned_college_ids || u.assigned_college_ids.length === 0) {
+        const cols = await College.find({
+          $or: [
+            { college_code: { $in: ['MCET', 'MEC'] } },
+            { college_name: { $in: [/mahalingam/i, /muthayammal/i] } },
+          ],
+          status: 'active',
+        });
+        u.assigned_college_ids = cols.map((c) => c._id);
       }
-      if (!tamilUser.account_status) tamilUser.account_status = 'active';
-      await tamilUser.save();
-    }
+      if (!u.account_status) u.account_status = 'active';
+      if (u.isModified()) await u.save();
+      return u;
+    };
 
-    // Ensure Megala Devi P S has her official focus colleges: NGP, KAMARAJ, MAREPHRAM
-    const megalaUser = await User.findOne({
-      $or: [
-        { official_email: 'megaladevi_ps@infoziant.com' },
-        { username: 'megaladevi' },
-        { username: 'megala' },
-        { full_name: /megala/i },
-      ],
-      is_deleted: false,
-    });
-    if (megalaUser) {
-      const megalaColleges = await College.find({
+    // Megala Devi P S: NGP, KAMARAJ, MAREPHRAM
+    const ensureMegala = async () => {
+      const u = await User.findOne({
         $or: [
-          { college_code: { $in: ['NGP', 'KAMARAJ', 'MAREPHRAM', 'MAREPHRA'] } },
-          { college_name: { $in: [/N\.?G\.?P\.?/i, /kamaraj/i, /ephraem/i, /ephram/i] } },
+          { official_email: 'megaladevi_ps@infoziant.com' },
+          { username: 'megaladevi' },
+          { username: 'megala' },
+          { full_name: /megala/i },
         ],
-        status: 'active',
+        is_deleted: false,
       });
-      const targetMegalaIds = megalaColleges.map((c) => c._id);
-      if (!megalaUser.assigned_college_ids || megalaUser.assigned_college_ids.length === 0) {
-        megalaUser.assigned_college_ids = targetMegalaIds; // starting default only — see Sujitha note above
+      if (!u) return null;
+      if (!u.assigned_college_ids || u.assigned_college_ids.length === 0) {
+        const cols = await College.find({
+          $or: [
+            { college_code: { $in: ['NGP', 'KAMARAJ', 'MAREPHRAM', 'MAREPHRA'] } },
+            { college_name: { $in: [/N\.?G\.?P\.?/i, /kamaraj/i, /ephraem/i, /ephram/i] } },
+          ],
+          status: 'active',
+        });
+        u.assigned_college_ids = cols.map((c) => c._id);
       }
-      if (!megalaUser.account_status) megalaUser.account_status = 'active';
-      await megalaUser.save();
-    }
+      if (!u.account_status) u.account_status = 'active';
+      if (u.isModified()) await u.save();
+      return u;
+    };
+
+    const [sujithaUser] = await Promise.all([ensureSujitha(), ensureTamil(), ensureMegala()]);
 
     const coordinators = await User.find({
       $or: [
@@ -11340,7 +11419,8 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
     }
 
     // Per-coordinator live profile & activity telemetry
-    const teamMatrix = await Promise.all(
+    const [teamMatrix, totalDispatchedAssignments, completedAssignments] = await Promise.all([
+      Promise.all(
       coordinators.map(async (c) => {
         const [todayTrackerRows, jds, pendingWork, latestCall] = await Promise.all([
           DailyTracker.find({
@@ -11510,10 +11590,10 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
           performance_status: calls >= 25 ? 'on_track' : calls > 0 ? 'active' : 'pending',
         };
       })
-    );
-
-    const totalDispatchedAssignments = await AssignedWork.countDocuments({ is_deleted: false });
-    const completedAssignments = await AssignedWork.countDocuments({ is_completed: true, is_deleted: false });
+      ),
+      AssignedWork.countDocuments({ is_deleted: false }),
+      AssignedWork.countDocuments({ is_completed: true, is_deleted: false }),
+    ]);
 
     // Count online coordinators and calling durations
     const onlineCount = teamMatrix.filter((m) => m.online_status === 'online').length;
@@ -14287,7 +14367,9 @@ app.get('/api/v1/settings', authenticateJWT, async (req: Request, res: Response)
 
     return res.status(200).json({
       success: true,
-      data: {
+      // Coordinators only need the season / targets; system health, storage and organisation counts are for
+      // Administrators and Team Leaders.
+      data: !isSupervisor(req) ? { settings } : {
         settings,
         system_health: {
           status: healthStatus,
@@ -14813,12 +14895,22 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
       error: { code: 'ORIGIN_NOT_ALLOWED', message: 'This origin is not permitted to access the API.' },
     });
   }
-  console.error('❌ [Unhandled Server Error]:', err);
+  const requestId = (req as any).requestId;
+  // body-parser refusals are the caller's problem, not a server fault
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({ success: false, error: { code: 'PAYLOAD_TOO_LARGE', message: 'The request is too large.', requestId } });
+  }
+  if (err?.type === 'entity.parse.failed') {
+    return res.status(400).json({ success: false, error: { code: 'BAD_JSON', message: 'The request body is not valid JSON.', requestId } });
+  }
+  console.error(`❌ [Unhandled Server Error] request ${requestId || '-'}:`, err);
   return res.status(500).json({
     success: false,
     error: {
       code: 'INTERNAL_SERVER_ERROR',
-      message: err.message || 'Internal server error',
+      // Internal messages can name collections, paths or queries - keep them out of production responses.
+      message: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message || 'Internal server error',
+      requestId,
     },
   });
 });

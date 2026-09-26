@@ -5,10 +5,9 @@ import {
   CalendarDays,
   Trash2,
   Search,
-  Undo2,
-  Redo2,
   RefreshCw,
   ClipboardPaste,
+  Copy,
   ChevronsUp,
   ChevronsDown,
 } from 'lucide-react';
@@ -39,10 +38,12 @@ interface Props {
   isExporting?: boolean;
   searchQuery?: string;
   onSearchChange?: (q: string) => void;
-  selectionMode?: 'move' | 'delete' | null;
+  selectionMode?: 'move' | 'delete' | 'transfer' | null;
   selectedCount?: number;
   onStartMoveMode?: () => void;
   onStartDeleteMode?: () => void;
+  onExecuteTransfer?: () => void;
+  transferTargetCode?: string;
   onCancelSelection?: () => void;
   onExecuteMove?: () => void;
   onExecuteBulkDelete?: () => void;
@@ -79,6 +80,8 @@ export function WeeklyHeader({
   selectedCount = 0,
   onStartMoveMode,
   onStartDeleteMode,
+  onExecuteTransfer,
+  transferTargetCode,
   onCancelSelection,
   onExecuteMove,
   onExecuteBulkDelete,
@@ -247,6 +250,26 @@ export function WeeklyHeader({
                   Cancel
                 </button>
               </div>
+            ) : selectionMode === 'transfer' ? (
+              <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                {/* Copy to another college: tick companies, then Copy (Esc leaves this mode) */}
+                <span className="hidden lg:inline text-[11px] font-semibold text-fg-subtle">
+                  Tick the companies to copy{transferTargetCode ? ` to ${transferTargetCode}` : ''}
+                </span>
+                <button
+                  type="button"
+                  disabled={(selectedCount || 0) === 0}
+                  onClick={() => {
+                    triggerHaptic('medium');
+                    onExecuteTransfer?.();
+                  }}
+                  className="h-8 px-3 bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white rounded-xl flex items-center gap-1.5 text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
+                  title="Copy the ticked companies to the other college (you keep yours). Esc to cancel."
+                >
+                  <Copy size={13} strokeWidth={2.4} />
+                  <span>Copy ({selectedCount || 0})</span>
+                </button>
+              </div>
             ) : selectionMode === 'delete' ? (
               <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
                 {/* Delete Mode Active: Cancel button */}
@@ -263,38 +286,6 @@ export function WeeklyHeader({
                 </button>
               </div>
             ) : null
-          )}
-
-          {/* Undo / Redo Buttons */}
-          {selectedCollegeId && (
-            <div className="flex items-center gap-1 border-r border-zinc-200 dark:border-zinc-800 pr-2 mr-0.5">
-              <button
-                type="button"
-                disabled={!canUndo}
-                onClick={() => {
-                  triggerHaptic('medium');
-                  onUndo?.();
-                }}
-                title="Undo (Ctrl+Z)"
-                aria-label="Undo last action"
-                className="w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900/50 dark:hover:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 border border-zinc-200 dark:border-zinc-700/80 shadow-2xs active:scale-[0.95] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-zinc-700"
-              >
-                <Undo2 size={15} strokeWidth={2.2} />
-              </button>
-              <button
-                type="button"
-                disabled={!canRedo}
-                onClick={() => {
-                  triggerHaptic('medium');
-                  onRedo?.();
-                }}
-                title="Redo (Ctrl+Y)"
-                aria-label="Redo action"
-                className="w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900/50 dark:hover:bg-zinc-800/80 text-zinc-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 border border-zinc-200 dark:border-zinc-700/80 shadow-2xs active:scale-[0.95] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-zinc-700"
-              >
-                <Redo2 size={15} strokeWidth={2.2} />
-              </button>
-            </div>
           )}
 
           {/* Collapse / Expand All Sections Toggle */}
@@ -382,7 +373,7 @@ export function WeeklyHeader({
                 triggerHaptic('selection');
                 onSyncDailyPositives();
               }}
-              className="relative h-8 px-2.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer select-none shrink-0 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80 shadow-2xs text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]"
+              className="relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80 shadow-2xs text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]"
               title="Sync positive leads from Daily Leads into Companies in Pipeline"
               aria-label="Sync Daily Positives"
             >
@@ -391,7 +382,6 @@ export function WeeklyHeader({
                 strokeWidth={2.4}
                 className={isSyncing ? 'animate-spin text-amber-600 dark:text-amber-400' : 'text-amber-600 dark:text-amber-400'}
               />
-              <span className="hidden sm:inline font-bold">Sync</span>
             </button>
           )}
 
