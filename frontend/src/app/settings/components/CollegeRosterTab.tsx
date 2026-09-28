@@ -232,10 +232,10 @@ export function CollegeRosterTab() {
             type="button"
             onClick={handleSyncOfficialRoster}
             disabled={syncing}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-primary bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-lg transition disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 active:bg-amber-800 rounded-lg shadow-2xs transition disabled:opacity-50 cursor-pointer"
             title="Reset to official 21 active partner colleges roster"
           >
-            <RefreshCw size={13} className={syncing ? 'animate-spin' : ''} />
+            <RefreshCw size={13} className={`text-white ${syncing ? 'animate-spin' : ''}`} />
             <span>{syncing ? 'Syncing...' : 'Sync Official Roster'}</span>
           </button>
         </div>

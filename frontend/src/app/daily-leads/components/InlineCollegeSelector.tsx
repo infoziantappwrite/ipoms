@@ -211,12 +211,12 @@ export function InlineCollegeSelector({
                   : 'auto',
               left: `${coords.left}px`,
               zIndex: 999999,
-              width: '320px',
+              width: '180px',
             }}
-            className="rounded-2xl bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 shadow-2xl p-2 flex flex-col text-fg animate-in fade-in zoom-in-95 duration-100 overflow-hidden select-none"
+            className="rounded-2xl bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 shadow-2xl p-1.5 flex flex-col text-fg animate-in fade-in zoom-in-95 duration-100 overflow-hidden select-none"
           >
             {/* Search Input */}
-            <div className="relative mb-2 shrink-0">
+            <div className="relative mb-1.5 shrink-0">
               <Search
                 size={13}
                 className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-disabled pointer-events-none"
@@ -224,10 +224,10 @@ export function InlineCollegeSelector({
               <input
                 type="text"
                 autoFocus
-                placeholder="Search college or code..."
+                placeholder="Search..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs bg-surface-sunken border border-border text-fg placeholder:text-fg-disabled outline-none focus:border-primary dark:focus:border-sky-400 focus:ring-1 focus:ring-primary/20 dark:focus:ring-sky-400/30 transition-all font-sans"
+                className="w-full pl-7 pr-2.5 py-1.5 rounded-xl text-xs bg-surface-sunken border border-border text-fg placeholder:text-fg-disabled outline-none focus:border-primary dark:focus:border-sky-400 focus:ring-1 focus:ring-primary/20 dark:focus:ring-sky-400/30 transition-all font-sans"
               />
             </div>
 

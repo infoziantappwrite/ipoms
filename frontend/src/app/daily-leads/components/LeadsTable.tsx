@@ -81,7 +81,7 @@ export function LeadsTable({
             No {activeTab === 'positive' ? 'Positive Leads' : activeTab === 'my_positives' ? 'College Positive Logs' : 'JD Received Records'} Found
           </h3>
           <p className="text-xs text-fg-subtle max-w-sm leading-relaxed">
-            No opportunities recorded for the selected date. Click <span className="text-indigo-600 dark:text-indigo-400 font-bold">Sync</span> in the header to pull pipeline companies for this date, or <span className="text-primary font-semibold font-mono">+ Add</span>.
+            No opportunities recorded for the selected date. Click <span className="text-amber-600 dark:text-amber-400 font-bold">Sync</span> in the header to pull pipeline companies for this date, or <span className="text-primary font-semibold font-mono">+ Add</span>.
           </p>
         </div>
       </div>
@@ -117,7 +117,7 @@ export function LeadsTable({
               <th className="py-3 px-3 min-w-[110px] text-center border-r border-border/80">Eligible Batch</th>
               <th className={`py-3 px-3 min-w-[140px] text-center ${activeTab === 'positive' ? 'border-r border-border/80' : ''}`}>Coordinator</th>
               {activeTab === 'positive' && (
-                <th className="py-3 px-2 w-28 text-center">Action</th>
+                <th className="py-3 px-2 w-20 text-center">Action</th>
               )}
             </tr>
           </thead>
@@ -472,7 +472,7 @@ function TableRow({
 
       {/* Action Column (Only needed for Positives tab to Move to JD; removed for JD Received since all cells are inline editable) */}
       {activeTab === 'positive' && (
-        <td className="py-2.5 px-2 text-center whitespace-nowrap w-28">
+        <td className="py-2.5 px-2 text-center whitespace-nowrap w-20">
           <button
             type="button"
             onClick={handleMoveAction}
@@ -482,7 +482,7 @@ function TableRow({
             aria-label="Move to JD Received"
           >
             <ArrowRightCircle size={13} strokeWidth={2.4} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
-            <span className="whitespace-nowrap">Move to JD</span>
+            <span className="whitespace-nowrap">JD</span>
           </button>
         </td>
       )}

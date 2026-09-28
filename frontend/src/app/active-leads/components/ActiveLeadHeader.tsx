@@ -408,7 +408,7 @@ export function ActiveLeadHeader({
               type="button"
               disabled={isSyncing}
               onClick={onSyncTracker}
-              className="w-8 h-8 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl transition-all shadow-xs flex items-center justify-center cursor-pointer active:scale-[0.992] hover:shadow-indigo-500/20 shrink-0"
+              className="w-8 h-8 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 disabled:opacity-50 text-white rounded-xl transition-all shadow-xs flex items-center justify-center cursor-pointer active:scale-[0.992] hover:shadow-amber-500/20 shrink-0"
               title="Sync leads from Weekly Tracker (Pipeline & JD Received)"
               aria-label="Sync leads from Weekly Tracker"
             >
@@ -444,11 +444,11 @@ export function ActiveLeadHeader({
             <button
               type="button"
               onClick={onToggleDeleteMode}
-              className="w-8 h-8 bg-rose-50 dark:bg-rose-950/60 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-500/50 rounded-xl transition-all shadow-xs flex items-center justify-center cursor-pointer active:scale-[0.992] ring-1 ring-rose-400/30 dark:ring-rose-400/30 shrink-0"
+              className="w-8 h-8 bg-rose-600 hover:bg-rose-700 text-white rounded-xl transition-all shadow-xs flex items-center justify-center cursor-pointer active:scale-[0.992] shrink-0"
               title="Delete mode — select and delete leads"
               aria-label="Delete leads"
             >
-              <Trash2 size={14} strokeWidth={2.2} className="text-rose-600 dark:text-rose-400 shrink-0" />
+              <Trash2 size={14} strokeWidth={2.2} className="text-white shrink-0" />
             </button>
           ) : (
             <div className="flex items-center gap-1.5 shrink-0 animate-in fade-in duration-150">

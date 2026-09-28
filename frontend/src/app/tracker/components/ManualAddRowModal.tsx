@@ -673,11 +673,11 @@ export function ManualAddRowModal({
                 }`}>
                   {placeholderInfo?.isPlaceholder ? (
                     <>
-                      <Sparkles size={11} strokeWidth={2.5} className="text-amber-500" /> Existing Placeholder in DB
+                      <Sparkles size={11} strokeWidth={2.5} className="text-amber-500" /> Existing Placeholder in DB {matchedMetaRecord?.serial_number ? `(S.No #${matchedMetaRecord.serial_number})` : ''}
                     </>
                   ) : (
                     <>
-                      <CheckCircle2 size={11} strokeWidth={2.5} /> Auto-filled from Meta DB
+                      <CheckCircle2 size={11} strokeWidth={2.5} /> Auto-filled from Meta DB {matchedMetaRecord?.serial_number ? `(S.No #${matchedMetaRecord.serial_number})` : ''}
                     </>
                   )}
                 </span>
@@ -800,24 +800,6 @@ export function ManualAddRowModal({
             )}
           </div>
 
-          {/* Placeholder Notification Banner */}
-          {matchedMetaRecord && placeholderInfo?.isPlaceholder && (
-            <div className="p-3 bg-amber-500/10 dark:bg-amber-950/40 border border-amber-500/30 rounded-xl space-y-1 text-xs text-amber-900 dark:text-amber-200 animate-in fade-in duration-150">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300">
-                  <Sparkles size={14} className="text-amber-500 shrink-0" />
-                  <span>Existing Company Placeholder Found {matchedMetaRecord.serial_number ? `(S.No #${matchedMetaRecord.serial_number})` : ''}</span>
-                </div>
-                <span className="text-[10px] font-semibold bg-amber-500/20 text-amber-800 dark:text-amber-200 px-2 py-0.5 rounded-full border border-amber-500/30">
-                  Needs Contact Info
-                </span>
-              </div>
-              <p className="text-[11.5px] text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
-                This company is already present in the database, but missing <strong>{placeholderInfo.missing.join(', ')}</strong>.
-                Fill in the numbers and details below to enrich this record directly rather than creating a duplicate entry.
-              </p>
-            </div>
-          )}
 
           {/* Section 2: HR Name & Mobile Number (2-column Grid) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">

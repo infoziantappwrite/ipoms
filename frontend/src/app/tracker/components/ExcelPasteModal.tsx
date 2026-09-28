@@ -23,6 +23,10 @@ import {
 import {
   validateAndNormalizeIndianContact,
   validateAndNormalizeEmail,
+  validateAndNormalizeMultiMobile,
+  validateAndNormalizeMultiEmail,
+  cleanPlaceholder,
+  isPlaceholderValue,
 } from '@/lib/contactValidation';
 import { triggerHaptic } from '@/lib/haptics';
 import { apiFetch } from '@/lib/api';
@@ -94,10 +98,10 @@ export function ExcelPasteModal({ isOpen, onClose, onImport, collegeName, initia
       raw: { company_name: string; hr_name: string; mobile_number: string; email_id: string; comments?: string },
       id: string
     ): ParsedExcelRow => {
-      const comp = raw.company_name?.trim() || '';
-      const hr = raw.hr_name?.trim() || 'HR Contact';
-      const mob = raw.mobile_number?.trim() || '';
-      const em = raw.email_id?.trim().toLowerCase() || '';
+      const comp = cleanPlaceholder(raw.company_name);
+      const hr = cleanPlaceholder(raw.hr_name) || 'HR Contact';
+      const mob = cleanPlaceholder(raw.mobile_number);
+      const em = cleanPlaceholder(raw.email_id).toLowerCase();
       const comm = raw.comments?.trim() || '';
 
       // 1. Mandatory Company Name validation
@@ -107,51 +111,35 @@ export function ExcelPasteModal({ isOpen, onClose, onImport, collegeName, initia
       // 2. Mobile validation (optional if email is present, but must be valid format if provided)
       let isMobileValid = true;
       let mobileError: string | undefined;
-      let normalizedMobile = mob;
+      let normalizedMobile = '';
 
       if (mob) {
-        const mobList = mob.split(/[,;/]+/).map((s) => s.trim()).filter(Boolean);
-        const normalizedList: string[] = [];
-        for (const m of mobList) {
-          const res = validateAndNormalizeIndianContact(m);
-          if (!res.valid) {
-            isMobileValid = false;
-            mobileError = res.error || `Invalid contact number: "${m}"`;
-            break;
-          } else {
-            normalizedList.push(res.normalized);
-          }
-        }
-        if (isMobileValid) {
-          normalizedMobile = normalizedList.join(', ');
+        const mobRes = validateAndNormalizeMultiMobile(mob);
+        if (!mobRes.valid) {
+          isMobileValid = false;
+          mobileError = mobRes.error;
+        } else {
+          normalizedMobile = mobRes.normalized;
         }
       }
 
       // 3. Email validation (optional if mobile is present, but must be valid format if provided)
       let isEmailValid = true;
       let emailError: string | undefined;
-      let normalizedEmail = em;
+      let normalizedEmail = '';
 
       if (em) {
-        const emList = em.split(/[,;/]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
-        const normalizedEmList: string[] = [];
-        for (const e of emList) {
-          const res = validateAndNormalizeEmail(e);
-          if (!res.valid) {
-            isEmailValid = false;
-            emailError = res.error || `Invalid email ID: "${e}"`;
-            break;
-          } else {
-            normalizedEmList.push(res.normalized);
-          }
-        }
-        if (isEmailValid) {
-          normalizedEmail = normalizedEmList.join(', ');
+        const emRes = validateAndNormalizeMultiEmail(em);
+        if (!emRes.valid) {
+          isEmailValid = false;
+          emailError = emRes.error;
+        } else {
+          normalizedEmail = emRes.normalized;
         }
       }
 
       // 4. Contact point requirement: either mobile_number OR email_id must be present
-      const hasContact = Boolean(mob) || Boolean(em);
+      const hasContact = Boolean(normalizedMobile) || Boolean(normalizedEmail) || (mob ? isMobileValid : false) || (em ? isEmailValid : false);
       const contactError = !hasContact ? 'At least one contact point (Mobile or Email) is required' : undefined;
 
       // Overall row validity: Company is mandatory, at least one contact point is present, and neither is malformed
@@ -159,7 +147,7 @@ export function ExcelPasteModal({ isOpen, onClose, onImport, collegeName, initia
 
       return {
         id,
-        company_name: comp,
+        company_name: comp || raw.company_name?.trim() || '',
         hr_name: hr,
         mobile_number: mob,
         email_id: em,
@@ -248,18 +236,18 @@ export function ExcelPasteModal({ isOpen, onClose, onImport, collegeName, initia
           }
         }
 
-        let companyName = cols[0] || '';
+        let companyName = cleanPlaceholder(cols[0] || '');
         let hrName = 'HR Contact';
         let mobileNumber = '';
         let emailId = '';
         let comments = '';
 
-        const remaining = cols.slice(1).map((c) => c.trim()).filter((c) => c.length > 0);
+        const remaining = cols.slice(1).map((c) => cleanPlaceholder(c)).filter((c) => c.length > 0);
 
         if (cols.length >= 4) {
-          const c1 = cols[1] || '';
-          const c2 = cols[2] || '';
-          const c3 = cols[3] || '';
+          const c1 = cleanPlaceholder(cols[1] || '');
+          const c2 = cleanPlaceholder(cols[2] || '');
+          const c3 = cleanPlaceholder(cols[3] || '');
           comments = cols.slice(4).join(' ').trim();
 
           if (c1.includes('@')) {
@@ -334,13 +322,20 @@ export function ExcelPasteModal({ isOpen, onClose, onImport, collegeName, initia
 
         const raw = {
           company_name: companyName,
-          hr_name: hrName || 'HR Contact',
-          mobile_number: mobileNumber,
-          email_id: emailId,
+          hr_name: cleanPlaceholder(hrName) || 'HR Contact',
+          mobile_number: cleanPlaceholder(mobileNumber),
+          email_id: cleanPlaceholder(emailId),
           comments: comments,
         };
 
         rows.push(validateRow(raw, `row-${idx}-${Date.now()}`));
+      });
+
+      // Sort so invalid contacts appear first at the top for immediate review & resolution
+      rows.sort((a, b) => {
+        if (!a.isValid && b.isValid) return -1;
+        if (a.isValid && !b.isValid) return 1;
+        return 0;
       });
 
       setParsedRows(rows);
@@ -496,8 +491,8 @@ export function ExcelPasteModal({ isOpen, onClose, onImport, collegeName, initia
         {/* Header */}
         <div className="px-6 py-4 border-b border-border/80 flex items-center justify-between bg-slate-50 dark:bg-[#1A2234]">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20 shadow-2xs">
-              <FileSpreadsheet size={18} strokeWidth={2.2} />
+            <div className="w-9 h-9 rounded-xl bg-[#8E1BB1]/10 text-[#8E1BB1] dark:text-[#C55FE9] flex items-center justify-center border border-[#8E1BB1]/20 shadow-2xs">
+              <ClipboardPaste size={18} strokeWidth={2.2} />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -650,7 +645,7 @@ export function ExcelPasteModal({ isOpen, onClose, onImport, collegeName, initia
                 <button
                   type="button"
                   onClick={handleReadClipboard}
-                  className="mb-1 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-primary/30 bg-primary/10 text-primary text-xs font-semibold hover:bg-primary/15 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
+                  className="mb-1 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#8E1BB1]/30 bg-[#8E1BB1]/10 text-[#8E1BB1] dark:text-[#C55FE9] text-xs font-semibold hover:bg-[#8E1BB1]/20 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
                 >
                   <ClipboardPaste size={13} /> Paste from Clipboard
                 </button>
@@ -713,8 +708,12 @@ export function ExcelPasteModal({ isOpen, onClose, onImport, collegeName, initia
                     </thead>
                     <tbody className="divide-y divide-border bg-surface">
                       {parsedRows.map((row, idx) => {
-                        const isNewToMeta = metadataStatus.new.some(
-                          (n) => n.toLowerCase() === row.company_name.trim().toLowerCase()
+                        const normComp = row.company_name.trim().replace(/\s+/g, ' ').toLowerCase();
+                        const isExistingInMeta = metadataStatus.existing.some(
+                          (n) => n.trim().replace(/\s+/g, ' ').toLowerCase() === normComp
+                        );
+                        const isNewToMeta = !isExistingInMeta && metadataStatus.new.some(
+                          (n) => n.trim().replace(/\s+/g, ' ').toLowerCase() === normComp
                         );
                         return (
                           <tr

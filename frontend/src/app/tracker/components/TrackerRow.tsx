@@ -71,6 +71,7 @@ interface Props {
   isDeleteMode?: boolean;
   selectionTheme?: 'blue' | 'emerald' | 'purple' | 'amber' | 'rose' | 'pink' | 'orange';
   isReadOnly: boolean;
+  isAdvanceLocked?: boolean;
   onUpdate: (patch: Partial<TrackerRowType>) => void;
   onEdit?: (row: TrackerRowType) => void;
   onDelete: () => void;
@@ -92,6 +93,7 @@ export function TrackerRow({
   isDeleteMode,
   selectionTheme = 'blue',
   isReadOnly,
+  isAdvanceLocked = false,
   onUpdate,
   onEdit,
   onDelete,
@@ -102,6 +104,7 @@ export function TrackerRow({
   onCellMouseDown,
   onCellMouseEnter,
 }: Props) {
+  const isEffectivelyReadOnly = isReadOnly || isAdvanceLocked;
   const startTimeRef = useRef<HTMLInputElement>(null);
   const prevStartTimeRef = useRef<string>(formatTime(row.call_start_time));
   const companyNameRef = useRef<HTMLInputElement>(null);
@@ -135,6 +138,14 @@ export function TrackerRow({
     return '';
   };
 
+  const adjustCommentsHeight = useCallback(() => {
+    if (commentsRef.current && 'scrollHeight' in commentsRef.current) {
+      const el = commentsRef.current as HTMLTextAreaElement;
+      el.style.height = 'auto';
+      el.style.height = `${Math.max(28, el.scrollHeight)}px`;
+    }
+  }, []);
+
   useEffect(() => {
     if (companyNameRef.current && document.activeElement !== companyNameRef.current && companyNameRef.current.value !== (row.company_name ?? '')) {
       companyNameRef.current.value = row.company_name ?? '';
@@ -154,7 +165,13 @@ export function TrackerRow({
     if (commentsRef.current && document.activeElement !== commentsRef.current && commentsRef.current.value !== (row.comments ?? '')) {
       commentsRef.current.value = row.comments ?? '';
     }
-  }, [row.company_name, row.hr_name, row.mobile_number, row.email_id, row.call_start_time, row.comments]);
+    adjustCommentsHeight();
+  }, [row.company_name, row.hr_name, row.mobile_number, row.email_id, row.call_start_time, row.comments, adjustCommentsHeight]);
+
+  useEffect(() => {
+    window.addEventListener('resize', adjustCommentsHeight);
+    return () => window.removeEventListener('resize', adjustCommentsHeight);
+  }, [adjustCommentsHeight]);
 
   // ── Start Time blur: strictly smart-parse time, auto-predict AM/PM, format input, revert if invalid
   const handleStartTimeBlur = useCallback(() => {
@@ -423,14 +440,14 @@ export function TrackerRow({
   return (
     <div
       data-row-id={row._id}
-      className={`grid ${gridTemplate} divide-x divide-border/60 min-h-[44px] text-xs ${rowBg} transition-colors group ${
+      className={`grid ${gridTemplate} divide-x divide-border/60 min-h-[44px] h-auto text-xs ${rowBg} transition-colors group ${
         isSelected
           ? 'border-b border-primary/30'
           : 'border-b border-border/80'
       }`}
     >
       {/* S.No / Selection Checkbox (Frozen Col 1) */}
-      <div className={`sticky left-0 z-10 ${rowBg} px-1.5 py-2 flex items-center justify-center gap-1.5 select-none transition-colors`}>
+      <div className={`sticky left-0 z-10 ${rowBg} px-1.5 py-1.5 self-stretch flex items-center justify-center gap-1.5 select-none transition-colors`}>
         {(isSelectMode || isDeleteMode || isSelected) ? (
           <button
             type="button"
@@ -439,7 +456,7 @@ export function TrackerRow({
               onToggleSelect?.(row._id, (index ?? 1) - 1, e.shiftKey);
             }}
             title={isSelected ? 'Deselect this row' : isDeleteMode ? 'Select row to delete' : 'Select this row'}
-            className={`w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer shadow-2xs shrink-0 ${
+            className={`w-4 h-4 rounded border flex items-center justify-center transition-all cursor-pointer shadow-2xs shrink-0 my-auto ${
               effectiveTheme === 'rose'
                 ? isSelected
                   ? 'bg-rose-600 border-rose-600 text-white scale-105 ring-2 ring-rose-500/30'
@@ -479,37 +496,43 @@ export function TrackerRow({
               onToggleSelect?.(row._id, (index ?? 1) - 1, e.shiftKey);
             }}
             title="Click to select this row"
-            className="w-4 h-4 rounded border border-transparent group-hover:border-border-strong hover:!border-primary/80 bg-transparent group-hover:bg-surface text-transparent flex items-center justify-center transition-all cursor-pointer shadow-2xs shrink-0"
+            className="w-4 h-4 rounded border border-transparent group-hover:border-border-strong hover:!border-primary/80 bg-transparent group-hover:bg-surface text-transparent flex items-center justify-center transition-all cursor-pointer shadow-2xs shrink-0 my-auto"
           >
             <Check size={11} strokeWidth={2.5} className="opacity-0 group-hover:opacity-40 hover:!opacity-100 text-primary" />
           </button>
         )}
-        <span className="text-fg-subtle tabular-nums font-medium text-[11px]">
+        <span className="text-fg-subtle tabular-nums font-medium text-[11px] my-auto">
           {index ?? row.serial_no}
         </span>
       </div>
 
       {/* Start Time (Frozen Col 2 - 1-Click Clock Stamp & Editable) */}
       <div
-        className={`sticky left-[56px] z-10 ${rowBg} px-1.5 py-1 flex items-center transition-colors ${getCellSelectionClass('start_time')}`}
-        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('start_time', e); }}
-        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('start_time'); }}
+        className={`sticky left-[56px] z-10 ${rowBg} px-1.5 py-1 self-stretch flex items-center transition-colors ${getCellSelectionClass('start_time')}`}
+        onMouseDown={(e) => { if (!isEffectivelyReadOnly && e.button === 0) onCellMouseDown?.('start_time', e); }}
+        onMouseEnter={() => { if (!isEffectivelyReadOnly) onCellMouseEnter?.('start_time'); }}
       >
-        {isReadOnly ? (
-          <span className="text-fg-muted text-xs tabular-nums px-1">{formatTime(row.call_start_time) || '—'}</span>
+        {isEffectivelyReadOnly ? (
+          <div
+            title={isAdvanceLocked ? "Calling operations & time logging will unlock automatically at 12:00 AM midnight" : "Read-only call record"}
+            className="flex items-center gap-1 text-fg-muted text-xs tabular-nums px-1 my-auto italic select-none"
+          >
+            <Clock size={11} className="opacity-40 shrink-0" />
+            <span>{formatTime(row.call_start_time) || (isAdvanceLocked ? 'Locked' : '—')}</span>
+          </div>
         ) : !row.call_start_time ? (
           <button
             type="button"
             data-field="start_time_btn"
             onClick={handleSetCurrentStartTime}
             title="Click clock to set current start time (or press Spacebar)"
-            className="flex items-center justify-center gap-1.5 w-full h-7 px-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 hover:border-primary/40 rounded-md text-[11px] font-semibold transition-all cursor-pointer shadow-2xs hover:shadow-xs group/clock"
+            className="flex items-center justify-center gap-1.5 w-full h-7 px-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 hover:border-primary/40 rounded-md text-[11px] font-semibold transition-all cursor-pointer shadow-2xs hover:shadow-xs group/clock my-auto"
           >
             <Clock size={12} className="shrink-0 text-primary group-hover/clock:scale-110 transition-transform" />
             <span className="truncate">Set Time</span>
           </button>
         ) : (
-          <div className="flex items-center gap-0.5 w-full group/time">
+          <div className="flex items-center gap-0.5 w-full group/time my-auto">
             <input
               ref={startTimeRef}
               data-field="start_time"
@@ -526,7 +549,7 @@ export function TrackerRow({
               type="button"
               onClick={handleSetCurrentStartTime}
               title="Re-stamp current time now"
-              className="p-1 rounded hover:bg-surface-raised text-fg-subtle hover:text-primary transition-colors cursor-pointer shrink-0 opacity-40 hover:opacity-100 group-hover/time:opacity-80"
+              className="p-1 rounded hover:bg-surface-raised text-fg-subtle hover:text-primary transition-colors cursor-pointer shrink-0 opacity-40 hover:opacity-100 group-hover/time:opacity-80 my-auto"
             >
               <Clock size={11} />
             </button>
@@ -536,39 +559,43 @@ export function TrackerRow({
 
       {/* End Time (Frozen Col 3 - Auto Display) */}
       <div
-        className={`sticky left-[156px] z-10 ${rowBg} px-2.5 py-2 text-fg-subtle tabular-nums text-xs flex items-center whitespace-nowrap transition-colors ${getCellSelectionClass('end_time')}`}
-        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('end_time', e); }}
-        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('end_time'); }}
+        className={`sticky left-[156px] z-10 ${rowBg} px-2.5 py-1.5 self-stretch text-fg-subtle tabular-nums text-xs flex items-center whitespace-nowrap transition-colors ${getCellSelectionClass('end_time')}`}
+        onMouseDown={(e) => { if (!isEffectivelyReadOnly && e.button === 0) onCellMouseDown?.('end_time', e); }}
+        onMouseEnter={() => { if (!isEffectivelyReadOnly) onCellMouseEnter?.('end_time'); }}
         title={formatTime(row.call_end_time) || 'Auto-captured on status selection'}
       >
-        {formatTime(row.call_end_time) || (
-          <span className="text-fg-muted italic">auto</span>
-        )}
+        <span className="my-auto">
+          {formatTime(row.call_end_time) || (
+            <span className="text-fg-muted italic">auto</span>
+          )}
+        </span>
       </div>
 
       {/* Duration (Frozen Col 4 - Auto Display) */}
       <div
-        className={`sticky left-[246px] z-10 ${rowBg} px-2.5 py-2 text-fg-subtle tabular-nums text-xs flex items-center whitespace-nowrap transition-colors ${getCellSelectionClass('duration')}`}
-        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('duration', e); }}
-        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('duration'); }}
+        className={`sticky left-[246px] z-10 ${rowBg} px-2.5 py-1.5 self-stretch text-fg-subtle tabular-nums text-xs flex items-center whitespace-nowrap transition-colors ${getCellSelectionClass('duration')}`}
+        onMouseDown={(e) => { if (!isEffectivelyReadOnly && e.button === 0) onCellMouseDown?.('duration', e); }}
+        onMouseEnter={() => { if (!isEffectivelyReadOnly) onCellMouseEnter?.('duration'); }}
         title={row.duration_formatted || 'Auto-calculated on status selection'}
       >
-        {row.duration_formatted || (
-          <span className="text-fg-muted">—</span>
-        )}
+        <span className="my-auto">
+          {row.duration_formatted || (
+            <span className="text-fg-muted">—</span>
+          )}
+        </span>
       </div>
 
       {/* Company Name (Frozen Col 5 - Editable & Solid Right Divider) */}
       <div
-        className={`sticky left-[336px] z-10 ${rowBg} px-2 py-1 flex items-center border-r-2 border-border-strong shadow-[6px_0_12px_-3px_rgba(0,0,0,0.12)] dark:shadow-[6px_0_12px_-3px_rgba(0,0,0,0.6)] transition-colors ${getCellSelectionClass('company_name')}`}
-        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('company_name', e); }}
-        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('company_name'); }}
+        className={`sticky left-[336px] z-10 ${rowBg} px-2 py-1 self-stretch flex items-center border-r-2 border-border-strong shadow-[6px_0_12px_-3px_rgba(0,0,0,0.12)] dark:shadow-[6px_0_12px_-3px_rgba(0,0,0,0.6)] transition-colors ${getCellSelectionClass('company_name')}`}
+        onMouseDown={(e) => { if (!isEffectivelyReadOnly && e.button === 0) onCellMouseDown?.('company_name', e); }}
+        onMouseEnter={() => { if (!isEffectivelyReadOnly) onCellMouseEnter?.('company_name'); }}
         title={row.company_name}
       >
-        {isReadOnly ? (
-          <div className="flex items-center justify-between w-full min-w-0 gap-1.5">
+        {isEffectivelyReadOnly ? (
+          <div className="flex items-center justify-between w-full min-w-0 gap-1.5 my-auto">
             <span className="text-fg font-semibold break-words leading-snug select-text truncate">{row.company_name}</span>
-            {onCopySingle && (
+            {onCopySingle && isReadOnly && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -598,13 +625,13 @@ export function TrackerRow({
             }}
             onBlur={handleCompanyNameBlur}
             title="Click to edit Company Name"
-            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg font-semibold transition-colors cursor-text text-xs outline-none"
+            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg font-semibold transition-colors cursor-text text-xs outline-none my-auto"
           />
         )}
         {row.original_college_code && (
           <span
             title={`Received from ${row.original_college_name || row.original_college_code}${row.original_coordinator_name ? ` (${row.original_coordinator_name})` : ''}`}
-            className="ml-1 px-1.5 py-0.5 text-[9.5px] font-bold rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0"
+            className="ml-1 px-1.5 py-0.5 text-[9.5px] font-bold rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0 my-auto"
           >
             Shared ({row.original_college_code})
           </span>
@@ -613,13 +640,13 @@ export function TrackerRow({
 
       {/* HR Name (Editable) */}
       <div
-        className={`px-2 py-1 flex items-center min-w-0 ${getCellSelectionClass('hr_name')}`}
-        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('hr_name', e); }}
-        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('hr_name'); }}
+        className={`px-2 py-1 self-stretch flex items-center min-w-0 ${getCellSelectionClass('hr_name')}`}
+        onMouseDown={(e) => { if (!isEffectivelyReadOnly && e.button === 0) onCellMouseDown?.('hr_name', e); }}
+        onMouseEnter={() => { if (!isEffectivelyReadOnly) onCellMouseEnter?.('hr_name'); }}
         title={row.hr_name || ''}
       >
-        {isReadOnly ? (
-          <span className="text-fg font-medium text-xs leading-snug break-words select-text">
+        {isEffectivelyReadOnly ? (
+          <span className="text-fg font-medium text-xs leading-snug break-words select-text my-auto">
             {row.hr_name || <span className="text-fg-muted italic">—</span>}
           </span>
         ) : (
@@ -637,20 +664,20 @@ export function TrackerRow({
             }}
             onBlur={handleHrNameBlur}
             title="Click to edit HR Contact Name"
-            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg font-medium transition-colors cursor-text text-xs outline-none placeholder:text-fg-disabled min-w-0"
+            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg font-medium transition-colors cursor-text text-xs outline-none placeholder:text-fg-disabled min-w-0 my-auto"
           />
         )}
       </div>
 
       {/* Contact (Call / WhatsApp + Editable Mobile) */}
       <div
-        className={`px-2 py-1.5 text-fg font-mono tabular-nums text-xs flex items-start gap-1.5 group/contact min-w-0 ${getCellSelectionClass('mobile_number')}`}
-        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('mobile_number', e); }}
-        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('mobile_number'); }}
+        className={`px-2 py-1.5 text-fg font-mono tabular-nums text-xs self-stretch flex items-center gap-1.5 group/contact min-w-0 ${getCellSelectionClass('mobile_number')}`}
+        onMouseDown={(e) => { if (!isEffectivelyReadOnly && e.button === 0) onCellMouseDown?.('mobile_number', e); }}
+        onMouseEnter={() => { if (!isEffectivelyReadOnly) onCellMouseEnter?.('mobile_number'); }}
       >
         {row.mobile_number && (
-          <div className="flex items-center gap-1 shrink-0 mt-0.5">
-            {!isReadOnly ? (
+          <div className="flex items-center gap-1 shrink-0 my-auto">
+            {!isEffectivelyReadOnly ? (
               <button
                 type="button"
                 onClick={() => {
@@ -662,22 +689,31 @@ export function TrackerRow({
               >
                 <Phone size={11} strokeWidth={2.5} className="text-blue-600 dark:text-blue-400" />
               </button>
+            ) : isAdvanceLocked ? (
+              <div
+                title="Calling is locked for tomorrow's advance entry. Unlocks automatically at 12:00 AM midnight"
+                className="w-5 h-5 rounded-md bg-zinc-200/80 dark:bg-zinc-800/80 border border-zinc-300 dark:border-zinc-700 text-fg-disabled flex items-center justify-center shrink-0 cursor-not-allowed shadow-2xs opacity-60"
+              >
+                <Phone size={11} strokeWidth={2} className="text-fg-disabled" />
+              </div>
             ) : (
               <div className="w-5 h-5 rounded-md bg-blue-500/15 border border-blue-500/40 dark:border-blue-400/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 shadow-2xs">
                 <Phone size={11} strokeWidth={2.5} className="text-blue-600 dark:text-blue-400" />
               </div>
             )}
 
-            <WhatsAppButton
-              mobileNumber={(row.mobile_number || '').split(/[,;/]+/)[0]?.trim() || row.mobile_number}
-              contactName={row.hr_name}
-              companyName={row.company_name}
-            />
+            {!isAdvanceLocked && (
+              <WhatsAppButton
+                mobileNumber={(row.mobile_number || '').split(/[,;/]+/)[0]?.trim() || row.mobile_number}
+                contactName={row.hr_name}
+                companyName={row.company_name}
+              />
+            )}
           </div>
         )}
 
-        {isReadOnly ? (
-          <div className="flex flex-col gap-0.5 min-w-0 leading-snug py-0.5">
+        {isEffectivelyReadOnly ? (
+          <div className="flex flex-col justify-center gap-0.5 min-w-0 leading-snug py-0.5 my-auto">
             {(() => {
               const numbers = (row.mobile_number || '')
                 .split(/[,;/]+/)
@@ -712,20 +748,20 @@ export function TrackerRow({
             }}
             onBlur={handleMobileBlur}
             title="Click to edit Mobile Number"
-            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg font-mono font-medium transition-colors cursor-text text-xs outline-none placeholder:text-fg-disabled min-w-0"
+            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg font-mono font-medium transition-colors cursor-text text-xs outline-none placeholder:text-fg-disabled min-w-0 my-auto"
           />
         )}
       </div>
 
       {/* Email ID (Editable) */}
       <div
-        className={`px-2 py-1.5 flex items-center min-w-0 text-xs ${getCellSelectionClass('email_id')}`}
-        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('email_id', e); }}
-        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('email_id'); }}
+        className={`px-2 py-1.5 self-stretch flex items-center min-w-0 text-xs ${getCellSelectionClass('email_id')}`}
+        onMouseDown={(e) => { if (!isEffectivelyReadOnly && e.button === 0) onCellMouseDown?.('email_id', e); }}
+        onMouseEnter={() => { if (!isEffectivelyReadOnly) onCellMouseEnter?.('email_id'); }}
         title={row.email_id || ''}
       >
-        {isReadOnly ? (
-          <div className="flex flex-col gap-0.5 min-w-0 leading-snug py-0.5">
+        {isEffectivelyReadOnly ? (
+          <div className="flex flex-col justify-center gap-0.5 min-w-0 leading-snug py-0.5 my-auto">
             {(() => {
               const emails = (row.email_id || '')
                 .split(/[,;/]+/)
@@ -760,7 +796,7 @@ export function TrackerRow({
             }}
             onBlur={handleEmailBlur}
             title="Click to edit Email Address"
-            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg transition-colors cursor-text text-xs outline-none placeholder:text-fg-disabled min-w-0"
+            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg transition-colors cursor-text text-xs outline-none placeholder:text-fg-disabled min-w-0 my-auto"
           />
         )}
       </div>
@@ -768,17 +804,17 @@ export function TrackerRow({
       {/* Coordinator & College — shown in read-only history, which spans coordinators and colleges */}
       {isReadOnly && (
         <div
-          className="px-2.5 py-2 flex items-center gap-1.5 whitespace-nowrap text-xs"
+          className="px-2.5 py-1.5 self-stretch flex items-center gap-1.5 whitespace-nowrap text-xs"
           title={`${row.college_name || row.college_code || ''} ${
             row.coordinator_name ? `• ${row.coordinator_name}` : ''
           }`.trim()}
         >
           {row.college_code && (
-            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 shrink-0">
+            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 shrink-0 my-auto">
               {row.college_code}
             </span>
           )}
-          <span className="text-fg-subtle select-text truncate max-w-[130px]">
+          <span className="text-fg-subtle select-text truncate max-w-[130px] my-auto">
             {(() => {
               const code = (row.college_code || '').toUpperCase();
               if (['ACET', 'AIHT', 'KARPAGAM', 'KPR'].includes(code)) {
@@ -794,47 +830,53 @@ export function TrackerRow({
 
       {/* Call Status (Dropdown directly in cell) */}
       <div
-        className={`px-2 py-1.5 min-w-0 flex items-center ${getCellSelectionClass('outcome_status')}`}
-        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('outcome_status', e); }}
-        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('outcome_status'); }}
+        className={`px-2 py-1.5 min-w-0 self-stretch flex items-center ${getCellSelectionClass('outcome_status')}`}
+        onMouseDown={(e) => { if (!isEffectivelyReadOnly && e.button === 0) onCellMouseDown?.('outcome_status', e); }}
+        onMouseEnter={() => { if (!isEffectivelyReadOnly) onCellMouseEnter?.('outcome_status'); }}
       >
-        {isReadOnly ? (
-          <OutcomeBadge outcome={row.outcome_status} />
+        {isEffectivelyReadOnly ? (
+          <div className="my-auto">
+            <OutcomeBadge outcome={row.outcome_status} />
+          </div>
         ) : (
-          <RowOutcomeDropdown
-            value={row.outcome_status}
-            onChange={(val) => handleOutcomeChange(val as CallOutcome)}
-          />
+          <div className="w-full my-auto">
+            <RowOutcomeDropdown
+              value={row.outcome_status}
+              onChange={(val) => handleOutcomeChange(val as CallOutcome)}
+            />
+          </div>
         )}
       </div>
 
       {/* Follow Up (Month Dropdown directly in cell) */}
       <div
-        className={`px-2 py-1.5 min-w-0 flex items-center ${getCellSelectionClass('follow_up_month')}`}
-        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('follow_up_month', e); }}
-        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('follow_up_month'); }}
+        className={`px-2 py-1.5 min-w-0 self-stretch flex items-center ${getCellSelectionClass('follow_up_month')}`}
+        onMouseDown={(e) => { if (!isEffectivelyReadOnly && e.button === 0) onCellMouseDown?.('follow_up_month', e); }}
+        onMouseEnter={() => { if (!isEffectivelyReadOnly) onCellMouseEnter?.('follow_up_month'); }}
       >
-        {isReadOnly ? (
-          <span className="text-xs text-fg-subtle px-1">
+        {isEffectivelyReadOnly ? (
+          <span className="text-xs text-fg-subtle px-1 my-auto">
             {row.outcome_status === 'follow_up' && row.follow_up_month ? row.follow_up_month : '—'}
           </span>
         ) : (
-          <RowMonthDropdown
-            value={row.outcome_status === 'follow_up' ? row.follow_up_month : null}
-            disabled={row.outcome_status !== 'follow_up'}
-            onChange={(month) => handleMonthChange(month)}
-          />
+          <div className="w-full my-auto">
+            <RowMonthDropdown
+              value={row.outcome_status === 'follow_up' ? row.follow_up_month : null}
+              disabled={row.outcome_status !== 'follow_up'}
+              onChange={(month) => handleMonthChange(month)}
+            />
+          </div>
         )}
       </div>
 
       {/* Comments (Textarea directly in cell) */}
       <div
-        className={`px-2.5 py-1.5 min-w-0 flex items-center ${getCellSelectionClass('comments')}`}
-        onMouseDown={(e) => { if (!isReadOnly && e.button === 0) onCellMouseDown?.('comments', e); }}
-        onMouseEnter={() => { if (!isReadOnly) onCellMouseEnter?.('comments'); }}
+        className={`px-2.5 py-1.5 min-w-0 self-stretch flex items-center ${getCellSelectionClass('comments')}`}
+        onMouseDown={(e) => { if (!isEffectivelyReadOnly && e.button === 0) onCellMouseDown?.('comments', e); }}
+        onMouseEnter={() => { if (!isEffectivelyReadOnly) onCellMouseEnter?.('comments'); }}
       >
-        {isReadOnly ? (
-          <p className="text-fg-subtle italic text-xs break-words leading-relaxed whitespace-pre-wrap">
+        {isEffectivelyReadOnly ? (
+          <p className="text-fg-subtle italic text-xs break-words leading-relaxed whitespace-pre-wrap my-auto w-full">
             {row.comments || '—'}
           </p>
         ) : (
@@ -843,15 +885,20 @@ export function TrackerRow({
             defaultValue={row.comments ?? ''}
             maxLength={200}
             placeholder="Optional notes (max 200 chars)…"
-            rows={row.comments && row.comments.length > 35 ? Math.min(4, Math.ceil(row.comments.length / 35)) : 1}
+            rows={1}
             onKeyDown={handleCommentsKeyDown}
             onBlur={handleCommentsBlur}
+            onFocus={(e) => {
+              const target = e.currentTarget;
+              target.style.height = 'auto';
+              target.style.height = `${Math.max(28, target.scrollHeight)}px`;
+            }}
             onInput={(e) => {
               const target = e.currentTarget;
               target.style.height = 'auto';
               target.style.height = `${Math.max(28, target.scrollHeight)}px`;
             }}
-            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:bg-surface px-1.5 py-1 rounded text-fg placeholder-fg-subtle transition-colors resize-none break-words leading-relaxed text-xs outline-none focus:ring-1 focus:ring-primary/30"
+            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:bg-surface px-1.5 py-1 rounded text-fg placeholder-fg-subtle transition-colors resize-none break-words leading-relaxed text-xs outline-none focus:ring-1 focus:ring-primary/30 my-auto overflow-hidden"
           />
         )}
       </div>

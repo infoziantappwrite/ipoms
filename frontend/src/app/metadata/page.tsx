@@ -40,6 +40,7 @@ export default function MetadataPage() {
   const [isExactDuplicate, setIsExactDuplicate] = useState<boolean>(false);
 
   const [showBulkPasteModal, setShowBulkPasteModal] = useState<boolean>(false);
+  const [pasteInitialText, setPasteInitialText] = useState<string>('');
   const [showEmptyRecycleBinModal, setShowEmptyRecycleBinModal] = useState<boolean>(false);
   const [isEmptyingRecycleBin, setIsEmptyingRecycleBin] = useState<boolean>(false);
   const [showBulkDeleteModal, setShowBulkDeleteModal] = useState<boolean>(false);
@@ -224,6 +225,47 @@ export default function MetadataPage() {
       window.removeEventListener('ipoms_global_save_trigger' as any, handleGlobalTrigger);
     };
   }, [loadMetadata]);
+
+  // Handle Global Paste (Ctrl+V outside of inputs triggers Bulk Paste Modal directly)
+  useEffect(() => {
+    const handleGlobalPaste = (e: ClipboardEvent) => {
+      const activeEl = document.activeElement as HTMLElement | null;
+      const tagName = activeEl?.tagName?.toLowerCase();
+      if (tagName === 'input' || tagName === 'textarea' || tagName === 'select' || activeEl?.isContentEditable) {
+        return;
+      }
+      if (showBulkPasteModal || showEditModal || showDuplicateModal) {
+        return;
+      }
+      const text = e.clipboardData?.getData('text') || '';
+      if (text.trim()) {
+        e.preventDefault();
+        setPasteInitialText(text);
+        setShowBulkPasteModal(true);
+      }
+    };
+
+    window.addEventListener('paste', handleGlobalPaste);
+    return () => window.removeEventListener('paste', handleGlobalPaste);
+  }, [showBulkPasteModal, showEditModal, showDuplicateModal]);
+
+  const handleOpenBulkPaste = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.readText) {
+      navigator.clipboard
+        .readText()
+        .then((text) => {
+          setPasteInitialText(text || '');
+          setShowBulkPasteModal(true);
+        })
+        .catch(() => {
+          setPasteInitialText('');
+          setShowBulkPasteModal(true);
+        });
+    } else {
+      setPasteInitialText('');
+      setShowBulkPasteModal(true);
+    }
+  };
 
   // Handle Escape Key: Closes active modal first; pressing Escape again exits selection mode & clears checkmarks
   useEffect(() => {
@@ -566,7 +608,7 @@ export default function MetadataPage() {
         onApplyRange={handleRangeChange}
         onClearRange={handleClearRange}
         onOpenAddModal={handleOpenAdd}
-        onOpenBulkPasteModal={() => setShowBulkPasteModal(true)}
+        onOpenBulkPasteModal={handleOpenBulkPaste}
         onExport={handleExport}
         isExporting={isExporting}
         onExportPdf={handleOpenPdfModal}
@@ -686,7 +728,11 @@ export default function MetadataPage() {
 
       {showBulkPasteModal && (
         <BulkPasteModal
-          onClose={() => setShowBulkPasteModal(false)}
+          initialText={pasteInitialText}
+          onClose={() => {
+            setShowBulkPasteModal(false);
+            setPasteInitialText('');
+          }}
           onSuccess={loadMetadata}
         />
       )}

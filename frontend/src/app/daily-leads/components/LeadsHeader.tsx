@@ -262,10 +262,10 @@ export function LeadsHeader({
               }}
               className={`relative w-9 h-9 flex items-center justify-center rounded-xl transition-all shadow-xs cursor-pointer select-none shrink-0 ${
                 isDeleteMode && selectedCount > 0
-                  ? 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs ring-2 ring-rose-500/30'
+                  ? 'bg-rose-700 hover:bg-rose-800 active:bg-rose-900 text-white shadow-xs ring-2 ring-rose-400'
                   : isDeleteMode
-                  ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-400 dark:border-rose-700 ring-2 ring-rose-500/20'
-                  : 'bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/80 shadow-2xs'
+                  ? 'bg-rose-700 hover:bg-rose-800 text-white shadow-xs ring-2 ring-rose-400'
+                  : 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs'
               } active:scale-[0.95]`}
               title={
                 isDeleteMode && selectedCount > 0
@@ -276,7 +276,7 @@ export function LeadsHeader({
               }
               aria-label={isDeleteMode ? 'Delete Selected Leads' : 'Delete Leads'}
             >
-              <Trash2 size={16} strokeWidth={2.2} />
+              <Trash2 size={16} strokeWidth={2.2} className="text-white" />
               {isDeleteMode && selectedCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-white dark:bg-zinc-900 text-rose-600 text-[9px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center shadow-xs tabular-nums ring-1 ring-rose-600">
                   {selectedCount}
@@ -290,11 +290,15 @@ export function LeadsHeader({
               type="button"
               disabled={isSyncing}
               onClick={onSyncPositives}
-              className="w-9 h-9 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl transition-all shadow-xs cursor-pointer active:scale-[0.992] hover:shadow-indigo-500/20 shrink-0"
+              className="w-9 h-9 flex items-center justify-center bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-xl transition-all shadow-xs cursor-pointer active:scale-[0.992] disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
               title="Sync positive calls and scheduled pipeline leads for this date"
               aria-label="Sync Positives"
             >
-              <RefreshCw size={16} strokeWidth={2.2} className={isSyncing ? 'animate-spin' : ''} />
+              <RefreshCw
+                size={16}
+                strokeWidth={2.2}
+                className={isSyncing ? 'animate-spin text-white' : 'text-white'}
+              />
             </button>
           )}
 

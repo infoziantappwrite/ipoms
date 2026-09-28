@@ -298,11 +298,11 @@ export function WeeklyHeader({
               }}
               title={allSectionsCollapsed ? 'Expand All Sections' : 'Collapse All Sections'}
               aria-label={allSectionsCollapsed ? 'Expand all sections' : 'Collapse all sections'}
-              className="w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 bg-zinc-50 hover:bg-zinc-100 dark:bg-zinc-900/50 dark:hover:bg-zinc-800/80 text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 border border-zinc-200 dark:border-zinc-700/80 shadow-2xs active:scale-[0.95] disabled:opacity-40"
+              className="w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 bg-slate-700 hover:bg-slate-800 active:bg-slate-900 text-white shadow-xs active:scale-[0.95] disabled:opacity-40"
             >
               {allSectionsCollapsed
-                ? <ChevronsDown size={15} strokeWidth={2.2} />
-                : <ChevronsUp size={15} strokeWidth={2.2} />}
+                ? <ChevronsDown size={15} strokeWidth={2.4} className="text-white" />
+                : <ChevronsUp size={15} strokeWidth={2.4} className="text-white" />}
             </button>
           )}
 
@@ -324,10 +324,10 @@ export function WeeklyHeader({
             disabled={!selectedCollegeId || isDeleting}
             className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 ${
               selectionMode === 'delete' && selectedCount > 0
-                ? 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs ring-2 ring-rose-500/30'
+                ? 'bg-rose-700 hover:bg-rose-800 active:bg-rose-900 text-white shadow-xs ring-2 ring-rose-400'
                 : selectionMode === 'delete'
-                ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-400 dark:border-rose-700 ring-2 ring-rose-500/20'
-                : 'bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/80 shadow-2xs'
+                ? 'bg-rose-700 hover:bg-rose-800 text-white shadow-xs ring-2 ring-rose-400'
+                : 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs'
             } disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]`}
             title={
               selectionMode === 'delete' && selectedCount > 0
@@ -338,7 +338,7 @@ export function WeeklyHeader({
             }
             aria-label="Delete Rows"
           >
-            <Trash2 size={16} strokeWidth={2.2} />
+            <Trash2 size={16} strokeWidth={2.2} className="text-white" />
             {selectionMode === 'delete' && selectedCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-white dark:bg-zinc-900 text-rose-600 text-[9px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center shadow-xs tabular-nums ring-1 ring-rose-600">
                 {selectedCount}
@@ -355,12 +355,12 @@ export function WeeklyHeader({
                 triggerHaptic('selection');
                 onOpenPaste();
               }}
-              className="relative h-8 px-2.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer select-none shrink-0 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 shadow-2xs text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]"
+              className="relative h-8 px-3 py-1.5 rounded-xl flex items-center gap-1.5 bg-[#8E1BB1] hover:bg-[#7A149B] active:bg-[#680F86] text-white shadow-xs text-xs font-bold transition-all cursor-pointer select-none shrink-0 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]"
               title="Paste companies, roles, CTC, contacts, emails or dates from Excel (select a college first)"
               aria-label="Paste"
             >
-              <ClipboardPaste size={13} strokeWidth={2.4} />
-              <span className="hidden sm:inline font-bold">Paste</span>
+              <ClipboardPaste size={14} strokeWidth={2.4} className="text-white" />
+              <span className="font-bold text-white">Paste</span>
             </button>
           )}
 
@@ -373,14 +373,14 @@ export function WeeklyHeader({
                 triggerHaptic('selection');
                 onSyncDailyPositives();
               }}
-              className="relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80 shadow-2xs text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]"
+              className="relative w-8 h-8 rounded-xl flex items-center justify-center bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white shadow-xs transition-all cursor-pointer select-none shrink-0 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]"
               title="Sync positive leads from Daily Leads into Companies in Pipeline"
               aria-label="Sync Daily Positives"
             >
               <RefreshCw
-                size={13}
+                size={14}
                 strokeWidth={2.4}
-                className={isSyncing ? 'animate-spin text-amber-600 dark:text-amber-400' : 'text-amber-600 dark:text-amber-400'}
+                className={isSyncing ? 'animate-spin text-white' : 'text-white'}
               />
             </button>
           )}
