@@ -15,7 +15,7 @@ import { apiFetch } from '@/lib/api';
 import { readSessionUser, roleOf } from '@/lib/session';
 import { useFullAccessViewer } from '@/lib/useFullAccessViewer';
 import { getCoordinatorSelectedColleges } from '@/lib/collegeSession';
-import { ManualAddRowModal } from './components/ManualAddRowModal';
+import { ManualAddRowModal, type ManualAddRowDraft } from './components/ManualAddRowModal';
 import { EditTrackerRowModal } from './components/EditTrackerRowModal';
 import { BulkDeleteTrackerModal } from './components/BulkDeleteTrackerModal';
 import { DeleteRowConfirmModal } from './components/DeleteRowConfirmModal';
@@ -125,6 +125,7 @@ export default function DailyTrackerPage() {
   const [activeCallRow, setActiveCallRow] = useState<TrackerRow | null>(null);
   const [sessionDate, setSessionDate] = useState<string>('');
   const [isManualAddOpen, setIsManualAddOpen] = useState(false);
+  const [manualAddDraft, setManualAddDraft] = useState<ManualAddRowDraft | null>(null);
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<TrackerRow | null>(null);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
@@ -303,6 +304,28 @@ export default function DailyTrackerPage() {
         if (col.obj) setSelectedCollegeObj(col.obj);
       }
     });
+
+    // Returning from "Add to Meta Database" (ManualAddRowModal.handleRedirectToMeta): reopen the
+    // manual-add modal pre-filled with what was typed before, instead of quietly discarding it - the
+    // contact was saved to the Meta Database but never actually reached the tracker (user-reported,
+    // 28 Sep 2026).
+    if (typeof window !== 'undefined') {
+      try {
+        const savedDraftStr = sessionStorage.getItem('ipoms_daily_tracker_add_row_draft');
+        if (savedDraftStr) {
+          const draft = JSON.parse(savedDraftStr);
+          if (draft && draft.companyName) {
+            setManualAddDraft(draft);
+            setIsManualAddOpen(true);
+          } else {
+            sessionStorage.removeItem('ipoms_daily_tracker_add_row_draft');
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse daily tracker add-row draft from sessionStorage:', e);
+        sessionStorage.removeItem('ipoms_daily_tracker_add_row_draft');
+      }
+    }
 
     const handleCollegeChange = (e: any) => {
       if (e.detail?.id) {
@@ -542,6 +565,8 @@ export default function DailyTrackerPage() {
       const next = [...prev, newRow];
       return next.map((r, idx) => ({ ...r, serial_no: idx + 1 }));
     });
+    setManualAddDraft(null);
+    if (typeof window !== 'undefined') sessionStorage.removeItem('ipoms_daily_tracker_add_row_draft');
     loadKpi();
     broadcastTrackerMutation();
   }, [loadKpi, broadcastTrackerMutation]);
@@ -1366,7 +1391,12 @@ export default function DailyTrackerPage() {
           coordinatorId={coordinatorId}
           collegeId={selectedCollegeId}
           sessionDate={sessionDate}
-          onClose={() => setIsManualAddOpen(false)}
+          initialDraft={manualAddDraft}
+          onClose={() => {
+            setIsManualAddOpen(false);
+            setManualAddDraft(null);
+            if (typeof window !== 'undefined') sessionStorage.removeItem('ipoms_daily_tracker_add_row_draft');
+          }}
           onRowAdded={handleManualRowAdded}
         />
       )}

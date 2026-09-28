@@ -2185,6 +2185,31 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     load further but is a bigger rewrite. 34/34 API tests still pass; Sujitha's and Malvika's dashboards still
     load with the right data.
 
+85. **Daily Tracker: a manually-entered contact saved to the Meta Database never actually reached the
+    tracker, 28 Sep 2026 (user-reported).** Flow: type a contact not on file -> "Contact Not in Meta
+    Database" popup -> **Yes** (add it) -> redirected to `/metadata` pre-filled -> Save -> returns to
+    `/tracker`. Everything up to Save worked; the return trip was the bug. `ManualAddRowModal` sent the
+    browser to `/metadata` with a plain `window.location.href` and nothing else - every field the
+    coordinator had typed (company, HR, mobile, email, times, call status, comments) was gone the moment
+    the page navigated, and nothing on `/tracker` knew a save had just happened, so the entry silently
+    never reached the tracker and had to be retyped from scratch. The same class of bug, fixed the same
+    way, as the Weekly Tracker's `AddCompanyModal` (see the `ipoms_weekly_add_company_draft` pattern,
+    referenced throughout this file) - Daily Tracker's manual-add flow had never gotten the same
+    treatment. Fixed with the identical mechanism: `handleRedirectToMeta` now saves a full snapshot of the
+    form (`ManualAddRowDraft`: company, HR names, mobiles, emails, start/end time, duration, outcome,
+    follow-up month, comments, college id, session date) to `sessionStorage`
+    (`ipoms_daily_tracker_add_row_draft`) before navigating; `tracker/page.tsx` checks for it on mount,
+    and if present reopens `ManualAddRowModal` pre-filled via a new `initialDraft` prop instead of showing
+    an empty tracker. The coordinator still clicks **Add Entry** once to finish (not auto-submitted - a
+    real user could review or correct anything, e.g. the time that's now passed) - this now finds the
+    freshly-created Meta Database record and saves for real; the draft is cleared on close or on a
+    successful add so it never resurfaces on a later visit. **Verified live end-to-end** with a throwaway
+    company (`ZZTEST86 NewCo ...`, all rows removed after): typed a new contact on AIHT -> "Yes" -> Meta
+    Database Create -> back on `/tracker`, the modal reopened with every field intact, including the call
+    status and the computed duration -> Add Entry -> "New entry added to tracker" toast -> the row appeared
+    in the AIHT table immediately, no reload needed. `tsc --noEmit` clean both sides; the 34 API tests
+    still pass (unaffected, frontend-only change).
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map
