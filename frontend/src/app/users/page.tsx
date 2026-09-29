@@ -25,6 +25,7 @@ export default function UsersPage() {
   // Modal State
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [defaultAddRole, setDefaultAddRole] = useState<string>('PLACEMENT_COORDINATOR');
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -143,7 +144,7 @@ export default function UsersPage() {
             <span>User Management & Staff Directory</span>
           </h1>
           <p className="text-xs text-fg-subtle mt-0.5">
-            Manage staff accounts, placement coordinators, team leaders, account unlocks, and college staffing allocations
+            Manage staff accounts, placement coordinators, team leaders, college placement officers, and account statuses
           </p>
         </div>
 
@@ -166,7 +167,8 @@ export default function UsersPage() {
         ) : (
           <UserManagementTab
             users={users}
-            onOpenAddUser={() => {
+            onOpenAddUser={(role) => {
+              setDefaultAddRole(role || 'PLACEMENT_COORDINATOR');
               setEditingUser(null);
               setShowUserModal(true);
             }}
@@ -185,6 +187,7 @@ export default function UsersPage() {
       {showUserModal && (
         <UserModal
           initialData={editingUser}
+          defaultRole={defaultAddRole}
           onClose={() => setShowUserModal(false)}
           onSuccess={loadUsers}
         />

@@ -126,6 +126,7 @@ const POLICIES: Policy[] = [
   // ownership-scoping discipline scopeToSelf() uses for coordinators.
   { method: 'GET',    pattern: /^\/tpo\/dashboard\/?$/,                  roles: TPO_ONLY },
   { method: 'GET',    pattern: /^\/tpo\/weekly-tracker\/?$/,             roles: TPO_ONLY },
+  { method: 'POST',   pattern: /^\/tpo\/sync\/?$/,                       roles: TPO_ONLY },
 
   // ── Daily Tracker (own call log) ──────────────────────────────────────────
   { method: '*',      pattern: /^\/daily-tracker(\/.*)?$/,               roles: STAFF },

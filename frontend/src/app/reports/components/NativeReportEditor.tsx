@@ -1489,7 +1489,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
             const wpCards = [
               { key: 'total_calls', label: 'Total Calls Made', val: report.kpi_summary.total_calls || 0, bgClass: 'bg-blue-50/80 dark:bg-blue-950/50 border-blue-200 dark:border-blue-800', labelText: 'text-blue-800 dark:text-blue-300 font-bold', valText: 'text-blue-700 dark:text-blue-400 font-bold' },
               { key: 'positive_responses', label: 'Positives', val: report.kpi_summary.positive_responses || 0, bgClass: 'bg-emerald-50/80 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800', labelText: 'text-emerald-800 dark:text-emerald-300 font-bold', valText: 'text-emerald-700 dark:text-emerald-400 font-bold' },
-              { key: 'not_hiring', label: 'Not Hiring', val: report.kpi_summary.not_hiring || 0, bgClass: 'bg-rose-50/80 dark:bg-rose-950/50 border-rose-200 dark:border-rose-800', labelText: 'text-rose-800 dark:text-rose-300 font-bold', valText: 'text-rose-700 dark:text-rose-400 font-bold' },
+              { key: 'not_hiring', label: 'Not Hiring', val: report.kpi_summary.not_hiring || 0, bgClass: 'bg-purple-50/80 dark:bg-purple-950/50 border-purple-200 dark:border-purple-800', labelText: 'text-purple-800 dark:text-purple-300 font-bold', valText: 'text-purple-700 dark:text-purple-400 font-bold' },
               { key: 'jds_received', label: 'JD Received', val: report.kpi_summary.jds_received || 0, bgClass: 'bg-cyan-50/80 dark:bg-cyan-950/50 border-cyan-200 dark:border-cyan-800', labelText: 'text-cyan-800 dark:text-cyan-300 font-bold', valText: 'text-cyan-700 dark:text-cyan-400 font-bold' },
             ].filter((c) => activeKpis[c.key] !== false);
 

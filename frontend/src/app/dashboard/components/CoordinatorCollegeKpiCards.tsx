@@ -244,9 +244,9 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
            and tooltip markup live in a child component, outside this scope. */
         :global(:root) {
           --ipoms-oc-positive: #059669;
-          --ipoms-oc-not_hiring: #f59e0b;
-          --ipoms-oc-negative: #e11d48;
-          --ipoms-oc-follow_up: #2563eb;
+          --ipoms-oc-not_hiring: #e11d48;
+          --ipoms-oc-negative: #64748b;
+          --ipoms-oc-follow_up: #f59e0b;
           --ipoms-hm-1: #e6f1fb;
           --ipoms-hm-2: #b5d4f4;
           --ipoms-hm-3: #85b7eb;
@@ -259,9 +259,9 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
         }
         :global(.dark) {
           --ipoms-oc-positive: #0ea271;
-          --ipoms-oc-not_hiring: #bf8508;
-          --ipoms-oc-negative: #e04e8a;
-          --ipoms-oc-follow_up: #5b8def;
+          --ipoms-oc-not_hiring: #f43f5e;
+          --ipoms-oc-negative: #94a3b8;
+          --ipoms-oc-follow_up: #fbbf24;
           --ipoms-hm-1: #1a2a40;
           --ipoms-hm-2: #1f4a80;
           --ipoms-hm-3: #2d6fc0;

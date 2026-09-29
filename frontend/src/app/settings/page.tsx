@@ -32,6 +32,7 @@ function SettingsPageContent() {
   // Modal State
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [defaultAddRole, setDefaultAddRole] = useState<string>('PLACEMENT_COORDINATOR');
 
   const loadSettingsData = useCallback(async () => {
     setLoading(true);
@@ -255,7 +256,8 @@ function SettingsPageContent() {
               {canManageUsers && activeSection === 'users' && (
                 <UserManagementTab
                   users={users}
-                  onOpenAddUser={() => {
+                  onOpenAddUser={(role) => {
+                    setDefaultAddRole(role || 'PLACEMENT_COORDINATOR');
                     setEditingUser(null);
                     setShowUserModal(true);
                   }}
@@ -298,6 +300,7 @@ function SettingsPageContent() {
       {canManageUsers && showUserModal && (
         <UserModal
           initialData={editingUser}
+          defaultRole={defaultAddRole}
           onClose={() => setShowUserModal(false)}
           onSuccess={loadSettingsData}
         />

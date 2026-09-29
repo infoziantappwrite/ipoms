@@ -501,9 +501,9 @@ export function ManualAddRowModal({
       if (res.success && (res.data as any)?.row) {
         const rec = matchedComp || matchedMetaRecord;
         if (rec && getCompanyMissingDetails(rec).isPlaceholder) {
-          toast(`Enriched company placeholder for "${companyName.trim()}" & logged entry`, 'success');
+          toast(`Enriched company placeholder for "${companyName.trim()}" & synced with metadata base`, 'success');
         } else {
-          toast('New entry added to tracker', 'success');
+          toast(`New entry added & synced with metadata base (${companyName.trim()})`, 'success');
         }
         onRowAdded((res.data as any).row);
         setShowNotInMetaModal(false);

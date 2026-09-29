@@ -18,7 +18,7 @@ import type { WeeklyRow } from './WeeklyTable';
  *   4. preview - the server checks every row; nothing is saved until Apply.
  */
 
-export type PasteFieldKey = 'job_role' | 'ctc_lpa' | 'contact' | 'email' | 'follow_up_date' | 'jd_received_date' | 'db_shared_date';
+export type PasteFieldKey = 'job_role' | 'ctc_lpa' | 'contact' | 'email' | 'follow_up_date' | 'jd_received_date' | 'db_shared_date' | 'drive_date';
 export type PasteSectionKey = 'in_progress' | 'pipeline';
 type Mode = 'fill' | 'add';
 
@@ -37,6 +37,7 @@ const COLUMNS: ColumnDef[] = [
   { key: 'follow_up_date', label: 'Follow-up date', isDate: true, hint: 'today or later' },
   { key: 'jd_received_date', label: 'JD received date', isDate: true, hint: 'past is fine' },
   { key: 'db_shared_date', label: 'DB shared date', isDate: true, hint: 'past is fine' },
+  { key: 'drive_date', label: 'Drive date', isDate: true, hint: 'past or future' },
 ];
 const COLUMN_LABEL: Record<string, string> = { company_name: 'Company name' };
 COLUMNS.forEach((c) => (COLUMN_LABEL[c.key] = c.label));
@@ -127,6 +128,7 @@ function currentValue(row: WeeklyRow, key: PasteFieldKey): string {
     case 'follow_up_date': return fmtDate(row.follow_up_date);
     case 'jd_received_date': return fmtDate(row.jd_received_date);
     case 'db_shared_date': return fmtDate(row.db_shared_date);
+    case 'drive_date': return fmtDate(row.drive_date);
   }
 }
 
@@ -158,13 +160,13 @@ function cellIssue(key: string, value: string): string {
   if (key === 'contact') { const r = validateAndNormalizeMultiMobile(v); return r.valid ? '' : (r.error || 'Invalid number'); }
   if (key === 'email') { const r = validateAndNormalizeMultiEmail(v); return r.valid ? '' : (r.error || 'Invalid email'); }
   if (key === 'follow_up_date') return checkDate(v, true);
-  if (key === 'jd_received_date' || key === 'db_shared_date') return checkDate(v, false);
+  if (key === 'jd_received_date' || key === 'db_shared_date' || key === 'drive_date') return checkDate(v, false);
   return '';
 }
 
 const COL_WIDTH: Record<string, string> = {
   company_name: '180px', contact: '115px', email: '165px', job_role: '130px', ctc_lpa: '90px',
-  follow_up_date: '110px', jd_received_date: '110px', db_shared_date: '110px',
+  follow_up_date: '110px', jd_received_date: '110px', db_shared_date: '110px', drive_date: '110px',
 };
 
 type Step = 'setup' | 'pick' | 'paste' | 'preview';

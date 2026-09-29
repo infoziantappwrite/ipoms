@@ -346,18 +346,18 @@ export function CoordinatorClockDurationWidget({ clockData, coordinatorName }: P
                     Positive <b className="font-mono font-bold text-fg ml-0.5">{oc.positive}</b>
                   </span>
 
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 text-[11px] font-semibold text-rose-700 dark:text-rose-300">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
                     Not Hiring <b className="font-mono font-bold text-fg ml-0.5">{oc.not_hiring}</b>
                   </span>
 
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 text-[11px] font-semibold text-rose-700 dark:text-rose-300">
-                    <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/60 text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                    <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
                     Negative <b className="font-mono font-bold text-fg ml-0.5">{oc.negative}</b>
                   </span>
 
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/50 text-[11px] font-semibold text-blue-700 dark:text-blue-300">
-                    <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
                     Follow Up <b className="font-mono font-bold text-fg ml-0.5">{oc.follow_up}</b>
                   </span>
                 </>

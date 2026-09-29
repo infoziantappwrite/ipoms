@@ -181,7 +181,7 @@ export async function generateReportCanvases(
       kpiCards = [
         { label: 'Total Calls Made', val: report.kpi_summary.total_calls || 0, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', labelColor: '#1e40af', key: 'total_calls' },
         { label: 'Positives', val: report.kpi_summary.positive_responses || 0, color: '#059669', bg: '#ecfdf5', border: '#a7f3d0', labelColor: '#065f46', key: 'positive_responses' },
-        { label: 'Not Hiring', val: report.kpi_summary.not_hiring || 0, color: '#e11d48', bg: '#fff1f2', border: '#fecdd3', labelColor: '#9f1239', key: 'not_hiring' },
+        { label: 'Not Hiring', val: report.kpi_summary.not_hiring || 0, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', labelColor: '#6d28d9', key: 'not_hiring' },
         { label: 'JD Received', val: report.kpi_summary.jds_received || 0, color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', labelColor: '#155e75', key: 'jds_received' },
       ];
     }

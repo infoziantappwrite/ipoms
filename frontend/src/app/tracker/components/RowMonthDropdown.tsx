@@ -134,12 +134,12 @@ export function RowMonthDropdown({ value, onChange, disabled = false }: Props) {
           disabled
             ? 'bg-surface-sunken/40 border-border/40 text-fg-disabled/50 cursor-not-allowed'
             : value
-            ? 'bg-warning-subtle/50 border-warning/70 text-warning-strong cursor-pointer active:scale-[0.992]'
-            : 'bg-amber-500/10 border-amber-500/70 text-amber-700 dark:text-amber-300 ring-2 ring-amber-500/20 font-semibold cursor-pointer active:scale-[0.992]'
-        } ${isOpen ? 'ring-2 ring-warning/30 border-warning' : ''}`}
+            ? 'bg-orange-500/10 border-orange-500/60 text-orange-700 dark:text-orange-300 font-semibold cursor-pointer active:scale-[0.992]'
+            : 'bg-orange-500/10 border-orange-500/70 text-orange-700 dark:text-orange-300 ring-2 ring-orange-500/20 font-semibold cursor-pointer active:scale-[0.992]'
+        } ${isOpen ? 'ring-2 ring-orange-500/30 border-orange-500' : ''}`}
       >
         <div className="flex items-center gap-2 truncate">
-          <Calendar size={12} className={disabled ? 'text-fg-disabled/40 shrink-0' : 'text-warning-strong shrink-0'} />
+          <Calendar size={12} className={disabled ? 'text-fg-disabled/40 shrink-0' : 'text-orange-600 dark:text-orange-400 shrink-0'} />
           <span className="truncate text-xs">
             {disabled ? '—' : (value || 'Pick Month *')}
           </span>
@@ -147,7 +147,7 @@ export function RowMonthDropdown({ value, onChange, disabled = false }: Props) {
         <ChevronDown
           size={12}
           className={`text-fg-subtle shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-            disabled ? 'opacity-20' : isOpen ? 'rotate-180 text-warning' : ''
+            disabled ? 'opacity-20' : isOpen ? 'rotate-180 text-orange-500' : ''
           }`}
         />
       </button>

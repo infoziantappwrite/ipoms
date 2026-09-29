@@ -547,6 +547,21 @@ export function EditCompanyModal({
                 />
               </div>
             )}
+
+            {(pipelineSection === 'in_drive' || pipelineSection === 'upcoming_drives' || pipelineSection === 'companies_in_drive' || pipelineSection === 'drive_in_progress') && (
+              <div>
+                <SmoothDatePicker
+                  label="Scheduled Drive Date"
+                  value={driveDate}
+                  onChange={setDriveDate}
+                  variant="input"
+                  fullWidth
+                  usePortal
+                  clearable
+                  placeholder="dd-mm-yyyy"
+                />
+              </div>
+            )}
           </div>
 
           {/* Student Candidate Counts (if in progress or completed) */}

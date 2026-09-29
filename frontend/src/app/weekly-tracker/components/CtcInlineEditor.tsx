@@ -18,7 +18,7 @@ interface ParsedCtc {
   stipendAmount: string;
 }
 
-function parseCurrentCtc(raw: string): ParsedCtc {
+export function parseCurrentCtc(raw: string): ParsedCtc {
   const trimmed = (raw || '').replace(/\u00a0/g, ' ').trim();
   if (!trimmed || trimmed === '-' || trimmed.toLowerCase() === 'not mentioned' || trimmed.toLowerCase() === 'competitive') {
     return { unit: 'LPA', lpaAmount: '', stipendAmount: '' };
@@ -28,16 +28,16 @@ function parseCurrentCtc(raw: string): ParsedCtc {
   const hasLpa = /lpa|full\s*time|ft\b|per\s*annum/i.test(trimmed) || (!hasStipend && /\d/.test(trimmed));
 
   if (hasStipend && hasLpa) {
-    // Both are present e.g. "8 - 12k Stipend and 3 - 5 Full time" or "8 - 12k Stipend & 3 - 5 LPA"
-    const parts = trimmed.split(/\s*(?:&|\band\b|\+|\/|;|,)\s*/i);
+    // Both are present e.g. "15k Stipend & 6 - 7 LPA" or "15k per month Stipend & 6 - 7 LPA" or "15k Stipend \n 6 - 7 LPA"
+    const parts = trimmed.split(/\s*(?:&|\band\b|\+|\n|;)\s*|,\s*(?=[0-9a-zA-Z])/i);
     let stAmt = '';
     let lpAmt = '';
 
     parts.forEach((p) => {
       if (/stipend|month|pm|\/m\b/i.test(p)) {
         stAmt = p.replace(/stipend|\/month|\/m\b|per\s*month|month/gi, '').trim();
-      } else if (/lpa|full\s*time|ft\b/i.test(p)) {
-        lpAmt = p.replace(/lpa|full\s*time|ft\b/gi, '').trim();
+      } else if (/lpa|full\s*time|ft\b|per\s*annum/i.test(p)) {
+        lpAmt = p.replace(/lpa|full\s*time|ft\b|per\s*annum/gi, '').trim();
       } else if (!stAmt && /\d.*k\b/i.test(p)) {
         stAmt = p.trim();
       } else if (!lpAmt) {
@@ -46,11 +46,15 @@ function parseCurrentCtc(raw: string): ParsedCtc {
     });
 
     if (!stAmt || !lpAmt) {
-      const stMatch = trimmed.match(/([\d\.\s\-kK]+)\s*(?:stipend|\/month|month)/i);
+      const stMatch = trimmed.match(/([\d\.\s\-kK,]+)\s*(?:stipend|\/month|month|pm|per\s*month)/i);
       const lpMatch = trimmed.match(/([\d\.\s\-]+)\s*(?:lpa|full\s*time)/i);
       if (stMatch) stAmt = stMatch[1].trim();
       if (lpMatch) lpAmt = lpMatch[1].trim();
     }
+
+    // Clean up amounts
+    stAmt = stAmt.replace(/(\d+(?:\.\d+)?)\s*[-–—]\s*(\d+(?:\.\d+)?)/g, '$1 - $2').replace(/\s+/g, ' ').trim();
+    lpAmt = lpAmt.replace(/(\d+(?:\.\d+)?)\s*[-–—]\s*(\d+(?:\.\d+)?)/g, '$1 - $2').replace(/\s+/g, ' ').trim();
 
     return {
       unit: 'Both',
@@ -75,6 +79,50 @@ function parseCurrentCtc(raw: string): ParsedCtc {
     .replace(/\s+/g, ' ')
     .trim();
   return { unit: 'LPA', lpaAmount: amount, stipendAmount: '' };
+}
+
+export interface FormattedCtcLines {
+  line1: string;
+  line2?: string;
+}
+
+export function formatCtcToLines(raw?: string): FormattedCtcLines | null {
+  if (!raw) return null;
+  const trimmed = raw.replace(/\u00a0/g, ' ').trim();
+  if (!trimmed || trimmed === '-' || trimmed.toLowerCase() === 'not mentioned' || trimmed.toLowerCase() === 'competitive') {
+    return null;
+  }
+
+  const parsed = parseCurrentCtc(trimmed);
+  if (parsed.unit === 'Both' && parsed.stipendAmount && parsed.lpaAmount) {
+    // 2 lines: line 1 = Stipend, line 2 = LPA (NO & symbol)
+    const stClean = parsed.stipendAmount.replace(/stipend|\/month|\/m\b|per\s*month|month/gi, '').trim();
+    const lpClean = parsed.lpaAmount.replace(/lpa|full\s*time|ft\b|per\s*annum/gi, '').trim();
+    const stipendSuffix = /month|pm|\/m/i.test(trimmed) && !/stipend/i.test(trimmed) ? '/ Month' : 'Stipend';
+    return {
+      line1: `${stClean} ${stipendSuffix}`,
+      line2: `${lpClean} LPA`,
+    };
+  }
+
+  if (parsed.unit === 'Stipend' && parsed.stipendAmount) {
+    const stClean = parsed.stipendAmount.replace(/stipend|\/month|\/m\b|per\s*month|month/gi, '').trim();
+    if (/month|pm|\/m/i.test(trimmed)) {
+      return { line1: `${stClean} / Month` };
+    }
+    return { line1: `${stClean} Stipend` };
+  }
+
+  if (parsed.unit === 'LPA' && parsed.lpaAmount) {
+    const lpClean = parsed.lpaAmount.replace(/lpa|full\s*time|ft\b|per\s*annum/gi, '').trim();
+    return { line1: `${lpClean} LPA` };
+  }
+
+  const clean = trimmed
+    .replace(/(\d+(?:\.\d+)?)\s*[-–—]\s*(\d+(?:\.\d+)?)/g, '$1 - $2')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return { line1: clean };
 }
 
 export function CtcInlineEditor({
@@ -252,30 +300,31 @@ export function CtcInlineEditor({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, lpaAmount, stipendAmount, unit]);
 
-  const cleanDisplay = (() => {
-    if (!value || value === '-' || value.toLowerCase() === 'not mentioned') return '';
-    return value
-      .replace(/(\d+(?:\.\d+)?)\s*[-–—]\s*(\d+(?:\.\d+)?)/g, '$1 - $2')
-      .replace(/\s+/g, ' ')
-      .trim();
-  })();
+  const ctcLines = formatCtcToLines(value);
 
   return (
     <div className="relative inline-block w-full" onClick={(e) => e.stopPropagation()}>
-      {/* ── Cell Trigger (Fully wrapped without truncation) ───────── */}
+      {/* ── Cell Trigger (Fully wrapped without truncation; 2 lines if Stipend + LPA) ───────── */}
       <div
         ref={triggerRef}
         onClick={handleOpen}
-        title={cleanDisplay || 'Click to enter CTC / Stipend'}
+        title={ctcLines ? (ctcLines.line2 ? `${ctcLines.line1}\n${ctcLines.line2}` : ctcLines.line1) : 'Click to enter CTC / Stipend'}
         className={`w-full min-h-[30px] px-2.5 py-1.5 rounded-lg text-left flex items-center justify-between gap-1.5 transition-all cursor-pointer select-none font-mono text-xs font-bold leading-snug break-words whitespace-normal border ${
-          cleanDisplay
+          ctcLines
             ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border-emerald-500/20 hover:bg-emerald-500/15 hover:border-emerald-500/30'
             : 'text-fg-disabled border-transparent hover:bg-surface-raised hover:text-fg-muted'
         } ${isOpen ? 'ring-2 ring-primary/40 bg-surface shadow-xs' : ''}`}
       >
-        <span className="break-words whitespace-normal leading-snug w-full block">
-          {cleanDisplay || <span className="italic font-normal text-fg-disabled">—</span>}
-        </span>
+        <div className="break-words whitespace-normal leading-tight w-full block">
+          {ctcLines ? (
+            <div className="flex flex-col items-start gap-0.5">
+              <span>{ctcLines.line1}</span>
+              {ctcLines.line2 && <span>{ctcLines.line2}</span>}
+            </div>
+          ) : (
+            <span className="italic font-normal text-fg-disabled">—</span>
+          )}
+        </div>
       </div>
 
       {/* ── Fixed Position Popover via Portal ───────────────────────── */}
@@ -419,10 +468,15 @@ export function CtcInlineEditor({
 
                 {/* Live Preview Pill */}
                 <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-md px-2 py-1 text-[11px] font-mono font-bold text-emerald-800 dark:text-emerald-300 break-words whitespace-normal leading-tight">
-                  <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 uppercase block">Preview:</span>
-                  {(stipendAmount ? `${stipendAmount} Stipend` : '') +
-                    (stipendAmount && lpaAmount ? ' & ' : '') +
-                    (lpaAmount ? `${lpaAmount} LPA` : '') || '—'}
+                  <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 uppercase block mb-0.5">Preview:</span>
+                  {stipendAmount || lpaAmount ? (
+                    <div className="flex flex-col items-start gap-0.5">
+                      {stipendAmount && <span>{stipendAmount.replace(/stipend/gi, '').trim()} Stipend</span>}
+                      {lpaAmount && <span>{lpaAmount.replace(/lpa/gi, '').trim()} LPA</span>}
+                    </div>
+                  ) : (
+                    <span>—</span>
+                  )}
                 </div>
               </div>
             )}

@@ -274,18 +274,18 @@ export function DailySummaryModal({
               <button
                 type="button"
                 onClick={() => handleCardClick('not_hiring')}
-                className="w-full flex items-center justify-between p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/20 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/40 transition-all cursor-pointer group text-left sm:col-span-2"
+                className="w-full flex items-center justify-between p-2.5 rounded-xl border border-rose-300/80 dark:border-rose-700/80 bg-rose-100/60 dark:bg-rose-900/30 hover:bg-rose-100 dark:hover:bg-rose-800/50 transition-all cursor-pointer group text-left sm:col-span-2"
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                    <Ban size={14} strokeWidth={2.2} />
+                  <div className="w-7 h-7 rounded-lg bg-rose-200/80 dark:bg-rose-800/80 text-rose-800 dark:text-rose-200 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                    <Ban size={14} strokeWidth={2.4} />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-fg">Not Hiring</div>
-                    <div className="text-[10px] text-fg-subtle">Hiring Frozen / Closed</div>
+                    <div className="text-xs font-bold text-rose-950 dark:text-rose-100">Not Hiring</div>
+                    <div className="text-[10px] text-rose-800/80 dark:text-rose-300 font-medium">Hiring Frozen / Closed (Long Term)</div>
                   </div>
                 </div>
-                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-lg bg-rose-200/90 dark:bg-rose-800 text-rose-900 dark:text-rose-100">
                   {notHiringCount}
                 </span>
               </button>

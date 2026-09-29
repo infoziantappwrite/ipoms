@@ -599,7 +599,7 @@ export default function DailyTrackerPage() {
       console.error('[DT] Row update failed', e);
       setSaveStatus('error');
     }
-  }, [rows, pushAction, loadKpi, coordinatorId, selectedCollegeId, broadcastTrackerMutation]);
+  }, [rows, pushAction, loadKpi, coordinatorId, selectedCollegeId, broadcastTrackerMutation, toast]);
 
   // ── Handle manual contact row added
   const handleManualRowAdded = useCallback((newRow: TrackerRow) => {
@@ -666,6 +666,63 @@ export default function DailyTrackerPage() {
       alert('Error occurred while deleting selected contacts.');
     }
   }, [selectedCollegeName, loadKpi, loadTodayRows, broadcastTrackerMutation]);
+
+  // ── Handle Move / Copy selected rows to Tomorrow
+  const handleMoveSelectedToTomorrow = useCallback(async () => {
+    if (selectedRowIds.length === 0) return;
+    if (!selectedCollegeId || selectedCollegeId === 'all') {
+      alert("Please select a specific college first to process contacts for tomorrow's sheet.");
+      return;
+    }
+
+    try {
+      triggerHaptic('medium');
+      const res = await apiFetch<{
+        total_processed: number;
+        copied_count: number;
+        moved_count: number;
+      }>('/daily-tracker/move-to-tomorrow', {
+        method: 'POST',
+        body: JSON.stringify({
+          row_ids: selectedRowIds,
+          college_id: selectedCollegeId,
+          target_date: tomorrowDateStr,
+        }),
+      });
+
+      if (res.success) {
+        const moved = res.data?.moved_count ?? 0;
+        const copied = res.data?.copied_count ?? 0;
+        let msg = '';
+        if (moved > 0 && copied > 0) {
+          msg = `Moved ${moved} uncalled contact(s) & copied ${copied} contacted lead(s) to Tomorrow's Sheet`;
+        } else if (moved > 0) {
+          msg = `Moved ${moved} uncalled contact(s) directly to Tomorrow's Sheet`;
+        } else if (copied > 0) {
+          msg = `Copied ${copied} contacted lead(s) to Tomorrow's Sheet (today's call logs preserved)`;
+        } else {
+          msg = res.message || `Processed ${selectedRowIds.length} contact(s) for tomorrow`;
+        }
+
+        toast(msg, 'success');
+
+        // Reset selection state in header and trigger clear in grid
+        setSelectedRowCount(0);
+        setSelectedRowIds([]);
+        setIsDeleteMode(false);
+        window.dispatchEvent(new CustomEvent('ipoms_tracker_clear_selection'));
+
+        // Refresh today's rows and KPIs
+        await Promise.all([loadTodayRows(), loadKpi()]);
+        broadcastTrackerMutation();
+      } else {
+        toast(res.error?.message || 'Failed to process contacts for tomorrow.', 'error');
+      }
+    } catch (err: any) {
+      console.error('[DT] Move to tomorrow error:', err);
+      toast('Failed to process contacts for tomorrow.', 'error');
+    }
+  }, [selectedRowIds, selectedCollegeId, tomorrowDateStr, toast, loadTodayRows, loadKpi, broadcastTrackerMutation]);
 
   // ── Save Progress (Ctrl+S / Save Button)
   const handleSaveProgress = useCallback(async () => {
@@ -789,7 +846,7 @@ export default function DailyTrackerPage() {
           return;
         }
 
-        // Shift+T: Open / Toggle Tomorrow's Entry Screen
+        // Shift+T: Move Selected to Tomorrow or Toggle Tomorrow's Entry Screen
         if (e.key === 'T' || e.key === 't') {
           e.preventDefault();
           if (!selectedCollegeId || selectedCollegeId === 'all') {
@@ -797,8 +854,12 @@ export default function DailyTrackerPage() {
             return;
           }
           triggerHaptic('selection');
-          setIsHistoryMode(false);
-          setActiveDateMode((prev) => (prev === 'tomorrow' ? 'today' : 'tomorrow'));
+          if (selectedRowCount > 0) {
+            handleMoveSelectedToTomorrow();
+          } else {
+            setIsHistoryMode(false);
+            setActiveDateMode((prev) => (prev === 'tomorrow' ? 'today' : 'tomorrow'));
+          }
           return;
         }
 
@@ -1344,12 +1405,14 @@ export default function DailyTrackerPage() {
                 )}
               </button>
 
-              {/* Tomorrow / Today Toggle Button (Solid Bold Color with White Text) */}
+              {/* Tomorrow / Today Toggle & Move-To-Tomorrow Button (Solid Bold Color with White Text) */}
               <button
                 type="button"
                 onClick={() => {
                   triggerHaptic('selection');
-                  if (isTomorrowMode) {
+                  if (selectedRowCount > 0) {
+                    handleMoveSelectedToTomorrow();
+                  } else if (isTomorrowMode) {
                     setActiveDateMode('today');
                   } else {
                     if (!selectedCollegeId || selectedCollegeId === 'all') {
@@ -1360,16 +1423,34 @@ export default function DailyTrackerPage() {
                   }
                 }}
                 disabled={!selectedCollegeId}
-                className="h-8 px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 bg-primary hover:bg-primary-hover active:bg-primary/90 text-white text-xs font-bold shadow-xs transition-all cursor-pointer select-none shrink-0 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.96]"
+                className={`h-8 px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 text-white text-xs font-bold shadow-xs transition-all cursor-pointer select-none shrink-0 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.96] ${
+                  selectedRowCount > 0
+                    ? 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 ring-2 ring-blue-400/40'
+                    : 'bg-primary hover:bg-primary-hover active:bg-primary/90'
+                }`}
                 title={
-                  isTomorrowMode
+                  selectedRowCount > 0
+                    ? `Move / Copy ${selectedRowCount} selected contact(s) to Tomorrow's Sheet (uncalled will move, contacted will copy)`
+                    : isTomorrowMode
                     ? "Switch back to Today's Session (Shift+T)"
                     : "Tomorrow's Advance Entry (Shift+T)"
                 }
-                aria-label={isTomorrowMode ? "Today's Session" : "Tomorrow's Advance Entry"}
+                aria-label={
+                  selectedRowCount > 0
+                    ? `Move ${selectedRowCount} contacts to Tomorrow`
+                    : isTomorrowMode
+                    ? "Today's Session"
+                    : "Tomorrow's Advance Entry"
+                }
               >
                 <CalendarDays size={14} strokeWidth={2.2} className="text-white shrink-0" />
-                <span className="tracking-wide">{isTomorrowMode ? 'Today' : 'Tomorrow'}</span>
+                <span className="tracking-wide">
+                  {selectedRowCount > 0
+                    ? `Tomorrow (${selectedRowCount})`
+                    : isTomorrowMode
+                    ? 'Today'
+                    : 'Tomorrow'}
+                </span>
               </button>
 
               {/* 3 Vertical Dots (Actions Menu containing Paste, Load Contacts, Save Progress, etc.) */}

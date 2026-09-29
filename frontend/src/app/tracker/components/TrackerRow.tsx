@@ -24,13 +24,13 @@ import {
 export const OUTCOMES: { value: CallOutcome; label: string; color: string }[] = [
   { value: 'jd_received', label: 'JD Received', color: 'text-primary' },
   { value: 'hiring_freezed', label: 'Hiring Freezed', color: 'text-warning' },
-  { value: 'hiring_completed', label: 'Hiring Completed', color: 'text-info' },
-  { value: 'call_back', label: 'Call Back', color: 'text-warning' },
+  { value: 'hiring_completed', label: 'Hiring Completed', color: 'text-cyan-600 dark:text-cyan-400 font-semibold' },
+  { value: 'call_back', label: 'Call Back', color: 'text-amber-600 dark:text-amber-400 font-medium' },
   { value: 'hiring', label: 'Hiring', color: 'text-success' },
   { value: 'invite_mail', label: 'Invite Mail', color: 'text-primary' },
-  { value: 'not_hiring', label: 'Not Hiring', color: 'text-destructive font-semibold' },
-  { value: 'no_response', label: 'No Response', color: 'text-destructive' },
-  { value: 'follow_up', label: 'Follow Up', color: 'text-warning font-semibold' },
+  { value: 'not_hiring', label: 'Not Hiring', color: 'text-rose-700 dark:text-rose-400 font-bold' },
+  { value: 'no_response', label: 'No Response', color: 'text-rose-600 dark:text-rose-400 font-medium' },
+  { value: 'follow_up', label: 'Follow Up', color: 'text-orange-600 dark:text-orange-400 font-semibold' },
   { value: 'in_connect', label: 'In Connect', color: 'text-primary' },
   { value: 'invalid', label: 'Invalid', color: 'text-fg-subtle' },
   { value: 'drive_completed', label: 'Drive Completed', color: 'text-success' },
@@ -49,13 +49,13 @@ const OUTCOME_ROW_COLORS: Record<CallOutcome | 'none', string> = {
   none: 'bg-white dark:bg-[#161D2E]',
   jd_received: 'bg-[#EFF6FF] dark:bg-[#1E293B]',
   hiring_freezed: 'bg-[#FFFBEB] dark:bg-[#292218]',
-  hiring_completed: 'bg-[#F0F9FF] dark:bg-[#162B3D]',
+  hiring_completed: 'bg-[#E0F2FE] dark:bg-[#0E2F4A]', // Matching cyan/sky-blue shade for Hiring Completed
   call_back: 'bg-[#FFFBEB] dark:bg-[#292218]',
   hiring: 'bg-[#ECFDF5] dark:bg-[#132E27]',
   invite_mail: 'bg-[#EFF6FF] dark:bg-[#1E293B]',
-  not_hiring: 'bg-[#F1F5F9] dark:bg-[#1E293B]',
-  no_response: 'bg-[#FEF2F2] dark:bg-[#2E1818]',
-  follow_up: 'bg-[#EEF2FF] dark:bg-[#1E2238]',
+  not_hiring: 'bg-[#FECDD3] dark:bg-[#481A24]', // Distinct darker red/rose shade for Not Hiring
+  no_response: 'bg-[#FEF2F2] dark:bg-[#2E1818]', // Pale light red for No Response
+  follow_up: 'bg-[#FFF4E6] dark:bg-[#2D1B10]', // Warm orange shade for Follow Up (distinct from yellow Call Back)
   in_connect: 'bg-[#EFF6FF] dark:bg-[#1E293B]',
   invalid: 'bg-[#F1F5F9] dark:bg-[#1E293B]',
   drive_completed: 'bg-[#ECFDF5] dark:bg-[#132E27]',

@@ -77,6 +77,16 @@ export function TrackerGrid({
     );
   }, [selectedRowIds, isDeleteMode]);
 
+  // Listen for clear selection event from parent header
+  useEffect(() => {
+    const handleClear = () => {
+      setSelectedRowIds(new Set());
+      setIsSelectMode(false);
+    };
+    window.addEventListener('ipoms_tracker_clear_selection', handleClear);
+    return () => window.removeEventListener('ipoms_tracker_clear_selection', handleClear);
+  }, []);
+
   // ── Active Working Row Focus & Auto-Advancement ──
   const [activeRowId, setActiveRowId] = useState<string | null>(null);
 

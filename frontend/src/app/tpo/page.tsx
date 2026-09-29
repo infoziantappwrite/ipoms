@@ -1,23 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import {
-  CheckCircle2,
-  Radio,
-  CalendarClock,
-  Users,
-  Layers,
-  XCircle,
-  Ban,
-  Briefcase,
-  GraduationCap,
-  TrendingUp,
-  ArrowRight,
-  BarChart3,
-  Building2,
-  Sparkles,
-} from 'lucide-react';
+import { XCircle, ArrowUpRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 interface TpoKpi {
@@ -31,6 +16,7 @@ interface TpoKpi {
   rejected: number;
   total_offers: number;
   total_students_registered: number;
+  ctc_distribution?: Record<string, number>;
 }
 
 interface TpoDashboardData {
@@ -38,118 +24,213 @@ interface TpoDashboardData {
   kpi: TpoKpi;
 }
 
-interface StageConfig {
-  key: keyof TpoKpi;
-  label: string;
-  sublabel: string;
-  icon: any;
-  borderClass: string;
-  bgBadge: string;
-  textColor: string;
-  iconColor: string;
-  barColor: string;
-  isLive?: boolean;
+/** ── CTC Distribution Bar Chart Component ───────────────────────────── */
+function CtcDistributionChart({ kpi }: { kpi: TpoKpi }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  const categories = [
+    { key: '3 - 5 LPA', label: '3 – 5 LPA' },
+    { key: '5 - 7 LPA', label: '5 – 7 LPA' },
+    { key: '7 - 10 LPA', label: '7 – 10 LPA' },
+    { key: '10+ LPA', label: '10+ LPA' },
+    { key: 'Internship', label: 'Internship' },
+  ];
+
+  const distribution = kpi.ctc_distribution || {
+    '3 - 5 LPA': 0,
+    '5 - 7 LPA': 0,
+    '7 - 10 LPA': 0,
+    '10+ LPA': 0,
+    Internship: 0,
+  };
+
+  const items = categories.map((c) => ({
+    label: c.label,
+    count: distribution[c.key] ?? 0,
+  }));
+
+  const maxVal = Math.max(...items.map((i) => i.count), 1);
+  // Scale Y-axis upper limit to nice steps
+  let upperLimit = Math.ceil(maxVal / 9) * 9;
+  if (upperLimit < 9) upperLimit = Math.ceil(maxVal / 4) * 4 || 4;
+  if (upperLimit < 4) upperLimit = 4;
+
+  const yTicks = [
+    upperLimit,
+    Math.round((upperLimit * 3) / 4),
+    Math.round((upperLimit * 2) / 4),
+    Math.round(upperLimit / 4),
+    0,
+  ];
+
+  return (
+    <div className="relative flex flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs transition-all hover:shadow-sm">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h3 className="text-sm sm:text-base font-bold text-slate-900 leading-tight">CTC Distribution</h3>
+          <p className="text-xs text-slate-500 mt-0.5 font-medium">Companies grouped by salary range</p>
+        </div>
+        <Link
+          href="/tpo/weekly-tracker"
+          className="flex items-center gap-1 text-[11px] font-bold text-primary hover:text-primary-hover transition-colors"
+          title="View Tracker"
+        >
+          <span>View All</span>
+          <ArrowUpRight size={13} />
+        </Link>
+      </div>
+
+      {/* Chart Canvas Area */}
+      <div className="my-4 flex h-[230px] w-full items-end gap-2 pt-6">
+        {/* Y Axis Labels */}
+        <div className="flex h-full flex-col justify-between pb-6 text-right text-[11px] font-semibold text-slate-400 select-none w-6 shrink-0">
+          {yTicks.map((tick, i) => (
+            <span key={i} className="leading-none tabular-nums">
+              {tick}
+            </span>
+          ))}
+        </div>
+
+        {/* Plot Area with Grid Lines and Bars */}
+        <div className="relative flex h-full flex-1 flex-col justify-between pb-6">
+          {/* Horizontal Dashed Grid Lines */}
+          <div className="absolute inset-x-0 inset-y-0 flex flex-col justify-between pointer-events-none pb-6">
+            {yTicks.map((_, i) => (
+              <div key={i} className="w-full border-b border-dashed border-slate-200/70" />
+            ))}
+          </div>
+
+          {/* Vertical Bars Grid */}
+          <div className="relative z-10 grid h-full grid-cols-5 items-end gap-2 sm:gap-3 px-1">
+            {items.map((item, idx) => {
+              const isHovered = hoveredIndex === idx;
+              const heightPct = upperLimit > 0 ? (item.count / upperLimit) * 100 : 0;
+              const displayHeight = item.count > 0 ? Math.max(heightPct, 6) : 2;
+
+              return (
+                <div
+                  key={item.label}
+                  onMouseEnter={() => setHoveredIndex(idx)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                  className="group relative flex h-full flex-col items-center justify-end cursor-pointer"
+                >
+                  {/* Translucent Column Highlight on Hover */}
+                  <div
+                    className={`absolute inset-x-0.5 inset-y-0 rounded-xl transition-all duration-200 ${
+                      isHovered ? 'bg-blue-50/80 shadow-2xs' : 'bg-transparent'
+                    }`}
+                  />
+
+                  {/* Floating Tooltip Card */}
+                  {isHovered && (
+                    <div className="absolute -top-12 z-30 flex flex-col items-center rounded-xl border border-slate-200/90 bg-white px-3 py-1.5 shadow-lg animate-in fade-in zoom-in-95 duration-150 pointer-events-none whitespace-nowrap">
+                      <span className="text-[10px] font-bold text-slate-500">{item.label}</span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="h-2 w-2 rounded-full bg-blue-600" />
+                        <span className="text-xs font-bold text-slate-900">
+                          Companies <span className="font-extrabold text-blue-700">{item.count}</span>
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* The Gradient Bar */}
+                  <div
+                    style={{ height: `${displayHeight}%` }}
+                    className={`relative z-10 w-8 sm:w-10 md:w-14 rounded-t-lg transition-all duration-500 ease-out ${
+                      item.count > 0
+                        ? 'bg-gradient-to-b from-[#06B6D4] to-[#2563EB] shadow-xs group-hover:brightness-110'
+                        : 'bg-slate-200/70 rounded-t-sm'
+                    }`}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* X Axis Labels */}
+      <div className="grid grid-cols-5 gap-2 sm:gap-3 pl-8 pr-1 border-t border-slate-100/90 pt-2 text-center text-[10px] sm:text-[11px] font-semibold text-slate-500">
+        {items.map((item) => (
+          <span key={item.label} className="truncate" title={item.label}>
+            {item.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
-const PIPELINE_STAGES: StageConfig[] = [
-  {
-    key: 'completed',
-    label: 'Companies Completed',
-    sublabel: 'Finished Drives',
-    icon: CheckCircle2,
-    borderClass: 'border-emerald-200/80 hover:border-emerald-400 bg-emerald-50/40',
-    bgBadge: 'bg-emerald-500/10 text-emerald-700 border-emerald-200',
-    textColor: 'text-emerald-700',
-    iconColor: 'text-emerald-600',
-    barColor: 'bg-emerald-500',
-  },
-  {
-    key: 'drive_in_progress',
-    label: 'Drive In Progress',
-    sublabel: 'Live Campus Drive',
-    icon: Radio,
-    borderClass: 'border-blue-200/80 hover:border-blue-400 bg-blue-50/40',
-    bgBadge: 'bg-blue-500/10 text-blue-700 border-blue-200',
-    textColor: 'text-blue-700',
-    iconColor: 'text-blue-600',
-    barColor: 'bg-blue-500',
-    isLive: true,
-  },
-  {
-    key: 'upcoming_drive',
-    label: 'Upcoming Drive',
-    sublabel: 'Scheduled Soon',
-    icon: CalendarClock,
-    borderClass: 'border-indigo-200/80 hover:border-indigo-400 bg-indigo-50/40',
-    bgBadge: 'bg-indigo-500/10 text-indigo-700 border-indigo-200',
-    textColor: 'text-indigo-700',
-    iconColor: 'text-indigo-600',
-    barColor: 'bg-indigo-500',
-  },
-  {
-    key: 'in_progress',
-    label: 'Companies In Progress',
-    sublabel: 'Interviews & Tests',
-    icon: Layers,
-    borderClass: 'border-amber-200/80 hover:border-amber-400 bg-amber-50/40',
-    bgBadge: 'bg-amber-500/10 text-amber-700 border-amber-200',
-    textColor: 'text-amber-700',
-    iconColor: 'text-amber-600',
-    barColor: 'bg-amber-500',
-  },
-  {
-    key: 'pipeline',
-    label: 'Companies in Pipeline',
-    sublabel: 'Under Outreach',
-    icon: Briefcase,
-    borderClass: 'border-sky-200/80 hover:border-sky-400 bg-sky-50/40',
-    bgBadge: 'bg-sky-500/10 text-sky-700 border-sky-200',
-    textColor: 'text-sky-700',
-    iconColor: 'text-sky-600',
-    barColor: 'bg-sky-500',
-  },
-  {
-    key: 'rejected_by_tpo',
-    label: 'Rejected by TPO',
-    sublabel: 'Declined by College',
-    icon: Ban,
-    borderClass: 'border-slate-200/80 hover:border-slate-300 bg-slate-50/60',
-    bgBadge: 'bg-slate-500/10 text-slate-700 border-slate-200',
-    textColor: 'text-slate-700',
-    iconColor: 'text-slate-500',
-    barColor: 'bg-slate-400',
-  },
-  {
-    key: 'rejected',
-    label: 'Rejected Companies',
-    sublabel: 'Declined by HR',
-    icon: XCircle,
-    borderClass: 'border-rose-200/80 hover:border-rose-400 bg-rose-50/40',
-    bgBadge: 'bg-rose-500/10 text-rose-700 border-rose-200',
-    textColor: 'text-rose-700',
-    iconColor: 'text-rose-600',
-    barColor: 'bg-rose-500',
-  },
-];
-
+/** ── Main TPO Dashboard Screen ─────────────────────────────────────────── */
 export default function TpoDashboardPage() {
   const [data, setData] = useState<TpoDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await apiFetch<TpoDashboardData>('/tpo/dashboard');
-        if (res.success && res.data) setData(res.data);
-        else setError(res.error?.message || 'Could not load the dashboard.');
-      } catch {
-        setError('Cannot reach the iPOMS server.');
-      } finally {
-        setLoading(false);
+  const loadDashboard = useCallback(async (isBackground = false) => {
+    try {
+      if (!isBackground) setLoading(true);
+      const res = await apiFetch<TpoDashboardData>('/tpo/dashboard');
+      if (res.success && res.data) {
+        setData(res.data);
+        setError('');
+      } else if (!isBackground) {
+        setError(res.error?.message || 'Could not load the dashboard.');
       }
-    })();
+    } catch {
+      if (!isBackground) setError('Cannot reach the iPOMS server.');
+    } finally {
+      if (!isBackground) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadDashboard();
+
+    // Auto-refresh interval every 5 seconds for real-time live monitoring
+    const interval = setInterval(() => {
+      loadDashboard(true);
+    }, 5000);
+
+    // BroadcastChannel real-time sync with Placement Coordinator & Weekly Tracker updates
+    let ch1: BroadcastChannel | null = null;
+    let ch2: BroadcastChannel | null = null;
+    let ch3: BroadcastChannel | null = null;
+    let chTpo: BroadcastChannel | null = null;
+    try {
+      ch1 = new BroadcastChannel('ipoms_tracker_sync');
+      ch1.onmessage = () => loadDashboard(true);
+      ch2 = new BroadcastChannel('ipoms_weekly_sync');
+      ch2.onmessage = () => loadDashboard(true);
+      ch3 = new BroadcastChannel('ipoms_daily_leads_sync');
+      ch3.onmessage = () => loadDashboard(true);
+      chTpo = new BroadcastChannel('ipoms_tpo_sync_channel');
+      chTpo.onmessage = () => loadDashboard(true);
+    } catch {}
+
+    const handleTpoSync = () => loadDashboard(true);
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key?.startsWith('ipoms_')) loadDashboard(true);
+    };
+    const handleFocus = () => loadDashboard(true);
+
+    window.addEventListener('ipoms_tpo_sync', handleTpoSync);
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      ch1?.close();
+      ch2?.close();
+      ch3?.close();
+      chTpo?.close();
+      window.removeEventListener('ipoms_tpo_sync', handleTpoSync);
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [loadDashboard]);
 
   if (loading) {
     return (
@@ -171,272 +252,10 @@ export default function TpoDashboardPage() {
   }
 
   const kpi = data.kpi;
-  const collegeName = data.college?.name || 'Placement Institution';
-  const totalCompanies = kpi.total_companies || 0;
-  const completionRate = totalCompanies > 0 ? Math.round((kpi.completed / totalCompanies) * 100) : 0;
-  const activePipelineTotal = kpi.drive_in_progress + kpi.upcoming_drive + kpi.in_progress + kpi.pipeline;
 
   return (
-    <div className="space-y-6">
-      {/* ── Main Title Card: Tracker - <College Name> (No repetitive college name, No 'weekly tracker' text) ── */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary">
-                <Sparkles size={12} />
-                Live Overview
-              </span>
-              <span className="text-[11px] font-medium text-slate-400">2026 Academic Season</span>
-            </div>
-            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900">
-              Tracker - {collegeName}
-            </h1>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Real-time placement drive metrics, student registrations, confirmed offers, and recruitment pipeline status.
-            </p>
-          </div>
-
-          <Link
-            href="/tpo/weekly-tracker"
-            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-xs transition-all hover:bg-slate-800 hover:shadow-sm shrink-0"
-          >
-            <span>View Full Tracker Table</span>
-            <ArrowRight size={14} />
-          </Link>
-        </div>
-      </div>
-
-      {/* ── Hero KPI Cards (Minimal, Colourful & High-Impact) ───────────── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {/* 1. Students Registered */}
-        <div className="relative overflow-hidden rounded-2xl border border-blue-200/70 bg-gradient-to-br from-blue-50/80 via-white to-sky-50/40 p-4 sm:p-5 shadow-xs transition-all hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600">
-              <Users size={18} strokeWidth={2.2} />
-            </span>
-            <span className="rounded-full bg-blue-100/70 px-2 py-0.5 text-[10px] font-bold text-blue-700">
-              Verified
-            </span>
-          </div>
-          <p className="mt-3 text-3xl font-extrabold tabular-nums tracking-tight text-slate-900">
-            {kpi.total_students_registered}
-          </p>
-          <div className="mt-1 flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-600">Students Registered</span>
-          </div>
-        </div>
-
-        {/* 2. Total Offers */}
-        <div className="relative overflow-hidden rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50/80 via-white to-teal-50/40 p-4 sm:p-5 shadow-xs transition-all hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
-              <GraduationCap size={18} strokeWidth={2.2} />
-            </span>
-            <span className="rounded-full bg-emerald-100/70 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-              Selections
-            </span>
-          </div>
-          <p className="mt-3 text-3xl font-extrabold tabular-nums tracking-tight text-emerald-600">
-            {kpi.total_offers}
-          </p>
-          <div className="mt-1 flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-600">Offers Secured</span>
-          </div>
-        </div>
-
-        {/* 3. Companies Tracked */}
-        <div className="relative overflow-hidden rounded-2xl border border-indigo-200/70 bg-gradient-to-br from-indigo-50/80 via-white to-violet-50/40 p-4 sm:p-5 shadow-xs transition-all hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600">
-              <Briefcase size={18} strokeWidth={2.2} />
-            </span>
-            <span className="rounded-full bg-indigo-100/70 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
-              Campus Drives
-            </span>
-          </div>
-          <p className="mt-3 text-3xl font-extrabold tabular-nums tracking-tight text-slate-900">
-            {kpi.total_companies}
-          </p>
-          <div className="mt-1 flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-600">Companies Tracked</span>
-          </div>
-        </div>
-
-        {/* 4. Completion Rate */}
-        <div className="relative overflow-hidden rounded-2xl border border-amber-200/70 bg-gradient-to-br from-amber-50/80 via-white to-orange-50/40 p-4 sm:p-5 shadow-xs transition-all hover:shadow-md">
-          <div className="flex items-center justify-between">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
-              <TrendingUp size={18} strokeWidth={2.2} />
-            </span>
-            <span className="rounded-full bg-amber-100/70 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-              {kpi.completed} of {totalCompanies} Done
-            </span>
-          </div>
-          <p className="mt-3 text-3xl font-extrabold tabular-nums tracking-tight text-slate-900">
-            {completionRate}%
-          </p>
-          <div className="mt-1 flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-600">Completion Rate</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Colourful Pipeline Stage Cards ─────────────────────────────── */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-            Recruitment Stages Breakdown
-          </h2>
-          <span className="text-[11px] font-semibold text-slate-400">
-            {activePipelineTotal} Active in Process
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {PIPELINE_STAGES.map((stage) => {
-            const Icon = stage.icon;
-            const count = (kpi[stage.key] as number) || 0;
-            return (
-              <Link
-                key={stage.key}
-                href="/tpo/weekly-tracker"
-                className={`group relative overflow-hidden rounded-2xl border p-4 shadow-xs transition-all hover:scale-[1.01] hover:shadow-md ${stage.borderClass}`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className={`flex h-9 w-9 items-center justify-center rounded-xl border ${stage.bgBadge}`}>
-                    <Icon size={18} strokeWidth={2} className={stage.iconColor} />
-                  </span>
-                  {stage.isLive && count > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-bold text-blue-700 animate-pulse">
-                      <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
-                      Live
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-3">
-                  <p className="text-2xl font-black tabular-nums tracking-tight text-slate-900">
-                    {count}
-                  </p>
-                  <p className="text-xs font-bold text-slate-800 line-clamp-1 mt-0.5">
-                    {stage.label}
-                  </p>
-                  <p className="text-[11px] font-medium text-slate-500">
-                    {stage.sublabel}
-                  </p>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── Visual Analytics Section ───────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* 1. Proportional Distribution Progress Bar */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <BarChart3 size={15} />
-              </span>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Pipeline Stage Distribution</h3>
-                <p className="text-[11px] text-slate-500">Visual breakdown across total active & completed companies</p>
-              </div>
-            </div>
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-700">
-              {totalCompanies} Companies
-            </span>
-          </div>
-
-          {/* Segmented multi-color bar */}
-          {totalCompanies > 0 ? (
-            <div className="space-y-3">
-              <div className="flex h-3.5 w-full overflow-hidden rounded-full bg-slate-100 p-0.5 shadow-inner">
-                {PIPELINE_STAGES.map((stage) => {
-                  const val = (kpi[stage.key] as number) || 0;
-                  if (val === 0) return null;
-                  const pct = (val / totalCompanies) * 100;
-                  return (
-                    <div
-                      key={stage.key}
-                      style={{ width: `${pct}%` }}
-                      className={`h-full first:rounded-l-full last:rounded-r-full transition-all ${stage.barColor}`}
-                      title={`${stage.label}: ${val} (${Math.round(pct)}%)`}
-                    />
-                  );
-                })}
-              </div>
-
-              {/* Legend with counts */}
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 pt-1">
-                {PIPELINE_STAGES.map((stage) => {
-                  const val = (kpi[stage.key] as number) || 0;
-                  const pct = totalCompanies > 0 ? Math.round((val / totalCompanies) * 100) : 0;
-                  return (
-                    <div key={stage.key} className="flex items-center gap-2 text-xs">
-                      <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${stage.barColor}`} />
-                      <span className="text-slate-600 truncate flex-1 font-medium">{stage.label}</span>
-                      <span className="font-bold text-slate-900 tabular-nums">
-                        {val} <span className="text-[10px] text-slate-400">({pct}%)</span>
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            <div className="py-8 text-center text-xs italic text-slate-400">
-              No company drive data recorded for this academic cycle yet.
-            </div>
-          )}
-        </div>
-
-        {/* 2. Quick Placement Summary & Navigation Card */}
-        <div className="flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-5 text-white shadow-xs">
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white">
-                <Building2 size={15} />
-              </span>
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                Placement Insights
-              </span>
-            </div>
-
-            <div className="space-y-2 pt-1">
-              <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                <span className="text-xs text-slate-300">Active Recruitment Drives</span>
-                <span className="text-sm font-bold text-blue-400 tabular-nums">
-                  {kpi.drive_in_progress + kpi.upcoming_drive}
-                </span>
-              </div>
-              <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                <span className="text-xs text-slate-300">Selections per Completed Drive</span>
-                <span className="text-sm font-bold text-emerald-400 tabular-nums">
-                  {kpi.completed > 0 ? (kpi.total_offers / kpi.completed).toFixed(1) : '0'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between pb-1">
-                <span className="text-xs text-slate-300">Total Selection Yield</span>
-                <span className="text-sm font-bold text-amber-400 tabular-nums">
-                  {kpi.total_offers} Offers
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <Link
-            href="/tpo/weekly-tracker"
-            className="mt-4 flex items-center justify-between rounded-xl bg-white/10 px-4 py-2.5 text-xs font-bold text-white backdrop-blur-sm transition-all hover:bg-white/20 hover:shadow-xs"
-          >
-            <span>Explore All Company Details</span>
-            <ArrowRight size={14} />
-          </Link>
-        </div>
-      </div>
+    <div className="space-y-4">
+      <CtcDistributionChart kpi={kpi} />
     </div>
   );
 }
