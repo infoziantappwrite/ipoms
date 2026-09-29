@@ -2210,6 +2210,165 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     in the AIHT table immediately, no reload needed. `tsc --noEmit` clean both sides; the 34 API tests
     still pass (unaffected, frontend-only change).
 
+86. **Placement Officer (TPO) login, dashboard and read-only Weekly Tracker — 29 Sep 2026 (user-requested,
+    built as a real feature inside iPOMS itself, not a bridge to the separate `PlacementDashboard`
+    Firebase app the user also has).** Decision history: the user first asked how to connect iPOMS to a
+    second, already-deployed app (`placement-dashboard-xi.vercel.app`, repo `PlacementDashboard`, Next 15 +
+    Firestore + its own bcrypt/JWT auth, TPOs logging in with a per-college username) so TPOs could see
+    Weekly Tracker and JD data. After inspecting that repo (real, working — `/api/sync` already accepts
+    pre-parsed JSON, JD is modeled as actual uploaded files) the user decided against bridging two systems
+    and asked to build a real, separate TPO experience directly in iPOMS instead — this is what item 0h
+    (29 Aug 2026) removed for exactly the opposite reason (no frontend was ever built for it). JD was
+    dropped from scope entirely — TPOs get JDs through their college email, not iPOMS.
+    **Login (user-specified shape):** the login page now opens on a persona picker — **Placement
+    Coordinator** (today's unchanged email/username form) or **Placement Officer**. Officer mode lists
+    live college acronyms (fetched from a new public endpoint, no auth) instead of a text field; picking
+    one shows a password field and signs in with `username = college_code.toLowerCase()`. No backend
+    auth-code changes were needed for this: `POST /auth/login` already resolved a no-`@` identifier
+    against `User.username` directly (verified by reading `authRoutes.ts`) — a TPO account just needed to
+    exist. Fixed shared password for every TPO account: **`Placement@123`** (capitalised to satisfy the
+    existing password policy — `placement@123` as first proposed has no uppercase and would have failed
+    it; never weakened the policy to fit the string instead). Flagged once to the user: one identical
+    password across every college's account is weaker than per-account passwords, accepted as their call.
+    Recovery is CLI-unlock only (`npm run unlock`), same as the Administrator, since a TPO account has no
+    real email for OTP.
+    **Backend:** `TPO` re-added to `RoleCode`/`ROLE_ALIASES`/`ensureDefaultAccounts`'s role list in
+    `routePolicy.ts` and `server.ts`, but deliberately **never** folded into the `STAFF` bucket used
+    everywhere else — it gets its own isolated policy block, `GET /tpo/dashboard` and
+    `GET /tpo/weekly-tracker`, both `TPO`-only and both pinned server-side to the caller's own single
+    `assigned_college_ids[0]` (`resolveTpoCollegeId()`) regardless of any parameter, the same discipline as
+    `scopeToSelf()`. `POST /colleges/:id/tpo-access` (Administrator-only) is the *only* place a TPO account
+    is created or deactivated — always forces `role_codes: ['TPO']` itself, never reads it from the body,
+    same rule as every other role-escalation guard in this file. A college's "TPO access" is not a stored
+    field — it's inferred from whether an active `TPO`-role `User` exists for it, so no `College` schema
+    change was needed. New deliberately public route `GET /public/tpo-colleges` (added to `isPublic()` in
+    **both** `routePolicy.ts` and `server.ts`'s auth-bypass gate, and to `verifyRoutePolicy.ts`'s own
+    separate hardcoded public-path check, which does not read `isPublic()` and silently required its own
+    fix) returns only `{code, name}` for TPO-enabled colleges — safe, no student/company/staff data.
+    **Section mapping — verified against live production data, not the schema's field names, and it's a
+    good thing that was checked:** the `WeeklyTracker.pipeline_section` enum has 13 declared values but
+    only 8 have any live rows; `top_companies`, `rejected_by_hr`, `rejected_by_college`, `upcoming_drives`,
+    `companies_in_drive` are all **empty** in production despite sounding like the obvious matches for the
+    user's 7 requested sections. Real mapping used: Companies Completed = `completed` (26 rows); Drive In
+    Progress = `drive_in_progress` (6); Upcoming Drive = `in_drive` (3 — thin, but the only real data for
+    this concept; `drive_date` is declared on the schema and never once set); Companies In Progress =
+    `in_progress` (116); **Companies in Pipeline is NOT `pipeline_section: 'pipeline'`** (751 rows, not
+    shown to TPOs at all) — it's the coordinator's `is_pinned_top: true` flag (137 rows), confirmed
+    explicitly by the user ("whatever we mention in top company section that will be reflected in the
+    placement officers companies in pipeline section"); Companies Rejected by TPO = `on_hold_by_college`
+    (27); Rejected Companies = `on_hold_by_hr` (43) — user-confirmed pick over the differently-populated
+    `rejected_companies` bucket (25 rows, no HR/college split). Contact fields (`mobile_numbers`,
+    `email_ids`) are deliberately excluded from `TPO_ROW_PROJECTION` — a TPO sees company/role/CTC/status/
+    counts, never HR contact details, a call made without being asked because there was no reason for an
+    external party to see that data.
+    **Frontend:** `RoleKey`/`roleOf()` in `session.ts` grow a `'tpo'` case; three pre-existing admin-only
+    pages (`dashboard/page.tsx`, `system-settings/page.tsx`, `users/page.tsx`) had their own narrower local
+    role unions that didn't include it — fixed by falling back `'tpo' -> 'coordinator'` at each call site
+    rather than widening those unions to imply TPO is a supported variant of screens it can never legally
+    reach. New `/tpo` route tree (`layout.tsx`, `page.tsx` dashboard, `weekly-tracker/page.tsx`) with its
+    own minimal header/nav — no `AppSidebar`, no Daily Tracker/Metadata/Daily Leads/Reports/Settings links.
+    **Real bug found and fixed while verifying live:** `/tpo` initially rendered *inside* `AppShell`'s
+    normal sidebar layout anyway — `AppShell.tsx`'s `CHROMELESS` array only exact-matched `/`, `/login`,
+    `/signup`, so a TPO briefly saw the full coordinator sidebar (Metadata DB, Report Builder, User
+    Management labels visible) wrapped around the TPO header. Fixed by adding a `pathname.startsWith('/tpo/')`
+    check alongside `CHROMELESS`; every TPO route now renders standalone, verified via a fresh screenshot
+    with zero sidebar. Admin control: `CollegeRosterTab.tsx` (Settings -> Partner Institutions & Roster)
+    grows a second toggle per row, next to the existing active/inactive one — indigo, graduation-cap icon,
+    reads live state from `GET /public/tpo-colleges` (cross-referenced by college code) rather than a new
+    field, calls `POST /colleges/:id/tpo-access` on click.
+    **Verified live end-to-end** (throwaway: AIHT enabled, tested, disabled again — zero TPO accounts left
+    active): admin toggle creates the account and shows it live in the roster; a TPO token gets `403` on
+    every real `STAFF` route (`/weekly-tracker`, `/daily-tracker/today`, `/users`) and `401` anonymously on
+    `/tpo/*`; full browser flow (Playwright, the in-app preview tool hit the same localhost-navigation
+    failure documented earlier this session, unrelated to this feature — confirmed the Next dev server
+    itself was healthy via `curl` first) — picker -> Officer -> AIHT tile -> password -> lands on `/tpo`
+    with real KPI cards and a distribution bar, `/tpo/weekly-tracker` shows real Fristine Infotech /
+    VivaIT / Dronix / NEOMETRIX rows in the correct sections, zero console errors, zero sidebar leak after
+    the fix. `tsc --noEmit` clean both sides, `verify:policy` 111/111 (2 public), 34/34 backend API tests
+    still pass. **Known, accepted, not a regression:** disabling a TPO account doesn't revoke its
+    already-issued JWT (no DB-backed revocation list anywhere in this app — same stateless model documented
+    for every other account type); a just-disabled TPO keeps working until that token's natural ~8h expiry.
+    **Not yet done:** the real rollout — no college currently has TPO access enabled (test account was
+    disabled after verification); that's an administrator action via the new toggle, not a code change.
+    **Officer login redesigned same day (user request)** — the picker-list-of-college-rows-then-password
+    two-step was replaced with a single combined form: a searchable `SmoothSelect` dropdown (the same
+    component used elsewhere in the app, reused rather than a new custom picker) for College, a Password
+    field, one Sign In button, Sign In disabled until a college is chosen. Verified live: dropdown search
+    works, selecting a college and submitting the fixed password lands correctly on `/tpo`. Same session,
+    the user was independently exercising the new admin toggle for real — 17 real colleges (ACET, ACEW,
+    DSU, HITS, KAMARAJ, KIOT, KLU, MAREPHRAM, MCET, MEC, MKCE, NGCE, NGP, NPR, PSNA, SMVEC, SONA) now
+    genuinely have TPO access enabled, left untouched — only the AIHT test account used to verify this
+    redesign was disabled again afterward.
+    **Corrected the same day (user caught it) — the dropdown itself was a real confidentiality leak.**
+    Any list of TPO-enabled colleges, shown to anyone including another college's own officer, reveals
+    which institutions Infoziant partners with — the user does not want that discoverable by anyone
+    outside the org, full stop. Officer login is now a **blind** "College Acronym" text field (placeholder
+    "e.g. AIHT, ACET, KLU") next to Password, one form, no list shown anywhere, ever. The backing
+    `GET /public/tpo-colleges` route is **deleted outright**, not just hidden from the UI — renamed to
+    `GET /colleges/tpo-access`, moved off the pre-auth bypass in both `routePolicy.ts`'s `isPublic()` and
+    `server.ts`'s auth-gate (and `verifyRoutePolicy.ts`'s own separate hardcoded public-path check, which
+    needed the same fix a second time), and given a real `ADMIN`-only policy entry — it now exists purely
+    for the Settings roster toggle's own admin session to read its current state, never reachable without
+    a token. `public (pre-auth)` in `verify:policy` is back down to 1 (`/health`+`/auth` only), matching
+    every other module in this app. **Verified live:** the old path now `401`s (falls through to the
+    global auth gate, no longer even routed) rather than serving data; the new path `401`s anonymously and
+    returns the real 17-college list for an authenticated Administrator; a real browser sign-in as `kiot`
+    (one of the 17 already-enabled colleges, no test account created for this check) lands correctly on
+    `/tpo` with zero college names rendered anywhere on the login screen. `tsc` clean both sides,
+    `verify:policy` 112/112 (1 public), 34/34 backend tests still pass.
+    **Real bug found and fixed the same day (user-reported — typing in College Acronym kept losing focus
+    and jumping back after every letter).** `Shell` (the brand-panel wrapper every login screen renders
+    inside) was defined as `const Shell = (...) => (...)` **inside** `LoginPage()`'s own render body — a
+    fresh function identity on every re-render. React keys reconciliation by component type/identity, so
+    each keystroke's state update made React treat `<Shell>` as a *different* component than the one just
+    rendered and remounted its entire subtree, including whatever input the user was typing into — hence
+    the visible "blink" and lost focus after every character, worst on the officer flow because
+    `officerCode`/`officerPassword` update on every keystroke while the picker/coordinator screens barely
+    re-render at all. Fixed by hoisting `Shell` to module scope, a real top-level function component
+    declared once, outside `LoginPage` — same JSX, zero visual change, but it now keeps one stable
+    identity across renders. **Verified live**, not just by reasoning about the cause: a Playwright run
+    typed "KIOT" and "Placement@123" character-by-character (80ms/60ms delay, i.e. slower than the bug
+    needed to reproduce) into the two fields — both fields held their full value afterward with focus
+    still on whichever field was last typed into, and a full sign-in as `kiot` still lands on `/tpo`
+    correctly. Worth a general note for this file: an inline `const Component = () => (...)` defined
+    inside another component's render body is this exact bug waiting to happen the moment that inner
+    component wraps an input — grep for the pattern if a similar "field keeps losing focus" report ever
+    comes in elsewhere.
+    **Four UI polish requests, same day, from real usage of the deployed-vs-local distinction being
+    made clear to the user first.** (a) Registered/Shortlisted/Offers columns in the read-only Weekly
+    Tracker now render only for the **Companies Completed** section (`showOutcomeColumns = meta.key ===
+    'completed'`) — those counts are meaningless mid-process, every other section always showed zeros.
+    (b) The Dashboard's "Pipeline distribution" bar removed entirely (and its now-dead `distribution`/
+    `total` computation removed with it) — the KPI cards above it already carry the same numbers.
+    (c) The Dashboard/Weekly Tracker nav pill's active state was too subtle (`bg-white text-primary
+    shadow-xs` on a light grey track — barely distinguishable, the user's literal complaint was not being
+    able to tell which tab they were on) — now a solid `bg-primary text-white shadow-sm`, unmistakable at
+    a glance; same treatment on the mobile nav variant. (d) The Weekly Tracker page's subtitle no longer
+    repeats the college name (already shown in the header above) — just "Read-only". Verified live: a
+    real AIHT sign-in showed the distribution bar gone, both nav states clearly bold-vs-not, the plain
+    "Read-only" subtitle, and the outcome columns present only on Companies Completed's own table (logic
+    is unconditional on section key, not on that college's data — AIHT had 0 completed rows to show a
+    populated example of, so this one was verified by reading the code path, not a screenshot with data
+    in it). `tsc --noEmit` clean, AIHT test-toggle disabled again afterward, 34/34 backend tests pass
+    (frontend-only change).
+    **Also clarified for the user, worth keeping in mind for any Vercel-related report:** none of item 86's
+    work (or anything else from this session) has been pushed to GitHub or deployed — everything so far
+    exists only against the local dev servers. A bug report against `ipoms.vercel.app` is against
+    whatever was last actually deployed, which may be significantly behind this branch.
+    **Unrelated pre-existing bug found while explaining a user screenshot, not fixed yet (flagged, not
+    part of item 86):** `PATCH /colleges/:id/status` (`server.ts` ~1330-1336) still runs
+    `User.updateMany({ weekly_focus_locked: id }, { $pull: { weekly_focus_locked: id } })` on every
+    deactivation — but `weekly_focus_locked` is a plain **Boolean** on `User` (confirmed in
+    `models/User.ts`; every other call site in `server.ts` treats it correctly as one), not an array of
+    locked college ids. Mongoose throws `Cast to Boolean failed for value "<collegeId>" ... at path
+    "weekly_focus_locked"` on that line — real user-visible impact: `College.findByIdAndUpdate` above it
+    has already committed the status change to the database by the time this throws, so the request
+    returns 500 and the admin UI's optimistic-update rollback shows the toggle reverting to its old state
+    even though the database disagrees. Leftover from an older per-college-array data model that
+    `weekly_focus_locked` was since simplified away from; the block can't be fixed to preserve its
+    original intent (there is no per-college data left to clear), only removed. Proposed to the user, not
+    yet applied.
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

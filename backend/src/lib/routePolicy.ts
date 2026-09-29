@@ -22,21 +22,21 @@ import { Request, Response, NextFunction } from 'express';
  * Canonical role codes. Everything else normalises into one of these.
  *
  * TPO (Training & Placement Officer — an external, read-only college contact)
- * was removed 29 Aug 2026: the frontend never actually built a scoped
- * experience for it, so any TPO account fell through to the full internal
- * coordinator dashboard, which the backend then correctly 403'd on every real
- * request — a broken account type nobody could use. Zero live accounts held
- * this role at removal time (verified against the database). Re-add it here,
- * in `ROLE_ALIASES`, `STAFF_AND_TPO` (call it that again), the `/colleges`
- * policy, and `assignableRoles()` if TPO support is built for real later —
- * this was a deliberate removal, not an oversight.
+ * was removed 29 Aug 2026, then RE-ADDED 29 Sep 2026 with a real scoped
+ * experience this time: its own dashboard + a single read-only Weekly Tracker
+ * view under `/tpo/*`, never mixed into the broad `STAFF` bucket used
+ * everywhere else. A TPO account is never created through `POST /users` —
+ * only through `POST /colleges/:id/tpo-access` (Administrator-only), which
+ * always forces `role_codes: ['TPO']` itself rather than trusting the body,
+ * same discipline as every other role-escalation guard in this file.
  */
-export type RoleCode = 'ADMINISTRATOR' | 'TEAM_LEADER' | 'PLACEMENT_COORDINATOR';
+export type RoleCode = 'ADMINISTRATOR' | 'TEAM_LEADER' | 'PLACEMENT_COORDINATOR' | 'TPO';
 
 const ADMIN: RoleCode[] = ['ADMINISTRATOR'];
 const TL_ADMIN: RoleCode[] = ['ADMINISTRATOR', 'TEAM_LEADER'];
 const STAFF: RoleCode[] = ['ADMINISTRATOR', 'TEAM_LEADER', 'PLACEMENT_COORDINATOR'];
 const COORDINATOR_ONLY: RoleCode[] = ['PLACEMENT_COORDINATOR'];
+const TPO_ONLY: RoleCode[] = ['TPO'];
 
 /**
  * Legacy/misspelled role codes found in live `users.role_codes`.
@@ -56,6 +56,7 @@ const ROLE_ALIASES: Record<string, RoleCode> = {
   TEAM_LEADER: 'TEAM_LEADER',
   COORDINATOR: 'PLACEMENT_COORDINATOR',
   PLACEMENT_COORDINATOR: 'PLACEMENT_COORDINATOR',
+  TPO: 'TPO',
 };
 
 export function normalizeRole(raw: string): RoleCode | null {
@@ -106,10 +107,25 @@ const POLICIES: Policy[] = [
   { method: 'GET',    pattern: /^\/metadata\/?$/,                        roles: STAFF },
 
   // ── Colleges & staff directory ────────────────────────────────────────────
+  // Administrator-only toggle that creates/deactivates one college's TPO
+  // account, and the matching read of current state (Settings roster only —
+  // never public, see the handler's own comment on why). Both listed before
+  // the general /colleges rule.
+  { method: 'POST',   pattern: new RegExp(`^/colleges/${ID}/tpo-access/?$`), roles: ADMIN },
+  { method: 'GET',    pattern: /^\/colleges\/tpo-access\/?$/,            roles: ADMIN },
   { method: 'PATCH',  pattern: new RegExp(`^/colleges/${ID}/status/?$`), roles: TL_ADMIN },
   { method: 'POST',   pattern: /^\/colleges\/sync-roster\/?$/,           roles: TL_ADMIN },
   { method: '*',      pattern: /^\/colleges(\/.*)?$/,                    roles: STAFF },
   { method: 'GET',    pattern: /^\/coordinators\/?$/,                    roles: STAFF },
+
+  // ── TPO (Training & Placement Officer) — external, read-only, one college ──
+  // Its own isolated block, deliberately never folded into STAFF: a TPO
+  // account must never reach Daily Tracker, Metadata, Daily Leads, Reports or
+  // Settings. Both handlers pin the response to the caller's own
+  // assigned_college_ids[0] regardless of any query param, the same
+  // ownership-scoping discipline scopeToSelf() uses for coordinators.
+  { method: 'GET',    pattern: /^\/tpo\/dashboard\/?$/,                  roles: TPO_ONLY },
+  { method: 'GET',    pattern: /^\/tpo\/weekly-tracker\/?$/,             roles: TPO_ONLY },
 
   // ── Daily Tracker (own call log) ──────────────────────────────────────────
   { method: '*',      pattern: /^\/daily-tracker(\/.*)?$/,               roles: STAFF },

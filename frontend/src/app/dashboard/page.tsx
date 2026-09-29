@@ -36,7 +36,11 @@ export default function DashboardPage() {
   // coordinators on the same machine must never see each other's work.
   useEffect(() => {
     const user = readSessionUser();
-    setRole(roleOf(user));
+    // A TPO never legitimately lands on this page (own /tpo route + shell) —
+    // fall back rather than widen this dashboard's own role union for a
+    // variant it was never built to render.
+    const r = roleOf(user);
+    setRole(r === 'tpo' ? 'coordinator' : r);
     setCoordinatorId(user?._id ?? null);
     setSessionRead(true);
   }, []);

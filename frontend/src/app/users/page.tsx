@@ -18,7 +18,8 @@ export default function UsersPage() {
   useEffect(() => {
     const session = readSessionUser();
     const role = roleOf(session);
-    setUserRole(role);
+    // A TPO never legitimately reaches this User Management page.
+    setUserRole(role === 'tpo' ? 'coordinator' : role);
   }, []);
 
   // Modal State

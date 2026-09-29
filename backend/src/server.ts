@@ -317,6 +317,42 @@ app.get('/api/v1/health', (req: Request, res: Response) => {
   });
 });
 
+// Administrator-only — NEVER public. Which colleges are TPO-enabled must
+// never be discoverable by anyone outside the org, including another
+// college's own TPO: the login screen for officers is a blind username
+// (college acronym) + password field precisely so this list is never
+// exposed anywhere pre-login. This endpoint exists only for the Settings
+// roster toggle to show its own current state. Returns {code, name} for
+// colleges that currently have an active TPO account; a college's TPO
+// login is created/removed via POST /colleges/:id/tpo-access.
+app.get('/api/v1/colleges/tpo-access', async (_req: Request, res: Response) => {
+  try {
+    const tpoUsers = await User.find({
+      role_codes: 'TPO',
+      is_deleted: false,
+      account_status: 'active',
+    })
+      .select('assigned_college_ids')
+      .lean();
+
+    const collegeIds = tpoUsers
+      .map((u: any) => u.assigned_college_ids?.[0])
+      .filter(Boolean);
+
+    const colleges = await College.find({ _id: { $in: collegeIds }, is_deleted: { $ne: true } })
+      .select('college_code college_name')
+      .sort({ college_code: 1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      data: colleges.map((c: any) => ({ code: c.college_code, name: c.college_name })),
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } });
+  }
+});
+
 // Metadata Contact Audit Endpoint
 // Registered ABOVE the global authenticateJWT mount, so it carries its own gate: until
 // 24 Sep 2026 this returned every flagged HR name/phone/email to anonymous callers.
@@ -1308,6 +1344,80 @@ app.patch('/api/v1/colleges/:id/status', async (req: Request, res: Response) => 
     return res.status(500).json({
       success: false,
       error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to update college status' },
+    });
+  }
+});
+
+// ── POST /api/v1/colleges/:id/tpo-access ─────────────────────────────────────
+// Administrator-only toggle. Enabling creates (or reactivates) that college's
+// single Placement Officer account: username = lowercase college_code,
+// password = the fixed org-wide TPO password, scoped to exactly this one
+// college. Disabling deactivates it (soft — account_status, never a delete)
+// so a re-enable does not need a new password reset. role_codes is always
+// set here, never taken from the request body, matching every other
+// role-escalation guard in this codebase.
+const TPO_DEFAULT_PASSWORD = 'Placement@123';
+
+app.post('/api/v1/colleges/:id/tpo-access', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const enabled = Boolean(req.body?.enabled);
+
+    const college = await College.findById(id);
+    if (!college) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'College not found' } });
+    }
+
+    const tpoUsername = college.college_code.trim().toLowerCase();
+    const tpoRole = await Role.findOne({ role_code: 'TPO' });
+    let tpoUser = await User.findOne({ username: tpoUsername, role_codes: 'TPO' });
+
+    if (!enabled) {
+      if (tpoUser) {
+        tpoUser.account_status = 'inactive';
+        await tpoUser.save();
+      }
+      return res.status(200).json({
+        success: true,
+        message: `TPO access disabled for ${college.college_code}`,
+        data: { enabled: false, college_code: college.college_code },
+      });
+    }
+
+    if (tpoUser) {
+      tpoUser.account_status = 'active';
+      tpoUser.assigned_college_ids = [college._id] as any;
+      if (tpoRole) tpoUser.role_ids = [tpoRole._id] as any;
+      await tpoUser.save();
+    } else {
+      const salt = await bcrypt.genSalt(12);
+      const password_hash = await bcrypt.hash(TPO_DEFAULT_PASSWORD, salt);
+      tpoUser = await User.create({
+        full_name: `${college.college_name} — Placement Officer`,
+        username: tpoUsername,
+        // Required + unique by schema, but never shown or used for login —
+        // TPO accounts log in with username alone. Internal-only domain so
+        // it can never collide with, or be mistaken for, a real staff email.
+        official_email: `${tpoUsername}.tpo@ipoms.internal`,
+        password_hash,
+        role_codes: ['TPO'],
+        role_ids: tpoRole ? [tpoRole._id] : [],
+        assigned_college_ids: [college._id],
+        account_status: 'active',
+        presence_status: 'available',
+        is_deleted: false,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `TPO access enabled for ${college.college_code}`,
+      data: { enabled: true, college_code: college.college_code, username: tpoUsername },
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to update TPO access' },
     });
   }
 });
@@ -9992,6 +10102,134 @@ function getTrackerCompletionTimestamp(row: any): Date {
   return ts ? new Date(ts) : new Date();
 }
 
+/**
+ * Resolves the calling TPO's single college. A TPO is created with exactly
+ * one entry in assigned_college_ids (POST /colleges/:id/tpo-access) — this
+ * is what makes every TPO route safe to expose with no per-request college
+ * parameter: whatever the caller asks for, they only ever get their own.
+ */
+async function resolveTpoCollegeId(userId: string): Promise<Types.ObjectId | null> {
+  const tpoUser = await User.findById(userId).select('assigned_college_ids role_codes').lean();
+  if (!tpoUser || !(tpoUser as any).role_codes?.includes('TPO')) return null;
+  const collegeId = (tpoUser as any).assigned_college_ids?.[0];
+  return collegeId ? new Types.ObjectId(collegeId) : null;
+}
+
+/**
+ * The 7 TPO-facing sections and where each one's real data lives. "Upcoming
+ * Drive" and "Companies in Pipeline" deliberately do NOT read the pipeline_section
+ * values their names would suggest (upcoming_drives / pipeline) — those are
+ * empty in production. See CLAUDE.md §5 for the verified live counts behind
+ * this mapping and why it was chosen.
+ */
+function bucketTpoRows(rows: any[]) {
+  const buckets: Record<string, any[]> = {
+    completed: [], drive_in_progress: [], upcoming_drive: [], in_progress: [],
+    pipeline: [], rejected_by_tpo: [], rejected: [],
+  };
+  for (const r of rows) {
+    if (r.is_pinned_top) buckets.pipeline.push(r);
+    switch (r.pipeline_section) {
+      case 'completed': buckets.completed.push(r); break;
+      case 'drive_in_progress': buckets.drive_in_progress.push(r); break;
+      case 'in_drive': buckets.upcoming_drive.push(r); break;
+      case 'in_progress': buckets.in_progress.push(r); break;
+      case 'on_hold_by_college': buckets.rejected_by_tpo.push(r); break;
+      case 'on_hold_by_hr': buckets.rejected.push(r); break;
+      default: break;
+    }
+  }
+  return buckets;
+}
+
+const TPO_ROW_PROJECTION = 'company_name job_role ctc_lpa current_status_text follow_up_date drive_date registered_count shortlisted_count selected_count is_pinned_top pipeline_section updated_at';
+
+// ── GET /api/v1/tpo/weekly-tracker — read-only, pinned to the caller's own college
+app.get('/api/v1/tpo/weekly-tracker', async (req: Request, res: Response) => {
+  try {
+    const collegeId = await resolveTpoCollegeId(req.user!.userId);
+    if (!collegeId) {
+      return res.status(403).json({ success: false, error: { code: 'NO_COLLEGE_SCOPE', message: 'This account has no assigned college.' } });
+    }
+
+    const college = await College.findById(collegeId).select('college_name college_code logo_url location').lean();
+    const rows = await WeeklyTracker.find({ college_id: collegeId, is_deleted: { $ne: true } })
+      .select(TPO_ROW_PROJECTION)
+      .sort({ order_index: 1, updated_at: -1 })
+      .lean();
+
+    const buckets = bucketTpoRows(rows);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        college: college ? {
+          name: (college as any).college_name,
+          code: (college as any).college_code,
+          logo_url: (college as any).logo_url || `/college-logos/${(college as any).college_code?.toLowerCase()}.png`,
+          location: (college as any).location || '',
+        } : null,
+        sections: {
+          completed: buckets.completed,
+          drive_in_progress: buckets.drive_in_progress,
+          upcoming_drive: buckets.upcoming_drive,
+          in_progress: buckets.in_progress,
+          pipeline: buckets.pipeline,
+          rejected_by_tpo: buckets.rejected_by_tpo,
+          rejected: buckets.rejected,
+        },
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: { code: 'INTERNAL_SERVER_ERROR', message: error.message } });
+  }
+});
+
+// ── GET /api/v1/tpo/dashboard — read-only KPI summary, pinned to the caller's own college
+app.get('/api/v1/tpo/dashboard', async (req: Request, res: Response) => {
+  try {
+    const collegeId = await resolveTpoCollegeId(req.user!.userId);
+    if (!collegeId) {
+      return res.status(403).json({ success: false, error: { code: 'NO_COLLEGE_SCOPE', message: 'This account has no assigned college.' } });
+    }
+
+    const college = await College.findById(collegeId).select('college_name college_code logo_url location').lean();
+    const rows = await WeeklyTracker.find({ college_id: collegeId, is_deleted: { $ne: true } })
+      .select('pipeline_section is_pinned_top selected_count registered_count')
+      .lean();
+
+    const buckets = bucketTpoRows(rows);
+    const totalOffers = rows.reduce((sum, r: any) => sum + (r.selected_count || 0), 0);
+    const totalRegistered = rows.reduce((sum, r: any) => sum + (r.registered_count || 0), 0);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        college: college ? {
+          name: (college as any).college_name,
+          code: (college as any).college_code,
+          logo_url: (college as any).logo_url || `/college-logos/${(college as any).college_code?.toLowerCase()}.png`,
+          location: (college as any).location || '',
+        } : null,
+        kpi: {
+          total_companies: rows.length,
+          completed: buckets.completed.length,
+          drive_in_progress: buckets.drive_in_progress.length,
+          upcoming_drive: buckets.upcoming_drive.length,
+          in_progress: buckets.in_progress.length,
+          pipeline: buckets.pipeline.length,
+          rejected_by_tpo: buckets.rejected_by_tpo.length,
+          rejected: buckets.rejected.length,
+          total_offers: totalOffers,
+          total_students_registered: totalRegistered,
+        },
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: { code: 'INTERNAL_SERVER_ERROR', message: error.message } });
+  }
+});
+
 // ── DB-1: GET /api/v1/dashboard/coordinator
 // Coordinator Dashboard (Spec Section 5.1 & 7) — "What should I do today?"
 app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => {
@@ -14967,13 +15205,17 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 const ensureDefaultAccounts = async () => {
   try {
     // 1. Ensure Roles
-    // TPO removed 29 Aug 2026 — no frontend experience was ever built for it,
-    // so the account type was unusable. See the RoleCode comment in
-    // routePolicy.ts for the full reasoning and how to bring it back.
+    // TPO removed 29 Aug 2026, re-added 29 Sep 2026 with a real scoped
+    // experience (own dashboard + read-only Weekly Tracker under /tpo/*,
+    // never the broad STAFF bucket). See the RoleCode comment in
+    // routePolicy.ts. TPO USER accounts are never created here — only
+    // through POST /colleges/:id/tpo-access — this just ensures the role
+    // document itself exists, same as the other three.
     const systemRoles = [
       { role_code: 'ADMINISTRATOR', role_name: 'Administrator', description: 'Master administrator with full system governance' },
       { role_code: 'TEAM_LEADER', role_name: 'Team Leader', description: 'Placement supervisor and team manager' },
       { role_code: 'PLACEMENT_COORDINATOR', role_name: 'Placement Coordinator', description: 'Campus placement coordinator' },
+      { role_code: 'TPO', role_name: 'Placement Officer', description: 'External, read-only college placement officer' },
     ];
 
     const roleMap: Record<string, any> = {};
