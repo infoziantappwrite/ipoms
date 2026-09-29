@@ -155,8 +155,15 @@ export function CalendarPicker({ coordinatorId, collegeId, onClose, onSelectDate
             const dayOfWeek = new Date(viewYear, viewMonth - 1, day).getDay(); // 0 = Sun, 6 = Sat
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
             const isToday = day === todayDate && viewMonth === todayMonth && viewYear === todayYear;
+
+            const tomorrowObj = new Date(todayYear, todayMonth - 1, todayDate + 1);
+            const isTomorrow =
+              day === tomorrowObj.getDate() &&
+              viewMonth === tomorrowObj.getMonth() + 1 &&
+              viewYear === tomorrowObj.getFullYear();
+
             const hasActivity = activeDays.has(day);
-            const isFuture = new Date(viewYear, viewMonth - 1, day) > today;
+            const isFuture = new Date(viewYear, viewMonth - 1, day) > tomorrowObj;
 
             return (
               <button
@@ -167,6 +174,8 @@ export function CalendarPicker({ coordinatorId, collegeId, onClose, onSelectDate
                   ${
                     isToday
                       ? 'bg-primary text-primary-foreground font-bold shadow-xs hover:bg-primary-hover hover:text-primary-foreground'
+                      : isTomorrow
+                      ? 'bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 dark:hover:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-bold border border-purple-300/60 dark:border-purple-700/60 shadow-2xs'
                       : isFuture
                       ? 'text-sky-700 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 font-medium'
                       : hasActivity
@@ -177,6 +186,8 @@ export function CalendarPicker({ coordinatorId, collegeId, onClose, onSelectDate
                 title={
                   isToday
                     ? 'Today (Live Session)'
+                    : isTomorrow
+                    ? `Tomorrow (${day} ${MONTHS[viewMonth - 1]} ${viewYear}) - Click to open advance entry sheet`
                     : isFuture
                     ? `Upcoming date (${day} ${MONTHS[viewMonth - 1]} ${viewYear}) - Click to view in Read-Only Mode`
                     : `Past date (${day} ${MONTHS[viewMonth - 1]} ${viewYear}) - Click to view archived tracker`
@@ -184,8 +195,11 @@ export function CalendarPicker({ coordinatorId, collegeId, onClose, onSelectDate
               >
                 <span>{day}</span>
                 {/* Activity Dot (No dots on Saturdays and Sundays) */}
-                {hasActivity && !isToday && !isWeekend && (
+                {hasActivity && !isToday && !isTomorrow && !isWeekend && (
                   <span className="w-1.5 h-1.5 rounded-full mt-0.5 bg-primary" />
+                )}
+                {isTomorrow && (
+                  <span className="w-1.5 h-1.5 rounded-full mt-0.5 bg-purple-500" />
                 )}
                 {isFuture && !isWeekend && (
                   <span className="w-1 h-1 rounded-full mt-0.5 bg-sky-400/70" />
@@ -197,16 +211,20 @@ export function CalendarPicker({ coordinatorId, collegeId, onClose, onSelectDate
 
         {/* ── Legend & Footer ────────────────────────────────── */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-border bg-surface-sunken text-xs">
-          <div className="flex items-center gap-3 text-fg-muted font-medium flex-wrap">
+          <div className="flex items-center gap-2.5 text-fg-muted font-medium flex-wrap">
             <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-primary" />
-              <span className="text-micro">Has calls</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3.5 h-3.5 rounded-md bg-primary text-primary-foreground text-micro font-bold inline-flex items-center justify-center">
+              <span className="w-3.5 h-3.5 rounded-md bg-primary text-primary-foreground text-[10px] font-bold inline-flex items-center justify-center">
                 T
               </span>
               <span className="text-micro">Today</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-purple-500" />
+              <span className="text-micro font-semibold text-purple-700 dark:text-purple-300">Tomorrow</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+              <span className="text-micro">Past calls</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />

@@ -25,6 +25,7 @@ const COLUMN_FIELDS = [
 interface Props {
   rows: TrackerRowType[];
   isReadOnly: boolean;
+  isAdvanceLocked?: boolean;
   onRowUpdate: (rowId: string, patch: Partial<TrackerRowType>) => Promise<void>;
   onEdit?: (row: TrackerRowType) => void;
   onDelete: (rowId: string) => Promise<void>;
@@ -33,7 +34,18 @@ interface Props {
   onCopyFromHistory?: (rows: TrackerRowType[]) => Promise<void>;
 }
 
-export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, onDeleteSelected, onCall, onCopyFromHistory }: Props) {
+export function TrackerGrid({
+  rows,
+  isReadOnly,
+  isAdvanceLocked = false,
+  onRowUpdate,
+  onEdit,
+  onDelete,
+  onDeleteSelected,
+  onCall,
+  onCopyFromHistory,
+}: Props) {
+  const isEffectivelyReadOnly = isReadOnly || isAdvanceLocked;
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [selectionTheme, setSelectionTheme] = useState<'blue' | 'emerald' | 'purple' | 'amber' | 'rose' | 'pink' | 'orange'>('blue');
@@ -131,7 +143,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
   // ── Cell Drag Range Selection (Excel / Google Sheets style)
   const handleCellMouseDown = useCallback(
     (rowId: string, rowIndex: number, field: string, e: React.MouseEvent) => {
-      if (isReadOnly) return;
+      if (isEffectivelyReadOnly) return;
       const target = e.target as HTMLElement;
       const cellKey = `${rowId}:${field}`;
 
@@ -193,12 +205,12 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
         setSelectedCells(new Set([cellKey]));
       }
     },
-    [isReadOnly, rows, dragStartCell, selectedCells]
+    [isEffectivelyReadOnly, rows, dragStartCell, selectedCells]
   );
 
   const handleCellMouseEnter = useCallback(
     (rowId: string, rowIndex: number, field: string) => {
-      if (!isDraggingCells || !dragStartCell || isReadOnly) return;
+      if (!isDraggingCells || !dragStartCell || isEffectivelyReadOnly) return;
 
       const colIdx = COLUMN_FIELDS.indexOf(field);
       if (colIdx === -1) return;
@@ -219,7 +231,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
       }
       setSelectedCells(newSet);
     },
-    [isDraggingCells, dragStartCell, isReadOnly, rows]
+    [isDraggingCells, dragStartCell, isEffectivelyReadOnly, rows]
   );
 
   // Global mouseup to stop dragging
@@ -1239,11 +1251,17 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
         </div>
         <div>
           <p className="text-sm font-bold text-fg">
-            {isReadOnly ? 'No Calls Logged for this Date' : 'Daily Calling Register Ready'}
+            {isReadOnly
+              ? 'No Calls Logged for this Date'
+              : isAdvanceLocked
+              ? "Tomorrow's Advance Calling Sheet Ready"
+              : 'Daily Calling Register Ready'}
           </p>
           <p className="text-xs text-fg-subtle mt-1 max-w-sm mx-auto">
             {isReadOnly
               ? 'There are no call records or scheduled calls for the selected date.'
+              : isAdvanceLocked
+              ? 'Paste contacts from Excel to prepare tomorrow’s sheet in advance. Calling controls and data edits will unlock automatically at 12:00 AM midnight.'
               : 'Click "Load Contacts" or "Paste from Excel" in the toolbar to populate your target company contacts for today.'}
           </p>
         </div>
@@ -1402,6 +1420,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
                 isDeleteMode={isDeleteMode}
                 selectionTheme={effectiveTheme}
                 isReadOnly={isReadOnly}
+                isAdvanceLocked={isAdvanceLocked}
                 onUpdate={(patch) => handleRowUpdateWithAutoAdvance(row._id, patch)}
                 onEdit={onEdit}
                 onDelete={() => onDelete(row._id)}
@@ -1419,7 +1438,7 @@ export function TrackerGrid({ rows, isReadOnly, onRowUpdate, onEdit, onDelete, o
 
       {/* Floating Action Indicator for Selected Cells - COPY ONLY (user decision: cells are never pasted into or
           cleared from a multi-selection; values are edited one cell at a time) */}
-      {!isReadOnly && selectedCells.size > 0 && (
+      {!isEffectivelyReadOnly && selectedCells.size > 0 && (
         <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-40 bg-white dark:bg-[#161D2E] border-2 border-slate-300 dark:border-slate-700 shadow-[0_20px_50px_rgba(0,0,0,0.35)] rounded-2xl px-4 py-2 flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-4 duration-200 opacity-100">
           <div className="flex items-center gap-2 pr-2.5 border-r border-border">
             <span className="w-5 h-5 rounded-full bg-blue-600 dark:bg-sky-500 text-white text-[11px] font-bold flex items-center justify-center shadow-xs">

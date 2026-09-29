@@ -264,22 +264,22 @@ export function CollegeSelector({
         <div
           className={`absolute top-full ${
             align === 'right' ? 'right-0 origin-top-right' : 'left-0 origin-top-left'
-          } mt-1.5 w-52 sm:w-60 bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 rounded-xl shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150 ease-out text-fg select-none`}
+          } mt-1.5 w-44 bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 rounded-xl shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] z-50 overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150 ease-out text-fg select-none`}
         >
           {/* Search Box */}
-          <div className="p-2 border-b border-border/60 bg-slate-50 dark:bg-[#1A2234] rounded-t-xl">
+          <div className="p-1.5 border-b border-border/60 bg-slate-50 dark:bg-[#1A2234] rounded-t-xl">
             <div className="relative flex items-center">
               <Search
-                size={14}
-                className="absolute left-2.5 text-fg-subtle pointer-events-none"
+                size={13}
+                className="absolute left-2 text-fg-subtle pointer-events-none"
               />
               <input
                 ref={searchInputRef}
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search college…"
-                className="w-full bg-surface border border-border text-xs text-fg pl-8 pr-3 py-1.5 rounded-lg outline-none focus:border-primary dark:focus:border-sky-400 focus:ring-1 focus:ring-primary/30 dark:focus:ring-sky-400/30 placeholder:text-fg-disabled font-normal shadow-2xs"
+                placeholder="Search..."
+                className="w-full bg-surface border border-border text-xs text-fg pl-7 pr-2.5 py-1.5 rounded-lg outline-none focus:border-primary dark:focus:border-sky-400 focus:ring-1 focus:ring-primary/30 dark:focus:ring-sky-400/30 placeholder:text-fg-disabled font-normal shadow-2xs"
               />
             </div>
           </div>

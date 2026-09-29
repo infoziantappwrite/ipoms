@@ -35,11 +35,11 @@ export interface IDailyTracker extends Document {
 
   // Denormalized company fields (pre-filled from company_metadata at load time)
   // Denormalized for ultra-fast grid rendering without join on every row read
-  company_id: Types.ObjectId;               // FK → company_metadata (source of truth)
+  company_id?: Types.ObjectId;              // FK → company_metadata (source of truth)
   company_name: string;
-  hr_name: string;
-  mobile_number: string;                    // mandatory per spec
-  email_id?: string;                        // optional — missing email never blocks saving
+  hr_name?: string;
+  mobile_number?: string;                   // optional if email_id is present
+  email_id?: string;                        // optional if mobile_number is present
 
   // Date dimensions — stored as integers for O(1) indexed monthly reporting
   year: number;                             // e.g. 2026
@@ -103,7 +103,7 @@ const DailyTrackerSchema: Schema<IDailyTracker> = new Schema(
     company_id: {
       type: Schema.Types.ObjectId,
       ref: 'CompanyMetadata',
-      required: [true, 'Source company is required'],
+      default: null,
       index: true,
     },
     company_name: {
@@ -113,13 +113,13 @@ const DailyTrackerSchema: Schema<IDailyTracker> = new Schema(
     },
     hr_name: {
       type: String,
-      required: [true, 'HR name is required'],
       trim: true,
+      default: 'HR Contact',
     },
     mobile_number: {
       type: String,
-      required: [true, 'Mobile number is mandatory per spec'],
       trim: true,
+      default: '',
     },
     email_id: {
       type: String,
@@ -273,6 +273,21 @@ const DailyTrackerSchema: Schema<IDailyTracker> = new Schema(
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
   }
 );
+
+// ─── Contact Point & Mandatory Validation ──────────────────────────────────
+// Mandatory rule: Company name is required, and at least ONE contact point (Mobile number OR Email ID) must be present.
+DailyTrackerSchema.pre('validate', function (next) {
+  const compName = (this.company_name || '').trim();
+  if (!compName) {
+    return next(new Error('Company name is required'));
+  }
+  const mob = (this.mobile_number || '').trim();
+  const em = (this.email_id || '').trim();
+  if (!mob && !em) {
+    return next(new Error('At least one contact point (Mobile number or Email ID) is required'));
+  }
+  next();
+});
 
 // ─── Compound Indexes (Spec: Section 6.1 of Implementation Plan) ─────────────
 

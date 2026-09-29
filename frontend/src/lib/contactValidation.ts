@@ -17,6 +17,31 @@ export interface ValidationResult {
 }
 
 /**
+ * Common placeholder strings found in Excel / Google Sheets exports
+ * e.g. '-', 'NA', 'N/A', 'Not Available', 'None', 'Nil', 'null', 'TBD', etc.
+ */
+export const PLACEHOLDER_STRINGS = new Set([
+  '-', '--', '---', '.', '..', '...', '/', '\\', '?', '??', '???', '!',
+  'na', 'n/a', 'n.a.', 'n.a', 'n a',
+  'not available', 'not_available', 'not-available', 'notavailable',
+  'none', 'nil', 'null', 'undefined',
+  'tbd', 'tba', 'pending', 'no', 'no number', 'no email',
+  'unavailable', 'un-available', 'not provided', 'not_provided',
+  'xxx', 'xxxx', '0', '00', '000', '0000', '00000', '0000000000'
+]);
+
+export function isPlaceholderValue(val?: string | null): boolean {
+  if (!val) return true;
+  const s = String(val).trim().toLowerCase();
+  return PLACEHOLDER_STRINGS.has(s);
+}
+
+export function cleanPlaceholder(val?: string | null): string {
+  if (!val) return '';
+  return isPlaceholderValue(val) ? '' : String(val).trim();
+}
+
+/**
  * Recognized Indian Landline STD Area Codes & Metro Directories
  */
 export const INDIAN_STD_CODES: Record<string, string> = {
@@ -522,13 +547,13 @@ export function validateAndNormalizeEmail(raw: string): ValidationResult {
  * Returns comma-separated normalized emails if all are valid.
  */
 export function validateAndNormalizeMultiEmail(raw: string): ValidationResult {
-  if (!raw || !raw.trim()) {
+  if (!raw || !raw.trim() || isPlaceholderValue(raw)) {
     return { valid: true, normalized: '' };
   }
 
   const parts = raw
     .split(/[,;/]+/)
-    .map((s) => s.trim())
+    .map((s) => cleanPlaceholder(s).toLowerCase())
     .filter(Boolean);
 
   if (parts.length === 0) {
@@ -557,13 +582,13 @@ export function validateAndNormalizeMultiEmail(raw: string): ValidationResult {
  * Returns comma-separated normalized mobile numbers if all are valid.
  */
 export function validateAndNormalizeMultiMobile(raw: string): ValidationResult {
-  if (!raw || !raw.trim()) {
+  if (!raw || !raw.trim() || isPlaceholderValue(raw)) {
     return { valid: true, normalized: '' };
   }
 
   const parts = raw
     .split(/[,;/]+/)
-    .map((s) => s.trim())
+    .map((s) => cleanPlaceholder(s))
     .filter(Boolean);
 
   if (parts.length === 0) {

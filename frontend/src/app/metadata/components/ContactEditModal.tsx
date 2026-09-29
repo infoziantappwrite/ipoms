@@ -146,14 +146,9 @@ export function ContactEditModal({
 
         {/* Placeholder Notice if editing an existing placeholder */}
         {isEditing && (
-          <div className="p-3 bg-amber-500/10 dark:bg-amber-950/40 border border-amber-500/30 rounded-xl space-y-1 text-xs text-amber-800 dark:text-amber-300 animate-in fade-in duration-150">
-            <div className="flex items-center gap-1.5 font-bold">
-              <Sparkles size={13} className="text-amber-500" />
-              Existing Company Placeholder Found {initialData?.serial_number ? `(S.No #${initialData.serial_number})` : ''}
-            </div>
-            <p className="text-[11px] text-amber-700/90 dark:text-amber-400/90 leading-relaxed">
-              This company is already registered in the Meta Database directory. Please fill in the missing phone number, email ID, and HR contact details below to enrich this record.
-            </p>
+          <div className="px-3 py-2 bg-amber-500/10 dark:bg-amber-950/40 border border-amber-500/30 rounded-xl flex items-center gap-1.5 font-bold text-xs text-amber-800 dark:text-amber-300 animate-in fade-in duration-150">
+            <Sparkles size={13} className="text-amber-500" />
+            <span>Existing {initialData?.serial_number ? `(S.No #${initialData.serial_number})` : ''}</span>
           </div>
         )}
 

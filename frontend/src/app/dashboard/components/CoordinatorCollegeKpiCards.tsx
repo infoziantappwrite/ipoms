@@ -192,17 +192,17 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
             </div>
           </div>
 
-          {/* Sync Button (Blue Shade, Icon-Only) */}
+          {/* Sync Button (Solid Mustard Amber, Icon-Only) */}
           <button
             type="button"
             onClick={handleSync}
             disabled={isSyncing}
             title="Synchronize monthly call trend data"
-            className="p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 active:bg-blue-500/30 text-blue-600 dark:text-blue-400 border border-blue-500/30 dark:border-blue-400/40 transition-all cursor-pointer shadow-2xs disabled:opacity-50 group/sync shrink-0"
+            className="p-2 rounded-xl bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white transition-all cursor-pointer shadow-2xs disabled:opacity-50 group/sync shrink-0"
           >
             <RefreshCw
               size={15}
-              className={`transition-transform ${isSyncing ? 'animate-spin' : 'group-hover/sync:rotate-180 duration-500'}`}
+              className={`text-white transition-transform ${isSyncing ? 'animate-spin' : 'group-hover/sync:rotate-180 duration-500'}`}
             />
           </button>
         </div>

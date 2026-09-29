@@ -15,7 +15,7 @@ import { apiFetch } from '@/lib/api';
 import { readSessionUser, roleOf } from '@/lib/session';
 import { useFullAccessViewer } from '@/lib/useFullAccessViewer';
 import { getCoordinatorSelectedColleges } from '@/lib/collegeSession';
-import { ManualAddRowModal } from './components/ManualAddRowModal';
+import { ManualAddRowModal, type ManualAddRowDraft } from './components/ManualAddRowModal';
 import { EditTrackerRowModal } from './components/EditTrackerRowModal';
 import { BulkDeleteTrackerModal } from './components/BulkDeleteTrackerModal';
 import { DeleteRowConfirmModal } from './components/DeleteRowConfirmModal';
@@ -125,6 +125,7 @@ export default function DailyTrackerPage() {
   const [activeCallRow, setActiveCallRow] = useState<TrackerRow | null>(null);
   const [sessionDate, setSessionDate] = useState<string>('');
   const [isManualAddOpen, setIsManualAddOpen] = useState(false);
+  const [manualAddDraft, setManualAddDraft] = useState<ManualAddRowDraft | null>(null);
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<TrackerRow | null>(null);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
@@ -304,6 +305,28 @@ export default function DailyTrackerPage() {
       }
     });
 
+    // Returning from "Add to Meta Database" (ManualAddRowModal.handleRedirectToMeta): reopen the
+    // manual-add modal pre-filled with what was typed before, instead of quietly discarding it - the
+    // contact was saved to the Meta Database but never actually reached the tracker (user-reported,
+    // 28 Sep 2026).
+    if (typeof window !== 'undefined') {
+      try {
+        const savedDraftStr = sessionStorage.getItem('ipoms_daily_tracker_add_row_draft');
+        if (savedDraftStr) {
+          const draft = JSON.parse(savedDraftStr);
+          if (draft && draft.companyName) {
+            setManualAddDraft(draft);
+            setIsManualAddOpen(true);
+          } else {
+            sessionStorage.removeItem('ipoms_daily_tracker_add_row_draft');
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse daily tracker add-row draft from sessionStorage:', e);
+        sessionStorage.removeItem('ipoms_daily_tracker_add_row_draft');
+      }
+    }
+
     const handleCollegeChange = (e: any) => {
       if (e.detail?.id) {
         setSelectedCollegeId(e.detail.id);
@@ -330,39 +353,79 @@ export default function DailyTrackerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMonitor, selectedCollegeObj, allCoordinators]);
 
-  // ── Derive today's title (e.g. "August Tracker 2026")
-  const today = new Date();
-  const monthName = today.toLocaleString('en-IN', { month: 'long' });
-  const yearStr = today.getFullYear();
-  const trackerTitle = `${monthName} Tracker ${yearStr}`;
-  const todayDisplay = today.toLocaleDateString('en-IN', {
+  // ── Derive date strings & live clock with midnight transition (Auto-unlock at 12:00 AM midnight)
+  const [currentDate, setCurrentDate] = useState(() => new Date());
+
+  useEffect(() => {
+    // Live clock interval to check for 12:00 AM midnight rollover every 5 seconds
+    const timer = setInterval(() => {
+      const now = new Date();
+      setCurrentDate((prev) => {
+        const prevDateStr = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}-${String(prev.getDate()).padStart(2, '0')}`;
+        const nowDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        if (prevDateStr !== nowDateStr) {
+          // Midnight 12:00 AM arrived! If in advance mode, switch seamlessly to today's active workspace
+          setActiveDateMode((mode) => {
+            if (mode === 'tomorrow') {
+              toast("It's 12:00 AM! Tomorrow's contacts have now unlocked as Today's active calling workspace.", 'success');
+              return 'today';
+            }
+            return mode;
+          });
+        }
+        return now;
+      });
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [toast]);
+
+  const todayDateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+  
+  const tomorrow = new Date(currentDate);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowDateStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+
+  const [activeDateMode, setActiveDateMode] = useState<'today' | 'tomorrow'>('today');
+  const isTomorrowMode = activeDateMode === 'tomorrow' && !isHistoryMode;
+  const isAdvanceLocked = isTomorrowMode; // Safe lock: calling and cell edits disabled in advance; auto-unlocks at 12:00 AM midnight
+
+  const monthName = currentDate.toLocaleString('en-IN', { month: 'long' });
+  const yearStr = currentDate.getFullYear();
+  const trackerTitle = isTomorrowMode ? `Tomorrow's Tracker ${yearStr}` : `${monthName} Tracker ${yearStr}`;
+  const todayDisplay = currentDate.toLocaleDateString('en-IN', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  });
+  const tomorrowDisplay = tomorrow.toLocaleDateString('en-IN', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
 
-  // ── Load today's tracker rows
+  // ── Load active tracker rows (Today or Advance Tomorrow session)
   const loadTodayRows = useCallback(async () => {
     if (!selectedCollegeId) return;
     const activeCoord = viewingCoordinatorId || coordinatorId;
     if (!activeCoord) return;
     try {
-      const res = await apiFetch(`/daily-tracker/today?coordinator_id=${activeCoord}&college_id=${selectedCollegeId}`);
+      const dateParam = activeDateMode === 'tomorrow' ? `&date=${tomorrowDateStr}` : '';
+      const res = await apiFetch(`/daily-tracker/today?coordinator_id=${activeCoord}&college_id=${selectedCollegeId}${dateParam}`);
       if (res.success) {
         setRows((res.data as any).rows || []);
         setSessionDate((res.data as any).session_date);
       }
     } catch (e) { console.error('[DT] Load today failed', e); }
-  }, [selectedCollegeId, coordinatorId, viewingCoordinatorId]);
+  }, [selectedCollegeId, coordinatorId, viewingCoordinatorId, activeDateMode, tomorrowDateStr]);
 
-  // ── Load KPI counts
+  // ── Load KPI counts (Today or Advance Tomorrow session)
   const loadKpi = useCallback(async () => {
     if (!selectedCollegeId) return;
     const activeCoord = viewingCoordinatorId || coordinatorId;
     if (!activeCoord) return;
     try {
-      const res = await apiFetch(`/daily-tracker/kpi?coordinator_id=${activeCoord}&college_id=${selectedCollegeId}`);
+      const dateParam = activeDateMode === 'tomorrow' ? `&date=${tomorrowDateStr}` : '';
+      const res = await apiFetch(`/daily-tracker/kpi?coordinator_id=${activeCoord}&college_id=${selectedCollegeId}${dateParam}`);
       if (res.success) setKpi((res.data as any).kpi);
     } catch (e) { console.error('[KPI] Load failed', e); }
-  }, [selectedCollegeId, coordinatorId, viewingCoordinatorId]);
+  }, [selectedCollegeId, coordinatorId, viewingCoordinatorId, activeDateMode, tomorrowDateStr]);
 
   // ── Sync official coordinator allocations in background on initial load
   useEffect(() => {
@@ -375,7 +438,7 @@ export default function DailyTrackerPage() {
       loadTodayRows();
       loadKpi();
     }
-  }, [selectedCollegeId, viewingCoordinatorId, loadTodayRows, loadKpi]);
+  }, [selectedCollegeId, viewingCoordinatorId, activeDateMode, loadTodayRows, loadKpi]);
 
   // ── Auto-refresh live tracker rows & KPI counts every 8 seconds (real-time live monitoring)
   useEffect(() => {
@@ -407,18 +470,20 @@ export default function DailyTrackerPage() {
           coordinator_id: coordinatorId,
           college_id: selectedCollegeId,
           company_ids: companyIds,
+          session_date: activeDateMode === 'tomorrow' ? tomorrowDateStr : undefined,
         }),
       });
       if (res.success) {
         await loadTodayRows();
         await loadKpi();
         const data = res.data as any;
+        const targetLabel = activeDateMode === 'tomorrow' ? "tomorrow's" : "today's";
         if (data.duplicates_skipped > 0 && data.loaded === 0) {
-          alert(`Selected contact(s) are already loaded in today's tracker for this college:\n${data.duplicate_companies.join(', ')}`);
+          alert(`Selected contact(s) are already loaded in ${targetLabel} tracker for this college:\n${data.duplicate_companies.join(', ')}`);
         }
       }
     } catch (e) { console.error('[DT] Load contacts failed', e); }
-  }, [selectedCollegeId, coordinatorId, loadTodayRows, loadKpi]);
+  }, [selectedCollegeId, coordinatorId, activeDateMode, tomorrowDateStr, loadTodayRows, loadKpi]);
 
   // ── Listen for imported contacts from the Load Contacts new tab
   useEffect(() => {
@@ -542,6 +607,8 @@ export default function DailyTrackerPage() {
       const next = [...prev, newRow];
       return next.map((r, idx) => ({ ...r, serial_no: idx + 1 }));
     });
+    setManualAddDraft(null);
+    if (typeof window !== 'undefined') sessionStorage.removeItem('ipoms_daily_tracker_add_row_draft');
     loadKpi();
     broadcastTrackerMutation();
   }, [loadKpi, broadcastTrackerMutation]);
@@ -658,6 +725,7 @@ export default function DailyTrackerPage() {
           body: JSON.stringify({
             coordinator_id: coordinatorId,
             college_id: selectedCollegeId,
+            session_date: activeDateMode === 'tomorrow' ? tomorrowDateStr : undefined,
             rows: incomingRows,
           }),
         });
@@ -667,8 +735,9 @@ export default function DailyTrackerPage() {
           await loadKpi();
           broadcastTrackerMutation();
           const data = res.data as any;
+          const targetLabel = activeDateMode === 'tomorrow' ? "Tomorrow's Sheet" : "Daily Tracker";
           toast(
-            `Successfully imported ${data?.created_count || incomingRows.length} company records into Daily Tracker${
+            `Successfully imported ${data?.created_count || incomingRows.length} company records into ${targetLabel}${
               data?.new_metadata_count > 0 ? ` (${data.new_metadata_count} new saved to Metadata Base)` : ''
             }`,
             'success'
@@ -684,7 +753,7 @@ export default function DailyTrackerPage() {
         return { success: false, error: e.message || 'Error importing records' };
       }
     },
-    [selectedCollegeId, coordinatorId, loadTodayRows, loadKpi, broadcastTrackerMutation, toast]
+    [selectedCollegeId, coordinatorId, activeDateMode, tomorrowDateStr, loadTodayRows, loadKpi, broadcastTrackerMutation, toast]
   );
 
   // ── Keyboard shortcuts (Ctrl+S to save, Ctrl+V to paste from Excel, Shift+S for summary, Shift+H for history, Shift+A for manual entry, Escape to close/exit)
@@ -717,6 +786,19 @@ export default function DailyTrackerPage() {
             return;
           }
           setIsManualAddOpen((prev) => !prev);
+          return;
+        }
+
+        // Shift+T: Open / Toggle Tomorrow's Entry Screen
+        if (e.key === 'T' || e.key === 't') {
+          e.preventDefault();
+          if (!selectedCollegeId || selectedCollegeId === 'all') {
+            alert("Please select a specific college first to prepare tomorrow's sheet.");
+            return;
+          }
+          triggerHaptic('selection');
+          setIsHistoryMode(false);
+          setActiveDateMode((prev) => (prev === 'tomorrow' ? 'today' : 'tomorrow'));
           return;
         }
 
@@ -801,7 +883,7 @@ export default function DailyTrackerPage() {
           coordinator_id: coordinatorId,
           college_id: scope === 'entire_database' ? 'all' : selectedCollegeId,
           scope,
-          session_date: sessionDate || undefined,
+          session_date: activeDateMode === 'tomorrow' ? tomorrowDateStr : (sessionDate || undefined),
         }),
       });
 
@@ -809,9 +891,10 @@ export default function DailyTrackerPage() {
         await loadTodayRows();
         await loadKpi();
         const code = selectedCollegeObj?.college_code || selectedCollegeName;
+        const targetLabel = activeDateMode === 'tomorrow' ? "tomorrow's" : "today's";
         const msg = (res.data as any)?.message ||
           (scope === 'today'
-            ? `Successfully cleared today's calling sheet for [${code}].`
+            ? `Successfully cleared ${targetLabel} calling sheet for [${code}].`
             : scope === 'college_all'
             ? `Successfully deleted all daily tracker records for [${code}].`
             : 'Successfully wiped entire daily tracker database.');
@@ -824,7 +907,7 @@ export default function DailyTrackerPage() {
       console.error('[DT] Bulk delete error', err);
       alert(err.message || 'Error occurred while deleting tracker records');
     }
-  }, [selectedCollegeId, coordinatorId, sessionDate, selectedCollegeObj, selectedCollegeName, loadTodayRows, loadKpi]);
+  }, [selectedCollegeId, coordinatorId, activeDateMode, tomorrowDateStr, sessionDate, selectedCollegeObj, selectedCollegeName, loadTodayRows, loadKpi]);
 
   // ── Load history view
   // Deliberately organization-wide, not scoped to the signed-in coordinator:
@@ -843,6 +926,20 @@ export default function DailyTrackerPage() {
       }
     } catch (e) { console.error('[DT] History load failed', e); }
   }, [selectedCollegeId]);
+
+  // ── Calendar date selection router: Today -> live today, Tomorrow -> advance tomorrow, Other -> history archive
+  const handleSelectCalendarDate = useCallback((dateStr: string) => {
+    setIsCalendarOpen(false);
+    if (dateStr === todayDateStr) {
+      setIsHistoryMode(false);
+      setActiveDateMode('today');
+    } else if (dateStr === tomorrowDateStr) {
+      setIsHistoryMode(false);
+      setActiveDateMode('tomorrow');
+    } else {
+      handleViewHistory(dateStr);
+    }
+  }, [todayDateStr, tomorrowDateStr, handleViewHistory]);
 
   // Re-fetch history when the college selector changes while already viewing
   // history — otherwise switching colleges mid-review would silently keep
@@ -945,7 +1042,6 @@ export default function DailyTrackerPage() {
         weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
       })
     : '';
-  const todayDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const isUpcomingDate = Boolean(historyDate && historyDate > todayDateStr);
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -970,11 +1066,19 @@ export default function DailyTrackerPage() {
                   ? isUpcomingDate
                     ? 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-400/30'
                     : 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-400/30'
+                  : isTomorrowMode
+                  ? 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-400/40 font-bold'
                   : isViewingOtherUser
                   ? 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border border-purple-400/30'
                   : 'bg-primary/10 text-primary border border-primary/20'
               }`}>
-                {isHistoryMode ? (isUpcomingDate ? 'Upcoming Schedule' : 'History Archive') : isViewingOtherUser ? `${viewingCoordinatorName}` : `${monthName} ${yearStr}`}
+                {isHistoryMode
+                  ? (isUpcomingDate ? 'Upcoming Schedule' : 'History Archive')
+                  : isTomorrowMode
+                  ? "Tomorrow's Advance Entry"
+                  : isViewingOtherUser
+                  ? `${viewingCoordinatorName}`
+                  : `${monthName} ${yearStr}`}
               </span>
               {isHistoryMode && (
                 <span className={`text-micro px-2.5 py-0.5 rounded-full font-bold border ${
@@ -991,6 +1095,8 @@ export default function DailyTrackerPage() {
                 ? isUpcomingDate
                   ? `Viewing upcoming schedule for ${historyDisplayDate} • Read-Only Mode`
                   : `Viewing archived records for ${historyDisplayDate} • Read-Only Mode`
+                : isTomorrowMode
+                ? `Tomorrow's Advance Entry: ${tomorrowDisplay}`
                 : isViewingOtherUser
                 ? `Viewing ${viewingCoordinatorName}'s calling sheet for ${sessionDate ? new Date(sessionDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : todayDisplay} • Read-Only Mode`
                 : selectedCollegeId === 'all'
@@ -1183,42 +1289,9 @@ export default function DailyTrackerPage() {
             )}
           </div>
 
-          {/* ── Right Top Corner: Paste from Excel, Delete Bin Button & 3 Vertical Dots (Actions Menu) ── */}
+          {/* ── Right Top Corner: Solid Red Delete Bin Button & 3 Vertical Dots (Actions Menu) ── */}
           {!isEffectiveReadOnly && (
             <div className="ml-auto shrink-0 flex items-center gap-2">
-              {/* Dedicated Paste from Excel Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  triggerHaptic('light');
-                  if (!selectedCollegeId || selectedCollegeId === 'all') {
-                    alert('Please select a specific college first to paste contacts.');
-                    return;
-                  }
-                  if (navigator.clipboard && navigator.clipboard.readText) {
-                    navigator.clipboard
-                      .readText()
-                      .then((text) => {
-                        setPasteInitialText(text || '');
-                        setIsPasteModalOpen(true);
-                      })
-                      .catch(() => {
-                        setPasteInitialText('');
-                        setIsPasteModalOpen(true);
-                      });
-                  } else {
-                    setPasteInitialText('');
-                    setIsPasteModalOpen(true);
-                  }
-                }}
-                disabled={!selectedCollegeId || selectedCollegeId === 'all'}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-[0.98] shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Paste bulk contacts from Excel / Google Sheets (Ctrl+V)"
-              >
-                <FileSpreadsheet size={13} strokeWidth={2.2} />
-                <span>Paste</span>
-              </button>
-
               {/* Move Selected Companies to Another College Button */}
               {selectedRowCount > 0 && (
                 <button
@@ -1235,7 +1308,7 @@ export default function DailyTrackerPage() {
                 </button>
               )}
 
-              {/* Standalone Red Dustbin / Trash Icon Button */}
+              {/* Standalone Solid Bold Red Dustbin / Trash Icon Button */}
               <button
                 type="button"
                 onClick={() => {
@@ -1249,10 +1322,10 @@ export default function DailyTrackerPage() {
                 disabled={!selectedCollegeId || rows.length === 0}
                 className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 ${
                   isDeleteMode && selectedRowCount > 0
-                    ? 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs ring-2 ring-rose-500/30'
+                    ? 'bg-rose-700 hover:bg-rose-800 active:bg-rose-900 text-white shadow-xs ring-2 ring-rose-400'
                     : isDeleteMode
-                    ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-400 dark:border-rose-700 ring-2 ring-rose-500/20'
-                    : 'bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/80 shadow-2xs'
+                    ? 'bg-rose-700 hover:bg-rose-800 text-white shadow-xs ring-2 ring-rose-400'
+                    : 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs'
                 } disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]`}
                 title={
                   isDeleteMode && selectedRowCount > 0
@@ -1263,7 +1336,7 @@ export default function DailyTrackerPage() {
                 }
                 aria-label="Delete Rows"
               >
-                <Trash2 size={16} strokeWidth={2.2} />
+                <Trash2 size={16} strokeWidth={2.2} className="text-white" />
                 {isDeleteMode && selectedRowCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-white dark:bg-zinc-900 text-rose-600 text-[9px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center shadow-xs tabular-nums ring-1 ring-rose-600">
                     {selectedRowCount}
@@ -1271,7 +1344,35 @@ export default function DailyTrackerPage() {
                 )}
               </button>
 
-              {/* 3 Vertical Dots (Actions Menu) */}
+              {/* Tomorrow / Today Toggle Button (Solid Bold Color with White Text) */}
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic('selection');
+                  if (isTomorrowMode) {
+                    setActiveDateMode('today');
+                  } else {
+                    if (!selectedCollegeId || selectedCollegeId === 'all') {
+                      alert("Please select a specific college first to prepare tomorrow's sheet.");
+                      return;
+                    }
+                    setActiveDateMode('tomorrow');
+                  }
+                }}
+                disabled={!selectedCollegeId}
+                className="h-8 px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 bg-primary hover:bg-primary-hover active:bg-primary/90 text-white text-xs font-bold shadow-xs transition-all cursor-pointer select-none shrink-0 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.96]"
+                title={
+                  isTomorrowMode
+                    ? "Switch back to Today's Session (Shift+T)"
+                    : "Tomorrow's Advance Entry (Shift+T)"
+                }
+                aria-label={isTomorrowMode ? "Today's Session" : "Tomorrow's Advance Entry"}
+              >
+                <CalendarDays size={14} strokeWidth={2.2} className="text-white shrink-0" />
+                <span className="tracking-wide">{isTomorrowMode ? 'Today' : 'Tomorrow'}</span>
+              </button>
+
+              {/* 3 Vertical Dots (Actions Menu containing Paste, Load Contacts, Save Progress, etc.) */}
               <TrackerActionsDropdown
                 selectedCollegeId={selectedCollegeId}
                 isReadOnly={false}
@@ -1291,8 +1392,21 @@ export default function DailyTrackerPage() {
                     alert('Please select a specific college first to paste contacts.');
                     return;
                   }
-                  setPasteInitialText('');
-                  setIsPasteModalOpen(true);
+                  if (navigator.clipboard && navigator.clipboard.readText) {
+                    navigator.clipboard
+                      .readText()
+                      .then((text) => {
+                        setPasteInitialText(text || '');
+                        setIsPasteModalOpen(true);
+                      })
+                      .catch(() => {
+                        setPasteInitialText('');
+                        setIsPasteModalOpen(true);
+                      });
+                  } else {
+                    setPasteInitialText('');
+                    setIsPasteModalOpen(true);
+                  }
                 }}
                 onSaveProgress={handleSaveProgress}
                 onAddManualRow={() => {
@@ -1334,6 +1448,7 @@ export default function DailyTrackerPage() {
           <TrackerGrid
             rows={displayRows}
             isReadOnly={isEffectiveReadOnly}
+            isAdvanceLocked={isAdvanceLocked}
             onRowUpdate={handleRowUpdate}
             onEdit={(row) => setEditingRow(row)}
             onDelete={handleDeleteRow}
@@ -1357,7 +1472,7 @@ export default function DailyTrackerPage() {
           coordinatorId={viewingCoordinatorId || coordinatorId}
           collegeId={selectedCollegeId}
           onClose={() => setIsCalendarOpen(false)}
-          onSelectDate={handleViewHistory}
+          onSelectDate={handleSelectCalendarDate}
         />
       )}
 
@@ -1365,8 +1480,13 @@ export default function DailyTrackerPage() {
         <ManualAddRowModal
           coordinatorId={coordinatorId}
           collegeId={selectedCollegeId}
-          sessionDate={sessionDate}
-          onClose={() => setIsManualAddOpen(false)}
+          sessionDate={activeDateMode === 'tomorrow' ? tomorrowDateStr : sessionDate}
+          initialDraft={manualAddDraft}
+          onClose={() => {
+            setIsManualAddOpen(false);
+            setManualAddDraft(null);
+            if (typeof window !== 'undefined') sessionStorage.removeItem('ipoms_daily_tracker_add_row_draft');
+          }}
           onRowAdded={handleManualRowAdded}
         />
       )}

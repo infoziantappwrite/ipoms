@@ -42,10 +42,31 @@ import {
 } from '@/lib/timeValidation';
 import { SmoothTimeInput } from '@/components/ui/SmoothTimeInput';
 
+export interface ManualAddRowDraft {
+  companyName: string;
+  hrNames: string[];
+  mobileNumbers: string[];
+  emailIds: string[];
+  startTime: string;
+  startDateIso: string;
+  endTime: string;
+  endDateIso: string | null;
+  durationText: string;
+  durationSec: number | null;
+  outcome: CallOutcome | '';
+  followUpMonth: string;
+  comments: string;
+  collegeId: string;
+  sessionDate?: string;
+  timestamp: number;
+}
+
 interface Props {
   coordinatorId: string;
   collegeId: string;
   sessionDate?: string;
+  /** Reopens the modal pre-filled after a round trip to the Meta Database (see handleRedirectToMeta). */
+  initialDraft?: ManualAddRowDraft | null;
   onClose: () => void;
   onRowAdded: (newRow: TrackerRow) => void;
 }
@@ -88,40 +109,49 @@ export function ManualAddRowModal({
   coordinatorId,
   collegeId,
   sessionDate,
+  initialDraft,
   onClose,
   onRowAdded,
 }: Props) {
   const { toast } = useToast();
 
-  const [companyName, setCompanyName] = useState('');
-  const [hrNames, setHrNames] = useState<string[]>([]);
-  const [mobileNumbers, setMobileNumbers] = useState<string[]>([]);
-  const [emailIds, setEmailIds] = useState<string[]>([]);
+  // Returning from the Meta Database after "Add to Meta Database" (see handleRedirectToMeta): reopen
+  // pre-filled with exactly what was typed before, so the entry doesn't have to be retyped and, this
+  // time, is found in the database and actually saved to the tracker.
+  const [companyName, setCompanyName] = useState(() => initialDraft?.companyName || '');
+  const [hrNames, setHrNames] = useState<string[]>(() => initialDraft?.hrNames || []);
+  const [mobileNumbers, setMobileNumbers] = useState<string[]>(() => initialDraft?.mobileNumbers || []);
+  const [emailIds, setEmailIds] = useState<string[]>(() => initialDraft?.emailIds || []);
 
   // Start Time & Tracking
   const [startTime, setStartTime] = useState(() => {
+    if (initialDraft?.startTime) return initialDraft.startTime;
     const now = new Date();
     return formatTime(now);
   });
-  const [startDateObj, setStartDateObj] = useState<Date>(() => new Date());
+  const [startDateObj, setStartDateObj] = useState<Date>(() =>
+    initialDraft?.startDateIso ? new Date(initialDraft.startDateIso) : new Date()
+  );
 
   // End Time & Duration (Auto calculated on status selection)
-  const [endTime, setEndTime] = useState('');
-  const [endDateObj, setEndDateObj] = useState<Date | null>(null);
-  const [durationText, setDurationText] = useState('');
-  const [durationSec, setDurationSec] = useState<number | null>(null);
+  const [endTime, setEndTime] = useState(() => initialDraft?.endTime || '');
+  const [endDateObj, setEndDateObj] = useState<Date | null>(() =>
+    initialDraft?.endDateIso ? new Date(initialDraft.endDateIso) : null
+  );
+  const [durationText, setDurationText] = useState(() => initialDraft?.durationText || '');
+  const [durationSec, setDurationSec] = useState<number | null>(() => initialDraft?.durationSec ?? null);
 
   // Outcome Dropdown State
-  const [outcome, setOutcome] = useState<CallOutcome | ''>('');
+  const [outcome, setOutcome] = useState<CallOutcome | ''>(() => initialDraft?.outcome || '');
   const [isOutcomeOpen, setIsOutcomeOpen] = useState(false);
   const outcomeRef = useRef<HTMLDivElement>(null);
 
   // Follow-Up Month Dropdown State
-  const [followUpMonth, setFollowUpMonth] = useState('');
+  const [followUpMonth, setFollowUpMonth] = useState(() => initialDraft?.followUpMonth || '');
   const [isMonthOpen, setIsMonthOpen] = useState(false);
   const monthRef = useRef<HTMLDivElement>(null);
 
-  const [comments, setComments] = useState('');
+  const [comments, setComments] = useState(() => initialDraft?.comments || '');
   const [submitting, setSubmitting] = useState(false);
   const [checkingMeta, setCheckingMeta] = useState(false);
   const [showNotInMetaModal, setShowNotInMetaModal] = useState(false);
@@ -550,6 +580,30 @@ export function ManualAddRowModal({
 
   const handleRedirectToMeta = () => {
     triggerHaptic('light');
+    // Save exactly what was typed so it can be restored the moment the tracker page reopens - see
+    // ManualAddRowDraft / tracker/page.tsx. Without this, everything typed here was lost on the trip to
+    // the Meta Database and the entry never actually reached the tracker (user-reported, 28 Sep 2026).
+    if (typeof window !== 'undefined') {
+      const draft: ManualAddRowDraft = {
+        companyName: companyName.trim(),
+        hrNames,
+        mobileNumbers,
+        emailIds,
+        startTime,
+        startDateIso: startDateObj.toISOString(),
+        endTime,
+        endDateIso: endDateObj ? endDateObj.toISOString() : null,
+        durationText,
+        durationSec,
+        outcome,
+        followUpMonth,
+        comments,
+        collegeId,
+        sessionDate,
+        timestamp: Date.now(),
+      };
+      sessionStorage.setItem('ipoms_daily_tracker_add_row_draft', JSON.stringify(draft));
+    }
     const params = new URLSearchParams({
       add: 'true',
       company_name: companyName.trim(),
@@ -619,11 +673,11 @@ export function ManualAddRowModal({
                 }`}>
                   {placeholderInfo?.isPlaceholder ? (
                     <>
-                      <Sparkles size={11} strokeWidth={2.5} className="text-amber-500" /> Existing Placeholder in DB
+                      <Sparkles size={11} strokeWidth={2.5} className="text-amber-500" /> Existing Placeholder in DB {matchedMetaRecord?.serial_number ? `(S.No #${matchedMetaRecord.serial_number})` : ''}
                     </>
                   ) : (
                     <>
-                      <CheckCircle2 size={11} strokeWidth={2.5} /> Auto-filled from Meta DB
+                      <CheckCircle2 size={11} strokeWidth={2.5} /> Auto-filled from Meta DB {matchedMetaRecord?.serial_number ? `(S.No #${matchedMetaRecord.serial_number})` : ''}
                     </>
                   )}
                 </span>
@@ -746,24 +800,6 @@ export function ManualAddRowModal({
             )}
           </div>
 
-          {/* Placeholder Notification Banner */}
-          {matchedMetaRecord && placeholderInfo?.isPlaceholder && (
-            <div className="p-3 bg-amber-500/10 dark:bg-amber-950/40 border border-amber-500/30 rounded-xl space-y-1 text-xs text-amber-900 dark:text-amber-200 animate-in fade-in duration-150">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300">
-                  <Sparkles size={14} className="text-amber-500 shrink-0" />
-                  <span>Existing Company Placeholder Found {matchedMetaRecord.serial_number ? `(S.No #${matchedMetaRecord.serial_number})` : ''}</span>
-                </div>
-                <span className="text-[10px] font-semibold bg-amber-500/20 text-amber-800 dark:text-amber-200 px-2 py-0.5 rounded-full border border-amber-500/30">
-                  Needs Contact Info
-                </span>
-              </div>
-              <p className="text-[11.5px] text-amber-800/90 dark:text-amber-300/90 leading-relaxed">
-                This company is already present in the database, but missing <strong>{placeholderInfo.missing.join(', ')}</strong>.
-                Fill in the numbers and details below to enrich this record directly rather than creating a duplicate entry.
-              </p>
-            </div>
-          )}
 
           {/* Section 2: HR Name & Mobile Number (2-column Grid) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">

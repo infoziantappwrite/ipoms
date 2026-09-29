@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Database, ClipboardList, FileSpreadsheet, Plus, Search, Trash2, Clock, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Database, ClipboardList, FileSpreadsheet, ClipboardPaste, Plus, Search, Trash2, Clock, ArrowLeft, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { UserSignOutButton } from '@/components/UserSignOutButton';
+import { triggerHaptic } from '@/lib/haptics';
 import { SmoothIndustryDropdown } from '@/components/ui/SmoothIndustryDropdown';
-import { SmoothExportDropdown } from '@/components/ui/SmoothExportDropdown';
 import { SnoRangeSelector } from './SnoRangeSelector';
 
 interface Props {
@@ -87,7 +87,7 @@ export function MetadataHeader({
 
   return (
     <header className="sticky top-0 z-40 bg-surface/95 backdrop-blur-md border-b border-border px-6 py-4 space-y-3 text-fg shadow-xs">
-      {/* ── Top Row: Title & Top-Right Sign Out ────────────────────────── */}
+      {/* ── Top Row: Title & Top-Right (Pagination + Sign Out) ────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
@@ -121,8 +121,56 @@ export function MetadataHeader({
           )}
         </div>
 
-        {/* Top-Right Sign Out */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Top-Right: Pagination Controls + Sign Out */}
+        <div className="flex items-center gap-3 shrink-0">
+          {totalPages !== undefined && totalPages > 1 && onPageChange && page !== undefined && (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => onPageChange(page - 1)}
+                title="Previous Page"
+                className="w-8 h-8 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-[0.992] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
+              >
+                <ChevronLeft size={14} strokeWidth={2.25} />
+              </button>
+
+              <div
+                className="flex items-center gap-1 px-2.5 py-1 bg-surface border border-border rounded-full shadow-2xs"
+                title={`Type a page number (1 to ${totalPages}) and press Enter`}
+              >
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  value={inputPage}
+                  onChange={(e) => setInputPage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handlePageInputSubmit();
+                    }
+                  }}
+                  onBlur={handlePageInputSubmit}
+                  className="w-10 text-center font-mono font-bold text-xs bg-surface-sunken border border-border/80 focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-md py-0.5 text-fg outline-none transition-colors"
+                />
+                <span className="text-xs font-mono font-bold text-fg-subtle select-none">
+                  / {totalPages}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => onPageChange(page + 1)}
+                title="Next Page"
+                className="w-8 h-8 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-[0.992] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
+              >
+                <ChevronRight size={14} strokeWidth={2.25} />
+              </button>
+            </div>
+          )}
+
           <UserSignOutButton />
         </div>
       </div>
@@ -186,53 +234,17 @@ export function MetadataHeader({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Pagination Controls with Jump-to-Page Input Before Delete/Recycle Bin */}
-          {totalPages !== undefined && totalPages > 1 && onPageChange && page !== undefined && (
-            <div className="flex items-center gap-1 mr-1">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => onPageChange(page - 1)}
-                title="Previous Page"
-                className="w-8 h-8 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-[0.992] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
-              >
-                <ChevronLeft size={14} strokeWidth={2.25} />
-              </button>
-
-              <div
-                className="flex items-center gap-1 px-2 py-0.5 bg-surface border border-border rounded-full shadow-2xs"
-                title={`Type a page number (1 to ${totalPages}) and press Enter`}
-              >
-                <input
-                  type="number"
-                  min={1}
-                  max={totalPages}
-                  value={inputPage}
-                  onChange={(e) => setInputPage(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handlePageInputSubmit();
-                    }
-                  }}
-                  onBlur={handlePageInputSubmit}
-                  className="w-10 text-center font-mono font-bold text-xs bg-surface-sunken border border-border/80 focus:border-primary focus:ring-1 focus:ring-primary/20 rounded-md py-0.5 text-fg outline-none transition-colors"
-                />
-                <span className="text-xs font-mono font-bold text-fg-subtle select-none">
-                  / {totalPages}
-                </span>
-              </div>
-
-              <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => onPageChange(page + 1)}
-                title="Next Page"
-                className="w-8 h-8 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-[0.992] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
-              >
-                <ChevronRight size={14} strokeWidth={2.25} />
-              </button>
-            </div>
+          {/* Paste Button (Solid #8E1BB1 Circular Icon Button) */}
+          {!isRecycleBin && (
+            <button
+              type="button"
+              onClick={onOpenBulkPasteModal}
+              className="w-9 h-9 rounded-full bg-[#8E1BB1] hover:bg-[#7A149B] active:bg-[#680F86] text-white flex items-center justify-center cursor-pointer shadow-md hover:shadow-[#8E1BB1]/30 transition-all active:scale-[0.95] shrink-0"
+              title="Paste bulk contacts from Excel / Google Sheets (Ctrl+V)"
+              aria-label="Paste Bulk Contacts"
+            >
+              <ClipboardPaste size={16} strokeWidth={2.2} className="text-white" />
+            </button>
           )}
 
           {/* Delete Dustbin Button: Toggles Multi-Row Deletion & Displays Badge Counter */}
@@ -314,24 +326,19 @@ export function MetadataHeader({
 
           {!isRecycleBin && (
             <>
-              {/* Solid Export Dropdown Menu (Green Icon Button) */}
-              <SmoothExportDropdown
-                onExportExcel={onExport}
-                onExportPdf={onExportPdf}
-                onExportImage={onExportImage}
-                isExporting={isExporting}
-                iconOnly={true}
-                title="Export Data (Excel, PDF, Image)"
-              />
-
-              {/* Bulk Paste Icon Button (Solid Mango Orange with Tooltip) */}
+              {/* Direct Excel Download (Green Circular Icon Button) */}
               <button
-                onClick={onOpenBulkPasteModal}
-                className="w-9 h-9 rounded-full bg-amber-500 hover:bg-amber-600 text-white flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-[0.992]"
-                title="Bulk Paste & Import Contacts"
-                aria-label="Bulk Paste Contacts"
+                type="button"
+                disabled={isExporting}
+                onClick={() => {
+                  triggerHaptic('selection');
+                  onExport();
+                }}
+                className="w-9 h-9 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white flex items-center justify-center cursor-pointer shadow-md hover:shadow-emerald-600/30 transition-all active:scale-[0.95] shrink-0"
+                title="Download Contacts as Excel (.xlsx)"
+                aria-label="Download Excel"
               >
-                <ClipboardList size={16} strokeWidth={2.2} />
+                <Download size={16} strokeWidth={2.4} className={isExporting ? 'animate-bounce' : ''} />
               </button>
 
               {/* Add Contact Icon Button (Solid Navy Blue with Tooltip) */}

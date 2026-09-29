@@ -86,9 +86,9 @@ export function AnalyticsView({ selectedCollegeId, onSelectCollege }: Props) {
 
         <button
           onClick={loadAnalytics}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#FEF3C7] hover:bg-[#FDE68A] text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
         >
-          <RefreshCw size={14} strokeWidth={2} aria-hidden /> Refresh Live BI
+          <RefreshCw size={14} strokeWidth={2.2} aria-hidden className="text-white" /> Refresh Live BI
         </button>
       </div>
 

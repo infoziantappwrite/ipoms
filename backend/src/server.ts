@@ -185,6 +185,27 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+export const PLACEHOLDER_STRINGS = new Set([
+  '-', '--', '---', '.', '..', '...', '/', '\\', '?', '??', '???', '!',
+  'na', 'n/a', 'n.a.', 'n.a', 'n a',
+  'not available', 'not_available', 'not-available', 'notavailable',
+  'none', 'nil', 'null', 'undefined',
+  'tbd', 'tba', 'pending', 'no', 'no number', 'no email',
+  'unavailable', 'un-available', 'not provided', 'not_provided',
+  'xxx', 'xxxx', '0', '00', '000', '0000', '00000', '0000000000'
+]);
+
+export function isPlaceholderValue(val?: string | null): boolean {
+  if (!val) return true;
+  const s = String(val).trim().toLowerCase();
+  return PLACEHOLDER_STRINGS.has(s);
+}
+
+export function cleanPlaceholder(val?: string | null): string {
+  if (!val) return '';
+  return isPlaceholderValue(val) ? '' : String(val).trim();
+}
+
 /**
  * The "Graduating Academic Batch" filter on the report builder means a BATCH (2027), but a weekly row
  * carries two different years: `academic_year` is the SEASON it was created in (2026 since the season
@@ -2132,16 +2153,18 @@ app.get('/api/v1/coordinators', async (req: Request, res: Response) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── DT-1: GET /api/v1/daily-tracker/today
-// Load today's active (non-finalized) tracker rows for a coordinator+college (supports viewing any user's tracker in read-only mode)
+// Load today's or advance/tomorrow's active (non-finalized) tracker rows for a coordinator+college (supports viewing any user's tracker in read-only mode)
 app.get('/api/v1/daily-tracker/today', async (req: Request, res: Response) => {
   try {
     const rawCollegeId = req.query.college_id as string | undefined;
     const rawCoordId = req.query.coordinator_id as string | undefined;
+    const rawDate = req.query.date as string | undefined;
+    const targetSessionDate = rawDate ? buildSessionDate(rawDate) : buildSessionDate();
     const isSuper = isSupervisor(req);
     const selfId = req.user?.userId;
 
     const filter: any = {
-      session_date: buildSessionDate(),
+      session_date: targetSessionDate,
       is_finalized: false,
     };
 
@@ -2157,7 +2180,7 @@ app.get('/api/v1/daily-tracker/today', async (req: Request, res: Response) => {
       }
     }
 
-    const today = buildSessionDate();
+    const today = targetSessionDate;
     const rows = await DailyTracker.find(filter)
       .populate('coordinator_id', 'full_name official_email')
       .populate('college_id', 'college_name college_code logo_url location')
@@ -2171,7 +2194,9 @@ app.get('/api/v1/daily-tracker/today', async (req: Request, res: Response) => {
     const duplicateIdsToDelete: any[] = [];
 
     for (const row of rows) {
-      const key = `${row.college_id?._id || row.college_id}_${row.company_id || row.company_name}_${row.mobile_number}`;
+      const contact = (row.mobile_number || row.email_id || '').trim().toLowerCase();
+      const compKey = String(row.company_name || row.company_id || '').trim().toLowerCase();
+      const key = `${row.college_id?._id || row.college_id}_${compKey}_${contact}`;
       if (seenKeys.has(key) && !row.call_start_time && !row.outcome_status) {
         duplicateIdsToDelete.push(row._id);
       } else {
@@ -2263,10 +2288,12 @@ app.post('/api/v1/daily-tracker/load-contacts', async (req: Request, res: Respon
       });
     }
 
-    const today = buildSessionDate();
-    const year = today.getUTCFullYear();
-    const month = today.getUTCMonth() + 1;
-    const day = today.getUTCDate();
+    const rawDate = req.body.session_date || req.body.date;
+    const targetSessionDate = rawDate ? buildSessionDate(rawDate) : buildSessionDate();
+    const year = targetSessionDate.getUTCFullYear();
+    const month = targetSessionDate.getUTCMonth() + 1;
+    const day = targetSessionDate.getUTCDate();
+    const today = targetSessionDate;
 
     const companies = await CompanyMetadata.find({
       _id: { $in: company_ids.map((id: string) => new Types.ObjectId(id)) },
@@ -2525,32 +2552,45 @@ app.post('/api/v1/daily-tracker/check-metadata-batch', async (req: Request, res:
   try {
     const { company_names } = req.body;
     if (!Array.isArray(company_names) || company_names.length === 0) {
-      return res.json({ success: true, data: { existing_names: [], new_names: [] } });
+      return res.json({ success: true, data: { existing_names: [], new_names: [], existing_count: 0, new_count: 0 } });
     }
 
-    const trimmedNames = company_names.map((n: string) => String(n || '').trim()).filter(Boolean);
+    const trimmedNames = company_names
+      .map((n: string) => cleanPlaceholder(String(n || '')))
+      .filter(Boolean);
+
     if (trimmedNames.length === 0) {
-      return res.json({ success: true, data: { existing_names: [], new_names: [] } });
+      return res.json({ success: true, data: { existing_names: [], new_names: [], existing_count: 0, new_count: 0 } });
     }
 
-    // Match exact or case-insensitive
-    const regexes = trimmedNames.map((name) => new RegExp(`^${escapeRegex(name)}$`, 'i'));
+    // Build flexible case-insensitive regex for each company name
+    const orClauses = trimmedNames.map((name) => ({
+      company_name: {
+        $regex: new RegExp(`^\\s*${escapeRegex(name.replace(/\\s+/g, ' '))}\\s*$`, 'i'),
+      },
+    }));
+
     const matchedDocs = await CompanyMetadata.find({
-      company_name: { $in: regexes },
+      $or: orClauses,
       is_deleted: false,
     }).select('company_name hr_name primary_mobile primary_email');
 
-    const matchedMap = new Map<string, any>();
-    matchedDocs.forEach((doc) => {
-      matchedMap.set((doc.company_name || '').trim().toLowerCase(), doc);
-    });
+    const normalize = (s: string) =>
+      String(s || '')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .toLowerCase();
+
+    const matchedSet = new Set(
+      matchedDocs.map((doc) => normalize(doc.company_name))
+    );
 
     const existingNames: string[] = [];
     const newNames: string[] = [];
 
     for (const name of trimmedNames) {
-      const lower = name.toLowerCase();
-      if (matchedMap.has(lower)) {
+      const norm = normalize(name);
+      if (matchedSet.has(norm)) {
         if (!existingNames.includes(name)) existingNames.push(name);
       } else {
         if (!newNames.includes(name)) newNames.push(name);
@@ -2853,11 +2893,12 @@ app.post('/api/v1/daily-tracker/bulk-paste', async (req: Request, res: Response)
       });
     }
 
-    const today = buildSessionDate();
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1;
-    const day = now.getDate();
+    const rawDate = req.body.session_date || req.body.date;
+    const targetSessionDate = rawDate ? buildSessionDate(rawDate) : buildSessionDate();
+    const year = targetSessionDate.getUTCFullYear();
+    const month = targetSessionDate.getUTCMonth() + 1;
+    const day = targetSessionDate.getUTCDate();
+    const today = targetSessionDate;
 
     // Check existing loaded company/contact for today's session to avoid duplicate row insertion
     const existingTrackerRows = await DailyTracker.find({
@@ -2891,117 +2932,122 @@ app.post('/api/v1/daily-tracker/bulk-paste', async (req: Request, res: Response)
     let currentNextSerial = (highestDoc?.serial_number || 0) + 1;
 
     for (const item of incomingRows) {
-      const companyName = (item.company_name || '').trim();
-      const mobileNumber = (item.mobile_number || '').trim();
-      const emailId = (item.email_id || '').trim().toLowerCase();
-      const hrName = (item.hr_name || 'HR Contact').trim();
-      const comments = (item.comments || '').trim();
+      try {
+        const rawComp = cleanPlaceholder(item.company_name) || String(item.company_name || '').trim();
+        const companyName = rawComp;
+        const mobileNumber = cleanPlaceholder(item.mobile_number);
+        const emailId = cleanPlaceholder(item.email_id).toLowerCase();
+        const hrName = cleanPlaceholder(item.hr_name) || 'HR Contact';
+        const comments = (item.comments || '').trim();
 
-      // Mandatory validation: Company Name is required, and at least ONE contact point (Mobile or Email) must be present
-      if (!companyName || (!mobileNumber && !emailId)) {
-        continue;
-      }
+        // Mandatory validation: Company Name is required, and at least ONE contact point (Mobile or Email) must be present
+        if (!companyName || (!mobileNumber && !emailId)) {
+          continue;
+        }
 
-      const key = `${companyName.toLowerCase()}_${(mobileNumber || emailId).toLowerCase()}`;
-      if (existingKeys.has(key)) {
-        duplicatesSkipped++;
-        continue;
-      }
-      existingKeys.add(key);
+        const key = `${companyName.toLowerCase()}_${(mobileNumber || emailId).toLowerCase()}`;
+        if (existingKeys.has(key)) {
+          duplicatesSkipped++;
+          continue;
+        }
+        existingKeys.add(key);
 
-      // Find or create CompanyMetadata
-      let company = await CompanyMetadata.findOne({
-        company_name: { $regex: new RegExp(`^${escapeRegex(companyName)}$`, 'i') },
-        is_deleted: false,
-      });
+        // Find or create CompanyMetadata (case-insensitive & flexible whitespace)
+        let company = await CompanyMetadata.findOne({
+          company_name: { $regex: new RegExp(`^\\s*${escapeRegex(companyName.replace(/\\s+/g, ' '))}\\s*$`, 'i') },
+          is_deleted: false,
+        });
 
-      const mobList = mobileNumber ? mobileNumber.split(/[,;/]+/).map((s: string) => s.trim()).filter(Boolean) : [];
-      const emailList = emailId ? emailId.split(/[,;/]+/).map((s: string) => s.trim().toLowerCase()).filter(Boolean) : [];
+        const mobList = mobileNumber ? mobileNumber.split(/[,;/]+/).map((s: string) => s.trim()).filter(Boolean) : [];
+        const emailList = emailId ? emailId.split(/[,;/]+/).map((s: string) => s.trim().toLowerCase()).filter(Boolean) : [];
 
-      if (!company) {
-        // Automatically save new contact into Company Metadata Base
-        company = await CompanyMetadata.create({
-          serial_number: currentNextSerial++,
+        if (!company) {
+          // Automatically save new contact into Company Metadata Base
+          company = await CompanyMetadata.create({
+            serial_number: currentNextSerial++,
+            company_name: companyName,
+            hr_name: hrName || 'HR Contact',
+            primary_mobile: mobList[0] || '',
+            mobile_numbers: mobList,
+            primary_email: emailList[0] || '',
+            email_ids: emailList,
+            notes: `Imported via Daily Tracker Excel paste on ${new Date().toLocaleDateString('en-IN')}`,
+          });
+
+          newMetadataCount++;
+          newMetadataIds.push(String(company._id));
+          newMetadataCompanies.push({
+            _id: String(company._id),
+            serial_number: company.serial_number,
+            company_name: company.company_name,
+            hr_name: company.hr_name,
+            primary_mobile: company.primary_mobile,
+            primary_email: company.primary_email,
+          });
+        } else {
+          existingMetadataCount++;
+          let metaUpdated = false;
+          if (hrName && hrName !== 'HR Contact') {
+            const existingHrs = (company.hr_name || '')
+              .split(/[,;/]+/)
+              .map((s: string) => s.trim())
+              .filter((s: string) => s && s.toLowerCase() !== 'hr contact' && s.toLowerCase() !== 'contact');
+            if (!existingHrs.includes(hrName)) {
+              existingHrs.push(hrName);
+              company.hr_name = existingHrs.join(', ');
+              metaUpdated = true;
+            }
+          }
+          for (const mob of mobList) {
+            if (!company.mobile_numbers.includes(mob)) {
+              company.mobile_numbers.push(mob);
+              metaUpdated = true;
+            }
+          }
+          if (!company.primary_mobile && mobList[0]) {
+            company.primary_mobile = mobList[0];
+            metaUpdated = true;
+          }
+          for (const em of emailList) {
+            if (!company.email_ids.includes(em)) {
+              company.email_ids.push(em);
+              metaUpdated = true;
+            }
+          }
+          if (!company.primary_email && emailList[0]) {
+            company.primary_email = emailList[0];
+            metaUpdated = true;
+          }
+          if (metaUpdated) {
+            await company.save();
+          }
+        }
+
+        const newRow = await DailyTracker.create({
+          coordinator_id: new Types.ObjectId(coordinator_id),
+          college_id: new Types.ObjectId(college_id),
+          company_id: company._id,
           company_name: companyName,
-          hr_name: hrName || 'HR Contact',
-          primary_mobile: mobList[0] || '',
-          mobile_numbers: mobList,
-          primary_email: emailList[0] || '',
-          email_ids: emailList,
-          notes: `Imported via Daily Tracker Excel paste on ${new Date().toLocaleDateString('en-IN')}`,
+          hr_name: hrName || company.hr_name || 'HR Contact',
+          mobile_number: mobileNumber || company.primary_mobile || '',
+          email_id: emailId || company.primary_email || '',
+          comments: comments,
+          year,
+          month,
+          day,
+          session_date: today,
+          is_skipped: false,
+          is_promoted_to_weekly: false,
+          is_finalized: false,
+          save_count: 0,
+          duplicate_acknowledged: false,
         });
 
-        newMetadataCount++;
-        newMetadataIds.push(String(company._id));
-        newMetadataCompanies.push({
-          _id: String(company._id),
-          serial_number: company.serial_number,
-          company_name: company.company_name,
-          hr_name: company.hr_name,
-          primary_mobile: company.primary_mobile,
-          primary_email: company.primary_email,
-        });
-      } else {
-        existingMetadataCount++;
-        let metaUpdated = false;
-        if (hrName && hrName !== 'HR Contact') {
-          const existingHrs = (company.hr_name || '')
-            .split(/[,;/]+/)
-            .map((s: string) => s.trim())
-            .filter((s: string) => s && s.toLowerCase() !== 'hr contact' && s.toLowerCase() !== 'contact');
-          if (!existingHrs.includes(hrName)) {
-            existingHrs.push(hrName);
-            company.hr_name = existingHrs.join(', ');
-            metaUpdated = true;
-          }
-        }
-        for (const mob of mobList) {
-          if (!company.mobile_numbers.includes(mob)) {
-            company.mobile_numbers.push(mob);
-            metaUpdated = true;
-          }
-        }
-        if (!company.primary_mobile && mobList[0]) {
-          company.primary_mobile = mobList[0];
-          metaUpdated = true;
-        }
-        for (const em of emailList) {
-          if (!company.email_ids.includes(em)) {
-            company.email_ids.push(em);
-            metaUpdated = true;
-          }
-        }
-        if (!company.primary_email && emailList[0]) {
-          company.primary_email = emailList[0];
-          metaUpdated = true;
-        }
-        if (metaUpdated) {
-          await company.save();
-        }
+        createdCount++;
+        createdRows.push(newRow);
+      } catch (rowErr: any) {
+        console.warn(`⚠️ [DailyTracker] Bulk-paste row import error for "${item.company_name}":`, rowErr.message);
       }
-
-      const newRow = await DailyTracker.create({
-        coordinator_id: new Types.ObjectId(coordinator_id),
-        college_id: new Types.ObjectId(college_id),
-        company_id: company._id,
-        company_name: companyName,
-        hr_name: hrName || company.hr_name || 'HR Contact',
-        mobile_number: mobileNumber || company.primary_mobile || '',
-        email_id: emailId || company.primary_email || '',
-        comments: comments,
-        year,
-        month,
-        day,
-        session_date: today,
-        is_skipped: false,
-        is_promoted_to_weekly: false,
-        is_finalized: false,
-        save_count: 0,
-        duplicate_acknowledged: false,
-      });
-
-      createdCount++;
-      createdRows.push(newRow);
     }
 
     return res.status(201).json({
@@ -4048,9 +4094,11 @@ app.get('/api/v1/daily-tracker/kpi', async (req: Request, res: Response) => {
   try {
     const rawCollegeId = req.query.college_id as string | undefined;
     const rawCoordId = req.query.coordinator_id as string | undefined;
+    const rawDate = req.query.date as string | undefined;
+    const targetSessionDate = rawDate ? buildSessionDate(rawDate) : buildSessionDate();
     const isSuper = isSupervisor(req);
 
-    const today = buildSessionDate();
+    const today = targetSessionDate;
     const baseFilter: any = {
       session_date: today,
       is_finalized: false,
@@ -13341,8 +13389,8 @@ app.post('/api/v1/metadata/bulk-import', authenticateJWT, authorizeRoles('ADMINI
       const rowNum = i + 1;
       const cName = (r.company_name || '').trim();
       const hName = (r.hr_name || '').trim();
-      const rawMobile = (r.primary_mobile || r.mobile || '').trim();
-      const rawEmail = (r.primary_email || r.email || '').trim().toLowerCase();
+      const rawMobile = (r.primary_mobile || r.mobile_number || r.mobile || '').trim();
+      const rawEmail = (r.primary_email || r.email_id || r.email || '').trim().toLowerCase();
       const cType = (r.company_type || 'other').trim().toLowerCase();
 
       if (!cName) {

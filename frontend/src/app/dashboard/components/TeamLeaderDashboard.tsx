@@ -287,10 +287,10 @@ export function TeamLeaderDashboard({ data, onRefresh }: Props) {
               type="button"
               onClick={handleManualRefresh}
               disabled={isRefreshing}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-750 text-xs font-semibold shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white text-xs font-bold shadow-2xs transition-colors cursor-pointer disabled:opacity-50"
               title="Refresh live team presence and active college telemetry immediately"
             >
-              <RefreshCw size={13} className={`text-blue-600 dark:text-blue-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw size={13} className={`text-white ${isRefreshing ? 'animate-spin' : ''}`} />
               <span>{isRefreshing ? 'Syncing...' : 'Live Sync'}</span>
             </button>
 
