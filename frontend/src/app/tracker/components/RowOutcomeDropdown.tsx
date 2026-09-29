@@ -22,7 +22,7 @@ export const ROW_OUTCOMES: RowOutcomeOption[] = [
   { value: 'follow_up', label: 'Follow Up', dotColor: 'bg-orange-500', textColor: 'text-orange-600 dark:text-orange-400 font-semibold' },
   { value: 'call_back', label: 'Call Back', dotColor: 'bg-amber-500', textColor: 'text-amber-600 dark:text-amber-400' },
   { value: 'hiring_completed', label: 'Hiring Completed', dotColor: 'bg-cyan-500', textColor: 'text-cyan-600 dark:text-cyan-400' },
-  { value: 'hiring_freezed', label: 'Hiring Freezed', dotColor: 'bg-orange-500', textColor: 'text-orange-600 dark:text-orange-400' },
+  { value: 'hiring_freezed', label: 'Hiring Freezed', dotColor: 'bg-purple-500', textColor: 'text-purple-600 dark:text-purple-400 font-semibold' },
   { value: 'not_hiring', label: 'Not Hiring', dotColor: 'bg-rose-600', textColor: 'text-rose-700 dark:text-rose-400 font-bold' },
   { value: 'no_response', label: 'No Response', dotColor: 'bg-rose-500', textColor: 'text-rose-600 dark:text-rose-400 font-medium' },
   { value: 'invalid', label: 'Invalid', dotColor: 'bg-slate-500', textColor: 'text-slate-400 dark:text-slate-500' },

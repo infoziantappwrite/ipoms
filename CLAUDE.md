@@ -2369,6 +2369,176 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     original intent (there is no per-college data left to clear), only removed. Proposed to the user, not
     yet applied.
 
+87. **TPO dashboard "Company Status" chart redesigned twice, then Daily Tracker "Follow-Ups Due"
+    feature added, 29 Sep 2026 (both user-requested, both against `frontend/src/app/tpo/page.tsx` and
+    `frontend/src/app/tracker/`).**
+    **(a) TPO donut, pass 1 — copied a reference screenshot exactly.** User supplied two example donut
+    screenshots and asked for an "exact copycat" using the app's own colors. Rebuilt
+    `CompanyStatusChart` in `tpo/page.tsx`: flat single-hue gradients (light→dark tint of ONE color per
+    segment, not the multi-stop rainbow gradients it had before), no background track ring, wide visible
+    gaps between segments, rounded caps, a soft blurred ambient glow underneath, and the legend removed
+    entirely (matching the reference, which has none) — just a big centered total + "companies" label,
+    with hover swapping to the hovered segment's own count/name. Verified live via Playwright as `kiot`.
+    **(b) TPO donut, pass 2 — replaced with the exact mechanism from the user's own older Placement
+    Dashboard project (Recharts-based), same day, same session.** User pasted a technical breakdown of
+    that chart and asked to port the technique, now that the six-color palette pass-1 invented (a
+    guess) could instead use the app's real canonical per-section colors. The one true source for those
+    turned out to be `weekly-tracker/components/MoveSectionDropdown.tsx`'s `WEEKLY_PIPELINE_SECTIONS` —
+    the "Move to Section" toggle every coordinator already uses — not a new palette. Centralized as
+    `SECTION_COLORS` in `tpo/page.tsx` (emerald/amber/indigo/blue/purple/orange/slate, one Tailwind
+    -600 hex per section, mapped: TPO's "Pipeline" = the dropdown's `top_companies` since that's what
+    TPO Pipeline actually sources from per item 86, not the dropdown's own separate `pipeline` key).
+    All **7** canonical sections now render (previously only 6 — "Rejected" alongside "Rejected by TPO"
+    was missing, even though `TpoKpi.rejected` already existed in the interface unused). Mechanism
+    ported: per-slice **opacity** gradient (same hex, 100%→72% stop, vertical) instead of a two-hue
+    blend; hover-grow via the SLICE's own outer radius growing 95→101 (recomputing that one path,
+    inner edge fixed) rather than a CSS `scale()` on the whole element — the actual Recharts
+    `activeShape` trick, reproduced by hand since this chart is plain SVG, not Recharts; a legend
+    brought back below the donut with bidirectional cross-highlight (hovering either the slice or its
+    legend row dims every other segment/row to 45% opacity via one shared `hoveredKey` state).
+    Verified live via Playwright as `kiot`: default render shows the correct 4 active colors for that
+    college's real data (blue/purple/orange/slate — no emerald/amber/indigo since KIOT has 0 in those
+    sections right now), and hovering the "Pipeline" legend row correctly grows that slice, dims the
+    other three, and swaps the center label to "8 / Pipeline" in purple. `tsc --noEmit` clean.
+    **(c) Daily Tracker "Follow-Ups Due" — a real feature, not a chart tweak.** User's ask: when a
+    coordinator marks a call "Follow Up" with a target month (`daily_tracker.follow_up_month`, e.g.
+    "November"), remind them inside the Daily Tracker itself — not the dashboard — once that month
+    genuinely arrives, pulling from history automatically; show only Company/HR/Mobile/Email, leave
+    every other column (timing, outcome, comments) visibly blank/inert, and color it distinctly
+    (mustard/amber). Design was proposed and confirmed with the user before building (see prior turn) —
+    the core problem `follow_up_month` alone can't solve is that it's a bare month name with **no
+    year**, so "November" is ambiguous across every future occurrence.
+    **Fix: give it a real date.** `computeFollowUpDueDate(monthName, referenceDate)`
+    (`backend/src/lib/followUpDate.ts`) resolves a month name to the 1st of its **next occurrence at or
+    after `referenceDate`** — same year if that month hasn't passed yet relative to the reference,
+    otherwise next year. Stored in `DailyTracker.follow_up_date`, a field the schema already had but
+    Daily Tracker had never populated (only Weekly Tracker used it before). Wired into both places a
+    Daily Tracker row's outcome becomes `follow_up`: `POST /daily-tracker/manual-row` (referenced
+    against that row's own effective session date) and `PATCH /daily-tracker/:id` (referenced against
+    the row's existing `session_date` when the client doesn't send an explicit `follow_up_date` — which
+    the frontend never did before this). New `DailyTracker.follow_up_resolved` boolean (default false)
+    closes the loop without ever touching the original row's real date/outcome (history stays honest):
+    set only when a *new* row is created that explicitly names the original via
+    `resolves_follow_up_id` in the `manual-row` payload.
+    **New endpoint** `GET /daily-tracker/follow-ups-due?college_id=...` — self-scoped like
+    `/daily-tracker/today` (a supervisor sees all), filtered to `outcome_status: 'follow_up'`,
+    `follow_up_resolved: { $ne: true }`, `follow_up_date` inside the **real current calendar month**
+    (always "now," independent of the page's Today/Tomorrow toggle — "when November starts" means the
+    real month, not whichever session date is being viewed). Deduped to one row per contact
+    (company+mobile/email), keeping the most recently logged if the same contact was marked in more
+    than one past cycle.
+    **One-time backfill**, `npm run backfill:followups -- --apply` (dry-run by default, matching the
+    `fix:roles`/`seed:nehru` convention) — computes `follow_up_date` for every historical row that only
+    ever had `follow_up_month`, referenced against **that row's own `session_date`** (not today), so a
+    "February" picked in September correctly backfills to *next* February, not this one already past.
+    Run live against production data: **92 rows backfilled**, spot-checked (e.g. a "February" pick from
+    21 Sep 2026 correctly resolved to 1 Feb **2027**, having already passed for 2026).
+    **Frontend, original version:** new `FollowUpsDueBanner.tsx` — a collapsible amber/mustard panel
+    pinned **above** the grid (deliberately not mixed into today's rows, so a reminder is never mistaken
+    for an already-logged call), showing Company/HR/Mobile/Email plus when it was marked and originally
+    logged, with a "Start Call" button per contact that opened `ManualAddRowModal` pre-filled via its
+    existing `initialDraft` mechanism (item 85), asking for Start Time/Call Status/comments right there.
+    `loadFollowUpReminders()` fires alongside the existing `loadTodayRows()`/`loadKpi()` on college
+    change (not the 8-second live-refresh interval — reminders don't change that often; unchanged by
+    the redesign below).
+    **Redesigned same day, same session (user feedback): "Start Call" → "Add to Tracker", no
+    call-logging popup at all.** The user's objection: Start Call demanded Start Time/Duration/Call
+    Status immediately, but a coordinator seeing this at 6 PM often isn't calling *right now* — they
+    just want the contact sitting on the active sheet, ready when they are. Rather than build a new
+    "push to tomorrow" control, the fix reuses the page's **one existing** Today/Tomorrow toggle
+    end-to-end (the user was explicit: no second Tomorrow button anywhere) — "Add to Tracker" drops the
+    contact into whichever sheet (`activeDateMode`) is already active, via the **same mechanism Load
+    Contacts already uses**: `POST /daily-tracker/load-contacts` (previously only reachable from the
+    Contact Picker), inserting a genuinely blank row (`outcome_status: null`, no timing, no comments) —
+    not a pre-filled form. That endpoint grew one new optional field, `resolves_follow_up_ids: string[]`
+    — after inserting (or finding the contact already a same-day duplicate, which still counts: the
+    reminder's job is done either way), it flags each of those ids `follow_up_resolved: true`, scoped to
+    the caller. This fully replaced `manual-row`'s `resolves_follow_up_id` param from the original
+    version — reverted there since nothing calls it anymore (no half-finished second path left behind).
+    The banner now shows a per-row **"Add to {Today's|Tomorrow's} Tracker"** button plus, when more than
+    one reminder is due, a header-level **"Add All to {Today's|Tomorrow's} Tracker"** — both call the
+    same `handleAddFollowUpsToTracker()`, which is really just `load-contacts` with the reminders'
+    `company_id`s and `_id`s. The label text itself (not a button) tells the coordinator which sheet
+    it's about to file into, always matching the header's own toggle state — confirmed live via
+    Playwright screenshot both ways: "will add to Today's tracker" flips to "will add to Tomorrow's
+    tracker" the instant the *existing* header button is clicked, with zero new day-switching UI
+    anywhere. `resolvesFollowUpId` state, the `ManualAddRowModal` prop of the same name, and its
+    Start-Call-only payload field were all removed as dead code rather than left half-wired.
+    **Process note (original version):** found `ManualAddRowModal.tsx` referencing `ROW_OUTCOMES` with
+    no import for it — a concurrent uncommitted edit elsewhere in the same file (`RowOutcomeDropdown.tsx`
+    was also modified, unrelated to this feature) had dropped the import, breaking the build. Restored
+    only the one missing `import { ROW_OUTCOMES } from './RowOutcomeDropdown'` line, matching the same
+    pattern already used in `EditTrackerRowModal.tsx` — left the rest of that other WIP untouched, same
+    precedent as item 56(b).
+    **Verified live end-to-end, both versions.** Original ("Start Call"): created a `follow_up` row due
+    this month via `manual-row` → confirmed it appears in `follow-ups-due` → created a second row
+    referencing it via `resolves_follow_up_id` → confirmed the original dropped out while an unrelated
+    real historical reminder (Precision Infomatic) correctly stayed; real browser (Playwright, dark
+    mode) showed the banner with genuine backfilled data and a correctly pre-filled Start Call modal.
+    Redesign ("Add to Tracker"), against real production data, all throwaway rows/metadata removed
+    after: (1) two same-day follow-ups resolved via a bulk "Add All" call correctly reported
+    `loaded: 0, duplicates_skipped: 2` — because both were artificially created already-in-today's-sheet
+    for the test — while still flipping `follow_up_resolved` on both (confirms the "already on an active
+    sheet = job done" rule even without a fresh insert); (2) a genuinely past-dated follow-up (session
+    date 20 Sep) resolved via a single "Add to Tracker" call correctly inserted a brand-new row **dated
+    today**, entirely blank (`outcome_status: null`, `call_start_time: null`, `comments: ""`) — proving
+    it's a ready-to-call placeholder, not a logged call. Real browser (Playwright): banner's copy and
+    button label both read "Today's tracker" by default and switch to "Tomorrow's tracker" the moment
+    the *existing* header Tomorrow button is clicked — no second button rendered anywhere in either
+    screenshot. `tsc --noEmit` clean both sides after every change, 34/34 backend API tests still pass,
+    `verify:policy` unaffected throughout (`/daily-tracker*` wildcard already covers every route touched,
+    no new entry needed at any point).
+    **Not yet done:** no automated test covers `follow-ups-due`, `load-contacts`'s new
+    `resolves_follow_up_ids` param, or the resolve flow specifically (the 34-test suite is read-only by
+    design — see item 82 — and this feature's core value is its write path).
+
+88. **Daily Tracker's Follow Up column became a real date picker (day/month/year), not just a month
+    name — 29 Sep 2026 (user-requested, extends item 87c).** The user's ask, after seeing the plain
+    "Pick Month" dropdown: a real date is strictly more useful than "sometime in November" — it lets a
+    reminder say "this contact, on 15 November" and, combined with item 87's Follow-Ups Due banner,
+    surface on the right day instead of fuzzily across a whole month.
+    **New component** `RowFollowUpDateDropdown.tsx` — a compact calendar popover (prev/next month nav,
+    weekday header, past days dimmed and unclickable, today ringed, selected day filled amber) with the
+    same portal-positioning mechanics as the `RowMonthDropdown.tsx` it replaces everywhere it was used:
+    the grid cell itself (`TrackerRow.tsx`), the Add Contact Entry modal (`ManualAddRowModal.tsx`, which
+    had its own hand-rolled inline month popover — replaced with this shared component instead, ~90
+    fewer lines), the Edit Row modal (`EditTrackerRowModal.tsx`, which used the unrelated shared
+    `SmoothMonthDropdown.tsx` — see below), and the Softphone wrap-up panel (`SoftphonePanel.tsx`).
+    `RowMonthDropdown.tsx` itself was **left untouched, not deleted** — it was mid-edit by a concurrent
+    session at the time (confirmed by reading it: its `getDynamicFollowUpMonths`/
+    `formatFollowUpMonthDisplay` helpers had already moved from bare month names to "Month YYYY" strings,
+    apparently solving the same year-ambiguity problem independently) — deleting it would have destroyed
+    that in-progress work for no functional gain, since nothing calls the component anymore but its two
+    helper functions are still re-exported from `TrackerRow.tsx` as a display fallback for any row that
+    somehow still only has `follow_up_month` and no `follow_up_date`. **`SmoothMonthDropdown.tsx` was
+    also left alone** — turned out to be unrelated shared infrastructure used by Active Leads (`active-leads/
+    components/*`), not by this feature at all; `EditTrackerRowModal.tsx`'s own usage of it was swapped
+    for the new component without touching the shared file.
+    **Backend:** `POST /daily-tracker/manual-row` and `PATCH /daily-tracker/:id` now accept an explicit
+    `follow_up_date` (still fall back to computing one from a bare `follow_up_month` via
+    `computeFollowUpDueDate`, item 87, if an older caller ever sends only that — no caller does anymore).
+    New `followUpDatePastError()` in `lib/followUpDate.ts` refuses a follow-up date earlier than today
+    (`400 FOLLOW_UP_DATE_PAST`), mirroring the identical rule already enforced for Weekly Tracker's own
+    `follow_up_date` — a reminder is always a look forward, never backward. `manual-row`'s missing-date
+    error renamed `FOLLOW_UP_MONTH_REQUIRED` → `FOLLOW_UP_DATE_REQUIRED` to match.
+    **`GET /daily-tracker/follow-ups-due` semantics changed from "due this calendar month" to "due today
+    or earlier, unresolved"** (`follow_up_date: { $lte: todayEnd }` instead of a month range) — the
+    natural evolution once a real date exists: a future-dated follow-up simply isn't shown yet and
+    appears automatically the day it's due, while a missed day keeps showing (never silently drops off)
+    until actually resolved. `FollowUpsDueBanner.tsx`'s per-contact caption now reflects this honestly —
+    "Due today" for an exact match, "Overdue since 1 Sep 2026" for anything earlier, "Due 15 Nov 2026"
+    for a genuinely future pick — rather than the old "Marked <Month>" text.
+    **Verified live end-to-end** against real production data: `follow_up_date: "2026-01-01"` (past) →
+    `400 FOLLOW_UP_DATE_PAST`; no date at all → `400 FOLLOW_UP_DATE_REQUIRED`; `"2026-11-15"` (future) →
+    `201`, correctly absent from `follow-ups-due` (not due yet); `PATCH`-ing that same row's date to
+    today → immediately appears. Real browser (Playwright, dark mode): opened Add Contact Entry, picked
+    Follow Up status, the calendar opened showing September 2026 with days 1–28 dimmed/disabled and 29
+    (today) ringed; clicked day 30 → trigger button correctly read **"30 Sep 2026"**; the live banner
+    above it showed genuine backfilled data as "Suguna Foods Pvt Limited — Overdue since 1 Sep 2026",
+    confirming the new caption logic against real data, not a mock. All throwaway rows/metadata removed
+    after. `tsc --noEmit` clean both sides, 34/34 backend API tests pass, `verify:policy` unaffected
+    (same `/daily-tracker*` wildcard covers every route touched).
+
 ## 6. Module map
 ## 6. Module map
 ## 6. Module map

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { TrackerRow, OUTCOMES, MONTHS } from './TrackerRow';
+import { TrackerRow, OUTCOMES, MONTHS, getDynamicFollowUpMonths, formatFollowUpMonthDisplay, formatFollowUpDateDisplay } from './TrackerRow';
 import type { TrackerRow as TrackerRowType } from '../page';
 import { ClipboardList, Copy, CopyPlus, Check, CheckSquare, Loader2, X, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
@@ -132,18 +132,18 @@ export function TrackerGrid({
       if (!targetRow) return;
 
       const newOutcome = patch.outcome_status !== undefined ? patch.outcome_status : targetRow.outcome_status;
-      const newFollowUpMonth = patch.follow_up_month !== undefined ? patch.follow_up_month : targetRow.follow_up_month;
+      const newFollowUpDate = patch.follow_up_date !== undefined ? patch.follow_up_date : targetRow.follow_up_date;
 
-      // Rule: If call outcome is 'follow_up', do NOT advance unless follow_up_month is set!
+      // Rule: If call outcome is 'follow_up', do NOT advance unless a follow-up date is set!
       if (newOutcome === 'follow_up') {
-        if (!newFollowUpMonth) {
+        if (!newFollowUpDate) {
           setActiveRowId(rowId);
           return;
         }
       }
 
-      // If call outcome status is set or follow_up_month was selected, auto-advance to next row!
-      if (patch.outcome_status || (newOutcome && patch.follow_up_month)) {
+      // If call outcome status is set or a follow-up date was picked, auto-advance to next row!
+      if (patch.outcome_status || (newOutcome && patch.follow_up_date)) {
         autoAdvanceRow(rowId);
       }
     },
@@ -307,6 +307,7 @@ export function TrackerGrid({
           break;
         case 'follow_up_month':
           rowPatches[rowId].follow_up_month = null as any;
+          rowPatches[rowId].follow_up_date = null as any;
           break;
         case 'comments':
           rowPatches[rowId].comments = '';
@@ -372,7 +373,7 @@ export function TrackerGrid({
               val = rowObj.outcome_status ?? '';
               break;
             case 'follow_up_month':
-              val = rowObj.follow_up_month ?? '';
+              val = rowObj.follow_up_date ? formatFollowUpDateDisplay(rowObj.follow_up_date) : (rowObj.follow_up_month ?? '');
               break;
             case 'comments':
               val = rowObj.comments ?? '';
@@ -431,7 +432,7 @@ export function TrackerGrid({
                 val = rowObj.outcome_status ?? '';
                 break;
               case 'follow_up_month':
-                val = rowObj.follow_up_month ?? '';
+                val = rowObj.follow_up_date ? formatFollowUpDateDisplay(rowObj.follow_up_date) : (rowObj.follow_up_month ?? '');
                 break;
               case 'comments':
                 val = rowObj.comments ?? '';
@@ -614,10 +615,17 @@ export function TrackerGrid({
                 rowPatches[targetRow._id].follow_up_month = null as any;
                 applied = true;
               } else {
-                const match = MONTHS.find((m) => m.toLowerCase() === valStr.toLowerCase());
+                const dynamicMonths = getDynamicFollowUpMonths();
+                const match = dynamicMonths.find((m) => m.toLowerCase() === valStr.toLowerCase() || m.toLowerCase().startsWith(valStr.toLowerCase()));
                 if (match) {
                   rowPatches[targetRow._id].follow_up_month = match;
                   applied = true;
+                } else {
+                  const formatted = formatFollowUpMonthDisplay(valStr);
+                  if (formatted) {
+                    rowPatches[targetRow._id].follow_up_month = formatted;
+                    applied = true;
+                  }
                 }
               }
               break;
@@ -918,7 +926,7 @@ export function TrackerGrid({
           })()
         : '';
       const outcome = r.outcome_status ? (outcomeLabels[r.outcome_status] || r.outcome_status) : '';
-      const followUp = (r.follow_up_month || '').trim();
+      const followUp = r.follow_up_date ? formatFollowUpDateDisplay(r.follow_up_date) : (r.follow_up_month || '').trim();
       const comments = (r.comments || '').replace(/[\t\n\r]+/g, ' ').trim();
 
       const cols = [
@@ -1001,7 +1009,7 @@ export function TrackerGrid({
           })()
         : '';
       const outcome = r.outcome_status ? (outcomeLabels[r.outcome_status] || r.outcome_status) : '';
-      const followUp = (r.follow_up_month || '').trim();
+      const followUp = r.follow_up_date ? formatFollowUpDateDisplay(r.follow_up_date) : (r.follow_up_month || '').trim();
       const comments = (r.comments || '').replace(/[\t\n\r]+/g, ' ').trim();
 
       const cols = [
@@ -1280,14 +1288,14 @@ export function TrackerGrid({
   }
 
   const gridTemplate = isReadOnly
-    ? 'grid-cols-[56px_100px_90px_90px_260px_200px_240px_270px_150px_180px_150px_minmax(260px,1fr)]'
-    : 'grid-cols-[56px_100px_90px_90px_260px_200px_240px_270px_180px_150px_minmax(260px,1fr)]';
+    ? 'grid-cols-[56px_100px_90px_90px_260px_200px_240px_270px_150px_180px_190px_minmax(260px,1fr)]'
+    : 'grid-cols-[56px_100px_90px_90px_260px_200px_240px_270px_180px_190px_minmax(260px,1fr)]';
 
   return (
     <div className="flex-1 relative flex flex-col min-h-0">
       {/* Grid Container */}
       <div className="flex-1 overflow-auto rounded-xl border border-border bg-surface">
-        <div className={isReadOnly ? 'min-w-[2060px]' : 'min-w-[1910px]'}>
+        <div className={isReadOnly ? 'min-w-[2100px]' : 'min-w-[1950px]'}>
           {/* Sticky Column Headers (Exact Sheet-grade CSS Grid) */}
           <div className={`sticky top-0 z-20 grid ${gridTemplate} divide-x divide-border bg-surface-sunken border-b border-border text-xs font-semibold text-fg-subtle uppercase tracking-wider shadow-2xs whitespace-nowrap select-none`}>
             {/* S.No / Select Toggle Button & Master Checkbox (Frozen Col 1) */}

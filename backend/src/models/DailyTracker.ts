@@ -55,7 +55,14 @@ export interface IDailyTracker extends Document {
   // Outcome (Spec Section 12)
   outcome_status?: CallOutcome;
   follow_up_month?: string | null;          // 12 calendar months: January–December (only when outcome = follow_up)
-  follow_up_date?: Date | null;             // Cleared to null when outcome moves away from follow_up
+  follow_up_date?: Date | null;             // Real due date (1st of the target month), computed server-side from
+                                             // follow_up_month — resolves the "which year's November" ambiguity a
+                                             // bare month name can't answer on its own. Cleared to null when outcome
+                                             // moves away from follow_up.
+  follow_up_resolved?: boolean;             // True once this follow-up was re-contacted via a fresh row (see
+                                             // resolves_follow_up_id on POST /daily-tracker/manual-row) — stops it
+                                             // from resurfacing in GET /daily-tracker/follow-ups-due. The original
+                                             // row's own outcome/date are never touched, so history stays honest.
 
   // Notes
   comments?: string;                        // Always optional
@@ -211,6 +218,11 @@ const DailyTrackerSchema: Schema<IDailyTracker> = new Schema(
     follow_up_date: {
       type: Date,
       default: null,
+      index: true,
+    },
+    follow_up_resolved: {
+      type: Boolean,
+      default: false,
     },
 
     // ── Notes

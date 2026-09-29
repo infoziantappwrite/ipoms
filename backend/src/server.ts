@@ -30,6 +30,7 @@ import { SystemSettings } from './models/SystemSettings';
 import { AuditLog } from './models/AuditLog';
 import { writeAudit } from './lib/audit';
 import { getCurrentAcademicYear, getCurrentGraduatingBatchYear, clearAcademicYearCache } from './lib/academicYear';
+import { computeFollowUpDueDate, followUpDatePastError } from './lib/followUpDate';
 import mongoose, { Types } from 'mongoose';
 import { startFinalizationJob } from './jobs/finalizeDailyTracker';
 import { startPositiveSyncReminderJob } from './jobs/positiveSyncReminder';
@@ -2388,7 +2389,7 @@ app.get('/api/v1/daily-tracker/today', async (req: Request, res: Response) => {
 // Bulk-create tracker rows from selected company_ids (Contact Picker)
 app.post('/api/v1/daily-tracker/load-contacts', async (req: Request, res: Response) => {
   try {
-    const { college_id, company_ids } = req.body;
+    const { college_id, company_ids, resolves_follow_up_ids } = req.body;
     const coordinator_id = scopeToSelf(req, req.body.coordinator_id);
 
     if (!coordinator_id || !college_id || !Array.isArray(company_ids) || company_ids.length === 0) {
@@ -2465,6 +2466,20 @@ app.post('/api/v1/daily-tracker/load-contacts', async (req: Request, res: Respon
       inserted = await DailyTracker.insertMany(toInsert, { ordered: false });
     }
 
+    // Follow-Ups Due "Add to Tracker": the contact is now sitting on a real
+    // active sheet (blank, ready to call) — that's the reminder's whole job
+    // done, so close the loop the same way manual-row's resolves_follow_up_id
+    // does. Scoped to the caller so one coordinator can't resolve another's.
+    if (Array.isArray(resolves_follow_up_ids) && resolves_follow_up_ids.length > 0) {
+      const validIds = resolves_follow_up_ids.filter((id: string) => Types.ObjectId.isValid(id));
+      if (validIds.length > 0) {
+        await DailyTracker.updateMany(
+          { _id: { $in: validIds }, coordinator_id: new Types.ObjectId(coordinator_id) },
+          { $set: { follow_up_resolved: true } }
+        );
+      }
+    }
+
     return res.status(201).json({
       success: true,
       message: `${inserted.length} contact(s) loaded into today's tracker`,
@@ -2498,6 +2513,7 @@ app.post('/api/v1/daily-tracker/manual-row', async (req: Request, res: Response)
       duration_seconds,
       outcome_status,
       follow_up_month,
+      follow_up_date,
       comments,
       session_date,
     } = req.body;
@@ -2516,11 +2532,18 @@ app.post('/api/v1/daily-tracker/manual-row', async (req: Request, res: Response)
       });
     }
 
-    if (outcome_status === 'follow_up' && !follow_up_month) {
+    if (outcome_status === 'follow_up' && !follow_up_date && !follow_up_month) {
       return res.status(400).json({
         success: false,
-        error: { code: 'FOLLOW_UP_MONTH_REQUIRED', message: 'Follow Up Month is mandatory when Call Status is Follow Up' },
+        error: { code: 'FOLLOW_UP_DATE_REQUIRED', message: 'Follow Up Date is mandatory when Call Status is Follow Up' },
       });
+    }
+
+    if (outcome_status === 'follow_up' && follow_up_date) {
+      const pastError = followUpDatePastError(follow_up_date);
+      if (pastError) {
+        return res.status(400).json({ success: false, error: { code: 'FOLLOW_UP_DATE_PAST', message: pastError } });
+      }
     }
 
     const effectiveDate = session_date ? new Date(session_date) : new Date();
@@ -2624,6 +2647,9 @@ app.post('/api/v1/daily-tracker/manual-row', async (req: Request, res: Response)
       duration_seconds: calculatedDuration,
       outcome_status: outcome_status || null,
       follow_up_month: outcome_status === 'follow_up' ? (follow_up_month || null) : null,
+      follow_up_date: outcome_status === 'follow_up'
+        ? (follow_up_date ? new Date(follow_up_date) : computeFollowUpDueDate(follow_up_month, today))
+        : null,
       comments: comments?.trim() || '',
       year,
       month,
@@ -2652,6 +2678,81 @@ app.post('/api/v1/daily-tracker/manual-row', async (req: Request, res: Response)
     return res.status(500).json({
       success: false,
       error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to add manual contact row' },
+    });
+  }
+});
+
+// ── DT-FOLLOWUPS-DUE: GET /api/v1/daily-tracker/follow-ups-due
+// Contacts the caller marked "Follow Up" with a real date (see
+// computeFollowUpDueDate / the RowFollowUpDateDropdown picker) that is today
+// or earlier and hasn't been resolved yet — "$lte todayEnd" rather than an
+// exact match so a missed day never silently drops off; it keeps showing
+// until actually resolved. A future-dated follow-up simply isn't due yet and
+// appears automatically once its day arrives. Self-scoped, same as
+// /daily-tracker/today. Deduped to one row per contact — the most recent
+// unresolved follow-up wins if the same contact was marked more than once.
+app.get('/api/v1/daily-tracker/follow-ups-due', async (req: Request, res: Response) => {
+  try {
+    const rawCollegeId = req.query.college_id as string | undefined;
+    const selfId = req.user?.userId;
+    const isSuper = isSupervisor(req);
+
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const filter: any = {
+      outcome_status: 'follow_up',
+      follow_up_resolved: { $ne: true },
+      follow_up_date: { $lte: todayEnd },
+    };
+
+    if (rawCollegeId && rawCollegeId !== 'all' && Types.ObjectId.isValid(rawCollegeId)) {
+      filter.college_id = new Types.ObjectId(String(rawCollegeId));
+    }
+
+    if (!isSuper) {
+      if (!selfId || !Types.ObjectId.isValid(selfId)) {
+        return res.status(200).json({ success: true, data: { reminders: [] } });
+      }
+      filter.coordinator_id = new Types.ObjectId(String(selfId));
+    }
+
+    const rows = await DailyTracker.find(filter)
+      .sort({ follow_up_date: 1, session_date: -1 })
+      .lean();
+
+    // Dedup by contact (company + mobile/email) — keep the most recently logged.
+    const byContact = new Map<string, any>();
+    for (const row of rows) {
+      const contact = (row.mobile_number || row.email_id || '').trim().toLowerCase();
+      const key = `${String(row.company_name || '').trim().toLowerCase()}_${contact}`;
+      const existing = byContact.get(key);
+      if (!existing || new Date(row.session_date as any).getTime() > new Date(existing.session_date).getTime()) {
+        byContact.set(key, row);
+      }
+    }
+
+    const reminders = Array.from(byContact.values()).map((row) => ({
+      _id: row._id,
+      company_id: row.company_id || null,
+      company_name: row.company_name,
+      hr_name: row.hr_name || '',
+      mobile_number: row.mobile_number || '',
+      email_id: row.email_id || '',
+      college_id: row.college_id,
+      follow_up_month: row.follow_up_month,
+      follow_up_date: row.follow_up_date,
+      originally_logged_on: row.session_date,
+    })).sort((a, b) => new Date(a.follow_up_date).getTime() - new Date(b.follow_up_date).getTime());
+
+    return res.status(200).json({
+      success: true,
+      data: { reminders, total: reminders.length },
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to load follow-ups due' },
     });
   }
 });
@@ -3505,6 +3606,13 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
       });
     }
 
+    if (follow_up_date) {
+      const pastError = followUpDatePastError(follow_up_date);
+      if (pastError) {
+        return res.status(400).json({ success: false, error: { code: 'FOLLOW_UP_DATE_PAST', message: pastError } });
+      }
+    }
+
     const prevCompanyName = row.company_name;
     const prevMobileNumber = row.mobile_number;
     const prevEmailId = row.email_id;
@@ -3551,15 +3659,31 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
       }
 
       if (outcome_status === 'follow_up') {
-        if (follow_up_date) row.follow_up_date = new Date(follow_up_date);
         if (follow_up_month !== undefined) row.follow_up_month = follow_up_month || null;
+        if (follow_up_date) {
+          row.follow_up_date = new Date(follow_up_date);
+        } else {
+          // No explicit date from the client — derive one from the month so
+          // "which year's November" is never ambiguous. Reference the row's
+          // own session_date (when this call was actually logged), not "now".
+          row.follow_up_date = computeFollowUpDueDate(row.follow_up_month, row.session_date || new Date());
+        }
+        row.follow_up_resolved = false;
       } else {
         // If outcome changed away from follow_up, reset follow_up_month
         row.follow_up_month = null;
         row.follow_up_date = null;
       }
+    } else if (follow_up_date !== undefined) {
+      // The Follow Up cell's date picker fires this on its own, with no outcome_status
+      // in the same request (the outcome was already set to 'follow_up' earlier).
+      row.follow_up_date = follow_up_date ? new Date(follow_up_date) : null;
+      row.follow_up_resolved = false;
     } else if (follow_up_month !== undefined) {
+      // Legacy path — nothing in the app sends a bare month anymore, kept only in
+      // case an older client/session is still mid-flight with the old contract.
       row.follow_up_month = follow_up_month || null;
+      row.follow_up_date = computeFollowUpDueDate(follow_up_month, row.session_date || new Date());
     }
 
     if (comments !== undefined) {

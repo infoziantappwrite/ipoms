@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { ChevronDown, Check, Calendar } from 'lucide-react';
 import { triggerHaptic } from '@/lib/haptics';
 
-export const MONTHS_LIST = [
+export const BASE_MONTHS_LIST = [
   'January',
   'February',
   'March',
@@ -19,6 +19,39 @@ export const MONTHS_LIST = [
   'November',
   'December',
 ] as const;
+
+export function getDynamicFollowUpMonths(refDate: Date = new Date()): string[] {
+  const currentYear = refDate.getFullYear();
+  const currentMonthIdx = refDate.getMonth();
+
+  return BASE_MONTHS_LIST.map((name, idx) => {
+    const year = idx >= currentMonthIdx ? currentYear : currentYear + 1;
+    return `${name} ${year}`;
+  });
+}
+
+export function formatFollowUpMonthDisplay(val?: string | null, refDate: Date = new Date()): string {
+  if (!val) return '';
+  const trimmed = val.trim();
+  if (!trimmed) return '';
+
+  if (/\b\d{4}\b/.test(trimmed)) {
+    return trimmed;
+  }
+
+  const currentYear = refDate.getFullYear();
+  const currentMonthIdx = refDate.getMonth();
+  const idx = BASE_MONTHS_LIST.findIndex(
+    (m) => m.toLowerCase() === trimmed.toLowerCase()
+  );
+  if (idx !== -1) {
+    const year = idx >= currentMonthIdx ? currentYear : currentYear + 1;
+    return `${BASE_MONTHS_LIST[idx]} ${year}`;
+  }
+  return trimmed;
+}
+
+export const MONTHS_LIST = BASE_MONTHS_LIST;
 
 export type MonthOption = (typeof MONTHS_LIST)[number] | '';
 
@@ -56,11 +89,17 @@ export function SmoothMonthDropdown({
     ready: false,
   });
 
+  const dynamicMonths = getDynamicFollowUpMonths();
+  const isAll = value === 'all' || (!value && allowAll);
+  const isSelected = Boolean(value && value !== 'all');
+  const formattedValue = isAll ? '' : formatFollowUpMonthDisplay(value);
+  const displayLabel = isAll ? (allLabel || placeholder) : formattedValue || placeholder;
+
   const calculateCoords = useCallback(() => {
     if (!triggerRef.current) return null;
     const rect = triggerRef.current.getBoundingClientRect();
     const popoverHeight = 250;
-    const popoverWidth = Math.max(rect.width, 185);
+    const popoverWidth = Math.max(rect.width, 205);
     const spaceBelow = window.innerHeight - rect.bottom;
     const placeAbove = spaceBelow < popoverHeight && rect.top > popoverHeight;
 
@@ -142,10 +181,6 @@ export function SmoothMonthDropdown({
     );
   }
 
-  const isAll = value === 'all' || (!value && allowAll);
-  const isSelected = Boolean(value && value !== 'all');
-  const displayLabel = isAll ? (allLabel || placeholder) : value || placeholder;
-
   return (
     <div className={`relative inline-block text-left ${className}`} onClick={(e) => e.stopPropagation()}>
       {/* Trigger Button */}
@@ -159,9 +194,9 @@ export function SmoothMonthDropdown({
             : 'bg-surface hover:bg-surface-raised text-fg border-border'
         } ${isOpen ? 'ring-2 ring-amber-500/20 border-amber-500/50' : ''}`}
       >
-        <div className="flex items-center gap-1.5 min-w-0 truncate">
+        <div className="flex items-center gap-1.5 min-w-0">
           <Calendar size={13} className="text-amber-500 shrink-0" />
-          <span className="truncate">{displayLabel}</span>
+          <span className="whitespace-nowrap">{displayLabel}</span>
         </div>
         <ChevronDown
           size={13}
@@ -188,7 +223,7 @@ export function SmoothMonthDropdown({
                   : 'auto',
               left: `${coords.left}px`,
               zIndex: 99999,
-              width: '196px',
+              width: '205px',
             }}
             className="rounded-xl bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] p-2 flex flex-col text-fg animate-in fade-in zoom-in-95 duration-150 ease-out select-none"
           >
@@ -215,8 +250,11 @@ export function SmoothMonthDropdown({
 
             {/* Scrollable Month Options starting directly from January */}
             <div className="overflow-y-auto max-h-[190px] space-y-0.5 pr-0.5 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              {MONTHS_LIST.map((month) => {
-                const isCurrentSelected = value === month;
+              {dynamicMonths.map((month) => {
+                const isCurrentSelected =
+                  formattedValue === month ||
+                  value === month ||
+                  (value ? month.toLowerCase().startsWith(value.toLowerCase()) : false);
                 return (
                   <button
                     key={month}

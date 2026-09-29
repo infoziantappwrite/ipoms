@@ -16,6 +16,7 @@ import { readSessionUser, roleOf } from '@/lib/session';
 import { useFullAccessViewer } from '@/lib/useFullAccessViewer';
 import { getCoordinatorSelectedColleges } from '@/lib/collegeSession';
 import { ManualAddRowModal, type ManualAddRowDraft } from './components/ManualAddRowModal';
+import { FollowUpsDueBanner, type FollowUpReminder } from './components/FollowUpsDueBanner';
 import { EditTrackerRowModal } from './components/EditTrackerRowModal';
 import { BulkDeleteTrackerModal } from './components/BulkDeleteTrackerModal';
 import { DeleteRowConfirmModal } from './components/DeleteRowConfirmModal';
@@ -57,6 +58,7 @@ export interface TrackerRow {
   duration_formatted?: string;
   outcome_status?: CallOutcome;
   follow_up_month?: string | null;
+  follow_up_date?: string | null;
   comments?: string;
   is_skipped: boolean;
   is_finalized: boolean;
@@ -126,6 +128,7 @@ export default function DailyTrackerPage() {
   const [sessionDate, setSessionDate] = useState<string>('');
   const [isManualAddOpen, setIsManualAddOpen] = useState(false);
   const [manualAddDraft, setManualAddDraft] = useState<ManualAddRowDraft | null>(null);
+  const [followUpReminders, setFollowUpReminders] = useState<FollowUpReminder[]>([]);
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<TrackerRow | null>(null);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
@@ -427,6 +430,16 @@ export default function DailyTrackerPage() {
     } catch (e) { console.error('[KPI] Load failed', e); }
   }, [selectedCollegeId, coordinatorId, viewingCoordinatorId, activeDateMode, tomorrowDateStr]);
 
+  // ── Load Follow-Ups Due this month — always the real current month, regardless
+  // of the Today/Tomorrow toggle, since that's what "when November starts" means.
+  const loadFollowUpReminders = useCallback(async () => {
+    if (!selectedCollegeId || selectedCollegeId === 'all') { setFollowUpReminders([]); return; }
+    try {
+      const res = await apiFetch(`/daily-tracker/follow-ups-due?college_id=${selectedCollegeId}`);
+      if (res.success) setFollowUpReminders((res.data as any).reminders || []);
+    } catch (e) { console.error('[FollowUpsDue] Load failed', e); }
+  }, [selectedCollegeId]);
+
   // ── Sync official coordinator allocations in background on initial load
   useEffect(() => {
     apiFetch('/daily-tracker/sync-coordinators').catch(() => {});
@@ -437,8 +450,9 @@ export default function DailyTrackerPage() {
     if (selectedCollegeId) {
       loadTodayRows();
       loadKpi();
+      loadFollowUpReminders();
     }
-  }, [selectedCollegeId, viewingCoordinatorId, activeDateMode, loadTodayRows, loadKpi]);
+  }, [selectedCollegeId, viewingCoordinatorId, activeDateMode, loadTodayRows, loadKpi, loadFollowUpReminders]);
 
   // ── Auto-refresh live tracker rows & KPI counts every 8 seconds (real-time live monitoring)
   useEffect(() => {
@@ -613,11 +627,58 @@ export default function DailyTrackerPage() {
     broadcastTrackerMutation();
   }, [loadKpi, broadcastTrackerMutation]);
 
+  // ── "Add to Tracker" from Follow-Ups Due: no call-logging popup — drops the
+  // contact(s) straight into whichever sheet is currently active (Today or
+  // Tomorrow, following the page's existing single toggle) as blank, ready-to-call
+  // rows, exactly like Load Contacts does. One contact or several at once ("Add All").
+  const handleAddFollowUpsToTracker = useCallback(async (reminders: FollowUpReminder[]) => {
+    if (!selectedCollegeId || !coordinatorId || reminders.length === 0) return;
+
+    const withCompanyId = reminders.filter((r) => r.company_id);
+    if (withCompanyId.length === 0) {
+      toast('These contacts have no linked Meta Database record — nothing to add.', 'warning');
+      return;
+    }
+
+    try {
+      const res = await apiFetch('/daily-tracker/load-contacts', {
+        method: 'POST',
+        body: JSON.stringify({
+          coordinator_id: coordinatorId,
+          college_id: selectedCollegeId,
+          company_ids: withCompanyId.map((r) => r.company_id),
+          resolves_follow_up_ids: withCompanyId.map((r) => r._id),
+          session_date: activeDateMode === 'tomorrow' ? tomorrowDateStr : undefined,
+        }),
+      });
+
+      if (res.success) {
+        const data = res.data as any;
+        const targetLabel = activeDateMode === 'tomorrow' ? "tomorrow's" : "today's";
+        const loadedCount = data.loaded || 0;
+        const dupCount = data.duplicates_skipped || 0;
+        const parts: string[] = [];
+        if (loadedCount > 0) parts.push(`${loadedCount} added to ${targetLabel} tracker`);
+        if (dupCount > 0) parts.push(`${dupCount} already on ${targetLabel} sheet`);
+        toast(parts.join(' — ') || 'Follow-ups processed', 'success');
+        await loadTodayRows();
+        await loadKpi();
+        await loadFollowUpReminders();
+        broadcastTrackerMutation();
+      } else {
+        toast(res.error?.message || 'Failed to add to tracker', 'error');
+      }
+    } catch (e) {
+      console.error('[FollowUpsDue] Add to tracker failed', e);
+      toast('Server error adding follow-ups to tracker', 'error');
+    }
+  }, [selectedCollegeId, coordinatorId, activeDateMode, tomorrowDateStr, loadTodayRows, loadKpi, loadFollowUpReminders, broadcastTrackerMutation, toast]);
+
   // ── Handle Softphone wrap-up save (auto-populates tracker row)
   const handleSoftphoneSave = useCallback(async (result: SoftphoneCallResult) => {
     const patch: Partial<TrackerRow> = {
       outcome_status: result.outcomeStatus,
-      follow_up_month: result.followUpMonth || null,
+      follow_up_date: result.followUpDate || null,
       comments: result.comments,
     };
     if (result.callDurationSeconds !== undefined && result.callDurationSeconds > 0) {
@@ -731,10 +792,10 @@ export default function DailyTrackerPage() {
       return;
     }
 
-    // Verify mandatory Follow Up Month for rows marked as follow_up
-    const missingFollowUp = rows.find((r) => !r.is_skipped && r.outcome_status === 'follow_up' && !r.follow_up_month);
+    // Verify mandatory Follow Up date for rows marked as follow_up
+    const missingFollowUp = rows.find((r) => !r.is_skipped && r.outcome_status === 'follow_up' && !r.follow_up_date);
     if (missingFollowUp) {
-      toast(`Follow Up Month is mandatory for "${missingFollowUp.company_name}" (Row #${missingFollowUp.serial_no}). Please select a month.`, 'warning');
+      toast(`Follow Up Date is mandatory for "${missingFollowUp.company_name}" (Row #${missingFollowUp.serial_no}). Please pick a date.`, 'warning');
       setSaveStatus('idle');
       return;
     }
@@ -1526,6 +1587,12 @@ export default function DailyTrackerPage() {
       {/* ── Tracker Grid ──────────────────────────────────────────────────── */}
       {selectedCollegeId && (
         <div className="flex-1 overflow-hidden flex flex-col px-6 pt-5 pb-4 min-h-0">
+          <FollowUpsDueBanner
+            reminders={followUpReminders}
+            isReadOnly={isEffectiveReadOnly}
+            activeDateLabel={activeDateMode === 'tomorrow' ? 'Tomorrow' : 'Today'}
+            onAddToTracker={handleAddFollowUpsToTracker}
+          />
           <TrackerGrid
             rows={displayRows}
             isReadOnly={isEffectiveReadOnly}

@@ -5,10 +5,43 @@ import { createPortal } from 'react-dom';
 import { ChevronDown, Calendar, Check } from 'lucide-react';
 import { triggerHaptic } from '@/lib/haptics';
 
-export const MONTHS = [
+export const BASE_MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
+
+export function getDynamicFollowUpMonths(refDate: Date = new Date()): string[] {
+  const currentYear = refDate.getFullYear();
+  const currentMonthIdx = refDate.getMonth(); // 0 = Jan, 8 = Sep, etc.
+
+  return BASE_MONTH_NAMES.map((name, idx) => {
+    const year = idx >= currentMonthIdx ? currentYear : currentYear + 1;
+    return `${name} ${year}`;
+  });
+}
+
+export function formatFollowUpMonthDisplay(val?: string | null, refDate: Date = new Date()): string {
+  if (!val) return '';
+  const trimmed = val.trim();
+  if (!trimmed) return '';
+
+  if (/\b\d{4}\b/.test(trimmed)) {
+    return trimmed;
+  }
+
+  const currentYear = refDate.getFullYear();
+  const currentMonthIdx = refDate.getMonth();
+  const idx = BASE_MONTH_NAMES.findIndex(
+    (m) => m.toLowerCase() === trimmed.toLowerCase()
+  );
+  if (idx !== -1) {
+    const year = idx >= currentMonthIdx ? currentYear : currentYear + 1;
+    return `${BASE_MONTH_NAMES[idx]} ${year}`;
+  }
+  return trimmed;
+}
+
+export const MONTHS = BASE_MONTH_NAMES;
 
 interface Props {
   value?: string | null;
@@ -32,11 +65,14 @@ export function RowMonthDropdown({ value, onChange, disabled = false }: Props) {
     ready: false,
   });
 
+  const dynamicMonths = getDynamicFollowUpMonths();
+  const formattedValue = formatFollowUpMonthDisplay(value);
+
   const calculateCoords = useCallback(() => {
     if (!triggerRef.current) return null;
     const rect = triggerRef.current.getBoundingClientRect();
     const popoverHeight = 230;
-    const popoverWidth = 190;
+    const popoverWidth = 205;
     const spaceBelow = window.innerHeight - rect.bottom;
     const placeAbove = spaceBelow < popoverHeight && rect.top > popoverHeight;
 
@@ -130,7 +166,7 @@ export function RowMonthDropdown({ value, onChange, disabled = false }: Props) {
         type="button"
         disabled={disabled}
         onClick={handleToggle}
-        className={`w-full flex items-center justify-between gap-2 pl-3 pr-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all select-none shadow-2xs ${
+        className={`w-full flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-medium transition-all select-none shadow-2xs whitespace-nowrap ${
           disabled
             ? 'bg-surface-sunken/40 border-border/40 text-fg-disabled/50 cursor-not-allowed'
             : value
@@ -138,15 +174,15 @@ export function RowMonthDropdown({ value, onChange, disabled = false }: Props) {
             : 'bg-orange-500/10 border-orange-500/70 text-orange-700 dark:text-orange-300 ring-2 ring-orange-500/20 font-semibold cursor-pointer active:scale-[0.992]'
         } ${isOpen ? 'ring-2 ring-orange-500/30 border-orange-500' : ''}`}
       >
-        <div className="flex items-center gap-2 truncate">
+        <div className="flex items-center gap-1.5 min-w-0">
           <Calendar size={12} className={disabled ? 'text-fg-disabled/40 shrink-0' : 'text-orange-600 dark:text-orange-400 shrink-0'} />
-          <span className="truncate text-xs">
-            {disabled ? '—' : (value || 'Pick Month *')}
+          <span className="whitespace-nowrap text-xs">
+            {disabled ? '—' : (formattedValue || 'Pick Month *')}
           </span>
         </div>
         <ChevronDown
           size={12}
-          className={`text-fg-subtle shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+          className={`text-fg-subtle shrink-0 ml-1 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
             disabled ? 'opacity-20' : isOpen ? 'rotate-180 text-orange-500' : ''
           }`}
         />
@@ -169,7 +205,7 @@ export function RowMonthDropdown({ value, onChange, disabled = false }: Props) {
                   ? `${window.innerHeight - coords.top}px`
                   : 'auto',
               left: `${coords.left}px`,
-              width: '190px',
+              width: '205px',
               zIndex: 99999,
             }}
             className="bg-white dark:bg-[#161D2E] border border-border-strong dark:border-slate-700 rounded-xl shadow-2xl shadow-slate-900/20 dark:shadow-[0_16px_40px_rgba(0,0,0,0.7)] p-2 flex flex-col text-fg select-none animate-in fade-in zoom-in-95 duration-150 ease-out"
@@ -178,8 +214,11 @@ export function RowMonthDropdown({ value, onChange, disabled = false }: Props) {
               Follow Up Month
             </div>
             <div className="overflow-y-auto max-h-[190px] space-y-0.5 pr-0.5 no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              {MONTHS.map((m) => {
-                const isSelected = value === m;
+              {dynamicMonths.map((m) => {
+                const isSelected =
+                  formattedValue === m ||
+                  value === m ||
+                  (value ? m.toLowerCase().startsWith(value.toLowerCase()) : false);
                 return (
                   <button
                     key={m}
