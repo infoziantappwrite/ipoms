@@ -440,7 +440,8 @@ export function CollegeDossierModal({
               disabled={isSyncingSharepoint}
               aria-label="Sync from Excel"
               title="Sync latest college & TPO details from Colleges & Coordinators SharePoint Excel"
-              className="flex items-center justify-center w-8 h-8 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
+              style={{ background: 'linear-gradient(180deg, #FFC53D 0%, #FF9500 50%, #FF5E00 100%)' }}
+              className="flex items-center justify-center w-8 h-8 text-white rounded-xl shadow-md shadow-orange-500/25 hover:brightness-110 active:scale-[0.95] transition-all cursor-pointer disabled:opacity-50"
             >
               <RefreshCw size={14} className={`text-white ${isSyncingSharepoint ? 'animate-spin' : ''}`} />
             </button>

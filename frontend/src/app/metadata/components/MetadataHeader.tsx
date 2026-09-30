@@ -106,8 +106,8 @@ export function MetadataHeader({
             ) : (
               <>
                 <div 
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-xs shrink-0"
-                  style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 30%, #0284c7 65%, #1d4ed8 100%)' }}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-md shadow-blue-900/25 shrink-0"
+                  style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
                 >
                   <Database size={17} strokeWidth={2.5} />
                 </div>
@@ -215,11 +215,8 @@ export function MetadataHeader({
           <button
             type="button"
             onClick={onToggleRecent}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer active:scale-[0.992] shadow-2xs ${
-              isRecent
-                ? 'bg-primary text-primary-foreground border-primary shadow-xs ring-1 ring-primary/30'
-                : 'bg-primary/10 hover:bg-primary/20 text-primary border-primary/25 hover:border-primary/40'
-            }`}
+            style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
+            className="px-3.5 py-1.5 rounded-full text-xs font-bold text-white shadow-md shadow-blue-900/25 hover:brightness-110 active:scale-[0.96] transition-all flex items-center gap-1.5 cursor-pointer shrink-0 select-none"
             title={isRecent ? 'Switch back to all metadata from Serial Number 1' : 'View contacts added in the past 1 to 2 weeks'}
           >
             {isRecent ? (
@@ -237,12 +234,13 @@ export function MetadataHeader({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Paste Button (Solid #8E1BB1 Circular Icon Button) */}
+          {/* Paste Button (Purple Gradient Circular Icon Button) */}
           {!isRecycleBin && (
             <button
               type="button"
               onClick={onOpenBulkPasteModal}
-              className="w-9 h-9 rounded-full bg-[#8E1BB1] hover:bg-[#7A149B] active:bg-[#680F86] text-white flex items-center justify-center cursor-pointer shadow-md hover:shadow-[#8E1BB1]/30 transition-all active:scale-[0.95] shrink-0"
+              className="w-9 h-9 rounded-full text-white flex items-center justify-center cursor-pointer shadow-md shadow-purple-600/25 hover:brightness-110 transition-all active:scale-[0.95] shrink-0"
+              style={{ background: 'linear-gradient(180deg, #A800E6 0%, #8A00D4 50%, #6C00B8 100%)' }}
               title="Paste bulk contacts from Excel / Google Sheets (Ctrl+V)"
               aria-label="Paste Bulk Contacts"
             >
@@ -262,11 +260,12 @@ export function MetadataHeader({
                     onToggleSelectionMode();
                   }
                 }}
-                className={`relative w-9 h-9 rounded-full flex items-center justify-center cursor-pointer shadow-md transition-all active:scale-[0.95] ${
+                className={`relative w-9 h-9 rounded-full flex items-center justify-center cursor-pointer shadow-md shadow-red-600/25 transition-all hover:brightness-110 active:scale-[0.95] text-white ${
                   isSelectionMode
-                    ? 'bg-rose-700 text-white ring-2 ring-rose-500/50'
-                    : 'bg-rose-600 hover:bg-rose-700 text-white hover:shadow-rose-600/30'
+                    ? 'ring-2 ring-red-400 brightness-110'
+                    : ''
                 }`}
+                style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
                 title={
                   isSelectionMode
                     ? selectedCount > 0
@@ -295,7 +294,8 @@ export function MetadataHeader({
                 <button
                   type="button"
                   onClick={onEmptyRecycleBin}
-                  className="w-9 h-9 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center cursor-pointer shadow-md hover:shadow-rose-600/30 transition-all active:scale-[0.95]"
+                  className="w-9 h-9 rounded-full text-white flex items-center justify-center cursor-pointer shadow-md shadow-red-600/25 hover:brightness-110 transition-all active:scale-[0.95]"
+                  style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
                   title="Empty All Items in Recycle Bin"
                   aria-label="Empty Recycle Bin"
                 >
@@ -337,11 +337,12 @@ export function MetadataHeader({
                   triggerHaptic('selection');
                   onExport();
                 }}
-                className="w-9 h-9 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white flex items-center justify-center cursor-pointer shadow-md hover:shadow-emerald-600/30 transition-all active:scale-[0.95] shrink-0"
+                className="w-9 h-9 rounded-full text-white flex items-center justify-center cursor-pointer shadow-md shadow-emerald-600/25 hover:brightness-110 transition-all active:scale-[0.95] shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: 'linear-gradient(180deg, #38BF3D 0%, #1BA32D 50%, #0B6B1E 100%)' }}
                 title="Download Contacts as Excel (.xlsx)"
                 aria-label="Download Excel"
               >
-                <Download size={16} strokeWidth={2.4} className={isExporting ? 'animate-bounce' : ''} />
+                <Download size={16} strokeWidth={2.4} className={isExporting ? 'animate-bounce text-white' : 'text-white'} />
               </button>
 
               {/* Add Contact Icon Button (Solid Navy Blue with Tooltip) */}

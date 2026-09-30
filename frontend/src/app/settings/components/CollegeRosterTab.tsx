@@ -283,7 +283,8 @@ export function CollegeRosterTab() {
             type="button"
             onClick={handleSyncOfficialRoster}
             disabled={syncing}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 active:bg-amber-800 rounded-lg shadow-2xs transition disabled:opacity-50 cursor-pointer"
+            style={{ background: 'linear-gradient(180deg, #FFC53D 0%, #FF9500 50%, #FF5E00 100%)' }}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-white rounded-lg shadow-md shadow-orange-500/25 hover:brightness-110 active:scale-[0.98] transition disabled:opacity-50 cursor-pointer"
             title="Reset to official 21 active partner colleges roster"
           >
             <RefreshCw size={13} className={`text-white ${syncing ? 'animate-spin' : ''}`} />

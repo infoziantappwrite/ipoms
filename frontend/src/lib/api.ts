@@ -155,7 +155,11 @@ export async function apiFetch<T = any>(
 
     return data;
   } catch (err: any) {
-    console.error(`[apiClient] Network error on ${url}:`, err);
+    if (url.includes('/users/heartbeat')) {
+      console.warn(`[apiClient] Background heartbeat unavailable (${url}):`, err?.message || err);
+    } else {
+      console.error(`[apiClient] Network error on ${url}:`, err);
+    }
     return {
       success: false,
       error: {

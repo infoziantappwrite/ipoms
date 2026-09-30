@@ -17,7 +17,8 @@ export type CallOutcome =
   | 'follow_up'
   | 'in_connect'
   | 'invalid'
-  | 'drive_completed';
+  | 'drive_completed'
+  | 'new_poc';
 
 // ONLY 'invite_mail' is considered as a positive outcome out of all call outcomes across all dashboards and reports
 export const POSITIVE_OUTCOMES: CallOutcome[] = [
@@ -191,6 +192,7 @@ const DailyTrackerSchema: Schema<IDailyTracker> = new Schema(
         'in_connect',
         'invalid',
         'drive_completed',
+        'new_poc',
       ],
       default: null,
       index: true,

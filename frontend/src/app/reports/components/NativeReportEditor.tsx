@@ -387,8 +387,9 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       const activeKpis = report.included_kpi_cards || report.included_sections?.kpi_cards || {};
       if (report.template_type === 'month_end') {
         const meCards = [
-          { key: 'total_conversion_count', label: 'Total Conversions', val: report.kpi_summary.total_conversion_count || 0, color: '#059669' },
-          { key: 'total_companies_scheduled', label: 'Companies Scheduled', val: report.kpi_summary.total_companies_scheduled || 0, color: '#d97706' },
+          { key: 'total_calls', label: 'Total Calls Made', val: report.kpi_summary.total_calls ?? 0, color: '#2563eb' },
+          { key: 'positive_responses', label: 'Positives Received', val: report.kpi_summary.positive_responses ?? 0, color: '#059669' },
+          { key: 'total_duration', label: 'Duration Spent', val: report.kpi_summary.total_duration || '0m', color: '#0891b2' },
           { key: 'total_offers_moved', label: 'Offers Received', val: report.kpi_summary.total_offers_moved || 0, color: '#7c3aed' },
         ].filter((c) => activeKpis[c.key] !== false);
 
@@ -603,7 +604,6 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         });
       } else if (
         report.template_type !== 'pending_tasks' &&
-        report.template_type !== 'month_end' &&
         report.template_type !== 'active_leads'
       ) {
         // Section 1: Companies Completed
@@ -939,176 +939,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
       html += `<tr><td colspan="4"></td></tr>`;
     }
 
-    // Month-End Section 1: Companies Completed
-    if (report.template_type === 'month_end' && report.sections?.completed_companies && report.sections.completed_companies.length > 0) {
-      html += `
-        <tr><td colspan="6" class="sec-header">COMPANIES COMPLETED (${report.sections.completed_companies.length} Companies)</td></tr>
-        <tr>
-          <th style="width:38px; text-align:center;">#</th>
-          <th>Company Name</th>
-          <th>Role</th>
-          <th>CTC</th>
-          <th style="text-align:center;">Status</th>
-          <th style="text-align:center;">Offers Received</th>
-        </tr>
-      `;
-      report.sections.completed_companies.forEach((r: any) => {
-        html += `
-          <tr>
-            <td style="text-align:center;">${r.s_no}</td>
-            <td><b>${r.company_name}</b></td>
-            <td>${r.role || r.job_role || '—'}</td>
-            <td style="color:#059669; font-weight:bold;">${r.ctc || r.ctc_lpa || '—'}</td>
-            <td style="text-align:center; color:#059669; font-weight:500;">${r.status || r.current_status_text || 'Drive Completed'}</td>
-            <td style="text-align:center; font-weight:bold; color:#059669;">${r.offers_received ?? r.selected_count ?? 0}</td>
-          </tr>
-        `;
-      });
-      html += `<tr><td colspan="6"></td></tr>`;
-    }
 
-    // Month-End Section 2: JD Received Companies
-    if (report.template_type === 'month_end' && report.sections?.company_conversions && report.sections.company_conversions.length > 0) {
-      html += `
-        <tr><td colspan="5" class="sec-header">JD RECEIVED COMPANIES (${report.sections.company_conversions.length} Companies)</td></tr>
-        <tr>
-          <th style="width:38px; text-align:center;">#</th>
-          <th>Company Name</th>
-          <th>Role</th>
-          <th>CTC</th>
-          <th style="text-align:center;">JD Received Date</th>
-        </tr>
-      `;
-      report.sections.company_conversions.forEach((r: any) => {
-        html += `
-          <tr>
-            <td style="text-align:center;">${r.s_no}</td>
-            <td><b>${r.company_name}</b></td>
-            <td>${r.role || '—'}</td>
-            <td style="color:#059669; font-weight:bold;">${r.ctc || '—'}</td>
-            <td style="text-align:center;">${r.jd_received_date || '—'}</td>
-          </tr>
-        `;
-      });
-      html += `<tr><td colspan="5"></td></tr>`;
-    }
-
-    // Month-End Section 2: Companies in Drive
-    const inDriveRows = report.sections?.companies_in_drive || report.sections?.company_drives_scheduled;
-    if (report.template_type === 'month_end' && inDriveRows && inDriveRows.length > 0) {
-      html += `
-        <tr><td colspan="5" class="sec-header">COMPANIES IN DRIVE (${inDriveRows.length} Companies in Drive)</td></tr>
-        <tr>
-          <th style="width:38px; text-align:center;">#</th>
-          <th>Company Name</th>
-          <th style="text-align:center;">Role</th>
-          <th style="text-align:center;">CTC</th>
-          <th style="text-align:center;">Status</th>
-        </tr>
-      `;
-      inDriveRows.forEach((r: any) => {
-        html += `
-          <tr>
-            <td style="text-align:center;">${r.s_no}</td>
-            <td><b>${r.company_name}</b></td>
-            <td style="text-align:center;">${r.role || '—'}</td>
-            <td style="text-align:center;">${r.ctc || '—'}</td>
-            <td style="text-align:center; color:#4338ca; font-weight:500;">${r.status || r.current_status_text || '—'}</td>
-          </tr>
-        `;
-      });
-      html += `<tr><td colspan="5"></td></tr>`;
-    }
-
-    // Month-End Section 3: Companies on Hold by TPO
-    const onHoldCollegeRows = report.sections?.on_hold_by_college;
-    if (report.template_type === 'month_end' && onHoldCollegeRows && onHoldCollegeRows.length > 0) {
-      html += `
-        <tr><td colspan="5" class="sec-header">COMPANIES ON HOLD BY TPO (${onHoldCollegeRows.length} Companies)</td></tr>
-        <tr>
-          <th style="width:38px; text-align:center;">#</th>
-          <th>Company Name</th>
-          <th style="text-align:center;">Role</th>
-          <th style="text-align:center;">CTC</th>
-          <th style="text-align:center;">Status / Remarks</th>
-        </tr>
-      `;
-      onHoldCollegeRows.forEach((r: any) => {
-        html += `
-          <tr>
-            <td style="text-align:center;">${r.s_no}</td>
-            <td><b>${r.company_name}</b></td>
-            <td style="text-align:center;">${r.role || '—'}</td>
-            <td style="text-align:center;">${r.ctc || '—'}</td>
-            <td style="text-align:center; color:#d97706; font-weight:500;">${r.status || r.remarks || '—'}</td>
-          </tr>
-        `;
-      });
-      html += `<tr><td colspan="5"></td></tr>`;
-    }
-
-    // Month-End Section 4: Companies on Hold by HR
-    const onHoldHrRows = report.sections?.on_hold_by_hr;
-    if (report.template_type === 'month_end' && onHoldHrRows && onHoldHrRows.length > 0) {
-      html += `
-        <tr><td colspan="5" class="sec-header">COMPANIES ON HOLD BY HR (${onHoldHrRows.length} Companies)</td></tr>
-        <tr>
-          <th style="width:38px; text-align:center;">#</th>
-          <th>Company Name</th>
-          <th style="text-align:center;">Role</th>
-          <th style="text-align:center;">CTC</th>
-          <th style="text-align:center;">Status / Remarks</th>
-        </tr>
-      `;
-      onHoldHrRows.forEach((r: any) => {
-        html += `
-          <tr>
-            <td style="text-align:center;">${r.s_no}</td>
-            <td><b>${r.company_name}</b></td>
-            <td style="text-align:center;">${r.role || '—'}</td>
-            <td style="text-align:center;">${r.ctc || '—'}</td>
-            <td style="text-align:center; color:#dc2626; font-weight:500;">${r.status || r.remarks || '—'}</td>
-          </tr>
-        `;
-      });
-      html += `<tr><td colspan="5"></td></tr>`;
-    }
-
-    // Month-End Section 5: Calling Activity Summary — calls + duration per handled
-    // college for the report's month, real Daily Tracker numbers (22 Sep 2026).
-    const callingActivityRows = report.sections?.calling_activity;
-    if (report.template_type === 'month_end' && callingActivityRows && callingActivityRows.length > 0) {
-      html += `
-        <tr><td colspan="4" class="sec-header">CALLING ACTIVITY SUMMARY (${callingActivityRows.length} ${callingActivityRows.length === 1 ? 'College' : 'Colleges'})</td></tr>
-        <tr>
-          <th style="width:38px; text-align:center;">#</th>
-          <th>College</th>
-          <th style="text-align:center;">Calls Made</th>
-          <th style="text-align:center;">Hours Dedicated</th>
-        </tr>
-      `;
-      callingActivityRows.forEach((r: any) => {
-        html += `
-          <tr>
-            <td style="text-align:center;">${r.s_no}</td>
-            <td><b>${r.college_name}</b></td>
-            <td style="text-align:center; font-weight:bold;">${r.total_calls ?? 0}</td>
-            <td style="text-align:center; color:#2563eb; font-weight:bold;">${r.total_duration_formatted || '00m 00s'}</td>
-          </tr>
-        `;
-      });
-      if (report.calling_activity_totals) {
-        html += `
-          <tr style="background:#eff6ff;">
-            <td></td>
-            <td style="font-weight:bold;">TOTAL</td>
-            <td style="text-align:center; font-weight:bold;">${report.calling_activity_totals.total_calls ?? 0}</td>
-            <td style="text-align:center; color:#2563eb; font-weight:bold;">${report.calling_activity_totals.total_duration_formatted || '00m 00s'}</td>
-          </tr>
-        `;
-      }
-      html += `<tr><td colspan="4"></td></tr>`;
-    }
 
     // Daily Leads Report Table (daily_positives and daily_jd_received)
     const dailyLeadsRows = report.sections?.daily_positives || report.sections?.daily_jd_received || report.sections?.daily_leads;
@@ -1358,20 +1189,28 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           if (report.template_type === 'month_end') {
             const meCards = [
               {
-                key: 'total_conversion_count',
-                label: 'Total Conversions',
-                val: report.kpi_summary.total_conversion_count || 0,
+                key: 'total_calls',
+                label: 'Total Calls Made',
+                val: report.kpi_summary.total_calls ?? 0,
+                bgClass: 'bg-blue-50 dark:bg-blue-950/60 border-blue-300 dark:border-blue-700/80',
+                labelText: 'text-blue-800 dark:text-blue-300 font-bold',
+                valText: 'text-blue-700 dark:text-blue-400 font-extrabold text-xl',
+              },
+              {
+                key: 'positive_responses',
+                label: 'Positives Received',
+                val: report.kpi_summary.positive_responses ?? 0,
                 bgClass: 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700/80',
                 labelText: 'text-emerald-800 dark:text-emerald-300 font-bold',
                 valText: 'text-emerald-700 dark:text-emerald-400 font-extrabold text-xl',
               },
               {
-                key: 'total_companies_scheduled',
-                label: 'Companies Scheduled',
-                val: report.kpi_summary.total_companies_scheduled || 0,
-                bgClass: 'bg-amber-50 dark:bg-amber-950/60 border-amber-300 dark:border-amber-700/80',
-                labelText: 'text-amber-800 dark:text-amber-300 font-bold',
-                valText: 'text-amber-700 dark:text-amber-400 font-extrabold text-xl',
+                key: 'total_duration',
+                label: 'Duration Spent',
+                val: report.kpi_summary.total_duration || '0m',
+                bgClass: 'bg-cyan-50 dark:bg-cyan-950/60 border-cyan-300 dark:border-cyan-700/80',
+                labelText: 'text-cyan-800 dark:text-cyan-300 font-bold',
+                valText: 'text-cyan-700 dark:text-cyan-400 font-extrabold text-xl',
               },
               {
                 key: 'total_offers_moved',
@@ -1385,7 +1224,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
 
             if (meCards.length === 0) return null;
             return (
-              <div className="flex flex-wrap gap-2.5 pt-1">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
                 {meCards.map((card) => (
                   <div key={card.key} className={`flex-1 min-w-[120px] border p-3 rounded-xl text-center shadow-xs ${card.bgClass}`}>
                     <span className={`text-micro uppercase block tracking-wider ${card.labelText}`}>{card.label}</span>
@@ -1520,7 +1359,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                   className="space-y-3 print:break-inside-avoid break-inside-avoid border border-border rounded-2xl p-4 bg-surface-sunken/30 shadow-xs"
                 >
                   {/* Institution Banner */}
-                  <div className="flex items-center justify-between flex-wrap gap-2 px-3.5 py-2 bg-[#0a2540] text-white rounded-xl shadow-xs">
+                  <div style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="flex items-center justify-between flex-wrap gap-2 px-3.5 py-2 text-white rounded-xl shadow-xs">
                     <div className="flex items-center gap-2">
                       <span className="w-5 h-5 rounded-full bg-[#007791] text-white flex items-center justify-center text-[10px] font-mono font-bold shrink-0">
                         {cIdx + 1}
@@ -1582,7 +1421,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                               <col style={{ width: '12%' }} />
                             </colgroup>
                             <thead>
-                              <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
+                              <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10px]">
                                 <th className="py-1.5 px-1 text-center font-bold">S.No</th>
                                 <th className="py-1.5 px-2 text-center font-bold">Company Name</th>
                                 <th className="py-1.5 px-2 text-center font-bold">Role</th>
@@ -1628,7 +1467,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                             <col style={{ width: '35%' }} />
                           </colgroup>
                           <thead>
-                            <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
+                            <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10px]">
                               <th className="py-1.5 px-1 text-center font-bold">S.No</th>
                               <th className="py-1.5 px-2 text-center font-bold">Company Name</th>
                               <th className="py-1.5 px-2 text-center font-bold">Role</th>
@@ -1671,7 +1510,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                             <col style={{ width: '35%' }} />
                           </colgroup>
                           <thead>
-                            <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
+                            <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10px]">
                               <th className="py-1.5 px-1 text-center font-bold">S.No</th>
                               <th className="py-1.5 px-2 text-center font-bold">Company Name</th>
                               <th className="py-1.5 px-2 text-center font-bold">Role</th>
@@ -1719,7 +1558,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                               <col style={{ width: '35%' }} />
                             </colgroup>
                             <thead>
-                              <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
+                              <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10px]">
                                 <th className="py-1.5 px-1 text-center font-bold">S.No</th>
                                 <th className="py-1.5 px-2 text-center font-bold">Company Name</th>
                                 <th className="py-1.5 px-2 text-center font-bold">Role</th>
@@ -1749,10 +1588,9 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           </div>
         )}
 
-        {/* ── Single College Weekly Placement Report (Editable Tables) ── */}
+        {/* ── Single College Weekly & Month-End Placement Report (Editable Tables) ── */}
         {!report.is_multi_college &&
           report.template_type !== 'pending_tasks' &&
-          report.template_type !== 'month_end' &&
           report.template_type !== 'active_leads' && (
           <div className="space-y-4">
             {/* Section 1: Completed Companies */}
@@ -1778,7 +1616,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                         <col style={{ width: '12%' }} />
                       </colgroup>
                       <thead>
-                        <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                        <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                           <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'completed_companies', 0, 'S.No')} onCommit={(v) => handleColumnHeading('completed_companies', 0, v)} /></th>
                           <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'completed_companies', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('completed_companies', 1, v)} /></th>
                           <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'completed_companies', 2, 'Role')} onCommit={(v) => handleColumnHeading('completed_companies', 2, v)} /></th>
@@ -1857,7 +1695,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                         <col style={{ width: '32%' }} />
                       </colgroup>
                       <thead>
-                        <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                        <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                           <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'drive_in_progress', 0, 'S.No')} onCommit={(v) => handleColumnHeading('drive_in_progress', 0, v)} /></th>
                           <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'drive_in_progress', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('drive_in_progress', 1, v)} /></th>
                           <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'drive_in_progress', 2, 'Role')} onCommit={(v) => handleColumnHeading('drive_in_progress', 2, v)} /></th>
@@ -1928,7 +1766,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                         <col style={{ width: '32%' }} />
                       </colgroup>
                       <thead>
-                        <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                        <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                           <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'upcoming_drives', 0, 'S.No')} onCommit={(v) => handleColumnHeading('upcoming_drives', 0, v)} /></th>
                           <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'upcoming_drives', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('upcoming_drives', 1, v)} /></th>
                           <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'upcoming_drives', 2, 'Role')} onCommit={(v) => handleColumnHeading('upcoming_drives', 2, v)} /></th>
@@ -2002,7 +1840,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                         <col style={{ width: '32%' }} />
                       </colgroup>
                       <thead>
-                        <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                        <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                           <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'in_progress', 0, 'S.No')} onCommit={(v) => handleColumnHeading('in_progress', 0, v)} /></th>
                           <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'in_progress', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('in_progress', 1, v)} /></th>
                           <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'in_progress', 2, 'Role')} onCommit={(v) => handleColumnHeading('in_progress', 2, v)} /></th>
@@ -2073,7 +1911,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                         <col style={{ width: '32%' }} />
                       </colgroup>
                       <thead>
-                        <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                        <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                           <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'pipeline', 0, 'S.No')} onCommit={(v) => handleColumnHeading('pipeline', 0, v)} /></th>
                           <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'pipeline', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('pipeline', 1, v)} /></th>
                           <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'pipeline', 2, 'Role')} onCommit={(v) => handleColumnHeading('pipeline', 2, v)} /></th>
@@ -2144,7 +1982,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                         <col style={{ width: '32%' }} />
                       </colgroup>
                       <thead>
-                        <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                        <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                           <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'top_companies', 0, 'S.No')} onCommit={(v) => handleColumnHeading('top_companies', 0, v)} /></th>
                           <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'top_companies', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('top_companies', 1, v)} /></th>
                           <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'top_companies', 2, 'Role')} onCommit={(v) => handleColumnHeading('top_companies', 2, v)} /></th>
@@ -2215,7 +2053,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                         <col style={{ width: '32%' }} />
                       </colgroup>
                       <thead>
-                        <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                        <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                           <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'rejected_companies', 0, 'S.No')} onCommit={(v) => handleColumnHeading('rejected_companies', 0, v)} /></th>
                           <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'rejected_companies', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('rejected_companies', 1, v)} /></th>
                           <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'rejected_companies', 2, 'Role')} onCommit={(v) => handleColumnHeading('rejected_companies', 2, v)} /></th>
@@ -2289,7 +2127,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                         <col style={{ width: '32%' }} />
                       </colgroup>
                       <thead>
-                        <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                        <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                           <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_college', 0, 'S.No')} onCommit={(v) => handleColumnHeading('on_hold_by_college', 0, v)} /></th>
                           <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_college', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('on_hold_by_college', 1, v)} /></th>
                           <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_college', 2, 'Role')} onCommit={(v) => handleColumnHeading('on_hold_by_college', 2, v)} /></th>
@@ -2363,7 +2201,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                         <col style={{ width: '32%' }} />
                       </colgroup>
                       <thead>
-                        <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                        <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                           <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_hr', 0, 'S.No')} onCommit={(v) => handleColumnHeading('on_hold_by_hr', 0, v)} /></th>
                           <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_hr', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('on_hold_by_hr', 1, v)} /></th>
                           <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_hr', 2, 'Role')} onCommit={(v) => handleColumnHeading('on_hold_by_hr', 2, v)} /></th>
@@ -2474,7 +2312,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                         <col style={{ width: '34%' }} />
                       </colgroup>
                       <thead>
-                        <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
+                        <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10px]">
                           <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, `pending_${sec.key}`, 0, '#')} onCommit={(v) => handleColumnHeading(`pending_${sec.key}`, 0, v)} /></th>
                           <th className="py-2 px-2.5 text-center font-bold"><EditableLabel value={columnHeading(report, `pending_${sec.key}`, 1, 'Company Name')} onCommit={(v) => handleColumnHeading(`pending_${sec.key}`, 1, v)} /></th>
                           <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, `pending_${sec.key}`, 2, 'Role')} onCommit={(v) => handleColumnHeading(`pending_${sec.key}`, 2, v)} /></th>
@@ -2626,7 +2464,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     <col style={{ width: '28%' }} />
                   </colgroup>
                   <thead>
-                    <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                    <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                       <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'active_leads', 0, 'S.No')} onCommit={(v) => handleColumnHeading('active_leads', 0, v)} /></th>
                       <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'active_leads', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('active_leads', 1, v)} /></th>
                       <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'active_leads', 2, 'Role')} onCommit={(v) => handleColumnHeading('active_leads', 2, v)} /></th>
@@ -2667,436 +2505,6 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           </div>
         )}
 
-        {/* ── Month-End Section Tables (Editable) ── */}
-        {/* Month-End Table 1: Completed Companies */}
-        {report.template_type === 'month_end' && report.included_sections?.completed_companies && report.sections?.completed_companies && (
-          <div className="space-y-1.5 pt-2">
-            <div className="mb-2">
-              <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                <Trophy size={14} className="text-[#007791] shrink-0" /> <EditableLabel value={sectionTitle(report, 'completed_companies', 'COMPANIES COMPLETED')} onCommit={(v) => handleSectionTitle('completed_companies', v)} />
-              </h3>
-              <div className="h-[2px] w-full bg-[#007791] mt-1" />
-            </div>
-
-            {report.sections.completed_companies.length === 0 ? (
-              <p className="text-[11px] text-slate-400 italic py-1 pl-1">No completed drives recorded for this month.</p>
-            ) : (
-              <div className="overflow-x-auto rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-                <table className="w-full text-[11px] border-collapse table-fixed bg-white dark:bg-slate-900">
-                  <colgroup>
-                    <col style={{ width: '42px' }} />
-                    <col style={{ width: '25%' }} />
-                    <col style={{ width: '24%' }} />
-                    <col style={{ width: '11%' }} />
-                    <col style={{ width: '26%' }} />
-                    <col style={{ width: '11%' }} />
-                  </colgroup>
-                  <thead>
-                    <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                      <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'completed_companies', 0, 'S.No')} onCommit={(v) => handleColumnHeading('completed_companies', 0, v)} /></th>
-                      <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'completed_companies', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('completed_companies', 1, v)} /></th>
-                      <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'completed_companies', 2, 'Role')} onCommit={(v) => handleColumnHeading('completed_companies', 2, v)} /></th>
-                      <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'completed_companies', 3, 'CTC')} onCommit={(v) => handleColumnHeading('completed_companies', 3, v)} /></th>
-                      <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'completed_companies', 4, 'Status')} onCommit={(v) => handleColumnHeading('completed_companies', 4, v)} /></th>
-                      <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'completed_companies', 5, 'Offers Received')} onCommit={(v) => handleColumnHeading('completed_companies', 5, v)} /></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
-                    {report.sections.completed_companies.map((r: any, idx: number) => (
-                      <tr key={idx} className={idx % 2 === 0 ? 'bg-[#f0f7f9] dark:bg-slate-900/40' : 'bg-white dark:bg-slate-950'}>
-                        <td className="py-2 px-1 text-center font-bold text-[#007791]">{r.s_no}</td>
-                        <td className="py-2 px-3 text-center font-bold text-[#0a2540] dark:text-slate-100 whitespace-normal break-words leading-snug">
-                          <EditableReportCell
-                            value={r.company_name}
-                            onChange={(val) => handleUpdateCell('completed_companies', idx, 'company_name', val)}
-                            className="font-bold text-[#0a2540] dark:text-slate-100 text-center"
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-center text-slate-700 dark:text-slate-300 whitespace-normal break-words leading-snug">
-                          <EditableReportCell
-                            value={r.role || r.job_role || ''}
-                            onChange={(val) => handleUpdateCell('completed_companies', idx, 'role', val)}
-                            className="text-slate-700 dark:text-slate-300 text-center"
-                          />
-                        </td>
-                        <td className="py-2 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                          <EditableReportCell
-                            value={r.ctc || r.ctc_lpa || ''}
-                            onChange={(val) => handleUpdateCell('completed_companies', idx, 'ctc', val)}
-                            className="font-bold text-[#007791] text-center"
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-center text-slate-600 dark:text-slate-400 whitespace-normal break-words leading-snug">
-                          <EditableReportCell
-                            value={r.status || r.current_status_text || 'Drive Completed'}
-                            onChange={(val) => handleUpdateCell('completed_companies', idx, 'status', val)}
-                            className="text-slate-600 dark:text-slate-400 text-center"
-                          />
-                        </td>
-                        <td className="py-2 px-2 text-center font-bold text-emerald-600 dark:text-emerald-400 whitespace-normal break-words leading-snug">
-                          <EditableReportCell
-                            value={r.offers_received ?? r.selected_count ?? 0}
-                            onChange={(val) => handleUpdateCell('completed_companies', idx, 'offers_received', val)}
-                            className="font-bold text-emerald-600 dark:text-emerald-400 text-center"
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Month-End Table 2: JD Received Companies */}
-        {report.template_type === 'month_end' && report.included_sections?.company_conversions && report.sections?.company_conversions && (
-          <div className="space-y-1.5 pt-2">
-            <div className="mb-2">
-              <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                <Briefcase size={14} className="text-[#007791] shrink-0" /> <EditableLabel value={sectionTitle(report, 'jd_received', 'JD RECEIVED COMPANIES')} onCommit={(v) => handleSectionTitle('jd_received', v)} />
-              </h3>
-              <div className="h-[2px] w-full bg-[#007791] mt-1" />
-            </div>
-
-            {report.sections.company_conversions.length === 0 ? (
-              <p className="text-[11px] text-slate-400 italic py-1 pl-1">No JD received companies recorded for this month.</p>
-            ) : (
-              <div className="overflow-x-auto rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-                <table className="w-full text-[11px] border-collapse table-fixed bg-white dark:bg-slate-900">
-                  <colgroup>
-                    <col style={{ width: '42px' }} />
-                    <col style={{ width: '36%' }} />
-                    <col style={{ width: '38%' }} />
-                    <col style={{ width: '11.5%' }} />
-                    <col style={{ width: '11.5%' }} />
-                  </colgroup>
-                  <thead>
-                    <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                      <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'jd_received', 0, 'S.No')} onCommit={(v) => handleColumnHeading('jd_received', 0, v)} /></th>
-                      <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'jd_received', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('jd_received', 1, v)} /></th>
-                      <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'jd_received', 2, 'Role')} onCommit={(v) => handleColumnHeading('jd_received', 2, v)} /></th>
-                      <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'jd_received', 3, 'CTC')} onCommit={(v) => handleColumnHeading('jd_received', 3, v)} /></th>
-                      <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'jd_received', 4, 'JD Received Date')} onCommit={(v) => handleColumnHeading('jd_received', 4, v)} /></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
-                    {report.sections.company_conversions.map((r: any, idx: number) => (
-                      <tr key={idx} className={idx % 2 === 0 ? 'bg-[#f0f7f9] dark:bg-slate-900/40' : 'bg-white dark:bg-slate-950'}>
-                        <td className="py-2 px-1 text-center font-bold text-[#007791]">{r.s_no}</td>
-                        <td className="py-2 px-3 text-center font-bold text-[#0a2540] dark:text-slate-100 whitespace-normal break-words leading-snug">
-                          <EditableReportCell
-                            value={r.company_name}
-                            onChange={(val) => handleUpdateCell('company_conversions', idx, 'company_name', val)}
-                            className="font-bold text-[#0a2540] dark:text-slate-100 text-center"
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-center text-slate-700 dark:text-slate-300 whitespace-normal break-words leading-snug">
-                          <EditableReportCell
-                            value={r.role}
-                            onChange={(val) => handleUpdateCell('company_conversions', idx, 'role', val)}
-                            className="text-slate-700 dark:text-slate-300 text-center"
-                          />
-                        </td>
-                        <td className="py-2 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                          <EditableReportCell
-                            value={r.ctc}
-                            onChange={(val) => handleUpdateCell('company_conversions', idx, 'ctc', val)}
-                            className="font-bold text-[#007791] text-center"
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-center text-slate-600 dark:text-slate-400 whitespace-normal break-words leading-snug">
-                          <EditableReportCell
-                            value={r.jd_received_date}
-                            onChange={(val) => handleUpdateCell('company_conversions', idx, 'jd_received_date', val)}
-                            className="text-slate-600 dark:text-slate-400 text-center"
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Month-End Table 3: Companies in Drive */}
-        {report.template_type === 'month_end' && (report.included_sections?.companies_in_drive || report.included_sections?.company_drives_scheduled) && (report.sections?.companies_in_drive || report.sections?.company_drives_scheduled) && (
-          <div className="space-y-1.5 pt-2">
-            <div className="mb-2">
-              <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                <Calendar size={14} className="text-[#007791] shrink-0" /> <EditableLabel value={sectionTitle(report, 'companies_in_drive', 'COMPANIES IN DRIVE')} onCommit={(v) => handleSectionTitle('companies_in_drive', v)} />
-              </h3>
-              <div className="h-[2px] w-full bg-[#007791] mt-1" />
-            </div>
-
-            {(report.sections.companies_in_drive || report.sections.company_drives_scheduled).length === 0 ? (
-              <p className="text-[11px] text-slate-400 italic py-1 pl-1">No companies in drive recorded for this month.</p>
-            ) : (
-              <div className="overflow-x-auto rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-                <table className="w-full text-[11px] border-collapse table-fixed bg-white dark:bg-slate-900">
-                  <colgroup>
-                    <col style={{ width: '42px' }} />
-                    <col style={{ width: '27%' }} />
-                    <col style={{ width: '28%' }} />
-                    <col style={{ width: '11.5%' }} />
-                    <col style={{ width: '30%' }} />
-                  </colgroup>
-                  <thead>
-                    <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                      <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'companies_in_drive', 0, 'S.No')} onCommit={(v) => handleColumnHeading('companies_in_drive', 0, v)} /></th>
-                      <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'companies_in_drive', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('companies_in_drive', 1, v)} /></th>
-                      <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'companies_in_drive', 2, 'Role')} onCommit={(v) => handleColumnHeading('companies_in_drive', 2, v)} /></th>
-                      <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'companies_in_drive', 3, 'CTC')} onCommit={(v) => handleColumnHeading('companies_in_drive', 3, v)} /></th>
-                      <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'companies_in_drive', 4, 'Status')} onCommit={(v) => handleColumnHeading('companies_in_drive', 4, v)} /></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
-                    {(report.sections.companies_in_drive || report.sections.company_drives_scheduled).map((r: any, idx: number) => {
-                      const secKey = report.sections?.companies_in_drive ? 'companies_in_drive' : 'company_drives_scheduled';
-                      return (
-                        <tr key={idx} className={idx % 2 === 0 ? 'bg-[#f0f7f9] dark:bg-slate-900/40' : 'bg-white dark:bg-slate-950'}>
-                          <td className="py-2 px-1 text-center font-bold text-[#007791]">{r.s_no}</td>
-                          <td className="py-2 px-3 text-center font-bold text-[#0a2540] dark:text-slate-100 whitespace-normal break-words leading-snug">
-                            <EditableReportCell
-                              value={r.company_name}
-                              onChange={(val) => handleUpdateCell(secKey, idx, 'company_name', val)}
-                              className="font-bold text-[#0a2540] dark:text-slate-100 text-center"
-                            />
-                          </td>
-                          <td className="py-2 px-3 text-center text-slate-700 dark:text-slate-300 whitespace-normal break-words leading-snug">
-                            <EditableReportCell
-                              value={r.role || ''}
-                              onChange={(val) => handleUpdateCell(secKey, idx, 'role', val)}
-                              className="text-slate-700 dark:text-slate-300 text-center"
-                            />
-                          </td>
-                          <td className="py-2 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                            <EditableReportCell
-                              value={r.ctc || ''}
-                              onChange={(val) => handleUpdateCell(secKey, idx, 'ctc', val)}
-                              className="font-bold text-[#007791] text-center"
-                            />
-                          </td>
-                          <td className="py-2 px-3 text-center text-slate-600 dark:text-slate-400 whitespace-normal break-words leading-snug">
-                            <EditableReportCell
-                              value={r.status || r.current_status_text || ''}
-                              onChange={(val) => handleUpdateCell(secKey, idx, 'status', val)}
-                              className="text-slate-600 dark:text-slate-400 text-center"
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Month-End Table 4: Companies on Hold by TPO */}
-        {report.template_type === 'month_end' && report.included_sections?.on_hold_by_college && report.sections?.on_hold_by_college && (
-          <div className="space-y-1.5 pt-2">
-            <div className="mb-2">
-              <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                <Clock size={14} className="text-[#007791] shrink-0" /> <EditableLabel value={sectionTitle(report, 'on_hold_by_college', 'COMPANIES ON HOLD BY TPO')} onCommit={(v) => handleSectionTitle('on_hold_by_college', v)} />
-              </h3>
-              <div className="h-[2px] w-full bg-[#007791] mt-1" />
-            </div>
-
-            {report.sections.on_hold_by_college.length === 0 ? (
-              <p className="text-[11px] text-slate-400 italic py-1 pl-1">No companies on hold by TPO recorded for this month.</p>
-            ) : (
-              <div className="overflow-x-auto rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-                <table className="w-full text-[11px] border-collapse table-fixed bg-white dark:bg-slate-900">
-                  <colgroup>
-                    <col style={{ width: '42px' }} />
-                    <col style={{ width: '27%' }} />
-                    <col style={{ width: '28%' }} />
-                    <col style={{ width: '11.5%' }} />
-                    <col style={{ width: '30%' }} />
-                  </colgroup>
-                  <thead>
-                    <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                      <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_college', 0, 'S.No')} onCommit={(v) => handleColumnHeading('on_hold_by_college', 0, v)} /></th>
-                      <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_college', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('on_hold_by_college', 1, v)} /></th>
-                      <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_college', 2, 'Role')} onCommit={(v) => handleColumnHeading('on_hold_by_college', 2, v)} /></th>
-                      <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_college', 3, 'CTC')} onCommit={(v) => handleColumnHeading('on_hold_by_college', 3, v)} /></th>
-                      <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_college', 4, 'Status / Remarks')} onCommit={(v) => handleColumnHeading('on_hold_by_college', 4, v)} /></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
-                    {report.sections.on_hold_by_college.map((r: any, idx: number) => (
-                      <tr key={idx} className={idx % 2 === 0 ? 'bg-[#f0f7f9] dark:bg-slate-900/40' : 'bg-white dark:bg-slate-950'}>
-                        <td className="py-2 px-1 text-center font-bold text-[#007791]">{r.s_no}</td>
-                        <td className="py-2 px-3 text-center font-bold text-[#0a2540] dark:text-slate-100 whitespace-normal break-words leading-snug">
-                          <EditableReportCell
-                            value={r.company_name}
-                            onChange={(val) => handleUpdateCell('on_hold_by_college', idx, 'company_name', val)}
-                            className="font-bold text-[#0a2540] dark:text-slate-100 text-center"
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-center text-slate-700 dark:text-slate-300 whitespace-normal break-words leading-snug">
-                          <EditableReportCell
-                            value={r.role || ''}
-                            onChange={(val) => handleUpdateCell('on_hold_by_college', idx, 'role', val)}
-                            className="text-slate-700 dark:text-slate-300 text-center"
-                          />
-                        </td>
-                        <td className="py-2 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                          <EditableReportCell
-                            value={r.ctc || ''}
-                            onChange={(val) => handleUpdateCell('on_hold_by_college', idx, 'ctc', val)}
-                            className="font-bold text-[#007791] text-center"
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-center text-slate-600 dark:text-slate-400 whitespace-normal break-words leading-snug">
-                          <EditableReportCell
-                            value={r.status || r.remarks || ''}
-                            onChange={(val) => handleUpdateCell('on_hold_by_college', idx, 'status', val)}
-                            className="text-slate-600 dark:text-slate-400 text-center"
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Month-End Table 5: Companies on Hold by HR */}
-        {report.template_type === 'month_end' && report.included_sections?.on_hold_by_hr && report.sections?.on_hold_by_hr && (
-          <div className="space-y-1.5 pt-2">
-            <div className="mb-2">
-              <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                <AlertCircle size={14} className="text-[#007791] shrink-0" /> <EditableLabel value={sectionTitle(report, 'on_hold_by_hr', 'COMPANIES ON HOLD BY HR')} onCommit={(v) => handleSectionTitle('on_hold_by_hr', v)} />
-              </h3>
-              <div className="h-[2px] w-full bg-[#007791] mt-1" />
-            </div>
-
-            {report.sections.on_hold_by_hr.length === 0 ? (
-              <p className="text-[11px] text-slate-400 italic py-1 pl-1">No companies on hold by HR recorded for this month.</p>
-            ) : (
-              <div className="overflow-x-auto rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-                <table className="w-full text-[11px] border-collapse table-fixed bg-white dark:bg-slate-900">
-                  <colgroup>
-                    <col style={{ width: '42px' }} />
-                    <col style={{ width: '27%' }} />
-                    <col style={{ width: '28%' }} />
-                    <col style={{ width: '11.5%' }} />
-                    <col style={{ width: '30%' }} />
-                  </colgroup>
-                  <thead>
-                    <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                      <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_hr', 0, 'S.No')} onCommit={(v) => handleColumnHeading('on_hold_by_hr', 0, v)} /></th>
-                      <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_hr', 1, 'Company Name')} onCommit={(v) => handleColumnHeading('on_hold_by_hr', 1, v)} /></th>
-                      <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_hr', 2, 'Role')} onCommit={(v) => handleColumnHeading('on_hold_by_hr', 2, v)} /></th>
-                      <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_hr', 3, 'CTC')} onCommit={(v) => handleColumnHeading('on_hold_by_hr', 3, v)} /></th>
-                      <th className="py-2 px-3 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_hr', 4, 'Status / Remarks')} onCommit={(v) => handleColumnHeading('on_hold_by_hr', 4, v)} /></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
-                    {report.sections.on_hold_by_hr.map((r: any, idx: number) => (
-                      <tr key={idx} className={idx % 2 === 0 ? 'bg-[#f0f7f9] dark:bg-slate-900/40' : 'bg-white dark:bg-slate-950'}>
-                        <td className="py-2 px-1 text-center font-bold text-[#007791]">{r.s_no}</td>
-                        <td className="py-2 px-3 text-center font-bold text-[#0a2540] dark:text-slate-100 whitespace-normal break-words leading-snug">
-                          <EditableReportCell
-                            value={r.company_name}
-                            onChange={(val) => handleUpdateCell('on_hold_by_hr', idx, 'company_name', val)}
-                            className="font-bold text-[#0a2540] dark:text-slate-100 text-center"
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-center text-slate-700 dark:text-slate-300 whitespace-normal break-words leading-snug">
-                          <EditableReportCell
-                            value={r.role || ''}
-                            onChange={(val) => handleUpdateCell('on_hold_by_hr', idx, 'role', val)}
-                            className="text-slate-700 dark:text-slate-300 text-center"
-                          />
-                        </td>
-                        <td className="py-2 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                          <EditableReportCell
-                            value={r.ctc || ''}
-                            onChange={(val) => handleUpdateCell('on_hold_by_hr', idx, 'ctc', val)}
-                            className="font-bold text-[#007791] text-center"
-                          />
-                        </td>
-                        <td className="py-2 px-3 text-center text-slate-600 dark:text-slate-400 whitespace-normal break-words leading-snug">
-                          <EditableReportCell
-                            value={r.status || r.remarks || ''}
-                            onChange={(val) => handleUpdateCell('on_hold_by_hr', idx, 'status', val)}
-                            className="text-slate-600 dark:text-slate-400 text-center"
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Calling Activity Summary — calls + duration per handled college for the
-            report's month, real Daily Tracker numbers, read-only (computed, not a
-            company row someone edits like the sections above). */}
-        {report.template_type === 'month_end' && report.included_sections?.calling_activity && report.sections?.calling_activity && (
-          <div className="space-y-1.5 pt-2">
-            <div className="mb-2">
-              <h3 className="text-[13px] font-bold text-[#0a2540] dark:text-slate-100 tracking-tight flex items-center gap-1.5">
-                <PhoneCall size={14} className="text-[#007791] shrink-0" /> <EditableLabel value={sectionTitle(report, 'calling_activity', 'CALLING ACTIVITY SUMMARY')} onCommit={(v) => handleSectionTitle('calling_activity', v)} />
-              </h3>
-              <div className="h-[2px] w-full bg-[#007791] mt-1" />
-            </div>
-
-            {report.sections.calling_activity.length === 0 ? (
-              <p className="text-[11px] text-slate-400 italic py-1 pl-1">No colleges resolved for this coordinator's calling activity this month.</p>
-            ) : (
-              <div className="overflow-x-auto rounded border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-                <table className="w-full text-[11px] border-collapse table-fixed bg-white dark:bg-slate-900">
-                  <colgroup>
-                    <col style={{ width: '42px' }} />
-                    <col style={{ width: '46%' }} />
-                    <col style={{ width: '25%' }} />
-                    <col style={{ width: '27%' }} />
-                  </colgroup>
-                  <thead>
-                    <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                      <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'calling_activity', 0, 'S.No')} onCommit={(v) => handleColumnHeading('calling_activity', 0, v)} /></th>
-                      <th className="py-2 px-3 text-left font-bold"><EditableLabel value={columnHeading(report, 'calling_activity', 1, 'College')} onCommit={(v) => handleColumnHeading('calling_activity', 1, v)} /></th>
-                      <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'calling_activity', 2, 'Calls Made')} onCommit={(v) => handleColumnHeading('calling_activity', 2, v)} /></th>
-                      <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'calling_activity', 3, 'Hours Dedicated')} onCommit={(v) => handleColumnHeading('calling_activity', 3, v)} /></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800">
-                    {report.sections.calling_activity.map((r: any, idx: number) => (
-                      <tr key={idx} className={idx % 2 === 0 ? 'bg-[#f0f7f9] dark:bg-slate-900/40' : 'bg-white dark:bg-slate-950'}>
-                        <td className="py-2 px-1 text-center font-bold text-[#007791]">{r.s_no}</td>
-                        <td className="py-2 px-3 text-left font-bold text-[#0a2540] dark:text-slate-100 whitespace-normal break-words leading-snug">
-                          {r.college_name}
-                        </td>
-                        <td className="py-2 px-2 text-center font-bold text-[#0a2540] dark:text-slate-100">{r.total_calls ?? 0}</td>
-                        <td className="py-2 px-2 text-center font-bold text-blue-600 dark:text-blue-400">{r.total_duration_formatted || '00m 00s'}</td>
-                      </tr>
-                    ))}
-                    {report.calling_activity_totals && (
-                      <tr className="bg-blue-50 dark:bg-blue-950/30">
-                        <td className="py-2 px-1"></td>
-                        <td className="py-2 px-3 text-left font-bold text-[#0a2540] dark:text-slate-100">TOTAL</td>
-                        <td className="py-2 px-2 text-center font-bold text-[#0a2540] dark:text-slate-100">{report.calling_activity_totals.total_calls ?? 0}</td>
-                        <td className="py-2 px-2 text-center font-bold text-blue-600 dark:text-blue-400">{report.calling_activity_totals.total_duration_formatted || '00m 00s'}</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Daily Positives Report Table */}
         {report.template_type === 'daily_positives' && report.included_sections?.daily_positives !== false && report.sections?.daily_positives && (
           <div className="space-y-1.5 pt-2">
@@ -3115,7 +2523,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     <col style={{ width: '20%' }} />
                   </colgroup>
                   <thead>
-                    <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
+                    <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10px]">
                       <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'daily_positives', 0, '#')} onCommit={(v) => handleColumnHeading('daily_positives', 0, v)} /></th>
                       <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'daily_positives', 1, 'COMPANY NAME')} onCommit={(v) => handleColumnHeading('daily_positives', 1, v)} /></th>
                       <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'daily_positives', 2, 'ROLE / DESIGNATION')} onCommit={(v) => handleColumnHeading('daily_positives', 2, v)} /></th>
@@ -3204,7 +2612,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                     <col style={{ width: '20%' }} />
                   </colgroup>
                   <thead>
-                    <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
+                    <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10px]">
                       <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'daily_jd', 0, '#')} onCommit={(v) => handleColumnHeading('daily_jd', 0, v)} /></th>
                       <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'daily_jd', 1, 'COMPANY NAME')} onCommit={(v) => handleColumnHeading('daily_jd', 1, v)} /></th>
                       <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'daily_jd', 2, 'ROLE / DESIGNATION')} onCommit={(v) => handleColumnHeading('daily_jd', 2, v)} /></th>
@@ -3312,24 +2720,26 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
 
       {/* ── Bottom Action Toolbar (Bottom Right Corner at End of Page) ────────── */}
       <div className="flex items-center justify-end gap-2.5 pt-2 pb-6 print:hidden">
-        {/* 1. Back (Neutral Slate) */}
+        {/* 1. Back (Weekly Tracker Collapse All Gradient) */}
         <button
           type="button"
           onClick={onBackToBuilder}
-          className="px-4 py-2 bg-surface hover:bg-surface-raised text-fg border border-border rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-[0.992]"
+          style={{ background: 'linear-gradient(180deg, #9AA0A6 0%, #64748B 50%, #334155 100%)' }}
+          className="px-4 py-2 hover:brightness-110 text-white rounded-xl text-xs font-bold shadow-md shadow-slate-500/25 transition-all cursor-pointer active:scale-[0.95]"
         >
           Back
         </button>
 
-        {/* 2. Interactive Preview Split Button with Dropdown (Side-by-Side, Image, PDF) */}
-        <div ref={previewMenuRef} className="relative inline-flex rounded-xl shadow-xs">
+        {/* 2. Interactive Preview Split Button with Dropdown (Dark Navy Blue Gradient) */}
+        <div ref={previewMenuRef} className="relative inline-flex rounded-xl shadow-md shadow-blue-900/25">
           <button
             type="button"
             onClick={() => {
               setPreviewMode('both');
               setShowA4Preview(true);
             }}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-l-xl text-xs font-bold transition-all cursor-pointer active:scale-[0.992]"
+            style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
+            className="flex items-center gap-1.5 px-3.5 py-2 hover:brightness-110 text-white rounded-l-xl text-xs font-bold transition-all cursor-pointer active:scale-[0.95]"
             title="Preview Side-by-Side (Image & PDF)"
           >
             <Eye size={14} strokeWidth={2} aria-hidden /> Preview
@@ -3337,7 +2747,8 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           <button
             type="button"
             onClick={() => setShowPreviewMenu((prev) => !prev)}
-            className="px-2 py-2 bg-indigo-700 hover:bg-indigo-800 text-white rounded-r-xl border-l border-indigo-500/60 text-xs font-bold transition-all cursor-pointer flex items-center justify-center"
+            style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
+            className="px-2 py-2 hover:brightness-110 text-white rounded-r-xl border-l border-white/20 text-xs font-bold transition-all cursor-pointer flex items-center justify-center"
             title="Choose Preview Mode"
             aria-label="Choose Preview Mode"
           >
@@ -3354,12 +2765,12 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                   setShowA4Preview(true);
                   setShowPreviewMenu(false);
                 }}
-                className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 flex items-center gap-2 cursor-pointer mb-1"
+                className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 flex items-center gap-2 cursor-pointer mb-1"
               >
-                <Columns2 size={14} className="text-indigo-600 shrink-0" />
+                <Columns2 size={14} className="text-blue-600 shrink-0" />
                 <div>
                   <div className="font-bold">Side-by-Side (Both)</div>
-                  <div className="text-[10px] text-indigo-500">Image & PDF Split View</div>
+                  <div className="text-[10px] text-blue-600 dark:text-blue-400">Image & PDF Split View</div>
                 </div>
               </button>
 
@@ -3372,7 +2783,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                 }}
                 className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium hover:bg-surface-sunken flex items-center gap-2 cursor-pointer text-fg"
               >
-                <ImageIcon size={14} className="text-sky-500 shrink-0" />
+                <ImageIcon size={14} className="text-blue-500 shrink-0" />
                 <div>
                   <div className="font-bold">Preview Image</div>
                   <div className="text-[10px] text-fg-subtle">Mobile & WhatsApp Canvas</div>
@@ -3398,30 +2809,33 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
           )}
         </div>
 
-        {/* 3. Export Excel (Emerald Green) */}
+        {/* 3. Export XLSX (Dark Navy Blue Gradient) */}
         <button
           type="button"
           onClick={handleExportExcel}
-          className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.992]"
+          className="flex items-center gap-1.5 px-4 py-2 hover:brightness-110 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/25 transition-all cursor-pointer active:scale-[0.95]"
+          style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
         >
           <FileSpreadsheet size={14} strokeWidth={2} aria-hidden /> Export XLSX
         </button>
 
-        {/* 4. Save Image (Infoziant Sky / Cyan) */}
+        {/* 4. Save Image (Dark Navy Blue Gradient) */}
         <button
           type="button"
           onClick={handleExportImage}
           disabled={exportingImage}
-          className="flex items-center gap-1.5 px-4 py-2 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.992]"
+          style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
+          className="flex items-center gap-1.5 px-4 py-2 hover:brightness-110 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/25 transition-all cursor-pointer active:scale-[0.95]"
         >
           <Download size={14} strokeWidth={2} aria-hidden /> {exportingImage ? 'Saving…' : 'Save Image'}
         </button>
 
-        {/* 5. Save PDF (Infoziant Corporate Navy) */}
+        {/* 5. Save PDF (Dark Navy Blue Gradient) */}
         <button
           type="button"
           onClick={handlePrintPdf}
-          className="flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary-hover text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-[0.992]"
+          style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
+          className="flex items-center gap-1.5 px-4 py-2 hover:brightness-110 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/25 transition-all cursor-pointer active:scale-[0.95]"
         >
           <Download size={14} strokeWidth={2} aria-hidden /> Save PDF
         </button>

@@ -340,12 +340,12 @@ export function CoordinatorCollegeFocusSection({ onSelectionChange }: Props) {
               type="button"
               onClick={handleUnlockToEdit}
               disabled={isSubmitting}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-surface-sunken hover:bg-surface-raised border border-border text-fg hover:border-primary/40 hover:text-primary transition-all shadow-xs cursor-pointer select-none active:scale-[0.992] shrink-0 disabled:opacity-50"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-primary hover:bg-primary-hover text-primary-foreground shadow-xs transition-all cursor-pointer select-none active:scale-[0.992] shrink-0 disabled:opacity-50"
             >
               {isSubmitting ? (
-                <RefreshCw size={14} className="animate-spin text-primary" />
+                <RefreshCw size={14} className="animate-spin text-primary-foreground" />
               ) : (
-                <Edit3 size={14} className="text-primary" />
+                <Edit3 size={14} className="text-primary-foreground" />
               )}
               <span>Change Selection</span>
             </button>

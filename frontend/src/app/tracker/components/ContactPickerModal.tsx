@@ -200,11 +200,8 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
                 setToSno(null);
                 setPage(1);
               }}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer active:scale-[0.992] ${
-                isRecent
-                  ? 'bg-primary text-primary-foreground border border-primary shadow-xs ring-1 ring-primary/30'
-                  : 'bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 hover:border-primary/40'
-              }`}
+              style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full font-bold text-xs text-white shadow-md shadow-blue-900/25 hover:brightness-110 active:scale-[0.96] transition-all cursor-pointer select-none"
               title={isRecent ? 'Switch back to all metadata from Serial Number 1' : 'Toggle to view recently added contacts'}
             >
               {isRecent ? (
@@ -249,7 +246,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
             <SnoRangeSelector
               fromSno={fromSno}
               toSno={toSno}
-              minSno={isRecent ? Math.max(1, masterTotal - 99) : 1}
+              minSno={isRecent ? Math.max(1, masterTotal - 199) : 1}
               maxSno={masterTotal}
               onApplyRange={(f, t) => {
                 setFromSno(f);

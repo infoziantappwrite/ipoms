@@ -178,7 +178,8 @@ export function MoveCollegeModal({
               type="button"
               disabled={isLoading || !selectedTargetId || colleges.length === 0}
               onClick={() => handleAction('move')}
-              className="px-3.5 py-1.5 rounded-xl bg-primary hover:bg-blue-700 text-primary-foreground text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 active:scale-[0.98] text-center shadow-2xs shrink-0"
+              className="px-3.5 py-1.5 rounded-xl text-white text-xs font-bold hover:brightness-110 transition-all cursor-pointer disabled:opacity-50 active:scale-[0.95] text-center shadow-md shadow-orange-500/25 shrink-0"
+              style={{ background: 'linear-gradient(180deg, #ED145B 0%, #FA6D38 52%, #FFBA08 100%)' }}
             >
               {loadingMode === 'move' ? 'Moving Rows...' : 'Move and Switch College'}
             </button>

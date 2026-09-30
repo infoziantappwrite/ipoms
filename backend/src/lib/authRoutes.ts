@@ -217,7 +217,7 @@ export function registerAuthRoutes(app: Express) {
         if (!isStaffDomain(rawEmail)) {
           return fail(res, 400, 'EMAIL_WRONG_DOMAIN', `Use your official organization address — it must end in @${STAFF_DOMAINS.join(' or @')}.`);
         }
-        user = await User.findOne({ official_email: rawEmail, is_deleted: false });
+        user = await User.findOne({ official_email: rawEmail });
       } else {
         const rawUsername = rawInput.toLowerCase().trim();
         user = await User.findOne({
@@ -226,7 +226,6 @@ export function registerAuthRoutes(app: Express) {
             { username: rawInput.trim() },
             { official_email: rawUsername },
           ],
-          is_deleted: false,
         });
       }
 
@@ -239,6 +238,10 @@ export function registerAuthRoutes(app: Express) {
         // Dummy hash compare to normalize response timing and prevent timing attacks
         await bcrypt.compare(password, '$2a$12$e8m.4U4pX4Z0U8NfQ12VKeVzQz/t9F2L1vK6H0j9x7L1s0r1w2e3u');
         return fail(res, 401, 'INVALID_CREDENTIALS', 'Invalid email/username or password.');
+      }
+
+      if (user.is_deleted || user.account_status === 'deactivated') {
+        return fail(res, 403, 'ACCOUNT_DEACTIVATED', 'Your account has been deactivated. Please contact your administrator.');
       }
 
       // Already locked — send them straight to recovery.

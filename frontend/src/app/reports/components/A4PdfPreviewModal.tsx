@@ -449,7 +449,7 @@ export function A4PdfPreviewModal({
                         {showCtcCol && <col style={{ width: activeLeadsColWidths.ctc }} />}
                       </colgroup>
                       <thead className="print:table-header-group">
-                        <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                        <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                           <th
                             className="py-2 px-1 text-center font-bold"
                             style={{ width: activeLeadsColWidths.num }}
@@ -754,20 +754,28 @@ export function A4PdfPreviewModal({
               } else if (report.template_type === 'month_end') {
                 const meCards = [
                   {
-                    key: 'total_conversion_count',
-                    label: 'Total Conversions',
-                    val: report.kpi_summary.total_conversion_count || 0,
+                    key: 'total_calls',
+                    label: 'Total Calls Made',
+                    val: report.kpi_summary.total_calls ?? 0,
+                    bg: 'bg-blue-50 border-blue-300',
+                    text: 'text-blue-700',
+                    labelText: 'text-blue-800',
+                  },
+                  {
+                    key: 'positive_responses',
+                    label: 'Positives Received',
+                    val: report.kpi_summary.positive_responses ?? 0,
                     bg: 'bg-emerald-50 border-emerald-300',
                     text: 'text-emerald-700',
                     labelText: 'text-emerald-800',
                   },
                   {
-                    key: 'total_companies_scheduled',
-                    label: 'Companies Scheduled',
-                    val: report.kpi_summary.total_companies_scheduled || 0,
-                    bg: 'bg-amber-50 border-amber-300',
-                    text: 'text-amber-700',
-                    labelText: 'text-amber-800',
+                    key: 'total_duration',
+                    label: 'Duration Spent',
+                    val: report.kpi_summary.total_duration || '0m',
+                    bg: 'bg-cyan-50 border-cyan-300',
+                    text: 'text-cyan-700',
+                    labelText: 'text-cyan-800',
                   },
                   {
                     key: 'total_offers_moved',
@@ -781,7 +789,7 @@ export function A4PdfPreviewModal({
 
                 if (meCards.length === 0) return null;
                 return (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                     {meCards.map((c) => (
                       <div
                         key={c.key}
@@ -1061,7 +1069,7 @@ export function A4PdfPreviewModal({
                               <col style={{ width: '12%' }} />
                             </colgroup>
                             <thead className="print:table-header-group">
-                              <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
+                              <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10px]">
                                 <th className="py-1.5 px-1 text-center font-bold">S.No</th>
                                 <th className="py-1.5 px-2 text-center font-bold">Company Name</th>
                                 <th className="py-1.5 px-2 text-center font-bold">Role</th>
@@ -1125,7 +1133,7 @@ export function A4PdfPreviewModal({
                               <col style={{ width: '32%' }} />
                             </colgroup>
                             <thead className="print:table-header-group">
-                              <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
+                              <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10px]">
                                 <th className="py-1.5 px-1 text-center font-bold">S.No</th>
                                 <th className="py-1.5 px-2 text-center font-bold">Company Name</th>
                                 <th className="py-1.5 px-2 text-center font-bold">Role</th>
@@ -1185,7 +1193,7 @@ export function A4PdfPreviewModal({
                               <col style={{ width: '32%' }} />
                             </colgroup>
                             <thead className="print:table-header-group">
-                              <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
+                              <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10px]">
                                 <th className="py-1.5 px-1 text-center font-bold">S.No</th>
                                 <th className="py-1.5 px-2 text-center font-bold">Company Name</th>
                                 <th className="py-1.5 px-2 text-center font-bold">Role</th>
@@ -1242,7 +1250,7 @@ export function A4PdfPreviewModal({
                             <col style={{ width: '32%' }} />
                           </colgroup>
                           <thead className="print:table-header-group">
-                            <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
+                            <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10px]">
                               <th className="py-1.5 px-1 text-center font-bold">S.No</th>
                               <th className="py-1.5 px-2 text-center font-bold">Company Name</th>
                               <th className="py-1.5 px-2 text-center font-bold">Role</th>
@@ -1283,9 +1291,8 @@ export function A4PdfPreviewModal({
             </div>
           )}
 
-          {/* Single-College Weekly Placement Tables */}
+          {/* Single-College Weekly & Month-End Placement Tables */}
           {!report.is_multi_college &&
-            report.template_type !== 'month_end' &&
             report.template_type !== 'active_leads' &&
             report.template_type !== 'pending_tasks' && (
               <>
@@ -1314,7 +1321,7 @@ export function A4PdfPreviewModal({
                             <col style={{ width: '14%' }} />
                           </colgroup>
                           <thead className="print:table-header-group">
-                            <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                            <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                               <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'completed_companies', 0, 'S.No')}</th>
                               <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'completed_companies', 1, 'Company Name')}</th>
                               <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'completed_companies', 2, 'Role')}</th>
@@ -1375,7 +1382,7 @@ export function A4PdfPreviewModal({
                           <col style={{ width: '31%' }} />
                         </colgroup>
                         <thead className="print:table-header-group">
-                          <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                          <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                             <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'drive_in_progress', 0, 'S.No')}</th>
                             <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'drive_in_progress', 1, 'Company Name')}</th>
                             <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'drive_in_progress', 2, 'Role')}</th>
@@ -1432,7 +1439,7 @@ export function A4PdfPreviewModal({
                           <col style={{ width: '31%' }} />
                         </colgroup>
                         <thead className="print:table-header-group">
-                          <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                          <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                             <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'upcoming_drives', 0, 'S.No')}</th>
                             <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'upcoming_drives', 1, 'Company Name')}</th>
                             <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'upcoming_drives', 2, 'Role')}</th>
@@ -1493,7 +1500,7 @@ export function A4PdfPreviewModal({
                           <col style={{ width: '31%' }} />
                         </colgroup>
                         <thead className="print:table-header-group">
-                          <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                          <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                             <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'in_progress', 0, 'S.No')}</th>
                             <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'in_progress', 1, 'Company Name')}</th>
                             <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'in_progress', 2, 'Role')}</th>
@@ -1553,7 +1560,7 @@ export function A4PdfPreviewModal({
                           <col style={{ width: '31%' }} />
                         </colgroup>
                         <thead className="print:table-header-group">
-                          <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                          <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                             <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'pipeline', 0, 'S.No')}</th>
                             <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'pipeline', 1, 'Company Name')}</th>
                             <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'pipeline', 2, 'Role')}</th>
@@ -1613,7 +1620,7 @@ export function A4PdfPreviewModal({
                           <col style={{ width: '31%' }} />
                         </colgroup>
                         <thead className="print:table-header-group">
-                          <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                          <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                             <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'top_companies', 0, 'S.No')}</th>
                             <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'top_companies', 1, 'Company Name')}</th>
                             <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'top_companies', 2, 'Role')}</th>
@@ -1676,7 +1683,7 @@ export function A4PdfPreviewModal({
                             <col style={{ width: '31%' }} />
                           </colgroup>
                           <thead className="print:table-header-group">
-                            <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                            <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                               <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'rejected_companies', 0, 'S.No')}</th>
                               <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'rejected_companies', 1, 'Company Name')}</th>
                               <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'rejected_companies', 2, 'Role')}</th>
@@ -1743,7 +1750,7 @@ export function A4PdfPreviewModal({
                             <col style={{ width: '31%' }} />
                           </colgroup>
                           <thead className="print:table-header-group">
-                            <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                            <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                               <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'on_hold_by_college', 0, 'S.No')}</th>
                               <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_college', 1, 'Company Name')}</th>
                               <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_college', 2, 'Role')}</th>
@@ -1806,7 +1813,7 @@ export function A4PdfPreviewModal({
                           <col style={{ width: '31%' }} />
                         </colgroup>
                         <thead className="print:table-header-group">
-                          <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                          <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                             <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'on_hold_by_hr', 0, 'S.No')}</th>
                             <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_hr', 1, 'Company Name')}</th>
                             <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_hr', 2, 'Role')}</th>
@@ -1837,74 +1844,6 @@ export function A4PdfPreviewModal({
                               </td>
                             </tr>
                           ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                )}
-
-                {/* Calling Activity Summary — calls + duration per handled college
-                    for the report's month, real Daily Tracker numbers (22 Sep 2026). */}
-                {report.included_sections?.calling_activity && report.sections?.calling_activity && (
-                  <div className="space-y-1.5">
-                    <div className="mb-2">
-                      <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                        <PhoneCall size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'calling_activity', 'CALLING ACTIVITY SUMMARY')}
-                      </h3>
-                      <div className="h-[2px] w-full bg-[#007791] mt-1" />
-                    </div>
-                    {report.sections.calling_activity.length === 0 ? (
-                      <p className="text-[11px] text-slate-400 italic py-1 pl-1">
-                        No colleges resolved for this coordinator's calling activity this month.
-                      </p>
-                    ) : (
-                      <table className="w-full text-[11px] border-collapse table-fixed bg-white">
-                        <colgroup>
-                          <col style={{ width: '38px' }} />
-                          <col style={{ width: '46%' }} />
-                          <col style={{ width: '25%' }} />
-                          <col style={{ width: '27%' }} />
-                        </colgroup>
-                        <thead className="print:table-header-group">
-                          <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                            <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'calling_activity', 0, 'S.No')}</th>
-                            <th className="py-2 px-2 text-left font-bold">{columnHeading(report, 'calling_activity', 1, 'College')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'calling_activity', 2, 'Calls Made')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'calling_activity', 3, 'Hours Dedicated')}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200/80">
-                          {report.sections.calling_activity.map((r: any, idx: number) => (
-                            <tr
-                              key={idx}
-                              className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                            >
-                              <td className="py-2 px-1 text-center font-bold text-[#007791]">
-                                {r.s_no}
-                              </td>
-                              <td className="py-2 px-2 text-left font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                                {r.college_name}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#0a2540]">
-                                {r.total_calls ?? 0}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-blue-600">
-                                {r.total_duration_formatted || '00m 00s'}
-                              </td>
-                            </tr>
-                          ))}
-                          {report.calling_activity_totals && (
-                            <tr className="bg-blue-50">
-                              <td className="py-2 px-1"></td>
-                              <td className="py-2 px-2 text-left font-bold text-[#0a2540]">TOTAL</td>
-                              <td className="py-2 px-2 text-center font-bold text-[#0a2540]">
-                                {report.calling_activity_totals.total_calls ?? 0}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-blue-600">
-                                {report.calling_activity_totals.total_duration_formatted || '00m 00s'}
-                              </td>
-                            </tr>
-                          )}
                         </tbody>
                       </table>
                     )}
@@ -1975,7 +1914,7 @@ export function A4PdfPreviewModal({
                         <col style={{ width: '34%' }} />
                       </colgroup>
                       <thead className="print:table-header-group">
-                        <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
+                        <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
                           <th className="py-2 px-1 text-center font-bold">{columnHeading(report, `pending_${sec.key}`, 0, '#')}</th>
                           <th className="py-2 px-2 text-center font-bold">{columnHeading(report, `pending_${sec.key}`, 1, 'Company Name')}</th>
                           <th className="py-2 px-2 text-center font-bold">{columnHeading(report, `pending_${sec.key}`, 2, 'Role')}</th>
@@ -2028,395 +1967,6 @@ export function A4PdfPreviewModal({
             );
           })()}
 
-          {/* Month-End Tables */}
-          {report.template_type === 'month_end' && (
-            <>
-              {/* Completed */}
-              {report.included_sections?.completed_companies &&
-                report.sections?.completed_companies && (
-                  <div className="space-y-1.5">
-                    <div className="mb-2">
-                      <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                        <Trophy size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'completed_companies', 'COMPANIES COMPLETED')}
-                      </h3>
-                      <div className="h-[2px] w-full bg-[#007791] mt-1" />
-                    </div>
-                    {report.sections.completed_companies.length === 0 ? (
-                      <p className="text-[11px] text-slate-400 italic py-1 pl-1">
-                        No completed drives recorded for this month.
-                      </p>
-                    ) : (
-                      <table className="w-full text-[11px] border-collapse table-fixed bg-white">
-                        <colgroup>
-                          <col style={{ width: '38px' }} />
-                          <col style={{ width: '25%' }} />
-                          <col style={{ width: '22%' }} />
-                          <col style={{ width: '12%' }} />
-                          <col style={{ width: '25%' }} />
-                          <col style={{ width: '14%' }} />
-                        </colgroup>
-                        <thead className="print:table-header-group">
-                          <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                            <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'completed_companies', 0, 'S.No')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'completed_companies', 1, 'Company Name')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'completed_companies', 2, 'Role')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'completed_companies', 3, 'CTC')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'completed_companies', 4, 'Status')}</th>
-                            <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'completed_companies', 5, 'Offers')}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200/80">
-                          {report.sections.completed_companies.map((r: any, idx: number) => (
-                            <tr
-                              key={idx}
-                              className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                            >
-                              <td className="py-2 px-1 text-center font-bold text-[#007791]">
-                                {r.s_no}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                                {r.company_name}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                                {r.role || r.job_role || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                                {r.ctc || r.ctc_lpa || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                                {r.status || r.current_status_text || 'Drive Completed'}
-                              </td>
-                              <td className="py-2 px-1 text-center font-extrabold text-[#059669]">
-                                {r.offers_received ?? r.selected_count ?? 0}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                )}
-
-              {/* Conversions / JD Received */}
-              {report.included_sections?.company_conversions &&
-                report.sections?.company_conversions && (
-                  <div className="space-y-1.5">
-                    <div className="mb-2">
-                      <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                        <Inbox size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'jd_received', 'JD RECEIVED COMPANIES')}
-                      </h3>
-                      <div className="h-[2px] w-full bg-[#007791] mt-1" />
-                    </div>
-                    {report.sections.company_conversions.length === 0 ? (
-                      <p className="text-[11px] text-slate-400 italic py-1 pl-1">
-                        No JD received conversions recorded for this month.
-                      </p>
-                    ) : (
-                      <table className="w-full text-[11px] border-collapse table-fixed bg-white">
-                        <colgroup>
-                          <col style={{ width: '38px' }} />
-                          <col style={{ width: '28%' }} />
-                          <col style={{ width: '28%' }} />
-                          <col style={{ width: '13%' }} />
-                          <col style={{ width: '28%' }} />
-                        </colgroup>
-                        <thead className="print:table-header-group">
-                          <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                            <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'jd_received', 0, 'S.No')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'jd_received', 1, 'Company Name')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'jd_received', 2, 'Role')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'jd_received', 3, 'CTC')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'jd_received', 4, 'JD Received Date')}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200/80">
-                          {report.sections.company_conversions.map((r: any, idx: number) => (
-                            <tr
-                              key={idx}
-                              className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                            >
-                              <td className="py-2 px-1 text-center font-bold text-[#007791]">
-                                {r.s_no}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                                {r.company_name}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                                {r.role || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                                {r.ctc || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                                {r.jd_received_date || '—'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                )}
-
-              {/* Companies in Drive */}
-              {report.included_sections?.companies_in_drive &&
-                (report.sections?.companies_in_drive ||
-                  report.sections?.company_drives_scheduled) && (
-                  <div className="space-y-1.5">
-                    <div className="mb-2">
-                      <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                        <Rocket size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'companies_in_drive', 'COMPANIES IN DRIVE')}
-                      </h3>
-                      <div className="h-[2px] w-full bg-[#007791] mt-1" />
-                    </div>
-                    {(
-                      report.sections.companies_in_drive ||
-                      report.sections.company_drives_scheduled
-                    ).length === 0 ? (
-                      <p className="text-[11px] text-slate-400 italic py-1 pl-1">
-                        No companies in drive recorded for this month.
-                      </p>
-                    ) : (
-                      <table className="w-full text-[11px] border-collapse table-fixed bg-white">
-                        <colgroup>
-                          <col style={{ width: '38px' }} />
-                          <col style={{ width: '27%' }} />
-                          <col style={{ width: '28%' }} />
-                          <col style={{ width: '11.5%' }} />
-                          <col style={{ width: '30%' }} />
-                        </colgroup>
-                        <thead className="print:table-header-group">
-                          <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                            <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'companies_in_drive', 0, 'S.No')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'companies_in_drive', 1, 'Company Name')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'companies_in_drive', 2, 'Role')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'companies_in_drive', 3, 'CTC')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'companies_in_drive', 4, 'Status')}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200/80">
-                          {(
-                            report.sections.companies_in_drive ||
-                            report.sections.company_drives_scheduled
-                          ).map((r: any, idx: number) => (
-                            <tr
-                              key={idx}
-                              className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                            >
-                              <td className="py-2 px-1 text-center font-bold text-[#007791]">
-                                {r.s_no}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                                {r.company_name}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                                {r.role || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                                {r.ctc || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                                {r.status || r.current_status_text || '—'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                )}
-
-              {/* On Hold by TPO */}
-              {report.included_sections?.on_hold_by_college &&
-                report.sections?.on_hold_by_college && (
-                  <div className="space-y-1.5">
-                    <div className="mb-2">
-                      <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                        <Clock size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'on_hold_by_college', 'COMPANIES ON HOLD BY TPO')}
-                      </h3>
-                      <div className="h-[2px] w-full bg-[#007791] mt-1" />
-                    </div>
-                    {report.sections.on_hold_by_college.length === 0 ? (
-                      <p className="text-[11px] text-slate-400 italic py-1 pl-1">
-                        No companies on hold by TPO recorded for this month.
-                      </p>
-                    ) : (
-                      <table className="w-full text-[11px] border-collapse table-fixed bg-white">
-                        <colgroup>
-                          <col style={{ width: '38px' }} />
-                          <col style={{ width: '27%' }} />
-                          <col style={{ width: '28%' }} />
-                          <col style={{ width: '11.5%' }} />
-                          <col style={{ width: '30%' }} />
-                        </colgroup>
-                        <thead className="print:table-header-group">
-                          <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                            <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'on_hold_by_college', 0, 'S.No')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_college', 1, 'Company Name')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_college', 2, 'Role')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_college', 3, 'CTC')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_college', 4, 'Status / Remarks')}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200/80">
-                          {report.sections.on_hold_by_college.map((r: any, idx: number) => (
-                            <tr
-                              key={idx}
-                              className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                            >
-                              <td className="py-2 px-1 text-center font-bold text-[#007791]">
-                                {r.s_no}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                                {r.company_name}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                                {r.role || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                                {r.ctc || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                                {r.status || r.remarks || '—'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                )}
-
-              {/* On Hold by HR */}
-              {report.included_sections?.on_hold_by_hr && report.sections?.on_hold_by_hr && (
-                <div className="space-y-1.5">
-                  <div className="mb-2">
-                    <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                      <Clock size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'on_hold_by_hr', 'COMPANIES ON HOLD BY HR')}
-                    </h3>
-                    <div className="h-[2px] w-full bg-[#007791] mt-1" />
-                  </div>
-                  {report.sections.on_hold_by_hr.length === 0 ? (
-                    <p className="text-[11px] text-slate-400 italic py-1 pl-1">
-                      No companies on hold by HR recorded for this month.
-                    </p>
-                  ) : (
-                    <table className="w-full text-[11px] border-collapse table-fixed bg-white">
-                      <colgroup>
-                        <col style={{ width: '38px' }} />
-                        <col style={{ width: '27%' }} />
-                        <col style={{ width: '28%' }} />
-                        <col style={{ width: '11.5%' }} />
-                        <col style={{ width: '30%' }} />
-                      </colgroup>
-                      <thead className="print:table-header-group">
-                        <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                          <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'on_hold_by_hr', 0, 'S.No')}</th>
-                          <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_hr', 1, 'Company Name')}</th>
-                          <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_hr', 2, 'Role')}</th>
-                          <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_hr', 3, 'CTC')}</th>
-                          <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_hr', 4, 'Status / Remarks')}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200/80">
-                        {report.sections.on_hold_by_hr.map((r: any, idx: number) => (
-                          <tr
-                            key={idx}
-                            className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                          >
-                            <td className="py-2 px-1 text-center font-bold text-[#007791]">
-                              {r.s_no}
-                            </td>
-                            <td className="py-2 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                              {r.company_name}
-                            </td>
-                            <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                              {r.role || '—'}
-                            </td>
-                            <td className="py-2 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                              {r.ctc || '—'}
-                            </td>
-                            <td className="py-2 px-2 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                              {r.status || r.remarks || '—'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              )}
-
-              {/* Calling Activity Summary — calls + duration per handled college for
-                  the report's month, real Daily Tracker numbers (22 Sep 2026). */}
-              {report.included_sections?.calling_activity && report.sections?.calling_activity && (
-                <div className="space-y-1.5">
-                  <div className="mb-2">
-                    <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                      <PhoneCall size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'calling_activity', 'CALLING ACTIVITY SUMMARY')}
-                    </h3>
-                    <div className="h-[2px] w-full bg-[#007791] mt-1" />
-                  </div>
-                  {report.sections.calling_activity.length === 0 ? (
-                    <p className="text-[11px] text-slate-400 italic py-1 pl-1">
-                      No colleges resolved for this coordinator's calling activity this month.
-                    </p>
-                  ) : (
-                    <table className="w-full text-[11px] border-collapse table-fixed bg-white">
-                      <colgroup>
-                        <col style={{ width: '38px' }} />
-                        <col style={{ width: '46%' }} />
-                        <col style={{ width: '25%' }} />
-                        <col style={{ width: '27%' }} />
-                      </colgroup>
-                      <thead className="print:table-header-group">
-                        <tr className="bg-[#0a2540] text-white font-semibold text-[10.5px]">
-                          <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'calling_activity', 0, 'S.No')}</th>
-                          <th className="py-2 px-2 text-left font-bold">{columnHeading(report, 'calling_activity', 1, 'College')}</th>
-                          <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'calling_activity', 2, 'Calls Made')}</th>
-                          <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'calling_activity', 3, 'Hours Dedicated')}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200/80">
-                        {report.sections.calling_activity.map((r: any, idx: number) => (
-                          <tr
-                            key={idx}
-                            className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                          >
-                            <td className="py-2 px-1 text-center font-bold text-[#007791]">
-                              {r.s_no}
-                            </td>
-                            <td className="py-2 px-2 text-left font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                              {r.college_name}
-                            </td>
-                            <td className="py-2 px-2 text-center font-bold text-[#0a2540]">
-                              {r.total_calls ?? 0}
-                            </td>
-                            <td className="py-2 px-2 text-center font-bold text-blue-600">
-                              {r.total_duration_formatted || '00m 00s'}
-                            </td>
-                          </tr>
-                        ))}
-                        {report.calling_activity_totals && (
-                          <tr className="bg-blue-50">
-                            <td className="py-2 px-1"></td>
-                            <td className="py-2 px-2 text-left font-bold text-[#0a2540]">TOTAL</td>
-                            <td className="py-2 px-2 text-center font-bold text-[#0a2540]">
-                              {report.calling_activity_totals.total_calls ?? 0}
-                            </td>
-                            <td className="py-2 px-2 text-center font-bold text-blue-600">
-                              {report.calling_activity_totals.total_duration_formatted || '00m 00s'}
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-
           {/* Daily Positives Table / Spotlight Card */}
           {report.template_type === 'daily_positives' && report.included_sections?.daily_positives !== false && report.sections?.daily_positives && (
             <div className="space-y-1.5">
@@ -2432,7 +1982,7 @@ export function A4PdfPreviewModal({
                       <div className="flex items-center justify-between gap-3 mb-4">
                         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100/90 border border-emerald-300 text-emerald-800 text-[11px] font-bold tracking-wide">
                           <Sparkles size={13} className="text-emerald-600" />
-                          <span>TODAY&apos;S PLACEMENT HIGHLIGHT</span>
+                          <span>POSITIVE LEAD</span>
                         </div>
                         <div className="text-xs font-mono font-semibold text-emerald-700 bg-emerald-100/50 px-2.5 py-0.5 rounded-md border border-emerald-200">
                           {r.time || r.time_stamp || r.event_time || 'Confirmed'}
@@ -2459,7 +2009,7 @@ export function A4PdfPreviewModal({
                         <div className="p-3.5 bg-emerald-50/70 border-2 border-emerald-300 rounded-xl shadow-xs">
                           <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 mb-1 flex items-center gap-1">
                             <Trophy size={12} className="text-emerald-600" />
-                            <span>Offered Package (CTC)</span>
+                            <span>CTC</span>
                           </div>
                           <div className="text-2xl font-black text-emerald-700 tracking-tight">
                             {r.ctc || '—'}
@@ -2499,7 +2049,7 @@ export function A4PdfPreviewModal({
                     <col style={{ width: '20%' }} />
                   </colgroup>
                   <thead className="print:table-header-group">
-                    <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
+                    <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10px]">
                       <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'daily_positives', 0, '#')}</th>
                       <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'daily_positives', 1, 'COMPANY NAME')}</th>
                       <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'daily_positives', 2, 'ROLE / DESIGNATION')}</th>
@@ -2558,7 +2108,7 @@ export function A4PdfPreviewModal({
                       <div className="flex items-center justify-between gap-3 mb-4">
                         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100/90 border border-blue-300 text-blue-800 text-[11px] font-bold tracking-wide">
                           <Rocket size={13} className="text-blue-600" />
-                          <span>NEW JD ANNOUNCEMENT</span>
+                          <span>JD RECEIVED</span>
                         </div>
                         <div className="text-xs font-mono font-semibold text-blue-700 bg-blue-100/50 px-2.5 py-0.5 rounded-md border border-blue-200">
                           {r.time || r.time_stamp || r.event_time || 'Active Opportunity'}
@@ -2585,7 +2135,7 @@ export function A4PdfPreviewModal({
                         <div className="p-3.5 bg-blue-50/70 border-2 border-blue-300 rounded-xl shadow-xs">
                           <div className="text-[10px] font-bold uppercase tracking-wider text-blue-700 mb-1 flex items-center gap-1">
                             <Zap size={12} className="text-blue-600" />
-                            <span>Offered Package (CTC)</span>
+                            <span>CTC</span>
                           </div>
                           <div className="text-2xl font-black text-blue-700 tracking-tight">
                             {r.ctc || '—'}
@@ -2625,7 +2175,7 @@ export function A4PdfPreviewModal({
                     <col style={{ width: '20%' }} />
                   </colgroup>
                   <thead className="print:table-header-group">
-                    <tr className="bg-[#0a2540] text-white font-semibold text-[10px]">
+                    <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10px]">
                       <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'daily_jd', 0, '#')}</th>
                       <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'daily_jd', 1, 'COMPANY NAME')}</th>
                       <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'daily_jd', 2, 'ROLE / DESIGNATION')}</th>
@@ -2852,7 +2402,8 @@ export function A4PdfPreviewModal({
           <button
             type="button"
             onClick={handleDownloadImage}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer"
+            style={{ background: 'linear-gradient(180deg, #1A73E8 0%, #0091FF 50%, #00A6F5 100%)' }}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 hover:brightness-110 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/25 transition-all cursor-pointer active:scale-[0.95]"
             title="Download A4 High-Res PNG Image"
           >
             <Download size={13} strokeWidth={2} />
@@ -2862,7 +2413,8 @@ export function A4PdfPreviewModal({
           <button
             type="button"
             onClick={onPrint}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary hover:bg-primary-hover text-primary-foreground rounded-lg text-xs font-bold shadow-xs transition-all cursor-pointer"
+            style={{ background: 'linear-gradient(180deg, #2563EB 0%, #1D4ED8 50%, #0C1D54 100%)' }}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 hover:brightness-110 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/30 transition-all cursor-pointer active:scale-[0.95]"
             title="Save / Print A4 PDF"
           >
             <Printer size={13} strokeWidth={2} />

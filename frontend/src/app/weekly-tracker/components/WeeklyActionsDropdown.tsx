@@ -169,8 +169,11 @@ export function WeeklyActionsDropdown({
                 className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold rounded-lg text-fg hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400 transition-colors cursor-pointer group"
               >
                 <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
-                    <RefreshCw size={12} strokeWidth={2.2} />
+                  <div 
+                    style={{ background: 'linear-gradient(180deg, #FFC53D 0%, #FF9500 50%, #FF5E00 100%)' }}
+                    className="w-5 h-5 rounded-md text-white shadow-2xs flex items-center justify-center group-hover:scale-105 transition-transform shrink-0"
+                  >
+                    <RefreshCw size={12} strokeWidth={2.4} />
                   </div>
                   <span>Sync Daily Positives</span>
                 </div>
@@ -221,7 +224,10 @@ export function WeeklyActionsDropdown({
                   className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold rounded-lg text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer group disabled:opacity-50"
                 >
                   <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
+                    <div 
+                      className="w-5 h-5 rounded-md text-white flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 shadow-2xs"
+                      style={{ background: 'linear-gradient(180deg, #38BF3D 0%, #1BA32D 50%, #0B6B1E 100%)' }}
+                    >
                       <FileSpreadsheet size={12} strokeWidth={2.2} />
                     </div>
                     <span>Export to Excel</span>

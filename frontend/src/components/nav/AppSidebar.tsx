@@ -297,7 +297,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                     onMouseLeave={() => setHovered(null)}
                     onFocus={(e) => showLabel(e.currentTarget, isLocked ? `${label} (Locked)` : label)}
                     onBlur={() => setHovered(null)}
-                    style={active ? { background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' } : undefined}
+                    style={active ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
                     className={`group relative flex items-center rounded-lg cursor-pointer active:scale-[0.992] ${
                       mounted ? 'transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]' : ''
                     } ${
@@ -308,7 +308,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                       isLocked
                         ? 'text-zinc-400 dark:text-zinc-600 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60'
                         : active
-                        ? 'text-white font-semibold shadow-md shadow-sky-500/25'
+                        ? 'text-white font-semibold shadow-md shadow-blue-500/30'
                         : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 font-medium'
                     }`}
                   >
@@ -361,7 +361,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                   />
                 ) : (
                   <span
-                    style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' }}
+                    style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
                     className="grid w-[35px] h-[35px] shrink-0 place-items-center rounded-full text-white text-[11px] font-bold tracking-normal leading-none shadow-sm ring-2 ring-white dark:ring-zinc-900 group-hover:scale-105 transition-transform"
                   >
                     {initialsFor(fullName)}
@@ -388,7 +388,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                   />
                 ) : (
                   <span
-                    style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' }}
+                    style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
                     className="grid w-8 h-8 shrink-0 place-items-center rounded-full text-white text-[11px] font-bold tracking-normal leading-none shadow-xs ring-2 ring-white dark:ring-zinc-900"
                   >
                     {initialsFor(fullName)}
@@ -583,12 +583,12 @@ function MobileDrawer({
                   <Link
                     href={href}
                     onClick={handleClick}
-                    style={active ? { background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' } : undefined}
+                    style={active ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
                     className={`group flex items-center justify-between px-3 py-2 rounded-xl text-[12.5px] transition-all active:scale-[0.992] ${
                       isLocked
                         ? 'text-zinc-400 dark:text-zinc-600 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60'
                         : active
-                        ? 'text-white font-semibold shadow-xs'
+                        ? 'text-white font-semibold shadow-md shadow-blue-500/25'
                         : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 font-medium'
                     }`}
                   >
@@ -625,7 +625,7 @@ function MobileDrawer({
               />
             ) : (
               <span 
-                style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' }}
+                style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
                 className="grid w-9 h-9 shrink-0 place-items-center rounded-full text-white text-[11px] font-bold tracking-normal leading-none shadow-xs ring-2 ring-white dark:ring-zinc-900"
               >
                 {initialsFor(fullName)}

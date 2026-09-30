@@ -233,8 +233,8 @@ export function ActiveLeadHeader({
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2.5">
           <div 
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-xs shrink-0"
-            style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 30%, #0284c7 65%, #1d4ed8 100%)' }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-md shadow-blue-900/25 shrink-0"
+            style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
           >
             <Sparkles size={17} strokeWidth={2.5} />
           </div>
@@ -282,59 +282,64 @@ export function ActiveLeadHeader({
       <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-border/40 overflow-x-auto no-scrollbar flex-nowrap">
         {/* Left Side: Segmented Tab Switcher (No emojis) */}
         <div className="flex items-center gap-2.5 shrink-0">
-          {/* Left Side: Segmented Tab Switcher — Apple Smooth Sliding Segmented Control */}
-          <div className="relative grid grid-cols-2 gap-1 p-1 bg-surface-sunken/80 dark:bg-zinc-900/90 rounded-lg border border-border/80 shadow-2xs shrink-0 select-none">
-            {/* Glider / Smooth Sliding Active Indicator */}
-            <div
-              className={`absolute top-1 bottom-1 w-[calc((100%-12px)/2)] rounded-md border shadow-xs transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none ${
-                activeTab === 'pipeline'
-                  ? 'left-1 translate-x-0 bg-blue-600 border-blue-500 shadow-blue-500/20'
-                  : 'left-1 translate-x-[calc(100%+4px)] bg-emerald-600 dark:bg-emerald-600 border-emerald-500 shadow-emerald-500/20'
-              }`}
-            />
-
+          {/* Left Side: Segmented Tab Switcher (White Card Pill with Blue & Green Accents) */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 dark:bg-zinc-900/90 rounded-xl border border-slate-200/80 dark:border-zinc-800 shadow-2xs shrink-0 select-none">
+            {/* Positives Tab */}
             <button
               type="button"
               onClick={() => {
                 triggerHaptic('selection');
                 onTabChange('pipeline');
               }}
-              className={`relative z-10 flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-bold transition-colors duration-200 cursor-pointer select-none ${
+              className={`flex items-center justify-center gap-2 px-3 py-1 text-xs transition-all duration-150 cursor-pointer select-none rounded-lg ${
                 activeTab === 'pipeline'
-                  ? 'text-white font-extrabold'
-                  : 'text-fg-subtle hover:text-fg'
+                  ? 'bg-white dark:bg-zinc-800 border-2 border-blue-400 dark:border-blue-500 shadow-xs'
+                  : 'border-2 border-transparent hover:bg-white/60 dark:hover:bg-zinc-800/60'
               }`}
             >
-              <span>Pipeline (Positives)</span>
+              <span className={`tracking-wide uppercase text-xs ${
+                activeTab === 'pipeline'
+                  ? 'text-blue-900 dark:text-blue-300 font-extrabold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-bold'
+              }`}>
+                Positives
+              </span>
               <span
-                className={`px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold transition-colors duration-200 tabular-nums ${
+                className={`font-mono text-[11px] px-1.5 py-0.5 rounded-md transition-colors duration-150 tabular-nums min-w-[20px] text-center ${
                   activeTab === 'pipeline'
-                    ? 'bg-blue-700/80 text-white'
-                    : 'bg-surface-sunken dark:bg-zinc-800 border border-border text-fg-subtle'
+                    ? 'bg-blue-600 text-white font-black shadow-xs'
+                    : 'bg-slate-200/80 dark:bg-zinc-800 text-slate-700 dark:text-slate-300 font-bold'
                 }`}
               >
                 {tabCounts.pipeline}
               </span>
             </button>
 
+            {/* JD Received Tab */}
             <button
               type="button"
               onClick={() => {
                 triggerHaptic('selection');
                 onTabChange('jd_received');
               }}
-              className={`relative z-10 flex items-center justify-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-bold transition-colors duration-200 cursor-pointer select-none ${
+              className={`flex items-center justify-center gap-2 px-3 py-1 text-xs transition-all duration-150 cursor-pointer select-none rounded-lg ${
                 activeTab === 'jd_received'
-                  ? 'text-white font-extrabold'
-                  : 'text-fg-subtle hover:text-fg'
+                  ? 'bg-white dark:bg-zinc-800 border-2 border-emerald-500 dark:border-emerald-400 shadow-xs'
+                  : 'border-2 border-transparent hover:bg-white/60 dark:hover:bg-zinc-800/60'
               }`}
             >
-              <span>JD Received</span>
+              <span className={`tracking-wide uppercase text-xs ${
+                activeTab === 'jd_received'
+                  ? 'text-emerald-800 dark:text-emerald-300 font-extrabold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-bold'
+              }`}>
+                JD Received
+              </span>
               <span
-                className={`px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold transition-colors duration-200 tabular-nums ${
+                className={`font-mono text-[11px] px-1.5 py-0.5 rounded-md transition-colors duration-150 tabular-nums min-w-[20px] text-center ${
                   activeTab === 'jd_received'
-                    ? 'bg-emerald-700/80 text-white'
-                    : 'bg-surface-sunken dark:bg-zinc-800 border border-border text-fg-subtle'
+                    ? 'bg-emerald-600 text-white font-black shadow-xs'
+                    : 'bg-slate-200/80 dark:bg-zinc-800 text-slate-700 dark:text-slate-300 font-bold'
                 }`}
               >
                 {tabCounts.jd_received}
@@ -406,7 +411,8 @@ export function ActiveLeadHeader({
               type="button"
               disabled={isSyncing}
               onClick={onSyncTracker}
-              className="w-8 h-8 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 disabled:opacity-50 text-white rounded-xl transition-all shadow-xs flex items-center justify-center cursor-pointer active:scale-[0.992] hover:shadow-amber-500/20 shrink-0"
+              style={{ background: 'linear-gradient(180deg, #FFC53D 0%, #FF9500 50%, #FF5E00 100%)' }}
+              className="w-8 h-8 disabled:opacity-50 text-white rounded-xl shadow-md shadow-orange-500/25 hover:brightness-110 transition-all flex items-center justify-center cursor-pointer active:scale-[0.992] shrink-0"
               title="Sync leads from Weekly Tracker (Pipeline & JD Received)"
               aria-label="Sync leads from Weekly Tracker"
             >
@@ -442,7 +448,8 @@ export function ActiveLeadHeader({
             <button
               type="button"
               onClick={onToggleDeleteMode}
-              className="w-8 h-8 bg-rose-600 hover:bg-rose-700 text-white rounded-xl transition-all shadow-xs flex items-center justify-center cursor-pointer active:scale-[0.992] shrink-0"
+              className="w-8 h-8 text-white rounded-xl transition-all shadow-md shadow-red-600/25 flex items-center justify-center cursor-pointer hover:brightness-110 active:scale-[0.95] shrink-0"
+              style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
               title="Delete mode — select and delete leads"
               aria-label="Delete leads"
             >
@@ -455,7 +462,8 @@ export function ActiveLeadHeader({
                 type="button"
                 onClick={onDeleteSelected}
                 disabled={selectedCount === 0 || isDeletingSelected}
-                className="h-8 px-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-[0.992] whitespace-nowrap shrink-0"
+                className="h-8 px-2.5 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-red-600/25 flex items-center gap-1.5 cursor-pointer hover:brightness-110 active:scale-[0.95] whitespace-nowrap shrink-0"
+                style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
                 title="Confirm delete selected leads"
                 aria-label="Delete selected leads"
               >

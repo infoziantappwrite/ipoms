@@ -159,8 +159,9 @@ export async function generateReportCanvases(
       ];
     } else if (report.template_type === 'month_end') {
       kpiCards = [
-        { label: 'Total Conversions', val: report.kpi_summary.total_conversion_count || 0, color: '#059669', bg: '#ecfdf5', border: '#6ee7b7', labelColor: '#065f46', key: 'total_conversion_count' },
-        { label: 'Companies Scheduled', val: report.kpi_summary.total_companies_scheduled || 0, color: '#d97706', bg: '#fffbeb', border: '#fcd34d', labelColor: '#92400e', key: 'total_companies_scheduled' },
+        { label: 'Total Calls Made', val: report.kpi_summary.total_calls ?? 0, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', labelColor: '#1e40af', key: 'total_calls' },
+        { label: 'Positives Received', val: report.kpi_summary.positive_responses ?? 0, color: '#059669', bg: '#ecfdf5', border: '#6ee7b7', labelColor: '#065f46', key: 'positive_responses' },
+        { label: 'Duration Spent', val: report.kpi_summary.total_duration || '0m', color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', labelColor: '#155e75', key: 'total_duration' },
         { label: 'Offers Received', val: report.kpi_summary.total_offers_moved || 0, color: '#7c3aed', bg: '#faf5ff', border: '#d8b4fe', labelColor: '#6b21a8', key: 'total_offers_moved' },
       ];
     } else if (report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined) {
@@ -585,8 +586,8 @@ export async function generateReportCanvases(
     });
   }
 
-  // 3. Single-College Weekly Placement (Sections 1-9)
-  if (!report.is_multi_college && report.template_type !== 'month_end' && report.template_type !== 'active_leads' && report.template_type !== 'pending_tasks' && report.template_type !== 'daily_positives' && report.template_type !== 'daily_jd_received') {
+  // 3. Single-College Weekly & Month-End Placement (Sections 1-9)
+  if (!report.is_multi_college && report.template_type !== 'active_leads' && report.template_type !== 'pending_tasks' && report.template_type !== 'daily_positives' && report.template_type !== 'daily_jd_received') {
     // 1. Completed
     if (report.included_sections?.completed_companies && report.sections?.completed_companies) {
       const cRows = report.sections.completed_companies;
@@ -1122,334 +1123,6 @@ export async function generateReportCanvases(
     });
   }
 
-  // 5. Month-End Sections
-  if (report.template_type === 'month_end') {
-    // 1. Completed
-    if (report.included_sections?.completed_companies && report.sections?.completed_companies) {
-      const compRows = report.sections.completed_companies;
-      const headers = applyColumnHeadings(report, 'completed_companies', ['#', 'Company Name', 'Role', 'CTC', 'Status', 'Offers']);
-      const colWidths = [36, 204, 180, 100, 180, 100];
-      const rawRows = compRows.map((r: any) => [
-        String(r.s_no || ''),
-        String(r.company_name || '—'),
-        String(r.role || r.job_role || '—'),
-        String(r.ctc || r.ctc_lpa || '—'),
-        String(r.status || r.current_status_text || 'Drive Completed'),
-        String(r.offers_received ?? r.selected_count ?? '0'),
-      ]);
-
-      const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
-        let maxLines = 1;
-        const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
-          const colW = colWidths[cIdx];
-          const maxCellW = colW - 14;
-          const font = cIdx === 1
-            ? 'bold 12px system-ui, -apple-system, sans-serif'
-            : cIdx === 0
-            ? '600 12px monospace'
-            : (cIdx === 3 || cIdx === 5)
-            ? 'bold 12px system-ui, -apple-system, sans-serif'
-            : '500 12px system-ui, -apple-system, sans-serif';
-          const fillStyle = cIdx === 1
-            ? '#0a2540'
-            : cIdx === 0
-            ? '#007791'
-            : (cIdx === 3)
-            ? '#007791'
-            : (cIdx === 5)
-            ? '#059669'
-            : '#334155';
-
-          const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
-          if (lines.length > maxLines) maxLines = lines.length;
-          return { lines, font, fillStyle };
-        });
-        const height = Math.max(38, maxLines * 17 + 16);
-        return { cells, height };
-      });
-
-      sectionsToDraw.push({
-        title: sectionTitle(report, 'completed_companies', 'COMPANIES COMPLETED'),
-        badge: `${compRows.length} Companies`,
-        accentBg: '#ecfdf5',
-        accentBorder: '#a7f3d0',
-        accentText: '#0a2540',
-        headers,
-        colWidths,
-        measuredRows,
-      });
-    }
-
-    // 2. JD Received
-    if (report.included_sections?.company_conversions && report.sections?.company_conversions) {
-      const convRows = report.sections.company_conversions;
-      const headers = applyColumnHeadings(report, 'jd_received', ['#', 'Company Name', 'Role', 'CTC', 'JD Received Date']);
-      const colWidths = [36, 234, 210, 110, 210];
-      const rawRows = convRows.map((r: any) => [
-        String(r.s_no || ''),
-        String(r.company_name || '—'),
-        String(r.role || '—'),
-        String(r.ctc || '—'),
-        String(r.jd_received_date || '—'),
-      ]);
-
-      const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
-        let maxLines = 1;
-        const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
-          const colW = colWidths[cIdx];
-          const maxCellW = colW - 14;
-          const font = cIdx === 1
-            ? 'bold 12px system-ui, -apple-system, sans-serif'
-            : cIdx === 0
-            ? '600 12px monospace'
-            : (cIdx === 3)
-            ? 'bold 12px system-ui, -apple-system, sans-serif'
-            : '500 12px system-ui, -apple-system, sans-serif';
-          const fillStyle = cIdx === 1
-            ? '#0a2540'
-            : cIdx === 0
-            ? '#007791'
-            : (cIdx === 3)
-            ? '#007791'
-            : '#334155';
-
-          const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
-          if (lines.length > maxLines) maxLines = lines.length;
-          return { lines, font, fillStyle };
-        });
-        const height = Math.max(38, maxLines * 17 + 16);
-        return { cells, height };
-      });
-
-      sectionsToDraw.push({
-        title: sectionTitle(report, 'jd_received', 'JD RECEIVED COMPANIES'),
-        badge: `${convRows.length} Companies`,
-        accentBg: '#ecfdf5',
-        accentBorder: '#a7f3d0',
-        accentText: '#0a2540',
-        headers,
-        colWidths,
-        measuredRows,
-      });
-    }
-
-    // 3. In Drive
-    const inDriveCanvasRows = report.sections?.companies_in_drive || report.sections?.company_drives_scheduled;
-    if ((report.included_sections?.companies_in_drive || report.included_sections?.company_drives_scheduled) && inDriveCanvasRows) {
-      const headers = applyColumnHeadings(report, 'companies_in_drive', ['#', 'Company Name', 'Role', 'CTC', 'Status']);
-      const colWidths = [36, 224, 200, 110, 230];
-      const rawRows = inDriveCanvasRows.map((r: any) => [
-        String(r.s_no || ''),
-        String(r.company_name || '—'),
-        String(r.role || '—'),
-        String(r.ctc || '—'),
-        String(r.status || r.current_status_text || '—'),
-      ]);
-
-      const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
-        let maxLines = 1;
-        const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
-          const colW = colWidths[cIdx];
-          const maxCellW = colW - 14;
-          const font = cIdx === 1
-            ? 'bold 12px system-ui, -apple-system, sans-serif'
-            : cIdx === 0
-            ? '600 12px monospace'
-            : (cIdx === 3)
-            ? 'bold 12px system-ui, -apple-system, sans-serif'
-            : '500 12px system-ui, -apple-system, sans-serif';
-          const fillStyle = cIdx === 1
-            ? '#0a2540'
-            : cIdx === 0
-            ? '#007791'
-            : (cIdx === 3)
-            ? '#007791'
-            : '#334155';
-
-          const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
-          if (lines.length > maxLines) maxLines = lines.length;
-          return { lines, font, fillStyle };
-        });
-        const height = Math.max(38, maxLines * 17 + 16);
-        return { cells, height };
-      });
-
-      sectionsToDraw.push({
-        title: sectionTitle(report, 'companies_in_drive', 'COMPANIES IN DRIVE'),
-        badge: `${inDriveCanvasRows.length} Companies`,
-        accentBg: '#eef2ff',
-        accentBorder: '#c7d2fe',
-        accentText: '#0a2540',
-        headers,
-        colWidths,
-        measuredRows,
-      });
-    }
-
-    // 4. On Hold by TPO
-    if (report.included_sections?.on_hold_by_college && report.sections?.on_hold_by_college && report.sections.on_hold_by_college.length > 0) {
-      const holdRows = report.sections.on_hold_by_college;
-      const headers = applyColumnHeadings(report, 'on_hold_by_college', ['#', 'Company Name', 'Role', 'CTC', 'Status / Remarks']);
-      const colWidths = [36, 224, 200, 110, 230];
-      const rawRows = holdRows.map((r: any) => [
-        String(r.s_no || ''),
-        String(r.company_name || '—'),
-        String(r.role || '—'),
-        String(r.ctc || '—'),
-        String(r.status || r.remarks || '—'),
-      ]);
-
-      const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
-        let maxLines = 1;
-        const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
-          const colW = colWidths[cIdx];
-          const maxCellW = colW - 14;
-          const font = cIdx === 1
-            ? 'bold 12px system-ui, -apple-system, sans-serif'
-            : cIdx === 0
-            ? '600 12px monospace'
-            : (cIdx === 3)
-            ? 'bold 12px system-ui, -apple-system, sans-serif'
-            : '500 12px system-ui, -apple-system, sans-serif';
-          const fillStyle = cIdx === 1
-            ? '#0a2540'
-            : cIdx === 0
-            ? '#007791'
-            : (cIdx === 3)
-            ? '#007791'
-            : '#334155';
-
-          const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
-          if (lines.length > maxLines) maxLines = lines.length;
-          return { lines, font, fillStyle };
-        });
-        const height = Math.max(38, maxLines * 17 + 16);
-        return { cells, height };
-      });
-
-      sectionsToDraw.push({
-        title: sectionTitle(report, 'on_hold_by_college', 'COMPANIES ON HOLD BY TPO'),
-        badge: `${holdRows.length} Companies`,
-        accentBg: '#fffbeb',
-        accentBorder: '#fde68a',
-        accentText: '#0a2540',
-        headers,
-        colWidths,
-        measuredRows,
-      });
-    }
-
-    // 5. On Hold by HR
-    if (report.included_sections?.on_hold_by_hr && report.sections?.on_hold_by_hr && report.sections.on_hold_by_hr.length > 0) {
-      const holdHrRows = report.sections.on_hold_by_hr;
-      const headers = applyColumnHeadings(report, 'on_hold_by_hr', ['#', 'Company Name', 'Role', 'CTC', 'Status / Remarks']);
-      const colWidths = [36, 224, 200, 110, 230];
-      const rawRows = holdHrRows.map((r: any) => [
-        String(r.s_no || ''),
-        String(r.company_name || '—'),
-        String(r.role || '—'),
-        String(r.ctc || '—'),
-        String(r.status || r.remarks || '—'),
-      ]);
-
-      const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
-        let maxLines = 1;
-        const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
-          const colW = colWidths[cIdx];
-          const maxCellW = colW - 14;
-          const font = cIdx === 1
-            ? 'bold 12px system-ui, -apple-system, sans-serif'
-            : cIdx === 0
-            ? '600 12px monospace'
-            : (cIdx === 3)
-            ? 'bold 12px system-ui, -apple-system, sans-serif'
-            : '500 12px system-ui, -apple-system, sans-serif';
-          const fillStyle = cIdx === 1
-            ? '#0a2540'
-            : cIdx === 0
-            ? '#007791'
-            : (cIdx === 3)
-            ? '#007791'
-            : '#334155';
-
-          const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
-          if (lines.length > maxLines) maxLines = lines.length;
-          return { lines, font, fillStyle };
-        });
-        const height = Math.max(38, maxLines * 17 + 16);
-        return { cells, height };
-      });
-
-      sectionsToDraw.push({
-        title: sectionTitle(report, 'on_hold_by_hr', 'COMPANIES ON HOLD BY HR'),
-        badge: `${holdHrRows.length} Companies`,
-        accentBg: '#fff1f2',
-        accentBorder: '#fecdd3',
-        accentText: '#0a2540',
-        headers,
-        colWidths,
-        measuredRows,
-      });
-    }
-
-    // 6. Calling Activity Summary — calls + duration per handled college for the
-    // report's month, real Daily Tracker numbers (user-requested, 22 Sep 2026).
-    if (report.included_sections?.calling_activity && report.sections?.calling_activity && report.sections.calling_activity.length > 0) {
-      const callRows = report.sections.calling_activity;
-      const totals = report.calling_activity_totals;
-      const headers = applyColumnHeadings(report, 'calling_activity', ['#', 'College', 'Calls Made', 'Hours Dedicated']);
-      const colWidths = [36, 380, 180, 204];
-      const rawRows: string[][] = callRows.map((r: any) => [
-        String(r.s_no || ''),
-        String(r.college_name || '—'),
-        String(r.total_calls ?? 0),
-        String(r.total_duration_formatted || '00m 00s'),
-      ]);
-      if (totals) {
-        rawRows.push(['', 'TOTAL', String(totals.total_calls ?? 0), String(totals.total_duration_formatted || '00m 00s')]);
-      }
-
-      const measuredRows: MeasuredRow[] = rawRows.map((row: string[], rIdx: number) => {
-        const isTotalRow = totals && rIdx === rawRows.length - 1;
-        let maxLines = 1;
-        const cells: MeasuredCell[] = row.map((cellText, cIdx) => {
-          const colW = colWidths[cIdx];
-          const maxCellW = colW - 14;
-          const font = isTotalRow
-            ? 'bold 12px system-ui, -apple-system, sans-serif'
-            : cIdx === 1
-            ? 'bold 12px system-ui, -apple-system, sans-serif'
-            : cIdx === 0
-            ? '600 12px monospace'
-            : '600 12px system-ui, -apple-system, sans-serif';
-          const fillStyle = isTotalRow
-            ? '#0a2540'
-            : cIdx === 1
-            ? '#0a2540'
-            : cIdx === 0
-            ? '#007791'
-            : '#007791';
-
-          const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
-          if (lines.length > maxLines) maxLines = lines.length;
-          return { lines, font, fillStyle };
-        });
-        const height = Math.max(38, maxLines * 17 + 16);
-        return { cells, height };
-      });
-
-      sectionsToDraw.push({
-        title: sectionTitle(report, 'calling_activity', 'CALLING ACTIVITY SUMMARY'),
-        badge: `${callRows.length} ${callRows.length === 1 ? 'College' : 'Colleges'}`,
-        accentBg: '#eff6ff',
-        accentBorder: '#bfdbfe',
-        accentText: '#0a2540',
-        headers,
-        colWidths,
-        measuredRows,
-      });
-    }
-  }
 
   // 6. Daily Positives & Daily JD Received Sections
   let singleHeroLead: any = null;
@@ -1822,8 +1495,12 @@ export async function generateReportCanvases(
       currentY += 34;
     }
 
-    // Header Background
-    ctx.fillStyle = '#0a2540';
+    // Header Background (matching navigation icon gradient)
+    const headerGrad = ctx.createLinearGradient(0, currentY, 0, currentY + tableHeaderH);
+    headerGrad.addColorStop(0, '#22449E');
+    headerGrad.addColorStop(0.5, '#1D3D8F');
+    headerGrad.addColorStop(1, '#172E6C');
+    ctx.fillStyle = headerGrad;
     ctx.fillRect(PADDING, currentY, CONTENT_W, tableHeaderH);
 
     ctx.fillStyle = '#ffffff';
@@ -1961,7 +1638,7 @@ export async function generateReportCanvases(
     drawRoundRect(cardX, cardY, cardW, cardH, 16, '#ffffff', isPos ? '#93c5fd' : '#93c5fd', 1.5);
 
     // ── TOP STRIP: Badge pill (left) + Time chip (right) ─────────────────────
-    const badgeLabel = isPos ? '✦ NEW PLACEMENT' : '✦ NEW JD ANNOUNCEMENT';
+    const badgeLabel = isPos ? '✦ POSITIVE LEAD' : '✦ JD RECEIVED';
     const badgeW = ctx.measureText(badgeLabel).width + 32;
     const badgeH = 26;
     const badgePillY = cardY + 18;
@@ -2021,7 +1698,7 @@ export async function generateReportCanvases(
     ctx.font = '700 9.5px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = isPos ? '#047857' : '#1e40af';
     ctx.textAlign = 'left';
-    ctx.fillText('⚡ OFFERED PACKAGE (CTC)', cardX + 22 + col1W + gapBetween + 14, row1Y + 22);
+    ctx.fillText('⚡ CTC', cardX + 22 + col1W + gapBetween + 14, row1Y + 22);
 
     ctx.font = 'bold 24px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = isPos ? '#059669' : '#2563eb';

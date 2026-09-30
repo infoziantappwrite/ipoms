@@ -245,8 +245,8 @@ export function BulkDeleteTrackerModal({
           <button
             type="button"
             onClick={handleDelete}
-            disabled={loading || (scope === 'entire_database' && confirmText.trim().toUpperCase() !== 'DELETE')}
-            className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-[0.992]"
+            className="px-4 py-2 rounded-xl text-xs font-bold text-white shadow-md shadow-red-600/25 hover:brightness-110 disabled:opacity-40 transition-all flex items-center gap-1.5 cursor-pointer active:scale-[0.95]"
+            style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
           >
             {loading ? (
               <>

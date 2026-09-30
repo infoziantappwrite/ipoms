@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Pencil, Plus, X, UserPlus, Shield, Activity, Lock, Unlock, Calendar, Mail, Phone, Linkedin, Hash } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
+import { CustomDatePicker } from '@/components/ui/CustomDatePicker';
 import { isPasswordValid, firstPasswordError } from '@/lib/passwordPolicy';
 
 interface Props {
@@ -184,7 +185,6 @@ export function UserModal({ initialData, defaultRole, onClose, onSuccess }: Prop
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="e.g. mohanaradha"
-                  disabled={isEditing}
                   className={`${inputClass} font-mono`}
                   required
                 />
@@ -200,7 +200,6 @@ export function UserModal({ initialData, defaultRole, onClose, onSuccess }: Prop
                   value={officialEmail}
                   onChange={(e) => setOfficialEmail(e.target.value)}
                   placeholder="name@infoziant.com or name@icl.today"
-                  disabled={isEditing}
                   className={`${inputClass} font-mono`}
                   required
                 />
@@ -368,11 +367,13 @@ export function UserModal({ initialData, defaultRole, onClose, onSuccess }: Prop
                   <Calendar size={12} className="text-zinc-500" />
                   <span>Date of Birth</span>
                 </label>
-                <input
-                  type="date"
+                <CustomDatePicker
                   value={dateOfBirth}
-                  onChange={(e) => setDateOfBirth(e.target.value)}
-                  className={inputClass}
+                  onChange={setDateOfBirth}
+                  placeholder="Select Date of Birth"
+                  minYear={1950}
+                  maxYear={new Date().getFullYear()}
+                  allowFuture={false}
                 />
               </div>
 
@@ -381,11 +382,13 @@ export function UserModal({ initialData, defaultRole, onClose, onSuccess }: Prop
                   <Calendar size={12} className="text-zinc-500" />
                   <span>Date of Joining Office</span>
                 </label>
-                <input
-                  type="date"
+                <CustomDatePicker
                   value={dateOfJoining}
-                  onChange={(e) => setDateOfJoining(e.target.value)}
-                  className={inputClass}
+                  onChange={setDateOfJoining}
+                  placeholder="Select Date of Joining"
+                  minYear={2015}
+                  maxYear={new Date().getFullYear() + 2}
+                  allowFuture={true}
                 />
               </div>
             </div>

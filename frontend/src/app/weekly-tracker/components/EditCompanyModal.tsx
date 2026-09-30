@@ -651,7 +651,8 @@ export function EditCompanyModal({
             type="button"
             onClick={handleDelete}
             disabled={deleting}
-            className="flex items-center gap-1.5 px-3.5 py-2.5 text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-[0.992] shadow-xs"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 text-white hover:brightness-110 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-[0.95] shadow-md shadow-red-600/25 disabled:opacity-50"
+            style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
           >
             <Trash2 size={14} />
             <span>{deleting ? 'Deleting…' : 'Delete Row'}</span>

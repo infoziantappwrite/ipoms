@@ -21,7 +21,6 @@ import { EditTrackerRowModal } from './components/EditTrackerRowModal';
 import { BulkDeleteTrackerModal } from './components/BulkDeleteTrackerModal';
 import { DeleteRowConfirmModal } from './components/DeleteRowConfirmModal';
 import { TrackerActionsDropdown } from './components/TrackerActionsDropdown';
-import { DailySummaryModal } from './components/DailySummaryModal';
 import { ExcelPasteModal } from './components/ExcelPasteModal';
 import { MoveCollegeModal } from './components/MoveCollegeModal';
 import { CollegeDossierModal } from '@/components/college/CollegeDossierModal';
@@ -43,7 +42,8 @@ export type CallOutcome =
   | 'follow_up'
   | 'in_connect'
   | 'invalid'
-  | 'drive_completed';
+  | 'drive_completed'
+  | 'new_poc';
 
 export interface TrackerRow {
   _id: string;
@@ -129,7 +129,6 @@ export default function DailyTrackerPage() {
   const [isManualAddOpen, setIsManualAddOpen] = useState(false);
   const [manualAddDraft, setManualAddDraft] = useState<ManualAddRowDraft | null>(null);
   const [followUpReminders, setFollowUpReminders] = useState<FollowUpReminder[]>([]);
-  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [editingRow, setEditingRow] = useState<TrackerRow | null>(null);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [bulkDeleteSuccessMsg, setBulkDeleteSuccessMsg] = useState<string | null>(null);
@@ -730,7 +729,7 @@ export default function DailyTrackerPage() {
 
   // ── Handle Move / Copy selected rows to Tomorrow
   const handleMoveSelectedToTomorrow = useCallback(async () => {
-    if (selectedRowIds.length === 0) return;
+    if (isTomorrowMode || selectedRowIds.length === 0) return;
     if (!selectedCollegeId || selectedCollegeId === 'all') {
       alert("Please select a specific college first to process contacts for tomorrow's sheet.");
       return;
@@ -882,13 +881,6 @@ export default function DailyTrackerPage() {
 
       // Handle Shift+Key global shortcuts when not typing in text fields
       if (!isInput && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        // Shift+S: Toggle Daily Calling Summary Pop-up Window
-        if (e.key === 'S' || e.key === 's') {
-          e.preventDefault();
-          setIsSummaryOpen((prev) => !prev);
-          return;
-        }
-
         // Shift+H: Open / Toggle Call History (Calendar)
         if (e.key === 'H' || e.key === 'h') {
           e.preventDefault();
@@ -915,7 +907,7 @@ export default function DailyTrackerPage() {
             return;
           }
           triggerHaptic('selection');
-          if (selectedRowCount > 0) {
+          if (selectedRowCount > 0 && !isTomorrowMode) {
             handleMoveSelectedToTomorrow();
           } else {
             setIsHistoryMode(false);
@@ -953,10 +945,6 @@ export default function DailyTrackerPage() {
         if (isPickerOpen) {
           return;
         }
-        if (isSummaryOpen) {
-          setIsSummaryOpen(false);
-          return;
-        }
         if (isCalendarOpen) {
           setIsCalendarOpen(false);
           return;
@@ -983,7 +971,6 @@ export default function DailyTrackerPage() {
   }, [
     handleSaveProgress,
     isPickerOpen,
-    isSummaryOpen,
     isCalendarOpen,
     isManualAddOpen,
     isHistoryMode,
@@ -1178,8 +1165,8 @@ export default function DailyTrackerPage() {
           <div>
             <div className="flex items-center gap-2.5">
               <div 
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-xs shrink-0"
-                style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 30%, #0284c7 65%, #1d4ed8 100%)' }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-md shadow-blue-900/25 shrink-0"
+                style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
               >
                 <PhoneCall size={17} strokeWidth={2.5} />
               </div>
@@ -1373,7 +1360,7 @@ export default function DailyTrackerPage() {
                 <button
                   type="button"
                   onClick={() => setIsHistoryMode(false)}
-                  className="flex items-center gap-1.5 bg-primary hover:bg-blue-700 text-primary-foreground px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
+                  className="flex items-center gap-1.5 bg-gradient-to-b from-[#1A73E8] via-[#0091FF] to-[#00A6F5] hover:brightness-110 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-md shadow-blue-500/25 border border-blue-400/30 transition-all cursor-pointer shrink-0 active:scale-[0.96]"
                 >
                   Back to Today
                 </button>
@@ -1414,10 +1401,10 @@ export default function DailyTrackerPage() {
             )}
           </div>
 
-          {/* ── Right Top Corner: Solid Red Delete Bin Button & 3 Vertical Dots (Actions Menu) ── */}
+          {/* ── Right Top Corner: Move, Tomorrow, Solid Red Delete Bin & 3 Vertical Dots (Actions Menu) ── */}
           {!isEffectiveReadOnly && (
             <div className="ml-auto shrink-0 flex items-center gap-2">
-              {/* Move Selected Companies to Another College Button */}
+              {/* 1. Move Selected Companies to Another College Button */}
               {selectedRowCount > 0 && (
                 <button
                   type="button"
@@ -1425,15 +1412,60 @@ export default function DailyTrackerPage() {
                     triggerHaptic('medium');
                     setIsMoveModalOpen(true);
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 text-xs font-bold transition-all cursor-pointer shadow-2xs active:scale-[0.98] shrink-0 animate-in fade-in duration-150"
+                  style={{ background: 'linear-gradient(180deg, #ED145B 0%, #FA6D38 52%, #FFBA08 100%)' }}
+                  className="px-3.5 py-1.5 rounded-xl text-white font-extrabold hover:brightness-110 text-xs transition-all cursor-pointer shadow-md shadow-orange-500/25 active:scale-[0.95] shrink-0 animate-in fade-in duration-150"
                   title={`Move ${selectedRowCount} selected company call(s) to another college`}
                 >
-                  <ArrowLeftRight size={13} strokeWidth={2.2} />
                   <span>Move ({selectedRowCount})</span>
                 </button>
               )}
 
-              {/* Standalone Solid Bold Red Dustbin / Trash Icon Button */}
+              {/* 2. Tomorrow / Today Toggle & Move-To-Tomorrow Button (Solid Bold Color with White Text) */}
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic('selection');
+                  if (selectedRowCount > 0 && !isTomorrowMode) {
+                    handleMoveSelectedToTomorrow();
+                  } else if (isTomorrowMode) {
+                    setActiveDateMode('today');
+                  } else {
+                    if (!selectedCollegeId || selectedCollegeId === 'all') {
+                      alert("Please select a specific college first to prepare tomorrow's sheet.");
+                      return;
+                    }
+                    setActiveDateMode('tomorrow');
+                  }
+                }}
+                disabled={!selectedCollegeId}
+                style={{ background: 'linear-gradient(180deg, #1D64D8 0%, #174EB8 50%, #0B2556 100%)' }}
+                className="h-8 px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 text-white text-xs font-bold shadow-md shadow-blue-900/25 border border-blue-400/30 hover:brightness-110 transition-all cursor-pointer select-none shrink-0 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.96]"
+                title={
+                  selectedRowCount > 0 && !isTomorrowMode
+                    ? `Move / Copy ${selectedRowCount} selected contact(s) to Tomorrow's Sheet (uncalled will move, contacted will copy)`
+                    : isTomorrowMode
+                    ? "Switch back to Today's Session (Shift+T)"
+                    : "Tomorrow's Advance Entry (Shift+T)"
+                }
+                aria-label={
+                  selectedRowCount > 0 && !isTomorrowMode
+                    ? `Move ${selectedRowCount} contacts to Tomorrow`
+                    : isTomorrowMode
+                    ? "Today's Session"
+                    : "Tomorrow's Advance Entry"
+                }
+              >
+                <CalendarDays size={14} strokeWidth={2.2} className="text-white shrink-0" />
+                <span className="tracking-wide">
+                  {selectedRowCount > 0 && !isTomorrowMode
+                    ? `Tomorrow (${selectedRowCount})`
+                    : isTomorrowMode
+                    ? 'Today'
+                    : 'Tomorrow'}
+                </span>
+              </button>
+
+              {/* 3. Standalone Solid Bold Red Dustbin / Trash Icon Button */}
               <button
                 type="button"
                 onClick={() => {
@@ -1444,13 +1476,13 @@ export default function DailyTrackerPage() {
                     window.dispatchEvent(new CustomEvent('ipoms_tracker_toggle_delete_mode'));
                   }
                 }}
-                disabled={!selectedCollegeId || rows.length === 0}
-                className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 ${
+                style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
+                className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 text-white shadow-md shadow-red-600/25 hover:brightness-110 ${
                   isDeleteMode && selectedRowCount > 0
-                    ? 'bg-rose-700 hover:bg-rose-800 active:bg-rose-900 text-white shadow-xs ring-2 ring-rose-400'
+                    ? 'ring-2 ring-red-400 brightness-110'
                     : isDeleteMode
-                    ? 'bg-rose-700 hover:bg-rose-800 text-white shadow-xs ring-2 ring-rose-400'
-                    : 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs'
+                    ? 'ring-2 ring-red-400'
+                    : ''
                 } disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]`}
                 title={
                   isDeleteMode && selectedRowCount > 0
@@ -1467,54 +1499,6 @@ export default function DailyTrackerPage() {
                     {selectedRowCount}
                   </span>
                 )}
-              </button>
-
-              {/* Tomorrow / Today Toggle & Move-To-Tomorrow Button (Solid Bold Color with White Text) */}
-              <button
-                type="button"
-                onClick={() => {
-                  triggerHaptic('selection');
-                  if (selectedRowCount > 0) {
-                    handleMoveSelectedToTomorrow();
-                  } else if (isTomorrowMode) {
-                    setActiveDateMode('today');
-                  } else {
-                    if (!selectedCollegeId || selectedCollegeId === 'all') {
-                      alert("Please select a specific college first to prepare tomorrow's sheet.");
-                      return;
-                    }
-                    setActiveDateMode('tomorrow');
-                  }
-                }}
-                disabled={!selectedCollegeId}
-                className={`h-8 px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 text-white text-xs font-bold shadow-xs transition-all cursor-pointer select-none shrink-0 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.96] ${
-                  selectedRowCount > 0
-                    ? 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 ring-2 ring-blue-400/40'
-                    : 'bg-primary hover:bg-primary-hover active:bg-primary/90'
-                }`}
-                title={
-                  selectedRowCount > 0
-                    ? `Move / Copy ${selectedRowCount} selected contact(s) to Tomorrow's Sheet (uncalled will move, contacted will copy)`
-                    : isTomorrowMode
-                    ? "Switch back to Today's Session (Shift+T)"
-                    : "Tomorrow's Advance Entry (Shift+T)"
-                }
-                aria-label={
-                  selectedRowCount > 0
-                    ? `Move ${selectedRowCount} contacts to Tomorrow`
-                    : isTomorrowMode
-                    ? "Today's Session"
-                    : "Tomorrow's Advance Entry"
-                }
-              >
-                <CalendarDays size={14} strokeWidth={2.2} className="text-white shrink-0" />
-                <span className="tracking-wide">
-                  {selectedRowCount > 0
-                    ? `Tomorrow (${selectedRowCount})`
-                    : isTomorrowMode
-                    ? 'Today'
-                    : 'Tomorrow'}
-                </span>
               </button>
 
               {/* 3 Vertical Dots (Actions Menu containing Paste, Load Contacts, Save Progress, etc.) */}
@@ -1571,7 +1555,6 @@ export default function DailyTrackerPage() {
                 onCopyEntireRows={() => {
                   window.dispatchEvent(new CustomEvent('ipoms_tracker_copy_entire_row'));
                 }}
-                onOpenSummary={() => setIsSummaryOpen(true)}
               />
             </div>
           )}
@@ -1600,12 +1583,12 @@ export default function DailyTrackerPage() {
             rows={displayRows}
             isReadOnly={isEffectiveReadOnly}
             isAdvanceLocked={isAdvanceLocked}
-            onRowUpdate={handleRowUpdate}
-            onEdit={(row) => setEditingRow(row)}
-            onDelete={handleDeleteRow}
-            onDeleteSelected={handleDeleteSelectedRows}
-            onCall={(row) => setActiveCallRow(row)}
-            onCopyFromHistory={handleCopyFromHistory}
+            onRowUpdate={isMonitor ? undefined : handleRowUpdate}
+            onEdit={isMonitor ? undefined : (row) => setEditingRow(row)}
+            onDelete={isMonitor ? (async () => {}) : handleDeleteRow}
+            onDeleteSelected={isMonitor ? undefined : handleDeleteSelectedRows}
+            onCall={isMonitor ? undefined : (row) => setActiveCallRow(row)}
+            onCopyFromHistory={isMonitor ? undefined : handleCopyFromHistory}
           />
         </div>
       )}
@@ -1678,21 +1661,6 @@ export default function DailyTrackerPage() {
           onConfirmDelete={handleBulkDelete}
         />
       )}
-
-      {/* ── Daily Summary Pop-up Modal (Shift+S) ─────────────────────────── */}
-      <DailySummaryModal
-        isOpen={isSummaryOpen}
-        onClose={() => setIsSummaryOpen(false)}
-        kpi={kpi}
-        rows={isHistoryMode ? historyRows : rows}
-        collegeName={selectedCollegeName}
-        collegeCode={selectedCollegeObj?.college_code}
-        sessionDate={isHistoryMode ? historyDate : sessionDate}
-        onFilterOutcome={(outcome) => {
-          setOutcomeFilter(outcome);
-          setIsSummaryOpen(false);
-        }}
-      />
 
       {/* ── Softphone Panel (Click-to-Call) ───────────────────────────────── */}
       <SoftphonePanel

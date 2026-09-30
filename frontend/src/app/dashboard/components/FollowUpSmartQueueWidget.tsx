@@ -505,7 +505,8 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
                 toast('Syncing follow-up leads from Weekly Tracker…', 'info');
               }}
               title="Sync with Weekly Tracker"
-              className="h-9 w-9 rounded-full bg-gradient-to-r from-rose-600 via-orange-500 to-amber-500 text-white flex items-center justify-center shadow-md shadow-orange-500/25 hover:from-rose-500 hover:via-orange-500 hover:to-amber-400 hover:shadow-lg hover:shadow-orange-500/35 hover:scale-105 transition-all cursor-pointer border border-white/20 active:scale-95"
+              style={{ background: 'linear-gradient(180deg, #FFC53D 0%, #FF9500 50%, #FF5E00 100%)' }}
+              className="h-9 w-9 rounded-full text-white flex items-center justify-center shadow-md shadow-orange-500/25 hover:brightness-110 hover:shadow-lg hover:shadow-orange-500/35 hover:scale-105 transition-all cursor-pointer border border-white/20 active:scale-95"
             >
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             </button>
@@ -660,9 +661,10 @@ export function FollowUpSmartQueueWidget({ selectedCollegeIds }: Props) {
               toast('Syncing follow-up leads from Weekly Tracker…', 'info');
             }}
             title="Sync with Weekly Tracker"
+            style={selectedCollegePending > 0 ? { background: 'linear-gradient(180deg, #FFC53D 0%, #FF9500 50%, #FF5E00 100%)' } : undefined}
             className={`h-8 px-3 transition-all cursor-pointer border active:scale-95 flex items-center gap-1.5 text-xs font-semibold shadow-2xs ${
               selectedCollegePending > 0
-                ? 'rounded-full bg-gradient-to-r from-rose-600 via-orange-500 to-amber-500 text-white font-bold shadow-md shadow-orange-500/25 hover:from-rose-500 hover:via-orange-500 hover:to-amber-400 border-white/20'
+                ? 'rounded-full text-white font-bold shadow-md shadow-orange-500/25 hover:brightness-110 border-white/20'
                 : 'rounded-xl bg-surface hover:bg-surface-raised border-border text-fg'
             }`}
           >

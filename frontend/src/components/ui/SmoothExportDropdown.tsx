@@ -117,10 +117,11 @@ export function SmoothExportDropdown({
         type="button"
         disabled={isExporting}
         onClick={handleToggle}
+        style={{ background: 'linear-gradient(180deg, #38BF3D 0%, #1BA32D 50%, #0B6B1E 100%)' }}
         className={
           iconOnly
-            ? `w-9 h-9 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl flex items-center justify-center transition-all duration-150 shadow-xs cursor-pointer active:scale-[0.992] shrink-0 relative ${className}`
-            : `px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all duration-150 shadow-2xs flex items-center gap-1.5 cursor-pointer active:scale-[0.992] whitespace-nowrap shrink-0 ${className}`
+            ? `w-9 h-9 hover:brightness-110 disabled:opacity-50 text-white rounded-xl flex items-center justify-center transition-all duration-150 shadow-md shadow-emerald-600/25 cursor-pointer active:scale-[0.95] shrink-0 relative ${className}`
+            : `px-3.5 py-1.5 hover:brightness-110 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all duration-150 shadow-md shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer active:scale-[0.95] whitespace-nowrap shrink-0 ${className}`
         }
         title={title}
         aria-label={title}
@@ -162,9 +163,12 @@ export function SmoothExportDropdown({
                 setIsOpen(false);
                 onExportExcel();
               }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-fg hover:bg-surface-raised hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer"
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-fg hover:bg-surface-raised hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors text-left cursor-pointer group"
             >
-              <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <div 
+                className="w-7 h-7 rounded-lg text-white flex items-center justify-center shrink-0 shadow-2xs"
+                style={{ background: 'linear-gradient(180deg, #38BF3D 0%, #1BA32D 50%, #0B6B1E 100%)' }}
+              >
                 <FileSpreadsheet size={15} strokeWidth={2.2} />
               </div>
               <span className="font-semibold text-xs text-fg">Excel Document (.xls)</span>

@@ -61,7 +61,7 @@ export const FAQ_CATEGORIES: FaqCategory[] = [
     id: 'master_companies',
     label: 'Master Companies & Search',
     iconName: 'Building2',
-    description: 'HR contact directory, past hiring history, and multi-parameter filtering.',
+    description: 'HR contact directory, past hiring history, bulk paste, recycle bin, and multi-parameter filtering.',
   },
   {
     id: 'institutions_roles',
@@ -94,6 +94,14 @@ export const FAQ_ITEMS: FaqItem[] = [
       'college selection',
     ],
   },
+  {
+    id: 'faq-0b',
+    category: 'active_college_focus',
+    categoryLabel: 'Active College Focus & Locking',
+    question: 'What happens if a coordinator forgets to lock their Active College Focus on Monday?',
+    answer: 'If you do not lock your Active College Focus at the beginning of the week:\n\n* The navigation links for **Daily Tracker**, **Weekly Tracker**, **Daily Leads**, **Pending Tasks**, and **Report Builder** remain in a secure locked state with a prompt directing you to your Dashboard.\n* Once you open your Dashboard, choose your 1 to 4 focus colleges, and click **Save & Lock Focus**, your entire workspace will instantly unlock.\n* If you need to reassign a college during mid-week, your Team Leader or Administrator can also update assignments directly from the **Settings > College Roster** control panel.',
+    tags: ['monday focus', 'forgot to lock', 'unlock workspace', 'team leader override', 'college roster'],
+  },
 
   // ── 1. Report Builder & Document Generation ──
   {
@@ -108,9 +116,9 @@ export const FAQ_ITEMS: FaqItem[] = [
     id: 'faq-2',
     category: 'report_builder',
     categoryLabel: 'Report Builder & Exports',
-    question: 'Which export formats are supported for generated reports?',
-    answer: 'Every report can be exported in 3 presentation-grade formats:\n\n* **Save PDF (`.pdf`)**: Formatted specifically for standard A4 printing with auto-repeating table headers and institutional footers across multi-page documents.\n* **Save Image (`.png`)**: Generates an Ultra-HD (3000px width) high-resolution image with crisp text wrapping, optimized for direct sharing on WhatsApp and mobile messaging.\n* **Export XLSX (`.xls`)**: Exports a structured spreadsheet with formatted data grids and section headers for internal records and spreadsheet analysis.',
-    tags: ['pdf', 'image', 'png', 'excel', 'xlsx', 'export', 'print', 'whatsapp'],
+    question: 'Which export formats are supported for generated reports and when should I use each?',
+    answer: 'Every report can be exported in 3 presentation-grade formats:\n\n* **Save Image (`.png`) [Ultra-HD 3000px]**: Generates a high-definition image formatted with crisp fonts, rounded cards, and optimal padding. **Best for**: Direct sharing to College/TPO WhatsApp groups where quick mobile readability without opening PDF viewers is essential.\n* **Save PDF (`.pdf`) [Standard A4 Print]**: Formatted specifically for standard A4 printing with auto-repeating table headers, clean page breaks, institutional branding, and footers. **Best for**: Formal executive management meetings, TPO audits, and physical printed dossiers.\n* **Export XLSX (`.xls`) [Spreadsheet Data]**: Exports a clean, structured spreadsheet with formatted data grids and section headers. **Best for**: Internal record keeping, historical archiving, and offline spreadsheet calculations.',
+    tags: ['pdf', 'image', 'png', 'excel', 'xlsx', 'export', 'print', 'whatsapp', 'ultra hd', 'when to use'],
   },
   {
     id: 'faq-3',
@@ -120,15 +128,39 @@ export const FAQ_ITEMS: FaqItem[] = [
     answer: 'Yes. After generating any report, the interactive document editor allows coordinators to edit company names, roles, CTC figures, remarks, and observations inline prior to exporting. All edits instantly update both the on-screen preview and the exported files.',
     tags: ['edit report', 'inline edit', 'live editor', 'customize'],
   },
+  {
+    id: 'faq-3b',
+    category: 'report_builder',
+    categoryLabel: 'Report Builder & Exports',
+    question: 'What does the "Reset" button do in the Report Builder / Generator area?',
+    answer: 'The **Reset** button (styled matching the navigation controls) allows you to instantly revert all temporary filters, custom date pickers, or unsaved inline edits back to their default pristine database values without needing to refresh the entire browser page.',
+    tags: ['reset button', 'clear filters', 'revert report', 'restore defaults'],
+  },
+  {
+    id: 'faq-3c',
+    category: 'report_builder',
+    categoryLabel: 'Report Builder & Exports',
+    question: 'How do the "Expand All" and "Collapse All" buttons assist in report generation?',
+    answer: 'In multi-section reports (like the Weekly Placement Report with 7 pipeline stages):\n\n* **Collapse All**: Collapses every section into compact title cards, allowing you to get an immediate high-level overview of total company counts per category.\n* **Expand All**: Expands all tables simultaneously, making it effortless to perform a comprehensive line-by-line review before exporting your final PDF or WhatsApp image.',
+    tags: ['expand all', 'collapse all', 'accordion', 'overview', 'quick review'],
+  },
 
   // ── 2. Active Leads Management ──
   {
     id: 'faq-4',
     category: 'active_leads',
     categoryLabel: 'Active Leads Management',
-    question: 'Where does the data in the Active Leads Report come from?',
-    answer: 'The data syncs directly from the **Active Leads Management** database module. Any changes made to company names, roles, or CTC packages in the Active Leads module automatically reflect when building the report.',
-    tags: ['sync', 'active leads management', 'database', 'source'],
+    question: 'Where does the data in the Active Leads Report come from and how does it sync?',
+    answer: 'The data syncs directly from the **Active Leads Management** database module. Any changes made to company names, roles, or CTC packages in the Active Leads module automatically reflect when building the report in real-time.\n\nCoordinators can switch between batch tabs (**Batch 2026**, **Batch 2027**, **Batch 2028**) to view and maintain distinct graduating rosters.',
+    tags: ['sync', 'active leads management', 'database', 'source', 'batch tabs'],
+  },
+  {
+    id: 'faq-4b',
+    category: 'active_leads',
+    categoryLabel: 'Active Leads Management',
+    question: 'What is the structure of the Active Leads table?',
+    answer: 'Active Leads utilizes an ultra-clean **4-Column Layout**:\n\n1. **S.No / ID**: Sequential tracking number.\n2. **Company Name**: Verified corporate recruiter name.\n3. **Role / Designation**: Designated campus hiring job profile (e.g., Software Engineer, Trainee, Analyst).\n4. **CTC Package**: Salary or stipend package details offered to candidates (e.g., 6.5 LPA, 12 LPA).\n5. **Actions**: Row actions for instant editing or deletion with the ruby-red delete trigger.',
+    tags: ['4-column layout', 'active leads table', 'ctc package', 'job role', 'company name'],
   },
 
   // ── 3. Placement Pending Tasks ──
@@ -139,6 +171,14 @@ export const FAQ_ITEMS: FaqItem[] = [
     question: 'How to use the Pending Tasks module?',
     answer: 'Once you are on the **Pending Tasks** screen:\n\n* **Select College**: Select your target college first from the dropdown.\n* **Add Entries**: After selecting the college, you can add new pending task entries manually.\n* **Edit Entries**: If you want to edit previously available entries, click the **Pen (Edit)** icon available in each row.\n* **Delete Entries**: You can delete any specific row by using the **Bin (Delete)** icon.\n* **Export Documents**: This pending task list can be exported into an **Excel document (`.xls`)**, **Image (`.png`)**, or **PDF document (`.pdf`)** by clicking the **Export** button.',
     tags: ['pending tasks', 'college selection', 'manual entry', 'edit row', 'delete row', 'export'],
+  },
+  {
+    id: 'faq-5b',
+    category: 'pending_tasks',
+    categoryLabel: 'Placement Pending Tasks',
+    question: 'What are the operational categories tracked under Placement Pending Tasks?',
+    answer: 'Pending Tasks allows placement coordinators to track time-sensitive action items including:\n\n* **Pending JD Collection**: Following up with HR to receive formal Job Descriptions and eligibility criteria.\n* **Candidate Database Sharing**: Preparing and transmitting filtered student resume lists to the recruiting team.\n* **Online Assessment Scheduling**: Coordinating test dates, platforms (HackerRank, Cocubes, etc.), and lab slots.\n* **Interview Slot Finalization**: Confirming panel dates and room allocations with TPO and HR representatives.',
+    tags: ['pending jd', 'candidate database', 'online assessment', 'interview dates', 'task categories'],
   },
 
   // ── 4. Daily Tracker & Call Logging ──
@@ -158,8 +198,34 @@ export const FAQ_ITEMS: FaqItem[] = [
     answer: 'To perform daily calls and log conversations:\n\n* **1. Load Contacts**: Click the **Load Contacts** button to open the master metadata directory. Select contacts using the **S.No Range Picker** or **Pagination**, or click **Recent Data** (top-right corner) to pick from recently loaded metadata. Click **Import Contacts** (e.g., Import 20 or 30 contacts) to create your daily calling table.\n* **2. Starting Time**: Enter your **Starting Time** manually in the first column before initiating the call.\n* **3. Complete Call & Select Outcome**: Perform the call. Once completed, select the **Call Outcome / Status** from the dropdown.\n* **4. Automatic End Time & Duration**: Once the call status is chosen, the system automatically records the **Ending Time** and computes the **Duration**.\n* **5. Remarks & Follow-Up Month**: Add any comments. If the outcome is **Follow Up**, the **Follow Up Month** column activates for that row to assign the scheduled month.\n* **6. Row Actions**: Use the action buttons on any row to edit or delete entries as needed.',
     tags: ['perform calls', 'load contacts', 'range picker', 'recent data', 'starting time', 'duration', 'follow up month', 'call outcome'],
   },
+  {
+    id: 'faq-7b',
+    category: 'daily_tracker',
+    categoryLabel: 'Daily Tracker & Calls',
+    question: 'How does the "Tomorrow\'s Tracker" work and how do I move or reschedule calls?',
+    answer: 'The Daily Tracker provides dedicated **Today** and **Tomorrow** views to manage your calling pipeline seamlessly:\n\n* **Moving Calls from Today to Tomorrow**: When managing today\'s calling list, you can select one or multiple rows and click **Tomorrow** (or the Move action) to transfer them directly into tomorrow\'s schedule.\n* **Working inside Tomorrow\'s Tracker**: When you switch to the **Tomorrow** tab, you are viewing your pre-scheduled upcoming roster.\n* **Rescheduling from Tomorrow**: When you select a row while already on the Tomorrow tab, the interface displays a direct **Move** action allowing you to reassign the call to a specific custom date or shift it back, preventing redundant "move to tomorrow" loops.\n* **Color Consistency**: The Tomorrow tab and Tomorrow action buttons use the signature cyan-teal theme (`#00E5FF`) for instant visual clarity.',
+    tags: ['tomorrow tracker', 'move button', 'reschedule calls', 'custom date', 'tomorrow tab', 'scheduled calls'],
+  },
+  {
+    id: 'faq-7c',
+    category: 'daily_tracker',
+    categoryLabel: 'Daily Tracker & Calls',
+    question: 'How do I use the "Recent Data" and "Range Picker" in the Load Contacts modal?',
+    answer: 'When loading fresh HR contacts into your Daily Tracker:\n\n* **S.No Range Picker**: Enter starting and ending serial numbers (e.g., From `1` to `30`) to immediately batch-select a contiguous block of contacts.\n* **Recent Data Quick Button**: Located at the top-right of the modal, clicking **Recent Data** automatically highlights the most recently added or updated corporate metadata contacts.\n* **Import Selected**: Click the green **Import Contacts** button to populate your Daily Tracker table instantly.',
+    tags: ['range picker', 'recent data', 's.no selection', 'quick import', 'load contacts modal'],
+  },
 
-  // ── 5. Weekly Tracker & Pipeline Progression ──
+  // ── 5. Inactive & Daily Leads Pipeline ──
+  {
+    id: 'faq-7d',
+    category: 'active_leads',
+    categoryLabel: 'Active Leads Management',
+    question: 'What is the difference between the "Positives" tab and the "JD Received" tab in Leads Management?',
+    answer: 'Leads Management organizes corporate opportunities across two stages:\n\n* **Positives Tab (Blue)**: Contains all companies that gave positive initial feedback during daily calls (*Hiring, Follow Up, Request for Email Pitch*). These represent warm opportunities requiring nurturing.\n* **JD Received Tab (Green)**: Contains corporate partners who have formally submitted their Job Description (JD), eligibility criteria, and CTC package. These leads are ready for drive scheduling and can be pushed directly into active placement rosters.',
+    tags: ['positives tab', 'jd received', 'blue tab', 'green tab', 'lead lifecycle', 'hiring pitch'],
+  },
+
+  // ── 6. Weekly Tracker & Pipeline Progression ──
   {
     id: 'faq-8',
     category: 'weekly_tracker',
@@ -175,6 +241,14 @@ export const FAQ_ITEMS: FaqItem[] = [
     question: 'How do I move a company between different sections in the Weekly Tracker?',
     answer: 'To move a company to another section:\n\n* Click the **Up/Down Bidirectional Arrow (`⇅`)** button in the **Actions** column of that company\'s row.\n* A dropdown list will appear displaying all 7 available sections (*Companies Completed, Companies In Progress, Companies in Pipeline, Top Companies, Rejected by HR, On Hold by College/TPO, On Hold by HR*).\n* Click on your desired target section, and the company details will be moved to that section table area immediately.',
     tags: ['move company', 'sections', 'bidirectional arrow', 'pipeline transfer', 'reassign'],
+  },
+  {
+    id: 'faq-9b',
+    category: 'weekly_tracker',
+    categoryLabel: 'Weekly Tracker & Pipelines',
+    question: 'Can I bulk copy-paste companies directly into Weekly Tracker sections from Excel?',
+    answer: 'Yes! You can click the **Paste from Excel** action in any Weekly Tracker section. A modal will open where you can paste tab-separated rows copied straight from your spreadsheet. The system automatically maps Company Name, Role, Package, Dates, and Contact details directly into the selected section.',
+    tags: ['bulk paste', 'excel paste', 'paste weekly', 'spreadsheet import', 'quick add'],
   },
   {
     id: 'faq-16',
@@ -193,7 +267,7 @@ export const FAQ_ITEMS: FaqItem[] = [
     tags: ['placed count', 'offers', 'completed drive', 'kpi summary'],
   },
 
-  // ── 6. Master Companies & HR Directory Search ──
+  // ── 7. Master Companies & HR Directory Search ──
   {
     id: 'faq-18',
     category: 'master_companies',
@@ -201,6 +275,22 @@ export const FAQ_ITEMS: FaqItem[] = [
     question: 'How do I search for company HR contact details and past hiring history across previous years?',
     answer: 'Use the global search bar in the **Master Companies** or **Active Leads** module. You can search by company name, HR contact person, email, or domain to view historical interactions and previous CTC offerings.',
     tags: ['search', 'hr contacts', 'hiring history', 'master database'],
+  },
+  {
+    id: 'faq-18b',
+    category: 'master_companies',
+    categoryLabel: 'Master Companies & Search',
+    question: 'How does the Bulk Paste modal work in Master Metadata?',
+    answer: 'The **Bulk Paste** feature in Master Metadata allows administrators and coordinators to onboard entire contact directories in seconds:\n\n1. Copy columns from Excel/Google Sheets (*Company Name, HR Person, Designation, Phone, Email, Domain, Location*).\n2. Click **Paste Contacts** in the Master Metadata header and paste the content into the text area.\n3. The system parses every row, detects headers automatically, and provides an interactive preview grid.\n4. If any rows have missing mandatory fields, click **Remove Invalid Rows** to clean them up, then click **Import All Valid Rows**.',
+    tags: ['bulk paste modal', 'metadata import', 'csv paste', 'parse excel', 'auto validation'],
+  },
+  {
+    id: 'faq-18c',
+    category: 'master_companies',
+    categoryLabel: 'Master Companies & Search',
+    question: 'How does the Metadata Recycle Bin and Soft Deletion protect contact records?',
+    answer: 'To prevent accidental data loss of valuable corporate HR numbers:\n\n* When you delete a contact from the Master Metadata directory, it is moved to the **Recycle Bin** rather than being permanently destroyed.\n* To view deleted records, click the **Recycle Bin** toggle in the header.\n* Click the green **Restore (`↺`)** button on any row to return that contact back to the active directory immediately.\n* If you want to permanently clear discarded contacts, click the red **Empty Recycle Bin** button.',
+    tags: ['recycle bin', 'soft delete', 'restore contact', 'empty recycle bin', 'data protection'],
   },
   {
     id: 'faq-19',
@@ -219,7 +309,7 @@ export const FAQ_ITEMS: FaqItem[] = [
     tags: ['filter', 'ctc tier', 'domain filter', 'batch filter'],
   },
 
-  // ── 7. Institutions, Roles & Account Settings ──
+  // ── 8. Institutions, Roles & Account Settings ──
   {
     id: 'faq-21',
     category: 'institutions_roles',
@@ -259,5 +349,13 @@ export const FAQ_ITEMS: FaqItem[] = [
     question: 'How do I update my profile details or password?',
     answer: 'Click on your avatar/name in the top-right corner of the dashboard, select **Profile / Settings**, update your contact details or password, and click **Save Changes**.',
     tags: ['profile', 'password', 'settings', 'account'],
+  },
+  {
+    id: 'faq-26',
+    category: 'institutions_roles',
+    categoryLabel: 'Institutions & Account Settings',
+    question: 'What design standard is used for Delete and Destructive buttons across iPOMS?',
+    answer: 'To ensure uniform safety and intuitive visual recognition, all delete, discard, and empty-bin triggers across all modules (Daily Tracker, Weekly Tracker, Master Metadata, Active Leads, Daily Leads, and Pending Tasks) use the standardized **Ruby-Red Gradient** with subtle glowing elevation (`linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)`).',
+    tags: ['delete button', 'ruby red', 'design standard', 'button colors', 'safety'],
   },
 ];

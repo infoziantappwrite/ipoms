@@ -265,7 +265,8 @@ export function EditTrackerRowModal({ row, onClose, onSave, onDelete }: Props) {
               <button
                 type="button"
                 onClick={handleDelete}
-                className="px-3.5 py-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 flex items-center gap-1.5 text-xs font-semibold transition-all active:scale-[0.992] cursor-pointer shadow-2xs"
+                className="px-3.5 py-2 rounded-xl text-white hover:brightness-110 flex items-center gap-1.5 text-xs font-bold transition-all active:scale-[0.95] cursor-pointer shadow-md shadow-red-600/25"
+                style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
               >
                 <Trash2 size={13} strokeWidth={2} />
                 Delete Row

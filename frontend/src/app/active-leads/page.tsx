@@ -582,7 +582,8 @@ export default function ActiveLeadsPage() {
               type="button"
               disabled={isDeletingSelected}
               onClick={handleExecuteDelete}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition-all shadow-xs flex items-center gap-1.5 cursor-pointer active:scale-[0.992] disabled:opacity-50"
+              className="px-4 py-2 rounded-xl text-xs font-bold text-white transition-all shadow-md shadow-red-600/25 flex items-center gap-1.5 cursor-pointer hover:brightness-110 active:scale-[0.95] disabled:opacity-50"
+              style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
             >
               {isDeletingSelected ? (
                 <>

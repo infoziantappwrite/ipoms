@@ -95,7 +95,8 @@ export function DeleteConfirmModal({
               triggerHaptic('medium');
               onConfirm();
             }}
-            className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+            className="px-5 py-2 rounded-xl hover:brightness-110 active:scale-[0.95] disabled:opacity-50 text-white text-xs font-bold shadow-md shadow-red-600/25 transition-all cursor-pointer flex items-center gap-1.5"
+            style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
           >
             <span>{isDeleting ? 'Deleting…' : 'OK'}</span>
           </button>

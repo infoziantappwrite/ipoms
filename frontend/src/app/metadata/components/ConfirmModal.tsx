@@ -77,9 +77,10 @@ export function ConfirmModal({
             type="button"
             onClick={onConfirm}
             disabled={loading}
-            className={`px-5 py-2 min-w-[75px] rounded-xl text-xs font-bold text-white shadow-xs transition-all cursor-pointer shrink-0 flex items-center justify-center gap-1.5 whitespace-nowrap disabled:opacity-50 ${
-              isDanger ? 'bg-rose-600 hover:bg-rose-700 ring-2 ring-rose-500/20' : 'bg-primary hover:bg-primary/90'
+            className={`px-5 py-2 min-w-[75px] rounded-xl text-xs font-bold text-white shadow-md transition-all cursor-pointer shrink-0 flex items-center justify-center gap-1.5 whitespace-nowrap disabled:opacity-50 hover:brightness-110 active:scale-[0.95] ${
+              isDanger ? 'shadow-red-600/25 ring-2 ring-red-400/30' : 'bg-primary hover:bg-primary/90'
             }`}
+            style={isDanger ? { background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' } : undefined}
           >
             {loading ? 'Processing...' : confirmLabel}
           </button>

@@ -214,9 +214,10 @@ function getCurrentMonthOption() {
 }
 
 const MONTH_END_KPIS = [
-  { key: 'total_conversion_count', label: 'Total Conversions', desc: 'Total Conversion Count' },
-  { key: 'total_companies_scheduled', label: 'Companies Scheduled', desc: 'Total Companies Scheduled' },
-  { key: 'total_offers_moved', label: 'Offers Received', desc: 'Total Offers Received' },
+  { key: 'total_calls', label: 'Total Calls Made' },
+  { key: 'positive_responses', label: 'Positives Received' },
+  { key: 'total_duration', label: 'Duration Spent' },
+  { key: 'total_offers_moved', label: 'Offers Received' },
 ];
 
 const DAILY_POSITIVES_KPIS = [
@@ -441,11 +442,15 @@ export function ReportBuilderWizard({
       s.active_leads = true;
       s.remarks = false;
     } else if (initialTemplateType === 'month_end') {
-      s.kpi_summary = false;
+      s.kpi_summary = true;
       s.completed_companies = true;
-      s.company_conversions = true;
+      s.drive_in_progress = true;
       s.companies_in_drive = true;
-      s.company_drives_scheduled = true;
+      s.upcoming_drives = true;
+      s.in_progress = true;
+      s.pipeline = true;
+      s.top_companies = true;
+      s.rejected_companies = true;
       s.on_hold_by_college = true;
       s.on_hold_by_hr = true;
       s.remarks = false;
@@ -489,7 +494,6 @@ export function ReportBuilderWizard({
     const cached = getCachedColleges();
     return cached.map((c: any) => c._id);
   });
-  const [monthEndCollegeSearch, setMonthEndCollegeSearch] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
@@ -673,17 +677,6 @@ export function ReportBuilderWizard({
     return sortCollegesWithPriority(colleges as any[], activeFocusIds);
   }, [colleges]);
 
-  const filteredMonthEndColleges = useMemo(() => {
-    if (!monthEndCollegeSearch.trim()) return prioritizedColleges;
-    const q = monthEndCollegeSearch.toLowerCase().trim();
-    return prioritizedColleges.filter(
-      (c: any) =>
-        (c.college_name || '').toLowerCase().includes(q) ||
-        (c.college_code || '').toLowerCase().includes(q) ||
-        (c.location || '').toLowerCase().includes(q)
-    );
-  }, [prioritizedColleges, monthEndCollegeSearch]);
-
   const filteredGroupColleges = useMemo(() => {
     if (!groupSearchQuery.trim()) return prioritizedColleges;
     const q = groupSearchQuery.toLowerCase().trim();
@@ -791,6 +784,22 @@ export function ReportBuilderWizard({
             on_hold_by_college,
             on_hold_by_hr,
           });
+
+          // By default, select month-end KPI cards and only select sections that have > 0 companies
+          setSections((prev) => ({
+            ...prev,
+            ...(templateType === 'month_end' ? { kpi_summary: true } : {}),
+            completed_companies: completed.length > 0,
+            drive_in_progress: drive_in_progress.length > 0,
+            companies_in_drive: in_drive.length > 0,
+            upcoming_drives: in_drive.length > 0,
+            in_progress: in_progress.length > 0,
+            pipeline: pipeline.length > 0,
+            top_companies: top_companies.length > 0,
+            rejected_companies: rejected_companies.length > 0,
+            on_hold_by_college: on_hold_by_college.length > 0,
+            on_hold_by_hr: on_hold_by_hr.length > 0,
+          }));
         }
       } catch (err) {
         console.error('Failed to sync weekly tracker data in report builder:', err);
@@ -1073,7 +1082,6 @@ export function ReportBuilderWizard({
     setCustomRemarks('');
 
     setMonthEndSelectedCollegeIds([]);
-    setMonthEndCollegeSearch('');
     setValidationErrors([]);
 
     setWeeklyMinCtc(null);
@@ -1084,6 +1092,17 @@ export function ReportBuilderWizard({
     setWeeklyActivePreviewTab('all');
     setWeeklyExcludedIds(new Set());
   };
+
+  // Listen for reset trigger from top navigation bar
+  useEffect(() => {
+    const handleResetEvent = () => {
+      handleFullReset();
+    };
+    window.addEventListener('ipoms:report-builder-reset', handleResetEvent);
+    return () => {
+      window.removeEventListener('ipoms:report-builder-reset', handleResetEvent);
+    };
+  }, []);
 
   const handleResetWeeklyFilters = () => {
     setWeeklyMinCtc(null);
@@ -1116,12 +1135,15 @@ export function ReportBuilderWizard({
         setSections({
           kpi_summary: false,
           completed_companies: true,
-          company_conversions: true,
+          drive_in_progress: true,
           companies_in_drive: true,
-          company_drives_scheduled: true,
+          upcoming_drives: true,
+          in_progress: true,
+          pipeline: true,
+          top_companies: true,
+          rejected_companies: true,
           on_hold_by_college: true,
           on_hold_by_hr: true,
-          calling_activity: true,
           remarks: false,
         });
         setCustomRemarks('Comprehensive monthly recruitment progress review covering conversions, scheduled drives, and placement selections.');
@@ -1309,14 +1331,17 @@ export function ReportBuilderWizard({
       setCustomRemarks('Comprehensive active corporate roster curated for campus recruitment engagements.');
     } else if (newType === 'month_end') {
       setSections({
-        kpi_summary: false,
-        completed_companies: true,
-        company_conversions: true,
-        companies_in_drive: true,
-        company_drives_scheduled: true,
-        on_hold_by_college: true,
-        on_hold_by_hr: true,
-        calling_activity: true,
+        kpi_summary: true,
+        completed_companies: (weeklyCompanies.completed || []).length > 0,
+        drive_in_progress: (weeklyCompanies.drive_in_progress || []).length > 0,
+        companies_in_drive: (weeklyCompanies.in_drive || []).length > 0,
+        upcoming_drives: (weeklyCompanies.in_drive || []).length > 0,
+        in_progress: (weeklyCompanies.in_progress || []).length > 0,
+        pipeline: (weeklyCompanies.pipeline || []).length > 0,
+        top_companies: (weeklyCompanies.top_companies || []).length > 0,
+        rejected_companies: (weeklyCompanies.rejected_companies || []).length > 0,
+        on_hold_by_college: (weeklyCompanies.on_hold_by_college || []).length > 0,
+        on_hold_by_hr: (weeklyCompanies.on_hold_by_hr || []).length > 0,
         remarks: false,
       });
       setIncludePreparedBy(true);
@@ -1354,16 +1379,16 @@ export function ReportBuilderWizard({
     } else {
       setSections({
         kpi_summary: false,
-        completed_companies: true,
-        drive_in_progress: true,
-        companies_in_drive: true,
-        upcoming_drives: true,
-        in_progress: true,
-        pipeline: true,
-        top_companies: true,
-        rejected_companies: true,
-        on_hold_by_college: true,
-        on_hold_by_hr: true,
+        completed_companies: (weeklyCompanies.completed || []).length > 0,
+        drive_in_progress: (weeklyCompanies.drive_in_progress || []).length > 0,
+        companies_in_drive: (weeklyCompanies.in_drive || []).length > 0,
+        upcoming_drives: (weeklyCompanies.in_drive || []).length > 0,
+        in_progress: (weeklyCompanies.in_progress || []).length > 0,
+        pipeline: (weeklyCompanies.pipeline || []).length > 0,
+        top_companies: (weeklyCompanies.top_companies || []).length > 0,
+        rejected_companies: (weeklyCompanies.rejected_companies || []).length > 0,
+        on_hold_by_college: (weeklyCompanies.on_hold_by_college || []).length > 0,
+        on_hold_by_hr: (weeklyCompanies.on_hold_by_hr || []).length > 0,
         remarks: true,
       });
       setIncludePreparedBy(true);
@@ -1424,6 +1449,7 @@ export function ReportBuilderWizard({
     setLoading(true);
     try {
       const isMultiWeekly = templateType === 'weekly_placement' && weeklyTargetMode === 'group';
+      const isMultiMonthEnd = templateType === 'month_end' && (collegeId === 'all' || !collegeId);
       const effectiveWeekLabel = (!startDate || !endDate)
         ? (weekLabel && !weekLabel.toLowerCase().includes('select') && !weekLabel.toLowerCase().includes('cumulative') ? weekLabel : '')
         : (weekLabel && !weekLabel.toLowerCase().includes('cumulative') ? weekLabel : '');
@@ -1451,7 +1477,7 @@ export function ReportBuilderWizard({
         method: 'POST',
         body: JSON.stringify({
           template_type: templateType,
-          is_multi_college: isMultiWeekly || templateType === 'month_end',
+          is_multi_college: isMultiWeekly || isMultiMonthEnd,
           college_ids: isMultiWeekly ? selectedGroupCollegeIds : (templateType === 'month_end' ? monthEndSelectedCollegeIds : undefined),
           selected_college_ids: templateType === 'month_end' ? monthEndSelectedCollegeIds : undefined,
           college_id: isMultiWeekly ? 'multi' : (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? 'all' : (templateType === 'active_leads' ? (collegeId || 'all') : (templateType === 'month_end' ? (collegeId || 'all') : collegeId)),
@@ -1459,9 +1485,6 @@ export function ReportBuilderWizard({
           academic_year: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? (academicYear && academicYear !== 'all' ? academicYear : getDefaultGraduatingBatch()) : academicYear,
           date: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? dailyReportDate : undefined,
           effective_date: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? dailyReportDate : undefined,
-          // The month picker already resolves real start/end dates (see MONTH_OPTIONS) but
-          // they were never actually sent — the backend was deriving only a display month
-          // *name* out of week_label text, so Calling Activity had no real range to query.
           date_from: templateType === 'month_end' ? startDate : undefined,
           date_to: templateType === 'month_end' ? endDate : undefined,
           lead_type: templateType === 'daily_positives' ? 'positive' : (templateType === 'daily_jd_received' ? 'jd_received' : undefined),
@@ -1537,7 +1560,7 @@ export function ReportBuilderWizard({
           key: 'kpi_summary',
           label: 'Month-End Executive KPI Cards',
           icon: BarChart3,
-          desc: '3 colored cards: Total conversions, Companies scheduled, Offers received',
+          desc: 'KPI Cards: Calls made, Positives, Duration spent, Companies scheduled, Offers received',
           isKpiSection: true,
           kpiList: MONTH_END_KPIS,
         },
@@ -1550,42 +1573,68 @@ export function ReportBuilderWizard({
           badgeColor: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
         },
         {
-          key: 'company_conversions',
-          label: 'JD Received Companies',
-          icon: Briefcase,
-          desc: 'Company Name, Role, CTC, JD Received Date',
-          companies: weeklyCompanies.in_progress,
-          badgeColor: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+          key: 'drive_in_progress',
+          label: 'Drive in Progress',
+          icon: Zap,
+          desc: 'Placement drives currently taking place / evaluation underway',
+          companies: weeklyCompanies.drive_in_progress,
+          badgeColor: 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
         },
         {
           key: 'companies_in_drive',
-          label: 'Companies in Drive',
+          label: 'Upcoming Drives',
           icon: Calendar,
-          desc: 'Company Name, Role, CTC, Status',
+          desc: 'Scheduled campus placement drives actively upcoming or confirmed',
           companies: weeklyCompanies.in_drive,
           badgeColor: 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
         },
         {
-          key: 'on_hold_by_college',
-          label: 'Companies on Hold by TPO',
+          key: 'in_progress',
+          label: 'Companies In Progress',
           icon: Clock,
-          desc: 'Placement drives placed on hold by college management / TPO',
-          companies: weeklyCompanies.on_hold_by_college,
-          badgeColor: 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+          desc: 'Active ongoing interview evaluation rounds',
+          companies: weeklyCompanies.in_progress,
+          badgeColor: 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
         },
         {
-          key: 'on_hold_by_hr',
-          label: 'Companies on Hold by HR',
-          icon: AlertCircle,
-          desc: 'Drives on hold from corporate employer / HR side',
-          companies: weeklyCompanies.on_hold_by_hr,
+          key: 'pipeline',
+          label: 'Companies In Pipeline',
+          icon: Layers,
+          desc: 'Upcoming scheduled drives and confirmed tech partnerships',
+          companies: weeklyCompanies.pipeline,
+          badgeColor: 'bg-cyan-50 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800',
+        },
+        {
+          key: 'top_companies',
+          label: 'Top Companies',
+          icon: Sparkles,
+          desc: 'Premier high-CTC partner organizations',
+          companies: weeklyCompanies.top_companies || [],
+          badgeColor: 'bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+        },
+        {
+          key: 'rejected_companies',
+          label: 'Rejected Companies',
+          icon: XCircle,
+          desc: 'Companies with employer declines or ineligible criteria',
+          companies: weeklyCompanies.rejected_companies || [],
           badgeColor: 'bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
         },
         {
-          key: 'calling_activity',
-          label: 'Calling Activity Summary',
-          icon: PhoneCall,
-          desc: 'Calls made and hours dedicated per college for the selected month — real numbers, computed on generate',
+          key: 'on_hold_by_college',
+          label: 'Companies On Hold By College',
+          icon: Clock,
+          desc: 'Placement drives placed on hold by college management / TPO',
+          companies: weeklyCompanies.on_hold_by_college,
+          badgeColor: 'bg-orange-50 dark:bg-orange-950/50 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800',
+        },
+        {
+          key: 'on_hold_by_hr',
+          label: 'Companies On Hold By HR',
+          icon: AlertCircle,
+          desc: 'Drives on hold from corporate employer / HR side',
+          companies: weeklyCompanies.on_hold_by_hr,
+          badgeColor: 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700',
         },
       ];
     }
@@ -1672,18 +1721,6 @@ export function ReportBuilderWizard({
       {/* ── Navigation Tabs (Weekly Report, Month-End Report, Pending Tasks, Active Leads, Daily Positives, Daily JD Received) ────────────────── */}
       <div className="flex justify-center pt-2 pb-2">
         <div className="w-full max-w-6xl">
-        <div className="flex justify-end mb-1.5">
-        <button
-          type="button"
-          onClick={handleFullReset}
-          title="Start fresh — clear all selections and input fields"
-          aria-label="Start fresh — clear all selections and input fields"
-          className="relative z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-fg-subtle hover:text-fg hover:bg-surface-sunken border border-transparent hover:border-border transition-colors cursor-pointer"
-        >
-          <RotateCcw size={13} aria-hidden />
-          Reset
-        </button>
-        </div>
         <div className="w-full bg-surface border border-border p-1.5 rounded-2xl shadow-xs grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-1.5">
           <button
             type="button"
@@ -1775,7 +1812,7 @@ export function ReportBuilderWizard({
             {templateType === 'active_leads' ? (
               <Sparkles size={16} className="text-primary shrink-0" />
             ) : templateType === 'month_end' ? (
-              <Award size={16} className="text-indigo-600 shrink-0" />
+              <Award size={16} className="text-primary shrink-0" />
             ) : templateType === 'daily_positives' ? (
               <Zap size={16} className="text-emerald-600 shrink-0" />
             ) : templateType === 'daily_jd_received' ? (
@@ -2738,20 +2775,14 @@ export function ReportBuilderWizard({
             {/* Target Colleges Checklist for Month-End Calling Activity & Report */}
             <div className="space-y-3 pt-2">
               <div className="flex items-center justify-between border-b border-border/80 pb-2 flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <Building2 size={16} className="text-indigo-600 shrink-0" />
-                  <div>
-                    <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
-                      Focus College Call Activity
-                    </h2>
-                    <p className="text-[11px] text-fg-subtle mt-0.5">
-                      Select which of your handled institutions should appear in the Month-End Calling Activity Summary and report totals. Unticked colleges will be omitted.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">
-                  <span>{monthEndSelectedCollegeIds.length} of {colleges.length} Selected</span>
+                <div className="flex items-center gap-2.5">
+                  <Building2 size={16} className="text-primary shrink-0" />
+                  <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
+                    Focus College Call Activity
+                  </h2>
+                  <span className="font-mono text-xs font-bold text-primary px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20">
+                    {monthEndSelectedCollegeIds.length} of {colleges.length} Selected
+                  </span>
                 </div>
               </div>
 
@@ -2765,7 +2796,7 @@ export function ReportBuilderWizard({
                         setMonthEndSelectedCollegeIds(colleges.map((c: any) => c._id));
                         setValidationErrors([]);
                       }}
-                      className="px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 text-xs font-semibold hover:bg-indigo-500/20 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                      className="px-2.5 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-semibold hover:bg-primary/20 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
                     >
                       Select All ({colleges.length})
                     </button>
@@ -2779,38 +2810,17 @@ export function ReportBuilderWizard({
                   </div>
 
                   <span className="text-[11px] text-fg-subtle italic">
-                    Tick marks determine colleges shown in Month-End Calling Summary
+                    Tick marks determine colleges included in Month-End Report
                   </span>
-                </div>
-
-                {/* Search filter inside Month-End college selector */}
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={monthEndCollegeSearch}
-                    onChange={(e) => setMonthEndCollegeSearch(e.target.value)}
-                    placeholder="Search college by acronym, code or name…"
-                    className="w-full pl-8 pr-3 py-1.5 bg-surface border border-border rounded-lg text-xs text-fg outline-none focus:border-indigo-500 placeholder:text-fg-disabled"
-                  />
-                  <Search size={13} className="absolute left-2.5 top-2.5 text-fg-disabled pointer-events-none" />
-                  {monthEndCollegeSearch && (
-                    <button
-                      type="button"
-                      onClick={() => setMonthEndCollegeSearch('')}
-                      className="absolute right-2.5 top-2 text-fg-subtle hover:text-fg cursor-pointer p-0.5"
-                    >
-                      <X size={12} />
-                    </button>
-                  )}
                 </div>
 
                 {/* Compact Checkbox Grid for College Acronyms */}
                 <div className="max-h-44 overflow-y-auto pr-1 border border-border rounded-lg bg-surface p-2 [scrollbar-width:thin]">
-                  {filteredMonthEndColleges.length === 0 ? (
-                    <p className="text-center py-3 text-xs text-fg-disabled italic">No institutions match search</p>
+                  {prioritizedColleges.length === 0 ? (
+                    <p className="text-center py-3 text-xs text-fg-disabled italic">No institutions available</p>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5">
-                      {filteredMonthEndColleges.map((c: any) => {
+                      {prioritizedColleges.map((c: any) => {
                         const isSelected = monthEndSelectedCollegeIds.includes(c._id);
                         const acronym = c.college_code || c.college_name;
 
@@ -2820,8 +2830,8 @@ export function ReportBuilderWizard({
                             title={`${c.college_name} (${acronym})`}
                             className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer transition-all select-none ${
                               isSelected
-                                ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs'
-                                : 'bg-surface border-border/80 text-fg-muted hover:border-indigo-300 hover:text-fg opacity-80'
+                                ? 'bg-primary/10 border-primary/40 text-primary font-bold shadow-2xs'
+                                : 'bg-surface border-border/80 text-fg-muted hover:border-primary/40 hover:text-fg opacity-80'
                             }`}
                           >
                             <input
@@ -2833,7 +2843,7 @@ export function ReportBuilderWizard({
                                   isSelected ? prev.filter((id) => id !== c._id) : [...prev, c._id]
                                 );
                               }}
-                              className="w-3.5 h-3.5 rounded border-border text-indigo-600 focus:ring-indigo-500 accent-indigo-600 cursor-pointer shrink-0"
+                              className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary accent-primary cursor-pointer shrink-0"
                             />
                             <span className="font-mono font-bold text-[11px] tracking-wide truncate">
                               {acronym}
@@ -2878,7 +2888,7 @@ export function ReportBuilderWizard({
                   </span>
                 )}
                 {templateType === 'month_end' && (
-                  <span className="flex items-center gap-1.5 text-[11px] text-indigo-600 dark:text-indigo-400 font-bold">
+                  <span className="flex items-center gap-1.5 text-[11px] text-primary font-bold">
                     <Award size={12} /> Individual Coordinator Month-End Summary
                   </span>
                 )}
@@ -2967,28 +2977,25 @@ export function ReportBuilderWizard({
                         <div className="text-micro">
                           <span className="font-semibold text-fg-subtle">Select KPI metric cards to include in report:</span>
                         </div>
-                        <div className={sec.kpiList.length <= 2 ? 'grid grid-cols-1 sm:grid-cols-2 gap-2.5' : 'grid grid-cols-2 sm:grid-cols-4 gap-2'}>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           {sec.kpiList.map((kpi: any) => {
                             const isKpiActive = kpiCards[kpi.key] !== false;
                             return (
                               <label
                                 key={kpi.key}
-                                className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-xs font-semibold cursor-pointer transition-all ${
+                                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border text-xs cursor-pointer transition-all ${
                                   isKpiActive
                                     ? 'bg-primary/10 border-primary/40 text-primary shadow-2xs font-bold ring-1 ring-primary/20'
-                                    : 'bg-surface border-border text-fg-subtle hover:text-fg'
+                                    : 'bg-surface border-border text-fg-subtle hover:text-fg font-medium'
                                 }`}
                               >
                                 <input
                                   type="checkbox"
                                   checked={isKpiActive}
                                   onChange={(e) => setKpiCards({ ...kpiCards, [kpi.key]: e.target.checked })}
-                                  className="rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary shrink-0"
+                                  className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary shrink-0"
                                 />
-                                <div className="flex flex-col min-w-0">
-                                  <span className="truncate leading-tight">{kpi.label}</span>
-                                  <span className="text-[10px] text-fg-subtle font-normal truncate mt-0.5">{kpi.desc}</span>
-                                </div>
+                                <span className="truncate leading-tight text-xs">{kpi.label}</span>
                               </label>
                             );
                           })}

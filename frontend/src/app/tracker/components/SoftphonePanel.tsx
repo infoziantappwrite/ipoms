@@ -31,6 +31,7 @@ const OUTCOMES: { value: CallOutcome; label: string }[] = [
   { value: 'in_connect', label: 'In Connect' },
   { value: 'invalid', label: 'Invalid' },
   { value: 'drive_completed', label: 'Drive Completed' },
+  { value: 'new_poc', label: 'New POC' },
 ];
 
 const MONTHS = [

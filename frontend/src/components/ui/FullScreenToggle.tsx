@@ -47,10 +47,10 @@ export function FullScreenToggle({ className = '', variant = 'icon', useGradient
       onClick={handleToggle}
       title={isFullscreen ? 'Exit Full Screen (F11 / Esc)' : 'Enter Full Screen Mode (F11)'}
       aria-label={isFullscreen ? 'Exit Full Screen Mode' : 'Enter Full Screen Mode'}
-      style={useGradient ? { background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' } : undefined}
+      style={useGradient ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
       className={`group flex items-center justify-center transition-all duration-200 active:scale-[0.992] cursor-pointer shadow-xs select-none rounded-lg ${
         useGradient
-          ? 'text-white border-none shadow-sky-500/25 hover:brightness-110 active:scale-95'
+          ? 'text-white border-none shadow-blue-500/25 hover:brightness-110 active:scale-95'
           : 'bg-surface hover:bg-surface-raised border border-border text-fg-subtle hover:text-fg shadow-2xs'
       } ${className || 'w-9 h-9'}`}
     >
