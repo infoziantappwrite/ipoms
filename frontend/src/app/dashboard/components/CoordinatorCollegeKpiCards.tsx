@@ -282,8 +282,8 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
         :global(.ipoms-hm-cell) {
           display: block;
           width: 100%;
-          height: 24px;
-          border-radius: 4px;
+          height: 20px;
+          border-radius: 3.5px;
           padding: 0;
           border: 0;
           cursor: pointer;
@@ -291,8 +291,8 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
           transition: transform 0.12s ease;
         }
         :global(.ipoms-hm-key) {
-          width: 12px;
-          height: 12px;
+          width: 11px;
+          height: 11px;
           border-radius: 3px;
           cursor: default;
         }
@@ -309,13 +309,13 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
           z-index: 1;
         }
         :global(.ipoms-hm-hot) {
-          transform: scale(1.08);
-          box-shadow: 0 0 0 1.5px rgb(var(--surface)), 0 0 0 2.5px rgb(var(--primary));
+          transform: scale(1.05);
+          box-shadow: 0 0 0 1.5px rgb(var(--surface)), 0 0 0 2px rgb(var(--primary));
           z-index: 10;
         }
         :global(.ipoms-hm-col-sel) {
           background: rgb(var(--primary) / 0.08);
-          border-radius: 6px;
+          border-radius: 5px;
         }
         @media (prefers-reduced-motion: reduce) {
           :global(.ipoms-hm-cell) {
@@ -427,8 +427,8 @@ function MonthChart({
     setScope((cur) => (cur === d ? 'month' : d));
   };
 
-  // Campus acronym column (auto-fit min 82px) · days 1..30/31
-  const cols = `minmax(82px, max-content) repeat(${days}, minmax(0, 1fr))`;
+  // Campus acronym column (auto-fit min 76px) · days 1..30/31
+  const cols = `minmax(76px, max-content) repeat(${days}, minmax(0, 1fr))`;
 
   return (
     <div className="mt-5">
@@ -456,11 +456,11 @@ function MonthChart({
         </div>
       </div>
 
-      <div className="overflow-x-auto pb-1">
+      <div className="overflow-x-auto pb-2 pr-2">
         <div
           role="grid"
           aria-label="Calls and duration logged per day, per campus"
-          className="min-w-[720px] grid gap-x-[6px] gap-y-[6px] items-center"
+          className="min-w-[660px] grid gap-x-[3.5px] gap-y-[4.5px] items-center pr-2"
           style={{ gridTemplateColumns: cols }}
           onMouseLeave={() => {
             setHover(null);

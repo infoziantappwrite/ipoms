@@ -297,6 +297,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                     onMouseLeave={() => setHovered(null)}
                     onFocus={(e) => showLabel(e.currentTarget, isLocked ? `${label} (Locked)` : label)}
                     onBlur={() => setHovered(null)}
+                    style={active ? { background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' } : undefined}
                     className={`group relative flex items-center rounded-lg cursor-pointer active:scale-[0.992] ${
                       mounted ? 'transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]' : ''
                     } ${
@@ -307,7 +308,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                       isLocked
                         ? 'text-zinc-400 dark:text-zinc-600 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60'
                         : active
-                        ? 'bg-blue-600 text-white font-semibold shadow-md shadow-blue-500/25'
+                        ? 'text-white font-semibold shadow-md shadow-sky-500/25'
                         : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 font-medium'
                     }`}
                   >
@@ -359,14 +360,17 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                     className="w-[35px] h-[35px] rounded-full object-cover shrink-0 ring-2 ring-zinc-200 dark:ring-zinc-700 shadow-sm group-hover:scale-105 transition-transform"
                   />
                 ) : (
-                  <span className="grid w-[35px] h-[35px] shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-[11px] font-bold tracking-normal leading-none shadow-sm ring-2 ring-white dark:ring-zinc-900 group-hover:scale-105 transition-transform">
+                  <span
+                    style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' }}
+                    className="grid w-[35px] h-[35px] shrink-0 place-items-center rounded-full text-white text-[11px] font-bold tracking-normal leading-none shadow-sm ring-2 ring-white dark:ring-zinc-900 group-hover:scale-105 transition-transform"
+                  >
                     {initialsFor(fullName)}
                   </span>
                 )}
               </Link>
               <div className="flex flex-col items-center gap-1.5">
-                <FullScreenToggle className="w-[35px] h-[35px] rounded-lg" />
-                <ThemeToggle className="w-[35px] h-[35px] rounded-lg" />
+                <FullScreenToggle useGradient className="w-[35px] h-[35px] rounded-lg" />
+                <ThemeToggle useGradient className="w-[35px] h-[35px] rounded-lg" />
               </div>
             </div>
           ) : (
@@ -383,7 +387,10 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                     className="w-8 h-8 rounded-full object-cover shrink-0 ring-2 ring-zinc-200 dark:ring-zinc-700 shadow-sm"
                   />
                 ) : (
-                  <span className="grid w-8 h-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-[11px] font-bold tracking-normal leading-none shadow-xs ring-2 ring-white dark:ring-zinc-900">
+                  <span
+                    style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' }}
+                    className="grid w-8 h-8 shrink-0 place-items-center rounded-full text-white text-[11px] font-bold tracking-normal leading-none shadow-xs ring-2 ring-white dark:ring-zinc-900"
+                  >
                     {initialsFor(fullName)}
                   </span>
                 )}
@@ -397,8 +404,8 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                 </div>
               </Link>
               <div className="flex items-center gap-1 shrink-0">
-                <FullScreenToggle className="w-8 h-8 rounded-lg text-xs" />
-                <ThemeToggle className="w-8 h-8 rounded-lg text-xs" />
+                <FullScreenToggle useGradient className="w-8 h-8 rounded-lg text-xs" />
+                <ThemeToggle useGradient className="w-8 h-8 rounded-lg text-xs" />
               </div>
             </div>
           )}
@@ -576,11 +583,12 @@ function MobileDrawer({
                   <Link
                     href={href}
                     onClick={handleClick}
+                    style={active ? { background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' } : undefined}
                     className={`group flex items-center justify-between px-3 py-2 rounded-xl text-[12.5px] transition-all active:scale-[0.992] ${
                       isLocked
                         ? 'text-zinc-400 dark:text-zinc-600 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60'
                         : active
-                        ? 'bg-blue-600 text-white font-semibold shadow-xs'
+                        ? 'text-white font-semibold shadow-xs'
                         : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100 font-medium'
                     }`}
                   >
@@ -616,7 +624,10 @@ function MobileDrawer({
                 className="w-9 h-9 rounded-full object-cover shrink-0 ring-2 ring-zinc-200 dark:ring-zinc-700 shadow-sm"
               />
             ) : (
-              <span className="grid w-9 h-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-white text-[11px] font-bold tracking-normal leading-none shadow-xs ring-2 ring-white dark:ring-zinc-900">
+              <span 
+                style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' }}
+                className="grid w-9 h-9 shrink-0 place-items-center rounded-full text-white text-[11px] font-bold tracking-normal leading-none shadow-xs ring-2 ring-white dark:ring-zinc-900"
+              >
                 {initialsFor(fullName)}
               </span>
             )}
@@ -624,8 +635,8 @@ function MobileDrawer({
           </Link>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            <FullScreenToggle className="w-9 h-9 rounded-xl text-xs" />
-            <ThemeToggle />
+            <FullScreenToggle useGradient className="w-9 h-9 rounded-xl text-xs" />
+            <ThemeToggle useGradient className="w-9 h-9 rounded-xl text-xs" />
           </div>
         </div>
       </div>

@@ -29,18 +29,18 @@ export interface OutcomeOption {
 
 export const CALL_OUTCOME_OPTIONS: OutcomeOption[] = [
   { value: 'all', label: 'All Call Statuses', dotColor: 'bg-primary' },
+  { value: 'no_response', label: 'No Response', dotColor: 'bg-rose-500', category: 'No Ans' },
+  { value: 'not_hiring', label: 'Not Hiring', dotColor: 'bg-rose-600', category: 'Closed' },
   { value: 'invite_mail', label: 'Invite Mail', dotColor: 'bg-sky-500', category: 'Positive' },
+  { value: 'follow_up', label: 'Follow Up', dotColor: 'bg-orange-500', category: 'Action Req' },
+  { value: 'call_back', label: 'Call Back', dotColor: 'bg-amber-500', category: 'Action Req' },
+  { value: 'invalid', label: 'Invalid', dotColor: 'bg-slate-500', category: 'Invalid' },
   { value: 'jd_received', label: 'JD Received', dotColor: 'bg-blue-500', category: 'JD Received' },
   { value: 'hiring', label: 'Hiring', dotColor: 'bg-emerald-500', category: 'Hiring' },
-  { value: 'drive_completed', label: 'Drive Completed', dotColor: 'bg-emerald-500', category: 'Conducted' },
   { value: 'in_connect', label: 'In Connect', dotColor: 'bg-indigo-500', category: 'Neutral' },
-  { value: 'follow_up', label: 'Follow Up', dotColor: 'bg-amber-500', category: 'Action Req' },
-  { value: 'call_back', label: 'Call Back', dotColor: 'bg-amber-500', category: 'Action Req' },
+  { value: 'drive_completed', label: 'Drive Completed', dotColor: 'bg-emerald-500', category: 'Conducted' },
   { value: 'hiring_completed', label: 'Hiring Completed', dotColor: 'bg-cyan-500', category: 'Completed' },
   { value: 'hiring_freezed', label: 'Hiring Freezed', dotColor: 'bg-purple-500', category: 'Paused' },
-  { value: 'not_hiring', label: 'Not Hiring', dotColor: 'bg-rose-600', category: 'Closed' },
-  { value: 'no_response', label: 'No Response', dotColor: 'bg-rose-500', category: 'No Ans' },
-  { value: 'invalid', label: 'Invalid', dotColor: 'bg-slate-500', category: 'Invalid' },
 ];
 
 interface Props {

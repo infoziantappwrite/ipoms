@@ -10,6 +10,10 @@ import { College } from '../models/College';
  * Provides complete CRUD, bulk deletion, KPI summary, and college-wise isolation
  * for the "Pending Task" register in iPOMS.
  */
+function escapeRegex(str: string): string {
+  return String(str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function registerPendingTaskRoutes(app: Express) {
   // ── PT-1: GET /api/v1/pending-tasks ──────────────────────────────────────────
   // Fetch pending tasks filtered by college_id, optional search, and db_shared_status
@@ -45,7 +49,7 @@ export function registerPendingTaskRoutes(app: Express) {
       }
 
       if (search) {
-        const q = String(search).trim();
+        const q = escapeRegex(String(search).trim());
         filter.$or = [
           { company_name: { $regex: q, $options: 'i' } },
           { current_status: { $regex: q, $options: 'i' } },
@@ -222,7 +226,7 @@ export function registerPendingTaskRoutes(app: Express) {
       let resolvedCompanyId = company_id;
       if (!resolvedCompanyId) {
         const meta = await CompanyMetadata.findOne({
-          company_name: { $regex: `^${company_name.trim()}$`, $options: 'i' },
+          company_name: { $regex: new RegExp(`^${escapeRegex(company_name.trim())}$`, 'i') },
         });
         if (meta) resolvedCompanyId = meta._id;
       }

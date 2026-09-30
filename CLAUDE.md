@@ -2539,8 +2539,19 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     after. `tsc --noEmit` clean both sides, 34/34 backend API tests pass, `verify:policy` unaffected
     (same `/daily-tracker*` wildcard covers every route touched).
 
-## 6. Module map
-## 6. Module map
+89. **Security, regex stability & data integrity fixes, 30 Sep 2026 (full system checkup).**
+    **(a) TPO Login Auto-Activation Bypass removed (`authRoutes.ts`):** logging in with a college code and
+    `Placement@123` previously auto-created or reactivated `account_status: 'active'`, which allowed anyone to
+    bypass an Administrator's TPO access deactivation toggle in Settings. Removed auto-creation and
+    auto-reactivation on login — TPO accounts now strictly authenticate only when an active account already
+    exists in the database (provisioned via `POST /colleges/:id/tpo-access`).
+    **(b) Unescaped regex vulnerabilities resolved (`server.ts`, `pendingTaskRoutes.ts`):**
+    - `POST /api/v1/daily-leads` (`server.ts`) wrapped `company_name` in `escapeRegex()`, preventing 500 crashes on company names with parentheses/brackets, and resolved `company_id` to `null` instead of dangling random ObjectIds when missing from metadata.
+    - `GET /api/v1/metadata` (`server.ts`) phone search escaped `queryStr` on `isPhone` branch, preventing 500 crashes on queries starting with `+` (e.g. `+91`).
+    - `registerPendingTaskRoutes` (`pendingTaskRoutes.ts`) escaped search queries and company lookups.
+    **(c) College Status deactivation CastError fixed (`server.ts`):** `PATCH /api/v1/colleges/:id/status` previously ran `$pull` on `weekly_focus_locked` (a Boolean field), throwing Mongoose `CastError`. Now correctly pulls from `assigned_college_ids`.
+    **(d) Active Leads sync dynamic academic year (`activeLeadRoutes.ts`):** replaced hardcoded `'2027'` fallback with dynamic `await getCurrentAcademicYear()`.
+
 ## 6. Module map
 
 Data flow: `company_metadata → assigned_work → daily_tracker → weekly_tracker → daily_leads → reports/dashboards`

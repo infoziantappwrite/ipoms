@@ -467,7 +467,7 @@ export default function LoginPage() {
 
           <div>
             <label className="block text-slate-700 font-bold mb-1">Password</label>
-            <div className="relative">
+            <div className="relative flex items-center">
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={officerPassword}
@@ -475,26 +475,31 @@ export default function LoginPage() {
                 placeholder="Enter password"
                 autoComplete="current-password"
                 required
-                className={inputClass}
+                className={`${inputClass} pr-11`}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                className="absolute right-2.5 w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-700 cursor-pointer select-none transition-colors"
                 tabIndex={-1}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
-                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                {showPassword ? <Eye size={16} strokeWidth={2} /> : <EyeOff size={16} strokeWidth={2} />}
               </button>
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={officerLoading || !officerCode.trim()}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-xs font-bold text-primary-foreground shadow-xs transition-all hover:bg-primary-hover disabled:opacity-60"
-          >
-            {officerLoading ? 'Signing in…' : (<><LogIn size={15} /> Sign In</>)}
-          </button>
+          <div className="flex justify-center pt-1">
+            <button
+              type="submit"
+              disabled={officerLoading || !officerCode.trim()}
+              style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl px-7 py-2.5 text-xs font-bold text-white shadow-md shadow-sky-500/25 transition-all hover:brightness-110 active:scale-[0.99] disabled:opacity-60 cursor-pointer"
+            >
+              <LogIn size={15} strokeWidth={2.2} />
+              <span>{officerLoading ? 'Signing in…' : 'Sign In'}</span>
+            </button>
+          </div>
         </form>
       </Shell>
     );
@@ -624,12 +629,12 @@ export default function LoginPage() {
                     placeholder="••••••••"
                     autoComplete="current-password"
                     required
-                    className={`${inputClass} pr-10`}
+                    className={`${inputClass} pr-11`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded"
+                    className="absolute right-2.5 w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-700 cursor-pointer select-none transition-colors"
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <Eye size={16} strokeWidth={2} /> : <EyeOff size={16} strokeWidth={2} />}
@@ -647,14 +652,17 @@ export default function LoginPage() {
                 <span>Remember this device for 30 days</span>
               </label>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground rounded-xl font-bold shadow-md transition-all active:scale-[0.99] text-xs cursor-pointer flex items-center justify-center gap-2"
-              >
-                <LogIn size={15} strokeWidth={2.2} />
-                <span>{loading ? 'Authenticating…' : 'Sign In'}</span>
-              </button>
+              <div className="flex justify-center pt-1">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' }}
+                  className="inline-flex items-center justify-center gap-2 px-7 py-2.5 text-white rounded-xl font-bold shadow-md shadow-sky-500/25 transition-all hover:brightness-110 active:scale-[0.99] text-xs cursor-pointer disabled:opacity-60"
+                >
+                  <LogIn size={15} strokeWidth={2.2} />
+                  <span>{loading ? 'Authenticating…' : 'Sign In'}</span>
+                </button>
+              </div>
 
               <div className="pt-3 border-t border-slate-100 text-center">
                 <p className="text-micro text-slate-400 leading-relaxed">
@@ -688,7 +696,8 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground rounded-xl font-bold shadow-md transition-colors text-xs cursor-pointer"
+                style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' }}
+                className="w-full py-3 text-white rounded-xl font-bold shadow-md shadow-sky-500/25 transition-all hover:brightness-110 active:scale-[0.99] text-xs cursor-pointer disabled:opacity-60"
               >
                 {loading ? 'Sending…' : 'Send Verification Code'}
               </button>
@@ -737,10 +746,11 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading || otp.length !== 6}
+                style={!isUnlocked ? { background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' } : undefined}
                 className={`w-full py-3.5 rounded-xl font-bold text-xs transition-all shadow-md flex items-center justify-center gap-2 select-none cursor-pointer ${
                   isUnlocked
                     ? 'bg-emerald-600 text-white scale-[1.02] shadow-emerald-500/25 ring-2 ring-emerald-400'
-                    : 'bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground active:scale-[0.99]'
+                    : 'text-white shadow-sky-500/25 hover:brightness-110 disabled:opacity-50 active:scale-[0.99]'
                 }`}
               >
                 {isUnlocked ? (
@@ -792,12 +802,12 @@ export default function LoginPage() {
                     placeholder="Minimum 9 characters"
                     autoComplete="new-password"
                     required
-                    className={`${inputClass} pr-10`}
+                    className={`${inputClass} pr-11`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded"
+                    className="absolute right-2.5 w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-700 cursor-pointer select-none transition-colors"
                     aria-label={showNewPassword ? 'Hide password' : 'Show password'}
                   >
                     {showNewPassword ? <Eye size={16} strokeWidth={2} /> : <EyeOff size={16} strokeWidth={2} />}
@@ -816,12 +826,12 @@ export default function LoginPage() {
                     placeholder="Repeat new password"
                     autoComplete="new-password"
                     required
-                    className={`${inputClass} pr-10`}
+                    className={`${inputClass} pr-11`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 p-1 text-slate-400 hover:text-slate-700 cursor-pointer select-none flex items-center justify-center rounded"
+                    className="absolute right-2.5 w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-700 cursor-pointer select-none transition-colors"
                     aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                   >
                     {showConfirmPassword ? <Eye size={16} strokeWidth={2} /> : <EyeOff size={16} strokeWidth={2} />}
@@ -837,7 +847,8 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading || !newPassword || newPassword !== confirmPassword || !isPasswordValid(newPassword)}
-                className="w-full py-3.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground rounded-xl font-bold shadow-md transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-[0.99]"
+                style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' }}
+                className="w-full py-3.5 text-white rounded-xl font-bold shadow-md shadow-sky-500/25 transition-all hover:brightness-110 active:scale-[0.99] flex items-center justify-center gap-2 text-xs cursor-pointer disabled:opacity-50"
               >
                 <KeyRound size={16} strokeWidth={2} />
                 <span>{loading ? 'Saving & Authenticating…' : 'Save & Sign In'}</span>

@@ -417,6 +417,10 @@ export function AnimatedTrashIcon({ size = 16, className = '', strokeWidth = 2 }
  * 10. Animated Theme Toggle Icon (Sun / Moon morphing)
  */
 export function AnimatedThemeIcon({ isDark = false, size = 16, className = '' }: { isDark?: boolean; size?: number; className?: string }) {
+  const isCustomColor = className.includes('text-');
+  const defaultColor = isDark ? 'text-amber-400' : 'text-amber-500';
+  const colorClass = isCustomColor ? '' : defaultColor;
+
   return (
     <svg
       width={size}
@@ -427,13 +431,13 @@ export function AnimatedThemeIcon({ isDark = false, size = 16, className = '' }:
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={`transition-all duration-300 ${isDark ? 'text-amber-400 -rotate-12' : 'text-amber-500 rotate-0'} group-hover:scale-110 ${className}`}
+      className={`transition-all duration-300 ${isDark ? '-rotate-12' : 'rotate-0'} ${colorClass} group-hover:scale-110 ${className}`}
     >
       {isDark ? (
-        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" className="fill-amber-400/20" />
+        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" className="fill-current/20" />
       ) : (
         <>
-          <circle cx="12" cy="12" r="4" className="fill-amber-500/20" />
+          <circle cx="12" cy="12" r="4" className="fill-current/20" />
           <path d="M12 2v2" />
           <path d="M12 20v2" />
           <path d="m4.93 4.93 1.41 1.41" />

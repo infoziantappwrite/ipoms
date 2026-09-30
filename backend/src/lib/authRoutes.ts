@@ -228,38 +228,6 @@ export function registerAuthRoutes(app: Express) {
           ],
           is_deleted: false,
         });
-
-        // TPO on-demand auto-activation & reconciliation:
-        if (!user) {
-          const matchingCollege = await College.findOne({
-            college_code: { $regex: new RegExp(`^${rawUsername}$`, 'i') },
-            is_deleted: { $ne: true },
-          });
-          if (matchingCollege) {
-            const tpoRole = await Role.findOne({ role_code: 'TPO' });
-            const salt = await bcrypt.genSalt(12);
-            const password_hash = await bcrypt.hash('Placement@123', salt);
-            user = await User.create({
-              full_name: `${matchingCollege.college_name} — Placement Officer`,
-              username: rawUsername,
-              official_email: `${rawUsername}.tpo@ipoms.internal`,
-              password_hash,
-              role_codes: ['TPO'],
-              role_ids: tpoRole ? [tpoRole._id] : [],
-              assigned_college_ids: [matchingCollege._id],
-              account_status: 'active',
-              presence_status: 'available',
-              is_deleted: false,
-            });
-          }
-        } else if (user.role_codes?.includes('TPO')) {
-          if (user.account_status !== 'active') {
-            user.account_status = 'active';
-            user.failed_login_attempts = 0;
-            user.is_password_locked = false;
-            await user.save();
-          }
-        }
       }
 
       if (!user) {
