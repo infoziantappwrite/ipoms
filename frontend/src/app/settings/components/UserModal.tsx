@@ -8,11 +8,12 @@ import { isPasswordValid, firstPasswordError } from '@/lib/passwordPolicy';
 
 interface Props {
   initialData?: any | null;
+  defaultRole?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function UserModal({ initialData, onClose, onSuccess }: Props) {
+export function UserModal({ initialData, defaultRole, onClose, onSuccess }: Props) {
   const isEditing = !!initialData?._id;
 
   const [colleges, setColleges] = useState<any[]>([]);
@@ -33,7 +34,9 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
     initialData?.date_of_joining ? new Date(initialData.date_of_joining).toISOString().split('T')[0] : ''
   );
   const [isProfileLocked, setIsProfileLocked] = useState<boolean>(Boolean(initialData?.is_profile_locked));
-  const [selectedRole, setSelectedRole] = useState(initialData?.role_codes?.[0] || 'PLACEMENT_COORDINATOR');
+  const [selectedRole, setSelectedRole] = useState(
+    initialData?.role_codes?.[0] || defaultRole || 'PLACEMENT_COORDINATOR'
+  );
   const [selectedColleges, setSelectedColleges] = useState<string[]>(
     initialData?.assigned_college_ids?.map((c: any) => (typeof c === 'object' ? c._id : c)) || []
   );
@@ -231,6 +234,7 @@ export function UserModal({ initialData, onClose, onSuccess }: Props) {
                     { value: 'PLACEMENT_COORDINATOR', label: 'Placement Coordinator' },
                     { value: 'TEAM_LEADER', label: 'Team Leader' },
                     { value: 'ADMINISTRATOR', label: 'Administrator (CEO / Director)' },
+                    { value: 'TPO', label: 'College Placement Officer (TPO)' },
                   ]}
                 />
               </div>

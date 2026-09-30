@@ -61,6 +61,7 @@ export function AddCompanyModal({
   const [pipelineSection, setPipelineSection] = useState(initialDraft?.pipelineSection || 'pipeline');
   const [offersReceived, setOffersReceived] = useState<string>(initialDraft?.offersReceived !== undefined ? String(initialDraft.offersReceived) : '0');
   const [followUpDate, setFollowUpDate] = useState(initialDraft?.followUpDate || '');
+  const [driveDate, setDriveDate] = useState(initialDraft?.driveDate || '');
   const [currentStatusText, setCurrentStatusText] = useState(initialDraft?.currentStatusText || 'Drive confirmed and scheduled');
   const [loading, setLoading] = useState(false);
   const [showForeignWarning, setShowForeignWarning] = useState(false);
@@ -106,6 +107,7 @@ export function AddCompanyModal({
         pipelineSection,
         offersReceived,
         followUpDate,
+        driveDate,
         currentStatusText: currentStatusText.trim(),
         collegeId,
         timestamp: Date.now(),
@@ -249,6 +251,7 @@ export function AddCompanyModal({
           pipeline_section: pipelineSection,
           current_status_text: currentStatusText.trim(),
           follow_up_date: followUpDate || undefined,
+          drive_date: driveDate || undefined,
           selected_count: finalOffersCount,
           offers_received: finalOffersCount,
         }),
@@ -678,6 +681,22 @@ export function AddCompanyModal({
                     const d = String(now.getDate()).padStart(2, '0');
                     return `${y}-${m}-${d}`;
                   })()}
+                  variant="input"
+                  fullWidth
+                  usePortal
+                  clearable
+                  placeholder="dd-mm-yyyy"
+                />
+              </div>
+            )}
+
+            {/* Scheduled Drive Date */}
+            {(pipelineSection === 'in_drive' || pipelineSection === 'upcoming_drives' || pipelineSection === 'companies_in_drive' || pipelineSection === 'drive_in_progress') && (
+              <div>
+                <SmoothDatePicker
+                  label="Scheduled Drive Date"
+                  value={driveDate}
+                  onChange={setDriveDate}
                   variant="input"
                   fullWidth
                   usePortal

@@ -6,7 +6,8 @@ import type { TrackerRow as TrackerRowType, CallOutcome } from '../page';
 import { triggerHaptic } from '@/lib/haptics';
 import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
 import { RowOutcomeDropdown } from './RowOutcomeDropdown';
-import { RowMonthDropdown } from './RowMonthDropdown';
+import { getDynamicFollowUpMonths, formatFollowUpMonthDisplay } from './RowMonthDropdown';
+import { RowFollowUpDateDropdown, formatFollowUpDateDisplay } from './RowFollowUpDateDropdown';
 import {
   smartParseTime,
   formatTime,
@@ -23,14 +24,14 @@ import {
 
 export const OUTCOMES: { value: CallOutcome; label: string; color: string }[] = [
   { value: 'jd_received', label: 'JD Received', color: 'text-primary' },
-  { value: 'hiring_freezed', label: 'Hiring Freezed', color: 'text-warning' },
-  { value: 'hiring_completed', label: 'Hiring Completed', color: 'text-info' },
-  { value: 'call_back', label: 'Call Back', color: 'text-warning' },
+  { value: 'hiring_freezed', label: 'Hiring Freezed', color: 'text-purple-600 dark:text-purple-400 font-semibold' },
+  { value: 'hiring_completed', label: 'Hiring Completed', color: 'text-cyan-600 dark:text-cyan-400 font-semibold' },
+  { value: 'call_back', label: 'Call Back', color: 'text-amber-600 dark:text-amber-400 font-medium' },
   { value: 'hiring', label: 'Hiring', color: 'text-success' },
   { value: 'invite_mail', label: 'Invite Mail', color: 'text-primary' },
-  { value: 'not_hiring', label: 'Not Hiring', color: 'text-destructive font-semibold' },
-  { value: 'no_response', label: 'No Response', color: 'text-destructive' },
-  { value: 'follow_up', label: 'Follow Up', color: 'text-warning font-semibold' },
+  { value: 'not_hiring', label: 'Not Hiring', color: 'text-rose-700 dark:text-rose-400 font-bold' },
+  { value: 'no_response', label: 'No Response', color: 'text-rose-600 dark:text-rose-400 font-medium' },
+  { value: 'follow_up', label: 'Follow Up', color: 'text-orange-600 dark:text-orange-400 font-semibold' },
   { value: 'in_connect', label: 'In Connect', color: 'text-primary' },
   { value: 'invalid', label: 'Invalid', color: 'text-fg-subtle' },
   { value: 'drive_completed', label: 'Drive Completed', color: 'text-success' },
@@ -41,6 +42,8 @@ export const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
+export { getDynamicFollowUpMonths, formatFollowUpMonthDisplay, formatFollowUpDateDisplay };
+
 /**
  * Solid, 100% opaque row backgrounds per outcome.
  * CRITICAL: Must be fully opaque so sticky frozen columns completely block scrolling data underneath.
@@ -48,14 +51,14 @@ export const MONTHS = [
 const OUTCOME_ROW_COLORS: Record<CallOutcome | 'none', string> = {
   none: 'bg-white dark:bg-[#161D2E]',
   jd_received: 'bg-[#EFF6FF] dark:bg-[#1E293B]',
-  hiring_freezed: 'bg-[#FFFBEB] dark:bg-[#292218]',
-  hiring_completed: 'bg-[#F0F9FF] dark:bg-[#162B3D]',
+  hiring_freezed: 'bg-[#F3E8FF] dark:bg-[#25143A]', // Light lilac / soft lavender for Hiring Freezed
+  hiring_completed: 'bg-[#E0F2FE] dark:bg-[#0E2F4A]', // Matching cyan/sky-blue shade for Hiring Completed
   call_back: 'bg-[#FFFBEB] dark:bg-[#292218]',
   hiring: 'bg-[#ECFDF5] dark:bg-[#132E27]',
   invite_mail: 'bg-[#EFF6FF] dark:bg-[#1E293B]',
-  not_hiring: 'bg-[#F1F5F9] dark:bg-[#1E293B]',
-  no_response: 'bg-[#FEF2F2] dark:bg-[#2E1818]',
-  follow_up: 'bg-[#EEF2FF] dark:bg-[#1E2238]',
+  not_hiring: 'bg-white dark:bg-[#161D2E]', // White row background for Not Hiring (text is red with mild bold)
+  no_response: 'bg-[#FEF2F2] dark:bg-[#2E1818]', // Pale light red for No Response
+  follow_up: 'bg-[#FFF4E6] dark:bg-[#2D1B10]', // Warm orange shade for Follow Up (distinct from yellow Call Back)
   in_connect: 'bg-[#EFF6FF] dark:bg-[#1E293B]',
   invalid: 'bg-[#F1F5F9] dark:bg-[#1E293B]',
   drive_completed: 'bg-[#ECFDF5] dark:bg-[#132E27]',
@@ -105,6 +108,7 @@ export function TrackerRow({
   onCellMouseEnter,
 }: Props) {
   const isEffectivelyReadOnly = isReadOnly || isAdvanceLocked;
+  const isNotHiring = row.outcome_status === 'not_hiring';
   const startTimeRef = useRef<HTMLInputElement>(null);
   const prevStartTimeRef = useRef<string>(formatTime(row.call_start_time));
   const companyNameRef = useRef<HTMLInputElement>(null);
@@ -387,6 +391,7 @@ export function TrackerRow({
         duration_formatted: durFmt,
         outcome_status: outcome,
         follow_up_month: null,
+        follow_up_date: null,
       });
     } else {
       onUpdate({
@@ -399,10 +404,10 @@ export function TrackerRow({
     }
   }, [onUpdate, row.call_start_time, row.duration_seconds, row.duration_formatted]);
 
-  // ── Follow Up Month selection (Only enabled when outcome === follow_up)
-  const handleMonthChange = useCallback((month: string) => {
+  // ── Follow Up Date selection (Only enabled when outcome === follow_up)
+  const handleFollowUpDateChange = useCallback((dateIso: string) => {
     triggerHaptic('selection');
-    onUpdate({ follow_up_month: month || null });
+    onUpdate({ follow_up_date: dateIso || null });
   }, [onUpdate]);
 
   // ── Comments save on blur & Enter press (max 200 chars)
@@ -434,8 +439,8 @@ export function TrackerRow({
   }, [onUpdate, row.comments]);
 
   const gridTemplate = isReadOnly
-    ? 'grid-cols-[56px_100px_90px_90px_260px_200px_240px_270px_150px_180px_150px_minmax(260px,1fr)]'
-    : 'grid-cols-[56px_100px_90px_90px_260px_200px_240px_270px_180px_150px_minmax(260px,1fr)]';
+    ? 'grid-cols-[56px_100px_90px_90px_260px_200px_240px_270px_150px_180px_190px_minmax(260px,1fr)]'
+    : 'grid-cols-[56px_100px_90px_90px_260px_200px_240px_270px_180px_190px_minmax(260px,1fr)]';
 
   return (
     <div
@@ -501,7 +506,7 @@ export function TrackerRow({
             <Check size={11} strokeWidth={2.5} className="opacity-0 group-hover:opacity-40 hover:!opacity-100 text-primary" />
           </button>
         )}
-        <span className="text-fg-subtle tabular-nums font-medium text-[11px] my-auto">
+        <span className={`tabular-nums text-[11px] my-auto ${isNotHiring ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-fg-subtle font-medium'}`}>
           {index ?? row.serial_no}
         </span>
       </div>
@@ -515,9 +520,9 @@ export function TrackerRow({
         {isEffectivelyReadOnly ? (
           <div
             title={isAdvanceLocked ? "Calling operations & time logging will unlock automatically at 12:00 AM midnight" : "Read-only call record"}
-            className="flex items-center gap-1 text-fg-muted text-xs tabular-nums px-1 my-auto italic select-none"
+            className={`flex items-center gap-1 text-xs tabular-nums px-1 my-auto italic select-none ${isNotHiring ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-fg-muted'}`}
           >
-            <Clock size={11} className="opacity-40 shrink-0" />
+            <Clock size={11} className={`opacity-40 shrink-0 ${isNotHiring ? 'text-red-600 dark:text-red-400' : ''}`} />
             <span>{formatTime(row.call_start_time) || (isAdvanceLocked ? 'Locked' : '—')}</span>
           </div>
         ) : !row.call_start_time ? (
@@ -543,7 +548,7 @@ export function TrackerRow({
               onKeyDown={(e) => { handleStartTimeKeyDown(e); handleKeyDownEnter(e); }}
               onBlur={handleStartTimeBlur}
               title="Start time set • Click to edit or click clock icon to re-stamp current time"
-              className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1 py-0.5 rounded text-fg font-medium transition-colors cursor-text text-xs tabular-nums outline-none min-w-0"
+              className={`w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1 py-0.5 rounded transition-colors cursor-text text-xs tabular-nums outline-none min-w-0 ${isNotHiring ? '!text-red-600 dark:!text-red-400 font-semibold' : 'text-fg font-medium'}`}
             />
             <button
               type="button"
@@ -559,28 +564,28 @@ export function TrackerRow({
 
       {/* End Time (Frozen Col 3 - Auto Display) */}
       <div
-        className={`sticky left-[156px] z-10 ${rowBg} px-2.5 py-1.5 self-stretch text-fg-subtle tabular-nums text-xs flex items-center whitespace-nowrap transition-colors ${getCellSelectionClass('end_time')}`}
+        className={`sticky left-[156px] z-10 ${rowBg} px-2.5 py-1.5 self-stretch tabular-nums text-xs flex items-center whitespace-nowrap transition-colors ${getCellSelectionClass('end_time')} ${isNotHiring ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-fg-subtle'}`}
         onMouseDown={(e) => { if (!isEffectivelyReadOnly && e.button === 0) onCellMouseDown?.('end_time', e); }}
         onMouseEnter={() => { if (!isEffectivelyReadOnly) onCellMouseEnter?.('end_time'); }}
         title={formatTime(row.call_end_time) || 'Auto-captured on status selection'}
       >
         <span className="my-auto">
           {formatTime(row.call_end_time) || (
-            <span className="text-fg-muted italic">auto</span>
+            <span className={isNotHiring ? 'text-red-600/70 dark:text-red-400/70 italic' : 'text-fg-muted italic'}>auto</span>
           )}
         </span>
       </div>
 
       {/* Duration (Frozen Col 4 - Auto Display) */}
       <div
-        className={`sticky left-[246px] z-10 ${rowBg} px-2.5 py-1.5 self-stretch text-fg-subtle tabular-nums text-xs flex items-center whitespace-nowrap transition-colors ${getCellSelectionClass('duration')}`}
+        className={`sticky left-[246px] z-10 ${rowBg} px-2.5 py-1.5 self-stretch tabular-nums text-xs flex items-center whitespace-nowrap transition-colors ${getCellSelectionClass('duration')} ${isNotHiring ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-fg-subtle'}`}
         onMouseDown={(e) => { if (!isEffectivelyReadOnly && e.button === 0) onCellMouseDown?.('duration', e); }}
         onMouseEnter={() => { if (!isEffectivelyReadOnly) onCellMouseEnter?.('duration'); }}
         title={row.duration_formatted || 'Auto-calculated on status selection'}
       >
         <span className="my-auto">
           {row.duration_formatted || (
-            <span className="text-fg-muted">—</span>
+            <span className={isNotHiring ? 'text-red-600/70 dark:text-red-400/70' : 'text-fg-muted'}>—</span>
           )}
         </span>
       </div>
@@ -594,7 +599,7 @@ export function TrackerRow({
       >
         {isEffectivelyReadOnly ? (
           <div className="flex items-center justify-between w-full min-w-0 gap-1.5 my-auto">
-            <span className="text-fg font-semibold break-words leading-snug select-text truncate">{row.company_name}</span>
+            <span className={`break-words leading-snug select-text truncate ${isNotHiring ? 'text-red-600 dark:text-red-400 font-bold' : 'text-fg font-semibold'}`}>{row.company_name}</span>
             {onCopySingle && isReadOnly && (
               <button
                 type="button"
@@ -625,7 +630,7 @@ export function TrackerRow({
             }}
             onBlur={handleCompanyNameBlur}
             title="Click to edit Company Name"
-            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg font-semibold transition-colors cursor-text text-xs outline-none my-auto"
+            className={`w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded transition-colors cursor-text text-xs outline-none my-auto ${isNotHiring ? '!text-red-600 dark:!text-red-400 font-bold' : 'text-fg font-semibold'}`}
           />
         )}
         {row.original_college_code && (
@@ -646,8 +651,8 @@ export function TrackerRow({
         title={row.hr_name || ''}
       >
         {isEffectivelyReadOnly ? (
-          <span className="text-fg font-medium text-xs leading-snug break-words select-text my-auto">
-            {row.hr_name || <span className="text-fg-muted italic">—</span>}
+          <span className={`text-xs leading-snug break-words select-text my-auto ${isNotHiring ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-fg font-medium'}`}>
+            {row.hr_name || <span className={isNotHiring ? 'text-red-600/70 dark:text-red-400/70 italic' : 'text-fg-muted italic'}>—</span>}
           </span>
         ) : (
           <input
@@ -664,14 +669,14 @@ export function TrackerRow({
             }}
             onBlur={handleHrNameBlur}
             title="Click to edit HR Contact Name"
-            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg font-medium transition-colors cursor-text text-xs outline-none placeholder:text-fg-disabled min-w-0 my-auto"
+            className={`w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded transition-colors cursor-text text-xs outline-none placeholder:text-fg-disabled min-w-0 my-auto ${isNotHiring ? '!text-red-600 dark:!text-red-400 font-semibold' : 'text-fg font-medium'}`}
           />
         )}
       </div>
 
       {/* Contact (Call / WhatsApp + Editable Mobile) */}
       <div
-        className={`px-2 py-1.5 text-fg font-mono tabular-nums text-xs self-stretch flex items-center gap-1.5 group/contact min-w-0 ${getCellSelectionClass('mobile_number')}`}
+        className={`px-2 py-1.5 font-mono tabular-nums text-xs self-stretch flex items-center gap-1.5 group/contact min-w-0 ${getCellSelectionClass('mobile_number')} ${isNotHiring ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-fg'}`}
         onMouseDown={(e) => { if (!isEffectivelyReadOnly && e.button === 0) onCellMouseDown?.('mobile_number', e); }}
         onMouseEnter={() => { if (!isEffectivelyReadOnly) onCellMouseEnter?.('mobile_number'); }}
       >
@@ -720,12 +725,12 @@ export function TrackerRow({
                 .map((s) => s.trim())
                 .filter(Boolean);
               if (numbers.length === 0) {
-                return <span className="text-fg-muted italic">—</span>;
+                return <span className={isNotHiring ? 'text-red-600/70 dark:text-red-400/70 italic' : 'text-fg-muted italic'}>—</span>;
               }
               return numbers.map((num, nIdx) => (
                 <span
                   key={nIdx}
-                  className="text-fg-subtle select-all hover:text-fg transition-colors"
+                  className={`select-all hover:text-fg transition-colors ${isNotHiring ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-fg-subtle'}`}
                   title={num}
                 >
                   {num}
@@ -748,7 +753,7 @@ export function TrackerRow({
             }}
             onBlur={handleMobileBlur}
             title="Click to edit Mobile Number"
-            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg font-mono font-medium transition-colors cursor-text text-xs outline-none placeholder:text-fg-disabled min-w-0 my-auto"
+            className={`w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded font-mono font-medium transition-colors cursor-text text-xs outline-none placeholder:text-fg-disabled min-w-0 my-auto ${isNotHiring ? '!text-red-600 dark:!text-red-400 font-semibold' : 'text-fg'}`}
           />
         )}
       </div>
@@ -768,12 +773,12 @@ export function TrackerRow({
                 .map((s) => s.trim().toLowerCase())
                 .filter(Boolean);
               if (emails.length === 0) {
-                return <span className="text-fg-muted italic">—</span>;
+                return <span className={isNotHiring ? 'text-red-600/70 dark:text-red-400/70 italic' : 'text-fg-muted italic'}>—</span>;
               }
               return emails.map((em, eIdx) => (
                 <span
                   key={eIdx}
-                  className="text-fg-subtle select-all hover:text-fg transition-colors break-all text-[11.5px]"
+                  className={`select-all hover:text-fg transition-colors break-all text-[11.5px] ${isNotHiring ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-fg-subtle'}`}
                   title={em}
                 >
                   {em}
@@ -796,7 +801,7 @@ export function TrackerRow({
             }}
             onBlur={handleEmailBlur}
             title="Click to edit Email Address"
-            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded text-fg transition-colors cursor-text text-xs outline-none placeholder:text-fg-disabled min-w-0 my-auto"
+            className={`w-full bg-transparent border border-transparent hover:border-border-strong focus:border-primary focus:bg-surface px-1.5 py-1 rounded transition-colors cursor-text text-xs outline-none placeholder:text-fg-disabled min-w-0 my-auto ${isNotHiring ? '!text-red-600 dark:!text-red-400 font-semibold' : 'text-fg'}`}
           />
         )}
       </div>
@@ -814,7 +819,7 @@ export function TrackerRow({
               {row.college_code}
             </span>
           )}
-          <span className="text-fg-subtle select-text truncate max-w-[130px] my-auto">
+          <span className={`select-text truncate max-w-[130px] my-auto ${isNotHiring ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-fg-subtle'}`}>
             {(() => {
               const code = (row.college_code || '').toUpperCase();
               if (['ACET', 'AIHT', 'KARPAGAM', 'KPR'].includes(code)) {
@@ -848,22 +853,24 @@ export function TrackerRow({
         )}
       </div>
 
-      {/* Follow Up (Month Dropdown directly in cell) */}
+      {/* Follow Up (Date picker directly in cell — real day/month/year, not just a month) */}
       <div
         className={`px-2 py-1.5 min-w-0 self-stretch flex items-center ${getCellSelectionClass('follow_up_month')}`}
         onMouseDown={(e) => { if (!isEffectivelyReadOnly && e.button === 0) onCellMouseDown?.('follow_up_month', e); }}
         onMouseEnter={() => { if (!isEffectivelyReadOnly) onCellMouseEnter?.('follow_up_month'); }}
       >
         {isEffectivelyReadOnly ? (
-          <span className="text-xs text-fg-subtle px-1 my-auto">
-            {row.outcome_status === 'follow_up' && row.follow_up_month ? row.follow_up_month : '—'}
+          <span className={`text-xs px-1 my-auto ${isNotHiring ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-fg-subtle'}`}>
+            {row.outcome_status === 'follow_up'
+              ? (row.follow_up_date ? formatFollowUpDateDisplay(row.follow_up_date) : (row.follow_up_month ? formatFollowUpMonthDisplay(row.follow_up_month) : '—'))
+              : '—'}
           </span>
         ) : (
           <div className="w-full my-auto">
-            <RowMonthDropdown
-              value={row.outcome_status === 'follow_up' ? row.follow_up_month : null}
+            <RowFollowUpDateDropdown
+              value={row.outcome_status === 'follow_up' ? (row.follow_up_date ?? null) : null}
               disabled={row.outcome_status !== 'follow_up'}
-              onChange={(month) => handleMonthChange(month)}
+              onChange={(dateIso) => handleFollowUpDateChange(dateIso)}
             />
           </div>
         )}
@@ -876,7 +883,7 @@ export function TrackerRow({
         onMouseEnter={() => { if (!isEffectivelyReadOnly) onCellMouseEnter?.('comments'); }}
       >
         {isEffectivelyReadOnly ? (
-          <p className="text-fg-subtle italic text-xs break-words leading-relaxed whitespace-pre-wrap my-auto w-full">
+          <p className={`italic text-xs break-words leading-relaxed whitespace-pre-wrap my-auto w-full ${isNotHiring ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-fg-subtle'}`}>
             {row.comments || '—'}
           </p>
         ) : (
@@ -898,7 +905,7 @@ export function TrackerRow({
               target.style.height = 'auto';
               target.style.height = `${Math.max(28, target.scrollHeight)}px`;
             }}
-            className="w-full bg-transparent border border-transparent hover:border-border-strong focus:bg-surface px-1.5 py-1 rounded text-fg placeholder-fg-subtle transition-colors resize-none break-words leading-relaxed text-xs outline-none focus:ring-1 focus:ring-primary/30 my-auto overflow-hidden"
+            className={`w-full bg-transparent border border-transparent hover:border-border-strong focus:bg-surface px-1.5 py-1 rounded transition-colors resize-none break-words leading-relaxed text-xs outline-none focus:ring-1 focus:ring-primary/30 my-auto overflow-hidden ${isNotHiring ? '!text-red-600 dark:!text-red-400 font-semibold placeholder:!text-red-300' : 'text-fg placeholder-fg-subtle'}`}
           />
         )}
       </div>

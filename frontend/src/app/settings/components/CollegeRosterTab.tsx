@@ -11,6 +11,7 @@ import {
   MapPin,
   Sparkles,
   ShieldAlert,
+  GraduationCap,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { useToast } from '@/components/ui/Toast';
@@ -36,6 +37,24 @@ export function CollegeRosterTab() {
   const [filterMode, setFilterMode] = useState<'all' | 'active' | 'inactive'>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState<boolean>(false);
+  // Which college codes currently have a live Placement Officer login —
+  // read from an Administrator-only endpoint (never public: which colleges
+  // are TPO-enabled must not be discoverable by anyone, including another
+  // college's own officer). College itself carries no field for this —
+  // enabled == an active TPO-role User exists for it.
+  const [tpoEnabledCodes, setTpoEnabledCodes] = useState<Set<string>>(new Set());
+  const [tpoUpdatingId, setTpoUpdatingId] = useState<string | null>(null);
+
+  const loadTpoStatus = useCallback(async () => {
+    try {
+      const res = await apiFetch<any>('/colleges/tpo-access');
+      if (res.success && Array.isArray(res.data)) {
+        setTpoEnabledCodes(new Set(res.data.map((c: any) => c.code)));
+      }
+    } catch (err) {
+      console.error('Failed to load TPO access status:', err);
+    }
+  }, []);
 
   const loadAllColleges = useCallback(async () => {
     setLoading(true);
@@ -54,7 +73,39 @@ export function CollegeRosterTab() {
 
   useEffect(() => {
     loadAllColleges();
-  }, [loadAllColleges]);
+    loadTpoStatus();
+  }, [loadAllColleges, loadTpoStatus]);
+
+  const handleToggleTpoAccess = async (college: CollegeRecord) => {
+    const enabling = !tpoEnabledCodes.has(college.college_code);
+    setTpoUpdatingId(college._id);
+    try {
+      const res = await apiFetch<any>(`/colleges/${college._id}/tpo-access`, {
+        method: 'POST',
+        body: JSON.stringify({ enabled: enabling }),
+      });
+      if (res.success) {
+        setTpoEnabledCodes((prev) => {
+          const next = new Set(prev);
+          if (enabling) next.add(college.college_code);
+          else next.delete(college.college_code);
+          return next;
+        });
+        toast(
+          enabling
+            ? `Placement Officer access enabled for ${college.college_code} — login: ${college.college_code.toLowerCase()}`
+            : `Placement Officer access disabled for ${college.college_code}`,
+          'success'
+        );
+      } else {
+        toast(res.error?.message || 'Failed to update TPO access', 'error');
+      }
+    } catch (err: any) {
+      toast(err.message || 'Error updating TPO access', 'error');
+    } finally {
+      setTpoUpdatingId(null);
+    }
+  };
 
   const handleToggleStatus = async (college: CollegeRecord) => {
     const nextStatus = college.status === 'active' ? 'inactive' : 'active';
@@ -332,6 +383,34 @@ export function CollegeRosterTab() {
 
                   {/* Right: Status Pill & Interactive Toggle */}
                   <div className="flex items-center gap-4 shrink-0 sm:self-center pl-10 sm:pl-0">
+                    {/* TPO Access Toggle */}
+                    <div className="flex items-center gap-1.5">
+                      <GraduationCap size={13} className={tpoEnabledCodes.has(college.college_code) ? 'text-indigo-600' : 'text-fg-subtle'} />
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={tpoEnabledCodes.has(college.college_code)}
+                        disabled={tpoUpdatingId === college._id}
+                        onClick={() => handleToggleTpoAccess(college)}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 ${
+                          tpoEnabledCodes.has(college.college_code) ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-700'
+                        } ${tpoUpdatingId === college._id ? 'opacity-50 cursor-wait' : ''}`}
+                        title={
+                          tpoEnabledCodes.has(college.college_code)
+                            ? `Placement Officer login: ${college.college_code.toLowerCase()} — click to disable`
+                            : `Click to enable Placement Officer login for ${college.college_code}`
+                        }
+                      >
+                        <span className="sr-only">Toggle {college.college_name} Placement Officer access</span>
+                        <span
+                          aria-hidden="true"
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                            tpoEnabledCodes.has(college.college_code) ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
                     {/* Status Badge */}
                     <div>
                       {isActive ? (

@@ -37,8 +37,8 @@ export const CALL_OUTCOME_OPTIONS: OutcomeOption[] = [
   { value: 'follow_up', label: 'Follow Up', dotColor: 'bg-amber-500', category: 'Action Req' },
   { value: 'call_back', label: 'Call Back', dotColor: 'bg-amber-500', category: 'Action Req' },
   { value: 'hiring_completed', label: 'Hiring Completed', dotColor: 'bg-cyan-500', category: 'Completed' },
-  { value: 'hiring_freezed', label: 'Hiring Freezed', dotColor: 'bg-orange-500', category: 'Paused' },
-  { value: 'not_hiring', label: 'Not Hiring', dotColor: 'bg-rose-500', category: 'Closed' },
+  { value: 'hiring_freezed', label: 'Hiring Freezed', dotColor: 'bg-purple-500', category: 'Paused' },
+  { value: 'not_hiring', label: 'Not Hiring', dotColor: 'bg-rose-600', category: 'Closed' },
   { value: 'no_response', label: 'No Response', dotColor: 'bg-rose-500', category: 'No Ans' },
   { value: 'invalid', label: 'Invalid', dotColor: 'bg-slate-500', category: 'Invalid' },
 ];

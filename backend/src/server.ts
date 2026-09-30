@@ -30,6 +30,7 @@ import { SystemSettings } from './models/SystemSettings';
 import { AuditLog } from './models/AuditLog';
 import { writeAudit } from './lib/audit';
 import { getCurrentAcademicYear, getCurrentGraduatingBatchYear, clearAcademicYearCache } from './lib/academicYear';
+import { computeFollowUpDueDate, followUpDatePastError } from './lib/followUpDate';
 import mongoose, { Types } from 'mongoose';
 import { startFinalizationJob } from './jobs/finalizeDailyTracker';
 import { startPositiveSyncReminderJob } from './jobs/positiveSyncReminder';
@@ -315,6 +316,42 @@ app.get('/api/v1/health', (req: Request, res: Response) => {
     },
     timestamp: new Date().toISOString(),
   });
+});
+
+// Administrator-only — NEVER public. Which colleges are TPO-enabled must
+// never be discoverable by anyone outside the org, including another
+// college's own TPO: the login screen for officers is a blind username
+// (college acronym) + password field precisely so this list is never
+// exposed anywhere pre-login. This endpoint exists only for the Settings
+// roster toggle to show its own current state. Returns {code, name} for
+// colleges that currently have an active TPO account; a college's TPO
+// login is created/removed via POST /colleges/:id/tpo-access.
+app.get('/api/v1/colleges/tpo-access', async (_req: Request, res: Response) => {
+  try {
+    const tpoUsers = await User.find({
+      role_codes: 'TPO',
+      is_deleted: false,
+      account_status: 'active',
+    })
+      .select('assigned_college_ids')
+      .lean();
+
+    const collegeIds = tpoUsers
+      .map((u: any) => u.assigned_college_ids?.[0])
+      .filter(Boolean);
+
+    const colleges = await College.find({ _id: { $in: collegeIds }, is_deleted: { $ne: true } })
+      .select('college_code college_name')
+      .sort({ college_code: 1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      data: colleges.map((c: any) => ({ code: c.college_code, name: c.college_name })),
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } });
+  }
 });
 
 // Metadata Contact Audit Endpoint
@@ -1312,6 +1349,80 @@ app.patch('/api/v1/colleges/:id/status', async (req: Request, res: Response) => 
   }
 });
 
+// ── POST /api/v1/colleges/:id/tpo-access ─────────────────────────────────────
+// Administrator-only toggle. Enabling creates (or reactivates) that college's
+// single Placement Officer account: username = lowercase college_code,
+// password = the fixed org-wide TPO password, scoped to exactly this one
+// college. Disabling deactivates it (soft — account_status, never a delete)
+// so a re-enable does not need a new password reset. role_codes is always
+// set here, never taken from the request body, matching every other
+// role-escalation guard in this codebase.
+const TPO_DEFAULT_PASSWORD = 'Placement@123';
+
+app.post('/api/v1/colleges/:id/tpo-access', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const enabled = Boolean(req.body?.enabled);
+
+    const college = await College.findById(id);
+    if (!college) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'College not found' } });
+    }
+
+    const tpoUsername = college.college_code.trim().toLowerCase();
+    const tpoRole = await Role.findOne({ role_code: 'TPO' });
+    let tpoUser = await User.findOne({ username: tpoUsername, role_codes: 'TPO' });
+
+    if (!enabled) {
+      if (tpoUser) {
+        tpoUser.account_status = 'inactive';
+        await tpoUser.save();
+      }
+      return res.status(200).json({
+        success: true,
+        message: `TPO access disabled for ${college.college_code}`,
+        data: { enabled: false, college_code: college.college_code },
+      });
+    }
+
+    if (tpoUser) {
+      tpoUser.account_status = 'active';
+      tpoUser.assigned_college_ids = [college._id] as any;
+      if (tpoRole) tpoUser.role_ids = [tpoRole._id] as any;
+      await tpoUser.save();
+    } else {
+      const salt = await bcrypt.genSalt(12);
+      const password_hash = await bcrypt.hash(TPO_DEFAULT_PASSWORD, salt);
+      tpoUser = await User.create({
+        full_name: `${college.college_name} — Placement Officer`,
+        username: tpoUsername,
+        // Required + unique by schema, but never shown or used for login —
+        // TPO accounts log in with username alone. Internal-only domain so
+        // it can never collide with, or be mistaken for, a real staff email.
+        official_email: `${tpoUsername}.tpo@ipoms.internal`,
+        password_hash,
+        role_codes: ['TPO'],
+        role_ids: tpoRole ? [tpoRole._id] : [],
+        assigned_college_ids: [college._id],
+        account_status: 'active',
+        presence_status: 'available',
+        is_deleted: false,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `TPO access enabled for ${college.college_code}`,
+      data: { enabled: true, college_code: college.college_code, username: tpoUsername },
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to update TPO access' },
+    });
+  }
+});
+
 // ── GET /api/v1/colleges/focus-matrix ──────────────────────────────────────────
 // Returns all active colleges with real-time occupancy metadata (who currently handles what),
 // guaranteeing zero duplication across coordinators.
@@ -2278,7 +2389,7 @@ app.get('/api/v1/daily-tracker/today', async (req: Request, res: Response) => {
 // Bulk-create tracker rows from selected company_ids (Contact Picker)
 app.post('/api/v1/daily-tracker/load-contacts', async (req: Request, res: Response) => {
   try {
-    const { college_id, company_ids } = req.body;
+    const { college_id, company_ids, resolves_follow_up_ids } = req.body;
     const coordinator_id = scopeToSelf(req, req.body.coordinator_id);
 
     if (!coordinator_id || !college_id || !Array.isArray(company_ids) || company_ids.length === 0) {
@@ -2355,6 +2466,20 @@ app.post('/api/v1/daily-tracker/load-contacts', async (req: Request, res: Respon
       inserted = await DailyTracker.insertMany(toInsert, { ordered: false });
     }
 
+    // Follow-Ups Due "Add to Tracker": the contact is now sitting on a real
+    // active sheet (blank, ready to call) — that's the reminder's whole job
+    // done, so close the loop the same way manual-row's resolves_follow_up_id
+    // does. Scoped to the caller so one coordinator can't resolve another's.
+    if (Array.isArray(resolves_follow_up_ids) && resolves_follow_up_ids.length > 0) {
+      const validIds = resolves_follow_up_ids.filter((id: string) => Types.ObjectId.isValid(id));
+      if (validIds.length > 0) {
+        await DailyTracker.updateMany(
+          { _id: { $in: validIds }, coordinator_id: new Types.ObjectId(coordinator_id) },
+          { $set: { follow_up_resolved: true } }
+        );
+      }
+    }
+
     return res.status(201).json({
       success: true,
       message: `${inserted.length} contact(s) loaded into today's tracker`,
@@ -2388,6 +2513,7 @@ app.post('/api/v1/daily-tracker/manual-row', async (req: Request, res: Response)
       duration_seconds,
       outcome_status,
       follow_up_month,
+      follow_up_date,
       comments,
       session_date,
     } = req.body;
@@ -2406,11 +2532,18 @@ app.post('/api/v1/daily-tracker/manual-row', async (req: Request, res: Response)
       });
     }
 
-    if (outcome_status === 'follow_up' && !follow_up_month) {
+    if (outcome_status === 'follow_up' && !follow_up_date && !follow_up_month) {
       return res.status(400).json({
         success: false,
-        error: { code: 'FOLLOW_UP_MONTH_REQUIRED', message: 'Follow Up Month is mandatory when Call Status is Follow Up' },
+        error: { code: 'FOLLOW_UP_DATE_REQUIRED', message: 'Follow Up Date is mandatory when Call Status is Follow Up' },
       });
+    }
+
+    if (outcome_status === 'follow_up' && follow_up_date) {
+      const pastError = followUpDatePastError(follow_up_date);
+      if (pastError) {
+        return res.status(400).json({ success: false, error: { code: 'FOLLOW_UP_DATE_PAST', message: pastError } });
+      }
     }
 
     const effectiveDate = session_date ? new Date(session_date) : new Date();
@@ -2514,6 +2647,9 @@ app.post('/api/v1/daily-tracker/manual-row', async (req: Request, res: Response)
       duration_seconds: calculatedDuration,
       outcome_status: outcome_status || null,
       follow_up_month: outcome_status === 'follow_up' ? (follow_up_month || null) : null,
+      follow_up_date: outcome_status === 'follow_up'
+        ? (follow_up_date ? new Date(follow_up_date) : computeFollowUpDueDate(follow_up_month, today))
+        : null,
       comments: comments?.trim() || '',
       year,
       month,
@@ -2542,6 +2678,81 @@ app.post('/api/v1/daily-tracker/manual-row', async (req: Request, res: Response)
     return res.status(500).json({
       success: false,
       error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to add manual contact row' },
+    });
+  }
+});
+
+// ── DT-FOLLOWUPS-DUE: GET /api/v1/daily-tracker/follow-ups-due
+// Contacts the caller marked "Follow Up" with a real date (see
+// computeFollowUpDueDate / the RowFollowUpDateDropdown picker) that is today
+// or earlier and hasn't been resolved yet — "$lte todayEnd" rather than an
+// exact match so a missed day never silently drops off; it keeps showing
+// until actually resolved. A future-dated follow-up simply isn't due yet and
+// appears automatically once its day arrives. Self-scoped, same as
+// /daily-tracker/today. Deduped to one row per contact — the most recent
+// unresolved follow-up wins if the same contact was marked more than once.
+app.get('/api/v1/daily-tracker/follow-ups-due', async (req: Request, res: Response) => {
+  try {
+    const rawCollegeId = req.query.college_id as string | undefined;
+    const selfId = req.user?.userId;
+    const isSuper = isSupervisor(req);
+
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const filter: any = {
+      outcome_status: 'follow_up',
+      follow_up_resolved: { $ne: true },
+      follow_up_date: { $lte: todayEnd },
+    };
+
+    if (rawCollegeId && rawCollegeId !== 'all' && Types.ObjectId.isValid(rawCollegeId)) {
+      filter.college_id = new Types.ObjectId(String(rawCollegeId));
+    }
+
+    if (!isSuper) {
+      if (!selfId || !Types.ObjectId.isValid(selfId)) {
+        return res.status(200).json({ success: true, data: { reminders: [] } });
+      }
+      filter.coordinator_id = new Types.ObjectId(String(selfId));
+    }
+
+    const rows = await DailyTracker.find(filter)
+      .sort({ follow_up_date: 1, session_date: -1 })
+      .lean();
+
+    // Dedup by contact (company + mobile/email) — keep the most recently logged.
+    const byContact = new Map<string, any>();
+    for (const row of rows) {
+      const contact = (row.mobile_number || row.email_id || '').trim().toLowerCase();
+      const key = `${String(row.company_name || '').trim().toLowerCase()}_${contact}`;
+      const existing = byContact.get(key);
+      if (!existing || new Date(row.session_date as any).getTime() > new Date(existing.session_date).getTime()) {
+        byContact.set(key, row);
+      }
+    }
+
+    const reminders = Array.from(byContact.values()).map((row) => ({
+      _id: row._id,
+      company_id: row.company_id || null,
+      company_name: row.company_name,
+      hr_name: row.hr_name || '',
+      mobile_number: row.mobile_number || '',
+      email_id: row.email_id || '',
+      college_id: row.college_id,
+      follow_up_month: row.follow_up_month,
+      follow_up_date: row.follow_up_date,
+      originally_logged_on: row.session_date,
+    })).sort((a, b) => new Date(a.follow_up_date).getTime() - new Date(b.follow_up_date).getTime());
+
+    return res.status(200).json({
+      success: true,
+      data: { reminders, total: reminders.length },
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to load follow-ups due' },
     });
   }
 });
@@ -3207,6 +3418,157 @@ app.post('/api/v1/daily-tracker/copy-from-history', async (req: Request, res: Re
   }
 });
 
+// ── DT-MOVE-TO-TOMORROW: POST /api/v1/daily-tracker/move-to-tomorrow
+// Move or Copy selected tracker rows to tomorrow's sheet:
+// - Rows WITH a call status (outcome_status present) -> COPIED to tomorrow (clean uncalled state for follow-up, keeping today's record & call history intact).
+// - Rows WITHOUT a call status (no call initiated) -> MOVED to tomorrow (session_date updated to tomorrow, removed from today's active sheet).
+app.post('/api/v1/daily-tracker/move-to-tomorrow', async (req: Request, res: Response) => {
+  try {
+    const { college_id, row_ids, target_date } = req.body;
+    const coordinator_id = scopeToSelf(req, req.body.coordinator_id);
+
+    if (!row_ids || !Array.isArray(row_ids) || row_ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'No row IDs provided to process' },
+      });
+    }
+
+    // Determine target tomorrow date
+    let tomorrowDate: Date;
+    if (target_date) {
+      tomorrowDate = buildSessionDate(target_date);
+    } else {
+      const today = buildSessionDate();
+      tomorrowDate = new Date(today);
+      tomorrowDate.setUTCDate(tomorrowDate.getUTCDate() + 1);
+    }
+
+    const targetYear = tomorrowDate.getUTCFullYear();
+    const targetMonth = tomorrowDate.getUTCMonth() + 1;
+    const targetDay = tomorrowDate.getUTCDate();
+
+    const validObjectIds = row_ids
+      .filter((id) => Types.ObjectId.isValid(String(id)))
+      .map((id) => new Types.ObjectId(String(id)));
+
+    const sourceRows = await DailyTracker.find({
+      _id: { $in: validObjectIds },
+    });
+
+    if (sourceRows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'No valid active rows found for the selected IDs.' },
+      });
+    }
+
+    // Verify ownership
+    for (const src of sourceRows) {
+      if (refuseForeignOwner(req, res, String(src.coordinator_id), 'You can only move or copy your own tracker rows.')) {
+        return;
+      }
+    }
+
+    let copiedCount = 0;
+    let movedCount = 0;
+
+    for (const row of sourceRows) {
+      const targetCollegeId = (college_id && Types.ObjectId.isValid(String(college_id)))
+        ? new Types.ObjectId(String(college_id))
+        : row.college_id;
+      const targetCoordId = coordinator_id
+        ? new Types.ObjectId(String(coordinator_id))
+        : row.coordinator_id;
+
+      // Check if this row has an initiated call outcome / status
+      const hasCallStatus = Boolean(
+        row.outcome_status &&
+        String(row.outcome_status).trim() !== '' &&
+        (row.outcome_status as any) !== 'pending'
+      );
+
+      // Check if a row with same company & mobile already exists on tomorrow's sheet
+      const compName = (row.company_name || '').trim();
+      const mob = (row.mobile_number || '').trim();
+
+      const existingOnTomorrow = await DailyTracker.findOne({
+        college_id: targetCollegeId,
+        coordinator_id: targetCoordId,
+        session_date: tomorrowDate,
+        company_name: { $regex: new RegExp(`^${escapeRegex(compName)}$`, 'i') },
+        mobile_number: mob,
+      });
+
+      if (hasCallStatus) {
+        // ── COPY: Keep original row in today's tracker; create a clean copy on tomorrow's sheet
+        if (!existingOnTomorrow) {
+          await DailyTracker.create({
+            session_date: tomorrowDate,
+            day: targetDay,
+            month: targetMonth,
+            year: targetYear,
+            academic_year: (row as any).academic_year || targetYear,
+            college_id: targetCollegeId,
+            coordinator_id: targetCoordId,
+            company_id: row.company_id || null,
+            company_name: row.company_name,
+            hr_name: row.hr_name || 'HR Contact',
+            mobile_number: row.mobile_number || '',
+            email_id: row.email_id || '',
+            is_contact_added: (row as any).is_contact_added || false,
+            is_skipped: false,
+            is_promoted_to_weekly: false,
+            call_start_time: null,
+            call_end_time: null,
+            duration_seconds: null,
+            outcome_status: null,
+            follow_up_month: null,
+            follow_up_date: null,
+            comments: row.comments || '',
+            created_at: new Date(),
+            updated_at: new Date(),
+          });
+        }
+        copiedCount++;
+      } else {
+        // ── MOVE: No call was initiated, so remove from today and transfer directly to tomorrow
+        if (existingOnTomorrow) {
+          // Already on tomorrow's sheet, so remove today's duplicate
+          await row.deleteOne();
+        } else {
+          // Update session_date to tomorrow
+          row.session_date = tomorrowDate;
+          row.day = targetDay;
+          row.month = targetMonth;
+          row.year = targetYear;
+          row.college_id = targetCollegeId;
+          row.coordinator_id = targetCoordId;
+          row.is_skipped = false;
+          row.updated_at = new Date();
+          await row.save();
+        }
+        movedCount++;
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        total_processed: sourceRows.length,
+        copied_count: copiedCount,
+        moved_count: movedCount,
+      },
+      message: `Successfully processed ${sourceRows.length} contact(s) for tomorrow (${movedCount} moved, ${copiedCount} copied).`,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to process rows for tomorrow' },
+    });
+  }
+});
+
 // ── DT-3: PATCH /api/v1/daily-tracker/:id
 // Auto-save a single row — start_time, outcome, comments
 app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
@@ -3243,6 +3605,17 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
         error: { code: 'FINALIZED', message: "This day's tracker has been finalized and is read-only" },
       });
     }
+
+    if (follow_up_date) {
+      const pastError = followUpDatePastError(follow_up_date);
+      if (pastError) {
+        return res.status(400).json({ success: false, error: { code: 'FOLLOW_UP_DATE_PAST', message: pastError } });
+      }
+    }
+
+    const prevCompanyName = row.company_name;
+    const prevMobileNumber = row.mobile_number;
+    const prevEmailId = row.email_id;
 
     if (company_name !== undefined && typeof company_name === 'string') {
       row.company_name = company_name.trim();
@@ -3286,15 +3659,31 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
       }
 
       if (outcome_status === 'follow_up') {
-        if (follow_up_date) row.follow_up_date = new Date(follow_up_date);
         if (follow_up_month !== undefined) row.follow_up_month = follow_up_month || null;
+        if (follow_up_date) {
+          row.follow_up_date = new Date(follow_up_date);
+        } else {
+          // No explicit date from the client — derive one from the month so
+          // "which year's November" is never ambiguous. Reference the row's
+          // own session_date (when this call was actually logged), not "now".
+          row.follow_up_date = computeFollowUpDueDate(row.follow_up_month, row.session_date || new Date());
+        }
+        row.follow_up_resolved = false;
       } else {
         // If outcome changed away from follow_up, reset follow_up_month
         row.follow_up_month = null;
         row.follow_up_date = null;
       }
+    } else if (follow_up_date !== undefined) {
+      // The Follow Up cell's date picker fires this on its own, with no outcome_status
+      // in the same request (the outcome was already set to 'follow_up' earlier).
+      row.follow_up_date = follow_up_date ? new Date(follow_up_date) : null;
+      row.follow_up_resolved = false;
     } else if (follow_up_month !== undefined) {
+      // Legacy path — nothing in the app sends a bare month anymore, kept only in
+      // case an older client/session is still mid-flight with the old contract.
       row.follow_up_month = follow_up_month || null;
+      row.follow_up_date = computeFollowUpDueDate(follow_up_month, row.session_date || new Date());
     }
 
     if (comments !== undefined) {
@@ -3304,257 +3693,260 @@ app.patch('/api/v1/daily-tracker/:id', async (req: Request, res: Response) => {
     row.last_saved_at = new Date();
     await row.save();
 
-    // Lively sync edited contact info to CompanyMetadata & synchronize across catalog
-    if (row.company_id || row.company_name) {
-      (async () => {
-        try {
-          let meta = row.company_id ? await CompanyMetadata.findById(row.company_id) : null;
-          if (!meta && row.company_name) {
-            meta = await CompanyMetadata.findOne({
-              company_name: { $regex: new RegExp(`^${escapeRegex(row.company_name.trim())}$`, 'i') },
-              is_deleted: false,
-            });
-          }
-          if (meta && !meta.is_deleted) {
-            let metaUpdated = false;
+    // ── Lively Sync edited company name spelling, contact info, HR name to CompanyMetadata ──
+    let metadataSynced = false;
+    let syncedCompanyName = row.company_name;
 
-            // 1. Sync HR Names (Comma / semicolon / slash separated)
-            if (row.hr_name && row.hr_name.trim()) {
-              const existingHrs = (meta.hr_name || '')
-                .split(/[,;/]+/)
-                .map((s: string) => s.trim())
-                .filter((s: string) => s && s.toLowerCase() !== 'hr contact' && s.toLowerCase() !== 'contact');
-              const incomingHrs = row.hr_name
-                .split(/[,;/]+/)
-                .map((s: string) => s.trim())
-                .filter((s: string) => s && s.toLowerCase() !== 'hr contact' && s.toLowerCase() !== 'contact');
-              const mergedHrs = Array.from(new Set([...existingHrs, ...incomingHrs]));
-              if (mergedHrs.length > 0 && mergedHrs.join(', ') !== meta.hr_name) {
-                meta.hr_name = mergedHrs.join(', ');
-                metaUpdated = true;
-              }
-            }
-
-            // 2. Sync Mobile Numbers (Comma / semicolon / slash separated)
-            if (row.mobile_number && row.mobile_number.trim()) {
-              const incomingMobiles = row.mobile_number
-                .split(/[,;/]+/)
-                .map((m: string) => m.trim())
-                .filter((m: string) => m.length > 0);
-              for (const mob of incomingMobiles) {
-                if (!meta.mobile_numbers.includes(mob)) {
-                  meta.mobile_numbers.push(mob);
-                  metaUpdated = true;
-                }
-              }
-              if (!meta.primary_mobile && meta.mobile_numbers.length > 0) {
-                meta.primary_mobile = meta.mobile_numbers[0];
-                metaUpdated = true;
-              }
-            }
-
-            // 3. Sync Email IDs (Comma / semicolon / slash separated)
-            if (row.email_id && row.email_id.trim()) {
-              const incomingEmails = row.email_id
-                .split(/[,;/]+/)
-                .map((e: string) => e.trim().toLowerCase())
-                .filter((e: string) => e.length > 0);
-              for (const em of incomingEmails) {
-                if (!meta.email_ids.includes(em)) {
-                  meta.email_ids.push(em);
-                  metaUpdated = true;
-                }
-              }
-              if (!meta.primary_email && meta.email_ids.length > 0) {
-                meta.primary_email = meta.email_ids[0];
-                metaUpdated = true;
-              }
-            }
-
-            if (metaUpdated) {
-              await meta.save();
-            }
-
-            // Synchronize full merged emails/mobiles/hr_name across DailyTracker & connected modules
-            const fullMergedEmails = meta.email_ids.join(', ');
-            const fullMergedMobiles = meta.mobile_numbers.join(', ');
-            const fullMergedHr = meta.hr_name;
-
-            let rowUpdated = false;
-            if (fullMergedEmails && row.email_id !== fullMergedEmails) {
-              row.email_id = fullMergedEmails;
-              rowUpdated = true;
-            }
-            if (fullMergedMobiles && row.mobile_number !== fullMergedMobiles) {
-              row.mobile_number = fullMergedMobiles;
-              rowUpdated = true;
-            }
-            if (fullMergedHr && row.hr_name !== fullMergedHr) {
-              row.hr_name = fullMergedHr;
-              rowUpdated = true;
-            }
-            if (rowUpdated) {
-              await row.save();
-            }
-
-            // Cascade to other DailyTracker records for this company
-            if (fullMergedEmails || fullMergedMobiles || fullMergedHr) {
-              const dtCascade: any = {};
-              if (fullMergedEmails) dtCascade.email_id = fullMergedEmails;
-              if (fullMergedMobiles) dtCascade.mobile_number = fullMergedMobiles;
-              if (fullMergedHr) dtCascade.hr_name = fullMergedHr;
-
-              await DailyTracker.updateMany(
-                {
-                  _id: { $ne: row._id },
-                  $or: [
-                    { company_id: meta._id },
-                    { company_name: { $regex: new RegExp(`^${escapeRegex(row.company_name.trim())}$`, 'i') } },
-                  ],
-                },
-                { $set: dtCascade }
-              );
-            }
-          }
-        } catch (syncErr) {
-          console.error('Metadata sync error on tracker update:', syncErr);
+    if (row.company_id || row.company_name || prevCompanyName) {
+      try {
+        let meta = row.company_id ? await CompanyMetadata.findById(row.company_id) : null;
+        if (!meta && prevCompanyName) {
+          meta = await CompanyMetadata.findOne({
+            company_name: { $regex: new RegExp(`^${escapeRegex(prevCompanyName.trim())}$`, 'i') },
+            is_deleted: false,
+          });
         }
-      })();
+        if (!meta && row.company_name) {
+          meta = await CompanyMetadata.findOne({
+            company_name: { $regex: new RegExp(`^${escapeRegex(row.company_name.trim())}$`, 'i') },
+            is_deleted: false,
+          });
+        }
+
+        if (meta && !meta.is_deleted) {
+          let metaUpdated = false;
+
+          // 1. Sync Company Name spelling correction
+          if (company_name !== undefined && typeof company_name === 'string' && company_name.trim()) {
+            const cleanName = company_name.trim();
+            if (meta.company_name !== cleanName) {
+              meta.company_name = cleanName;
+              metaUpdated = true;
+            }
+          }
+
+          // 2. Sync HR Names
+          if (hr_name !== undefined && typeof hr_name === 'string') {
+            const cleanHr = hr_name.trim();
+            if (cleanHr && cleanHr !== 'HR Contact' && cleanHr !== 'Contact') {
+              meta.hr_name = cleanHr;
+              metaUpdated = true;
+            }
+          }
+
+          // 3. Sync Mobile Numbers
+          if (mobile_number !== undefined && typeof mobile_number === 'string') {
+            const incomingMobiles = mobile_number
+              .split(/[,;/]+/)
+              .map((m: string) => m.trim())
+              .filter(Boolean);
+            if (incomingMobiles.length > 0) {
+              meta.primary_mobile = incomingMobiles[0];
+              const mergedMobiles = Array.from(new Set([...incomingMobiles, ...(meta.mobile_numbers || [])]));
+              meta.mobile_numbers = mergedMobiles;
+              metaUpdated = true;
+            }
+          }
+
+          // 4. Sync Email IDs
+          if (email_id !== undefined && typeof email_id === 'string') {
+            const incomingEmails = email_id
+              .split(/[,;/]+/)
+              .map((e: string) => e.trim().toLowerCase())
+              .filter(Boolean);
+            if (incomingEmails.length > 0) {
+              meta.primary_email = incomingEmails[0];
+              const mergedEmails = Array.from(new Set([...incomingEmails, ...(meta.email_ids || [])]));
+              meta.email_ids = mergedEmails;
+              metaUpdated = true;
+            }
+          }
+
+          if (metaUpdated) {
+            await meta.save();
+          }
+
+          if (!row.company_id) {
+            row.company_id = meta._id;
+            await row.save();
+          }
+
+          metadataSynced = true;
+          syncedCompanyName = meta.company_name;
+
+          // Cascade to other DailyTracker records for this company
+          const dtCascade: any = {
+            company_name: meta.company_name,
+          };
+          if (meta.primary_mobile) dtCascade.mobile_number = meta.mobile_numbers?.join(', ') || meta.primary_mobile;
+          if (meta.primary_email) dtCascade.email_id = meta.email_ids?.join(', ') || meta.primary_email;
+          if (meta.hr_name) dtCascade.hr_name = meta.hr_name;
+
+          const dtOrConditions: any[] = [
+            { company_id: meta._id },
+            { company_name: { $regex: new RegExp(`^${escapeRegex(meta.company_name.trim())}$`, 'i') } },
+          ];
+          if (prevCompanyName && prevCompanyName.trim() !== meta.company_name.trim()) {
+            dtOrConditions.push({ company_name: { $regex: new RegExp(`^${escapeRegex(prevCompanyName.trim())}$`, 'i') } });
+          }
+
+          await DailyTracker.updateMany(
+            {
+              _id: { $ne: row._id },
+              $or: dtOrConditions,
+            },
+            { $set: dtCascade }
+          );
+        } else if (!meta && row.company_name && row.company_name.trim()) {
+          // Auto-create in CompanyMetadata if not yet present
+          const highestDoc = await CompanyMetadata.findOne({ serial_number: { $gt: 0 } })
+            .sort({ serial_number: -1 })
+            .select('serial_number');
+          const nextSerial = (highestDoc?.serial_number || 0) + 1;
+
+          const mobList = row.mobile_number ? row.mobile_number.split(/[,;/]+/).map((s: string) => s.trim()).filter(Boolean) : [];
+          const emailList = row.email_id ? row.email_id.split(/[,;/]+/).map((s: string) => s.trim().toLowerCase()).filter(Boolean) : [];
+
+          meta = await CompanyMetadata.create({
+            serial_number: nextSerial,
+            company_name: row.company_name.trim(),
+            hr_name: row.hr_name || 'HR Contact',
+            primary_mobile: mobList[0] || '',
+            mobile_numbers: mobList,
+            primary_email: emailList[0] || '',
+            email_ids: emailList,
+            notes: `Auto-synced from Daily Tracker edit on ${new Date().toLocaleDateString('en-IN')}`,
+          });
+
+          row.company_id = meta._id;
+          await row.save();
+
+          metadataSynced = true;
+          syncedCompanyName = meta.company_name;
+        }
+      } catch (syncErr) {
+        console.error('Metadata sync error on tracker update:', syncErr);
+      }
     }
 
     // Note: Active Leads is now exclusively sourced from Weekly Tracker (Daily Tracker sync decoupled)
 
     // ── Cascade Edits / Outcome changes to already connected DailyLead and WeeklyTracker ──
-    (async () => {
-      try {
-        const escapedName = escapeRegex(row.company_name.trim());
-        const isPositiveOutcome = row.outcome_status && ['invite_mail', 'jd_received', 'hiring', 'drive_completed'].includes(row.outcome_status);
+    try {
+      const escapedName = escapeRegex(row.company_name.trim());
+      const escapedPrevName = prevCompanyName ? escapeRegex(prevCompanyName.trim()) : '';
+      const isPositiveOutcome = row.outcome_status && ['invite_mail', 'jd_received', 'hiring', 'drive_completed'].includes(row.outcome_status);
 
-        // 1. If outcome changed AWAY from positive outcome, cascade soft-delete to linked DailyLead and WeeklyTracker
-        if (outcome_status !== undefined && !isPositiveOutcome) {
-          await DailyLead.updateMany(
-            {
-              $or: [
-                { daily_tracker_id: row._id },
-                {
-                  college_id: row.college_id,
-                  company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
-                },
-              ],
-              is_deleted: false,
-            },
-            {
-              $set: { is_deleted: true, deleted_at: new Date() },
-            }
-          );
-
-          await WeeklyTracker.updateMany(
-            {
-              $or: [
-                { daily_tracker_id: row._id },
-                {
-                  college_id: row.college_id,
-                  company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
-                },
-              ],
-              is_deleted: false,
-            },
-            {
-              $set: { is_deleted: true, deleted_at: new Date() },
-            }
-          );
-        }
-
-        // 2. If outcome is positive (invite_mail or jd_received), ensure matching DailyLead is in sync
-        if (isPositiveOutcome) {
-          const leadType = row.outcome_status === 'jd_received' ? 'jd_received' : 'positive';
-          const existingLead = await DailyLead.findOne({
-            $or: [
-              { daily_tracker_id: row._id },
-              {
-                college_id: row.college_id,
-                company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
-              },
-            ],
-          });
-
-          if (existingLead) {
-            existingLead.lead_type = leadType;
-            existingLead.company_name = row.company_name.trim();
-            existingLead.daily_tracker_id = row._id;
-            if (row.comments) existingLead.remarks = row.comments;
-            existingLead.is_deleted = false;
-            existingLead.deleted_at = undefined;
-            await existingLead.save();
-          }
-        }
-
-        // 3. Propagate edited company / contact fields to already-synchronized records
-        if (company_name !== undefined || hr_name !== undefined || mobile_number !== undefined || email_id !== undefined || comments !== undefined) {
-          // Update matching DailyLeads
-          await DailyLead.updateMany(
-            {
-              $or: [
-                { daily_tracker_id: row._id },
-                {
-                  college_id: row.college_id,
-                  company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
-                },
-              ],
-              is_deleted: false,
-            },
-            {
-              $set: {
-                company_name: row.company_name.trim(),
-                ...(comments !== undefined && comments ? { remarks: comments } : {}),
-              },
-            }
-          );
-
-          // Update matching already-synchronized WeeklyTracker rows
-          const wtRows = await WeeklyTracker.find({
-            $or: [
-              { daily_tracker_id: row._id },
-              {
-                college_id: row.college_id,
-                company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
-              },
-            ],
-            is_deleted: false,
-          });
-
-          for (const wt of wtRows) {
-            wt.company_name = row.company_name.trim();
-            if (row.mobile_number) {
-              wt.contact_number = row.mobile_number.trim();
-              if (!wt.mobile_numbers) wt.mobile_numbers = [];
-              if (!wt.mobile_numbers.includes(row.mobile_number.trim())) {
-                wt.mobile_numbers.push(row.mobile_number.trim());
-              }
-            }
-            if (row.email_id) {
-              wt.email_id = row.email_id.trim();
-              if (!wt.email_ids) wt.email_ids = [];
-              if (!wt.email_ids.includes(row.email_id.trim())) {
-                wt.email_ids.push(row.email_id.trim());
-              }
-            }
-            if (row.hr_name) {
-              wt.cdc_reference = `${row.hr_name.trim()}${row.mobile_number ? ` (${row.mobile_number.trim()})` : ''}`;
-            }
-            wt.last_status_updated_at = new Date();
-            wt.updated_at = new Date();
-            await wt.save();
-          }
-        }
-      } catch (cascadeErr) {
-        console.error('Cascade DT update error:', cascadeErr);
+      const leadMatchOr: any[] = [
+        { daily_tracker_id: row._id },
+        {
+          college_id: row.college_id,
+          company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+        },
+      ];
+      if (escapedPrevName && escapedPrevName !== escapedName) {
+        leadMatchOr.push({
+          college_id: row.college_id,
+          company_name: { $regex: new RegExp(`^${escapedPrevName}$`, 'i') },
+        });
       }
-    })();
+
+      // 1. If outcome changed AWAY from positive outcome, cascade soft-delete to linked DailyLead and WeeklyTracker
+      if (outcome_status !== undefined && !isPositiveOutcome) {
+        await DailyLead.updateMany(
+          {
+            $or: leadMatchOr,
+            is_deleted: false,
+          },
+          {
+            $set: { is_deleted: true, deleted_at: new Date() },
+          }
+        );
+
+        await WeeklyTracker.updateMany(
+          {
+            $or: leadMatchOr,
+            is_deleted: false,
+          },
+          {
+            $set: { is_deleted: true, deleted_at: new Date() },
+          }
+        );
+      }
+
+      // 2. If outcome is positive (invite_mail or jd_received), ensure matching DailyLead is in sync
+      if (isPositiveOutcome) {
+        const leadType = row.outcome_status === 'jd_received' ? 'jd_received' : 'positive';
+        const existingLead = await DailyLead.findOne({
+          $or: leadMatchOr,
+        });
+
+        if (existingLead) {
+          existingLead.lead_type = leadType;
+          existingLead.company_name = row.company_name.trim();
+          existingLead.daily_tracker_id = row._id;
+          if (row.comments) existingLead.remarks = row.comments;
+          existingLead.is_deleted = false;
+          existingLead.deleted_at = undefined;
+          await existingLead.save();
+        }
+      }
+
+      // 3. Propagate edited company / contact fields to already-synchronized records
+      if (company_name !== undefined || hr_name !== undefined || mobile_number !== undefined || email_id !== undefined || comments !== undefined) {
+        // Update matching DailyLeads
+        await DailyLead.updateMany(
+          {
+            $or: leadMatchOr,
+            is_deleted: false,
+          },
+          {
+            $set: {
+              company_name: row.company_name.trim(),
+              ...(comments !== undefined && comments ? { remarks: comments } : {}),
+            },
+          }
+        );
+
+        // Update matching already-synchronized WeeklyTracker rows
+        const wtRows = await WeeklyTracker.find({
+          $or: leadMatchOr,
+          is_deleted: false,
+        });
+
+        for (const wt of wtRows) {
+          wt.company_name = row.company_name.trim();
+          if (row.mobile_number) {
+            wt.contact_number = row.mobile_number.trim();
+            if (!wt.mobile_numbers) wt.mobile_numbers = [];
+            if (!wt.mobile_numbers.includes(row.mobile_number.trim())) {
+              wt.mobile_numbers.push(row.mobile_number.trim());
+            }
+          }
+          if (row.email_id) {
+            wt.email_id = row.email_id.trim();
+            if (!wt.email_ids) wt.email_ids = [];
+            if (!wt.email_ids.includes(row.email_id.trim())) {
+              wt.email_ids.push(row.email_id.trim());
+            }
+          }
+          if (row.hr_name) {
+            wt.cdc_reference = `${row.hr_name.trim()}${row.mobile_number ? ` (${row.mobile_number.trim()})` : ''}`;
+          }
+          wt.last_status_updated_at = new Date();
+          wt.updated_at = new Date();
+          await wt.save();
+        }
+      }
+    } catch (cascadeErr) {
+      console.error('Cascade DT update error:', cascadeErr);
+    }
 
     return res.status(200).json({
       success: true,
       message: 'Row saved',
+      metadata_synced: metadataSynced,
+      metadata_company: syncedCompanyName,
       data: {
         ...row.toObject(),
         duration_formatted: row.duration_seconds != null ? formatDuration(row.duration_seconds) : null,
@@ -9992,6 +10384,470 @@ function getTrackerCompletionTimestamp(row: any): Date {
   return ts ? new Date(ts) : new Date();
 }
 
+/**
+ * Resolves the calling TPO's single college. A TPO is created with exactly
+ * one entry in assigned_college_ids (POST /colleges/:id/tpo-access) — this
+ * is what makes every TPO route safe to expose with no per-request college
+ * parameter: whatever the caller asks for, they only ever get their own.
+ */
+async function resolveTpoCollegeId(userId: string): Promise<Types.ObjectId | null> {
+  const tpoUser = await User.findById(userId).select('assigned_college_ids role_codes').lean();
+  if (!tpoUser || !(tpoUser as any).role_codes?.includes('TPO')) return null;
+  const collegeId = (tpoUser as any).assigned_college_ids?.[0];
+  return collegeId ? new Types.ObjectId(collegeId) : null;
+}
+
+/**
+ * The 7 TPO-facing sections and where each one's real data lives. "Upcoming
+ * Drive" and "Companies in Pipeline" deliberately do NOT read the pipeline_section
+ * values their names would suggest (upcoming_drives / pipeline) — those are
+ * empty in production. See CLAUDE.md §5 for the verified live counts behind
+ * this mapping and why it was chosen.
+ */
+function sanitizeMobiles(rawNumbers: any[] | string | undefined): string[] {
+  if (!rawNumbers) return [];
+  const list = Array.isArray(rawNumbers) ? rawNumbers : [rawNumbers];
+  return list
+    .map((s) => String(s || '').trim())
+    .filter(Boolean)
+    .filter((num) => {
+      const digits = num.replace(/\D/g, '');
+      return digits.length >= 7 && !/^[a-zA-Z\s]+$/.test(num);
+    });
+}
+
+function bucketTpoRows(rows: any[]) {
+  const buckets: Record<string, any[]> = {
+    completed: [], drive_in_progress: [], upcoming_drive: [], in_progress: [],
+    pipeline: [], rejected_by_tpo: [], rejected: [],
+  };
+  for (const r of rows) {
+    if (r.mobile_numbers) {
+      r.mobile_numbers = sanitizeMobiles(r.mobile_numbers);
+    }
+    if (r.contact_number && (/^[a-zA-Z\s]+$/.test(r.contact_number.trim()) || r.contact_number.replace(/\D/g, '').length < 7)) {
+      r.contact_number = r.mobile_numbers?.[0] || '';
+    }
+
+    if (r.is_pinned_top) buckets.pipeline.push(r);
+    switch (r.pipeline_section) {
+      case 'completed': buckets.completed.push(r); break;
+      case 'drive_in_progress': buckets.drive_in_progress.push(r); break;
+      case 'in_drive': buckets.upcoming_drive.push(r); break;
+      case 'in_progress': buckets.in_progress.push(r); break;
+      case 'on_hold_by_college': buckets.rejected_by_tpo.push(r); break;
+      case 'on_hold_by_hr': buckets.rejected.push(r); break;
+      default: break;
+    }
+  }
+  return buckets;
+}
+
+const TPO_ROW_PROJECTION = 'company_name job_role ctc_lpa company_type current_status_text follow_up_date drive_date jd_received_date db_shared_date contact_number mobile_numbers email_id email_ids registered_count shortlisted_count selected_count is_pinned_top pipeline_section updated_at';
+
+// ── GET /api/v1/tpo/weekly-tracker — read-only, pinned to the caller's own college
+app.get('/api/v1/tpo/weekly-tracker', async (req: Request, res: Response) => {
+  try {
+    const collegeId = await resolveTpoCollegeId(req.user!.userId);
+    if (!collegeId) {
+      return res.status(403).json({ success: false, error: { code: 'NO_COLLEGE_SCOPE', message: 'This account has no assigned college.' } });
+    }
+
+    const college = await College.findById(collegeId).select('college_name college_code logo_url location').lean();
+    const rows = await WeeklyTracker.find({ college_id: collegeId, is_deleted: { $ne: true } })
+      .select(TPO_ROW_PROJECTION)
+      .sort({ order_index: 1, updated_at: -1 })
+      .lean();
+
+    const buckets = bucketTpoRows(rows);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        college: college ? {
+          name: (college as any).college_name,
+          code: (college as any).college_code,
+          logo_url: (college as any).logo_url || `/college-logos/${(college as any).college_code?.toLowerCase()}.png`,
+          location: (college as any).location || '',
+        } : null,
+        sections: {
+          completed: buckets.completed,
+          drive_in_progress: buckets.drive_in_progress,
+          upcoming_drive: buckets.upcoming_drive,
+          in_progress: buckets.in_progress,
+          pipeline: buckets.pipeline,
+          rejected_by_tpo: buckets.rejected_by_tpo,
+          rejected: buckets.rejected,
+        },
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: { code: 'INTERNAL_SERVER_ERROR', message: error.message } });
+  }
+});
+
+// ── POST /api/v1/tpo/sync — Collects coordinator updates for the caller's specific college and synchronizes into Weekly Tracker
+app.post('/api/v1/tpo/sync', async (req: Request, res: Response) => {
+  try {
+    const collegeId = await resolveTpoCollegeId(req.user!.userId);
+    if (!collegeId) {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'NO_COLLEGE_SCOPE', message: 'This account has no assigned college.' },
+      });
+    }
+
+    const targetCol = await College.findById(collegeId);
+    const queryCollegeIds: Types.ObjectId[] = [collegeId];
+    if (targetCol) {
+      const sameCodeCols = await College.find({
+        $or: [
+          { college_code: targetCol.college_code },
+          { college_name: targetCol.college_name },
+        ],
+      });
+      sameCodeCols.forEach((sc) => {
+        if (!queryCollegeIds.some((id) => String(id) === String(sc._id))) {
+          queryCollegeIds.push(sc._id as Types.ObjectId);
+        }
+      });
+    }
+
+    const targetYear = await getCurrentAcademicYear();
+    const batchYear = await getCurrentGraduatingBatchYear();
+    const { startFriday, endThursday, weekNumber } = getFridayWeekBounds();
+
+    // 1. Clean up any existing duplicate records in weekly_tracker for this college
+    const existingAll = await WeeklyTracker.find({
+      college_id: { $in: queryCollegeIds },
+      academic_year: targetYear,
+      is_deleted: false,
+    }).sort({ created_at: 1 });
+
+    const seenCollegeCompanyKeys = new Set<string>();
+    const dupIdsToDelete: Types.ObjectId[] = [];
+    for (const row of existingAll) {
+      const colIdStr = String(row.college_id);
+      const nameKey = row.company_name ? row.company_name.trim().toLowerCase() : '';
+      if (nameKey) {
+        const compositeKey = `${colIdStr}::${nameKey}`;
+        if (seenCollegeCompanyKeys.has(compositeKey)) {
+          dupIdsToDelete.push(row._id as Types.ObjectId);
+        } else {
+          seenCollegeCompanyKeys.add(compositeKey);
+        }
+      }
+    }
+    if (dupIdsToDelete.length > 0) {
+      await WeeklyTracker.deleteMany({ _id: { $in: dupIdsToDelete } });
+    }
+
+    // 2. Fetch all positive and JD received leads from DailyLead for this college
+    const positiveDailyLeads = await DailyLead.find({
+      college_id: { $in: queryCollegeIds },
+      lead_type: { $in: ['positive', 'jd_received'] },
+      is_deleted: false,
+    }).sort({ lead_date: 1, created_at: 1 });
+
+    let syncedCount = 0;
+    const inBatchSyncedKeys = new Set<string>(seenCollegeCompanyKeys);
+
+    for (const lead of positiveDailyLeads) {
+      if (!lead.company_name || !lead.company_name.trim() || !lead.college_id) continue;
+      const trimmedName = lead.company_name.trim();
+      const normalizedName = trimmedName.toLowerCase();
+      const leadCollegeIdStr = String(lead.college_id);
+      const compositeKey = `${leadCollegeIdStr}::${normalizedName}`;
+
+      if (inBatchSyncedKeys.has(compositeKey)) {
+        // Backfill role, CTC, contact, email, or JD date if updated in coordinator lead
+        const safeRegex = new RegExp(`^${escapeRegex(trimmedName)}$`, 'i');
+        const existingRow = await WeeklyTracker.findOne({
+          college_id: lead.college_id,
+          academic_year: targetYear,
+          company_name: { $regex: safeRegex },
+          is_deleted: false,
+        });
+        if (existingRow) {
+          let updated = false;
+          if (!existingRow.job_role && lead.job_role) {
+            existingRow.job_role = lead.job_role.trim();
+            updated = true;
+          }
+          if (!existingRow.ctc_lpa && lead.ctc) {
+            existingRow.ctc_lpa = lead.ctc.trim();
+            updated = true;
+          }
+          if (!existingRow.contact_number && (lead as any).contact_number) {
+            existingRow.contact_number = (lead as any).contact_number.trim();
+            updated = true;
+          }
+          if (!existingRow.email_id && (lead as any).email_id) {
+            existingRow.email_id = (lead as any).email_id.trim();
+            updated = true;
+          }
+          if (!existingRow.jd_received_date && lead.lead_type === 'jd_received') {
+            existingRow.jd_received_date = lead.lead_date || new Date();
+            updated = true;
+          }
+          if (updated) {
+            existingRow.updated_at = new Date();
+            await existingRow.save();
+          }
+        }
+        continue;
+      }
+
+      const safeRegex = new RegExp(`^${escapeRegex(trimmedName)}$`, 'i');
+      const existing = await WeeklyTracker.findOne({
+        college_id: lead.college_id,
+        academic_year: targetYear,
+        company_name: { $regex: safeRegex },
+        is_deleted: false,
+      });
+
+      if (!existing) {
+        const isJdLead = lead.lead_type === 'jd_received';
+        const targetSection = isJdLead ? 'in_progress' : 'pipeline';
+        const statusText = isJdLead ? 'JD Received' : 'Invite sent, Awaiting JD';
+
+        const maxPipelineRow = await WeeklyTracker.findOne({
+          college_id: lead.college_id,
+          academic_year: targetYear,
+          pipeline_section: targetSection,
+          is_deleted: false,
+        }).sort({ order_index: -1 });
+
+        const nextOrderIndex = maxPipelineRow && typeof maxPipelineRow.order_index === 'number'
+          ? maxPipelineRow.order_index + 1
+          : (await WeeklyTracker.countDocuments({
+              college_id: lead.college_id,
+              academic_year: targetYear,
+              pipeline_section: targetSection,
+              is_deleted: false,
+            }));
+
+        let metaContacts: { mobile_numbers?: string[]; email_ids?: string[]; company_type?: string } = {};
+        if (lead.company_id && Types.ObjectId.isValid(String(lead.company_id))) {
+          const meta = await CompanyMetadata.findById(lead.company_id).lean();
+          if (meta) {
+            metaContacts = {
+              mobile_numbers: meta.mobile_numbers,
+              email_ids: meta.email_ids,
+              company_type: meta.company_type || meta.industry_sector,
+            };
+          }
+        }
+
+        let dtContact: any = null;
+        if (lead.daily_tracker_id && Types.ObjectId.isValid(String(lead.daily_tracker_id))) {
+          dtContact = await DailyTracker.findById(lead.daily_tracker_id).lean();
+        }
+
+        const primaryMobile = (lead as any).contact_number || dtContact?.mobile_number || (metaContacts.mobile_numbers && metaContacts.mobile_numbers[0]) || '';
+        const allMobiles = Array.from(new Set([
+          ...((lead as any).contact_number ? [(lead as any).contact_number] : []),
+          ...(dtContact?.mobile_number ? [dtContact.mobile_number] : []),
+          ...(metaContacts.mobile_numbers || []),
+        ].filter(Boolean)));
+
+        const primaryEmail = (lead as any).email_id || dtContact?.email_id || (metaContacts.email_ids && metaContacts.email_ids[0]) || '';
+        const allEmails = Array.from(new Set([
+          ...((lead as any).email_id ? [(lead as any).email_id] : []),
+          ...(dtContact?.email_id ? [dtContact.email_id] : []),
+          ...(metaContacts.email_ids || []),
+        ].filter(Boolean)));
+
+        await WeeklyTracker.create({
+          academic_year: targetYear,
+          college_id: lead.college_id,
+          coordinator_id: lead.coordinator_id || new Types.ObjectId('6a847199fa3bf51271bc14eb'),
+          company_id: lead.company_id || new Types.ObjectId(),
+          daily_tracker_id: lead.daily_tracker_id || null,
+          company_name: trimmedName,
+          job_role: lead.job_role?.trim() || '',
+          contact_number: primaryMobile,
+          mobile_numbers: allMobiles,
+          email_id: primaryEmail,
+          email_ids: allEmails,
+          cdc_reference: dtContact?.hr_name ? `${dtContact.hr_name}${dtContact.mobile_number ? ` (${dtContact.mobile_number})` : ''}` : '',
+          company_type: metaContacts.company_type || '',
+          ctc_lpa: lead.ctc?.trim() || '',
+          eligible_batch: lead.eligible_batch?.trim() || `${batchYear} Batch`,
+          pipeline_section: targetSection,
+          current_status_text: statusText,
+          jd_received_date: isJdLead ? (lead.lead_date || new Date()) : undefined,
+          follow_up_date: null,
+          order_index: nextOrderIndex,
+          week_number: weekNumber,
+          week_start_date: startFriday,
+          week_end_date: endThursday,
+          created_at: new Date(),
+          updated_at: new Date(),
+          last_status_updated_at: new Date(),
+        });
+        syncedCount++;
+        inBatchSyncedKeys.add(compositeKey);
+      }
+    }
+
+    // 3. Check for any unpromoted positive daily tracker calls for this college
+    const unpromotedDailyCalls = await DailyTracker.find({
+      college_id: { $in: queryCollegeIds },
+      is_promoted_to_weekly: { $ne: true },
+      outcome_status: { $in: ['positive', 'jd_received', 'invite_mail'] },
+    });
+
+    for (const callRow of unpromotedDailyCalls) {
+      if (!callRow.company_name || !callRow.company_name.trim()) continue;
+      const trimmedName = callRow.company_name.trim();
+      const escapedName = escapeRegex(trimmedName);
+      const existing = await WeeklyTracker.findOne({
+        college_id: callRow.college_id,
+        academic_year: targetYear,
+        $or: [
+          { daily_tracker_id: callRow._id },
+          { company_name: { $regex: new RegExp(`^${escapedName}$`, 'i') } },
+        ],
+        is_deleted: false,
+      });
+
+      if (!existing) {
+        const isJd = callRow.outcome_status === 'jd_received';
+        const targetSection = isJd ? 'in_progress' : 'pipeline';
+        const statusText = isJd
+          ? 'JD Received'
+          : callRow.outcome_status === 'invite_mail'
+          ? 'Invite email sent'
+          : (callRow.outcome_status || 'positive').replace(/_/g, ' ');
+
+        await WeeklyTracker.create({
+          academic_year: targetYear,
+          college_id: callRow.college_id,
+          coordinator_id: callRow.coordinator_id,
+          company_id: callRow.company_id || new Types.ObjectId(),
+          daily_tracker_id: callRow._id,
+          company_name: trimmedName,
+          job_role: 'Graduate Trainee',
+          contact_number: callRow.mobile_number || '',
+          email_id: callRow.email_id || '',
+          cdc_reference: callRow.hr_name ? `${callRow.hr_name}${callRow.mobile_number ? ` (${callRow.mobile_number})` : ''}` : '',
+          company_type: '',
+          ctc_lpa: 'To be disclosed',
+          eligible_batch: `${batchYear} Batch`,
+          pipeline_section: targetSection,
+          current_status_text: statusText,
+          follow_up_date: callRow.follow_up_date || null,
+          week_number: weekNumber,
+          week_start_date: startFriday,
+          week_end_date: endThursday,
+          created_at: new Date(),
+          updated_at: new Date(),
+          last_status_updated_at: new Date(),
+        });
+        syncedCount++;
+      }
+
+      callRow.is_promoted_to_weekly = true;
+      await callRow.save();
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully synchronized coordinator data for ${(targetCol as any)?.college_name || 'your college'}.`,
+      data: {
+        college_id: collegeId,
+        college_name: (targetCol as any)?.college_name,
+        synced_count: syncedCount,
+        synced_at: new Date().toISOString(),
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: { code: 'INTERNAL_SERVER_ERROR', message: error.message } });
+  }
+});
+
+function classifyTpoCtc(ctcStr?: string): '3 - 5 LPA' | '5 - 7 LPA' | '7 - 10 LPA' | '10+ LPA' | 'Internship' {
+  if (!ctcStr || typeof ctcStr !== 'string') return 'Internship';
+  const s = ctcStr.toLowerCase();
+  if (s.includes('intern') || s.includes('stipend') || s.includes('month') || s.includes('/m')) {
+    return 'Internship';
+  }
+  const nums = ctcStr.match(/(\d+(?:\.\d+)?)/g);
+  if (!nums || nums.length === 0) return 'Internship';
+
+  const parsed = nums.map(Number).filter((n) => !isNaN(n) && n > 0);
+  if (parsed.length === 0) return 'Internship';
+  if (parsed[0] > 1000) return 'Internship';
+
+  const val = parsed.length === 1 ? parsed[0] : (parsed[0] + parsed[1]) / 2;
+
+  if (val < 3) return 'Internship';
+  if (val < 5) return '3 - 5 LPA';
+  if (val < 7) return '5 - 7 LPA';
+  if (val < 10) return '7 - 10 LPA';
+  return '10+ LPA';
+}
+
+// ── GET /api/v1/tpo/dashboard — read-only KPI summary, pinned to the caller's own college
+app.get('/api/v1/tpo/dashboard', async (req: Request, res: Response) => {
+  try {
+    const collegeId = await resolveTpoCollegeId(req.user!.userId);
+    if (!collegeId) {
+      return res.status(403).json({ success: false, error: { code: 'NO_COLLEGE_SCOPE', message: 'This account has no assigned college.' } });
+    }
+
+    const college = await College.findById(collegeId).select('college_name college_code logo_url location').lean();
+    const rows = await WeeklyTracker.find({ college_id: collegeId, is_deleted: { $ne: true } })
+      .select('company_name job_role ctc_lpa pipeline_section is_pinned_top selected_count registered_count')
+      .lean();
+
+    const buckets = bucketTpoRows(rows);
+    const totalOffers = rows.reduce((sum, r: any) => sum + (r.selected_count || 0), 0);
+    const totalRegistered = rows.reduce((sum, r: any) => sum + (r.registered_count || 0), 0);
+
+    const ctcDistribution: Record<string, number> = {
+      '3 - 5 LPA': 0,
+      '5 - 7 LPA': 0,
+      '7 - 10 LPA': 0,
+      '10+ LPA': 0,
+      'Internship': 0,
+    };
+
+    for (const r of rows) {
+      const bucket = classifyTpoCtc((r as any).ctc_lpa);
+      ctcDistribution[bucket] = (ctcDistribution[bucket] || 0) + 1;
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        college: college ? {
+          name: (college as any).college_name,
+          code: (college as any).college_code,
+          logo_url: (college as any).logo_url || `/college-logos/${(college as any).college_code?.toLowerCase()}.png`,
+          location: (college as any).location || '',
+        } : null,
+        kpi: {
+          total_companies: rows.length,
+          completed: buckets.completed.length,
+          drive_in_progress: buckets.drive_in_progress.length,
+          upcoming_drive: buckets.upcoming_drive.length,
+          in_progress: buckets.in_progress.length,
+          pipeline: buckets.pipeline.length,
+          rejected_by_tpo: buckets.rejected_by_tpo.length,
+          rejected: buckets.rejected.length,
+          total_offers: totalOffers,
+          total_students_registered: totalRegistered,
+          ctc_distribution: ctcDistribution,
+        },
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: { code: 'INTERNAL_SERVER_ERROR', message: error.message } });
+  }
+});
+
 // ── DB-1: GET /api/v1/dashboard/coordinator
 // Coordinator Dashboard (Spec Section 5.1 & 7) — "What should I do today?"
 app.get('/api/v1/dashboard/coordinator', async (req: Request, res: Response) => {
@@ -14967,13 +15823,17 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 const ensureDefaultAccounts = async () => {
   try {
     // 1. Ensure Roles
-    // TPO removed 29 Aug 2026 — no frontend experience was ever built for it,
-    // so the account type was unusable. See the RoleCode comment in
-    // routePolicy.ts for the full reasoning and how to bring it back.
+    // TPO removed 29 Aug 2026, re-added 29 Sep 2026 with a real scoped
+    // experience (own dashboard + read-only Weekly Tracker under /tpo/*,
+    // never the broad STAFF bucket). See the RoleCode comment in
+    // routePolicy.ts. TPO USER accounts are never created here — only
+    // through POST /colleges/:id/tpo-access — this just ensures the role
+    // document itself exists, same as the other three.
     const systemRoles = [
       { role_code: 'ADMINISTRATOR', role_name: 'Administrator', description: 'Master administrator with full system governance' },
       { role_code: 'TEAM_LEADER', role_name: 'Team Leader', description: 'Placement supervisor and team manager' },
       { role_code: 'PLACEMENT_COORDINATOR', role_name: 'Placement Coordinator', description: 'Campus placement coordinator' },
+      { role_code: 'TPO', role_name: 'Placement Officer', description: 'External, read-only college placement officer' },
     ];
 
     const roleMap: Record<string, any> = {};
@@ -15282,6 +16142,63 @@ const ensureDefaultAccounts = async () => {
       }
     }
 
+    // 7. Ensure all partner colleges have active Placement Officer (TPO) accounts
+    try {
+      const tpoRole = await Role.findOne({ role_code: 'TPO' });
+      const colleges = await College.find({ is_deleted: { $ne: true } });
+      const tpoSalt = await bcrypt.genSalt(12);
+      const tpoPasswordHash = await bcrypt.hash('Placement@123', tpoSalt);
+
+      for (const col of colleges) {
+        if (!col.college_code) continue;
+        const tpoUserCode = col.college_code.trim().toLowerCase();
+        let tpoUserDoc = await User.findOne({ username: tpoUserCode, role_codes: 'TPO' });
+        if (tpoUserDoc) {
+          let updated = false;
+          if (tpoUserDoc.account_status !== 'active') {
+            tpoUserDoc.account_status = 'active';
+            updated = true;
+          }
+          if (tpoUserDoc.is_deleted) {
+            tpoUserDoc.is_deleted = false;
+            updated = true;
+          }
+          if (tpoUserDoc.failed_login_attempts > 0 || tpoUserDoc.is_password_locked) {
+            tpoUserDoc.failed_login_attempts = 0;
+            tpoUserDoc.is_password_locked = false;
+            updated = true;
+          }
+          if (!tpoUserDoc.assigned_college_ids || tpoUserDoc.assigned_college_ids.length === 0) {
+            tpoUserDoc.assigned_college_ids = [col._id] as any;
+            updated = true;
+          }
+          if (tpoRole && (!tpoUserDoc.role_ids || tpoUserDoc.role_ids.length === 0)) {
+            tpoUserDoc.role_ids = [tpoRole._id] as any;
+            updated = true;
+          }
+          if (updated) {
+            await tpoUserDoc.save();
+          }
+        } else {
+          await User.create({
+            full_name: `${col.college_name} — Placement Officer`,
+            username: tpoUserCode,
+            official_email: `${tpoUserCode}.tpo@ipoms.internal`,
+            password_hash: tpoPasswordHash,
+            role_codes: ['TPO'],
+            role_ids: tpoRole ? [tpoRole._id] : [],
+            assigned_college_ids: [col._id],
+            account_status: 'active',
+            presence_status: 'available',
+            is_deleted: false,
+          });
+        }
+      }
+      console.log(`✅ [iPOMS] Placement Officer (TPO) accounts verified and active for all ${colleges.length} partner colleges.`);
+    } catch (tpoErr) {
+      console.error('⚠️ [iPOMS] Error verifying TPO accounts on boot:', tpoErr);
+    }
+
     if (createdUserIds.length > 0) {
       console.log(`✅ [iPOMS] Created ${createdUserIds.length} missing default account(s) with password: ${defaultPassword}`);
     }
@@ -15392,6 +16309,71 @@ const startServer = async () => {
     }
   } catch (err) {
     console.error('Reconcile same-day moved leads error:', err);
+  }
+
+  // ── Scrub non-phone strings (e.g. HR names like 'Balaji') from mobile fields in MongoDB ──
+  try {
+    const trackers = await WeeklyTracker.find({
+      $or: [
+        { mobile_numbers: { $exists: true, $ne: [] } },
+        { contact_number: { $exists: true, $ne: '' } },
+      ],
+    });
+    for (const t of trackers) {
+      let modified = false;
+      if (Array.isArray(t.mobile_numbers) && t.mobile_numbers.length > 0) {
+        const clean = t.mobile_numbers.filter((num) => {
+          const digits = String(num).replace(/\D/g, '');
+          return digits.length >= 7 && !/^[a-zA-Z\s]+$/.test(String(num));
+        });
+        if (clean.length !== t.mobile_numbers.length) {
+          t.mobile_numbers = clean;
+          modified = true;
+        }
+      }
+      if (t.contact_number) {
+        const digits = String(t.contact_number).replace(/\D/g, '');
+        if (digits.length < 7 || /^[a-zA-Z\s]+$/.test(String(t.contact_number))) {
+          t.contact_number = t.mobile_numbers?.[0] || '';
+          modified = true;
+        }
+      }
+      if (modified) {
+        await t.save();
+      }
+    }
+
+    const metas = await CompanyMetadata.find({
+      $or: [
+        { mobile_numbers: { $exists: true, $ne: [] } },
+        { primary_mobile: { $exists: true, $ne: '' } },
+      ],
+    });
+    for (const m of metas) {
+      let modified = false;
+      if (Array.isArray(m.mobile_numbers) && m.mobile_numbers.length > 0) {
+        const clean = m.mobile_numbers.filter((num) => {
+          const digits = String(num).replace(/\D/g, '');
+          return digits.length >= 7 && !/^[a-zA-Z\s]+$/.test(String(num));
+        });
+        if (clean.length !== m.mobile_numbers.length) {
+          m.mobile_numbers = clean;
+          modified = true;
+        }
+      }
+      if (m.primary_mobile) {
+        const digits = String(m.primary_mobile).replace(/\D/g, '');
+        if (digits.length < 7 || /^[a-zA-Z\s]+$/.test(String(m.primary_mobile))) {
+          m.primary_mobile = m.mobile_numbers?.[0] || '';
+          modified = true;
+        }
+      }
+      if (modified) {
+        await m.save();
+      }
+    }
+  } catch (err) {
+    console.error('Scrub non-phone strings error:', err);
   }
 
   // Always ensure official active college roster (21 colleges including MAREPHRAM) is synchronized on boot

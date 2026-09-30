@@ -17,10 +17,9 @@ import {
 import type { TrackerRow, CallOutcome } from '../page';
 import { triggerHaptic } from '@/lib/haptics';
 import { ROW_OUTCOMES } from './RowOutcomeDropdown';
-import { MONTHS } from './TrackerRow';
+import { RowFollowUpDateDropdown } from './RowFollowUpDateDropdown';
 import { MultiTagInput } from '@/components/ui/MultiTagInput';
 import { SmoothSelect } from '@/components/ui/SmoothSelect';
-import { SmoothMonthDropdown } from '@/components/ui/SmoothMonthDropdown';
 import {
   validateAndNormalizeIndianContact,
   validateAndNormalizeEmail,
@@ -48,7 +47,7 @@ export function EditTrackerRowModal({ row, onClose, onSave, onDelete }: Props) {
     return row.email_id.split(/[,;/]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
   });
   const [outcomeStatus, setOutcomeStatus] = useState<CallOutcome | ''>(row.outcome_status || '');
-  const [followUpMonth, setFollowUpMonth] = useState<string>(row.follow_up_month || '');
+  const [followUpDate, setFollowUpDate] = useState<string>(row.follow_up_date || '');
   const [comments, setComments] = useState(row.comments || '');
   const [loading, setLoading] = useState(false);
 
@@ -83,9 +82,10 @@ export function EditTrackerRowModal({ row, onClose, onSave, onDelete }: Props) {
       if (outcomeStatus) {
         patch.outcome_status = outcomeStatus as CallOutcome;
         if (outcomeStatus === 'follow_up') {
-          patch.follow_up_month = followUpMonth || null;
+          patch.follow_up_date = followUpDate || null;
         } else {
           patch.follow_up_month = null;
+          patch.follow_up_date = null;
         }
       }
 
@@ -228,14 +228,13 @@ export function EditTrackerRowModal({ row, onClose, onSave, onDelete }: Props) {
 
             <div>
               <label className="block text-[11px] font-bold text-fg uppercase tracking-wider mb-1 flex items-center justify-between">
-                <span>Follow Up Month</span>
+                <span>Follow Up Date</span>
                 {outcomeStatus !== 'follow_up' && <Lock size={10} className="text-fg-disabled" />}
               </label>
-              <SmoothMonthDropdown
+              <RowFollowUpDateDropdown
                 disabled={outcomeStatus !== 'follow_up'}
-                value={followUpMonth}
-                onChange={(m) => setFollowUpMonth(m)}
-                placeholder="— Select Month —"
+                value={followUpDate}
+                onChange={(d) => setFollowUpDate(d)}
               />
             </div>
           </div>

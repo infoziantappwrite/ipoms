@@ -19,12 +19,12 @@ export const ROW_OUTCOMES: RowOutcomeOption[] = [
   { value: 'drive_completed', label: 'Drive Completed', dotColor: 'bg-emerald-500', textColor: 'text-emerald-600 dark:text-emerald-400' },
   { value: 'invite_mail', label: 'Invite Mail', dotColor: 'bg-sky-500', textColor: 'text-sky-600 dark:text-sky-400' },
   { value: 'in_connect', label: 'In Connect', dotColor: 'bg-indigo-500', textColor: 'text-indigo-600 dark:text-indigo-400' },
-  { value: 'follow_up', label: 'Follow Up', dotColor: 'bg-amber-500', textColor: 'text-amber-600 dark:text-amber-400 font-semibold' },
+  { value: 'follow_up', label: 'Follow Up', dotColor: 'bg-orange-500', textColor: 'text-orange-600 dark:text-orange-400 font-semibold' },
   { value: 'call_back', label: 'Call Back', dotColor: 'bg-amber-500', textColor: 'text-amber-600 dark:text-amber-400' },
   { value: 'hiring_completed', label: 'Hiring Completed', dotColor: 'bg-cyan-500', textColor: 'text-cyan-600 dark:text-cyan-400' },
-  { value: 'hiring_freezed', label: 'Hiring Freezed', dotColor: 'bg-orange-500', textColor: 'text-orange-600 dark:text-orange-400' },
-  { value: 'not_hiring', label: 'Not Hiring', dotColor: 'bg-rose-500', textColor: 'text-rose-600 dark:text-rose-400 font-semibold' },
-  { value: 'no_response', label: 'No Response', dotColor: 'bg-rose-500', textColor: 'text-rose-600 dark:text-rose-400' },
+  { value: 'hiring_freezed', label: 'Hiring Freezed', dotColor: 'bg-purple-500', textColor: 'text-purple-600 dark:text-purple-400 font-semibold' },
+  { value: 'not_hiring', label: 'Not Hiring', dotColor: 'bg-rose-600', textColor: 'text-rose-700 dark:text-rose-400 font-bold' },
+  { value: 'no_response', label: 'No Response', dotColor: 'bg-rose-500', textColor: 'text-rose-600 dark:text-rose-400 font-medium' },
   { value: 'invalid', label: 'Invalid', dotColor: 'bg-slate-500', textColor: 'text-slate-400 dark:text-slate-500' },
 ];
 

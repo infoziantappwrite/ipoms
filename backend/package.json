@@ -18,7 +18,8 @@
     "fix:college-assignments": "ts-node src/scripts/fixCollegeAssignments.ts",
     "fill:placeholders": "ts-node src/scripts/fillCleanMetadataPlaceholders.ts",
     "import:152": "ts-node src/scripts/importFilled152Placeholders.ts",
-    "sync:past": "ts-node src/scripts/syncPastDailyToWeekly.ts"
+    "sync:past": "ts-node src/scripts/syncPastDailyToWeekly.ts",
+    "backfill:followups": "ts-node src/scripts/backfillFollowUpDates.ts"
   },
   "keywords": [
     "ipoms",

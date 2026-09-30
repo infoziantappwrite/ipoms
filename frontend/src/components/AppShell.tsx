@@ -81,7 +81,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('keydown', handleGlobalSaveShortcut);
   }, [pathname]);
 
-  if (CHROMELESS.includes(pathname)) {
+  // /tpo/* renders its own separate shell (TpoLayout) — a Placement Officer
+  // must never see the coordinator sidebar (Metadata DB, Report Builder, …),
+  // only Dashboard + Weekly Tracker.
+  if (CHROMELESS.includes(pathname) || pathname === '/tpo' || pathname.startsWith('/tpo/')) {
     return <main id="main" className="flex min-h-screen flex-1 flex-col">{children}</main>;
   }
 

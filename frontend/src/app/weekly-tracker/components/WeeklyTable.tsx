@@ -174,6 +174,7 @@ export function WeeklyTable({
   const hasFollowUpColumn = FOLLOWUP_SECTIONS.includes(sectionKey);
   const hasContactAndEmail = ['drive_in_progress', 'in_drive', 'companies_in_drive', 'upcoming_drives', 'in_progress', 'pipeline'].includes(sectionKey);
   const hasJdDbDates = ['drive_in_progress', 'in_drive', 'companies_in_drive', 'upcoming_drives', 'in_progress'].includes(sectionKey);
+  const hasDriveDate = ['drive_in_progress', 'in_drive', 'companies_in_drive', 'upcoming_drives'].includes(sectionKey);
 
   // Local rows state for real-time optimistic swapping
   const [localRows, setLocalRows] = useState<WeeklyRow[]>(rows);
@@ -625,6 +626,16 @@ export function WeeklyTable({
               </>
             )}
 
+            {/* ── Drive Date (Upcoming Drives Only) ── */}
+            {hasDriveDate && (
+              <th className="py-2.5 px-3 min-w-[135px] text-center border-b border-border bg-[#F1F5F9] dark:bg-[#0D111C]" title="Drive Date">
+                <div className="inline-flex items-center justify-center gap-1 text-purple-600 dark:text-purple-400">
+                  <span className="font-extrabold text-[11px]">DRIVE</span>
+                  <Calendar size={12} strokeWidth={2.5} />
+                </div>
+              </th>
+            )}
+
             {isCompletedSection && (
               <th className="py-2.5 px-3 min-w-[120px] text-center border-b border-border bg-[#F1F5F9] dark:bg-[#0D111C]">Offers Received</th>
             )}
@@ -640,6 +651,7 @@ export function WeeklyTable({
               hasFollowUpColumn={hasFollowUpColumn}
               hasContactAndEmail={hasContactAndEmail}
               hasJdDbDates={hasJdDbDates}
+              hasDriveDate={hasDriveDate}
               isDeleteMode={isDeleteMode}
               isSelected={selectedRowIds.includes(row._id)}
               onToggleSelect={() => onToggleSelectRow && onToggleSelectRow(row._id)}
@@ -677,6 +689,7 @@ function TableRow({
   hasFollowUpColumn,
   hasContactAndEmail,
   hasJdDbDates,
+  hasDriveDate = false,
   isDeleteMode,
   isSelected,
   onToggleSelect,
@@ -706,6 +719,7 @@ function TableRow({
   hasFollowUpColumn: boolean;
   hasContactAndEmail: boolean;
   hasJdDbDates: boolean;
+  hasDriveDate: boolean;
   isDeleteMode: boolean;
   isSelected: boolean;
   onToggleSelect: () => void;
@@ -1001,15 +1015,7 @@ function TableRow({
             <div className="flex items-center gap-1.5 group/contact whitespace-nowrap">
               {row.contact_number || (row.mobile_numbers && row.mobile_numbers[0]) ? (
                 <>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <a
-                      href={`tel:${row.contact_number || row.mobile_numbers?.[0]}`}
-                      title={`Call ${row.contact_number || row.mobile_numbers?.[0]}`}
-                      className="w-5 h-5 rounded-md bg-blue-500/15 hover:bg-blue-500/30 border border-blue-500/40 text-blue-600 dark:text-blue-400 flex items-center justify-center transition-all hover:scale-105 active:scale-[0.992] cursor-pointer shrink-0 shadow-2xs"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Phone size={11} strokeWidth={2.5} />
-                    </a>
+                  <div className="flex items-center shrink-0">
                     <WhatsAppButton
                       mobileNumber={row.contact_number || row.mobile_numbers?.[0] || ''}
                       companyName={row.company_name}
@@ -1219,6 +1225,35 @@ function TableRow({
             </div>
           </td>
         </>
+      )}
+
+      {/* ── Drive Date (Upcoming Drives Only) ── */}
+      {hasDriveDate && (
+        <td className={`py-2.5 px-3 text-center whitespace-nowrap border-b border-border/60 relative z-0 ${nonStickyBg}`} onClick={(e) => e.stopPropagation()}>
+          <div className="inline-flex items-center justify-center">
+            <SmoothDatePicker
+              value={(() => {
+                if (!row.drive_date) return '';
+                try {
+                  const d = new Date(row.drive_date);
+                  if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+                  return row.drive_date.length === 10 ? row.drive_date : '';
+                } catch {
+                  return '';
+                }
+              })()}
+              onChange={(newDate) => {
+                onUpdateRow(row._id, { drive_date: newDate || undefined });
+              }}
+              placeholder="Set Drive Date"
+              usePortal={true}
+              clearable={true}
+              variant="pill"
+              size="sm"
+              theme="navy"
+            />
+          </div>
+        </td>
       )}
 
       {/* Offers Received (Completed Section Only) */}

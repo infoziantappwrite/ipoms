@@ -1,6 +1,6 @@
 'use client';
 
-export type RoleKey = 'admin' | 'team_leader' | 'coordinator';
+export type RoleKey = 'admin' | 'team_leader' | 'coordinator' | 'tpo';
 
 export interface SessionUser {
   _id: string;
@@ -50,6 +50,7 @@ export function roleOf(user: SessionUser | null): RoleKey {
   const codes = user?.role_codes ?? [];
   if (codes.includes('ADMINISTRATOR') || codes.includes('ADMIN')) return 'admin';
   if (codes.includes('TEAM_LEADER')) return 'team_leader';
+  if (codes.includes('TPO')) return 'tpo';
   return 'coordinator';
 }
 
@@ -57,6 +58,7 @@ export const ROLE_LABEL: Record<RoleKey, string> = {
   admin: 'Administrator',
   team_leader: 'Team Leader',
   coordinator: 'Placement Coordinator',
+  tpo: 'Placement Officer',
 };
 
 /** Marks the drawer intro as due — called once, on successful sign-in. */

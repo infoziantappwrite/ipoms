@@ -16,7 +16,7 @@ import type { CallOutcome } from '../page';
 import { triggerHaptic } from '@/lib/haptics';
 import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
 import { RowOutcomeDropdown } from './RowOutcomeDropdown';
-import { RowMonthDropdown } from './RowMonthDropdown';
+import { RowFollowUpDateDropdown } from './RowFollowUpDateDropdown';
 
 const OUTCOMES: { value: CallOutcome; label: string }[] = [
   { value: 'jd_received', label: 'JD Received' },
@@ -43,7 +43,7 @@ const DIALPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'
 export interface SoftphoneCallResult {
   rowId: string;
   outcomeStatus: CallOutcome;
-  followUpMonth?: string;
+  followUpDate?: string;
   comments?: string;
   callDurationSeconds?: number;
 }
@@ -78,7 +78,7 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
 
   // Wrap-up inputs
   const [outcome, setOutcome] = useState<CallOutcome | ''>('');
-  const [followUpMonth, setFollowUpMonth] = useState('');
+  const [followUpDate, setFollowUpDate] = useState('');
   const [comments, setComments] = useState('');
 
   const numberInputRef = useRef<HTMLInputElement>(null);
@@ -91,7 +91,7 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
       setIsMinimized(false);
       setElapsedSeconds(0);
       setOutcome(row.outcome_status || '');
-      setFollowUpMonth('');
+      setFollowUpDate('');
       setComments('');
       setShowDialpad(false);
     }
@@ -147,11 +147,15 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
       alert('Please select a Call Outcome status');
       return;
     }
+    if (outcome === 'follow_up' && !followUpDate) {
+      alert('Please pick a Follow Up date');
+      return;
+    }
 
     const result: SoftphoneCallResult = {
       rowId: row._id,
       outcomeStatus: outcome,
-      followUpMonth: outcome === 'follow_up' ? followUpMonth : undefined,
+      followUpDate: outcome === 'follow_up' ? followUpDate : undefined,
       comments: comments.trim() || undefined,
       callDurationSeconds: elapsedSeconds,
     };
@@ -307,15 +311,15 @@ export function SoftphonePanel({ row, onSave, onClose }: Props) {
               />
             </div>
 
-            {/* Follow Up Month (Conditional) */}
+            {/* Follow Up Date (Conditional) */}
             {outcome === 'follow_up' && (
               <div>
                 <label className="text-xs font-bold text-fg mb-1.5 block">
-                  Follow Up Month
+                  Follow Up Date <span className="text-rose-500">*</span>
                 </label>
-                <RowMonthDropdown
-                  value={followUpMonth}
-                  onChange={(m) => setFollowUpMonth(m)}
+                <RowFollowUpDateDropdown
+                  value={followUpDate}
+                  onChange={(d) => setFollowUpDate(d)}
                 />
               </div>
             )}

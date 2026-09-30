@@ -933,9 +933,9 @@ export function A4PdfPreviewModal({
                     key: 'not_hiring',
                     label: 'Not Hiring',
                     val: report.kpi_summary.not_hiring || 0,
-                    bg: 'bg-rose-50/80 border-rose-200',
-                    text: 'text-rose-700',
-                    labelText: 'text-rose-800',
+                    bg: 'bg-purple-50/80 border-purple-200',
+                    text: 'text-purple-700',
+                    labelText: 'text-purple-800',
                   },
                   {
                     key: 'jds_received',

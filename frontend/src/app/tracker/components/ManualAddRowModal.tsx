@@ -28,8 +28,8 @@ import { apiFetch } from '@/lib/api';
 import { triggerHaptic } from '@/lib/haptics';
 import { useToast } from '@/components/ui/Toast';
 import type { CallOutcome, TrackerRow } from '../page';
-import { ROW_OUTCOMES, type RowOutcomeOption } from './RowOutcomeDropdown';
-import { MONTHS } from './TrackerRow';
+import { ROW_OUTCOMES } from './RowOutcomeDropdown';
+import { RowFollowUpDateDropdown } from './RowFollowUpDateDropdown';
 import { MultiTagInput } from '@/components/ui/MultiTagInput';
 import {
   validateAndNormalizeIndianContact,
@@ -54,7 +54,7 @@ export interface ManualAddRowDraft {
   durationText: string;
   durationSec: number | null;
   outcome: CallOutcome | '';
-  followUpMonth: string;
+  followUpDate: string;
   comments: string;
   collegeId: string;
   sessionDate?: string;
@@ -146,10 +146,8 @@ export function ManualAddRowModal({
   const [isOutcomeOpen, setIsOutcomeOpen] = useState(false);
   const outcomeRef = useRef<HTMLDivElement>(null);
 
-  // Follow-Up Month Dropdown State
-  const [followUpMonth, setFollowUpMonth] = useState(() => initialDraft?.followUpMonth || '');
-  const [isMonthOpen, setIsMonthOpen] = useState(false);
-  const monthRef = useRef<HTMLDivElement>(null);
+  // Follow-Up Date State
+  const [followUpDate, setFollowUpDate] = useState(() => initialDraft?.followUpDate || '');
 
   const [comments, setComments] = useState(() => initialDraft?.comments || '');
   const [submitting, setSubmitting] = useState(false);
@@ -207,9 +205,6 @@ export function ManualAddRowModal({
       if (outcomeRef.current && !outcomeRef.current.contains(e.target as Node)) {
         setIsOutcomeOpen(false);
       }
-      if (monthRef.current && !monthRef.current.contains(e.target as Node)) {
-        setIsMonthOpen(false);
-      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -228,16 +223,12 @@ export function ManualAddRowModal({
           setIsOutcomeOpen(false);
           return;
         }
-        if (isMonthOpen) {
-          setIsMonthOpen(false);
-          return;
-        }
         onClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [submitting, showNotInMetaModal, showSuggestions, isOutcomeOpen, isMonthOpen, onClose]);
+  }, [submitting, showNotInMetaModal, showSuggestions, isOutcomeOpen, onClose]);
 
   // Fetch company suggestions from Meta Database
   const fetchSuggestions = async (query: string) => {
@@ -461,12 +452,6 @@ export function ManualAddRowModal({
     setDurationText(formatDurationMinutesLevel(diffSec));
   };
 
-  const handleSelectMonth = (m: string) => {
-    triggerHaptic('selection');
-    setFollowUpMonth(m);
-    setIsMonthOpen(false);
-  };
-
   const saveRowToTracker = async (matchedComp?: any) => {
     try {
       setSubmitting(true);
@@ -488,7 +473,7 @@ export function ManualAddRowModal({
         call_end_time: endObj.toISOString(),
         duration_seconds: computedSec,
         outcome_status: outcome,
-        follow_up_month: outcome === 'follow_up' ? followUpMonth : null,
+        follow_up_date: outcome === 'follow_up' ? followUpDate : null,
         comments: comments.trim(),
         session_date: sessionDate,
       };
@@ -501,9 +486,9 @@ export function ManualAddRowModal({
       if (res.success && (res.data as any)?.row) {
         const rec = matchedComp || matchedMetaRecord;
         if (rec && getCompanyMissingDetails(rec).isPlaceholder) {
-          toast(`Enriched company placeholder for "${companyName.trim()}" & logged entry`, 'success');
+          toast(`Enriched company placeholder for "${companyName.trim()}" & synced with metadata base`, 'success');
         } else {
-          toast('New entry added to tracker', 'success');
+          toast(`New entry added & synced with metadata base (${companyName.trim()})`, 'success');
         }
         onRowAdded((res.data as any).row);
         setShowNotInMetaModal(false);
@@ -533,8 +518,8 @@ export function ManualAddRowModal({
       toast('Call Status is mandatory to log this entry', 'warning');
       return;
     }
-    if (outcome === 'follow_up' && !followUpMonth) {
-      toast('Follow Up Month is mandatory when Call Status is Follow Up', 'warning');
+    if (outcome === 'follow_up' && !followUpDate) {
+      toast('Follow Up Date is mandatory when Call Status is Follow Up', 'warning');
       return;
     }
 
@@ -596,7 +581,7 @@ export function ManualAddRowModal({
         durationText,
         durationSec,
         outcome,
-        followUpMonth,
+        followUpDate,
         comments,
         collegeId,
         sessionDate,
@@ -1019,66 +1004,13 @@ export function ManualAddRowModal({
               )}
             </div>
 
-            {/* Follow Up Month (Solid Minimal Dropdown) */}
+            {/* Follow Up Date — real day/month/year picker, same component the grid cell uses */}
             {outcome === 'follow_up' && (
-              <div className="relative animate-in fade-in slide-in-from-top-1 duration-100" ref={monthRef}>
+              <div className="animate-in fade-in slide-in-from-top-1 duration-100">
                 <label className="block text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-1">
-                  Follow Up Month <span className="text-rose-500">*</span>
+                  Follow Up Date <span className="text-rose-500">*</span>
                 </label>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    triggerHaptic('light');
-                    setIsMonthOpen((prev) => !prev);
-                  }}
-                  className={`w-full flex items-center justify-between gap-2.5 px-3.5 py-2 rounded-xl border text-xs font-semibold transition-colors shadow-2xs cursor-pointer select-none ${
-                    followUpMonth
-                      ? 'bg-amber-500/10 border-amber-500/60 ring-2 ring-amber-500/15 text-amber-700 dark:text-amber-300'
-                      : 'bg-surface-sunken border-amber-400/50 text-fg-subtle hover:text-fg'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    <Calendar size={14} className="text-amber-500 shrink-0" />
-                    <span className="truncate">
-                      {followUpMonth ? followUpMonth : '— Select Follow Up Month —'}
-                    </span>
-                  </div>
-                  <ChevronDown
-                    size={14}
-                    className={`text-amber-500 shrink-0 transition-transform duration-150 ${
-                      isMonthOpen ? 'rotate-180' : ''
-                    }`}
-                  />
-                </button>
-
-                {/* Solid Minimal Month Popover */}
-                {isMonthOpen && (
-                  <div
-                    onClick={(e) => e.stopPropagation()}
-                    className="absolute left-0 right-0 top-full mt-1 z-50 bg-surface border border-border rounded-xl shadow-xl p-1 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100 max-h-56 overflow-y-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-                  >
-                    {MONTHS.map((m) => {
-                      const isSelected = followUpMonth === m;
-                      return (
-                        <button
-                          key={m}
-                          type="button"
-                          tabIndex={-1}
-                          onClick={() => handleSelectMonth(m)}
-                          className={`w-full text-left px-3 py-1.5 rounded-lg text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer ${
-                            isSelected
-                              ? 'bg-amber-500/15 text-amber-900 dark:text-amber-200 font-bold shadow-2xs'
-                              : 'hover:bg-surface-raised text-fg'
-                          }`}
-                        >
-                          <span className="truncate">{m}</span>
-                          {isSelected && <Check size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+                <RowFollowUpDateDropdown value={followUpDate} onChange={(d) => setFollowUpDate(d)} />
               </div>
             )}
           </div>

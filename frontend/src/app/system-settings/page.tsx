@@ -19,7 +19,8 @@ export default function SystemSettingsPage() {
   useEffect(() => {
     const session = readSessionUser();
     const role = roleOf(session);
-    setUserRole(role);
+    // A TPO never legitimately reaches this Administrator-only page.
+    setUserRole(role === 'tpo' ? 'coordinator' : role);
   }, []);
 
   const loadSettings = useCallback(async () => {

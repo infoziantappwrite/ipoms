@@ -8,7 +8,8 @@ import { LoginCollegeLogoStrip } from '@/components/auth/LoginCollegeLogoStrip';
 import { PasswordChecklist } from '@/components/auth/PasswordChecklist';
 import {
   AlertTriangle, CheckCircle2, LockKeyhole, LogIn,
-  ShieldAlert, Lock, Unlock, RotateCcw, KeyRound, Eye, EyeOff, Sparkles
+  ShieldAlert, Lock, Unlock, RotateCcw, KeyRound, Eye, EyeOff, Sparkles,
+  GraduationCap, Building2, ArrowLeft, ChevronRight
 } from 'lucide-react';
 import { armNavIntro } from '@/lib/session';
 import { clearDailyFocusOnLogin, clearAllCollegeSessionState, resolveDefaultCollege } from '@/lib/collegeSession';
@@ -26,6 +27,56 @@ function completeEmail(raw: string): string {
   return `${v}@infoziant.com`;
 }
 
+/**
+ * Shared shell (brand panel + centered surface) used by every login screen.
+ * MUST live at module scope, not inside LoginPage: a component defined
+ * inline in a render body gets a brand new function identity on every
+ * re-render, so React treats it as a different component type each time
+ * and remounts its whole subtree — every keystroke in a field inside it
+ * would drop focus and restart the input. (Exactly the bug this fixes —
+ * see CLAUDE.md item 86 for the full story.)
+ */
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-slate-50 lg:grid lg:grid-cols-[1.05fr_1fr] text-slate-900">
+      <aside className="relative hidden lg:flex flex-col items-center justify-between overflow-hidden border-r border-slate-200 bg-white py-12">
+        <div className="w-full space-y-2">
+          <p className="text-center text-micro font-bold text-slate-400 uppercase tracking-widest font-mono">
+            Partner Institutions
+          </p>
+          <LoginCollegeLogoStrip />
+        </div>
+        <div className="flex flex-col items-center text-center px-8 shrink-0 my-auto py-8">
+          <p className="font-display text-4xl font-bold tracking-tight text-primary drop-shadow-xs">
+            iPOMS
+          </p>
+          <h2 className="mt-2 font-display text-sm font-semibold tracking-normal text-slate-700 whitespace-nowrap">
+            Infoziant Placement Operations & Management System
+          </h2>
+        </div>
+        <div className="w-full space-y-2">
+          <p className="text-center text-micro font-bold text-slate-400 uppercase tracking-widest font-mono">
+            Core Modules
+          </p>
+          <LoginModuleMarquee />
+        </div>
+      </aside>
+      <main className="relative flex min-h-screen items-center justify-center bg-slate-50 lg:bg-white p-4 sm:p-6 lg:min-h-0 lg:p-10 text-slate-900">
+        <div className="hidden lg:block absolute top-8 right-8">
+          <InfoziantMark size={88} />
+        </div>
+        <div className="w-full max-w-md space-y-5">
+          <div className="flex flex-col items-center gap-1 lg:hidden">
+            <InfoziantMark size={52} />
+            <p className="text-title font-bold tracking-tight text-primary">iPOMS</p>
+          </div>
+          {children}
+        </div>
+      </main>
+    </div>
+  );
+}
+
 export default function LoginPage() {
   const router = useRouter();
 
@@ -38,6 +89,66 @@ export default function LoginPage() {
   }, []);
 
   const [mode, setMode] = useState<Mode>('login');
+
+  // Persona picker — shown first, before either login form. 'officer' is a
+  // fully separate, deliberately blind flow: the College field is free text
+  // (a typed acronym, never a discoverable list) so no TPO — or anyone else
+  // on this screen — can ever see which other colleges iPOMS works with.
+  // 'coordinator' renders the existing form, unchanged.
+  const [persona, setPersona] = useState<'picker' | 'coordinator' | 'officer'>('picker');
+  const [officerCode, setOfficerCode] = useState('');
+  const [officerPassword, setOfficerPassword] = useState('');
+  const [officerLoading, setOfficerLoading] = useState(false);
+  const [officerError, setOfficerError] = useState('');
+
+  const handleOfficerLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setOfficerError('');
+    const code = officerCode.trim().toLowerCase();
+    if (!code) return;
+    setOfficerLoading(true);
+    try {
+      const res = await fetch(`${API}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          email: code,
+          username: code,
+          password: officerPassword,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setOfficerError(data.error?.message || 'Invalid college or password.');
+        return;
+      }
+
+      clearAllCollegeSessionState();
+      const user = data.data?.user;
+      const token = data.data?.token;
+      if (token) {
+        try {
+          localStorage.setItem('ipoms_token', token);
+          sessionStorage.setItem('ipoms_token', token);
+          sessionStorage.setItem('ipoms_login_time', String(Date.now()));
+        } catch {}
+      }
+      if (user) {
+        try {
+          const raw = JSON.stringify(user);
+          localStorage.setItem('ipoms_user', raw);
+          sessionStorage.setItem('ipoms_user', raw);
+        } catch {}
+      }
+      armNavIntro();
+      router.push('/tpo');
+    } catch {
+      setOfficerError('Cannot reach the iPOMS server. Check your connection and try again.');
+    } finally {
+      setOfficerLoading(false);
+    }
+  };
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -160,7 +271,9 @@ export default function LoginPage() {
         await resolveDefaultCollege();
       } catch {}
 
-      router.push('/dashboard');
+      // Defensive: a TPO account should only ever arrive via the officer
+      // flow above, but route correctly either way rather than trusting that.
+      router.push(user?.role_codes?.includes('TPO') ? '/tpo' : '/dashboard');
     } catch {
       setErrorMsg('Cannot reach the iPOMS server. Check your connection and try again.');
     } finally {
@@ -266,6 +379,127 @@ export default function LoginPage() {
     : mode === 'verify_otp' ? 'Verify & Unlock Account'
     : 'Set New Password';
 
+  // ── Screen 1: persona picker ──────────────────────────────────────────────
+  if (persona === 'picker') {
+    return (
+      <Shell>
+        <div className="space-y-1 text-center">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 lg:text-3xl">Sign in as</h1>
+          <p className="text-micro text-slate-500">Choose how you'd like to access iPOMS.</p>
+        </div>
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={() => setPersona('coordinator')}
+            className="group flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-xs transition-all hover:border-primary/40 hover:shadow-sm"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Building2 size={20} strokeWidth={2} />
+            </span>
+            <span className="flex-1">
+              <span className="block text-sm font-bold text-slate-900">Placement Coordinator</span>
+              <span className="block text-micro text-slate-500">Infoziant staff — email or username</span>
+            </span>
+            <ChevronRight size={18} className="shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPersona('officer')}
+            className="group flex w-full items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-xs transition-all hover:border-primary/40 hover:shadow-sm"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <GraduationCap size={20} strokeWidth={2} />
+            </span>
+            <span className="flex-1">
+              <span className="block text-sm font-bold text-slate-900">Placement Officer</span>
+              <span className="block text-micro text-slate-500">College TPO — select your college</span>
+            </span>
+            <ChevronRight size={18} className="shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+          </button>
+        </div>
+      </Shell>
+    );
+  }
+
+  // ── Screen 2 (officer path): one form — college dropdown + password ─────
+  if (persona === 'officer') {
+    return (
+      <Shell>
+        <button
+          type="button"
+          onClick={() => { setPersona('picker'); setOfficerCode(''); setOfficerPassword(''); setOfficerError(''); }}
+          className="inline-flex items-center gap-1.5 text-micro font-semibold text-slate-500 hover:text-primary transition-colors"
+        >
+          <ArrowLeft size={14} /> Back
+        </button>
+
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 lg:text-3xl">Placement Officer</h1>
+          <p className="text-micro text-slate-500">Enter your college acronym and password.</p>
+        </div>
+
+        {officerError && (
+          <div role="alert" className="flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50 p-3.5 text-xs text-rose-700 font-medium">
+            <AlertTriangle size={16} strokeWidth={2} className="mt-px shrink-0" aria-hidden />
+            <span className="leading-relaxed">{officerError}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleOfficerLogin} className="space-y-4 text-xs animate-form-in">
+          <div>
+            <label className="block text-slate-700 font-bold mb-1">College Acronym</label>
+            <div className="relative">
+              <GraduationCap size={15} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={officerCode}
+                onChange={(e) => setOfficerCode(e.target.value)}
+                placeholder="e.g. AIHT, ACET, KLU"
+                autoComplete="username"
+                autoCapitalize="characters"
+                required
+                autoFocus
+                className={`${inputClass} pl-9 uppercase placeholder:normal-case`}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-slate-700 font-bold mb-1">Password</label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={officerPassword}
+                onChange={(e) => setOfficerPassword(e.target.value)}
+                placeholder="Enter password"
+                autoComplete="current-password"
+                required
+                className={inputClass}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={officerLoading || !officerCode.trim()}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-xs font-bold text-primary-foreground shadow-xs transition-all hover:bg-primary-hover disabled:opacity-60"
+          >
+            {officerLoading ? 'Signing in…' : (<><LogIn size={15} /> Sign In</>)}
+          </button>
+        </form>
+      </Shell>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 lg:grid lg:grid-cols-[1.05fr_1fr] text-slate-900">
 
@@ -319,6 +553,15 @@ export default function LoginPage() {
               Infoziant Placement Operations & Management System
             </p>
           </div>
+
+          {/* Back to persona picker */}
+          <button
+            type="button"
+            onClick={() => { setPersona('picker'); goTo('login'); }}
+            className="inline-flex items-center gap-1.5 -mt-2 text-micro font-semibold text-slate-500 hover:text-primary transition-colors"
+          >
+            <ArrowLeft size={14} /> Not a coordinator? Switch login
+          </button>
 
           {errorMsg && (
             <div
