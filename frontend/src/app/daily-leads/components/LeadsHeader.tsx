@@ -60,18 +60,16 @@ export function LeadsHeader({
     <header className="sticky top-0 z-40 bg-surface/95 backdrop-blur-md border-b border-border px-6 pt-4 pb-3 space-y-3 shadow-xs text-fg">
       {/* ── Top Row: Title & Top-Right Sign Out ────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-              <Target size={18} strokeWidth={2.5} />
-            </div>
-            <h1 className="text-base font-bold text-fg tracking-tight">
-              Daily Leads
-            </h1>
+        <div className="flex items-center gap-2.5">
+          <div 
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-xs shrink-0"
+            style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 30%, #0284c7 65%, #1d4ed8 100%)' }}
+          >
+            <Target size={17} strokeWidth={2.5} />
           </div>
-          <p className="text-xs text-fg-subtle mt-1 font-medium">
-            Positives and JD Tracker
-          </p>
+          <h1 className="text-base font-bold text-fg tracking-tight">
+            Daily Leads
+          </h1>
         </div>
 
         <div className="shrink-0">

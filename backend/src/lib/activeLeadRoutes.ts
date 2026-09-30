@@ -6,6 +6,7 @@ import { DailyTracker } from '../models/DailyTracker';
 import { WeeklyTracker } from '../models/WeeklyTracker';
 import { authenticateJWT } from './authMiddleware';
 import { seedActiveLeadsFromMasterPositives } from './seedActiveLeadsFromMasterPositives';
+import { getCurrentAcademicYear } from './academicYear';
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -81,7 +82,8 @@ export async function syncLeadFromDailyTracker(data: {
 
     if (!status) return null;
 
-    const year = (data.academic_year as any) || '2027';
+    const resolvedYear = await getCurrentAcademicYear();
+    const year = (data.academic_year as any) || String(resolvedYear);
 
     // Find existing lead or upsert (with safe regex escaping)
     const existing = await ActiveLead.findOne({

@@ -1,10 +1,14 @@
-import mongoose from 'mongoose';
-import dotenv from 'dotenv';
-dotenv.config({ path: 'c:/Projects/iPOMS/backend/.env' });
+const mongoose = require('mongoose');
+const dns = require('dns');
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../backend/.env') });
+
+dns.setServers(['8.8.8.8', '8.8.4.4']);
+
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://admin_ipoms:iPOMS_2026_Secure%23@ipoms-prod.7e8ft3k.mongodb.net/ipoms_db?retryWrites=true&w=majority';
 
 async function checkNovatech() {
-  const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/ipoms';
-  await mongoose.connect(uri);
+  await mongoose.connect(MONGODB_URI);
   const db = mongoose.connection.db;
   if (!db) {
     console.log('No DB connection');

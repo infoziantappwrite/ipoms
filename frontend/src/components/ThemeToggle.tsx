@@ -7,9 +7,10 @@ import { getStoredTheme, getResolvedTheme, toggleTheme, Theme } from '@/lib/them
 interface Props {
   variant?: 'pill' | 'icon' | 'compact';
   className?: string;
+  useGradient?: boolean;
 }
 
-export function ThemeToggle({ className = '' }: Props) {
+export function ThemeToggle({ className = '', useGradient = false }: Props) {
   const [mounted, setMounted] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<Theme>('light');
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
@@ -50,9 +51,14 @@ export function ThemeToggle({ className = '' }: Props) {
       onClick={handleToggle}
       title={isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
       aria-label={isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}
-      className={`group flex items-center justify-center transition-all duration-200 active:scale-[0.992] cursor-pointer shadow-2xs border select-none bg-surface hover:bg-surface-raised border-border text-fg rounded-lg ${className || 'w-9 h-9'}`}
+      style={useGradient ? { background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' } : undefined}
+      className={`group flex items-center justify-center transition-all duration-200 active:scale-[0.992] cursor-pointer shadow-xs select-none rounded-lg ${
+        useGradient
+          ? 'text-white border-none shadow-sky-500/25 hover:brightness-110 active:scale-95'
+          : 'bg-surface hover:bg-surface-raised border border-border text-fg shadow-2xs'
+      } ${className || 'w-9 h-9'}`}
     >
-      <AnimatedThemeIcon isDark={isDark} size={16} />
+      <AnimatedThemeIcon isDark={isDark} size={16} className={useGradient ? 'text-white' : undefined} />
     </button>
   );
 }

@@ -183,7 +183,7 @@ if (process.env.NODE_ENV === 'production') {
 // ── Shared Helpers ───────────────────────────────────────────────────────────
 
 function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return String(str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export const PLACEHOLDER_STRINGS = new Set([
@@ -1331,8 +1331,8 @@ app.patch('/api/v1/colleges/:id/status', async (req: Request, res: Response) => 
     // If marked inactive, clear from any coordinator's active weekly focus
     if (status !== 'active') {
       await User.updateMany(
-        { weekly_focus_locked: id },
-        { $pull: { weekly_focus_locked: id } }
+        { assigned_college_ids: id },
+        { $pull: { assigned_college_ids: id } }
       );
     }
 
@@ -2474,7 +2474,7 @@ app.post('/api/v1/daily-tracker/load-contacts', async (req: Request, res: Respon
       const validIds = resolves_follow_up_ids.filter((id: string) => Types.ObjectId.isValid(id));
       if (validIds.length > 0) {
         await DailyTracker.updateMany(
-          { _id: { $in: validIds }, coordinator_id: new Types.ObjectId(coordinator_id) },
+          { _id: { $in: validIds } },
           { $set: { follow_up_resolved: true } }
         );
       }
@@ -2708,9 +2708,7 @@ app.get('/api/v1/daily-tracker/follow-ups-due', async (req: Request, res: Respon
 
     if (rawCollegeId && rawCollegeId !== 'all' && Types.ObjectId.isValid(rawCollegeId)) {
       filter.college_id = new Types.ObjectId(String(rawCollegeId));
-    }
-
-    if (!isSuper) {
+    } else if (!isSuper) {
       if (!selfId || !Types.ObjectId.isValid(selfId)) {
         return res.status(200).json({ success: true, data: { reminders: [] } });
       }
@@ -6954,16 +6952,16 @@ app.post('/api/v1/daily-leads', async (req: Request, res: Response) => {
     let resolvedCompanyId = company_id;
     if (!resolvedCompanyId || !Types.ObjectId.isValid(String(resolvedCompanyId))) {
       const existingMeta = await CompanyMetadata.findOne({
-        company_name: { $regex: `^${company_name.trim()}$`, $options: 'i' },
+        company_name: { $regex: new RegExp(`^${escapeRegex(company_name.trim())}$`, 'i') },
       });
-      resolvedCompanyId = existingMeta?._id || new Types.ObjectId();
+      resolvedCompanyId = existingMeta?._id || null;
     }
 
     const newLead = await DailyLead.create({
       lead_type: lead_type || 'positive',
       college_id: new Types.ObjectId(String(college_id)),
       coordinator_id: new Types.ObjectId(String(resolvedCoordinatorId)),
-      company_id: new Types.ObjectId(String(resolvedCompanyId)),
+      company_id: resolvedCompanyId ? new Types.ObjectId(String(resolvedCompanyId)) : null,
       daily_tracker_id: daily_tracker_id && Types.ObjectId.isValid(String(daily_tracker_id)) ? new Types.ObjectId(String(daily_tracker_id)) : null,
       company_name: company_name.trim(),
       job_role: job_role?.trim() || '',
@@ -12281,23 +12279,43 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
     // window, so the next day's first load already reflects the new day.
     let todayCollegeActivity: Array<{
       college_id: string; college_code: string; college_name: string;
-      calls: number; duration_seconds: number; duration_formatted: string;
+      calls: number; completed_calls: number; duration_seconds: number; duration_formatted: string;
     }> = [];
     if (viewerHasFullAccess) {
       const activityAgg = await DailyTracker.aggregate([
         {
           $match: {
             is_skipped: { $ne: true },
-            $or: [
-              { session_date: { $gte: todayStart, $lte: todayEnd } },
-              { created_at: { $gte: todayStart, $lte: todayEnd } },
-            ],
+            session_date: { $gte: todayStart, $lte: todayEnd },
           },
         },
         {
           $group: {
             _id: '$college_id',
             calls: { $sum: 1 },
+            completed_calls: {
+              $sum: {
+                $cond: [
+                  {
+                    $or: [
+                      {
+                        $and: [
+                          { $ne: [{ $ifNull: ['$outcome_status', ''] }, ''] },
+                          { $ne: ['$outcome_status', 'pending'] },
+                          { $ne: ['$outcome_status', 'null'] },
+                          { $ne: ['$outcome_status', 'undefined'] },
+                        ],
+                      },
+                      { $gt: [{ $ifNull: ['$duration_seconds', 0] }, 0] },
+                      { $ne: [{ $ifNull: ['$call_start_time', null] }, null] },
+                      { $ne: [{ $ifNull: ['$call_end_time', null] }, null] },
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
             duration_seconds: { $sum: { $ifNull: ['$duration_seconds', 0] } },
           },
         },
@@ -12315,6 +12333,7 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
             college_code: resolvedCode || col.college_code,
             college_name: col.college_name,
             calls: a.calls,
+            completed_calls: typeof a.completed_calls === 'number' ? a.completed_calls : a.calls,
             duration_seconds: a.duration_seconds || 0,
             duration_formatted: formatDurationClock(a.duration_seconds || 0).formatted,
           };
@@ -12329,20 +12348,13 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
         const [todayTrackerRows, jds, pendingWork, latestCall] = await Promise.all([
           DailyTracker.find({
             coordinator_id: c._id,
-            $or: [
-              { session_date: { $gte: todayStart, $lte: todayEnd } },
-              { created_at: { $gte: todayStart, $lte: todayEnd } },
-              { year: todayStart.getUTCFullYear(), month: todayStart.getUTCMonth() + 1, day: todayStart.getUTCDate() },
-            ],
+            session_date: { $gte: todayStart, $lte: todayEnd },
           }).select('duration_seconds call_start_time call_end_time outcome_status').lean(),
           DailyLead.countDocuments({
             coordinator_id: c._id,
             lead_type: 'jd_received',
             is_deleted: false,
-            $or: [
-              { lead_date: { $gte: todayStart, $lte: todayEnd } },
-              { created_at: { $gte: todayStart, $lte: todayEnd } },
-            ],
+            lead_date: { $gte: todayStart, $lte: todayEnd },
           }),
           AssignedWork.countDocuments({ assigned_to_coordinator_id: c._id, is_completed: false, is_deleted: false }),
           DailyTracker.findOne({ coordinator_id: c._id })
@@ -12530,11 +12542,7 @@ app.get('/api/v1/dashboard/team-leader', async (req: Request, res: Response) => 
     if (targetLeader) {
       const leaderRows = await DailyTracker.find({
         coordinator_id: targetLeader._id,
-        $or: [
-          { session_date: { $gte: todayStart, $lte: todayEnd } },
-          { created_at: { $gte: todayStart, $lte: todayEnd } },
-          { year: todayStart.getUTCFullYear(), month: todayStart.getUTCMonth() + 1, day: todayStart.getUTCDate() },
-        ],
+        session_date: { $gte: todayStart, $lte: todayEnd },
       }).select('duration_seconds call_start_time call_end_time outcome_status created_at updated_at last_saved_at session_date is_skipped').lean();
 
       const completedLeaderRows = leaderRows.filter((r) => isTrackerRowCompleted(r));
@@ -12663,11 +12671,13 @@ app.get('/api/v1/dashboard/admin', async (req: Request, res: Response) => {
       AssignedWork.countDocuments({ is_deleted: false }),
       SystemSettings.findOne({}),
       CompanyMetadata.countDocuments({
-        $or: [{ mobile_number: { $exists: false } }, { mobile_number: '' }, { mobile_number: null }],
+        $or: [{ primary_mobile: { $exists: false } }, { primary_mobile: '' }, { primary_mobile: null }],
+        mobile_numbers: { $size: 0 },
         is_deleted: false,
       }),
       CompanyMetadata.countDocuments({
-        $or: [{ email_id: { $exists: false } }, { email_id: '' }, { email_id: null }],
+        $or: [{ primary_email: { $exists: false } }, { primary_email: '' }, { primary_email: null }],
+        email_ids: { $size: 0 },
         is_deleted: false,
       }),
     ]);
@@ -13784,10 +13794,11 @@ app.get('/api/v1/metadata', async (req: Request, res: Response) => {
       const isPhone = /^[0-9+]+$/.test(queryStr);
 
       if (isPhone) {
+        const escapedPhone = escapeRegex(queryStr);
         filter.$or = [
-          { primary_mobile: { $regex: queryStr, $options: 'i' } },
-          { contact_numbers: { $regex: queryStr, $options: 'i' } },
-          { mobile_numbers: { $regex: queryStr, $options: 'i' } },
+          { primary_mobile: { $regex: escapedPhone, $options: 'i' } },
+          { contact_numbers: { $regex: escapedPhone, $options: 'i' } },
+          { mobile_numbers: { $regex: escapedPhone, $options: 'i' } },
         ];
       } else {
         // Starts-with regex

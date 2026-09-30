@@ -55,20 +55,21 @@ export function FollowUpsDueBanner({ reminders, isReadOnly, activeDateLabel, onA
   if (reminders.length === 0) return null;
 
   return (
-    <div className="mb-3 rounded-xl border border-amber-300/70 bg-amber-50 dark:border-amber-700/50 dark:bg-amber-950/30 overflow-hidden">
-      <div className="flex w-full items-center justify-between gap-3 px-4 py-2.5">
+    <div className="mb-3 rounded-xl border border-amber-300/70 bg-amber-50 dark:border-amber-700/50 dark:bg-amber-950/30 overflow-hidden shadow-xs">
+      {/* ── Header Bar: Count & Top Action Button Only ── */}
+      <div className="flex w-full items-center justify-between gap-3 px-4 py-2.5 bg-amber-100/60 dark:bg-amber-900/30 border-b border-amber-200/70 dark:border-amber-800/50">
         <button
           type="button"
           onClick={() => setCollapsed((c) => !c)}
-          className="flex items-center gap-2.5 text-left min-w-0 cursor-pointer"
+          className="flex items-center gap-2.5 text-left min-w-0 cursor-pointer select-none group"
         >
-          <AlarmClock size={16} className="text-amber-600 dark:text-amber-400 shrink-0" strokeWidth={2.2} />
-          <span className="text-sm font-bold text-amber-800 dark:text-amber-300 shrink-0">
+          <AlarmClock size={16} className="text-amber-600 dark:text-amber-400 shrink-0 group-hover:scale-110 transition-transform" strokeWidth={2.2} />
+          <span className="text-sm font-bold text-amber-900 dark:text-amber-200 shrink-0">
             {reminders.length} Follow-Up{reminders.length === 1 ? '' : 's'} Due
           </span>
           <ChevronDown
             size={16}
-            className={`text-amber-500 transition-transform shrink-0 ${collapsed ? '' : 'rotate-180'}`}
+            className={`text-amber-600 dark:text-amber-400 transition-transform shrink-0 ${collapsed ? '' : 'rotate-180'}`}
           />
         </button>
 
@@ -79,49 +80,46 @@ export function FollowUpsDueBanner({ reminders, isReadOnly, activeDateLabel, onA
               e.stopPropagation();
               onAddToTracker(reminders);
             }}
-            className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#D97706] hover:bg-[#B45309] text-white text-xs font-bold px-3.5 py-1.5 transition-all shadow-xs active:scale-[0.98] cursor-pointer ml-auto"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[#D97706] hover:bg-[#B45309] text-white text-xs font-bold px-3.5 py-1.5 transition-all shadow-xs active:scale-[0.98] cursor-pointer ml-auto"
           >
-            <ListPlus size={13} strokeWidth={2.4} />
+            <ListPlus size={14} strokeWidth={2.4} />
             {reminders.length === 1
               ? `Add to ${activeDateLabel}'s Tracker`
-              : `Add All to ${activeDateLabel}'s Tracker`}
+              : `Add All (${reminders.length}) to ${activeDateLabel}'s Tracker`}
           </button>
         )}
       </div>
 
+      {/* ── Follow-Up Reminders List: Dynamic Height for up to 5 items, Invisible Scroller for > 5 ── */}
       {!collapsed && (
-        <div className="border-t border-amber-200/70 dark:border-amber-800/40 divide-y divide-amber-200/60 dark:divide-amber-800/40">
+        <div className="max-h-[255px] overflow-y-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden divide-y divide-amber-200/60 dark:divide-amber-800/40">
           {reminders.map((r) => (
-            <div key={r._id} className="flex flex-wrap items-center gap-x-5 gap-y-1.5 px-4 py-2.5">
-              <div className="min-w-[160px]">
-                <p className="text-sm font-bold text-amber-900 dark:text-amber-200 leading-tight">{r.company_name}</p>
-                <p className="text-[11px] text-amber-600/80 dark:text-amber-400/70">{formatDueCaption(r.follow_up_date)}</p>
+            <div key={r._id} className="flex flex-wrap items-center gap-x-6 gap-y-1 px-4 py-2 hover:bg-amber-100/40 dark:hover:bg-amber-900/20 transition-colors">
+              {/* Company & Due Status */}
+              <div className="min-w-[170px] flex-1 sm:flex-initial">
+                <p className="text-xs font-bold text-amber-950 dark:text-amber-100 leading-tight truncate">{r.company_name}</p>
+                <p className="text-[10.5px] font-semibold text-amber-700/90 dark:text-amber-400/80">{formatDueCaption(r.follow_up_date)}</p>
               </div>
 
+              {/* HR Contact */}
               {r.hr_name && (
-                <span className="flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-300">
-                  <User size={12} strokeWidth={2.2} /> {r.hr_name}
-                </span>
-              )}
-              {r.mobile_number && (
-                <span className="flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-300 tabular-nums">
-                  <Phone size={12} strokeWidth={2.2} /> {r.mobile_number}
-                </span>
-              )}
-              {r.email_id && (
-                <span className="flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-300">
-                  <Mail size={12} strokeWidth={2.2} /> {r.email_id}
+                <span className="flex items-center gap-1.5 text-xs font-medium text-amber-800 dark:text-amber-300 truncate max-w-[180px]">
+                  <User size={12} strokeWidth={2.2} className="text-amber-600 dark:text-amber-400 shrink-0" /> {r.hr_name}
                 </span>
               )}
 
-              {!isReadOnly && reminders.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => onAddToTracker([r])}
-                  className="ml-auto shrink-0 rounded-full bg-[#D97706] hover:bg-[#B45309] text-white text-xs font-bold px-3 py-1.5 transition-all shadow-xs active:scale-[0.98] cursor-pointer"
-                >
-                  Add to {activeDateLabel}'s Tracker
-                </button>
+              {/* Phone */}
+              {r.mobile_number && (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-amber-800 dark:text-amber-300 tabular-nums">
+                  <Phone size={12} strokeWidth={2.2} className="text-amber-600 dark:text-amber-400 shrink-0" /> {r.mobile_number}
+                </span>
+              )}
+
+              {/* Email */}
+              {r.email_id && (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-amber-800 dark:text-amber-300 truncate max-w-[220px]">
+                  <Mail size={12} strokeWidth={2.2} className="text-amber-600 dark:text-amber-400 shrink-0" /> {r.email_id}
+                </span>
               )}
             </div>
           ))}

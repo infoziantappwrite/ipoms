@@ -1177,8 +1177,11 @@ export default function DailyTrackerPage() {
           {/* Left: Tracker title + date */}
           <div>
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-                <PhoneCall size={18} strokeWidth={2.25} />
+              <div 
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-xs shrink-0"
+                style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 30%, #0284c7 65%, #1d4ed8 100%)' }}
+              >
+                <PhoneCall size={17} strokeWidth={2.5} />
               </div>
               <h1 className="text-base font-bold text-fg tracking-tight">
                 Daily Tracker

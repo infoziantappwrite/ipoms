@@ -23,18 +23,18 @@ import {
 } from '@/lib/contactValidation';
 
 export const OUTCOMES: { value: CallOutcome; label: string; color: string }[] = [
-  { value: 'jd_received', label: 'JD Received', color: 'text-primary' },
-  { value: 'hiring_freezed', label: 'Hiring Freezed', color: 'text-purple-600 dark:text-purple-400 font-semibold' },
-  { value: 'hiring_completed', label: 'Hiring Completed', color: 'text-cyan-600 dark:text-cyan-400 font-semibold' },
-  { value: 'call_back', label: 'Call Back', color: 'text-amber-600 dark:text-amber-400 font-medium' },
-  { value: 'hiring', label: 'Hiring', color: 'text-success' },
-  { value: 'invite_mail', label: 'Invite Mail', color: 'text-primary' },
-  { value: 'not_hiring', label: 'Not Hiring', color: 'text-rose-700 dark:text-rose-400 font-bold' },
   { value: 'no_response', label: 'No Response', color: 'text-rose-600 dark:text-rose-400 font-medium' },
+  { value: 'not_hiring', label: 'Not Hiring', color: 'text-rose-700 dark:text-rose-400 font-bold' },
+  { value: 'invite_mail', label: 'Invite Mail', color: 'text-primary' },
   { value: 'follow_up', label: 'Follow Up', color: 'text-orange-600 dark:text-orange-400 font-semibold' },
-  { value: 'in_connect', label: 'In Connect', color: 'text-primary' },
+  { value: 'call_back', label: 'Call Back', color: 'text-amber-600 dark:text-amber-400 font-medium' },
   { value: 'invalid', label: 'Invalid', color: 'text-fg-subtle' },
+  { value: 'jd_received', label: 'JD Received', color: 'text-primary' },
+  { value: 'hiring', label: 'Hiring', color: 'text-success' },
+  { value: 'in_connect', label: 'In Connect', color: 'text-primary' },
   { value: 'drive_completed', label: 'Drive Completed', color: 'text-success' },
+  { value: 'hiring_completed', label: 'Hiring Completed', color: 'text-cyan-600 dark:text-cyan-400 font-semibold' },
+  { value: 'hiring_freezed', label: 'Hiring Freezed', color: 'text-purple-600 dark:text-purple-400 font-semibold' },
 ];
 
 export const MONTHS = [

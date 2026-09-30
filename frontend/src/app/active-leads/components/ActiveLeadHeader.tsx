@@ -232,17 +232,15 @@ export function ActiveLeadHeader({
       {/* ── Top Row: Title & Subtitle on Left, Top Pagination & User on Right ── */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2.5">
-          <span className="w-8 h-8 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shadow-xs">
-            <Sparkles size={18} strokeWidth={2.2} />
-          </span>
-          <div>
-            <h1 className="text-xl font-bold text-fg tracking-tight leading-tight">
-              Active Leads Management
-            </h1>
-            <p className="text-[11px] text-fg-subtle">
-              Central directory for exploratory corporate leads and confirmed campus drives
-            </p>
+          <div 
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-xs shrink-0"
+            style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 30%, #0284c7 65%, #1d4ed8 100%)' }}
+          >
+            <Sparkles size={17} strokeWidth={2.5} />
           </div>
+          <h1 className="text-xl font-bold text-fg tracking-tight leading-tight">
+            Active Leads Management
+          </h1>
         </div>
 
         {/* ── Top Pagination & Sign Out ── */}
@@ -291,7 +289,7 @@ export function ActiveLeadHeader({
               className={`absolute top-1 bottom-1 w-[calc((100%-12px)/2)] rounded-md border shadow-xs transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none ${
                 activeTab === 'pipeline'
                   ? 'left-1 translate-x-0 bg-blue-600 border-blue-500 shadow-blue-500/20'
-                  : 'left-1 translate-x-[calc(100%+4px)] bg-blue-600 dark:bg-blue-600 border-blue-500 shadow-blue-500/20'
+                  : 'left-1 translate-x-[calc(100%+4px)] bg-emerald-600 dark:bg-emerald-600 border-emerald-500 shadow-emerald-500/20'
               }`}
             />
 
@@ -335,7 +333,7 @@ export function ActiveLeadHeader({
               <span
                 className={`px-1.5 py-0.5 rounded-[4px] text-[10px] font-mono font-bold transition-colors duration-200 tabular-nums ${
                   activeTab === 'jd_received'
-                    ? 'bg-blue-700/80 text-white'
+                    ? 'bg-emerald-700/80 text-white'
                     : 'bg-surface-sunken dark:bg-zinc-800 border border-border text-fg-subtle'
                 }`}
               >
