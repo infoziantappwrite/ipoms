@@ -233,13 +233,7 @@ export function DashboardHeader() {
               <HelpCircle size={15} strokeWidth={2.2} className="group-hover:scale-110 transition-transform duration-200" />
             </Link>
 
-            <UserSignOutButton
-              className={
-                isNight
-                  ? 'bg-white/85 dark:bg-white/10 border-slate-200 dark:border-white/20 text-rose-500 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/20 backdrop-blur-md'
-                  : ''
-              }
-            />
+            <UserSignOutButton />
           </div>
         </div>
 

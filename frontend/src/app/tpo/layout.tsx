@@ -211,17 +211,15 @@ export default function TpoLayout({ children }: { children: React.ReactNode }) {
               type="button"
               onClick={handleSync}
               title="Synchronize Data"
-              className="group relative flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white hover:border-cyan-300 hover:bg-slate-50/80 shadow-2xs hover:shadow-xs transition-all cursor-pointer"
+              style={{ background: 'linear-gradient(180deg, #FFC53D 0%, #FF9500 50%, #FF5E00 100%)' }}
+              className="group relative flex h-10 w-10 items-center justify-center rounded-2xl text-white shadow-md shadow-orange-500/25 hover:brightness-110 active:scale-95 transition-all cursor-pointer"
             >
               <RefreshCw
                 size={17}
                 strokeWidth={2.4}
-                className={`transition-all duration-500 ${
+                className={`text-white transition-all duration-500 ${
                   isSyncing ? 'animate-spin' : 'group-hover:rotate-180'
                 }`}
-                style={{
-                  stroke: 'url(#sync-icon-grad)',
-                }}
               />
             </button>
 

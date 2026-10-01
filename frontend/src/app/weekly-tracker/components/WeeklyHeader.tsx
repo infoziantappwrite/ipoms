@@ -117,8 +117,8 @@ export function WeeklyHeader({
         <div>
           <div className="flex items-center gap-2.5">
             <div 
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-xs shrink-0"
-              style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 30%, #0284c7 65%, #1d4ed8 100%)' }}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-md shadow-blue-900/25 shrink-0"
+              style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
             >
               <CalendarDays size={17} strokeWidth={2.5} />
             </div>
@@ -301,7 +301,8 @@ export function WeeklyHeader({
               }}
               title={allSectionsCollapsed ? 'Expand All Sections' : 'Collapse All Sections'}
               aria-label={allSectionsCollapsed ? 'Expand all sections' : 'Collapse all sections'}
-              className="w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 bg-slate-700 hover:bg-slate-800 active:bg-slate-900 text-white shadow-xs active:scale-[0.95] disabled:opacity-40"
+              style={{ background: 'linear-gradient(180deg, #9AA0A6 0%, #64748B 50%, #334155 100%)' }}
+              className="w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 text-white shadow-md shadow-slate-500/25 hover:brightness-110 active:scale-[0.95] disabled:opacity-40"
             >
               {allSectionsCollapsed
                 ? <ChevronsDown size={15} strokeWidth={2.4} className="text-white" />
@@ -324,13 +325,13 @@ export function WeeklyHeader({
                 onStartDeleteMode?.();
               }
             }}
-            disabled={!selectedCollegeId || isDeleting}
-            className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 ${
+            style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
+            className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 text-white shadow-md shadow-red-600/25 hover:brightness-110 ${
               selectionMode === 'delete' && selectedCount > 0
-                ? 'bg-rose-700 hover:bg-rose-800 active:bg-rose-900 text-white shadow-xs ring-2 ring-rose-400'
+                ? 'ring-2 ring-red-400 brightness-110'
                 : selectionMode === 'delete'
-                ? 'bg-rose-700 hover:bg-rose-800 text-white shadow-xs ring-2 ring-rose-400'
-                : 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs'
+                ? 'ring-2 ring-red-400'
+                : ''
             } disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]`}
             title={
               selectionMode === 'delete' && selectedCount > 0
@@ -358,7 +359,8 @@ export function WeeklyHeader({
                 triggerHaptic('selection');
                 onOpenPaste();
               }}
-              className="relative h-8 px-3 py-1.5 rounded-xl flex items-center gap-1.5 bg-[#8E1BB1] hover:bg-[#7A149B] active:bg-[#680F86] text-white shadow-xs text-xs font-bold transition-all cursor-pointer select-none shrink-0 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]"
+              style={{ background: 'linear-gradient(180deg, #A800E6 0%, #8A00D4 50%, #6C00B8 100%)' }}
+              className="relative h-8 px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-white shadow-md shadow-purple-500/25 hover:brightness-110 text-xs font-bold transition-all cursor-pointer select-none shrink-0 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]"
               title="Paste companies, roles, CTC, contacts, emails or dates from Excel (select a college first)"
               aria-label="Paste"
             >
@@ -376,7 +378,8 @@ export function WeeklyHeader({
                 triggerHaptic('selection');
                 onSyncDailyPositives();
               }}
-              className="relative w-8 h-8 rounded-xl flex items-center justify-center bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white shadow-xs transition-all cursor-pointer select-none shrink-0 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]"
+              style={{ background: 'linear-gradient(180deg, #FFC53D 0%, #FF9500 50%, #FF5E00 100%)' }}
+              className="relative w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-md shadow-orange-500/25 hover:brightness-110 active:scale-[0.95] transition-all cursor-pointer select-none shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
               title="Sync positive leads from Daily Leads into Companies in Pipeline"
               aria-label="Sync Daily Positives"
             >

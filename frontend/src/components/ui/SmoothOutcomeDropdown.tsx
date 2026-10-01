@@ -17,7 +17,8 @@ export type CallOutcome =
   | 'hiring_freezed'
   | 'not_hiring'
   | 'no_response'
-  | 'invalid';
+  | 'invalid'
+  | 'new_poc';
 
 export interface OutcomeOption {
   value: CallOutcome | 'all';
@@ -34,10 +35,11 @@ export const CALL_OUTCOME_OPTIONS: OutcomeOption[] = [
   { value: 'invite_mail', label: 'Invite Mail', dotColor: 'bg-sky-500', category: 'Positive' },
   { value: 'follow_up', label: 'Follow Up', dotColor: 'bg-orange-500', category: 'Action Req' },
   { value: 'call_back', label: 'Call Back', dotColor: 'bg-amber-500', category: 'Action Req' },
-  { value: 'invalid', label: 'Invalid', dotColor: 'bg-slate-500', category: 'Invalid' },
+  { value: 'new_poc', label: 'New POC', dotColor: 'bg-[#FF0A80]', category: 'Action Req' },
+  { value: 'invalid', label: 'Invalid', dotColor: 'bg-[#7D838C]', category: 'Invalid' },
   { value: 'jd_received', label: 'JD Received', dotColor: 'bg-blue-500', category: 'JD Received' },
   { value: 'hiring', label: 'Hiring', dotColor: 'bg-emerald-500', category: 'Hiring' },
-  { value: 'in_connect', label: 'In Connect', dotColor: 'bg-indigo-500', category: 'Neutral' },
+  { value: 'in_connect', label: 'In Connect', dotColor: 'bg-[#7D838C]', category: 'Neutral' },
   { value: 'drive_completed', label: 'Drive Completed', dotColor: 'bg-emerald-500', category: 'Conducted' },
   { value: 'hiring_completed', label: 'Hiring Completed', dotColor: 'bg-cyan-500', category: 'Completed' },
   { value: 'hiring_freezed', label: 'Hiring Freezed', dotColor: 'bg-purple-500', category: 'Paused' },

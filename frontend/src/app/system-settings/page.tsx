@@ -96,8 +96,8 @@ export default function SystemSettingsPage() {
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-md border-b border-border px-6 py-4 flex items-center justify-between gap-4 shadow-2xs">
         <div className="flex items-center gap-2.5">
           <div 
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-xs shrink-0"
-            style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 30%, #0284c7 65%, #1d4ed8 100%)' }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-md shadow-blue-900/25 shrink-0"
+            style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
           >
             <Sliders size={17} strokeWidth={2.5} />
           </div>

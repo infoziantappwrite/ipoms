@@ -7,6 +7,7 @@ import { getCoordinatorSelectedColleges } from '@/lib/collegeSession';
 import { readSessionUser } from '@/lib/session';
 import { useToast } from '@/components/ui/Toast';
 import { triggerHaptic } from '@/lib/haptics';
+import { SmoothSelect } from '@/components/ui/SmoothSelect';
 
 /**
  * Monthly Call Trend + campus outcomes, one card (21 Sep 2026).
@@ -168,6 +169,25 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
     return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
   }, [monthly]);
 
+  // Header-level "which college's Positives/JD this month" control — lives up here, next to
+  // the sync button, instead of under the grid, so it's visible without scrolling (item 90,
+  // moved per user request). Ranked strictly by Positives descending; JD rides along.
+  const [summaryCollegeId, setSummaryCollegeId] = useState('');
+  const summaryRows = useMemo(() => {
+    if (!monthly) return [];
+    const days = monthly.days_in_month || 30;
+    const todayDay = monthly.is_current_month && monthly.today_day ? monthly.today_day : null;
+    const lastDay = todayDay ?? days;
+    return [...monthly.series]
+      .map((s) => ({
+        id: s.college_id,
+        code: s.college_code,
+        positive: sum(s.daily_outcomes?.positive ?? [], lastDay),
+        jd: sum(s.daily_jd ?? [], lastDay),
+      }))
+      .sort((a, b) => b.positive - a.positive);
+  }, [monthly]);
+
   if (loading && !monthly) {
     return (
       <div className="bg-surface border border-border rounded-2xl p-6 text-xs text-fg-subtle">
@@ -178,13 +198,13 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
 
   return (
     <div>
-      <section className="bg-surface border border-border rounded-2xl p-5 sm:p-6 shadow-xs">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="w-9 h-9 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center">
+      <section className="bg-surface border border-border rounded-2xl p-6 sm:p-7 shadow-xs">
+        <div className="flex items-center justify-between gap-3 flex-wrap gap-y-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-9 h-9 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0">
               <LineChart size={17} strokeWidth={2.2} />
             </span>
-            <div>
+            <div className="min-w-0">
               <h3 className="text-sm font-bold text-fg">Monthly Call Trend — {monthLabel || 'This Month'}</h3>
               <p className="text-[11px] text-fg-subtle mt-0.5">
                 Calls per day, per campus · click any day to see its details
@@ -192,19 +212,69 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
             </div>
           </div>
 
+          <div className="flex items-center gap-3 ml-auto shrink-0">
+            {/* Per-college Positives/JD this month — compact, sized to the longest college
+                name rather than the card's full width, and always visible up here (not
+                below the grid, where seeing it meant scrolling past 20+ rows). */}
+            {summaryRows.length > 0 && (() => {
+              // No default selection — starts on the "Select college" placeholder with 0/0
+              // shown, rather than silently pre-picking the top-ranked college (user decision).
+              const activeRow = summaryRows.find((r) => r.id === summaryCollegeId);
+              // College acronym only in the dropdown itself — the Positives count already
+              // renders right next to it once picked, so a badge here was the same number
+              // shown twice at once (user decision: keep the list plain).
+              const summaryOptions = summaryRows.map((row) => ({
+                value: row.id,
+                label: row.code,
+              }));
+              return (
+                <div className="flex items-center gap-2.5">
+                  <div className="w-[150px]">
+                    <SmoothSelect
+                      value={summaryCollegeId}
+                      options={summaryOptions}
+                      onChange={setSummaryCollegeId}
+                      searchable={summaryRows.length > 8}
+                      placeholder="Select college"
+                    />
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 text-[13px]">
+                    <i
+                      className="w-[14px] h-[14px] rounded-[3.5px] not-italic leading-none flex items-center justify-center text-[8.5px] font-black text-white"
+                      style={{ background: 'var(--ipoms-hm-4)' }}
+                    >
+                      P
+                    </i>
+                    <b className="text-fg tabular-nums">{activeRow?.positive ?? 0}</b>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-[13px]">
+                    <i
+                      className="w-[14px] h-[14px] rounded-[3.5px] not-italic leading-none flex items-center justify-center text-[8.5px] font-black text-white"
+                      style={{ background: 'var(--ipoms-hm-4)' }}
+                    >
+                      J
+                    </i>
+                    <b className="text-fg tabular-nums">{activeRow?.jd ?? 0}</b>
+                  </span>
+                </div>
+              );
+            })()}
+
           {/* Sync Button (Solid Mustard Amber, Icon-Only) */}
           <button
             type="button"
             onClick={handleSync}
             disabled={isSyncing}
             title="Synchronize monthly call trend data"
-            className="p-2 rounded-xl bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white transition-all cursor-pointer shadow-2xs disabled:opacity-50 group/sync shrink-0"
+            style={{ background: 'linear-gradient(180deg, #FFC53D 0%, #FF9500 50%, #FF5E00 100%)' }}
+            className="p-2 rounded-xl text-white shadow-md shadow-orange-500/25 hover:brightness-110 active:scale-[0.95] transition-all cursor-pointer disabled:opacity-50 group/sync shrink-0"
           >
             <RefreshCw
               size={15}
               className={`text-white transition-transform ${isSyncing ? 'animate-spin' : 'group-hover/sync:rotate-180 duration-500'}`}
             />
           </button>
+          </div>
         </div>
 
         {monthly && monthly.series.length > 0 ? (
@@ -254,8 +324,9 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
           --ipoms-hm-5: #185fa5;
           --ipoms-hm-zero: #f1efe8;
           --ipoms-hm-stripe: #e1e0d9;
-          --ipoms-hm-today: #0b0b0b;
-          --ipoms-hm-jd: #c026d3;
+          --ipoms-hm-positive: #7dc234;
+          --ipoms-hm-jd: #008a45;
+          --ipoms-hm-both: #064e26;
         }
         :global(.dark) {
           --ipoms-oc-positive: #0ea271;
@@ -269,8 +340,9 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
           --ipoms-hm-5: #8cbaf5;
           --ipoms-hm-zero: #2c2c2a;
           --ipoms-hm-stripe: #383835;
-          --ipoms-hm-today: #f0efec;
-          --ipoms-hm-jd: #e879f9;
+          --ipoms-hm-positive: #8ad13f;
+          --ipoms-hm-jd: #0fa958;
+          --ipoms-hm-both: #064e26;
         }
         :global(.ipoms-sw) {
           display: inline-block;
@@ -282,8 +354,8 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
         :global(.ipoms-hm-cell) {
           display: block;
           width: 100%;
-          height: 20px;
-          border-radius: 3.5px;
+          height: 30px;
+          border-radius: 5px;
           padding: 0;
           border: 0;
           cursor: pointer;
@@ -291,10 +363,19 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
           transition: transform 0.12s ease;
         }
         :global(.ipoms-hm-key) {
-          width: 11px;
-          height: 11px;
-          border-radius: 3px;
+          width: 13px;
+          height: 13px;
+          border-radius: 3.5px;
           cursor: default;
+          /* .ipoms-hm-cell sets display:block above — same specificity as the inline
+             Tailwind "flex" utility class, and this styled-jsx block loses that tie
+             against Tailwind on source order, so the letter renders top-left instead
+             of centered. Overriding display here (later in the same stylesheet, more
+             specific selector) wins reliably instead of fighting it per call site. */
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-style: normal;
         }
         :global(.ipoms-hm-zero) {
           background: var(--ipoms-hm-zero);
@@ -302,11 +383,6 @@ export function CoordinatorCollegeKpiCards({ selectedCollegeIds }: Props) {
         :global(.ipoms-hm-future) {
           background: repeating-linear-gradient(45deg, transparent 0 3px, var(--ipoms-hm-stripe) 3px 4px);
           cursor: default;
-        }
-        :global(.ipoms-hm-today) {
-          box-shadow: inset 0 0 0 2px var(--ipoms-hm-today);
-          position: relative;
-          z-index: 1;
         }
         :global(.ipoms-hm-hot) {
           transform: scale(1.05);
@@ -415,9 +491,11 @@ function MonthChart({
   const callsAt = (s: MonthlySeries, day: number | 'month') =>
     day === 'month' ? sum(s.daily, lastDay) : s.daily[day - 1] || 0;
 
+  const monthName = new Date(yy, mm - 1, 1).toLocaleDateString('en-IN', { month: 'long' });
+
   const scopeLabel =
     scope === 'month'
-      ? `${new Date(yy, mm - 1, 1).toLocaleDateString('en-IN', { month: 'long' })} total`
+      ? `${monthName} total`
       : scope === todayDay
       ? `Today · ${dayMeta[scope - 1].label}`
       : dayMeta[scope - 1].label;
@@ -443,16 +521,17 @@ function MonthChart({
           </span>
           <span>More</span>
           <span className="inline-flex items-center gap-1.5 ml-2">
-            <i className="ipoms-hm-cell ipoms-hm-key" style={{ background: 'var(--ipoms-hm-jd)' }} /> JD received
+            <i className="ipoms-hm-cell ipoms-hm-key not-italic leading-none flex items-center justify-center text-[8px] font-black text-white" style={{ background: 'var(--ipoms-hm-4)' }}>P</i> Positive (P)
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <i className="ipoms-hm-cell ipoms-hm-key not-italic leading-none flex items-center justify-center text-[8px] font-black text-white" style={{ background: 'var(--ipoms-hm-4)' }}>J</i> JD received (J)
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <i className="ipoms-hm-cell ipoms-hm-key not-italic leading-none flex items-center justify-center text-[7.5px] font-black text-white" style={{ background: 'var(--ipoms-hm-5)' }}>PJ</i> Both (P+J)
           </span>
           <span className="inline-flex items-center gap-1.5">
             <i className="ipoms-hm-cell ipoms-hm-key ipoms-hm-future" /> Not yet
           </span>
-          {todayDay && (
-            <span className="inline-flex items-center gap-1.5">
-              <i className="ipoms-hm-cell ipoms-hm-key ipoms-hm-zero ipoms-hm-today" /> Today
-            </span>
-          )}
         </div>
       </div>
 
@@ -460,7 +539,7 @@ function MonthChart({
         <div
           role="grid"
           aria-label="Calls and duration logged per day, per campus"
-          className="min-w-[660px] grid gap-x-[3.5px] gap-y-[4.5px] items-center pr-2"
+          className="min-w-[660px] grid gap-x-[4px] gap-y-[6px] items-center pr-2"
           style={{ gridTemplateColumns: cols }}
           onMouseLeave={() => {
             setHover(null);
@@ -476,7 +555,7 @@ function MonthChart({
               disabled={m.day > lastDay}
               onClick={() => selectDay(m.day)}
               title={m.day > lastDay ? undefined : `Show details for ${m.label}`}
-              className={`text-center text-[10px] font-mono tabular-nums py-0.5 rounded disabled:cursor-default ${
+              className={`text-center text-[10.5px] font-mono tabular-nums py-1 rounded disabled:cursor-default ${
                 scope === m.day ? 'ipoms-hm-col-sel text-primary font-extrabold' : ''
               } ${
                 m.day === todayDay
@@ -497,7 +576,7 @@ function MonthChart({
             return (
               <React.Fragment key={s.college_id}>
                 <b
-                  className={`font-mono text-xs whitespace-nowrap pr-2.5 select-none ${
+                  className={`font-mono text-[13px] whitespace-nowrap pr-2.5 select-none ${
                     hover?.row === row ? 'text-primary font-bold' : 'text-fg font-semibold'
                   }`}
                   title={s.college_code}
@@ -507,14 +586,9 @@ function MonthChart({
                 {dayMeta.map((m, i) => {
                   const future = m.day > lastDay;
                   const v = vals[i] || 0;
-                  const cls = [
-                    'ipoms-hm-cell',
-                    future ? 'ipoms-hm-future' : v === 0 ? 'ipoms-hm-zero' : '',
-                    m.day === todayDay ? 'ipoms-hm-today' : '',
-                    (hover && hover.row === row && hover.day === m.day) || scope === m.day ? 'ipoms-hm-hot' : '',
-                  ].join(' ');
                   const dCalls = s.daily[i] || 0;
                   const dJd = jdAt(s, m.day);
+                  const dPositive = outcomeAt(s, 'positive', m.day);
                   const mins = s.daily_duration?.[i] || 0;
                   const tipLines = future
                     ? [`${s.college_code} · ${m.label}`, 'Not yet']
@@ -524,6 +598,28 @@ function MonthChart({
                         `Positive ${outcomeAt(s, 'positive', m.day)} · Not Hiring ${outcomeAt(s, 'not_hiring', m.day)}`,
                         `Follow Up ${outcomeAt(s, 'follow_up', m.day)} · JD Received ${jdAt(s, m.day)}`,
                       ];
+                  const hasPositive = !future && dPositive > 0;
+                  const hasJd = !future && dJd > 0;
+                  const letter = hasPositive && hasJd ? 'PJ' : hasPositive ? 'P' : hasJd ? 'J' : null;
+
+                  // Dynamic blue call volume scale step. If calls = 0 but positive or JD occurred, fallback to step 1 so it's a visible blue block.
+                  const cellStep = v > 0 ? step(v) : hasPositive || hasJd ? 1 : 0;
+                  const hasColor = !future && (v > 0 || hasPositive || hasJd);
+
+                  // Today no longer gets an automatic black ring by default — the day-number
+                  // header above is already bold for today, and today starts out selected
+                  // (scope defaults to todayDay), which already draws the normal blue "hot"
+                  // ring every selected day gets. A second, always-on black border on top of
+                  // that was redundant and looked like it needed pressing to go away — it
+                  // never did, it was just stacked under the selection ring (user-reported).
+                  const cls = [
+                    'ipoms-hm-cell',
+                    future ? 'ipoms-hm-future' : !hasColor ? 'ipoms-hm-zero' : '',
+                    (hover && hover.row === row && hover.day === m.day) || scope === m.day ? 'ipoms-hm-hot' : '',
+                  ].join(' ');
+
+                  const textContrastClass = cellStep >= 2 ? 'text-white' : 'text-[#072c54] dark:text-blue-100';
+
                   return (
                     <button
                       key={m.day}
@@ -531,14 +627,12 @@ function MonthChart({
                       role="gridcell"
                       disabled={future}
                       aria-label={`${s.college_code}, ${m.label}: ${
-                        future ? 'not yet' : `${plural(dCalls)}, ${fmtMins(mins)} logged${dJd > 0 ? `, ${dJd} JD received` : ''}`
+                        future ? 'not yet' : `${plural(dCalls)}, ${fmtMins(mins)} logged${dPositive > 0 ? `, ${dPositive} positive` : ''}${dJd > 0 ? `, ${dJd} JD received` : ''}`
                       }`}
-                      className={cls}
+                      className={`${cls} flex items-center justify-center overflow-hidden`}
                       style={
-                        !future && dJd > 0
-                          ? { background: 'var(--ipoms-hm-jd)' }
-                          : !future && v > 0
-                          ? { background: `var(${HEAT_STEPS[step(v)]})` }
+                        hasColor
+                          ? { background: `var(${HEAT_STEPS[cellStep]})` }
                           : undefined
                       }
                       onClick={() => selectDay(m.day)}
@@ -548,7 +642,13 @@ function MonthChart({
                       }}
                       onFocus={(e) => onTip(e, tipLines)}
                       onBlur={onHideTip}
-                    />
+                    >
+                      {letter && (
+                        <span className={`text-[9.5px] font-black leading-none tracking-tighter select-none ${textContrastClass}`}>
+                          {letter}
+                        </span>
+                      )}
+                    </button>
                   );
                 })}
               </React.Fragment>

@@ -374,7 +374,8 @@ export function WeeklySection({
                 type="button"
                 disabled={selectedRowIds.length === 0 || isDeleting}
                 onClick={handleBatchDelete}
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg hover:brightness-110 active:scale-[0.95] disabled:opacity-40 text-white text-xs font-bold transition-all shadow-md shadow-red-600/25 cursor-pointer"
+                style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
                 title="Delete Selected Rows"
               >
                 <Trash2 size={13} />

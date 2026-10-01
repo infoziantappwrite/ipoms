@@ -119,7 +119,8 @@ export function DeleteConfirmModal({
                 triggerHaptic('heavy');
                 onConfirm();
               }}
-              className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 disabled:opacity-50 text-white text-xs font-bold shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-[0.992]"
+              className="px-5 py-2.5 rounded-xl disabled:opacity-50 text-white text-xs font-bold shadow-md shadow-red-600/25 transition-all flex items-center gap-2 cursor-pointer hover:brightness-110 active:scale-[0.95]"
+              style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
             >
               {isDeleting ? (
                 <>

@@ -82,8 +82,8 @@ export function PendingTaskHeader({
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2.5">
           <div 
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-xs shrink-0"
-            style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 30%, #0284c7 65%, #1d4ed8 100%)' }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-md shadow-blue-900/25 shrink-0"
+            style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
           >
             <ListTodo size={17} strokeWidth={2.5} />
           </div>
@@ -168,11 +168,12 @@ export function PendingTaskHeader({
             type="button"
             onClick={onToggleSelectionMode}
             title={isSelectionMode ? 'Cancel deletion / Exit selection' : 'Delete pending tasks'}
-            className={`group w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-[0.95] ${
+            className={`group w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-md shadow-red-600/25 hover:brightness-110 active:scale-[0.95] text-white ${
               isSelectionMode
-                ? 'bg-rose-700 hover:bg-rose-800 text-white ring-2 ring-rose-400'
-                : 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white'
+                ? 'ring-2 ring-red-400 brightness-110'
+                : ''
             }`}
+            style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
           >
             <AnimatedTrashIcon size={15} />
           </button>
@@ -182,7 +183,8 @@ export function PendingTaskHeader({
             <button
               type="button"
               onClick={onDeleteSelected}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-rose-700 hover:bg-rose-800 rounded-xl shadow-xs transition-all cursor-pointer animate-in fade-in duration-150 active:scale-[0.95]"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white rounded-xl shadow-md shadow-red-600/25 hover:brightness-110 transition-all cursor-pointer animate-in fade-in duration-150 active:scale-[0.95]"
+              style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
             >
               <Trash2 size={13} />
               <span>Delete ({selectedCount})</span>

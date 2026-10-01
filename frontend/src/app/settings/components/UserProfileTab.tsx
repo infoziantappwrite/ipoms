@@ -9,6 +9,7 @@ import { readSessionUser, updateSessionUser } from '@/lib/session';
 import { apiFetch } from '@/lib/api';
 import { initialsFor } from '@/lib/initials';
 import { PhotoCropModal } from './PhotoCropModal';
+import { CustomDatePicker } from '@/components/ui/CustomDatePicker';
 
 interface Props {
   currentUser: any;
@@ -630,7 +631,8 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
                 <button
                   type="button"
                   onClick={handleDeletePhoto}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-danger/10 hover:bg-danger/20 text-danger border border-danger/25 hover:border-danger/40 text-[11px] font-semibold transition-all hover:scale-105 active:scale-[0.992] cursor-pointer shadow-xs animate-fadeIn"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-white hover:brightness-110 text-[11px] font-semibold transition-all hover:scale-105 active:scale-[0.95] cursor-pointer shadow-md shadow-red-600/25 animate-fadeIn"
+                  style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
                   title="Remove Profile Photo"
                 >
                   <Trash2 size={12} className="shrink-0" />
@@ -955,14 +957,14 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
                       <span>Date of Birth</span>
                       {isPersonalLocked && <Lock size={10} className="text-fg-subtle" />}
                     </label>
-                    <input
-                      ref={dobInputRef}
-                      type="date"
+                    <CustomDatePicker
                       value={dateOfBirth}
-                      onChange={(e) => setDateOfBirth(e.target.value)}
+                      onChange={setDateOfBirth}
+                      placeholder="Select Date of Birth"
                       disabled={isPersonalLocked}
-                      title={isPersonalLocked ? 'Date of Birth is permanently locked' : 'Select Date of Birth'}
-                      className={isPersonalLocked ? whiteDisabledInputClass : normalInputClass}
+                      minYear={1950}
+                      maxYear={new Date().getFullYear()}
+                      allowFuture={false}
                     />
                   </div>
 
@@ -973,13 +975,14 @@ export function UserProfileTab({ currentUser, onUpdateProfile }: Props) {
                       <span>Date of Joining Office</span>
                       {isPersonalLocked && <Lock size={10} className="text-fg-subtle" />}
                     </label>
-                    <input
-                      type="date"
+                    <CustomDatePicker
                       value={dateOfJoining}
-                      onChange={(e) => setDateOfJoining(e.target.value)}
+                      onChange={setDateOfJoining}
+                      placeholder="Select Date of Joining"
                       disabled={isPersonalLocked}
-                      title={isPersonalLocked ? 'Date of Joining Office is permanently locked' : 'Select Date of Joining'}
-                      className={isPersonalLocked ? whiteDisabledInputClass : normalInputClass}
+                      minYear={2015}
+                      maxYear={new Date().getFullYear() + 2}
+                      allowFuture={true}
                     />
                   </div>
 

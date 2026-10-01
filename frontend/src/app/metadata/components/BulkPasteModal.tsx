@@ -468,7 +468,10 @@ export function BulkPasteModal({ onClose, onSuccess, initialText = '' }: Props) 
         {/* Header */}
         <div className="px-6 py-4 border-b border-border/80 flex items-center justify-between bg-slate-50 dark:bg-[#1A2234]">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#8E1BB1]/10 text-[#8E1BB1] dark:text-[#C55FE9] flex items-center justify-center border border-[#8E1BB1]/20 shadow-2xs">
+            <div
+              className="w-9 h-9 rounded-xl text-white flex items-center justify-center shadow-md shadow-purple-600/25 shrink-0"
+              style={{ background: 'linear-gradient(180deg, #A800E6 0%, #8A00D4 50%, #6C00B8 100%)' }}
+            >
               <ClipboardPaste size={18} strokeWidth={2.2} />
             </div>
             <div>
@@ -685,7 +688,8 @@ export function BulkPasteModal({ onClose, onSuccess, initialText = '' }: Props) 
                 <button
                   type="button"
                   onClick={handleReadClipboard}
-                  className="mb-1 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#8E1BB1]/30 bg-[#8E1BB1]/10 text-[#8E1BB1] dark:text-[#C55FE9] text-xs font-semibold hover:bg-[#8E1BB1]/20 transition-all cursor-pointer shadow-2xs active:scale-[0.98]"
+                  className="mb-1 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-semibold hover:brightness-110 transition-all cursor-pointer shadow-md shadow-purple-600/25 active:scale-[0.98]"
+                  style={{ background: 'linear-gradient(180deg, #A800E6 0%, #8A00D4 50%, #6C00B8 100%)' }}
                 >
                   <ClipboardPaste size={13} /> Paste from Clipboard
                 </button>

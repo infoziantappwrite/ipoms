@@ -62,8 +62,8 @@ export function LeadsHeader({
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2.5">
           <div 
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-xs shrink-0"
-            style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 30%, #0284c7 65%, #1d4ed8 100%)' }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-md shadow-blue-900/25 shrink-0"
+            style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
           >
             <Target size={17} strokeWidth={2.5} />
           </div>
@@ -258,13 +258,10 @@ export function LeadsHeader({
                   onToggleDeleteMode();
                 }
               }}
-              className={`relative w-9 h-9 flex items-center justify-center rounded-xl transition-all shadow-xs cursor-pointer select-none shrink-0 ${
-                isDeleteMode && selectedCount > 0
-                  ? 'bg-rose-700 hover:bg-rose-800 active:bg-rose-900 text-white shadow-xs ring-2 ring-rose-400'
-                  : isDeleteMode
-                  ? 'bg-rose-700 hover:bg-rose-800 text-white shadow-xs ring-2 ring-rose-400'
-                  : 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white shadow-xs'
-              } active:scale-[0.95]`}
+              className={`relative w-9 h-9 flex items-center justify-center rounded-xl transition-all shadow-md shadow-red-600/25 cursor-pointer select-none shrink-0 hover:brightness-110 active:scale-[0.95] text-white ${
+                isDeleteMode ? 'ring-2 ring-red-400 brightness-110' : ''
+              }`}
+              style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
               title={
                 isDeleteMode && selectedCount > 0
                   ? `Delete ${selectedCount} selected record${selectedCount > 1 ? 's' : ''}`
@@ -276,7 +273,7 @@ export function LeadsHeader({
             >
               <Trash2 size={16} strokeWidth={2.2} className="text-white" />
               {isDeleteMode && selectedCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-white dark:bg-zinc-900 text-rose-600 text-[9px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center shadow-xs tabular-nums ring-1 ring-rose-600">
+                <span className="absolute -top-1 -right-1 bg-white dark:bg-zinc-900 text-red-600 text-[9px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center shadow-xs tabular-nums ring-1 ring-red-600">
                   {selectedCount}
                 </span>
               )}
@@ -288,7 +285,8 @@ export function LeadsHeader({
               type="button"
               disabled={isSyncing}
               onClick={onSyncPositives}
-              className="w-9 h-9 flex items-center justify-center bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-xl transition-all shadow-xs cursor-pointer active:scale-[0.992] disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+              style={{ background: 'linear-gradient(180deg, #FFC53D 0%, #FF9500 50%, #FF5E00 100%)' }}
+              className="w-9 h-9 flex items-center justify-center text-white rounded-xl shadow-md shadow-orange-500/25 hover:brightness-110 transition-all cursor-pointer active:scale-[0.992] disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
               title="Sync positive calls and scheduled pipeline leads for this date"
               aria-label="Sync Positives"
             >

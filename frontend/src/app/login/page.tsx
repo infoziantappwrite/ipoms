@@ -493,8 +493,8 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={officerLoading || !officerCode.trim()}
-              style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' }}
-              className="inline-flex items-center justify-center gap-2 rounded-xl px-7 py-2.5 text-xs font-bold text-white shadow-md shadow-sky-500/25 transition-all hover:brightness-110 active:scale-[0.99] disabled:opacity-60 cursor-pointer"
+              style={{ background: 'linear-gradient(180deg, #1A73E8 0%, #0091FF 50%, #00A6F5 100%)' }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl px-7 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-500/25 transition-all hover:brightness-110 active:scale-[0.99] disabled:opacity-60 cursor-pointer"
             >
               <LogIn size={15} strokeWidth={2.2} />
               <span>{officerLoading ? 'Signing in…' : 'Sign In'}</span>
@@ -656,8 +656,8 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' }}
-                  className="inline-flex items-center justify-center gap-2 px-7 py-2.5 text-white rounded-xl font-bold shadow-md shadow-sky-500/25 transition-all hover:brightness-110 active:scale-[0.99] text-xs cursor-pointer disabled:opacity-60"
+                  style={{ background: 'linear-gradient(180deg, #1A73E8 0%, #0091FF 50%, #00A6F5 100%)' }}
+                  className="inline-flex items-center justify-center gap-2 px-7 py-2.5 text-white rounded-xl font-bold shadow-md shadow-blue-500/25 transition-all hover:brightness-110 active:scale-[0.99] text-xs cursor-pointer disabled:opacity-60"
                 >
                   <LogIn size={15} strokeWidth={2.2} />
                   <span>{loading ? 'Authenticating…' : 'Sign In'}</span>
@@ -696,8 +696,8 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' }}
-                className="w-full py-3 text-white rounded-xl font-bold shadow-md shadow-sky-500/25 transition-all hover:brightness-110 active:scale-[0.99] text-xs cursor-pointer disabled:opacity-60"
+                style={{ background: 'linear-gradient(180deg, #1A73E8 0%, #0091FF 50%, #00A6F5 100%)' }}
+                className="w-full py-3 text-white rounded-xl font-bold shadow-md shadow-blue-500/25 transition-all hover:brightness-110 active:scale-[0.99] text-xs cursor-pointer disabled:opacity-60"
               >
                 {loading ? 'Sending…' : 'Send Verification Code'}
               </button>
@@ -746,11 +746,11 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading || otp.length !== 6}
-                style={!isUnlocked ? { background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' } : undefined}
+                style={!isUnlocked ? { background: 'linear-gradient(180deg, #1A73E8 0%, #0091FF 50%, #00A6F5 100%)' } : undefined}
                 className={`w-full py-3.5 rounded-xl font-bold text-xs transition-all shadow-md flex items-center justify-center gap-2 select-none cursor-pointer ${
                   isUnlocked
                     ? 'bg-emerald-600 text-white scale-[1.02] shadow-emerald-500/25 ring-2 ring-emerald-400'
-                    : 'text-white shadow-sky-500/25 hover:brightness-110 disabled:opacity-50 active:scale-[0.99]'
+                    : 'text-white shadow-blue-500/25 hover:brightness-110 disabled:opacity-50 active:scale-[0.99]'
                 }`}
               >
                 {isUnlocked ? (
@@ -847,8 +847,8 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading || !newPassword || newPassword !== confirmPassword || !isPasswordValid(newPassword)}
-                style={{ background: 'linear-gradient(135deg, #22d3ee 0%, #0ea5e9 25%, #0284c7 60%, #1d4ed8 100%)' }}
-                className="w-full py-3.5 text-white rounded-xl font-bold shadow-md shadow-sky-500/25 transition-all hover:brightness-110 active:scale-[0.99] flex items-center justify-center gap-2 text-xs cursor-pointer disabled:opacity-50"
+                style={{ background: 'linear-gradient(180deg, #1A73E8 0%, #0091FF 50%, #00A6F5 100%)' }}
+                className="w-full py-3.5 text-white rounded-xl font-bold shadow-md shadow-blue-500/25 transition-all hover:brightness-110 active:scale-[0.99] flex items-center justify-center gap-2 text-xs cursor-pointer disabled:opacity-50"
               >
                 <KeyRound size={16} strokeWidth={2} />
                 <span>{loading ? 'Saving & Authenticating…' : 'Save & Sign In'}</span>

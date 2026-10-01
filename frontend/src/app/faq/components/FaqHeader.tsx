@@ -10,7 +10,10 @@ export function FaqHeader() {
       {/* ── Top Row: Title & Top-Right User Sign Out ────────────────────────── */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-xs">
+          <div 
+            className="w-9 h-9 rounded-lg flex items-center justify-center text-white shadow-md shadow-blue-900/25 shrink-0"
+            style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
+          >
             <HelpCircle size={22} strokeWidth={2.2} />
           </div>
           <div>

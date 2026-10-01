@@ -400,7 +400,10 @@ export function PasteWeeklyModal({ collegeId, collegeName, sections, onClose, on
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-border bg-surface-sunken/60 shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-[#8E1BB1]/15 text-[#8E1BB1] dark:text-[#C55FE9] flex items-center justify-center shrink-0">
+            <div 
+              style={{ background: 'linear-gradient(180deg, #A800E6 0%, #8A00D4 50%, #6C00B8 100%)' }}
+              className="w-8 h-8 rounded-lg text-white shadow-xs flex items-center justify-center shrink-0"
+            >
               <ClipboardPaste size={16} />
             </div>
             <div className="min-w-0">

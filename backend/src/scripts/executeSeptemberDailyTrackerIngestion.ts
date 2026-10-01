@@ -198,6 +198,9 @@ function normalizeOutcome(raw: string): { outcome: CallOutcome | null; inferredM
   if (s.includes('jd received') || s.includes('jd_received')) {
     return { outcome: 'jd_received' };
   }
+  if (s.includes('new poc') || s.includes('new_poc') || s.includes('alternate poc') || s.includes('alternate contact')) {
+    return { outcome: 'new_poc' };
+  }
   if (s.includes('hiring')) {
     return { outcome: 'hiring' };
   }

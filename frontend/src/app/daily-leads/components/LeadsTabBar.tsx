@@ -28,15 +28,22 @@ export function LeadsTabBar({
   return (
     <div className="px-6 border-b border-border flex items-center justify-between gap-4 bg-surface min-h-[48px]">
       {/* ── Left: Tab Buttons — Apple Smooth Sliding Segmented Control ── */}
-      <div className="relative grid grid-cols-3 gap-0.5 p-0.5 bg-surface-sunken/80 dark:bg-zinc-900/90 rounded-lg border border-border/80 shadow-2xs shrink-0 select-none">
+      <div className="relative grid grid-cols-3 gap-1 p-1 bg-surface-sunken/80 dark:bg-zinc-900/90 rounded-lg border border-border/80 shadow-2xs shrink-0 select-none">
         {/* Glider / Smooth Sliding Indicator */}
         <div
-          className={`absolute top-0.5 bottom-0.5 w-[calc((100%-8px)/3)] rounded-md border shadow-xs transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none ${
+          style={
             activeTab === 'positive'
-              ? 'left-0.5 translate-x-0 bg-white dark:bg-emerald-950/80 border-emerald-500/40 dark:border-emerald-600/50 shadow-emerald-500/10'
+              ? { background: 'linear-gradient(180deg, #1D64D8 0%, #174EB8 50%, #0B2556 100%)' }
               : activeTab === 'jd_received'
-              ? 'left-0.5 translate-x-[calc(100%+2px)] bg-white dark:bg-blue-950/80 border-blue-500/40 dark:border-blue-600/50 shadow-blue-500/10'
-              : 'left-0.5 translate-x-[calc(200%+4px)] bg-white dark:bg-indigo-950/80 border-indigo-500/40 dark:border-indigo-600/50 shadow-indigo-500/10'
+              ? { background: 'linear-gradient(180deg, #38BF3D 0%, #1BA32D 50%, #0B6B1E 100%)' }
+              : { background: 'linear-gradient(180deg, #6366F1 0%, #4F46E5 50%, #3730A3 100%)' }
+          }
+          className={`absolute top-1 bottom-1 w-[calc((100%-12px)/3)] rounded-md border shadow-md transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none ${
+            activeTab === 'positive'
+              ? 'left-1 translate-x-0 border-blue-400/40 shadow-blue-900/30'
+              : activeTab === 'jd_received'
+              ? 'left-1 translate-x-[calc(100%+4px)] border-emerald-400/40 shadow-emerald-600/25'
+              : 'left-1 translate-x-[calc(200%+8px)] border-indigo-400/40 shadow-indigo-500/25'
           }`}
         />
 
@@ -44,9 +51,9 @@ export function LeadsTabBar({
         <button
           type="button"
           onClick={() => onTabChange('positive')}
-          className={`relative z-10 flex items-center justify-center gap-1.5 px-2 py-1 text-xs font-bold transition-colors duration-200 cursor-pointer rounded-md ${
+          className={`relative z-10 flex items-center justify-center gap-1.5 px-2.5 py-1 text-xs font-bold transition-colors duration-200 cursor-pointer rounded-md select-none ${
             activeTab === 'positive'
-              ? 'text-emerald-900 dark:text-emerald-200 font-extrabold'
+              ? 'text-white font-extrabold'
               : 'text-fg-subtle hover:text-fg'
           }`}
         >
@@ -54,8 +61,8 @@ export function LeadsTabBar({
           <span
             className={`text-[10px] font-bold px-1.5 py-0.5 rounded-[4px] transition-colors duration-200 tabular-nums shadow-2xs ${
               activeTab === 'positive'
-                ? 'bg-emerald-600 dark:bg-emerald-500 text-white font-black'
-                : 'bg-surface-sunken dark:bg-zinc-800 text-fg-muted'
+                ? 'bg-black/20 text-white font-black'
+                : 'bg-surface-sunken dark:bg-zinc-800 text-fg-muted border border-border/40'
             }`}
           >
             {positivesCount}
@@ -66,9 +73,9 @@ export function LeadsTabBar({
         <button
           type="button"
           onClick={() => onTabChange('jd_received')}
-          className={`relative z-10 flex items-center justify-center gap-1.5 px-2 py-1 text-xs font-bold transition-colors duration-200 cursor-pointer rounded-md ${
+          className={`relative z-10 flex items-center justify-center gap-1.5 px-2.5 py-1 text-xs font-bold transition-colors duration-200 cursor-pointer rounded-md select-none ${
             activeTab === 'jd_received'
-              ? 'text-blue-900 dark:text-blue-200 font-extrabold'
+              ? 'text-white font-extrabold'
               : 'text-fg-subtle hover:text-fg'
           }`}
         >
@@ -76,8 +83,8 @@ export function LeadsTabBar({
           <span
             className={`text-[10px] font-bold px-1.5 py-0.5 rounded-[4px] transition-colors duration-200 tabular-nums shadow-2xs ${
               activeTab === 'jd_received'
-                ? 'bg-blue-600 dark:bg-blue-500 text-white font-black'
-                : 'bg-surface-sunken dark:bg-zinc-800 text-fg-muted'
+                ? 'bg-black/20 text-white font-black'
+                : 'bg-surface-sunken dark:bg-zinc-800 text-fg-muted border border-border/40'
             }`}
           >
             {jdCount}
@@ -88,9 +95,9 @@ export function LeadsTabBar({
         <button
           type="button"
           onClick={() => onTabChange('my_positives')}
-          className={`relative z-10 flex items-center justify-center gap-1.5 px-2 py-1 text-xs font-bold transition-colors duration-200 cursor-pointer rounded-md ${
+          className={`relative z-10 flex items-center justify-center gap-1.5 px-2.5 py-1 text-xs font-bold transition-colors duration-200 cursor-pointer rounded-md select-none ${
             activeTab === 'my_positives'
-              ? 'text-indigo-900 dark:text-indigo-200 font-extrabold'
+              ? 'text-white font-extrabold'
               : 'text-fg-subtle hover:text-fg'
           }`}
         >
@@ -98,8 +105,8 @@ export function LeadsTabBar({
           <span
             className={`text-[10px] font-bold px-1.5 py-0.5 rounded-[4px] transition-colors duration-200 tabular-nums shadow-2xs ${
               activeTab === 'my_positives'
-                ? 'bg-indigo-600 dark:bg-indigo-500 text-white font-black'
-                : 'bg-surface-sunken dark:bg-zinc-800 text-fg-muted'
+                ? 'bg-black/20 text-white font-black'
+                : 'bg-surface-sunken dark:bg-zinc-800 text-fg-muted border border-border/40'
             }`}
           >
             {myPositivesCount}
@@ -114,7 +121,8 @@ export function LeadsTabBar({
             type="button"
             disabled={selectedCount === 0}
             onClick={onBulkDelete}
-            className="flex items-center gap-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer active:scale-[0.992]"
+            className="flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-md shadow-red-600/25 transition-all cursor-pointer hover:brightness-110 active:scale-[0.95]"
+            style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
           >
             <Trash2 size={13} strokeWidth={2.2} aria-hidden />
             <span>Delete Selected ({selectedCount})</span>

@@ -55,7 +55,8 @@ export function DeleteConfirmModal({
               type="button"
               onClick={onConfirm}
               disabled={loading}
-              className="px-5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm transition-colors cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+              className="px-5 py-2 text-xs font-bold text-white rounded-xl shadow-md shadow-red-600/25 hover:brightness-110 active:scale-[0.95] transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+              style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
             >
               <Trash2 size={14} />
               <span>{loading ? 'Deleting...' : 'Confirm Delete'}</span>

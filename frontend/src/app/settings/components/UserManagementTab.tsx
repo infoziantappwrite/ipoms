@@ -306,12 +306,12 @@ export function UserManagementTab({
                     ? cleanCollegeDisplayName(u.full_name)
                     : u.full_name;
 
-                  // Calculate days left in the 1-week recovery window
-                  let daysRemaining = 7;
+                  // Calculate days left in the 1-month (30-day) recovery window
+                  let daysRemaining = 30;
                   if (u.deleted_at) {
                     const ms = Date.now() - new Date(u.deleted_at).getTime();
                     const daysPast = ms / (1000 * 60 * 60 * 24);
-                    daysRemaining = Math.max(0, Math.ceil(7 - daysPast));
+                    daysRemaining = Math.max(0, Math.ceil(30 - daysPast));
                   }
 
                   return (
@@ -614,11 +614,11 @@ export function UserManagementTab({
                 <li>Historic logs, student data, and company assignments will be preserved.</li>
                 <li>
                   <strong className="text-emerald-700 dark:text-emerald-400 font-semibold">
-                    1-Week Recovery Window:
+                    1-Month Recovery Window:
                   </strong>{' '}
-                  The Administrator can restore this account anytime within <strong>7 days</strong>.
+                  The Administrator can restore this account anytime within <strong>30 days (1 month)</strong>.
                 </li>
-                <li>After 7 days, the account will be permanently archived.</li>
+                <li>After 30 days, the account will be permanently archived.</li>
               </ul>
             </div>
 

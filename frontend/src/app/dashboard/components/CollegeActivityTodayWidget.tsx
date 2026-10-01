@@ -119,7 +119,8 @@ export function CollegeActivityTodayWidget({ rows = [], onRefresh }: Props) {
             onClick={handleSync}
             disabled={isSyncing}
             title="Synchronize today's college activity data"
-            className="p-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white transition-all cursor-pointer shadow-2xs disabled:opacity-50 group/sync shrink-0"
+            style={{ background: 'linear-gradient(180deg, #FFC53D 0%, #FF9500 50%, #FF5E00 100%)' }}
+            className="p-1.5 rounded-lg text-white shadow-md shadow-orange-500/25 hover:brightness-110 active:scale-[0.95] transition-all cursor-pointer disabled:opacity-50 group/sync shrink-0"
           >
             <RefreshCw
               size={14}

@@ -969,10 +969,10 @@ app.get('/api/v1/companies/search', async (req: Request, res: Response) => {
 
     const isRecent = req.query.recent === 'true';
     if (isRecent) {
-      // Recent data selects the latest 100 companies in the directory
+      // Recent data selects the latest 200 companies in the directory
       const highestDoc = await CompanyMetadata.findOne({ is_deleted: false }).sort({ serial_number: -1 }).select('serial_number');
-      const maxSerial = highestDoc?.serial_number || 100;
-      const recentThreshold = Math.max(1, maxSerial - 99);
+      const maxSerial = highestDoc?.serial_number || 200;
+      const recentThreshold = Math.max(1, maxSerial - 199);
       if (!filter.serial_number) {
         filter.serial_number = { $gte: recentThreshold };
       } else {
@@ -9200,9 +9200,9 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       });
     }
 
-    // ── CASE 3: MONTH-END REPORT (INDIVIDUAL COORDINATOR) ──────────────────────
+    // ── CASE 3: MONTH-END REPORT (INDIVIDUAL COORDINATOR / COLLEGE) ───────────
     if (template_type === 'month_end' || template_type === 'monthly_placement') {
-      // 1. Resolve Colleges Handled by Coordinator
+      // 1. Resolve Colleges Handled by Coordinator / Selected
       let handledColleges: any[] = [];
       if (coordinator?.assigned_college_ids && coordinator.assigned_college_ids.length > 0) {
         handledColleges = await College.find({
@@ -9235,231 +9235,240 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         handledColleges.forEach(col => collegeIdsToMatch.push(col._id));
       }
 
-      // 2. Fetch conversions (Exclusively from 'in_progress' section of Weekly Tracker for the target college)
-      const wtFilterProgress: any = {
-        is_deleted: { $ne: true },
-        pipeline_section: 'in_progress',
-      };
+      const wtMonthFilter: any = { is_deleted: { $ne: true } };
       if (collegeIdsToMatch.length > 0) {
-        wtFilterProgress.college_id = { $in: collegeIdsToMatch };
+        wtMonthFilter.college_id = { $in: collegeIdsToMatch };
+      }
+      if (academic_year && academic_year !== 'all') {
+        wtMonthFilter.$and = [...(wtMonthFilter.$and || []), batchOrYearClause(academic_year)];
       }
 
-      const inProgressConversions = await WeeklyTracker.find(wtFilterProgress)
-        .populate('college_id', 'college_name college_code')
-        .sort({ created_at: -1, company_name: 1 });
+      // Fetch all 9 Weekly Tracker Sections
+      let [
+        completedDrives,
+        driveInProgressDrives,
+        inDriveDrives,
+        inProgressDrives,
+        pipelineDrives,
+        topCompaniesDrives,
+        rejectedCompaniesDrives,
+        onHoldCollegeDrives,
+        onHoldHrDrives,
+      ] = await Promise.all([
+        WeeklyTracker.find({ ...wtMonthFilter, pipeline_section: 'completed' })
+          .populate('college_id', 'college_name college_code')
+          .sort({ created_at: -1, company_name: 1 }),
+        WeeklyTracker.find({ ...wtMonthFilter, pipeline_section: 'drive_in_progress' })
+          .populate('college_id', 'college_name college_code')
+          .sort({ created_at: -1, company_name: 1 }),
+        WeeklyTracker.find({ ...wtMonthFilter, pipeline_section: { $in: ['in_drive', 'companies_in_drive', 'upcoming_drives'] } })
+          .populate('college_id', 'college_name college_code')
+          .sort({ drive_date: 1, created_at: -1, company_name: 1 }),
+        WeeklyTracker.find({ ...wtMonthFilter, pipeline_section: 'in_progress' })
+          .populate('college_id', 'college_name college_code')
+          .sort({ created_at: -1, company_name: 1 }),
+        WeeklyTracker.find({ ...wtMonthFilter, pipeline_section: { $in: ['pipeline', 'top_companies'] } })
+          .populate('college_id', 'college_name college_code')
+          .sort({ created_at: -1, company_name: 1 }),
+        WeeklyTracker.find({
+          ...wtMonthFilter,
+          $or: [{ pipeline_section: 'top_companies' }, { is_pinned_top: true }],
+        })
+          .populate('college_id', 'college_name college_code')
+          .sort({ created_at: -1, company_name: 1 }),
+        WeeklyTracker.find({ ...wtMonthFilter, pipeline_section: { $in: ['rejected_companies', 'rejected_by_hr'] } })
+          .populate('college_id', 'college_name college_code')
+          .sort({ created_at: -1, company_name: 1 }),
+        WeeklyTracker.find({ ...wtMonthFilter, pipeline_section: { $in: ['on_hold_by_college', 'rejected_by_college'] } })
+          .populate('college_id', 'college_name college_code')
+          .sort({ created_at: -1, company_name: 1 }),
+        WeeklyTracker.find({ ...wtMonthFilter, pipeline_section: 'on_hold_by_hr' })
+          .populate('college_id', 'college_name college_code')
+          .sort({ created_at: -1, company_name: 1 }),
+      ]);
 
-      // Fetch matching pending tasks to pull exact jd_received_date from Pending Task section
-      const pendingTasksForColleges = await PendingTask.find({
-        is_deleted: { $ne: true },
-        ...(collegeIdsToMatch.length > 0 ? { college_id: { $in: collegeIdsToMatch } } : {}),
-      });
-
-      const normalizeCompName = (name: string) =>
-        (name || '')
-          .toLowerCase()
-          .replace(/\b(private\s+limited|pvt\.?\s*ltd\.?|ltd\.?|limited|services|technologies|solutions|corp|india|inc\.?)\b/gi, '')
-          .replace(/[^a-z0-9]/gi, '')
-          .trim();
-
-      // Build Section 1: Company Conversions (from in_progress, pulling JD received date from Pending Task)
-      const conversionsList = inProgressConversions.map((wt, idx) => {
-        const wtName = (wt.company_name || '').toLowerCase().trim();
-        const normWt = normalizeCompName(wt.company_name);
-
-        const matchedPt = pendingTasksForColleges.find((pt) => {
-          const ptName = (pt.company_name || '').toLowerCase().trim();
-          const normPt = normalizeCompName(pt.company_name);
-          return (
-            ptName === wtName ||
-            normPt === normWt ||
-            (normPt.length > 3 && normWt.length > 3 && (normPt.includes(normWt) || normWt.includes(normPt))) ||
-            ptName.includes(wtName) ||
-            wtName.includes(ptName)
-          );
-        });
-
-        let formattedJdDate = '';
-        if (matchedPt?.jd_received_date) {
-          formattedJdDate = new Date(matchedPt.jd_received_date).toLocaleDateString('en-IN', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-          });
-        }
-
-        return {
-          s_no: idx + 1,
-          company_name: wt.company_name,
-          role: wt.job_role || (wt as any).role || 'Software Engineer',
-          ctc: wt.ctc_lpa || 'Competitive',
-          college_name: (wt.college_id as any)?.college_name || targetCollege?.college_name || 'Target Institution',
-          jd_received_date: formattedJdDate,
-        };
-      });
-
-      // 3. Fetch Companies in Drive (Exclusively from 'in_drive' / 'companies_in_drive' section of Weekly Tracker)
-      const wtFilterInDrive: any = {
-        is_deleted: { $ne: true },
-        pipeline_section: { $in: ['in_drive', 'companies_in_drive'] },
-      };
-      if (collegeIdsToMatch.length > 0) {
-        wtFilterInDrive.college_id = { $in: collegeIdsToMatch };
+      // Fallback if 0 results found with academic_year filter
+      if (
+        completedDrives.length === 0 &&
+        driveInProgressDrives.length === 0 &&
+        inDriveDrives.length === 0 &&
+        inProgressDrives.length === 0 &&
+        pipelineDrives.length === 0 &&
+        topCompaniesDrives.length === 0 &&
+        rejectedCompaniesDrives.length === 0 &&
+        onHoldCollegeDrives.length === 0 &&
+        onHoldHrDrives.length === 0 &&
+        wtMonthFilter.$and
+      ) {
+        const fallbackFilter = { ...wtMonthFilter };
+        delete fallbackFilter.$and;
+        const [fComp, fDip, fInDrive, fInProg, fPipe, fTop, fRej, fHoldCol, fHoldHr] = await Promise.all([
+          WeeklyTracker.find({ ...fallbackFilter, pipeline_section: 'completed' }).populate('college_id', 'college_name college_code').sort({ created_at: -1, company_name: 1 }),
+          WeeklyTracker.find({ ...fallbackFilter, pipeline_section: 'drive_in_progress' }).populate('college_id', 'college_name college_code').sort({ created_at: -1, company_name: 1 }),
+          WeeklyTracker.find({ ...fallbackFilter, pipeline_section: { $in: ['in_drive', 'companies_in_drive', 'upcoming_drives'] } }).populate('college_id', 'college_name college_code').sort({ drive_date: 1, created_at: -1, company_name: 1 }),
+          WeeklyTracker.find({ ...fallbackFilter, pipeline_section: 'in_progress' }).populate('college_id', 'college_name college_code').sort({ created_at: -1, company_name: 1 }),
+          WeeklyTracker.find({ ...fallbackFilter, pipeline_section: { $in: ['pipeline', 'top_companies'] } }).populate('college_id', 'college_name college_code').sort({ created_at: -1, company_name: 1 }),
+          WeeklyTracker.find({ ...fallbackFilter, $or: [{ pipeline_section: 'top_companies' }, { is_pinned_top: true }] }).populate('college_id', 'college_name college_code').sort({ created_at: -1, company_name: 1 }),
+          WeeklyTracker.find({ ...fallbackFilter, pipeline_section: { $in: ['rejected_companies', 'rejected_by_hr'] } }).populate('college_id', 'college_name college_code').sort({ created_at: -1, company_name: 1 }),
+          WeeklyTracker.find({ ...fallbackFilter, pipeline_section: { $in: ['on_hold_by_college', 'rejected_by_college'] } }).populate('college_id', 'college_name college_code').sort({ created_at: -1, company_name: 1 }),
+          WeeklyTracker.find({ ...fallbackFilter, pipeline_section: 'on_hold_by_hr' }).populate('college_id', 'college_name college_code').sort({ created_at: -1, company_name: 1 }),
+        ]);
+        completedDrives = fComp;
+        driveInProgressDrives = fDip;
+        inDriveDrives = fInDrive;
+        inProgressDrives = fInProg;
+        pipelineDrives = fPipe;
+        topCompaniesDrives = fTop;
+        rejectedCompaniesDrives = fRej;
+        onHoldCollegeDrives = fHoldCol;
+        onHoldHrDrives = fHoldHr;
       }
 
-      const inDriveCompanies = await WeeklyTracker.find(wtFilterInDrive)
-        .populate('college_id', 'college_name college_code')
-        .sort({ drive_date: 1, created_at: -1, company_name: 1 });
-
-      // Build Section 2: Companies in Drive (Exact mirror of Weekly Tracker in_drive section: S.No, Company Name, Role, CTC, Status)
-      const companiesInDriveList = inDriveCompanies.map((wt, idx) => ({
-        s_no: idx + 1,
-        company_name: wt.company_name,
-        role: wt.job_role || (wt as any).role || 'Software Engineer',
-        ctc: wt.ctc_lpa || 'Competitive',
-        status: wt.current_status_text || (wt.drive_date ? `Drive on ${new Date(wt.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Drive in progress'),
-        college_name: (wt.college_id as any)?.college_name || targetCollege?.college_name || 'Target Institution',
-      }));
-
-      // 4. Fetch Companies on Hold by College / TPO
-      const wtFilterOnHoldCollege: any = {
-        is_deleted: { $ne: true },
-        pipeline_section: { $in: ['on_hold_by_college', 'rejected_by_college'] },
-      };
-      if (collegeIdsToMatch.length > 0) {
-        wtFilterOnHoldCollege.college_id = { $in: collegeIdsToMatch };
-      }
-
-      const onHoldCollegeCompanies = await WeeklyTracker.find(wtFilterOnHoldCollege)
-        .populate('college_id', 'college_name college_code')
-        .sort({ created_at: -1, company_name: 1 });
-
-      const onHoldByCollegeList = onHoldCollegeCompanies.map((wt, idx) => ({
-        s_no: idx + 1,
-        company_name: wt.company_name,
-        role: wt.job_role || (wt as any).role || 'Software Engineer',
-        ctc: wt.ctc_lpa || 'Competitive',
-        status: wt.current_status_text || (wt as any).remarks || 'On Hold by College / TPO',
-        remarks: (wt as any).remarks || wt.current_status_text || 'On Hold by College / TPO',
-        college_name: (wt.college_id as any)?.college_name || targetCollege?.college_name || 'Target Institution',
-      }));
-
-      // 5. Fetch Companies on Hold by HR
-      const wtFilterOnHoldHr: any = {
-        is_deleted: { $ne: true },
-        pipeline_section: 'on_hold_by_hr',
-      };
-      if (collegeIdsToMatch.length > 0) {
-        wtFilterOnHoldHr.college_id = { $in: collegeIdsToMatch };
-      }
-
-      const onHoldHrCompanies = await WeeklyTracker.find(wtFilterOnHoldHr)
-        .populate('college_id', 'college_name college_code')
-        .sort({ created_at: -1, company_name: 1 });
-
-      const onHoldByHrList = onHoldHrCompanies.map((wt, idx) => ({
-        s_no: idx + 1,
-        company_name: wt.company_name,
-        role: wt.job_role || (wt as any).role || 'Software Engineer',
-        ctc: wt.ctc_lpa || 'Competitive',
-        status: wt.current_status_text || (wt as any).remarks || 'On Hold from Corporate / HR',
-        remarks: (wt as any).remarks || wt.current_status_text || 'On Hold from Corporate / HR',
-        college_name: (wt.college_id as any)?.college_name || targetCollege?.college_name || 'Target Institution',
-      }));
-
-      // 6. Fetch Completed Drives to calculate Total Offers Received & Completed Companies Section
-      const wtFilterCompleted: any = {
-        is_deleted: { $ne: true },
-        pipeline_section: 'completed',
-      };
-      if (collegeIdsToMatch.length > 0) {
-        wtFilterCompleted.college_id = { $in: collegeIdsToMatch };
-      }
-
-      const completedDrives = await WeeklyTracker.find(wtFilterCompleted)
-        .populate('college_id', 'college_name college_code')
-        .sort({ created_at: -1, company_name: 1 });
       const totalOffersReceived = completedDrives.reduce((sum, d) => sum + (Number(d.selected_count) || 0), 0);
 
+      // Section 1: Completed Companies
       const completedCompaniesList = completedDrives.map((wt, idx) => ({
         s_no: idx + 1,
         company_name: wt.company_name,
-        role: wt.job_role || (wt as any).role || 'Software Engineer',
         job_role: wt.job_role || (wt as any).role || 'Software Engineer',
+        role: wt.job_role || (wt as any).role || 'Software Engineer',
+        company_type: wt.company_type || 'Software / IT',
         ctc: wt.ctc_lpa || 'Competitive',
         ctc_lpa: wt.ctc_lpa || 'Competitive',
         status: wt.current_status_text || 'Drive Completed',
         current_status_text: wt.current_status_text || 'Drive Completed',
         offers_received: Number(wt.selected_count) || 0,
         selected_count: Number(wt.selected_count) || 0,
+        follow_up_date: wt.follow_up_date ? new Date(wt.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
         college_name: (wt.college_id as any)?.college_name || targetCollege?.college_name || 'Target Institution',
       }));
 
-      // ── Calling Activity Summary — real calls + duration per handled college
-      // for the report's month, straight from Daily Tracker (user-requested,
-      // perf/security session, 22 Sep 2026). Month bounds come from date_from/
-      // date_to when the wizard's month picker sends them; falls back to the
-      // current IST calendar month so an older client that doesn't send them
-      // yet still gets a real (if less exact) answer, never a silently empty one.
-      let monthRangeStart: Date;
-      let monthRangeEnd: Date;
-      const parsedFrom = date_from ? new Date(String(date_from) + 'T00:00:00Z') : null;
-      const parsedTo = date_to ? new Date(String(date_to) + 'T23:59:59Z') : null;
-      if (parsedFrom && !isNaN(parsedFrom.getTime()) && parsedTo && !isNaN(parsedTo.getTime())) {
-        monthRangeStart = parsedFrom;
-        monthRangeEnd = parsedTo;
-      } else {
-        const todayIst = getTodayDate();
-        monthRangeStart = new Date(Date.UTC(todayIst.getUTCFullYear(), todayIst.getUTCMonth(), 1, 0, 0, 0));
-        monthRangeEnd = new Date(Date.UTC(todayIst.getUTCFullYear(), todayIst.getUTCMonth() + 1, 0, 23, 59, 59, 999));
-      }
+      // Section 2: Drive In Progress
+      const driveInProgressList = driveInProgressDrives.map((wt, idx) => ({
+        s_no: idx + 1,
+        company_name: wt.company_name,
+        job_role: wt.job_role || (wt as any).role || 'Software Engineer',
+        role: wt.job_role || (wt as any).role || 'Software Engineer',
+        company_type: wt.company_type || 'Software / IT',
+        ctc: wt.ctc_lpa || 'Competitive',
+        ctc_lpa: wt.ctc_lpa || 'Competitive',
+        status: wt.current_status_text || 'Drive in progress',
+        current_status_text: wt.current_status_text || 'Drive in progress',
+        drive_date: wt.drive_date ? new Date(wt.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+        follow_up_date: wt.follow_up_date ? new Date(wt.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+        college_name: (wt.college_id as any)?.college_name || targetCollege?.college_name || 'Target Institution',
+      }));
 
-      // Deliberately NOT narrowed to collegeIdsToMatch like the other sections —
-      // the user asked for "how many calls per college handled by the user", i.e.
-      // this coordinator's whole monthly picture, not just whichever single
-      // institution the rest of the report currently targets.
-      const callingActivityRows = await Promise.all(
-        handledColleges.map(async (col, idx) => {
-          const rows = await DailyTracker.find({
-            coordinator_id: coordinator._id,
-            college_id: col._id,
-            is_skipped: { $ne: true },
-            $or: [
-              { session_date: { $gte: monthRangeStart, $lte: monthRangeEnd } },
-              { created_at: { $gte: monthRangeStart, $lte: monthRangeEnd } },
-            ],
-          }).select('duration_seconds call_start_time call_end_time').lean();
+      // Section 3: Companies in Drive / Upcoming Drives
+      const companiesInDriveList = inDriveDrives.map((wt, idx) => ({
+        s_no: idx + 1,
+        company_name: wt.company_name,
+        job_role: wt.job_role || (wt as any).role || 'Software Engineer',
+        role: wt.job_role || (wt as any).role || 'Software Engineer',
+        company_type: wt.company_type || 'Software / IT',
+        ctc: wt.ctc_lpa || 'Competitive',
+        ctc_lpa: wt.ctc_lpa || 'Competitive',
+        status: wt.current_status_text || (wt.drive_date ? `Drive on ${new Date(wt.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Upcoming Drive'),
+        current_status_text: wt.current_status_text || (wt.drive_date ? `Drive on ${new Date(wt.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : 'Upcoming Drive'),
+        drive_date: wt.drive_date ? new Date(wt.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+        follow_up_date: wt.follow_up_date ? new Date(wt.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+        college_name: (wt.college_id as any)?.college_name || targetCollege?.college_name || 'Target Institution',
+      }));
 
-          let durationSecs = 0;
-          for (const row of rows) {
-            if (typeof row.duration_seconds === 'number' && row.duration_seconds > 0) {
-              durationSecs += row.duration_seconds;
-            } else if (row.call_start_time && row.call_end_time) {
-              const s = new Date(row.call_start_time).getTime();
-              const e = new Date(row.call_end_time).getTime();
-              if (e > s) durationSecs += Math.floor((e - s) / 1000);
-            }
-          }
+      // Section 4: Companies In Progress
+      const inProgressList = inProgressDrives.map((wt, idx) => ({
+        s_no: idx + 1,
+        company_name: wt.company_name,
+        job_role: wt.job_role || (wt as any).role || 'Software Engineer',
+        role: wt.job_role || (wt as any).role || 'Software Engineer',
+        company_type: wt.company_type || 'Software / IT',
+        ctc: wt.ctc_lpa || 'To be finalized',
+        ctc_lpa: wt.ctc_lpa || 'To be finalized',
+        status: wt.current_status_text || 'In Progress',
+        current_status_text: wt.current_status_text || 'In Progress',
+        follow_up_date: wt.follow_up_date ? new Date(wt.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Scheduled',
+        college_name: (wt.college_id as any)?.college_name || targetCollege?.college_name || 'Target Institution',
+      }));
 
-          return {
-            s_no: idx + 1,
-            college_name: col.college_name,
-            college_code: col.college_code,
-            total_calls: rows.length,
-            total_duration_seconds: durationSecs,
-            total_duration_formatted: formatDurationClock(durationSecs).formatted,
-          };
-        })
-      );
+      // Section 5: Companies in Pipeline
+      const pipelineList = pipelineDrives.map((wt, idx) => ({
+        s_no: idx + 1,
+        company_name: wt.company_name,
+        job_role: wt.job_role || (wt as any).role || 'Software Engineer',
+        role: wt.job_role || (wt as any).role || 'Software Engineer',
+        company_type: wt.company_type || 'Corporate',
+        ctc: wt.ctc_lpa || 'Awaiting JD',
+        ctc_lpa: wt.ctc_lpa || 'Awaiting JD',
+        status: wt.current_status_text || 'Pipeline',
+        current_status_text: wt.current_status_text || 'Pipeline',
+        follow_up_date: wt.follow_up_date ? new Date(wt.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+        college_name: (wt.college_id as any)?.college_name || targetCollege?.college_name || 'Target Institution',
+      }));
 
-      const callingActivityTotals = callingActivityRows.reduce(
-        (acc, r) => ({
-          calls: acc.calls + r.total_calls,
-          seconds: acc.seconds + r.total_duration_seconds,
-        }),
-        { calls: 0, seconds: 0 }
-      );
+      // Section 6: Top Companies
+      const topCompaniesList = topCompaniesDrives.map((wt, idx) => ({
+        s_no: idx + 1,
+        company_name: wt.company_name,
+        job_role: wt.job_role || (wt as any).role || 'Software Engineer',
+        role: wt.job_role || (wt as any).role || 'Software Engineer',
+        company_type: wt.company_type || 'Corporate',
+        ctc: wt.ctc_lpa || 'Competitive',
+        ctc_lpa: wt.ctc_lpa || 'Competitive',
+        status: wt.current_status_text || 'Target Top Company',
+        current_status_text: wt.current_status_text || 'Target Top Company',
+        follow_up_date: wt.follow_up_date ? new Date(wt.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+        college_name: (wt.college_id as any)?.college_name || targetCollege?.college_name || 'Target Institution',
+      }));
 
-      let monthName = 'August';
+      // Section 7: Rejected Companies
+      const rejectedCompaniesList = rejectedCompaniesDrives.map((wt, idx) => ({
+        s_no: idx + 1,
+        company_name: wt.company_name,
+        job_role: wt.job_role || (wt as any).role || 'Software Engineer',
+        role: wt.job_role || (wt as any).role || 'Software Engineer',
+        company_type: wt.company_type || 'Corporate',
+        ctc: wt.ctc_lpa || '—',
+        ctc_lpa: wt.ctc_lpa || '—',
+        status: wt.current_status_text || (wt as any).remarks || 'Rejected Company',
+        current_status_text: wt.current_status_text || (wt as any).remarks || 'Rejected Company',
+        remarks: (wt as any).remarks || wt.current_status_text || 'Rejected Company',
+        follow_up_date: wt.follow_up_date ? new Date(wt.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+        college_name: (wt.college_id as any)?.college_name || targetCollege?.college_name || 'Target Institution',
+      }));
+
+      // Section 8: Companies on Hold by College / TPO
+      const onHoldByCollegeList = onHoldCollegeDrives.map((wt, idx) => ({
+        s_no: idx + 1,
+        company_name: wt.company_name,
+        job_role: wt.job_role || (wt as any).role || 'Software Engineer',
+        role: wt.job_role || (wt as any).role || 'Software Engineer',
+        company_type: wt.company_type || 'Corporate',
+        ctc: wt.ctc_lpa || '—',
+        ctc_lpa: wt.ctc_lpa || '—',
+        status: wt.current_status_text || (wt as any).remarks || 'On Hold by College / TPO',
+        current_status_text: wt.current_status_text || (wt as any).remarks || 'On Hold by College / TPO',
+        remarks: (wt as any).remarks || wt.current_status_text || 'On Hold by College / TPO',
+        follow_up_date: wt.follow_up_date ? new Date(wt.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+        college_name: (wt.college_id as any)?.college_name || targetCollege?.college_name || 'Target Institution',
+      }));
+
+      // Section 9: Companies on Hold by HR
+      const onHoldByHrList = onHoldHrDrives.map((wt, idx) => ({
+        s_no: idx + 1,
+        company_name: wt.company_name,
+        job_role: wt.job_role || (wt as any).role || 'Software Engineer',
+        role: wt.job_role || (wt as any).role || 'Software Engineer',
+        company_type: wt.company_type || 'Corporate',
+        ctc: wt.ctc_lpa || '—',
+        ctc_lpa: wt.ctc_lpa || '—',
+        status: wt.current_status_text || (wt as any).remarks || 'On Hold from Corporate / HR',
+        current_status_text: wt.current_status_text || (wt as any).remarks || 'On Hold from Corporate / HR',
+        remarks: (wt as any).remarks || wt.current_status_text || 'On Hold from Corporate / HR',
+        follow_up_date: wt.follow_up_date ? new Date(wt.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+        college_name: (wt.college_id as any)?.college_name || targetCollege?.college_name || 'Target Institution',
+      }));
+
+      let monthName = 'September';
       if (week_label) {
         const cleaned = String(week_label).trim();
         if (/jan/i.test(cleaned)) monthName = 'January';
@@ -9479,11 +9488,143 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         }
       }
 
+      // ── Resolve Target Month & Date Range for DailyTracker Calling Stats (Matches Monthly Call Trend) ──
+      const MONTH_NAME_MAP: Record<string, number> = {
+        january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+        july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+      };
+
+      let targetYear: number = new Date().getUTCFullYear();
+      let targetMonth: number = new Date().getUTCMonth() + 1;
+
+      if (date_from && date_to) {
+        const parsedStart = parseDateParam(String(date_from));
+        targetYear = parsedStart.getUTCFullYear();
+        targetMonth = parsedStart.getUTCMonth() + 1;
+      } else if (monthName && MONTH_NAME_MAP[monthName.toLowerCase()]) {
+        targetMonth = MONTH_NAME_MAP[monthName.toLowerCase()];
+      }
+
+      const monthIdx = Math.max(0, Math.min(11, targetMonth - 1));
+      const dtStart = new Date(Date.UTC(targetYear, monthIdx, 1, 0, 0, 0));
+      const dtEndNext = new Date(Date.UTC(targetYear, monthIdx + 1, 1, 0, 0, 0));
+
+      // Resolve all target college identifiers (ObjectIds, string IDs, and college codes) across all logins
+      const targetCollegeObjIds: Types.ObjectId[] = [];
+      const targetCollegeStrIds: string[] = [];
+      const targetCollegeCodes: string[] = [];
+
+      if (targetCollege) {
+        if (targetCollege._id) {
+          targetCollegeObjIds.push(new Types.ObjectId(String(targetCollege._id)));
+          targetCollegeStrIds.push(String(targetCollege._id));
+        }
+        if (targetCollege.college_code) {
+          targetCollegeCodes.push(String(targetCollege.college_code).trim().toUpperCase());
+        }
+      }
+
+      if (college_id && college_id !== 'all' && college_id !== 'multi' && Types.ObjectId.isValid(String(college_id))) {
+        targetCollegeObjIds.push(new Types.ObjectId(String(college_id)));
+        targetCollegeStrIds.push(String(college_id));
+      }
+
+      if (handledColleges && handledColleges.length > 0) {
+        for (const col of handledColleges) {
+          if (col._id) {
+            targetCollegeObjIds.push(new Types.ObjectId(String(col._id)));
+            targetCollegeStrIds.push(String(col._id));
+          }
+          if (col.college_code) {
+            targetCollegeCodes.push(String(col.college_code).trim().toUpperCase());
+          }
+        }
+      }
+
+      const uniqueCollegeObjIds = Array.from(new Set(targetCollegeObjIds.map((id) => id.toString()))).map((s) => new Types.ObjectId(s));
+      const uniqueCollegeStrIds = Array.from(new Set(targetCollegeStrIds));
+      const uniqueCollegeCodes = Array.from(new Set(targetCollegeCodes.filter(Boolean)));
+
+      let totalCallsCount = 0;
+      let totalPositivesCount = 0;
+      let totalDurationSeconds = 0;
+
+      const dtCollegeMatchConditions: any[] = [];
+      if (uniqueCollegeObjIds.length > 0) {
+        dtCollegeMatchConditions.push({ college_id: { $in: uniqueCollegeObjIds } });
+      }
+      if (uniqueCollegeStrIds.length > 0) {
+        dtCollegeMatchConditions.push({ college_id: { $in: uniqueCollegeStrIds } });
+      }
+      if (uniqueCollegeCodes.length > 0) {
+        dtCollegeMatchConditions.push({ college_code: { $in: uniqueCollegeCodes } });
+      }
+
+      if (dtCollegeMatchConditions.length > 0) {
+        // Query DailyTracker across all coordinators/logins for the target college(s) and month
+        const dailyRecords = await DailyTracker.find({
+          $or: dtCollegeMatchConditions,
+          is_skipped: { $ne: true },
+          $and: [
+            {
+              $or: [
+                { session_date: { $gte: dtStart, $lt: dtEndNext } },
+                { created_at: { $gte: dtStart, $lt: dtEndNext } },
+                { year: targetYear, month: targetMonth },
+              ],
+            },
+          ],
+        }).select('duration_seconds call_start_time call_end_time outcome_status day month year session_date created_at').lean();
+
+        totalCallsCount = dailyRecords.length;
+
+        for (const r of dailyRecords) {
+          const outcome = String((r as any).outcome_status || '').toLowerCase().trim();
+          if (
+            outcome === 'invite_mail' ||
+            outcome === 'positive' ||
+            outcome === 'jd_received' ||
+            (POSITIVE_OUTCOMES as string[]).includes(outcome as any)
+          ) {
+            totalPositivesCount++;
+          }
+
+          let durSec = 0;
+          if (typeof r.duration_seconds === 'number' && r.duration_seconds > 0) {
+            durSec = r.duration_seconds;
+          } else if (r.call_start_time && r.call_end_time) {
+            const s = new Date(r.call_start_time).getTime();
+            const e = new Date(r.call_end_time).getTime();
+            if (e > s && (e - s) < 86400000) {
+              durSec = Math.floor((e - s) / 1000);
+            }
+          }
+          totalDurationSeconds += durSec;
+        }
+      }
+
+      // Format calling duration (e.g. "18h 45m" or "45m" or "0m")
+      let formattedDuration = '0m';
+      if (totalDurationSeconds >= 3600) {
+        const hrs = Math.floor(totalDurationSeconds / 3600);
+        const mins = Math.floor((totalDurationSeconds % 3600) / 60);
+        formattedDuration = mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
+      } else if (totalDurationSeconds >= 60) {
+        const mins = Math.floor(totalDurationSeconds / 60);
+        formattedDuration = `${mins}m`;
+      } else if (totalDurationSeconds > 0) {
+        formattedDuration = `${totalDurationSeconds}s`;
+      }
+
+      const isMulti = Boolean(req.body.is_multi_college && (college_id === 'all' || college_id === 'multi' || !college_id));
+
       const reportDocument = {
         template_type: 'month_end',
+        is_multi_college: isMulti,
         report_title: `${monthName} Month Placement Operations Report`,
         report_period: `${monthName} 2026`,
-        generated_by: coordinator?.full_name || 'Placement Coordinator',
+        generated_by: (include_prepared_by === false) ? '' : (prepared_by || coordinator?.full_name || 'Placement Coordinator'),
+        include_prepared_by: include_prepared_by !== false,
         generated_date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }),
         theme: theme || 'blue',
         branding: {
@@ -9493,43 +9634,49 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
           college_code: targetCollege?.college_code || (college_id === 'all' ? 'IPOMS' : 'COLLEGE'),
           college_logo: resolveCollegeLogoUrl(targetCollege),
           confidential_notice: `Prepared by Infoziant • ${coordinator?.full_name || 'Placement Coordinator'}`,
-          prepared_by: coordinator?.full_name || 'Placement Coordinator',
+          prepared_by: (include_prepared_by === false) ? '' : (prepared_by || coordinator?.full_name || 'Placement Coordinator'),
           coordinator_name: coordinator?.full_name || 'Placement Coordinator',
         },
         kpi_summary: {
-          total_conversion_count: conversionsList.length + companiesInDriveList.length,
-          total_companies_scheduled: companiesInDriveList.length,
+          total_calls: totalCallsCount,
+          positive_responses: totalPositivesCount,
+          total_duration: formattedDuration,
+          total_duration_seconds: totalDurationSeconds,
+          total_conversion_count: inProgressList.length + companiesInDriveList.length,
+          total_companies_scheduled: driveInProgressList.length + companiesInDriveList.length,
           total_offers_moved: totalOffersReceived,
-          total_calls_this_month: callingActivityTotals.calls,
-          total_hours_dedicated: formatDurationClock(callingActivityTotals.seconds).formatted,
         },
         sections: {
           completed_companies: completedCompaniesList,
-          company_conversions: conversionsList,
+          drive_in_progress: driveInProgressList,
           companies_in_drive: companiesInDriveList,
-          company_drives_scheduled: companiesInDriveList,
+          upcoming_drives: companiesInDriveList,
+          in_progress: inProgressList,
+          pipeline: pipelineList,
+          top_companies: topCompaniesList,
+          rejected_companies: rejectedCompaniesList,
           on_hold_by_college: onHoldByCollegeList,
           on_hold_by_hr: onHoldByHrList,
-          calling_activity: callingActivityRows,
         },
-        calling_activity_totals: {
-          total_calls: callingActivityTotals.calls,
-          total_duration_formatted: formatDurationClock(callingActivityTotals.seconds).formatted,
-        },
-        remarks: custom_remarks || 'All scheduled month-end campus drives and JD received companies have been reviewed. Follow-ups with corporate HRs remain on track.',
+        remarks: custom_remarks || 'Comprehensive monthly recruitment progress review covering conversions, scheduled drives, and placement selections.',
         included_sections: included_sections || {
           kpi_summary: true,
           completed_companies: true,
-          company_conversions: true,
+          drive_in_progress: true,
           companies_in_drive: true,
-          company_drives_scheduled: true,
+          upcoming_drives: true,
+          in_progress: true,
+          pipeline: true,
+          top_companies: true,
+          rejected_companies: true,
           on_hold_by_college: true,
           on_hold_by_hr: true,
-          calling_activity: true,
           remarks: false,
         },
         included_kpi_cards: kpi_cards || {
-          total_conversion_count: true,
+          total_calls: true,
+          positive_responses: true,
+          total_duration: true,
           total_companies_scheduled: true,
           total_offers_moved: true,
         },
@@ -10345,6 +10492,7 @@ const OUTCOME_BUCKET: Record<string, OutcomeBucket> = {
   jd_received: 'other_progress',
   hiring: 'other_progress',
   drive_completed: 'other_progress',
+  new_poc: 'follow_up',
 };
 
 /**
@@ -13821,10 +13969,10 @@ app.get('/api/v1/metadata', async (req: Request, res: Response) => {
 
     const isRecent = req.query.recent === 'true';
     if (isRecent) {
-      // Recent data selects the latest 100 companies in the directory
+      // Recent data selects the latest 200 companies in the directory
       const highestDoc = await CompanyMetadata.findOne({ is_deleted: false }).sort({ serial_number: -1 }).select('serial_number');
-      const maxSerial = highestDoc?.serial_number || 100;
-      const recentThreshold = Math.max(1, maxSerial - 99);
+      const maxSerial = highestDoc?.serial_number || 200;
+      const recentThreshold = Math.max(1, maxSerial - 199);
       if (!filter.serial_number) {
         filter.serial_number = { $gte: recentThreshold };
       } else {
@@ -14585,6 +14733,8 @@ app.patch('/api/v1/users/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR', 
     const { id } = req.params;
     const {
       full_name,
+      username,
+      official_email,
       personal_email,
       primary_mobile,
       secondary_mobile,
@@ -14626,6 +14776,30 @@ app.patch('/api/v1/users/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR', 
           message: 'You do not have permission to modify this account.',
         },
       });
+    }
+
+    if (official_email !== undefined && official_email.trim()) {
+      const cleanEmail = official_email.trim().toLowerCase();
+      const existingEmail = await User.findOne({ _id: { $ne: user._id }, official_email: cleanEmail, is_deleted: false });
+      if (existingEmail) {
+        return res.status(409).json({
+          success: false,
+          error: { code: 'DUPLICATE_EMAIL', message: `Official email "${cleanEmail}" is already in use by another active account.` },
+        });
+      }
+      user.official_email = cleanEmail;
+    }
+
+    if (username !== undefined && username.trim()) {
+      const cleanUsername = username.trim().toLowerCase();
+      const existingUser = await User.findOne({ _id: { $ne: user._id }, username: cleanUsername, is_deleted: false });
+      if (existingUser) {
+        return res.status(409).json({
+          success: false,
+          error: { code: 'DUPLICATE_USERNAME', message: `Username "${cleanUsername}" is already taken.` },
+        });
+      }
+      user.username = cleanUsername;
     }
 
     if (full_name !== undefined) user.full_name = full_name.trim();
@@ -15010,13 +15184,13 @@ app.delete('/api/v1/users/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR',
       performedByEmail: (req as any).user?.email || '',
       module: 'UserManagement',
       severity: 'warning',
-      summary: `User "${user.full_name}" (${user.official_email}) deactivated. Restorable by administrator within 7 days.`,
+      summary: `User "${user.full_name}" (${user.official_email}) deactivated. Restorable by administrator within 30 days (1 month).`,
       req,
     });
 
     return res.status(200).json({
       success: true,
-      message: `User account "${user.full_name}" has been deactivated. You can restore this account anytime within 1 week (7 days).`,
+      message: `User account "${user.full_name}" has been deactivated. You can restore this account anytime within 1 month (30 days).`,
       data: user,
     });
   } catch (error: any) {
@@ -15027,7 +15201,7 @@ app.delete('/api/v1/users/:id', authenticateJWT, authorizeRoles('ADMINISTRATOR',
   }
 });
 
-// ── US-5: PATCH /api/v1/users/:id/restore — Administrator restores deactivated user within 1 week (7 days)
+// ── US-5: PATCH /api/v1/users/:id/restore — Administrator restores deactivated user within 1 month (30 days)
 app.patch('/api/v1/users/:id/restore', authenticateJWT, authorizeRoles('ADMINISTRATOR', 'ADMIN'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -15047,16 +15221,16 @@ app.patch('/api/v1/users/:id/restore', authenticateJWT, authorizeRoles('ADMINIST
       });
     }
 
-    // Check 7 days (1 week) window
+    // Check 30 days (1 month) window
     if (user.deleted_at) {
       const msDiff = Date.now() - new Date(user.deleted_at).getTime();
       const daysDiff = msDiff / (1000 * 60 * 60 * 24);
-      if (daysDiff > 7) {
+      if (daysDiff > 30) {
         return res.status(400).json({
           success: false,
           error: {
             code: 'RESTORE_WINDOW_EXPIRED',
-            message: 'Restore window expired: Deactivated user accounts can only be restored within 7 days (1 week).',
+            message: 'Restore window expired: Deactivated user accounts can only be restored within 30 days (1 month).',
           },
         });
       }

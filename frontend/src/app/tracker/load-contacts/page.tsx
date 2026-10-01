@@ -229,7 +229,10 @@ export default function LoadContactsPage() {
         <header className="px-6 py-3 border-b border-border/70">
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-[inset_1px_1px_3px_rgba(0,0,0,0.05)] shrink-0">
+              <div 
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-md shadow-blue-900/25 shrink-0"
+                style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
+              >
                 <Download size={16} strokeWidth={2} />
               </div>
               <div className="flex items-center gap-2">
@@ -237,7 +240,7 @@ export default function LoadContactsPage() {
                   <span>Load Today's Contacts</span>
                 </h1>
                 <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full font-bold">
-                  {isRecent ? 'Recent Data (Last 100)' : 'Master Database Picker'}
+                  {isRecent ? 'Recent Data (Last 200)' : 'Master Database Picker'}
                 </span>
               </div>
             </div>
@@ -253,11 +256,8 @@ export default function LoadContactsPage() {
                   setToSno(null);
                   setPage(1);
                 }}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer active:scale-[0.992] ${
-                  isRecent
-                    ? 'bg-primary text-primary-foreground border border-primary shadow-xs ring-1 ring-primary/30'
-                    : 'bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 hover:border-primary/40'
-                }`}
+                style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full font-bold text-xs text-white shadow-md shadow-blue-900/25 hover:brightness-110 active:scale-[0.96] transition-all cursor-pointer select-none"
                 title={isRecent ? 'Switch back to all metadata from Serial Number 1' : 'Filter & sort contacts added in the past 1 to 2 weeks'}
               >
                 {isRecent ? (
@@ -298,7 +298,7 @@ export default function LoadContactsPage() {
               <SnoRangeSelector
                 fromSno={fromSno}
                 toSno={toSno}
-                minSno={isRecent ? Math.max(1, masterTotal - 99) : 1}
+                minSno={isRecent ? Math.max(1, masterTotal - 199) : 1}
                 maxSno={masterTotal}
                 onApplyRange={(f, t) => {
                   setFromSno(f);

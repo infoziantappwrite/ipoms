@@ -95,7 +95,8 @@ export function DeleteRowConfirmModal({ isOpen, count, onClose, onConfirm }: Pro
             type="button"
             onClick={handleConfirm}
             disabled={loading}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl hover:brightness-110 active:scale-[0.95] text-white text-xs font-bold shadow-md shadow-red-600/25 transition-all cursor-pointer disabled:opacity-50"
+            style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
           >
             {loading ? (
               <>

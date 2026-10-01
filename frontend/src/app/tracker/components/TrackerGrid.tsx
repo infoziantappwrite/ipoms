@@ -26,7 +26,7 @@ interface Props {
   rows: TrackerRowType[];
   isReadOnly: boolean;
   isAdvanceLocked?: boolean;
-  onRowUpdate: (rowId: string, patch: Partial<TrackerRowType>) => Promise<void>;
+  onRowUpdate?: (rowId: string, patch: Partial<TrackerRowType>) => Promise<void>;
   onEdit?: (row: TrackerRowType) => void;
   onDelete: (rowId: string) => Promise<void>;
   onDeleteSelected?: (rowIds: string[]) => Promise<void>;
@@ -127,7 +127,9 @@ export function TrackerGrid({
     async (rowId: string, patch: Partial<TrackerRowType>) => {
       const targetRow = rows.find((r) => r._id === rowId);
 
-      await onRowUpdate(rowId, patch);
+      if (onRowUpdate) {
+        await onRowUpdate(rowId, patch);
+      }
 
       if (!targetRow) return;
 
@@ -317,6 +319,8 @@ export function TrackerGrid({
 
     triggerHaptic('success');
     const totalCells = selectedCells.size;
+
+    if (!onRowUpdate) return;
 
     try {
       await Promise.all(
@@ -644,7 +648,7 @@ export function TrackerGrid({
         });
       });
 
-      if (pastedCount > 0) {
+      if (pastedCount > 0 && onRowUpdate) {
         triggerHaptic('success');
         setSelectedCells(newSelectedCells);
         try {
@@ -903,6 +907,7 @@ export function TrackerGrid({
       in_connect: 'In Connect',
       invalid: 'Invalid',
       drive_completed: 'Drive Completed',
+      new_poc: 'New POC',
     };
 
     const dataRows = targetRows.map((r, i) => {
@@ -986,6 +991,7 @@ export function TrackerGrid({
       in_connect: 'In Connect',
       invalid: 'Invalid',
       drive_completed: 'Drive Completed',
+      new_poc: 'New POC',
     };
 
     const dataRows = rows.map((r, i) => {
@@ -1444,7 +1450,7 @@ export function TrackerGrid({
                 onDelete={() => onDelete(row._id)}
                 onCall={onCall}
                 onToggleSelect={handleToggleSelectRow}
-                onCopySingle={isReadOnly ? handleCopySingleRowToWorkspace : undefined}
+                onCopySingle={isReadOnly && onCopyFromHistory ? handleCopySingleRowToWorkspace : undefined}
                 isCellSelected={(field) => selectedCells.has(`${row._id}:${field}`)}
                 onCellMouseDown={(field, e) => handleCellMouseDown(row._id, index, field, e)}
                 onCellMouseEnter={(field) => handleCellMouseEnter(row._id, index, field)}
@@ -1515,7 +1521,8 @@ export function TrackerGrid({
               <button
                 type="button"
                 onClick={handleConfirmCellDelete}
-                className="px-4 py-1.5 rounded-xl bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+                className="px-4 py-1.5 rounded-xl hover:brightness-110 text-white text-xs font-bold transition-all cursor-pointer shadow-md shadow-red-600/25 active:scale-95"
+                style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
               >
                 OK
               </button>
@@ -1536,20 +1543,22 @@ export function TrackerGrid({
             </span>
           </div>
 
-          {/* Primary Action: Copy Selected to Today's Workspace */}
-          <button
-            type="button"
-            onClick={handleCopySelectedToWorkspace}
-            disabled={isCopyingToWorkspace}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-primary hover:bg-blue-700 text-primary-foreground text-xs font-bold shadow-md transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50 whitespace-nowrap"
-          >
-            {isCopyingToWorkspace ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <CopyPlus size={14} strokeWidth={2.4} />
-            )}
-            <span>Copy to Today&apos;s Workspace</span>
-          </button>
+          {/* Primary Action: Copy Selected to Today's Workspace (Only if not in monitor/read-only mode) */}
+          {onCopyFromHistory && (
+            <button
+              type="button"
+              onClick={handleCopySelectedToWorkspace}
+              disabled={isCopyingToWorkspace}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-primary hover:bg-blue-700 text-primary-foreground text-xs font-bold shadow-md transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50 whitespace-nowrap"
+            >
+              {isCopyingToWorkspace ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <CopyPlus size={14} strokeWidth={2.4} />
+              )}
+              <span>Copy to Today&apos;s Workspace</span>
+            </button>
+          )}
 
           {/* Secondary Action: Copy Text to Clipboard */}
           <button

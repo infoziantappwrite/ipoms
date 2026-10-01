@@ -2552,6 +2552,154 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     **(c) College Status deactivation CastError fixed (`server.ts`):** `PATCH /api/v1/colleges/:id/status` previously ran `$pull` on `weekly_focus_locked` (a Boolean field), throwing Mongoose `CastError`. Now correctly pulls from `assigned_college_ids`.
     **(d) Active Leads sync dynamic academic year (`activeLeadRoutes.ts`):** replaced hardcoded `'2027'` fallback with dynamic `await getCurrentAcademicYear()`.
 
+90. **Monthly Call Trend: an end-of-month "Month Summary" folded into the same card, 30 Sep 2026
+    (user-requested, design agreed via an Artifact preview before building).** User first asked whether
+    the heat strip's P/J letter cells (`CoordinatorCollegeKpiCards.tsx`) were the best way to show
+    Positive/JD Received per day, or whether a different encoding (icons, colored dots) would read
+    better. Built a live Artifact mockup of a dot-based alternative (green dot = Positive, fuchsia dot =
+    JD, matching the Hourly Rhythm bar colors from item 58) to compare side by side — **user rejected the
+    dots and asked to keep the original P/J letters exactly as they are**, which turned out to already
+    match the real live component (no change needed there at all).
+    **What was actually requested and built:** a new "{Month} Summary" block — Positives and JD Received
+    per college for the month — living **inside the same card**, directly below the day-square grid, with
+    a 0.5cm gap and a thin divider, *not* a separate card/section (explicit user instruction). Reuses the
+    `outcomeAt(s, 'positive', 'month')` and `jdAt(s, 'month')` helpers the grid's own tooltips already
+    call, so the summary can never disagree with the squares above it — no new data fetch, no new backend
+    endpoint. **Colors: user explicitly rejected green/purple** ("use the normal Black colour or some sort
+    of Blue colour") — the summary's P/J chips reuse the exact same blue (`--ipoms-hm-4`) the grid's own
+    legend already uses for its P/J key, so this introduced zero new color decisions and stays consistent
+    with the chart above it; values render in the app's plain `text-fg` (near-black), not a status color.
+    A totals row sums across every campus shown, using the existing `sum()` helper (works unchanged on an
+    array of per-college totals, not just daily arrays).
+    **Deliberately out of scope, per explicit user instruction:** the separate Month-End Report elsewhere
+    in Reports (item 45's Calling Activity Summary — calls made, duration, positives converted) is
+    **not** getting a JD Received column; the user was explicit that JD counts belong only on this
+    dashboard summary, never in that report. Nothing in Reports was touched.
+    **Verified live** as A.Mohanaradha (`mohanaradha_a@infoziant.com`) against real September 2026
+    production data, dark mode, via Playwright: AIHT correctly showed 8 Positives / 1 JD Received, ACET
+    showed 2 / 0, and the totals row correctly summed to 10 / 1 — all using the blue P/J chip style, no
+    green or purple anywhere on the card. `tsc --noEmit` clean on the touched file (two pre-existing,
+    unrelated errors in `TrackerGrid.tsx` from a concurrent session's WIP were confirmed unrelated and
+    left alone, per the item 56(b)/87 precedent).
+    **Same-day follow-up, two fixes (user-reported off-center letters; user-requested sort order):**
+    (a) The P/J/PJ legend chips (and the Month Summary's own P/J chips) looked slanted and top-left
+    aligned instead of centered — not actually italic text, but `display: flex` losing a same-specificity
+    tie: `.ipoms-hm-cell`'s `display: block` and the inline Tailwind `flex` utility carry identical
+    specificity, and this component's `<style jsx>` block is injected after Tailwind's stylesheet, so the
+    later same-specificity rule (`.ipoms-hm-cell`) won regardless of which element used `flex`. Fixed at
+    the source instead of fighting it per call site: `.ipoms-hm-key` now declares
+    `display: flex; align-items: center; justify-content: center; font-style: normal` directly, which
+    wins on its own source order within the same stylesheet. Worth remembering for any future
+    styled-jsx-vs-Tailwind fight in this codebase — put the override in the styled-jsx rule itself, not
+    on the call site.
+    (b) The Month Summary's own row order **no longer follows the grid's call-volume sort** — it's a
+    separate `summaryRows` list, sorted strictly by Positives descending (ties don't matter per the user;
+    JD Received rides along and never affects order). Verified live as Malvika Kumar (all 21 colleges):
+    MCET 23 → NGP 16 → KAMARAJ 15 → ACEW 15 → MAREPHRAM 10 → … → 0, genuinely descending, badges
+    correctly centered in both the legend and the summary table. `tsc --noEmit` clean.
+    **Second same-day follow-up (user-reported/requested):** (a) Today's column had a black inset ring
+    applied unconditionally to every row's today-cell (`m.day === todayDay ? 'ipoms-hm-today' : ''`),
+    stacked underneath the normal blue "selected" ring that today already gets for free (`scope`
+    defaults to `todayDay`, so today starts out selected like any clicked day). The user read the
+    always-on black ring as something that shouldn't need "pressing" to appear — it never did, the two
+    rings were just stacked and easy to mistake for one. Removed the unconditional black ring entirely,
+    the now-meaningless "Today" legend swatch, and the dead `--ipoms-hm-today` CSS variable/class —
+    today is still visually obvious from its bold day-number header and its default selection ring,
+    with one less redundant layer. (b) The Month Summary table was `w-full` on a 900+px-wide card with
+    only 3 columns, so College/Positives/JD Received ended up strung out with a huge empty gap between
+    them. Now a **fixed 420px table** (`College 150px / Positives 135px / JD Received 135px` via
+    `<colgroup>`, not `w-full`) sitting left-aligned under the grid, with font sizes bumped
+    (header 10.5px→11px, body 12px→13px) since compressing the width freed up the room for it — college
+    codes stay as acronyms (MCET, NGP, …), matching the grid's own row labels directly above, rather
+    than switching to full college names. The totals row label shortened from "Total, all campuses
+    shown" to "Total" to fit the narrower first column cleanly. Verified live as Malvika Kumar: no black
+    ring on today's column (still correctly shows the blue selection ring, same as any selected day),
+    no "Today" legend entry, and the summary table now reads as one tight, legible block instead of a
+    stretched three-column spread. `tsc --noEmit` clean.
+    **Third same-day follow-up (user-requested — supersedes the compact-table shape of the previous
+    two entries, not the underlying data/ranking).** Once a viewer holds 15-20+ colleges (Malvika
+    Kumar's real case), even the compressed 420px table still ran to 20 rows and dominated the card.
+    Replaced the full list with **one college at a time**: a `SmoothSelect` dropdown on the left (the
+    same reusable dropdown component used elsewhere in the app, not a bare HTML `<select>`) and that
+    college's Positives/JD Received numbers on the right, in the same compact blue P/J chip style as
+    before. The dropdown's own option order is still ranked by Positives descending — opening it shows
+    the identical ranking the old table did (`[23 P] MCET`, `[16 P] NGP`, `[15 P] KAMARAJ`, …), it's
+    just one row visible at a time instead of all of them. Auto-searchable once there are more than 8
+    colleges. Defaults to the top-ranked (highest Positives) college on load; `summaryCollegeId` state
+    persists the selection, falling back to the top row if the previously selected college isn't in a
+    newer dataset. No backend change — still the same `summaryRows` computed from `outcomeAt`/`jdAt`.
+    Verified live as Malvika Kumar: default view shows MCET (23 P / 0 J); opening the dropdown lists
+    all 21 colleges correctly ranked, searchable; selecting AIHT updates both the dropdown and the two
+    numbers to 8 P / 1 J, matching the grid above exactly. `tsc --noEmit` clean, 34/34 backend API
+    tests still pass (unaffected, frontend-only change).
+    **Fourth same-day follow-up (user-requested — relocates the control from the previous entry,
+    doesn't change its data or ranking).** Even the single-college dropdown still sat below the whole
+    20-row grid, so seeing it meant scrolling past every campus first. Moved the entire control —
+    dropdown + P/J counts — **into the card's own title row**, right before the sync button, sized to
+    the dropdown's own content rather than stretching (`w-[150px]`, fits the longest college code
+    comfortably). Required lifting the state and the `summaryRows` computation from `MonthChart` up
+    into the parent `CoordinatorCollegeKpiCards` (which already holds `monthly`), since the header row
+    is rendered there, not inside `MonthChart`; `MonthChart` itself no longer computes or renders
+    anything summary-related. Same ranking, same data source, same compact blue P/J chips — only the
+    position changed. Header row gained `flex-wrap` as a safety margin for narrow widths, title block
+    gained `min-w-0` so long month names don't force the summary control off-screen instead of wrapping.
+    Verified live as Malvika Kumar: default shows `[23 P] MCET` with `P 23 · J 0` directly in the title
+    row next to the sync button, zero scrolling required; the dropdown opens anchored correctly to its
+    new position with the same ranked, searchable list; selecting AIHT updates to `[8 P] AIHT` with
+    `P 8 · J 1` in place, instantly. `tsc --noEmit` clean, 34/34 backend API tests still pass.
+    **Fifth same-day follow-up (user-requested):** dropped the `${positive} P` badge from each
+    option in the list itself — plain college acronyms only (MCET, NGP, KAMARAJ, …); the actual
+    Positives/JD numbers still show next to the trigger once a college is picked, so the badge was
+    the same number shown twice. Verified live: dropdown list shows acronyms with no badge, trigger
+    and P/J counts unaffected.
+    **Sixth same-day follow-up (user-requested):** removed the default top-ranked-college
+    pre-selection — the control now opens on an unselected "Select college" placeholder with
+    `P 0 · J 0` shown, not silently defaulting to whichever college happens to rank first.
+    `activeRow` is now `summaryRows.find(...)` with no `?? summaryRows[0]` fallback, and both
+    counts render `?? 0`. Verified live as Malvika Kumar: fresh load shows "Select college" / `P 0
+    · J 0`; picking KAMARAJ updates to `P 15 · J 0`, matching its real month total.
+
+91. **JD Received pill added to the "Dedicated Calling Time Today" widget; Month-End Report's
+    section picker expanded from 6 to all 9 real Weekly Tracker sections, 30 Sep 2026 (both
+    user-requested).**
+    **(a) JD Received pill.** `CoordinatorClockDurationWidget.tsx`'s outcomes row (Positive / Not
+    Hiring / Negative / Follow Up) grows a 5th pill, **JD Received**, right after Follow Up, using
+    the same fuchsia already established for JD on the Hourly Rhythm bars (item 58) and the Monthly
+    Call Trend heat strip (item 59) — no new color decision. Value is
+    `(effectiveData?.hourly_jd || []).reduce(...)`, summed across all 24 hours — reuses the
+    `hourly_jd` array the widget already receives for bar coloring, so **no backend change and no
+    new fetch**; it is therefore already a live, synced count, same data source as the fuchsia bars
+    above it. Verified: `tsc --noEmit` clean on the touched file. **Not verified live in-browser
+    this session** — the in-app preview tool failed to navigate to `localhost:3000` even with the
+    dev server confirmed healthy (`curl` 200 on `/login`), the same class of tooling failure
+    documented repeatedly elsewhere in this file (items 35, 38, 86) — confirmed only by code trace
+    and a clean typecheck; re-check visually next time the preview tool works.
+    **(b) Month-End Report sections.** `ReportBuilderWizard.tsx`'s `getSectionsConfig()` month_end
+    branch only exposed 6 of the report's 9 real Weekly Tracker pipeline sections as checkboxes
+    (`completed_companies`, `company_conversions`/"JD Received Companies", `companies_in_drive`,
+    `on_hold_by_college`, `on_hold_by_hr`, plus the KPI/calling-activity extras) — missing
+    `drive_in_progress`, `in_progress`, `pipeline`, `top_companies`, `rejected_companies` entirely,
+    even though the underlying data (`weeklyCompanies`, Month-End's own fetched state) already
+    holds all 9 keys and two other places in the same file already read every one of them. Added
+    the 5 missing sections with the **exact same labels/icons/badge colors** the Weekly branch uses
+    (`filteredWeeklyCompanies.*` there vs `weeklyCompanies.*` here — same shape, different variable
+    name only), and renamed 3 existing Month-End labels to match Weekly's wording exactly:
+    "Companies in Drive" → "Upcoming Drives", "Companies on Hold by TPO" → "Companies On Hold By
+    College", "Companies on Hold by HR" → "Companies On Hold By HR" (casing). The 3 Month-End-only
+    extras (`kpi_summary`, `company_conversions`, `calling_activity`) are unchanged and kept in
+    their original relative position (KPI first, calling activity last); the 9 shared sections now
+    sit between them in the same order Weekly uses. **Known pre-existing oddity, surfaced here but
+    not changed:** `company_conversions` ("JD Received Companies") sources from
+    `weeklyCompanies.in_progress` — the same bucket the new, separate `in_progress` ("Companies In
+    Progress") section also reads. Both will show the same company list under two different section
+    names/checkboxes now that both exist side by side; this was already true of the data mapping
+    before this change; flag to the user if it looks confusing in practice; not fixed without
+    asking, since the JD Received Companies section may have been deliberately aliased to a
+    different bucket than its label suggests. Verified: `tsc --noEmit` clean on the touched file.
+    **Not verified live in-browser this session** — same tooling failure as (a) above; verified by
+    code trace confirming `weeklyCompanies` already carries all 9 keys (cross-checked against two
+    other existing call sites in the same file that already consume all 9), not by a screenshot.
+
 ## 6. Module map
 
 Data flow: `company_metadata → assigned_work → daily_tracker → weekly_tracker → daily_leads → reports/dashboards`

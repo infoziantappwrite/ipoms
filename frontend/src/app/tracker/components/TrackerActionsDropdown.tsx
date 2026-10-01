@@ -33,7 +33,6 @@ interface Props {
   onCopyBoth: () => void;
   onCopyEntireRows: () => void;
   onFilterOutcome?: (outcome: CallOutcome | 'all') => void;
-  onOpenSummary?: () => void;
   onPasteFromExcel?: () => void;
 }
 
@@ -51,7 +50,6 @@ export function TrackerActionsDropdown({
   onCopyBoth,
   onCopyEntireRows,
   onFilterOutcome,
-  onOpenSummary,
   onPasteFromExcel,
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
@@ -210,22 +208,6 @@ export function TrackerActionsDropdown({
                   <span>Call History Archive</span>
                 </div>
               </button>
-
-              {/* ── Summary Option (Opens in-app popup modal directly) ── */}
-              {onOpenSummary && (
-                <button
-                  type="button"
-                  onClick={() => executeAction(onOpenSummary)}
-                  className="w-full flex items-center px-2 py-1.5 text-xs font-semibold rounded-lg text-fg hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:text-sky-700 dark:hover:text-sky-300 transition-colors cursor-pointer group"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
-                      <BarChart3 size={12} strokeWidth={2.2} />
-                    </div>
-                    <span>Summary</span>
-                  </div>
-                </button>
-              )}
             </div>
           )}
 

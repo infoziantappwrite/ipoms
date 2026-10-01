@@ -28,10 +28,11 @@ export const OUTCOMES: { value: CallOutcome; label: string; color: string }[] = 
   { value: 'invite_mail', label: 'Invite Mail', color: 'text-primary' },
   { value: 'follow_up', label: 'Follow Up', color: 'text-orange-600 dark:text-orange-400 font-semibold' },
   { value: 'call_back', label: 'Call Back', color: 'text-amber-600 dark:text-amber-400 font-medium' },
-  { value: 'invalid', label: 'Invalid', color: 'text-fg-subtle' },
+  { value: 'new_poc', label: 'New POC', color: 'text-[#FF0A80] dark:text-[#FF389B] font-semibold' },
+  { value: 'invalid', label: 'Invalid', color: 'text-[#7D838C] dark:text-[#9AA0A9]' },
   { value: 'jd_received', label: 'JD Received', color: 'text-primary' },
   { value: 'hiring', label: 'Hiring', color: 'text-success' },
-  { value: 'in_connect', label: 'In Connect', color: 'text-primary' },
+  { value: 'in_connect', label: 'In Connect', color: 'text-[#7D838C] dark:text-[#9AA0A9]' },
   { value: 'drive_completed', label: 'Drive Completed', color: 'text-success' },
   { value: 'hiring_completed', label: 'Hiring Completed', color: 'text-cyan-600 dark:text-cyan-400 font-semibold' },
   { value: 'hiring_freezed', label: 'Hiring Freezed', color: 'text-purple-600 dark:text-purple-400 font-semibold' },
@@ -54,13 +55,14 @@ const OUTCOME_ROW_COLORS: Record<CallOutcome | 'none', string> = {
   hiring_freezed: 'bg-[#F3E8FF] dark:bg-[#25143A]', // Light lilac / soft lavender for Hiring Freezed
   hiring_completed: 'bg-[#E0F2FE] dark:bg-[#0E2F4A]', // Matching cyan/sky-blue shade for Hiring Completed
   call_back: 'bg-[#FFFBEB] dark:bg-[#292218]',
+  new_poc: 'bg-[#FFF0F7] dark:bg-[#2B0E1E]', // Soft pink tint for New POC (#FF0A80)
   hiring: 'bg-[#ECFDF5] dark:bg-[#132E27]',
   invite_mail: 'bg-[#EFF6FF] dark:bg-[#1E293B]',
   not_hiring: 'bg-white dark:bg-[#161D2E]', // White row background for Not Hiring (text is red with mild bold)
   no_response: 'bg-[#FEF2F2] dark:bg-[#2E1818]', // Pale light red for No Response
   follow_up: 'bg-[#FFF4E6] dark:bg-[#2D1B10]', // Warm orange shade for Follow Up (distinct from yellow Call Back)
-  in_connect: 'bg-[#EFF6FF] dark:bg-[#1E293B]',
-  invalid: 'bg-[#F1F5F9] dark:bg-[#1E293B]',
+  in_connect: 'bg-[#F4F5F7] dark:bg-[#1C2028]', // Soft neutral slate tint for In Connect (#7D838C)
+  invalid: 'bg-[#F4F5F7] dark:bg-[#1C2028]', // Soft neutral slate tint for Invalid (#7D838C)
   drive_completed: 'bg-[#ECFDF5] dark:bg-[#132E27]',
 };
 
@@ -531,9 +533,9 @@ export function TrackerRow({
             data-field="start_time_btn"
             onClick={handleSetCurrentStartTime}
             title="Click clock to set current start time (or press Spacebar)"
-            className="flex items-center justify-center gap-1.5 w-full h-7 px-2 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 hover:border-primary/40 rounded-md text-[11px] font-semibold transition-all cursor-pointer shadow-2xs hover:shadow-xs group/clock my-auto"
+            className="flex items-center justify-center gap-1.5 w-full h-7 px-2 bg-gradient-to-b from-[#E2EDF8] via-[#C9DCF0] to-[#B4CDE7] dark:from-[#253850] dark:to-[#1A293D] text-[#103B70] dark:text-[#D8E6F5] border border-[#A4C2E0] dark:border-[#3A5374] hover:brightness-95 dark:hover:brightness-110 rounded-md text-[11px] font-bold transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-[0.98] group/clock my-auto"
           >
-            <Clock size={12} className="shrink-0 text-primary group-hover/clock:scale-110 transition-transform" />
+            <Clock size={12} className="shrink-0 text-[#103B70] dark:text-[#D8E6F5] group-hover/clock:scale-110 transition-transform" />
             <span className="truncate">Set Time</span>
           </button>
         ) : (

@@ -184,6 +184,13 @@ export function CoordinatorClockDurationWidget({ clockData, coordinatorName }: P
 
   const callsCount = effectiveData?.today_calls_count || 0;
   const positivesCount = effectiveData?.positive_calls_count || 0;
+  // Live synced JD Received total for the pill row — summed from the same hourly_jd
+  // array the Hourly Rhythm bars already use, across all 24 hours (not just the
+  // 10am-7pm display window), so it can never miss a JD call outside that window.
+  const jdReceivedCount = useMemo(
+    () => (effectiveData?.hourly_jd || []).reduce((sum, v) => sum + (v || 0), 0),
+    [effectiveData?.hourly_jd]
+  );
 
   /**
    * Hourly rhythm window (10am to 7pm default, extends if calls recorded outside).
@@ -359,6 +366,13 @@ export function CoordinatorClockDurationWidget({ clockData, coordinatorName }: P
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
                     <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
                     Follow Up <b className="font-mono font-bold text-fg ml-0.5">{oc.follow_up}</b>
+                  </span>
+
+                  {/* Fuchsia matches the JD Received color already used on the Hourly Rhythm
+                      bars (item 58) — live synced total, not a static/cached number. */}
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-fuchsia-50 dark:bg-fuchsia-950/40 border border-fuchsia-200 dark:border-fuchsia-800/50 text-[11px] font-semibold text-fuchsia-700 dark:text-fuchsia-300">
+                    <span className="w-2 h-2 rounded-full bg-fuchsia-500 shrink-0" />
+                    JD Received <b className="font-mono font-bold text-fg ml-0.5">{jdReceivedCount}</b>
                   </span>
                 </>
               );
@@ -730,19 +744,19 @@ export function CoordinatorClockDurationWidget({ clockData, coordinatorName }: P
           background: linear-gradient(180deg, #6ee7b7, #10b981);
           box-shadow: 0 0 12px rgba(16, 185, 129, 0.55);
         }
-        /* JD Received: fuchsia, deliberately distinct from Invite Mail green and the default indigo */
+        /* JD Received: vibrant hot pink pill bar */
         .ipoms-spark-bar.is-jd {
-          background: linear-gradient(180deg, #e879f9, #c026d3);
-          box-shadow: 0 0 10px rgba(192, 38, 211, 0.4);
+          background: linear-gradient(180deg, #FF3E9E 0%, #EA0E82 60%, #D80074 100%);
+          box-shadow: 0 0 12px rgba(234, 14, 130, 0.55);
         }
         :global(.dark) .ipoms-spark-bar.is-jd {
-          background: linear-gradient(180deg, #f0abfc, #d946ef);
-          box-shadow: 0 0 12px rgba(217, 70, 239, 0.5);
+          background: linear-gradient(180deg, #FF60B5 0%, #FA1D8A 60%, #E8007C 100%);
+          box-shadow: 0 0 14px rgba(250, 29, 138, 0.65);
         }
-        /* Invite Mail and JD Received in the same hour: top half fuchsia, bottom half green */
+        /* Invite Mail and JD Received in the same hour: top half hot pink, bottom half green */
         .ipoms-spark-bar.is-both {
-          background: linear-gradient(180deg, #d946ef 50%, #10b981 50%);
-          box-shadow: 0 0 10px rgba(16, 185, 129, 0.35);
+          background: linear-gradient(180deg, #EA0E82 50%, #10b981 50%);
+          box-shadow: 0 0 10px rgba(234, 14, 130, 0.35);
         }
         .ipoms-spark-legend {
           display: flex;
@@ -756,8 +770,8 @@ export function CoordinatorClockDurationWidget({ clockData, coordinatorName }: P
         .ipoms-spark-legend span { display: inline-flex; align-items: center; gap: 5px; }
         .ipoms-legend-dot { width: 8px; height: 8px; border-radius: 9999px; display: inline-block; }
         .ipoms-legend-dot.is-invite { background: #10b981; }
-        .ipoms-legend-dot.is-jd { background: #c026d3; }
-        :global(.dark) .ipoms-legend-dot.is-jd { background: #e879f9; }
+        .ipoms-legend-dot.is-jd { background: #EA0E82; }
+        :global(.dark) .ipoms-legend-dot.is-jd { background: #FA1D8A; }
         .ipoms-spark-bar.is-future {
           background: linear-gradient(180deg, rgb(var(--border)), rgb(var(--border-strong)));
           opacity: 0.45;
