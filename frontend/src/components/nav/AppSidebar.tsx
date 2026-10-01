@@ -218,10 +218,10 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
             <div className="w-full flex items-center justify-center">
               <Link
                 href="/dashboard"
-                className="w-[35px] h-[35px] bg-white rounded-lg p-0.5 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0 hover:scale-105 active:scale-[0.992] transition-transform duration-200 cursor-pointer"
+                className="w-[34px] h-[34px] bg-white rounded-lg p-0.5 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0 hover:scale-105 active:scale-[0.992] transition-transform duration-200 cursor-pointer"
                 title="iPOMS Placement Suite"
               >
-                <InfoziantMark size={28} className="w-full h-full object-contain" />
+                <InfoziantMark size={26} className="w-full h-full object-contain" />
               </Link>
             </div>
           ) : (
@@ -230,8 +230,8 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                 href="/dashboard"
                 className="flex items-center gap-3 overflow-hidden focus-visible:outline-hidden"
               >
-                <div className="w-9 h-9 bg-white rounded-lg p-1 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0">
-                  <InfoziantMark size={32} className="w-full h-full object-contain" />
+                <div className="w-[34px] h-[34px] bg-white rounded-lg p-0.5 shadow-xs border border-slate-200/80 dark:border-white/20 flex items-center justify-center shrink-0">
+                  <InfoziantMark size={26} className="w-full h-full object-contain" />
                 </div>
                 <div
                   className={`flex flex-col min-w-0
@@ -250,7 +250,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
           )}
         </div>
 
-        {/* ── Main Nav Items (All 7 Navigation Buttons: 35px × 35px, rounded-lg) ── */}
+        {/* ── Main Nav Items (All Navigation Buttons: 34px × 34px, rounded-lg) ── */}
         <nav className="flex-1 overflow-y-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden px-2 py-3 min-h-0 flex flex-col justify-start">
           <ul className="space-y-2 w-full flex flex-col items-center">
             {items.map(({ href, label, Icon }) => {
@@ -302,8 +302,8 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                       mounted ? 'transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]' : ''
                     } ${
                       collapsed
-                        ? 'w-[35px] h-[35px] justify-center p-0 mx-auto'
-                        : 'w-full h-9 px-3 gap-3 justify-start'
+                        ? 'w-[34px] h-[34px] justify-center p-0 mx-auto'
+                        : 'w-full h-[34px] px-3 gap-3 justify-start'
                     } ${
                       isLocked
                         ? 'text-zinc-400 dark:text-zinc-600 hover:bg-zinc-100/60 dark:hover:bg-zinc-800/60'
@@ -313,7 +313,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                     }`}
                   >
                     <span className={`relative shrink-0 grid place-items-center ${collapsed ? 'w-full h-full' : 'w-5 h-5'}`}>
-                      <Icon size={17} strokeWidth={active ? 2.2 : 1.8} aria-hidden />
+                      <Icon size={16} strokeWidth={active ? 2.2 : 1.8} aria-hidden />
                       {isLocked && (
                         <span className="absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
                           <Lock size={6} strokeWidth={2.5} />
@@ -343,7 +343,7 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
           </ul>
         </nav>
 
-        {/* ── Signed-in Profile Identity Avatar (35px × 35px) & Controls (35px × 35px) ───── */}
+        {/* ── Signed-in Profile Identity Avatar (34px × 34px) & Controls (34px × 34px) ───── */}
         <div className="shrink-0 border-t border-zinc-200 dark:border-zinc-800 px-2 py-2.5">
           {collapsed ? (
             <div className="flex flex-col items-center gap-2">
@@ -357,20 +357,20 @@ export function AppSidebar({ mobileOpen, onMobileClose }: Props) {
                   <img
                     src={user.profile_photo_url}
                     alt={fullName}
-                    className="w-[35px] h-[35px] rounded-full object-cover shrink-0 ring-2 ring-zinc-200 dark:ring-zinc-700 shadow-sm group-hover:scale-105 transition-transform"
+                    className="w-[34px] h-[34px] rounded-full object-cover shrink-0 ring-2 ring-zinc-200 dark:ring-zinc-700 shadow-sm group-hover:scale-105 transition-transform"
                   />
                 ) : (
                   <span
                     style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
-                    className="grid w-[35px] h-[35px] shrink-0 place-items-center rounded-full text-white text-[11px] font-bold tracking-normal leading-none shadow-sm ring-2 ring-white dark:ring-zinc-900 group-hover:scale-105 transition-transform"
+                    className="grid w-[34px] h-[34px] shrink-0 place-items-center rounded-full text-white text-[11px] font-bold tracking-normal leading-none shadow-sm ring-2 ring-white dark:ring-zinc-900 group-hover:scale-105 transition-transform"
                   >
                     {initialsFor(fullName)}
                   </span>
                 )}
               </Link>
               <div className="flex flex-col items-center gap-1.5">
-                <FullScreenToggle useGradient className="w-[35px] h-[35px] rounded-lg" />
-                <ThemeToggle useGradient className="w-[35px] h-[35px] rounded-lg" />
+                <FullScreenToggle useGradient className="w-[34px] h-[34px] rounded-lg" />
+                <ThemeToggle useGradient className="w-[34px] h-[34px] rounded-lg" />
               </div>
             </div>
           ) : (

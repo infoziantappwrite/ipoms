@@ -8418,7 +8418,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
 
       const reportDocument = {
         template_type: 'pending_tasks',
-        report_title: 'Pending Task Placement Report',
+        report_title: 'PENDING  TASK  PLACEMENT  REPORT',
         report_period: week_label,
         generated_by: coordinator?.full_name || 'A. Mohanaradha (Lead Placement Coordinator)',
         generated_date: new Date().toLocaleDateString('en-IN', {
@@ -8694,20 +8694,20 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       const countPipeline = activeLeadsList.filter((l) => l.source === 'pipeline').length;
 
       // Dynamic Title & Focus description
-      let dynamicTitle = 'Active Leads Pipeline Report';
+      let dynamicTitle = 'ACTIVE  LEADS  PIPELINE  REPORT';
       let tierFocusLabel = 'Consolidated (JD Received & Pipeline)';
       if (includeJd && !includePipeline) {
         dynamicTitle = hasSpecificBatch
-          ? `JD Received Companies — ${selectedBatch}`
-          : `JD Received Companies`;
+          ? `JD  RECEIVED  COMPANIES — ${selectedBatch}`
+          : `JD  RECEIVED  COMPANIES`;
         tierFocusLabel = 'JD Received Companies (In-Progress • In Drive • Completed)';
       } else if (!includeJd && includePipeline) {
         dynamicTitle = hasSpecificBatch
-          ? `Companies in Pipeline — ${selectedBatch}`
-          : `Companies in Pipeline`;
+          ? `COMPANIES  IN  PIPELINE — ${selectedBatch}`
+          : `COMPANIES  IN  PIPELINE`;
         tierFocusLabel = 'Companies in Pipeline';
       } else if (hasSpecificBatch) {
-        dynamicTitle = `Active Leads Pipeline Report — ${selectedBatch}`;
+        dynamicTitle = `ACTIVE  LEADS  PIPELINE  REPORT — ${selectedBatch}`;
       }
 
       const reportDocument = {
@@ -8936,7 +8936,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
 
       const reportDocument = {
         template_type: 'daily_positives',
-        report_title: 'POSITIVES OF THE DAY',
+        report_title: 'POSITIVES  OF  THE  DAY',
         report_period: targetDateStr === 'all' ? 'All Dates' : formattedFullDate,
         day_date: targetDateStr === 'all' ? 'Consolidated' : formattedDayLabel,
         include_prepared_by: false,
@@ -9148,7 +9148,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
 
       const reportDocument = {
         template_type: 'daily_jd_received',
-        report_title: 'JD RECEIVED FOR THE DAY',
+        report_title: 'JD  RECEIVED  FOR  THE  DAY',
         report_period: targetDateStr === 'all' ? 'All Dates' : formattedFullDate,
         day_date: targetDateStr === 'all' ? 'Consolidated' : formattedDayLabel,
         include_prepared_by: false,
@@ -9468,7 +9468,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         college_name: (wt.college_id as any)?.college_name || targetCollege?.college_name || 'Target Institution',
       }));
 
-      let monthName = 'September';
+      let monthName = new Date().toLocaleDateString('en-US', { month: 'long' });
       if (week_label) {
         const cleaned = String(week_label).trim();
         if (/jan/i.test(cleaned)) monthName = 'January';
@@ -9486,6 +9486,20 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         else if (cleaned.length > 0) {
           monthName = cleaned.split(' ')[0];
         }
+      } else if (req.body.selected_month) {
+        const sm = String(req.body.selected_month).trim();
+        if (/jan/i.test(sm)) monthName = 'January';
+        else if (/feb/i.test(sm)) monthName = 'February';
+        else if (/mar/i.test(sm)) monthName = 'March';
+        else if (/apr/i.test(sm)) monthName = 'April';
+        else if (/may/i.test(sm)) monthName = 'May';
+        else if (/jun/i.test(sm)) monthName = 'June';
+        else if (/jul/i.test(sm)) monthName = 'July';
+        else if (/aug/i.test(sm)) monthName = 'August';
+        else if (/sep/i.test(sm)) monthName = 'September';
+        else if (/oct/i.test(sm)) monthName = 'October';
+        else if (/nov/i.test(sm)) monthName = 'November';
+        else if (/dec/i.test(sm)) monthName = 'December';
       }
 
       // ── Resolve Target Month & Date Range for DailyTracker Calling Stats (Matches Monthly Call Trend) ──
@@ -9529,7 +9543,14 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         targetCollegeStrIds.push(String(college_id));
       }
 
-      if (handledColleges && handledColleges.length > 0) {
+      // Only fall back to every handled college when this is genuinely an "all handled
+      // institutions" report (no single Target Institution resolved) — otherwise a single
+      // college_id was deliberately chosen and calling stats must stay scoped to just that
+      // one college, not silently widened to every college the coordinator handles.
+      const isSingleCollegeTarget = Boolean(targetCollege?._id) ||
+        (college_id && college_id !== 'all' && college_id !== 'multi' && Types.ObjectId.isValid(String(college_id)));
+
+      if (!isSingleCollegeTarget && handledColleges && handledColleges.length > 0) {
         for (const col of handledColleges) {
           if (col._id) {
             targetCollegeObjIds.push(new Types.ObjectId(String(col._id)));
@@ -9621,7 +9642,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       const reportDocument = {
         template_type: 'month_end',
         is_multi_college: isMulti,
-        report_title: `${monthName} Month Placement Operations Report`,
+        report_title: `${monthName.toUpperCase()}   MONTH  PLACEMENT  REPORT`,
         report_period: `${monthName} 2026`,
         generated_by: (include_prepared_by === false) ? '' : (prepared_by || coordinator?.full_name || 'Placement Coordinator'),
         include_prepared_by: include_prepared_by !== false,
@@ -9832,7 +9853,7 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
         template_type: 'weekly_placement',
         is_multi_college: true,
         colleges_data,
-        report_title: 'Consolidated Weekly Placement Report',
+        report_title: 'CONSOLIDATED  WEEKLY  PLACEMENT  REPORT',
         report_period: (week_label && !String(week_label).toLowerCase().includes('cumulative')) ? String(week_label).trim() : '',
         include_prepared_by: include_prepared_by !== false,
         generated_by: (include_prepared_by === false) ? '' : (prepared_by || coordinator?.full_name || 'Placement Coordinator'),
@@ -10051,10 +10072,10 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       filter_applied: min_ctc ? `CTC ≥ ${min_ctc} LPA` : (company_name_filter ? `Company: ${company_name_filter}` : undefined),
       report_title:
         template_type === 'weekly_placement'
-          ? 'Weekly Placement Report'
+          ? 'WEEKLY  PLACEMENT  REPORT'
           : template_type === 'monthly_placement'
-          ? `Monthly Placement Review — ${academic_year} Season`
-          : 'Placement Operations Report',
+          ? `MONTHLY  PLACEMENT  REVIEW — ${academic_year} SEASON`
+          : 'PLACEMENT  OPERATIONS  REPORT',
       report_period: (week_label && !String(week_label).toLowerCase().includes('cumulative')) ? String(week_label).trim() : '',
       include_prepared_by: include_prepared_by !== false,
       generated_by: (include_prepared_by === false) ? '' : (prepared_by || coordinator?.full_name || 'Placement Coordinator'),

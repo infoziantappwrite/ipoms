@@ -70,10 +70,22 @@ function ReportsPageContent() {
     setIsEditingReport(true);
   };
 
+  const handleReset = () => {
+    if (isEditingReport) {
+      setIsEditingReport(false);
+    } else {
+      window.dispatchEvent(new CustomEvent('ipoms:report-builder-reset'));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-fg flex flex-col selection:bg-primary selection:text-primary-foreground">
       {/* ── Report Builder Header ────────────────────────────────────────── */}
-      <ReportsNavigation />
+      <ReportsNavigation
+        isEditingReport={isEditingReport && Boolean(generatedReport)}
+        onReset={handleReset}
+        onBackToBuilder={() => setIsEditingReport(false)}
+      />
 
       {/* ── Direct View: Wizard or Live Interactive Editor ────────────────── */}
       <main className="flex-1">

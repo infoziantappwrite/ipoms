@@ -1,5 +1,6 @@
 import { getCollegeLogoUrl } from '@/lib/collegeLogo';
 import { sectionTitle, applyColumnHeadings, columnHeading } from './reportOverrides';
+import jsPDF from 'jspdf';
 
 function getCleanPeriod(period?: string): string {
   if (!period) return '';
@@ -30,6 +31,133 @@ function getCleanPeriod(period?: string): string {
   return trimmed;
 }
 
+function drawLucideIcon(
+  ctx: CanvasRenderingContext2D,
+  iconName: string,
+  centerX: number,
+  centerY: number,
+  size: number,
+  color: string,
+  strokeWidth: number = 2.2
+) {
+  ctx.save();
+  ctx.translate(centerX - size / 2, centerY - size / 2);
+  const scale = size / 24;
+  ctx.scale(scale, scale);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = strokeWidth / scale;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  const paths: string[] = [];
+  const circles: Array<{ cx: number; cy: number; r: number }> = [];
+
+  switch (iconName) {
+    case 'PhoneCall':
+      paths.push(
+        'M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z',
+        'M14.05 2a9 9 0 0 1 8 7.94',
+        'M14.05 6A5 5 0 0 1 18 10'
+      );
+      break;
+    case 'TrendingUp':
+      paths.push(
+        'M22 7L13.5 15.5L8.5 10.5L2 17',
+        'M16 7h6v6'
+      );
+      break;
+    case 'Clock':
+      circles.push({ cx: 12, cy: 12, r: 10 });
+      paths.push('M12 6v6l4 2');
+      break;
+    case 'Trophy':
+      paths.push(
+        'M6 9H4.5a2.5 2.5 0 0 1 0-5H6',
+        'M18 9h1.5a2.5 2.5 0 0 0 0-5H18',
+        'M4 22h16',
+        'M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22',
+        'M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22',
+        'M18 2H6v7a6 6 0 0 0 12 0V2Z'
+      );
+      break;
+    case 'Flame':
+      paths.push(
+        'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z'
+      );
+      break;
+    case 'Zap':
+      paths.push(
+        'M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z'
+      );
+      break;
+    case 'Building2':
+      paths.push(
+        'M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z',
+        'M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2',
+        'M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2',
+        'M10 6h4',
+        'M10 10h4',
+        'M10 14h4',
+        'M10 18h4'
+      );
+      break;
+    case 'Briefcase':
+      paths.push(
+        'M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16',
+        'M4 6h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z'
+      );
+      break;
+    case 'Calendar':
+      paths.push(
+        'M8 2v4',
+        'M16 2v4',
+        'M3 10h18',
+        'M4 4h16a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'
+      );
+      break;
+    case 'Rocket':
+      paths.push(
+        'M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z',
+        'm12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z',
+        'M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0',
+        'M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5'
+      );
+      break;
+    case 'Star':
+      paths.push(
+        'M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a.53.53 0 0 0 .399.29l5.163.751a.53.53 0 0 1 .294.904l-3.736 3.642a.53.53 0 0 0-.153.47l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a.53.53 0 0 0-.493 0L7.14 18.73a.53.53 0 0 1-.77-.56l.881-5.139a.53.53 0 0 0-.153-.47L3.36 8.92a.53.53 0 0 1 .294-.904l5.163-.75a.53.53 0 0 0 .399-.29l2.31-4.68z'
+      );
+      break;
+    case 'Inbox':
+      paths.push(
+        'M22 12h-6l-2 3h-4l-2-3H2',
+        'M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z'
+      );
+      break;
+    case 'CircleX':
+    case 'XCircle':
+      circles.push({ cx: 12, cy: 12, r: 10 });
+      paths.push('M15 9l-6 6', 'M9 9l6 6');
+      break;
+  }
+
+  for (const c of circles) {
+    ctx.beginPath();
+    ctx.arc(c.cx, c.cy, c.r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  for (const pStr of paths) {
+    if (typeof Path2D !== 'undefined') {
+      const p = new Path2D(pStr);
+      ctx.stroke(p);
+    }
+  }
+
+  ctx.restore();
+}
+
 export function getReportExportBaseFileName(report: any): string {
   const sanitize = (str?: string) =>
     (str || '')
@@ -50,6 +178,7 @@ export type ImageExportSize = 'auto' | 'a4' | 'compact' | 'square';
 
 export interface ReportCanvasOptions {
   size?: ImageExportSize;
+  scale?: number;
 }
 
 /** First page only (kept for callers that want a single canvas). */
@@ -80,16 +209,20 @@ export async function generateReportCanvases(
   const W = 860;
   const PADDING = 30;
   const CONTENT_W = W - PADDING * 2; // 800px
-  const BASE_SCALE = 4; // High-DPI output resolution (lowered per page only if a canvas would be enormous)
+  const BASE_SCALE = options?.scale || 4; // High-DPI output (3440x4864 px per A4 page by default) for sharp, shareable exports
 
-  const loadImg = (url: string): Promise<HTMLImageElement | null> => {
+  const loadImg = (url?: string): Promise<HTMLImageElement | null> => {
     return new Promise((resolve) => {
-      if (!url) return resolve(null);
+      if (!url || typeof url !== 'string' || !url.trim()) return resolve(null);
+      const cleanUrl = url.trim();
       const img = new window.Image();
-      img.crossOrigin = 'anonymous';
+      if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
+        img.crossOrigin = 'anonymous';
+      }
       img.onload = () => resolve(img);
       img.onerror = () => resolve(null);
-      img.src = url;
+      setTimeout(() => resolve(null), 1000);
+      img.src = cleanUrl;
     });
   };
 
@@ -106,7 +239,7 @@ export async function generateReportCanvases(
 
   const activeKpis = report.included_kpi_cards || report.included_sections?.kpi_cards || {};
   const hasKpis = report.template_type !== 'pending_tasks' && report.included_sections?.kpi_summary !== false && report.kpi_summary;
-  let kpiCards: Array<{ label: string; val: any; color: string; bg?: string; border?: string; labelColor?: string; key?: string }> = [];
+  let kpiCards: Array<{ label: string; val: any; color: string; bg?: string; border?: string; labelColor?: string; key?: string; iconName?: string }> = [];
   if (hasKpis) {
     if (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') {
       const isPos = report.template_type === 'daily_positives';
@@ -118,7 +251,8 @@ export async function generateReportCanvases(
           bg: isPos ? '#ecfdf5' : '#eff6ff',
           border: isPos ? '#6ee7b7' : '#93c5fd',
           labelColor: isPos ? '#065f46' : '#1e40af',
-          key: isPos ? 'total_positives' : 'total_jds'
+          key: isPos ? 'total_positives' : 'total_jds',
+          iconName: isPos ? 'Flame' : 'Zap'
         },
         {
           label: isPos ? 'Colleges Reached' : 'Beneficiary Colleges',
@@ -127,7 +261,8 @@ export async function generateReportCanvases(
           bg: '#eff6ff',
           border: '#bfdbfe',
           labelColor: '#1e40af',
-          key: 'active_colleges_count'
+          key: 'active_colleges_count',
+          iconName: 'Building2'
         },
         {
           label: 'Distinct Companies',
@@ -136,7 +271,8 @@ export async function generateReportCanvases(
           bg: '#eef2ff',
           border: '#c7d2fe',
           labelColor: '#3730a3',
-          key: 'distinct_companies_count'
+          key: 'distinct_companies_count',
+          iconName: 'Briefcase'
         },
         {
           label: 'Highest Package',
@@ -145,50 +281,43 @@ export async function generateReportCanvases(
           bg: '#faf5ff',
           border: '#d8b4fe',
           labelColor: '#6b21a8',
-          key: 'highest_ctc'
-        },
-        {
-          label: 'Graduating Batch',
-          val: report.kpi_summary.graduating_year || '2027',
-          color: '#059669',
-          bg: '#ecfdf5',
-          border: '#6ee7b7',
-          labelColor: '#065f46',
-          key: 'graduating_year'
+          key: 'highest_ctc',
+          iconName: 'Trophy'
         },
       ];
-    } else if (report.template_type === 'month_end') {
+    } else if (report.template_type === 'month_end' || report.template_type === 'monthly_placement') {
       kpiCards = [
-        { label: 'Total Calls Made', val: report.kpi_summary.total_calls ?? 0, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', labelColor: '#1e40af', key: 'total_calls' },
-        { label: 'Positives Received', val: report.kpi_summary.positive_responses ?? 0, color: '#059669', bg: '#ecfdf5', border: '#6ee7b7', labelColor: '#065f46', key: 'positive_responses' },
-        { label: 'Duration Spent', val: report.kpi_summary.total_duration || '0m', color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', labelColor: '#155e75', key: 'total_duration' },
-        { label: 'Offers Received', val: report.kpi_summary.total_offers_moved || 0, color: '#7c3aed', bg: '#faf5ff', border: '#d8b4fe', labelColor: '#6b21a8', key: 'total_offers_moved' },
+        { label: 'Total Calls Made', val: report.kpi_summary.total_calls ?? 0, color: '#2563eb', bg: '#ffffff', border: '#e0f2fe', labelColor: '#475569', key: 'total_calls', iconName: 'PhoneCall' },
+        { label: 'Positives Received', val: report.kpi_summary.positive_responses ?? 0, color: '#059669', bg: '#ffffff', border: '#e0f2fe', labelColor: '#475569', key: 'positive_responses', iconName: 'TrendingUp' },
+        { label: 'Duration Spent', val: report.kpi_summary.total_duration || '0m', color: '#0891b2', bg: '#ffffff', border: '#e0f2fe', labelColor: '#475569', key: 'total_duration', iconName: 'Clock' },
+        { label: 'Offers Received', val: report.kpi_summary.total_offers_moved || 0, color: '#7c3aed', bg: '#ffffff', border: '#e0f2fe', labelColor: '#475569', key: 'total_offers_moved', iconName: 'Trophy' },
       ];
     } else if (report.template_type === 'active_leads' || report.kpi_summary.total_leads !== undefined) {
       kpiCards = [
-        { label: 'Total Active Leads', val: report.kpi_summary.total_leads || 0, color: '#2563eb', bg: '#eff6ff', border: '#93c5fd', labelColor: '#1e40af', key: 'total_leads' },
-        { label: 'JD Received Companies', val: report.kpi_summary.hot_leads_count ?? report.kpi_summary.jd_received_count ?? 0, color: '#d97706', bg: '#fffbeb', border: '#fcd34d', labelColor: '#92400e', key: 'hot_leads_count' },
-        { label: 'Companies in Pipeline', val: report.kpi_summary.pipeline_leads_count ?? report.kpi_summary.pipeline_count ?? 0, color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', labelColor: '#3730a3', key: 'pipeline_leads_count' },
-        { label: 'Graduating Batch', val: report.kpi_summary.graduating_year || 'All Batches', color: '#059669', bg: '#ecfdf5', border: '#6ee7b7', labelColor: '#065f46', key: 'graduating_year' },
+        { label: 'Total Active Leads', val: report.kpi_summary.total_leads || 0, color: '#2563eb', bg: '#eff6ff', border: '#93c5fd', labelColor: '#1e40af', key: 'total_leads', iconName: 'Briefcase' },
+        { label: 'JD Received Companies', val: report.kpi_summary.hot_leads_count ?? report.kpi_summary.jd_received_count ?? 0, color: '#d97706', bg: '#fffbeb', border: '#fcd34d', labelColor: '#92400e', key: 'hot_leads_count', iconName: 'Flame' },
+        { label: 'Companies in Pipeline', val: report.kpi_summary.pipeline_leads_count ?? report.kpi_summary.pipeline_count ?? 0, color: '#4f46e5', bg: '#eef2ff', border: '#c7d2fe', labelColor: '#3730a3', key: 'pipeline_leads_count', iconName: 'Zap' },
+        { label: 'Graduating Batch', val: report.kpi_summary.graduating_year || 'All Batches', color: '#059669', bg: '#ecfdf5', border: '#6ee7b7', labelColor: '#065f46', key: 'graduating_year', iconName: 'Calendar' },
       ];
     } else if (report.is_multi_college) {
       kpiCards = [
-        { label: 'Colleges Included', val: report.kpi_summary?.total_colleges || report.colleges_data?.length || 0, color: '#1e3a8a', bg: '#eff6ff', border: '#bfdbfe', labelColor: '#1e40af', key: 'total_colleges' },
-        { label: 'Drives Completed', val: report.kpi_summary?.drives_completed || 0, color: '#059669', bg: '#ecfdf5', border: '#a7f3d0', labelColor: '#065f46', key: 'drives_completed' },
-        { label: 'In Progress', val: report.kpi_summary?.drives_in_progress || 0, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', labelColor: '#1e40af', key: 'drives_in_progress' },
-        { label: 'Offers Placed', val: report.kpi_summary?.total_offers || 0, color: '#7c3aed', bg: '#faf5ff', border: '#e9d5ff', labelColor: '#6b21a8', key: 'total_offers' },
+        { label: 'Colleges Included', val: report.kpi_summary?.total_colleges || report.colleges_data?.length || 0, color: '#1e3a8a', bg: '#eff6ff', border: '#bfdbfe', labelColor: '#1e40af', key: 'total_colleges', iconName: 'Building2' },
+        { label: 'Drives Completed', val: report.kpi_summary?.drives_completed || 0, color: '#059669', bg: '#ecfdf5', border: '#a7f3d0', labelColor: '#065f46', key: 'drives_completed', iconName: 'Trophy' },
+        { label: 'In Progress', val: report.kpi_summary?.drives_in_progress || 0, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', labelColor: '#1e40af', key: 'drives_in_progress', iconName: 'Rocket' },
+        { label: 'Offers Placed', val: report.kpi_summary?.total_offers || 0, color: '#7c3aed', bg: '#faf5ff', border: '#e9d5ff', labelColor: '#6b21a8', key: 'total_offers', iconName: 'Star' },
       ];
     } else {
       kpiCards = [
-        { label: 'Total Calls Made', val: report.kpi_summary.total_calls || 0, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', labelColor: '#1e40af', key: 'total_calls' },
-        { label: 'Positives', val: report.kpi_summary.positive_responses || 0, color: '#059669', bg: '#ecfdf5', border: '#a7f3d0', labelColor: '#065f46', key: 'positive_responses' },
-        { label: 'Not Hiring', val: report.kpi_summary.not_hiring || 0, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', labelColor: '#6d28d9', key: 'not_hiring' },
-        { label: 'JD Received', val: report.kpi_summary.jds_received || 0, color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', labelColor: '#155e75', key: 'jds_received' },
+        { label: 'Total Calls Made', val: report.kpi_summary.total_calls || 0, color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', labelColor: '#1e40af', key: 'total_calls', iconName: 'PhoneCall' },
+        { label: 'Positives', val: report.kpi_summary.positive_responses || 0, color: '#059669', bg: '#ecfdf5', border: '#a7f3d0', labelColor: '#065f46', key: 'positive_responses', iconName: 'TrendingUp' },
+        { label: 'Not Hiring', val: report.kpi_summary.not_hiring || 0, color: '#7c3aed', bg: '#f5f3ff', border: '#ddd6fe', labelColor: '#6d28d9', key: 'not_hiring', iconName: 'CircleX' },
+        { label: 'JD Received', val: report.kpi_summary.jds_received || 0, color: '#0891b2', bg: '#ecfeff', border: '#a5f3fc', labelColor: '#155e75', key: 'jds_received', iconName: 'Inbox' },
       ];
     }
     kpiCards = kpiCards.filter((c: any) => activeKpis[c.key] !== false);
     if (kpiCards.length > 0) {
-      totalH += 58 + 18;
+      const isMonthEndKpi = report.template_type === 'month_end' || report.template_type === 'monthly_placement';
+      totalH += (isMonthEndKpi ? (22 + 84) : 58) + 18;
     }
   }
 
@@ -336,13 +465,17 @@ export async function generateReportCanvases(
           const maxCellW = colW - 14;
           const font = cIdx === 1
             ? 'bold 12.5px system-ui, -apple-system, sans-serif'
-            : cIdx === 0 || cIdx === 3
+            : cIdx === 0
             ? '600 12px monospace'
+            : cIdx === 3
+            ? 'bold 12px system-ui, -apple-system, sans-serif'
             : '500 12px system-ui, -apple-system, sans-serif';
           const fillStyle = cIdx === 1
             ? (isHl ? '#09090b' : '#0a2540')
             : cIdx === 0
             ? (isHl ? '#27272a' : '#007791')
+            : cIdx === 3
+            ? (isHl ? '#047857' : '#059669')
             : (isHl ? '#18181b' : '#334155');
 
           const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
@@ -400,7 +533,7 @@ export async function generateReportCanvases(
               : cIdx2 === 0
               ? '#007791'
               : (cIdx2 === 3)
-              ? '#007791'
+              ? '#059669'
               : (cIdx2 === 5)
               ? '#059669'
               : '#334155';
@@ -428,7 +561,7 @@ export async function generateReportCanvases(
       // Drive in progress
       const dipRows = colData.drive_in_progress || colData.drive_in_progress_companies;
       if (report.included_sections?.drive_in_progress !== false && dipRows && dipRows.length > 0) {
-        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Follow-up'];
+        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
         const colWidths = [36, 224, 200, 110, 230];
         const rawRows = dipRows.map((r: any) => [
           String(r.s_no || ''),
@@ -455,7 +588,7 @@ export async function generateReportCanvases(
               : cIdx2 === 0
               ? '#007791'
               : (cIdx2 === 3)
-              ? '#007791'
+              ? '#059669'
               : '#334155';
 
             const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
@@ -481,7 +614,7 @@ export async function generateReportCanvases(
       // Upcoming drives
       const upRows = colData.upcoming_drives || colData.companies_in_drive;
       if (report.included_sections?.upcoming_drives !== false && report.included_sections?.companies_in_drive !== false && upRows && upRows.length > 0) {
-        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status / Drive Date'];
+        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
         const colWidths = [36, 224, 200, 110, 230];
         const rawRows = upRows.map((r: any) => [
           String(r.s_no || ''),
@@ -508,7 +641,7 @@ export async function generateReportCanvases(
               : cIdx2 === 0
               ? '#007791'
               : (cIdx2 === 3)
-              ? '#007791'
+              ? '#059669'
               : '#334155';
 
             const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
@@ -561,7 +694,7 @@ export async function generateReportCanvases(
               : cIdx2 === 0
               ? '#007791'
               : (cIdx2 === 3)
-              ? '#007791'
+              ? '#059669'
               : '#334155';
 
             const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
@@ -619,7 +752,7 @@ export async function generateReportCanvases(
             : cIdx === 0
             ? '#007791'
             : (cIdx === 3)
-            ? '#007791'
+            ? '#059669'
             : (cIdx === 5)
             ? '#059669'
             : '#334155';
@@ -647,7 +780,7 @@ export async function generateReportCanvases(
     // 2. Drive In Progress
     if (report.included_sections?.drive_in_progress !== false && report.sections?.drive_in_progress && report.sections.drive_in_progress.length > 0) {
       const dipRows = report.sections.drive_in_progress;
-      const headers = applyColumnHeadings(report, 'drive_in_progress', ['#', 'Company Name', 'Role', 'CTC', 'Status / Follow-up']);
+      const headers = applyColumnHeadings(report, 'drive_in_progress', ['#', 'Company Name', 'Role', 'CTC', 'Status']);
       const colWidths = [36, 224, 200, 110, 230];
       const rawRows = dipRows.map((r: any) => [
         String(r.s_no || ''),
@@ -674,7 +807,7 @@ export async function generateReportCanvases(
             : cIdx === 0
             ? '#007791'
             : (cIdx === 3)
-            ? '#007791'
+            ? '#059669'
             : '#334155';
 
           const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
@@ -701,7 +834,7 @@ export async function generateReportCanvases(
     const upCanvasRows = report.sections?.companies_in_drive || report.sections?.upcoming_drives;
     if (report.included_sections?.companies_in_drive !== false && upCanvasRows && upCanvasRows.length > 0) {
       const cidRows = upCanvasRows;
-      const headers = applyColumnHeadings(report, 'upcoming_drives', ['#', 'Company Name', 'Role', 'CTC', 'Status / Drive Date']);
+      const headers = applyColumnHeadings(report, 'upcoming_drives', ['#', 'Company Name', 'Role', 'CTC', 'Status']);
       const colWidths = [36, 224, 200, 110, 230];
       const rawRows = cidRows.map((r: any) => [
         String(r.s_no || ''),
@@ -728,7 +861,7 @@ export async function generateReportCanvases(
             : cIdx === 0
             ? '#007791'
             : (cIdx === 3)
-            ? '#007791'
+            ? '#059669'
             : '#334155';
 
           const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
@@ -781,7 +914,7 @@ export async function generateReportCanvases(
             : cIdx === 0
             ? '#007791'
             : (cIdx === 3)
-            ? '#007791'
+            ? '#059669'
             : '#334155';
 
           const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
@@ -834,7 +967,7 @@ export async function generateReportCanvases(
             : cIdx === 0
             ? '#007791'
             : (cIdx === 3)
-            ? '#007791'
+            ? '#059669'
             : '#334155';
 
           const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
@@ -887,7 +1020,7 @@ export async function generateReportCanvases(
             : cIdx === 0
             ? '#007791'
             : (cIdx === 3)
-            ? '#007791'
+            ? '#059669'
             : '#334155';
 
           const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
@@ -913,7 +1046,7 @@ export async function generateReportCanvases(
     // 7. Rejected Companies
     const rejRows = report.sections?.rejected_companies || report.sections?.rejected_by_hr;
     if ((report.included_sections?.rejected_companies || report.included_sections?.rejected_by_hr) && rejRows && rejRows.length > 0) {
-      const headers = applyColumnHeadings(report, 'rejected_companies', ['#', 'Company Name', 'Role', 'CTC', 'Status / Reason']);
+      const headers = applyColumnHeadings(report, 'rejected_companies', ['#', 'Company Name', 'Role', 'CTC', 'Status']);
       const colWidths = [36, 224, 200, 110, 230];
       const rawRows = rejRows.map((r: any) => [
         String(r.s_no || ''),
@@ -940,7 +1073,7 @@ export async function generateReportCanvases(
             : cIdx === 0
             ? '#007791'
             : (cIdx === 3)
-            ? '#007791'
+            ? '#059669'
             : '#334155';
 
           const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
@@ -966,7 +1099,7 @@ export async function generateReportCanvases(
     // 8. On Hold by College
     const holdCollegeRows = report.sections?.on_hold_by_college || report.sections?.rejected_by_college;
     if ((report.included_sections?.on_hold_by_college || report.included_sections?.rejected_by_college) && holdCollegeRows && holdCollegeRows.length > 0) {
-      const headers = applyColumnHeadings(report, 'on_hold_by_college', ['#', 'Company Name', 'Role', 'CTC', 'Status / Reason']);
+      const headers = applyColumnHeadings(report, 'on_hold_by_college', ['#', 'Company Name', 'Role', 'CTC', 'Status']);
       const colWidths = [36, 224, 200, 110, 230];
       const rawRows = holdCollegeRows.map((r: any) => [
         String(r.s_no || ''),
@@ -993,7 +1126,7 @@ export async function generateReportCanvases(
             : cIdx === 0
             ? '#007791'
             : (cIdx === 3)
-            ? '#007791'
+            ? '#059669'
             : '#334155';
 
           const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
@@ -1019,7 +1152,7 @@ export async function generateReportCanvases(
     // 9. On Hold by HR
     if (report.included_sections?.on_hold_by_hr && report.sections?.on_hold_by_hr && report.sections.on_hold_by_hr.length > 0) {
       const holdHrRows = report.sections.on_hold_by_hr;
-      const headers = applyColumnHeadings(report, 'on_hold_by_hr', ['#', 'Company Name', 'Role', 'CTC', 'Status / Reason']);
+      const headers = applyColumnHeadings(report, 'on_hold_by_hr', ['#', 'Company Name', 'Role', 'CTC', 'Status']);
       const colWidths = [36, 224, 200, 110, 230];
       const rawRows = holdHrRows.map((r: any) => [
         String(r.s_no || ''),
@@ -1046,7 +1179,7 @@ export async function generateReportCanvases(
             : cIdx === 0
             ? '#007791'
             : (cIdx === 3)
-            ? '#007791'
+            ? '#059669'
             : '#334155';
 
           const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
@@ -1099,7 +1232,7 @@ export async function generateReportCanvases(
           : cIdx === 0
           ? '#007791'
           : (cIdx === 3)
-          ? '#007791'
+          ? '#059669'
           : '#334155';
 
         const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
@@ -1172,7 +1305,7 @@ export async function generateReportCanvases(
             : (cIdx === 5)
             ? (isPos ? '#047857' : '#1d4ed8')
             : (cIdx === 3)
-            ? (isPos ? '#059669' : '#2563eb')
+            ? '#059669'
             : (cIdx === 6)
             ? '#1e293b'
             : '#334155';
@@ -1331,7 +1464,7 @@ export async function generateReportCanvases(
     w: number,
     h: number,
     r: number,
-    fill?: string,
+    fill?: string | CanvasGradient,
     stroke?: string,
     lineWidth = 1
   ) => {
@@ -1377,26 +1510,34 @@ export async function generateReportCanvases(
   ctx.textAlign = 'center';
   ctx.fillStyle = '#0a2540';
   ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
-  let rawTitle =
-    report.report_title ||
-    (report.template_type === 'month_end'
-      ? `${report.report_period?.split(' ')[0] || 'August'} Month Placement Report`
-      : report.template_type === 'pending_tasks'
-      ? 'Pending Task Placement Report'
-      : report.template_type === 'active_leads'
-      ? 'Active Leads Pipeline Report'
-      : report.template_type === 'daily_positives'
-      ? 'POSITIVES OF THE DAY'
-      : report.template_type === 'daily_jd_received'
-      ? 'JD RECEIVED FOR THE DAY'
-      : 'Weekly Placement Report');
+  let rawTitle = '';
+  if (report.template_type === 'daily_positives') {
+    rawTitle = 'POSITIVES  OF  THE  DAY';
+  } else if (report.template_type === 'daily_jd_received') {
+    rawTitle = 'JD  RECEIVED  FOR  THE  DAY';
+  } else if (report.template_type === 'pending_tasks') {
+    rawTitle = 'PENDING  TASK  PLACEMENT  REPORT';
+  } else if (report.template_type === 'month_end') {
+    const m = (report.report_period?.split(' ')[0] || 'October').toUpperCase();
+    rawTitle = report.report_title ? report.report_title.toUpperCase() : `${m}   MONTH  PLACEMENT  REPORT`;
+  } else if (report.report_title) {
+    rawTitle = report.report_title.toUpperCase();
+  } else if (report.template_type === 'active_leads') {
+    rawTitle = 'ACTIVE  LEADS  PIPELINE  REPORT';
+  } else if (report.is_multi_college) {
+    rawTitle = 'CONSOLIDATED  WEEKLY  PLACEMENT  REPORT';
+  } else {
+    rawTitle = 'WEEKLY  PLACEMENT  REPORT';
+  }
   
   if (/pending\s*task/i.test(rawTitle)) {
-    rawTitle = 'Pending Task Placement Report';
+    rawTitle = 'PENDING  TASK  PLACEMENT  REPORT';
   } else if (/positives\s*of\s*the\s*day/i.test(rawTitle)) {
-    rawTitle = 'POSITIVES OF THE DAY';
+    rawTitle = 'POSITIVES  OF  THE  DAY';
   } else if (/jd\s*received\s*for\s*the\s*day/i.test(rawTitle)) {
-    rawTitle = 'JD RECEIVED FOR THE DAY';
+    rawTitle = 'JD  RECEIVED  FOR  THE  DAY';
+  } else if (report.template_type === 'month_end' || /month\s+placement\s+report/i.test(rawTitle)) {
+    rawTitle = rawTitle.toUpperCase();
   }
   ctx.fillText(rawTitle, W / 2, currentY + 32);
 
@@ -1451,24 +1592,79 @@ export async function generateReportCanvases(
 
   // KPI Summary Cards
   if (hasKpis && kpiCards.length > 0) {
-    const kpiCount = kpiCards.length;
-    const kpiGap = 12;
-    const kpiCardW = (CONTENT_W - (kpiCount - 1) * kpiGap) / kpiCount;
+    const isMonthEndKpi = report.template_type === 'month_end' || report.template_type === 'monthly_placement';
+    if (isMonthEndKpi) {
+      // Header Subtitle
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#0a2540';
+      ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+      ctx.fillText('☆  MONTH-END KPI SUMMARY', PADDING + 2, currentY + 12);
+      currentY += 22;
 
-    kpiCards.forEach((kpi, kIdx) => {
-      const cardX = PADDING + kIdx * (kpiCardW + kpiGap);
-      drawRoundRect(cardX, currentY, kpiCardW, 58, 8, kpi.bg || '#f8fafc', kpi.border || '#e2e8f0', 1);
+      const kpiCount = kpiCards.length;
+      const kpiGap = 14;
+      const kpiCardW = (CONTENT_W - (kpiCount - 1) * kpiGap) / kpiCount;
+      const kpiCardH = 84;
 
-      ctx.textAlign = 'center';
-      ctx.fillStyle = kpi.labelColor || '#475569';
-      ctx.font = 'bold 9.5px system-ui, -apple-system, sans-serif';
-      ctx.fillText(kpi.label.toUpperCase(), cardX + kpiCardW / 2, currentY + 20);
+      kpiCards.forEach((kpi, kIdx) => {
+        const cardX = PADDING + kIdx * (kpiCardW + kpiGap);
+        drawRoundRect(cardX, currentY, kpiCardW, kpiCardH, 12, '#ffffff', '#e0f2fe', 1.2);
 
-      ctx.fillStyle = kpi.color;
-      ctx.font = 'bold 17px system-ui, -apple-system, monospace';
-      ctx.fillText(String(kpi.val), cardX + kpiCardW / 2, currentY + 46);
-    });
-    currentY += 58 + 18;
+        const centerX = cardX + kpiCardW / 2;
+        const iconCenterY = currentY + 20;
+
+        // Draw Metric Icon
+        if (kpi.iconName) {
+          drawLucideIcon(ctx, kpi.iconName, centerX, iconCenterY, 19, kpi.color, 2.2);
+        }
+
+        // Label
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#475569';
+        ctx.font = '500 11px system-ui, -apple-system, sans-serif';
+        ctx.fillText(kpi.label, centerX, currentY + 48);
+
+        // Value
+        ctx.fillStyle = kpi.color;
+        ctx.font = 'bold 22px system-ui, -apple-system, monospace';
+        ctx.fillText(String(kpi.val), centerX, currentY + 72);
+      });
+
+      currentY += kpiCardH + 18;
+    } else {
+      const kpiCount = kpiCards.length;
+      const kpiGap = 12;
+      const kpiCardW = (CONTENT_W - (kpiCount - 1) * kpiGap) / kpiCount;
+      const cardH = 62;
+
+      kpiCards.forEach((kpi, kIdx) => {
+        const cardX = PADDING + kIdx * (kpiCardW + kpiGap);
+        drawRoundRect(cardX, currentY, kpiCardW, cardH, 8, kpi.bg || '#f8fafc', kpi.border || '#e2e8f0', 1);
+
+        const centerX = cardX + kpiCardW / 2;
+        if (kpi.iconName) {
+          drawLucideIcon(ctx, kpi.iconName, centerX, currentY + 15, 15, kpi.color, 2);
+          ctx.textAlign = 'center';
+          ctx.fillStyle = kpi.labelColor || '#475569';
+          ctx.font = 'bold 9px system-ui, -apple-system, sans-serif';
+          ctx.fillText(kpi.label.toUpperCase(), centerX, currentY + 31);
+
+          ctx.fillStyle = kpi.color;
+          ctx.font = 'bold 16px system-ui, -apple-system, monospace';
+          ctx.fillText(String(kpi.val), centerX, currentY + 50);
+        } else {
+          ctx.textAlign = 'center';
+          ctx.fillStyle = kpi.labelColor || '#475569';
+          ctx.font = 'bold 9.5px system-ui, -apple-system, sans-serif';
+          ctx.fillText(kpi.label.toUpperCase(), centerX, currentY + 20);
+
+          ctx.fillStyle = kpi.color;
+          ctx.font = 'bold 17px system-ui, -apple-system, monospace';
+          ctx.fillText(String(kpi.val), centerX, currentY + 46);
+        }
+      });
+      currentY += cardH + 18;
+    }
   }
 
   // Render Section Tables
@@ -1484,7 +1680,7 @@ export async function generateReportCanvases(
     if (sec.title) {
       // Title
       ctx.textAlign = 'left';
-      ctx.fillStyle = '#0a2540';
+      ctx.fillStyle = '#000000';
       ctx.font = 'bold 15px system-ui, -apple-system, sans-serif';
       ctx.fillText(secTitle, PADDING, currentY + 16);
 
@@ -1495,11 +1691,11 @@ export async function generateReportCanvases(
       currentY += 34;
     }
 
-    // Header Background (matching navigation icon gradient)
+    // Header Background (Ocean Azure Gradient across all report types)
     const headerGrad = ctx.createLinearGradient(0, currentY, 0, currentY + tableHeaderH);
-    headerGrad.addColorStop(0, '#22449E');
-    headerGrad.addColorStop(0.5, '#1D3D8F');
-    headerGrad.addColorStop(1, '#172E6C');
+    headerGrad.addColorStop(0, '#009EE3');
+    headerGrad.addColorStop(0.5, '#006BB6');
+    headerGrad.addColorStop(1, '#063A78');
     ctx.fillStyle = headerGrad;
     ctx.fillRect(PADDING, currentY, CONTENT_W, tableHeaderH);
 
@@ -1566,7 +1762,7 @@ export async function generateReportCanvases(
           breakPage();
           drawSectionHead(true);
         }
-        const rowBg = mRow.bg || (report.template_type === 'pending_tasks' ? '#ffffff' : (rIdx % 2 === 0 ? '#f0f7f9' : '#ffffff'));
+        const rowBg = mRow.bg || '#ffffff';
         const rowH = mRow.height;
         ctx.fillStyle = rowBg;
         ctx.fillRect(PADDING, currentY, CONTENT_W, rowH);
@@ -1690,18 +1886,18 @@ export async function generateReportCanvases(
     ctx.fillStyle = '#0f172a';
     ctx.fillText(singleHeroLead.role || singleHeroLead.job_role || '—', cardX + 30, row1Y + 56);
 
-    // CTC box – light-blue bg, stronger blue border
+    // CTC box – light-green bg, stronger green border
     drawRoundRect(cardX + 22 + col1W + gapBetween, row1Y, col2W, row1H, 10,
-      isPos ? '#f0fdf4' : '#eff6ff',
-      isPos ? '#34d399' : '#60a5fa', 1.5);
+      '#f0fdf4',
+      '#34d399', 1.5);
 
     ctx.font = '700 9.5px system-ui, -apple-system, sans-serif';
-    ctx.fillStyle = isPos ? '#047857' : '#1e40af';
+    ctx.fillStyle = '#047857';
     ctx.textAlign = 'left';
     ctx.fillText('⚡ CTC', cardX + 22 + col1W + gapBetween + 14, row1Y + 22);
 
     ctx.font = 'bold 24px system-ui, -apple-system, sans-serif';
-    ctx.fillStyle = isPos ? '#059669' : '#2563eb';
+    ctx.fillStyle = '#059669';
     ctx.fillText(singleHeroLead.ctc || '—', cardX + 22 + col1W + gapBetween + 14, row1Y + 60);
 
     // ── FOOTER BAR: College chip (left) + Coordinator (right) ────────────────
@@ -1818,23 +2014,153 @@ export async function generateReportCanvases(
   return pageCanvases;
 }
 
-export async function exportReportAsImage(report: any, options?: ReportCanvasOptions): Promise<void> {
-  const pages = await generateReportCanvases(report, options);
-  if (!pages.length) return;
+export async function prepareReportImageBlob(
+  report: any,
+  options?: ReportCanvasOptions
+): Promise<{ blob: Blob; fileName: string } | null> {
+  const baseFileName = getReportExportBaseFileName(report);
+  const suggestedName = `${baseFileName}.png`;
 
-  const fileName = getReportExportBaseFileName(report);
-  for (let i = 0; i < pages.length; i++) {
-    const blob: Blob | null = await new Promise((resolve) => pages[i].toBlob(resolve, 'image/png'));
-    if (!blob) continue;
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = pages.length > 1 ? `${fileName}_page-${i + 1}-of-${pages.length}.png` : `${fileName}.png`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-    // a short gap so the browser accepts several downloads in a row
-    if (i < pages.length - 1) await new Promise((r) => setTimeout(r, 350));
+  try {
+    const pages = await generateReportCanvases(report, { scale: 4, ...options });
+    if (!pages || !pages.length) {
+      console.error('prepareReportImageBlob: No pages generated');
+      return null;
+    }
+
+    let finalCanvas: HTMLCanvasElement = pages[0];
+
+    if (pages.length > 1) {
+      const totalWidth = pages[0].width;
+      let totalHeight = 0;
+      pages.forEach((p) => (totalHeight += p.height));
+
+      // Browser canvas max height safety cap (14,000px)
+      let renderScale = 1.0;
+      if (totalHeight > 14000) {
+        renderScale = 14000 / totalHeight;
+      }
+
+      finalCanvas = document.createElement('canvas');
+      finalCanvas.width = Math.floor(totalWidth * renderScale);
+      finalCanvas.height = Math.floor(totalHeight * renderScale);
+      const ctx = finalCanvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+        let currentY = 0;
+        pages.forEach((p) => {
+          const drawH = Math.floor(p.height * renderScale);
+          ctx.drawImage(p, 0, 0, p.width, p.height, 0, currentY, finalCanvas.width, drawH);
+          currentY += drawH;
+        });
+      }
+    }
+
+    // Stage 1: Native toBlob with 3s timeout safety guard
+    let blob: Blob | null = await new Promise((resolve) => {
+      let resolved = false;
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          resolve(null);
+        }
+      }, 3000);
+
+      try {
+        finalCanvas.toBlob((b) => {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            resolve(b);
+          }
+        }, 'image/png');
+      } catch (err) {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          resolve(null);
+        }
+      }
+    });
+
+    // Stage 2: DataURL -> binary Uint8Array Blob conversion if toBlob returned null or timed out
+    if (!blob) {
+      try {
+        const dataUrl = finalCanvas.toDataURL('image/png');
+        if (dataUrl && dataUrl.startsWith('data:image')) {
+          const parts = dataUrl.split(',');
+          const byteString = atob(parts[1]);
+          const mimeString = parts[0].split(':')[1].split(';')[0];
+          const ia = new Uint8Array(byteString.length);
+          for (let i = 0; i < byteString.length; i++) {
+            ia[i] = byteString.charCodeAt(i);
+          }
+          blob = new Blob([ia], { type: mimeString });
+        }
+      } catch (dataUrlErr) {
+        console.error('DataURL blob fallback failed:', dataUrlErr);
+      }
+    }
+
+    // Stage 3: Single-page fallback if multi-page composite failed
+    if (!blob && pages.length > 1) {
+      try {
+        const dataUrl = pages[0].toDataURL('image/png');
+        const parts = dataUrl.split(',');
+        const byteString = atob(parts[1]);
+        const mimeString = parts[0].split(':')[1].split(';')[0];
+        const ia = new Uint8Array(byteString.length);
+        for (let i = 0; i < byteString.length; i++) {
+          ia[i] = byteString.charCodeAt(i);
+        }
+        blob = new Blob([ia], { type: mimeString });
+      } catch (e) {
+        console.error('Page 1 fallback failed:', e);
+      }
+    }
+
+    if (!blob) {
+      console.error('prepareReportImageBlob: all blob-generation stages failed');
+      return null;
+    }
+
+    return { blob, fileName: suggestedName };
+  } catch (err) {
+    console.error('prepareReportImageBlob error:', err);
+    return null;
   }
 }
+
+export async function exportReportAsImage(report: any, options?: ReportCanvasOptions): Promise<void> {
+  const result = await prepareReportImageBlob(report, options);
+  if (!result) {
+    alert('Could not generate image file. Please try saving as PDF.');
+    return;
+  }
+  const url = URL.createObjectURL(result.blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = result.fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+export async function exportReportAsPdf(report?: any): Promise<void> {
+  if (typeof window !== 'undefined') {
+    const originalTitle = document.title;
+    if (report) {
+      document.title = getReportExportBaseFileName(report);
+    }
+    window.print();
+    const restoreTitle = () => {
+      document.title = originalTitle;
+      window.removeEventListener('afterprint', restoreTitle);
+    };
+    window.addEventListener('afterprint', restoreTitle);
+    setTimeout(restoreTitle, 2000);
+  }
+}
+

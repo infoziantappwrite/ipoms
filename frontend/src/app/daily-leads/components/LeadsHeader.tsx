@@ -224,7 +224,7 @@ export function LeadsHeader({
               placeholder="Search company, role…"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full h-8 pl-8 pr-3 bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-300 dark:border-zinc-700/90 hover:border-zinc-400 dark:hover:border-zinc-500 text-zinc-900 dark:text-zinc-100 text-xs rounded-xl shadow-xs placeholder:text-zinc-500 dark:placeholder:text-zinc-300/80 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium"
+              className="w-full h-[30px] pl-8 pr-3 bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-300 dark:border-zinc-700/90 hover:border-zinc-400 dark:hover:border-zinc-500 text-zinc-900 dark:text-zinc-100 text-xs rounded-lg shadow-xs placeholder:text-zinc-500 dark:placeholder:text-zinc-300/80 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium"
             />
           </div>
         </div>
@@ -239,7 +239,7 @@ export function LeadsHeader({
                 triggerHaptic('light');
                 onToggleDeleteMode();
               }}
-              className="h-9 px-2.5 bg-surface-sunken hover:bg-surface-raised border border-border text-fg rounded-xl flex items-center text-xs font-semibold transition-colors cursor-pointer shrink-0"
+              className="h-[30px] px-2.5 bg-surface-sunken hover:bg-surface-raised border border-border text-fg rounded-lg flex items-center text-xs font-semibold transition-colors cursor-pointer shrink-0 active:scale-[0.95]"
               title="Cancel Selection (Esc)"
             >
               Cancel
@@ -258,7 +258,7 @@ export function LeadsHeader({
                   onToggleDeleteMode();
                 }
               }}
-              className={`relative w-9 h-9 flex items-center justify-center rounded-xl transition-all shadow-md shadow-red-600/25 cursor-pointer select-none shrink-0 hover:brightness-110 active:scale-[0.95] text-white ${
+              className={`relative w-[30px] h-[30px] flex items-center justify-center rounded-lg transition-all shadow-md shadow-red-600/25 cursor-pointer select-none shrink-0 hover:brightness-110 active:scale-[0.95] text-white ${
                 isDeleteMode ? 'ring-2 ring-red-400 brightness-110' : ''
               }`}
               style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
@@ -271,7 +271,7 @@ export function LeadsHeader({
               }
               aria-label={isDeleteMode ? 'Delete Selected Leads' : 'Delete Leads'}
             >
-              <Trash2 size={16} strokeWidth={2.2} className="text-white" />
+              <Trash2 size={14} strokeWidth={2.2} className="text-white" />
               {isDeleteMode && selectedCount > 0 && (
                 <span className="absolute -top-1 -right-1 bg-white dark:bg-zinc-900 text-red-600 text-[9px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center shadow-xs tabular-nums ring-1 ring-red-600">
                   {selectedCount}
@@ -286,12 +286,12 @@ export function LeadsHeader({
               disabled={isSyncing}
               onClick={onSyncPositives}
               style={{ background: 'linear-gradient(180deg, #FFC53D 0%, #FF9500 50%, #FF5E00 100%)' }}
-              className="w-9 h-9 flex items-center justify-center text-white rounded-xl shadow-md shadow-orange-500/25 hover:brightness-110 transition-all cursor-pointer active:scale-[0.992] disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+              className="w-[30px] h-[30px] flex items-center justify-center text-white rounded-lg shadow-md shadow-orange-500/25 hover:brightness-110 transition-all cursor-pointer active:scale-[0.95] disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
               title="Sync positive calls and scheduled pipeline leads for this date"
               aria-label="Sync Positives"
             >
               <RefreshCw
-                size={16}
+                size={14}
                 strokeWidth={2.2}
                 className={isSyncing ? 'animate-spin text-white' : 'text-white'}
               />
@@ -311,14 +311,14 @@ export function LeadsHeader({
             <button
               type="button"
               onClick={onOpenAddModal}
-              className="w-9 h-9 flex items-center justify-center bg-primary hover:bg-blue-700 text-primary-foreground rounded-xl shadow-xs transition-colors cursor-pointer active:scale-[0.992] shrink-0"
+              className="w-[30px] h-[30px] flex items-center justify-center bg-primary hover:bg-blue-700 text-primary-foreground rounded-lg shadow-xs transition-colors cursor-pointer active:scale-[0.95] shrink-0"
               title="Add Daily Opportunity Entry"
               aria-label="Add Lead"
             >
-              <Plus size={18} strokeWidth={2.5} />
+              <Plus size={16} strokeWidth={2.5} />
             </button>
           ) : (
-            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1.5 rounded-xl whitespace-nowrap">
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1 rounded-lg whitespace-nowrap">
               Supervisor (Read-Only)
             </span>
           )}

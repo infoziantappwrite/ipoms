@@ -83,7 +83,7 @@ export function WeeklyActionsDropdown({
           setIsOpen((prev) => !prev);
         }}
         disabled={!selectedCollegeId}
-        className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 ${
+        className={`w-[30px] h-[30px] rounded-lg flex items-center justify-center transition-all cursor-pointer select-none shrink-0 ${
           isOpen
             ? 'bg-primary text-primary-foreground shadow-xs ring-2 ring-primary/30'
             : 'bg-surface hover:bg-surface-sunken border border-border text-fg-subtle hover:text-fg shadow-2xs'

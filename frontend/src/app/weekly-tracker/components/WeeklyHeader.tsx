@@ -235,7 +235,7 @@ export function WeeklyHeader({
                     triggerHaptic('medium');
                     onExecuteMove?.();
                   }}
-                  className="h-8 px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl flex items-center justify-center text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
+                  className="h-[30px] px-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg flex items-center justify-center text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
                   title="Choose destination section for selected companies"
                 >
                   <span>Move ({selectedCount || 0})</span>
@@ -247,7 +247,7 @@ export function WeeklyHeader({
                     triggerHaptic('light');
                     onCancelSelection?.();
                   }}
-                  className="h-8 px-2.5 bg-surface-sunken hover:bg-surface-raised border border-border text-fg rounded-xl flex items-center text-xs font-semibold transition-colors cursor-pointer shrink-0"
+                  className="h-[30px] px-2.5 bg-surface-sunken hover:bg-surface-raised border border-border text-fg rounded-lg flex items-center text-xs font-semibold transition-colors cursor-pointer shrink-0"
                   title="Cancel Selection (Esc)"
                 >
                   Cancel
@@ -266,26 +266,11 @@ export function WeeklyHeader({
                     triggerHaptic('medium');
                     onExecuteTransfer?.();
                   }}
-                  className="h-8 px-3 bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white rounded-xl flex items-center gap-1.5 text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
+                  className="h-[30px] px-3 bg-sky-600 hover:bg-sky-700 disabled:opacity-40 text-white rounded-lg flex items-center gap-1.5 text-xs font-bold shadow-xs transition-all cursor-pointer shrink-0"
                   title="Copy the ticked companies to the other college (you keep yours). Esc to cancel."
                 >
                   <Copy size={13} strokeWidth={2.4} />
                   <span>Copy ({selectedCount || 0})</span>
-                </button>
-              </div>
-            ) : selectionMode === 'delete' ? (
-              <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-                {/* Delete Mode Active: Cancel button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    triggerHaptic('light');
-                    onCancelSelection?.();
-                  }}
-                  className="h-8 px-2.5 bg-surface-sunken hover:bg-surface-raised border border-border text-fg rounded-xl flex items-center text-xs font-semibold transition-colors cursor-pointer shrink-0"
-                  title="Cancel Selection (Esc)"
-                >
-                  Cancel
                 </button>
               </div>
             ) : null
@@ -302,7 +287,7 @@ export function WeeklyHeader({
               title={allSectionsCollapsed ? 'Expand All Sections' : 'Collapse All Sections'}
               aria-label={allSectionsCollapsed ? 'Expand all sections' : 'Collapse all sections'}
               style={{ background: 'linear-gradient(180deg, #9AA0A6 0%, #64748B 50%, #334155 100%)' }}
-              className="w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 text-white shadow-md shadow-slate-500/25 hover:brightness-110 active:scale-[0.95] disabled:opacity-40"
+              className="w-[30px] h-[30px] rounded-lg flex items-center justify-center transition-all cursor-pointer select-none shrink-0 text-white shadow-md shadow-slate-500/25 hover:brightness-110 active:scale-[0.95] disabled:opacity-40"
             >
               {allSectionsCollapsed
                 ? <ChevronsDown size={15} strokeWidth={2.4} className="text-white" />
@@ -326,7 +311,7 @@ export function WeeklyHeader({
               }
             }}
             style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
-            className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 text-white shadow-md shadow-red-600/25 hover:brightness-110 ${
+            className={`relative w-[30px] h-[30px] rounded-lg flex items-center justify-center transition-all cursor-pointer select-none shrink-0 text-white shadow-md shadow-red-600/25 hover:brightness-110 ${
               selectionMode === 'delete' && selectedCount > 0
                 ? 'ring-2 ring-red-400 brightness-110'
                 : selectionMode === 'delete'
@@ -342,7 +327,7 @@ export function WeeklyHeader({
             }
             aria-label="Delete Rows"
           >
-            <Trash2 size={16} strokeWidth={2.2} className="text-white" />
+            <Trash2 size={15} strokeWidth={2.2} className="text-white" />
             {selectionMode === 'delete' && selectedCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-white dark:bg-zinc-900 text-rose-600 text-[9px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center shadow-xs tabular-nums ring-1 ring-rose-600">
                 {selectedCount}
@@ -360,7 +345,7 @@ export function WeeklyHeader({
                 onOpenPaste();
               }}
               style={{ background: 'linear-gradient(180deg, #A800E6 0%, #8A00D4 50%, #6C00B8 100%)' }}
-              className="relative h-8 px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-white shadow-md shadow-purple-500/25 hover:brightness-110 text-xs font-bold transition-all cursor-pointer select-none shrink-0 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]"
+              className="relative h-[30px] px-3 py-1 rounded-lg flex items-center gap-1.5 text-white shadow-md shadow-purple-500/25 hover:brightness-110 text-xs font-bold transition-all cursor-pointer select-none shrink-0 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]"
               title="Paste companies, roles, CTC, contacts, emails or dates from Excel (select a college first)"
               aria-label="Paste"
             >
@@ -379,7 +364,7 @@ export function WeeklyHeader({
                 onSyncDailyPositives();
               }}
               style={{ background: 'linear-gradient(180deg, #FFC53D 0%, #FF9500 50%, #FF5E00 100%)' }}
-              className="relative w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-md shadow-orange-500/25 hover:brightness-110 active:scale-[0.95] transition-all cursor-pointer select-none shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="relative w-[30px] h-[30px] rounded-lg flex items-center justify-center text-white shadow-md shadow-orange-500/25 hover:brightness-110 active:scale-[0.95] transition-all cursor-pointer select-none shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
               title="Sync positive leads from Daily Leads into Companies in Pipeline"
               aria-label="Sync Daily Positives"
             >

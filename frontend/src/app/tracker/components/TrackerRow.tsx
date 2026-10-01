@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useCallback, useEffect, useState } from 'react';
-import { Phone, Check, Clock, CopyPlus } from 'lucide-react';
+import { Check, Clock, CopyPlus } from 'lucide-react';
 import type { TrackerRow as TrackerRowType, CallOutcome } from '../page';
 import { triggerHaptic } from '@/lib/haptics';
 import { WhatsAppButton } from '@/components/ui/WhatsAppButton';
@@ -676,7 +676,7 @@ export function TrackerRow({
         )}
       </div>
 
-      {/* Contact (Call / WhatsApp + Editable Mobile) */}
+      {/* Contact (WhatsApp + Editable Mobile) */}
       <div
         className={`px-2 py-1.5 font-mono tabular-nums text-xs self-stretch flex items-center gap-1.5 group/contact min-w-0 ${getCellSelectionClass('mobile_number')} ${isNotHiring ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-fg'}`}
         onMouseDown={(e) => { if (!isEffectivelyReadOnly && e.button === 0) onCellMouseDown?.('mobile_number', e); }}
@@ -684,31 +684,6 @@ export function TrackerRow({
       >
         {row.mobile_number && (
           <div className="flex items-center gap-1 shrink-0 my-auto">
-            {!isEffectivelyReadOnly ? (
-              <button
-                type="button"
-                onClick={() => {
-                  triggerHaptic('light');
-                  onCall?.(row);
-                }}
-                title={`Click to call ${row.hr_name || row.company_name} (${(row.mobile_number || '').split(/[,;/]+/)[0]?.trim() || row.mobile_number})`}
-                className="w-5 h-5 rounded-md bg-blue-500/15 hover:bg-blue-500/30 border border-blue-500/40 dark:border-blue-400/60 text-blue-600 dark:text-blue-400 flex items-center justify-center transition-all hover:scale-105 active:scale-[0.992] cursor-pointer shrink-0 shadow-2xs"
-              >
-                <Phone size={11} strokeWidth={2.5} className="text-blue-600 dark:text-blue-400" />
-              </button>
-            ) : isAdvanceLocked ? (
-              <div
-                title="Calling is locked for tomorrow's advance entry. Unlocks automatically at 12:00 AM midnight"
-                className="w-5 h-5 rounded-md bg-zinc-200/80 dark:bg-zinc-800/80 border border-zinc-300 dark:border-zinc-700 text-fg-disabled flex items-center justify-center shrink-0 cursor-not-allowed shadow-2xs opacity-60"
-              >
-                <Phone size={11} strokeWidth={2} className="text-fg-disabled" />
-              </div>
-            ) : (
-              <div className="w-5 h-5 rounded-md bg-blue-500/15 border border-blue-500/40 dark:border-blue-400/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 shadow-2xs">
-                <Phone size={11} strokeWidth={2.5} className="text-blue-600 dark:text-blue-400" />
-              </div>
-            )}
-
             {!isAdvanceLocked && (
               <WhatsAppButton
                 mobileNumber={(row.mobile_number || '').split(/[,;/]+/)[0]?.trim() || row.mobile_number}

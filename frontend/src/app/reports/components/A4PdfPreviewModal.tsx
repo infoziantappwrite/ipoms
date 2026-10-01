@@ -32,10 +32,11 @@ import {
   PhoneCall,
 } from 'lucide-react';
 import { COLLEGE_LOGO_MAP, getCollegeLogoUrl } from '@/lib/collegeLogo';
+import { ReportDocumentView } from './ReportDocumentView';
 import {
   generateReportCanvases,
-  exportReportAsImage,
-  getReportExportBaseFileName,
+  prepareReportImageBlob,
+  exportReportAsPdf,
   type ImageExportSize,
 } from '../lib/reportCanvasRenderer';
 import { sectionTitle, columnHeading } from '../lib/reportOverrides';
@@ -84,7 +85,7 @@ export function A4PdfPreviewModal({
   isOpen,
   onClose,
   onPrint,
-  initialMode = 'both',
+  initialMode = 'image',
 }: Props) {
   const [mode, setMode] = useState<PreviewMode>(initialMode);
   const [zoomPdf, setZoomPdf] = useState<number>(100);
@@ -94,20 +95,61 @@ export function A4PdfPreviewModal({
   const [imageSize, setImageSize] = useState<ImageExportSize>('auto');
   const [imageSrcs, setImageSrcs] = useState<string[]>([]);
   const [imageLoading, setImageLoading] = useState(false);
+  const [savingImage, setSavingImage] = useState(false);
+  const [savingPdf, setSavingPdf] = useState(false);
+  const [readyImageDownload, setReadyImageDownload] = useState<{ url: string; fileName: string } | null>(null);
   const paperRef = useRef<HTMLDivElement>(null);
+
+  // Clear any pending "click to download" link whenever the underlying report/size changes
+  // or the modal closes, so a stale object URL is never reused.
+  useEffect(() => {
+    return () => {
+      if (readyImageDownload) URL.revokeObjectURL(readyImageDownload.url);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [report, imageSize, isOpen]);
+
+  const handleSaveImage = async () => {
+    if (readyImageDownload) {
+      URL.revokeObjectURL(readyImageDownload.url);
+      setReadyImageDownload(null);
+    }
+    setSavingImage(true);
+    try {
+      const result = await prepareReportImageBlob(report, { size: imageSize });
+      if (!result) {
+        alert('Could not generate image file. Please try saving as PDF.');
+        return;
+      }
+      const url = URL.createObjectURL(result.blob);
+      setReadyImageDownload({ url, fileName: result.fileName });
+    } catch (err) {
+      console.error('Save image from preview failed:', err);
+      alert('Failed to save image. Please try again.');
+    } finally {
+      setSavingImage(false);
+    }
+  };
+
+  const handleSavePdf = async () => {
+    setSavingPdf(true);
+    try {
+      await exportReportAsPdf(report);
+    } catch (err) {
+      console.error('Save PDF from preview failed:', err);
+      onPrint();
+    } finally {
+      setSavingPdf(false);
+    }
+  };
 
   // Sync initialMode when modal opens
   useEffect(() => {
     if (isOpen) {
-      setMode(initialMode || 'both');
-      // Set comfortable initial zoom depending on mode
-      if (initialMode === 'both') {
-        setZoomPdf(85);
-        setZoomImage(85);
-      } else {
-        setZoomPdf(100);
-        setZoomImage(100);
-      }
+      const activeMode = (initialMode === 'both' ? 'image' : initialMode) || 'image';
+      setMode(activeMode);
+      setZoomPdf(100);
+      setZoomImage(100);
     }
   }, [isOpen, initialMode]);
 
@@ -150,11 +192,20 @@ export function A4PdfPreviewModal({
     generateReportCanvases(report, { size: imageSize })
       .then((canvases) => {
         if (!isMounted) return;
-        setImageSrcs(canvases.map((c) => c.toDataURL('image/png')));
-        setImageLoading(false);
+        const urls: string[] = [];
+        for (const canvas of canvases) {
+          try {
+            urls.push(canvas.toDataURL('image/png'));
+          } catch (e) {
+            console.error('Failed to convert canvas to data URL:', e);
+          }
+        }
+        setImageSrcs(urls);
       })
       .catch((err) => {
         console.error('Error generating report canvas preview:', err);
+      })
+      .finally(() => {
         if (isMounted) setImageLoading(false);
       });
 
@@ -182,25 +233,6 @@ export function A4PdfPreviewModal({
   const collegeCode = (report.branding?.college_code || 'iPOMS').toUpperCase();
   const isConsolidated = !collegeCode || collegeCode === 'IPOMS';
   const collegeLogoUrl = getCollegeLogoUrl(collegeCode, collegeName, report.branding?.college_logo);
-
-  const handleDownloadImage = async () => {
-    if (imageSrcs.length) {
-      const fileName = getReportExportBaseFileName(report);
-      for (let i = 0; i < imageSrcs.length; i++) {
-        const a = document.createElement('a');
-        a.href = imageSrcs[i];
-        a.download =
-          imageSrcs.length > 1 ? `${fileName}_page-${i + 1}-of-${imageSrcs.length}.png` : `${fileName}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        // a short gap so the browser accepts several downloads in a row
-        if (i < imageSrcs.length - 1) await new Promise((r) => setTimeout(r, 350));
-      }
-    } else {
-      await exportReportAsImage(report, { size: imageSize });
-    }
-  };
 
   const isActiveLeadsReport = report.template_type === 'active_leads';
   const allActiveLeads: any[] = report.sections?.active_leads || [];
@@ -289,7 +321,9 @@ export function A4PdfPreviewModal({
                   transform: `scale(${zoomPdf / 100})`,
                   transformOrigin: 'top center',
                   width: '794px',
-                  minHeight: '1123px',
+                  minHeight: imageSize === 'compact' ? '480px' : imageSize === 'square' ? '794px' : '1123px',
+                  height: imageSize === 'square' ? '794px' : undefined,
+                  overflow: imageSize === 'square' ? 'hidden' : undefined,
                 }}
                 className="bg-white text-slate-900 rounded-none sm:rounded-sm shadow-xl shadow-slate-900/10 dark:shadow-[0_20px_50px_rgba(0,0,0,0.6)] border border-slate-200 dark:border-slate-800 p-8 sm:p-12 transition-transform duration-150 select-text flex flex-col justify-between relative print:break-after-page print:min-h-screen shrink-0"
               >
@@ -449,7 +483,7 @@ export function A4PdfPreviewModal({
                         {showCtcCol && <col style={{ width: activeLeadsColWidths.ctc }} />}
                       </colgroup>
                       <thead className="print:table-header-group">
-                        <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
+                        <tr style={{ background: 'linear-gradient(180deg, #009EE3 0%, #006BB6 50%, #063A78 100%)' }} className="text-white font-bold text-[10.5px]">
                           <th
                             className="py-2 px-1 text-center font-bold"
                             style={{ width: activeLeadsColWidths.num }}
@@ -466,7 +500,7 @@ export function A4PdfPreviewModal({
                       </thead>
                       <tbody className="divide-y divide-slate-200/80">
                         {pageRows.map((r: any, rIdx: number) => (
-                          <tr key={rIdx} className={rIdx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}>
+                          <tr key={rIdx} className="bg-white">
                             <td
                               className="py-2 px-1 text-center font-bold text-[#007791]"
                               style={{ width: activeLeadsColWidths.num }}
@@ -493,7 +527,7 @@ export function A4PdfPreviewModal({
                               </td>
                             )}
                             {showCtcCol && (
-                              <td className="py-2 px-2 text-center text-[#007791] font-bold whitespace-normal break-words leading-tight">
+                              <td className="py-2 px-2 text-center text-emerald-700 dark:text-emerald-400 font-bold whitespace-normal break-words leading-tight">
                                 {r.ctc ? (
                                   r.ctc.includes(',') ? (
                                     <div className="flex flex-col items-center justify-center gap-0.5 leading-tight py-0.5">
@@ -564,7 +598,7 @@ export function A4PdfPreviewModal({
       );
     }
 
-    // Standard Single/Multi-Section Paper Container for Other Report Types
+    // Standard Single/Multi-Section Paper Container for Other Report Types (Consumes single shared ReportDocumentView)
     return (
       <div
         ref={paperRef}
@@ -572,1687 +606,13 @@ export function A4PdfPreviewModal({
           transform: `scale(${zoomPdf / 100})`,
           transformOrigin: 'top center',
           width: '794px',
-          minHeight: `${Math.max(1, paperPages) * 1123}px`,
+          minHeight: imageSize === 'compact' ? '480px' : imageSize === 'square' ? '794px' : `${Math.max(1, paperPages) * 1123}px`,
+          height: imageSize === 'square' ? '794px' : undefined,
+          overflow: imageSize === 'square' ? 'hidden' : undefined,
         }}
-        className="bg-white text-slate-900 rounded-none sm:rounded-sm shadow-xl shadow-slate-900/10 dark:shadow-[0_20px_50px_rgba(0,0,0,0.6)] border border-slate-200 dark:border-slate-800 p-8 sm:p-12 transition-transform duration-150 select-text flex flex-col justify-between relative shrink-0"
+        className="transition-transform duration-150 relative shrink-0"
       >
-        {/* Header Branding */}
-        <div className="flex items-center justify-between border-b-2 border-slate-300 pb-4 gap-4 mb-2">
-          <div className="flex items-center shrink-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/infoziant-head.png"
-              alt="Infoziant"
-              className="h-14 w-auto object-contain shrink-0"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = '/college-logos/Infozianthead.png';
-              }}
-            />
-          </div>
-
-          <div className="flex-1 text-center min-w-0 px-2 flex flex-col items-center justify-center">
-            <h1 className="text-xl sm:text-2xl font-black text-[#0a2540] tracking-tight font-sans text-center uppercase">
-              {report.template_type === 'daily_positives'
-                ? 'POSITIVES OF THE DAY'
-                : report.template_type === 'daily_jd_received'
-                ? 'JD RECEIVED FOR THE DAY'
-                : report.report_title ||
-                  (report.template_type === 'month_end'
-                    ? `${report.report_period?.split(' ')[0] || 'August'} Month Placement Report`
-                    : report.template_type === 'pending_tasks'
-                    ? 'Pending Task Placement Report'
-                    : report.template_type === 'active_leads'
-                    ? 'Active Leads Pipeline Report'
-                    : 'Weekly Placement Report')}
-            </h1>
-            <p className="text-xs font-semibold text-slate-700 mt-0.5 text-center">{collegeName}</p>
-          </div>
-
-          <div className="flex items-center shrink-0 justify-end min-w-[100px]">
-            {report.is_multi_college || isConsolidated ? null : !logoFailed ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={collegeLogoUrl}
-                src={collegeLogoUrl}
-                alt={collegeName}
-                className="h-14 w-auto max-w-[160px] object-contain shrink-0"
-                onError={() => setLogoFailed(true)}
-              />
-            ) : (
-              <div className="h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700">
-                <Building2 size={15} className="text-blue-900 shrink-0" />
-                <span>{collegeCode}</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Metadata Ribbon */}
-        <div className="flex items-center justify-between flex-wrap gap-4 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-5 py-2.5 font-medium mb-4">
-          {report.template_type === 'weekly_placement' && getCleanPeriod(report.report_period) ? (
-            <>
-              <div className="flex items-center gap-1.5">
-                <Calendar size={13} className="text-blue-700 shrink-0" />
-                <span>
-                  Period:{' '}
-                  <strong className="text-slate-900 font-semibold">
-                    {getCleanPeriod(report.report_period)}
-                  </strong>
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Calendar size={13} className="text-slate-400 shrink-0" />
-                <span>
-                  Generated On:{' '}
-                  <strong className="text-slate-900 font-semibold">
-                    {report.generated_date}
-                  </strong>
-                </span>
-              </div>
-            </>
-          ) : (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') ? (
-            <>
-              <div className="flex items-center gap-1.5">
-                <Calendar size={13} className="text-slate-400 shrink-0" />
-                <span>
-                  Generated On:{' '}
-                  <strong className="text-slate-900 font-semibold">
-                    {report.generated_date}
-                  </strong>
-                </span>
-              </div>
-            </>
-          ) : (
-            <div className="w-full flex items-center justify-center">
-              <div className="flex items-center gap-1.5">
-                <Calendar size={13} className="text-slate-500 shrink-0" />
-                <span>
-                  Generated On:{' '}
-                  <strong className="text-slate-900 font-semibold">
-                    {report.generated_date}
-                  </strong>
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Main Content Sections */}
-        <div className="space-y-6 flex-1 flex flex-col pt-1">
-          {/* KPI Summary */}
-          {report.template_type !== 'pending_tasks' &&
-            report.included_sections?.kpi_summary &&
-            report.kpi_summary &&
-            (() => {
-              const activeKpis =
-                report.included_kpi_cards || report.included_sections?.kpi_cards || {};
-              if (report.template_type === 'daily_positives' || report.template_type === 'daily_jd_received') {
-                const isPositives = report.template_type === 'daily_positives';
-                const dailyCards = [
-                  {
-                    key: isPositives ? 'total_positives' : 'total_jds',
-                    label: isPositives ? 'Total Positives' : 'Total JDs Received',
-                    val: isPositives ? (report.kpi_summary.total_positives || 0) : (report.kpi_summary.total_jds || 0),
-                    bg: isPositives ? 'bg-emerald-50 border-emerald-300' : 'bg-blue-50 border-blue-300',
-                    text: isPositives ? 'text-emerald-700' : 'text-blue-700',
-                    labelText: isPositives ? 'text-emerald-800' : 'text-blue-800',
-                  },
-                  {
-                    key: 'active_colleges_count',
-                    label: isPositives ? 'Colleges Reached' : 'Beneficiary Colleges',
-                    val: report.kpi_summary.active_colleges_count || 0,
-                    bg: 'bg-blue-50 border-blue-200',
-                    text: 'text-blue-700',
-                    labelText: 'text-blue-800',
-                  },
-                  {
-                    key: 'distinct_companies_count',
-                    label: 'Distinct Companies',
-                    val: report.kpi_summary.distinct_companies_count || 0,
-                    bg: 'bg-indigo-50 border-indigo-200',
-                    text: 'text-indigo-700',
-                    labelText: 'text-indigo-800',
-                  },
-                  {
-                    key: 'highest_ctc',
-                    label: 'Highest Package',
-                    val: report.kpi_summary.highest_ctc || '—',
-                    bg: 'bg-purple-50 border-purple-200',
-                    text: 'text-purple-700',
-                    labelText: 'text-purple-800',
-                  },
-                  {
-                    key: 'graduating_year',
-                    label: 'Graduating Batch',
-                    val: report.kpi_summary.graduating_year || '2027',
-                    bg: 'bg-emerald-50 border-emerald-200',
-                    text: 'text-emerald-700',
-                    labelText: 'text-emerald-800',
-                  },
-                ].filter((c) => activeKpis[c.key] !== false);
-
-                if (dailyCards.length === 0) return null;
-                return (
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-                    {dailyCards.map((c) => (
-                      <div
-                        key={c.key}
-                        className={`border p-2.5 rounded-xl text-center shadow-xs ${c.bg}`}
-                      >
-                        <span
-                          className={`text-[9.5px] font-bold uppercase block tracking-wider truncate ${c.labelText}`}
-                        >
-                          {c.label}
-                        </span>
-                        <span className={`text-base font-extrabold font-mono ${c.text}`}>
-                          {c.val}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              } else if (report.template_type === 'month_end') {
-                const meCards = [
-                  {
-                    key: 'total_calls',
-                    label: 'Total Calls Made',
-                    val: report.kpi_summary.total_calls ?? 0,
-                    bg: 'bg-blue-50 border-blue-300',
-                    text: 'text-blue-700',
-                    labelText: 'text-blue-800',
-                  },
-                  {
-                    key: 'positive_responses',
-                    label: 'Positives Received',
-                    val: report.kpi_summary.positive_responses ?? 0,
-                    bg: 'bg-emerald-50 border-emerald-300',
-                    text: 'text-emerald-700',
-                    labelText: 'text-emerald-800',
-                  },
-                  {
-                    key: 'total_duration',
-                    label: 'Duration Spent',
-                    val: report.kpi_summary.total_duration || '0m',
-                    bg: 'bg-cyan-50 border-cyan-300',
-                    text: 'text-cyan-700',
-                    labelText: 'text-cyan-800',
-                  },
-                  {
-                    key: 'total_offers_moved',
-                    label: 'Offers Received',
-                    val: report.kpi_summary.total_offers_moved || 0,
-                    bg: 'bg-purple-50 border-purple-300',
-                    text: 'text-purple-700',
-                    labelText: 'text-purple-800',
-                  },
-                ].filter((c) => activeKpis[c.key] !== false);
-
-                if (meCards.length === 0) return null;
-                return (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    {meCards.map((c) => (
-                      <div
-                        key={c.key}
-                        className={`border p-3 rounded-xl text-center shadow-xs ${c.bg}`}
-                      >
-                        <span
-                          className={`text-[10px] font-bold uppercase block tracking-wider ${c.labelText}`}
-                        >
-                          {c.label}
-                        </span>
-                        <span className={`text-lg font-extrabold font-mono ${c.text}`}>
-                          {c.val}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              } else if (
-                report.template_type === 'active_leads' ||
-                report.kpi_summary.total_leads !== undefined
-              ) {
-                const alCards = [
-                  {
-                    key: 'total_leads',
-                    label: 'Total Active Leads',
-                    val: report.kpi_summary.total_leads || 0,
-                    bg: 'bg-blue-50 border-blue-300',
-                    text: 'text-blue-700',
-                    labelText: 'text-blue-800',
-                  },
-                  {
-                    key: 'hot_leads_count',
-                    label: 'JD Received Companies',
-                    val: report.kpi_summary.hot_leads_count ?? report.kpi_summary.jd_received_count ?? 0,
-                    bg: 'bg-amber-50 border-amber-300',
-                    text: 'text-amber-700',
-                    labelText: 'text-amber-800',
-                  },
-                  {
-                    key: 'pipeline_leads_count',
-                    label: 'Companies in Pipeline',
-                    val: report.kpi_summary.pipeline_leads_count ?? report.kpi_summary.pipeline_count ?? 0,
-                    bg: 'bg-indigo-50 border-indigo-300',
-                    text: 'text-indigo-700',
-                    labelText: 'text-indigo-800',
-                  },
-                  {
-                    key: 'graduating_year',
-                    label: 'Graduating Batch',
-                    val: report.kpi_summary.graduating_year || 'All Batches',
-                    bg: 'bg-emerald-50 border-emerald-300',
-                    text: 'text-emerald-700',
-                    labelText: 'text-emerald-800',
-                  },
-                ].filter((c) => activeKpis[c.key] !== false);
-
-                if (alCards.length === 0) return null;
-                return (
-                  <div className="flex flex-wrap gap-2">
-                    {alCards.map((c) => (
-                      <div
-                        key={c.key}
-                        className={`flex-1 min-w-[100px] border p-2.5 rounded-xl text-center shadow-xs ${c.bg}`}
-                      >
-                        <span
-                          className={`text-[10px] font-bold uppercase block tracking-wider ${c.labelText}`}
-                        >
-                          {c.label}
-                        </span>
-                        <span className={`text-base font-extrabold font-mono ${c.text}`}>
-                          {c.val}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              } else if (report.is_multi_college) {
-                const multiCards = [
-                  {
-                    key: 'total_colleges',
-                    label: 'Colleges Included',
-                    val:
-                      report.kpi_summary.total_colleges || report.colleges_data?.length || 0,
-                    bg: 'bg-indigo-50/80 border-indigo-200',
-                    text: 'text-indigo-700',
-                    labelText: 'text-indigo-800',
-                  },
-                  {
-                    key: 'drives_completed',
-                    label: 'Companies Completed',
-                    val: report.kpi_summary.drives_completed || 0,
-                    bg: 'bg-emerald-50/80 border-emerald-200',
-                    text: 'text-emerald-700',
-                    labelText: 'text-emerald-800',
-                  },
-                  {
-                    key: 'drives_in_progress',
-                    label: 'Companies In Progress',
-                    val: report.kpi_summary.drives_in_progress || 0,
-                    bg: 'bg-blue-50/80 border-blue-200',
-                    text: 'text-blue-700',
-                    labelText: 'text-blue-800',
-                  },
-                  {
-                    key: 'total_offers',
-                    label: 'Total Offers Placed',
-                    val: report.kpi_summary.total_offers || 0,
-                    bg: 'bg-purple-50/80 border-purple-200',
-                    text: 'text-purple-700',
-                    labelText: 'text-purple-800',
-                  },
-                ];
-                return (
-                  <div className="flex flex-wrap gap-2">
-                    {multiCards.map((c) => (
-                      <div
-                        key={c.key}
-                        className={`flex-1 min-w-[80px] border p-2 rounded-lg text-center shadow-xs ${c.bg}`}
-                      >
-                        <span
-                          className={`text-[10px] font-bold uppercase block truncate ${c.labelText}`}
-                        >
-                          {c.label}
-                        </span>
-                        <span className={`text-sm font-bold font-mono ${c.text}`}>{c.val}</span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              } else {
-                const wpCards = [
-                  {
-                    key: 'total_calls',
-                    label: 'Total Calls Made',
-                    val: report.kpi_summary.total_calls || 0,
-                    bg: 'bg-blue-50/80 border-blue-200',
-                    text: 'text-blue-700',
-                    labelText: 'text-blue-800',
-                  },
-                  {
-                    key: 'positive_responses',
-                    label: 'Positives',
-                    val: report.kpi_summary.positive_responses || 0,
-                    bg: 'bg-emerald-50/80 border-emerald-200',
-                    text: 'text-emerald-700',
-                    labelText: 'text-emerald-800',
-                  },
-                  {
-                    key: 'not_hiring',
-                    label: 'Not Hiring',
-                    val: report.kpi_summary.not_hiring || 0,
-                    bg: 'bg-purple-50/80 border-purple-200',
-                    text: 'text-purple-700',
-                    labelText: 'text-purple-800',
-                  },
-                  {
-                    key: 'jds_received',
-                    label: 'JD Received',
-                    val: report.kpi_summary.jds_received || 0,
-                    bg: 'bg-cyan-50/80 border-cyan-200',
-                    text: 'text-cyan-700',
-                    labelText: 'text-cyan-800',
-                  },
-                ].filter((c) => activeKpis[c.key] !== false);
-
-                if (wpCards.length === 0) return null;
-                return (
-                  <div className="flex flex-wrap gap-2">
-                    {wpCards.map((c) => (
-                      <div
-                        key={c.key}
-                        className={`flex-1 min-w-[80px] border p-2 rounded-lg text-center shadow-xs ${c.bg}`}
-                      >
-                        <span
-                          className={`text-[10px] font-bold uppercase block truncate ${c.labelText}`}
-                        >
-                          {c.label}
-                        </span>
-                        <span className={`text-sm font-bold font-mono ${c.text}`}>{c.val}</span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              }
-            })()}
-
-          {/* Multi-College Sections */}
-          {report.is_multi_college && Array.isArray(report.colleges_data) && (
-            <div className="space-y-6">
-              {report.colleges_data.map((colData: any, cIdx: number) => {
-                const hasCompleted =
-                  colData.completed_companies && colData.completed_companies.length > 0;
-                const hasDriveInProgress =
-                  (colData.drive_in_progress && colData.drive_in_progress.length > 0) ||
-                  (colData.drive_in_progress_companies &&
-                    colData.drive_in_progress_companies.length > 0);
-                const hasInDrive =
-                  (colData.upcoming_drives && colData.upcoming_drives.length > 0) ||
-                  (colData.companies_in_drive && colData.companies_in_drive.length > 0);
-                const hasProgress = colData.in_progress && colData.in_progress.length > 0;
-
-                return (
-                  <div
-                    key={colData.college_id || cIdx}
-                    className="space-y-2.5 print:break-inside-avoid break-inside-avoid border border-slate-200 rounded-xl p-3 bg-slate-50/30"
-                  >
-                    <div className="flex items-center justify-between flex-wrap gap-2 px-3 py-1.5 bg-blue-900 text-white rounded-lg shadow-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-white/20 text-white flex items-center justify-center text-[10px] font-mono font-bold shrink-0">
-                          {cIdx + 1}
-                        </span>
-                        <span className="font-bold text-xs">
-                          {colData.college_name}{' '}
-                          {colData.college_code ? `(${colData.college_code})` : ''}
-                        </span>
-                        {colData.location && (
-                          <span className="text-[10px] text-blue-200 font-normal">
-                            • {colData.location}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5 text-[10px] font-medium">
-                        <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
-                          {colData.total_completed || 0} Completed
-                        </span>
-                        {(colData.total_drive_in_progress ||
-                          (colData.drive_in_progress && colData.drive_in_progress.length) ||
-                          0) > 0 && (
-                          <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-200 border border-amber-400/30">
-                            {colData.total_drive_in_progress || colData.drive_in_progress.length}{' '}
-                            Drive in Progress
-                          </span>
-                        )}
-                        {((colData.total_upcoming_drives || colData.total_in_drive || 0) > 0 ||
-                          (colData.upcoming_drives && colData.upcoming_drives.length > 0) ||
-                          (colData.companies_in_drive &&
-                            colData.companies_in_drive.length > 0)) && (
-                          <span className="px-2 py-0.5 rounded bg-orange-500/20 text-orange-200 border border-orange-400/30">
-                            {colData.total_upcoming_drives ||
-                              colData.total_in_drive ||
-                              colData.upcoming_drives?.length ||
-                              colData.companies_in_drive?.length}{' '}
-                            Upcoming Drives
-                          </span>
-                        )}
-                        <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-200 border border-blue-400/30">
-                          {colData.total_in_progress || 0} In Progress
-                        </span>
-                        <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-200 border border-purple-400/30 font-bold">
-                          {colData.total_offers || 0} Offers
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Multi-College Completed */}
-                    {report.included_sections?.completed_companies !== false && (
-                      <div>
-                        <div className="mb-1.5">
-                          <h4 className="text-[12px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                            <Trophy size={13} className="text-[#007791] shrink-0" /> COMPANIES
-                            COMPLETED {hasCompleted ? `(${colData.completed_companies.length})` : ''}
-                          </h4>
-                          <div className="h-[2px] w-full bg-[#007791] mt-0.5" />
-                        </div>
-                        {!hasCompleted ? (
-                          <p className="text-[10.5px] text-slate-400 italic px-1 py-0.5">
-                            No completed drives for this institution during this period.
-                          </p>
-                        ) : (
-                          <table className="w-full text-[10.5px] border-collapse table-fixed bg-white rounded">
-                            <colgroup>
-                              <col style={{ width: '36px' }} />
-                              <col style={{ width: '25%' }} />
-                              <col style={{ width: '23%' }} />
-                              <col style={{ width: '13%' }} />
-                              <col style={{ width: '27%' }} />
-                              <col style={{ width: '12%' }} />
-                            </colgroup>
-                            <thead className="print:table-header-group">
-                              <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10px]">
-                                <th className="py-1.5 px-1 text-center font-bold">S.No</th>
-                                <th className="py-1.5 px-2 text-center font-bold">Company Name</th>
-                                <th className="py-1.5 px-2 text-center font-bold">Role</th>
-                                <th className="py-1.5 px-2 text-center font-bold">CTC</th>
-                                <th className="py-1.5 px-2 text-center font-bold">Status</th>
-                                <th className="py-1.5 px-1 text-center font-bold">Offers</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200/80">
-                              {colData.completed_companies.map((r: any, idx: number) => (
-                                <tr
-                                  key={idx}
-                                  className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                                >
-                                  <td className="py-1.5 px-1 text-center font-bold text-[#007791]">
-                                    {r.s_no}
-                                  </td>
-                                  <td className="py-1.5 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                                    {r.company_name}
-                                  </td>
-                                  <td className="py-1.5 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                                    {r.job_role || r.role || '—'}
-                                  </td>
-                                  <td className="py-1.5 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                                    {r.ctc_lpa || r.ctc || '—'}
-                                  </td>
-                                  <td className="py-1.5 px-2 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                                    {r.current_status_text || r.status || 'Drive Completed'}
-                                  </td>
-                                  <td className="py-1.5 px-1 text-center font-extrabold text-[#059669]">
-                                    {r.selected_count || 0}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Multi-College Drive in Progress */}
-                    {report.included_sections?.drive_in_progress !== false &&
-                      hasDriveInProgress && (
-                        <div>
-                          <div className="mb-1.5">
-                            <h4 className="text-[12px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                              <Flame size={13} className="text-[#007791] shrink-0" /> DRIVE IN
-                              PROGRESS (
-                              {(colData.drive_in_progress || colData.drive_in_progress_companies)
-                                .length}
-                              )
-                            </h4>
-                            <div className="h-[2px] w-full bg-[#007791] mt-0.5" />
-                          </div>
-                          <table className="w-full text-[10.5px] border-collapse table-fixed bg-white rounded">
-                            <colgroup>
-                              <col style={{ width: '36px' }} />
-                              <col style={{ width: '28%' }} />
-                              <col style={{ width: '26%' }} />
-                              <col style={{ width: '14%' }} />
-                              <col style={{ width: '32%' }} />
-                            </colgroup>
-                            <thead className="print:table-header-group">
-                              <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10px]">
-                                <th className="py-1.5 px-1 text-center font-bold">S.No</th>
-                                <th className="py-1.5 px-2 text-center font-bold">Company Name</th>
-                                <th className="py-1.5 px-2 text-center font-bold">Role</th>
-                                <th className="py-1.5 px-2 text-center font-bold">CTC</th>
-                                <th className="py-1.5 px-2 text-center font-bold">Status / Follow-up</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200/80">
-                              {(
-                                colData.drive_in_progress || colData.drive_in_progress_companies
-                              ).map((r: any, idx: number) => (
-                                <tr
-                                  key={idx}
-                                  className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                                >
-                                  <td className="py-1.5 px-1 text-center font-bold text-[#007791]">
-                                    {r.s_no}
-                                  </td>
-                                  <td className="py-1.5 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                                    {r.company_name}
-                                  </td>
-                                  <td className="py-1.5 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                                    {r.job_role || r.role || '—'}
-                                  </td>
-                                  <td className="py-1.5 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                                    {r.ctc_lpa || r.ctc || 'Competitive'}
-                                  </td>
-                                  <td className="py-1.5 px-2 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                                    {r.current_status_text || r.status || 'Drive in progress'}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-
-                    {/* Multi-College Upcoming Drives */}
-                    {report.included_sections?.upcoming_drives !== false &&
-                      report.included_sections?.companies_in_drive !== false &&
-                      hasInDrive && (
-                        <div>
-                          <div className="mb-1.5">
-                            <h4 className="text-[12px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                              <Rocket size={13} className="text-[#007791] shrink-0" /> UPCOMING
-                              DRIVES (
-                              {(colData.upcoming_drives || colData.companies_in_drive).length})
-                            </h4>
-                            <div className="h-[2px] w-full bg-[#007791] mt-0.5" />
-                          </div>
-                          <table className="w-full text-[10.5px] border-collapse table-fixed bg-white rounded">
-                            <colgroup>
-                              <col style={{ width: '36px' }} />
-                              <col style={{ width: '28%' }} />
-                              <col style={{ width: '26%' }} />
-                              <col style={{ width: '14%' }} />
-                              <col style={{ width: '32%' }} />
-                            </colgroup>
-                            <thead className="print:table-header-group">
-                              <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10px]">
-                                <th className="py-1.5 px-1 text-center font-bold">S.No</th>
-                                <th className="py-1.5 px-2 text-center font-bold">Company Name</th>
-                                <th className="py-1.5 px-2 text-center font-bold">Role</th>
-                                <th className="py-1.5 px-2 text-center font-bold">CTC</th>
-                                <th className="py-1.5 px-2 text-center font-bold">Status / Drive Date</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-200/80">
-                              {(colData.upcoming_drives || colData.companies_in_drive).map(
-                                (r: any, idx: number) => (
-                                  <tr
-                                    key={idx}
-                                    className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                                  >
-                                    <td className="py-1.5 px-1 text-center font-bold text-[#007791]">
-                                      {r.s_no}
-                                    </td>
-                                    <td className="py-1.5 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                                      {r.company_name}
-                                    </td>
-                                    <td className="py-1.5 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                                      {r.job_role || r.role || '—'}
-                                    </td>
-                                    <td className="py-1.5 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                                      {r.ctc_lpa || r.ctc || 'Competitive'}
-                                    </td>
-                                    <td className="py-1.5 px-2 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                                      {r.current_status_text || r.status || 'Upcoming Drive'}
-                                    </td>
-                                  </tr>
-                                )
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-
-                    {/* Multi-College In Progress */}
-                    {report.included_sections?.in_progress !== false && hasProgress && (
-                      <div>
-                        <div className="mb-1.5">
-                          <h4 className="text-[12px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                            <TrendingUp size={13} className="text-[#007791] shrink-0" /> IN
-                            PROGRESS ({colData.in_progress.length})
-                          </h4>
-                          <div className="h-[2px] w-full bg-[#007791] mt-0.5" />
-                        </div>
-                        <table className="w-full text-[10.5px] border-collapse table-fixed bg-white rounded">
-                          <colgroup>
-                            <col style={{ width: '36px' }} />
-                            <col style={{ width: '28%' }} />
-                            <col style={{ width: '26%' }} />
-                            <col style={{ width: '14%' }} />
-                            <col style={{ width: '32%' }} />
-                          </colgroup>
-                          <thead className="print:table-header-group">
-                            <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10px]">
-                              <th className="py-1.5 px-1 text-center font-bold">S.No</th>
-                              <th className="py-1.5 px-2 text-center font-bold">Company Name</th>
-                              <th className="py-1.5 px-2 text-center font-bold">Role</th>
-                              <th className="py-1.5 px-2 text-center font-bold">CTC</th>
-                              <th className="py-1.5 px-2 text-center font-bold">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-200/80">
-                            {colData.in_progress.map((r: any, idx: number) => (
-                              <tr
-                                key={idx}
-                                className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                              >
-                                <td className="py-1.5 px-1 text-center font-bold text-[#007791]">
-                                  {r.s_no}
-                                </td>
-                                <td className="py-1.5 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                                  {r.company_name}
-                                </td>
-                                <td className="py-1.5 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                                  {r.job_role || r.role || '—'}
-                                </td>
-                                <td className="py-1.5 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                                  {r.ctc_lpa || r.ctc || '—'}
-                                </td>
-                                <td className="py-1.5 px-2 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                                  {r.current_status_text || r.status || 'In Progress'}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Single-College Weekly & Month-End Placement Tables */}
-          {!report.is_multi_college &&
-            report.template_type !== 'active_leads' &&
-            report.template_type !== 'pending_tasks' && (
-              <>
-                {/* 1. Companies Completed */}
-                {report.included_sections?.completed_companies &&
-                  report.sections?.completed_companies && (
-                    <div className="space-y-1.5">
-                      <div className="mb-2">
-                        <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                          <Trophy size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'completed_companies', 'COMPANIES COMPLETED')}
-                        </h3>
-                        <div className="h-[2px] w-full bg-[#007791] mt-1" />
-                      </div>
-                      {report.sections.completed_companies.length === 0 ? (
-                        <p className="text-[11px] text-slate-400 italic py-1 pl-1">
-                          No completed drives recorded for this period.
-                        </p>
-                      ) : (
-                        <table className="w-full text-[11px] border-collapse table-fixed bg-white">
-                          <colgroup>
-                            <col style={{ width: '38px' }} />
-                            <col style={{ width: '25%' }} />
-                            <col style={{ width: '22%' }} />
-                            <col style={{ width: '12%' }} />
-                            <col style={{ width: '25%' }} />
-                            <col style={{ width: '14%' }} />
-                          </colgroup>
-                          <thead className="print:table-header-group">
-                            <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
-                              <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'completed_companies', 0, 'S.No')}</th>
-                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'completed_companies', 1, 'Company Name')}</th>
-                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'completed_companies', 2, 'Role')}</th>
-                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'completed_companies', 3, 'CTC')}</th>
-                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'completed_companies', 4, 'Status')}</th>
-                              <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'completed_companies', 5, 'Offers')}</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-200/80">
-                            {report.sections.completed_companies.map((r: any, idx: number) => (
-                              <tr
-                                key={idx}
-                                className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                              >
-                                <td className="py-2 px-1 text-center font-bold text-[#007791]">
-                                  {r.s_no}
-                                </td>
-                                <td className="py-2 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                                  {r.company_name}
-                                </td>
-                                <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                                  {r.job_role || r.role || '—'}
-                                </td>
-                                <td className="py-2 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                                  {r.ctc_lpa || r.ctc || '—'}
-                                </td>
-                                <td className="py-2 px-2 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                                  {r.current_status_text || r.status || 'Drive Completed'}
-                                </td>
-                                <td className="py-2 px-1 text-center font-extrabold text-[#059669]">
-                                  {r.selected_count || 0}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                    </div>
-                  )}
-
-                {/* 2. Drive in Progress */}
-                {report.included_sections?.drive_in_progress !== false &&
-                  report.sections?.drive_in_progress &&
-                  report.sections.drive_in_progress.length > 0 && (
-                    <div className="space-y-1.5">
-                      <div className="mb-2">
-                        <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                          <Flame size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'drive_in_progress', 'DRIVE IN PROGRESS')}
-                        </h3>
-                        <div className="h-[2px] w-full bg-[#007791] mt-1" />
-                      </div>
-                      <table className="w-full text-[11px] border-collapse table-fixed bg-white">
-                        <colgroup>
-                          <col style={{ width: '38px' }} />
-                          <col style={{ width: '28%' }} />
-                          <col style={{ width: '26%' }} />
-                          <col style={{ width: '13%' }} />
-                          <col style={{ width: '31%' }} />
-                        </colgroup>
-                        <thead className="print:table-header-group">
-                          <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
-                            <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'drive_in_progress', 0, 'S.No')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'drive_in_progress', 1, 'Company Name')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'drive_in_progress', 2, 'Role')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'drive_in_progress', 3, 'CTC')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'drive_in_progress', 4, 'Status / Follow-up')}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200/80">
-                          {report.sections.drive_in_progress.map((r: any, idx: number) => (
-                            <tr
-                              key={idx}
-                              className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                            >
-                              <td className="py-2 px-1 text-center font-bold text-[#007791]">
-                                {r.s_no}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                                {r.company_name}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                                {r.job_role || r.role || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                                {r.ctc_lpa || r.ctc || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                                {r.current_status_text || r.status || 'Drive in progress'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
-                {/* 3. Upcoming Drives */}
-                {report.included_sections?.companies_in_drive !== false &&
-                  (report.sections?.companies_in_drive || report.sections?.upcoming_drives) &&
-                  (report.sections?.companies_in_drive || report.sections?.upcoming_drives)
-                    .length > 0 && (
-                    <div className="space-y-1.5">
-                      <div className="mb-2">
-                        <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                          <Rocket size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'upcoming_drives', 'UPCOMING DRIVES')}
-                        </h3>
-                        <div className="h-[2px] w-full bg-[#007791] mt-1" />
-                      </div>
-                      <table className="w-full text-[11px] border-collapse table-fixed bg-white">
-                        <colgroup>
-                          <col style={{ width: '38px' }} />
-                          <col style={{ width: '28%' }} />
-                          <col style={{ width: '26%' }} />
-                          <col style={{ width: '13%' }} />
-                          <col style={{ width: '31%' }} />
-                        </colgroup>
-                        <thead className="print:table-header-group">
-                          <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
-                            <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'upcoming_drives', 0, 'S.No')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'upcoming_drives', 1, 'Company Name')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'upcoming_drives', 2, 'Role')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'upcoming_drives', 3, 'CTC')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'upcoming_drives', 4, 'Status / Drive Date')}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200/80">
-                          {(
-                            report.sections.companies_in_drive || report.sections.upcoming_drives
-                          ).map((r: any, idx: number) => (
-                            <tr
-                              key={idx}
-                              className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                            >
-                              <td className="py-2 px-1 text-center font-bold text-[#007791]">
-                                {r.s_no}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                                {r.company_name}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                                {r.job_role || r.role || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                                {r.ctc_lpa || r.ctc || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                                {r.current_status_text || r.status || 'Upcoming Drive'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-
-                {/* 4. In Progress */}
-                {report.included_sections?.in_progress && report.sections?.in_progress && (
-                  <div className="space-y-1.5">
-                    <div className="mb-2">
-                      <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                        <TrendingUp size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'in_progress', 'COMPANIES IN PROGRESS')}
-                      </h3>
-                      <div className="h-[2px] w-full bg-[#007791] mt-1" />
-                    </div>
-                    {report.sections.in_progress.length === 0 ? (
-                      <p className="text-[11px] text-slate-400 italic py-1 pl-1">
-                        No in-progress drives recorded for this period.
-                      </p>
-                    ) : (
-                      <table className="w-full text-[11px] border-collapse table-fixed bg-white">
-                        <colgroup>
-                          <col style={{ width: '38px' }} />
-                          <col style={{ width: '28%' }} />
-                          <col style={{ width: '26%' }} />
-                          <col style={{ width: '13%' }} />
-                          <col style={{ width: '31%' }} />
-                        </colgroup>
-                        <thead className="print:table-header-group">
-                          <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
-                            <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'in_progress', 0, 'S.No')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'in_progress', 1, 'Company Name')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'in_progress', 2, 'Role')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'in_progress', 3, 'CTC')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'in_progress', 4, 'Status')}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200/80">
-                          {report.sections.in_progress.map((r: any, idx: number) => (
-                            <tr
-                              key={idx}
-                              className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                            >
-                              <td className="py-2 px-1 text-center font-bold text-[#007791]">
-                                {r.s_no}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                                {r.company_name}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                                {r.job_role || r.role || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                                {r.ctc_lpa || r.ctc || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                                {r.current_status_text || r.status || '—'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                )}
-
-                {/* 5. Pipeline */}
-                {report.included_sections?.pipeline && report.sections?.pipeline && (
-                  <div className="space-y-1.5">
-                    <div className="mb-2">
-                      <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                        <Inbox size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'pipeline', 'COMPANIES IN PIPELINE')}
-                      </h3>
-                      <div className="h-[2px] w-full bg-[#007791] mt-1" />
-                    </div>
-                    {report.sections.pipeline.length === 0 ? (
-                      <p className="text-[11px] text-slate-400 italic py-1 pl-1">
-                        No pipeline companies recorded.
-                      </p>
-                    ) : (
-                      <table className="w-full text-[11px] border-collapse table-fixed bg-white">
-                        <colgroup>
-                          <col style={{ width: '38px' }} />
-                          <col style={{ width: '28%' }} />
-                          <col style={{ width: '26%' }} />
-                          <col style={{ width: '13%' }} />
-                          <col style={{ width: '31%' }} />
-                        </colgroup>
-                        <thead className="print:table-header-group">
-                          <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
-                            <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'pipeline', 0, 'S.No')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'pipeline', 1, 'Company Name')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'pipeline', 2, 'Role')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'pipeline', 3, 'CTC')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'pipeline', 4, 'Status')}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200/80">
-                          {report.sections.pipeline.map((r: any, idx: number) => (
-                            <tr
-                              key={idx}
-                              className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                            >
-                              <td className="py-2 px-1 text-center font-bold text-[#007791]">
-                                {r.s_no}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                                {r.company_name}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                                {r.job_role || r.role || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                                {r.ctc_lpa || r.ctc || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                                {r.current_status_text || r.status || '—'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                )}
-
-                {/* 6. Top Companies */}
-                {report.included_sections?.top_companies && report.sections?.top_companies && (
-                  <div className="space-y-1.5">
-                    <div className="mb-2">
-                      <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                        <Star size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'top_companies', 'TOP COMPANIES')}
-                      </h3>
-                      <div className="h-[2px] w-full bg-[#007791] mt-1" />
-                    </div>
-                    {report.sections.top_companies.length === 0 ? (
-                      <p className="text-[11px] text-slate-400 italic py-1 pl-1">
-                        No top companies recorded.
-                      </p>
-                    ) : (
-                      <table className="w-full text-[11px] border-collapse table-fixed bg-white">
-                        <colgroup>
-                          <col style={{ width: '38px' }} />
-                          <col style={{ width: '28%' }} />
-                          <col style={{ width: '26%' }} />
-                          <col style={{ width: '13%' }} />
-                          <col style={{ width: '31%' }} />
-                        </colgroup>
-                        <thead className="print:table-header-group">
-                          <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
-                            <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'top_companies', 0, 'S.No')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'top_companies', 1, 'Company Name')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'top_companies', 2, 'Role')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'top_companies', 3, 'CTC')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'top_companies', 4, 'Status')}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200/80">
-                          {report.sections.top_companies.map((r: any, idx: number) => (
-                            <tr
-                              key={idx}
-                              className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                            >
-                              <td className="py-2 px-1 text-center font-bold text-[#007791]">
-                                {r.s_no}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                                {r.company_name}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                                {r.job_role || r.role || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                                {r.ctc_lpa || r.ctc || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                                {r.current_status_text || r.status || '—'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                )}
-
-                {/* 7. Rejected Companies */}
-                {(report.included_sections?.rejected_companies ||
-                  report.included_sections?.rejected_by_hr) &&
-                  (report.sections?.rejected_companies || report.sections?.rejected_by_hr) && (
-                    <div className="space-y-1.5">
-                      <div className="mb-2">
-                        <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                          <XCircle size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'rejected_companies', 'REJECTED COMPANIES')}
-                        </h3>
-                        <div className="h-[2px] w-full bg-[#007791] mt-1" />
-                      </div>
-                      {(report.sections.rejected_companies || report.sections.rejected_by_hr)
-                        .length === 0 ? (
-                        <p className="text-[11px] text-slate-400 italic py-1 pl-1">
-                          No rejected companies recorded.
-                        </p>
-                      ) : (
-                        <table className="w-full text-[11px] border-collapse table-fixed bg-white">
-                          <colgroup>
-                            <col style={{ width: '38px' }} />
-                            <col style={{ width: '28%' }} />
-                            <col style={{ width: '26%' }} />
-                            <col style={{ width: '13%' }} />
-                            <col style={{ width: '31%' }} />
-                          </colgroup>
-                          <thead className="print:table-header-group">
-                            <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
-                              <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'rejected_companies', 0, 'S.No')}</th>
-                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'rejected_companies', 1, 'Company Name')}</th>
-                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'rejected_companies', 2, 'Role')}</th>
-                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'rejected_companies', 3, 'CTC')}</th>
-                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'rejected_companies', 4, 'Status / Reason')}</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-200/80">
-                            {(
-                              report.sections.rejected_companies ||
-                              report.sections.rejected_by_hr
-                            ).map((r: any, idx: number) => (
-                              <tr
-                                key={idx}
-                                className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                              >
-                                <td className="py-2 px-1 text-center font-bold text-[#007791]">
-                                  {r.s_no}
-                                </td>
-                                <td className="py-2 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                                  {r.company_name}
-                                </td>
-                                <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                                  {r.job_role || r.role || '—'}
-                                </td>
-                                <td className="py-2 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                                  {r.ctc_lpa || r.ctc || '—'}
-                                </td>
-                                <td className="py-2 px-2 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                                  {r.current_status_text || r.status || r.reason || '—'}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                    </div>
-                  )}
-
-                {/* 8. On Hold by College */}
-                {(report.included_sections?.on_hold_by_college ||
-                  report.included_sections?.rejected_by_college) &&
-                  (report.sections?.on_hold_by_college ||
-                    report.sections?.rejected_by_college) && (
-                    <div className="space-y-1.5">
-                      <div className="mb-2">
-                        <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                          <Clock size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'on_hold_by_college', 'ON HOLD BY COLLEGE')}
-                        </h3>
-                        <div className="h-[2px] w-full bg-[#007791] mt-1" />
-                      </div>
-                      {(report.sections.on_hold_by_college ||
-                        report.sections.rejected_by_college).length === 0 ? (
-                        <p className="text-[11px] text-slate-400 italic py-1 pl-1">
-                          No companies on hold by college.
-                        </p>
-                      ) : (
-                        <table className="w-full text-[11px] border-collapse table-fixed bg-white">
-                          <colgroup>
-                            <col style={{ width: '38px' }} />
-                            <col style={{ width: '28%' }} />
-                            <col style={{ width: '26%' }} />
-                            <col style={{ width: '13%' }} />
-                            <col style={{ width: '31%' }} />
-                          </colgroup>
-                          <thead className="print:table-header-group">
-                            <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
-                              <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'on_hold_by_college', 0, 'S.No')}</th>
-                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_college', 1, 'Company Name')}</th>
-                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_college', 2, 'Role')}</th>
-                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_college', 3, 'CTC')}</th>
-                              <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_college', 4, 'Status / Reason')}</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-200/80">
-                            {(
-                              report.sections.on_hold_by_college ||
-                              report.sections.rejected_by_college
-                            ).map((r: any, idx: number) => (
-                              <tr
-                                key={idx}
-                                className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                              >
-                                <td className="py-2 px-1 text-center font-bold text-[#007791]">
-                                  {r.s_no}
-                                </td>
-                                <td className="py-2 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                                  {r.company_name}
-                                </td>
-                                <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                                  {r.job_role || r.role || '—'}
-                                </td>
-                                <td className="py-2 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                                  {r.ctc_lpa || r.ctc || '—'}
-                                </td>
-                                <td className="py-2 px-2 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                                  {r.current_status_text || r.status || r.reason || '—'}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      )}
-                    </div>
-                  )}
-
-                {/* 9. On Hold by HR */}
-                {report.included_sections?.on_hold_by_hr && report.sections?.on_hold_by_hr && (
-                  <div className="space-y-1.5">
-                    <div className="mb-2">
-                      <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                        <Clock size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, 'on_hold_by_hr', 'ON HOLD BY HR')}
-                      </h3>
-                      <div className="h-[2px] w-full bg-[#007791] mt-1" />
-                    </div>
-                    {report.sections.on_hold_by_hr.length === 0 ? (
-                      <p className="text-[11px] text-slate-400 italic py-1 pl-1">
-                        No companies on hold by HR.
-                      </p>
-                    ) : (
-                      <table className="w-full text-[11px] border-collapse table-fixed bg-white">
-                        <colgroup>
-                          <col style={{ width: '38px' }} />
-                          <col style={{ width: '28%' }} />
-                          <col style={{ width: '26%' }} />
-                          <col style={{ width: '13%' }} />
-                          <col style={{ width: '31%' }} />
-                        </colgroup>
-                        <thead className="print:table-header-group">
-                          <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
-                            <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'on_hold_by_hr', 0, 'S.No')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_hr', 1, 'Company Name')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_hr', 2, 'Role')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_hr', 3, 'CTC')}</th>
-                            <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'on_hold_by_hr', 4, 'Status / Reason')}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200/80">
-                          {report.sections.on_hold_by_hr.map((r: any, idx: number) => (
-                            <tr
-                              key={idx}
-                              className={idx % 2 === 0 ? 'bg-[#f0f7f9]' : 'bg-white'}
-                            >
-                              <td className="py-2 px-1 text-center font-bold text-[#007791]">
-                                {r.s_no}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                                {r.company_name}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                                {r.job_role || r.role || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#007791] whitespace-normal break-words leading-snug">
-                                {r.ctc_lpa || r.ctc || '—'}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-600 whitespace-normal break-words leading-snug">
-                                {r.current_status_text || r.status || r.reason || '—'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-
-          {/* Placement Pending Tasks (Section-wise 3 Tables) */}
-          {report.template_type === 'pending_tasks' && (() => {
-            const allTasks = report.sections?.pending_tasks || [];
-            const sec1 =
-              report.sections?.drive_in_progress && report.sections.drive_in_progress.length > 0
-                ? report.sections.drive_in_progress
-                : allTasks.filter((t: any) => t.task_section === 'drive_in_progress');
-            const sec2 =
-              report.sections?.companies_in_drive && report.sections.companies_in_drive.length > 0
-                ? report.sections.companies_in_drive
-                : allTasks.filter((t: any) => t.task_section === 'companies_in_drive');
-            const sec3 =
-              report.sections?.company_in_progress && report.sections.company_in_progress.length > 0
-                ? report.sections.company_in_progress
-                : allTasks.filter(
-                    (t: any) =>
-                      t.task_section === 'company_in_progress' ||
-                      (!t.task_section && !sec1.includes(t) && !sec2.includes(t))
-                  );
-
-            const sections = [
-              { num: 1, title: 'DRIVE IN PROGRESS', icon: Flame, list: sec1, key: 'drive_in_progress' },
-              { num: 2, title: 'COMPANIES IN DRIVE', icon: Calendar, list: sec2, key: 'companies_in_drive' },
-              { num: 3, title: 'COMPANY IN PROGRESS', icon: Clock, list: sec3, key: 'company_in_progress' },
-            ].filter((s) => s.list.length > 0);
-
-            if (sections.length === 0) {
-              return (
-                <div className="space-y-1.5">
-                  <div className="mb-2">
-                    <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                      <ListTodo size={14} className="text-[#007791] shrink-0" /> PLACEMENT PENDING
-                      TASKS
-                    </h3>
-                    <div className="h-[2px] w-full bg-[#007791] mt-1" />
-                  </div>
-                  <p className="text-[11px] text-slate-400 italic py-1 pl-1">
-                    No pending tasks recorded for this period.
-                  </p>
-                </div>
-              );
-            }
-
-            return (
-              <div className="space-y-6">
-                {sections.map((sec, secIdx) => (
-                  <div key={sec.key} className="space-y-1.5">
-                    <div className="mb-2">
-                      <h3 className="text-[13px] font-bold text-[#0a2540] tracking-tight flex items-center gap-1.5">
-                        <sec.icon size={14} className="text-[#007791] shrink-0" /> {sectionTitle(report, `pending_${sec.key}`, sec.title)}
-                      </h3>
-                      <div className="h-[2px] w-full bg-[#007791] mt-1" />
-                    </div>
-                    <table className="w-full text-[11px] border-collapse table-fixed bg-white">
-                      <colgroup>
-                        <col style={{ width: '36px' }} />
-                        <col style={{ width: '27%' }} />
-                        <col style={{ width: '20%' }} />
-                        <col style={{ width: '15%' }} />
-                        <col style={{ width: '34%' }} />
-                      </colgroup>
-                      <thead className="print:table-header-group">
-                        <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10.5px]">
-                          <th className="py-2 px-1 text-center font-bold">{columnHeading(report, `pending_${sec.key}`, 0, '#')}</th>
-                          <th className="py-2 px-2 text-center font-bold">{columnHeading(report, `pending_${sec.key}`, 1, 'Company Name')}</th>
-                          <th className="py-2 px-2 text-center font-bold">{columnHeading(report, `pending_${sec.key}`, 2, 'Role')}</th>
-                          <th className="py-2 px-1 text-center font-bold">{columnHeading(report, `pending_${sec.key}`, 3, 'CTC')}</th>
-                          <th className="py-2 px-2 text-center font-bold">{columnHeading(report, `pending_${sec.key}`, 4, 'Status')}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200/80">
-                        {sec.list.map((r: any, idx: number) => {
-                          const isHl = Boolean(r.is_highlighted);
-                          const hlBg = r.highlight_color || '#fef08a';
-                          const roleVal = r.role || r.job_role || '—';
-                          const ctcVal = r.ctc || r.ctc_lpa || r.package_details || '—';
-                          const statusVal =
-                            r.status ||
-                            r.current_status_text ||
-                            r.action_to_be_taken ||
-                            r.current_status ||
-                            r.remarks ||
-                            '—';
-                          return (
-                            <tr
-                              key={idx}
-                              style={isHl ? { backgroundColor: hlBg } : undefined}
-                              className={!isHl ? 'bg-white' : ''}
-                            >
-                              <td className="py-2 px-1 text-center font-bold text-[#007791]">
-                                {idx + 1}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                                {r.company_name}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                                {roleVal}
-                              </td>
-                              <td className="py-2 px-1 text-center font-semibold text-slate-700 whitespace-nowrap leading-snug">
-                                {ctcVal}
-                              </td>
-                              <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                                {statusVal}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-
-          {/* Daily Positives Table / Spotlight Card */}
-          {report.template_type === 'daily_positives' && report.included_sections?.daily_positives !== false && report.sections?.daily_positives && (
-            <div className="space-y-1.5">
-              {report.sections.daily_positives.length === 0 ? (
-                <p className="text-[11px] text-slate-400 italic py-1 pl-1">
-                  No positive leads recorded for this day.
-                </p>
-              ) : report.sections.daily_positives.length === 1 ? (
-                (() => {
-                  const r = report.sections.daily_positives[0];
-                  return (
-                    <div className="bg-gradient-to-br from-emerald-50/70 via-white to-emerald-50/30 border-2 border-emerald-300/80 rounded-2xl p-6 shadow-sm">
-                      <div className="flex items-center justify-between gap-3 mb-4">
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100/90 border border-emerald-300 text-emerald-800 text-[11px] font-bold tracking-wide">
-                          <Sparkles size={13} className="text-emerald-600" />
-                          <span>POSITIVE LEAD</span>
-                        </div>
-                        <div className="text-xs font-mono font-semibold text-emerald-700 bg-emerald-100/50 px-2.5 py-0.5 rounded-md border border-emerald-200">
-                          {r.time || r.time_stamp || r.event_time || 'Confirmed'}
-                        </div>
-                      </div>
-
-                      <div className="mb-5">
-                        <h2 className="text-2xl sm:text-3xl font-black text-[#0a2540] tracking-tight">
-                          {r.company_name}
-                        </h2>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-4">
-                        <div className="p-3.5 bg-white border border-slate-200 rounded-xl shadow-xs">
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1">
-                            <Briefcase size={12} className="text-slate-400" />
-                            <span>Job Role / Designation</span>
-                          </div>
-                          <div className="text-base font-bold text-slate-900 leading-snug">
-                            {r.role || r.job_role || '—'}
-                          </div>
-                        </div>
-
-                        <div className="p-3.5 bg-emerald-50/70 border-2 border-emerald-300 rounded-xl shadow-xs">
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 mb-1 flex items-center gap-1">
-                            <Trophy size={12} className="text-emerald-600" />
-                            <span>CTC</span>
-                          </div>
-                          <div className="text-2xl font-black text-emerald-700 tracking-tight">
-                            {r.ctc || '—'}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50/90 border border-slate-200 rounded-xl p-3">
-                        <div className="flex items-center gap-2">
-                          <Building2 size={14} className="text-emerald-700 shrink-0" />
-                          <span className="text-slate-600 font-medium">Beneficiary:</span>
-                          <span className="font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded border border-emerald-200 font-mono text-[11px]">
-                            {r.college_code || r.college_name || '—'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 justify-start sm:justify-end text-xs">
-                          <User size={14} className="text-slate-500 shrink-0" />
-                          <span className="text-slate-600 font-medium">Coordinator</span>
-                          <span className="text-slate-400 font-semibold px-0.5">:</span>
-                          <span className="font-bold text-slate-800">
-                            {r.coordinator || 'Placement Team'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()
-              ) : (
-                <table className="w-full text-[11px] border-collapse table-fixed bg-white">
-                  <colgroup>
-                    <col style={{ width: '36px' }} />
-                    <col style={{ width: '27%' }} />
-                    <col style={{ width: '22%' }} />
-                    <col style={{ width: '12%' }} />
-                    <col style={{ width: '85px' }} />
-                    <col style={{ width: '80px' }} />
-                    <col style={{ width: '20%' }} />
-                  </colgroup>
-                  <thead className="print:table-header-group">
-                    <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10px]">
-                      <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'daily_positives', 0, '#')}</th>
-                      <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'daily_positives', 1, 'COMPANY NAME')}</th>
-                      <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'daily_positives', 2, 'ROLE / DESIGNATION')}</th>
-                      <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'daily_positives', 3, 'CTC')}</th>
-                      <th className="py-2 px-1.5 text-center font-bold">{columnHeading(report, 'daily_positives', 4, 'TIME')}</th>
-                      <th className="py-2 px-1.5 text-center font-bold">{columnHeading(report, 'daily_positives', 5, 'COLLEGE')}</th>
-                      <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'daily_positives', 6, 'COORDINATOR')}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200/80">
-                    {report.sections.daily_positives.map((r: any, idx: number) => (
-                      <tr key={idx} className={idx % 2 === 0 ? 'bg-[#f0fdf4]/50' : 'bg-white'}>
-                        <td className="py-2 px-1 text-center font-bold text-emerald-700">
-                          {r.s_no || idx + 1}
-                        </td>
-                        <td className="py-2 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                          {r.company_name}
-                        </td>
-                        <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                          {r.role || r.job_role || '—'}
-                        </td>
-                        <td className="py-2 px-1 text-center font-bold text-emerald-600 whitespace-normal break-words leading-snug">
-                          {r.ctc || '—'}
-                        </td>
-                        <td className="py-2 px-1.5 text-center text-slate-600 font-mono text-[10px] whitespace-normal break-words leading-snug">
-                          {r.time || r.time_stamp || r.event_time || '—'}
-                        </td>
-                        <td className="py-2 px-1 text-center">
-                          <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            {r.college_code || '—'}
-                          </span>
-                        </td>
-                        <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                          {r.coordinator || 'Placement Team'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
-
-          {/* Daily JD Received Table / Spotlight Card */}
-          {report.template_type === 'daily_jd_received' && report.included_sections?.daily_jd_received !== false && report.sections?.daily_jd_received && (
-            <div className="space-y-1.5">
-              {report.sections.daily_jd_received.length === 0 ? (
-                <p className="text-[11px] text-slate-400 italic py-1 pl-1">
-                  No JDs received recorded for this day.
-                </p>
-              ) : report.sections.daily_jd_received.length === 1 ? (
-                (() => {
-                  const r = report.sections.daily_jd_received[0];
-                  return (
-                    <div className="bg-gradient-to-br from-blue-50/70 via-white to-blue-50/30 border-2 border-blue-300/80 rounded-2xl p-6 shadow-sm">
-                      <div className="flex items-center justify-between gap-3 mb-4">
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100/90 border border-blue-300 text-blue-800 text-[11px] font-bold tracking-wide">
-                          <Rocket size={13} className="text-blue-600" />
-                          <span>JD RECEIVED</span>
-                        </div>
-                        <div className="text-xs font-mono font-semibold text-blue-700 bg-blue-100/50 px-2.5 py-0.5 rounded-md border border-blue-200">
-                          {r.time || r.time_stamp || r.event_time || 'Active Opportunity'}
-                        </div>
-                      </div>
-
-                      <div className="mb-5">
-                        <h2 className="text-2xl sm:text-3xl font-black text-[#0a2540] tracking-tight">
-                          {r.company_name}
-                        </h2>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-4">
-                        <div className="p-3.5 bg-white border border-slate-200 rounded-xl shadow-xs">
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1">
-                            <Briefcase size={12} className="text-slate-400" />
-                            <span>Job Role / Designation</span>
-                          </div>
-                          <div className="text-base font-bold text-slate-900 leading-snug">
-                            {r.role || r.job_role || '—'}
-                          </div>
-                        </div>
-
-                        <div className="p-3.5 bg-blue-50/70 border-2 border-blue-300 rounded-xl shadow-xs">
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-blue-700 mb-1 flex items-center gap-1">
-                            <Zap size={12} className="text-blue-600" />
-                            <span>CTC</span>
-                          </div>
-                          <div className="text-2xl font-black text-blue-700 tracking-tight">
-                            {r.ctc || '—'}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50/90 border border-slate-200 rounded-xl p-3">
-                        <div className="flex items-center gap-2">
-                          <Building2 size={14} className="text-blue-700 shrink-0" />
-                          <span className="text-slate-600 font-medium">Target Colleges:</span>
-                          <span className="font-bold text-blue-800 bg-blue-100/80 px-2 py-0.5 rounded border border-blue-200 font-mono text-[11px]">
-                            {r.college_code || r.college_name || '—'}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 justify-start sm:justify-end text-xs">
-                          <User size={14} className="text-slate-500 shrink-0" />
-                          <span className="text-slate-600 font-medium">Coordinator</span>
-                          <span className="text-slate-400 font-semibold px-0.5">:</span>
-                          <span className="font-bold text-slate-800">
-                            {r.coordinator || 'Placement Team'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()
-              ) : (
-                <table className="w-full text-[11px] border-collapse table-fixed bg-white">
-                  <colgroup>
-                    <col style={{ width: '36px' }} />
-                    <col style={{ width: '27%' }} />
-                    <col style={{ width: '22%' }} />
-                    <col style={{ width: '12%' }} />
-                    <col style={{ width: '85px' }} />
-                    <col style={{ width: '80px' }} />
-                    <col style={{ width: '20%' }} />
-                  </colgroup>
-                  <thead className="print:table-header-group">
-                    <tr style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }} className="text-white font-semibold text-[10px]">
-                      <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'daily_jd', 0, '#')}</th>
-                      <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'daily_jd', 1, 'COMPANY NAME')}</th>
-                      <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'daily_jd', 2, 'ROLE / DESIGNATION')}</th>
-                      <th className="py-2 px-1 text-center font-bold">{columnHeading(report, 'daily_jd', 3, 'CTC')}</th>
-                      <th className="py-2 px-1.5 text-center font-bold">{columnHeading(report, 'daily_jd', 4, 'TIME')}</th>
-                      <th className="py-2 px-1.5 text-center font-bold">{columnHeading(report, 'daily_jd', 5, 'COLLEGE')}</th>
-                      <th className="py-2 px-2 text-center font-bold">{columnHeading(report, 'daily_jd', 6, 'COORDINATOR')}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200/80">
-                    {report.sections.daily_jd_received.map((r: any, idx: number) => (
-                      <tr key={idx} className={idx % 2 === 0 ? 'bg-[#eff6ff]/50' : 'bg-white'}>
-                        <td className="py-2 px-1 text-center font-bold text-blue-700">
-                          {r.s_no || idx + 1}
-                        </td>
-                        <td className="py-2 px-2 text-center font-bold text-[#0a2540] whitespace-normal break-words leading-snug">
-                          {r.company_name}
-                        </td>
-                        <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                          {r.role || r.job_role || '—'}
-                        </td>
-                        <td className="py-2 px-1 text-center font-bold text-blue-600 whitespace-normal break-words leading-snug">
-                          {r.ctc || '—'}
-                        </td>
-                        <td className="py-2 px-1.5 text-center text-slate-600 font-mono text-[10px] whitespace-normal break-words leading-snug">
-                          {r.time || r.time_stamp || r.event_time || '—'}
-                        </td>
-                        <td className="py-2 px-1 text-center">
-                          <span className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
-                            {r.college_code || '—'}
-                          </span>
-                        </td>
-                        <td className="py-2 px-2 text-center text-slate-700 whitespace-normal break-words leading-snug">
-                          {r.coordinator || 'Placement Team'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
-
-          {/* Observations & Remarks */}
-          {report.included_sections?.remarks && report.remarks && (
-            <div className="space-y-1 pt-1">
-              <div className="font-bold text-[11px] text-slate-800 flex items-center gap-1.5">
-                <PenLine size={13} className="text-slate-600" />
-                <span>
-                  {report.template_type === 'active_leads'
-                    ? 'Notes'
-                    : 'Coordinator Remarks & Observations'}
-                </span>
-              </div>
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-800 leading-relaxed">
-                {report.remarks}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        {report.include_prepared_by !== false && (
-          <div className="border-t border-slate-300 pt-3 pb-1 mt-auto flex items-center justify-between text-[10px] text-slate-500 avoid-break shrink-0">
-            <div>
-              <p className="mt-0.5">© 2026 Infoziant. All rights reserved.</p>
-            </div>
-            {hasPreparedBy && (
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
-                <User size={12} className="text-blue-900 shrink-0" />
-                <span>
-                  Prepared by: <strong className="font-bold">{preparedByName}</strong>
-                </span>
-              </div>
-            )}
-          </div>
-        )}
+        <ReportDocumentView report={report} editable={false} className="bg-white text-slate-900 rounded-none sm:rounded-sm shadow-xl shadow-slate-900/10 dark:shadow-[0_20px_50px_rgba(0,0,0,0.6)] border border-slate-200 dark:border-slate-800" />
       </div>
     );
   };
@@ -2286,20 +646,20 @@ export function A4PdfPreviewModal({
             width: '860px',
             maxWidth: '100%',
           }}
-          className="transition-transform duration-150 flex flex-col items-center"
+          className="transition-transform duration-150 flex flex-col items-center gap-6"
         >
           {imageSrcs.map((src, i) => (
-            <div key={i} className={`w-full ${i > 0 ? 'mt-4' : ''}`}>
+            <div key={i} className="w-full flex flex-col items-center">
               {imageSrcs.length > 1 && (
-                <p className="text-[10px] font-bold text-slate-500 mb-1 text-center">
-                  Image {i + 1} of {imageSrcs.length}
+                <p className="text-[11px] font-bold text-slate-500 mb-1.5 text-center tracking-wide uppercase">
+                  Page {i + 1} of {imageSrcs.length}
                 </p>
               )}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={src}
-                alt={`Report Preview ${i + 1}`}
-                className="w-full h-auto bg-white rounded-sm shadow-xl shadow-slate-900/10 dark:shadow-[0_20px_50px_rgba(0,0,0,0.6)] border border-slate-200 dark:border-slate-700/80"
+                alt={`Report Preview Page ${i + 1}`}
+                className="w-full h-auto bg-white rounded-sm shadow-xl shadow-slate-900/10 dark:shadow-[0_20px_50px_rgba(0,0,0,0.6)] border border-slate-200 dark:border-slate-700/80 block"
               />
             </div>
           ))}
@@ -2318,17 +678,17 @@ export function A4PdfPreviewModal({
       <header className="relative bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white px-4 sm:px-6 py-2.5 flex items-center justify-between shadow-sm dark:shadow-xl z-20 shrink-0 gap-3">
         {/* Left: Branding & Status */}
         <div className="flex items-center gap-3 shrink-0 z-10">
-          <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-600/20 border border-indigo-200 dark:border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+          <div className="w-[30px] h-[30px] rounded-lg bg-indigo-50 dark:bg-indigo-600/20 border border-indigo-200 dark:border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
             {mode === 'both' ? (
-              <Columns2 size={16} />
+              <Columns2 size={15} />
             ) : mode === 'image' ? (
-              <ImageIcon size={16} />
+              <ImageIcon size={15} />
             ) : (
-              <FileText size={16} />
+              <FileText size={15} />
             )}
           </div>
           <div className="hidden sm:block">
-            <h2 className="text-xs font-bold text-slate-800 dark:text-slate-100">
+            <h2 className="text-sm sm:text-[14px] font-extrabold text-slate-900 dark:text-white tracking-tight leading-tight">
               Report previewer
             </h2>
             <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate max-w-[280px]">
@@ -2339,8 +699,18 @@ export function A4PdfPreviewModal({
           </div>
         </div>
 
-        {/* Center: Segmented Preview Mode Switcher (Image / Both / PDF) — Perfectly Center Aligned */}
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center bg-slate-100 dark:bg-slate-950/90 border border-slate-200 dark:border-slate-800 rounded-xl p-1 shadow-inner gap-1 z-10">
+        {/* Center: Segmented Preview Mode Switcher (Image / PDF) — Perfectly Center Aligned */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center bg-slate-100 dark:bg-slate-950/90 border border-slate-200 dark:border-slate-800 rounded-xl p-1 shadow-inner z-20">
+          {/* Smooth Sliding Pill Indicator */}
+          <div
+            className="absolute top-1 bottom-1 left-1 rounded-lg shadow-md shadow-blue-900/25 transition-transform duration-300 ease-[cubic-bezier(0.2,0,0,1)] pointer-events-none z-0"
+            style={{
+              width: 'calc(50% - 4px)',
+              background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)',
+              transform: mode === 'pdf' ? 'translateX(calc(100% + 4px))' : 'translateX(0%)',
+            }}
+          />
+
           {/* 1. Image */}
           <button
             type="button"
@@ -2348,87 +718,93 @@ export function A4PdfPreviewModal({
               setMode('image');
               setZoomImage(100);
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`relative z-10 flex items-center justify-center gap-1.5 px-3.5 py-1 rounded-lg text-xs font-bold transition-colors duration-200 cursor-pointer min-w-[76px] ${
               mode === 'image'
-                ? 'bg-sky-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-800/60'
+                ? 'text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
-            title="Show Image Preview full screen"
+            title="Show Image Preview"
           >
-            <ImageIcon size={13} />
+            <ImageIcon size={13} strokeWidth={2.2} />
             <span>Image</span>
           </button>
 
-          {/* 2. Both (Image + PDF) */}
-          <button
-            type="button"
-            onClick={() => {
-              setMode('both');
-              setZoomPdf(85);
-              setZoomImage(85);
-            }}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              mode === 'both'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-800/60'
-            }`}
-            title="Show Both (Image and PDF Preview)"
-          >
-            <Columns2 size={13} />
-            <span>Both</span>
-          </button>
-
-          {/* 3. PDF */}
+          {/* 2. PDF */}
           <button
             type="button"
             onClick={() => {
               setMode('pdf');
               setZoomPdf(100);
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`relative z-10 flex items-center justify-center gap-1.5 px-3.5 py-1 rounded-lg text-xs font-bold transition-colors duration-200 cursor-pointer min-w-[76px] ${
               mode === 'pdf'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-800/60'
+                ? 'text-white'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
-            title="Show A4 PDF Document preview full screen"
+            title="Show PDF Preview"
           >
-            <FileText size={13} />
+            <FileText size={13} strokeWidth={2.2} />
             <span>PDF</span>
           </button>
         </div>
 
-        {/* Right: Action Buttons (Save Image, Save PDF) & Close (X) */}
+        {/* Right: Export Actions & Close (X) */}
         <div className="flex items-center gap-2 shrink-0 z-10">
+          {/* Save Image Button — becomes a real, user-clicked download link once the file is ready.
+              Chrome silently drops downloads triggered by a script-dispatched click after several
+              have fired without a fresh user gesture in between; a genuine click on a real <a> is
+              never subject to that. */}
+          {readyImageDownload ? (
+            <a
+              href={readyImageDownload.url}
+              download={readyImageDownload.fileName}
+              onClick={() => {
+                setTimeout(() => {
+                  URL.revokeObjectURL(readyImageDownload.url);
+                  setReadyImageDownload(null);
+                }, 2000);
+              }}
+              style={{ background: 'linear-gradient(180deg, #16A34A 0%, #15803D 50%, #166534 100%)' }}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 hover:brightness-110 text-white rounded-xl text-xs font-bold shadow-md shadow-green-900/25 transition-all cursor-pointer active:scale-[0.95] animate-pulse"
+              title="Click to download the generated image"
+            >
+              <Download size={14} strokeWidth={2} aria-hidden /> Click to Save
+            </a>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSaveImage}
+              disabled={savingImage}
+              style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 hover:brightness-110 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/25 transition-all cursor-pointer active:scale-[0.95]"
+              title="Save PNG Image with selected size settings"
+            >
+              <Download size={14} strokeWidth={2} aria-hidden /> {savingImage ? 'Saving…' : 'Save Image'}
+            </button>
+          )}
+
+          {/* Save PDF Button */}
           <button
             type="button"
-            onClick={handleDownloadImage}
-            style={{ background: 'linear-gradient(180deg, #1A73E8 0%, #0091FF 50%, #00A6F5 100%)' }}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 hover:brightness-110 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/25 transition-all cursor-pointer active:scale-[0.95]"
-            title="Download A4 High-Res PNG Image"
+            onClick={handleSavePdf}
+            disabled={savingPdf}
+            style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 hover:brightness-110 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/25 transition-all cursor-pointer active:scale-[0.95]"
+            title="Save High-Definition Vector PDF"
           >
-            <Download size={13} strokeWidth={2} />
-            <span className="hidden sm:inline">Save Image</span>
+            <Download size={14} strokeWidth={2} aria-hidden /> {savingPdf ? 'Saving…' : 'Save PDF'}
           </button>
 
-          <button
-            type="button"
-            onClick={onPrint}
-            style={{ background: 'linear-gradient(180deg, #2563EB 0%, #1D4ED8 50%, #0C1D54 100%)' }}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 hover:brightness-110 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/30 transition-all cursor-pointer active:scale-[0.95]"
-            title="Save / Print A4 PDF"
-          >
-            <Printer size={13} strokeWidth={2} />
-            <span className="hidden sm:inline">Save PDF</span>
-          </button>
-
+          {/* Close (X) Button */}
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-rose-100 dark:bg-slate-800 dark:hover:bg-rose-900/40 text-slate-600 hover:text-rose-600 dark:text-slate-300 dark:hover:text-rose-200 border border-slate-200 dark:border-slate-700 hover:border-rose-300 dark:hover:border-rose-500/40 flex items-center justify-center transition-colors cursor-pointer ml-1"
+            style={{ background: 'linear-gradient(180deg, #EF4444 0%, #DC2626 50%, #B91C1C 100%)' }}
+            className="w-[30px] h-[30px] rounded-lg text-white hover:brightness-110 shadow-md shadow-red-600/25 border border-red-500/30 flex items-center justify-center transition-all cursor-pointer ml-1 active:scale-[0.95]"
             title="Close Preview (ESC)"
             aria-label="Close Preview"
           >
-            <X size={18} />
+            <X size={16} strokeWidth={2.5} />
           </button>
         </div>
       </header>
@@ -2476,9 +852,10 @@ export function A4PdfPreviewModal({
                     <button
                       type="button"
                       onClick={() => setImageSize('auto')}
+                      style={imageSize === 'auto' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
                       className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
                         imageSize === 'auto'
-                          ? 'bg-sky-600 text-white shadow-xs'
+                          ? 'text-white shadow-xs'
                           : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                       }`}
                       title="Smart auto-fit: Compact card for single company, A4 for multi-company"
@@ -2488,9 +865,10 @@ export function A4PdfPreviewModal({
                     <button
                       type="button"
                       onClick={() => setImageSize('compact')}
+                      style={imageSize === 'compact' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
                       className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
                         imageSize === 'compact'
-                          ? 'bg-sky-600 text-white shadow-xs'
+                          ? 'text-white shadow-xs'
                           : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                       }`}
                       title="WhatsApp / Mobile Card format"
@@ -2500,9 +878,10 @@ export function A4PdfPreviewModal({
                     <button
                       type="button"
                       onClick={() => setImageSize('a4')}
+                      style={imageSize === 'a4' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
                       className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
                         imageSize === 'a4'
-                          ? 'bg-sky-600 text-white shadow-xs'
+                          ? 'text-white shadow-xs'
                           : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                       }`}
                       title="Standard full A4 document sheet"
@@ -2512,9 +891,10 @@ export function A4PdfPreviewModal({
                     <button
                       type="button"
                       onClick={() => setImageSize('square')}
+                      style={imageSize === 'square' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
                       className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
                         imageSize === 'square'
-                          ? 'bg-sky-600 text-white shadow-xs'
+                          ? 'text-white shadow-xs'
                           : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                       }`}
                       title="Square 1:1 format"
@@ -2531,8 +911,8 @@ export function A4PdfPreviewModal({
             <div className="flex flex-col h-full min-h-0 bg-slate-100/50 dark:bg-slate-900/60 overflow-hidden">
               {/* Right Pane Scrollable Body */}
               <div className="flex-1 overflow-auto p-4 sm:p-6 flex flex-col items-center bg-slate-200/50 dark:bg-slate-900/80 no-scrollbar gap-8">
-                {/* Compact Zoom Controls directly above PDF Title Card */}
-                <div className="flex items-center justify-center mb-1 shrink-0 print:hidden">
+                {/* Compact Zoom & Size Controls directly above PDF */}
+                <div className="flex items-center justify-center gap-2 mb-3 shrink-0 flex-wrap print:hidden">
                   <div className="flex items-center gap-1 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full px-2.5 py-1 shadow-sm">
                     <button
                       type="button"
@@ -2557,6 +937,62 @@ export function A4PdfPreviewModal({
                       title="Zoom In PDF (+)"
                     >
                       <ZoomIn size={12} />
+                    </button>
+                  </div>
+
+                  {/* Size Switcher Pills */}
+                  <div className="flex items-center gap-0.5 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full p-0.5 shadow-sm text-[10.5px]">
+                    <button
+                      type="button"
+                      onClick={() => setImageSize('auto')}
+                      style={imageSize === 'auto' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
+                      className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
+                        imageSize === 'auto'
+                          ? 'text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      }`}
+                      title="Smart auto-fit"
+                    >
+                      ⚡ Auto
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImageSize('compact')}
+                      style={imageSize === 'compact' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
+                      className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
+                        imageSize === 'compact'
+                          ? 'text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      }`}
+                      title="WhatsApp Card format"
+                    >
+                      📱 WhatsApp Card
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImageSize('a4')}
+                      style={imageSize === 'a4' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
+                      className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
+                        imageSize === 'a4'
+                          ? 'text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      }`}
+                      title="Standard full A4 document sheet"
+                    >
+                      📄 A4 Sheet
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImageSize('square')}
+                      style={imageSize === 'square' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
+                      className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
+                        imageSize === 'square'
+                          ? 'text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+                      }`}
+                      title="Square 1:1 format"
+                    >
+                      🔲 Square (1:1)
                     </button>
                   </div>
                 </div>
@@ -2603,9 +1039,10 @@ export function A4PdfPreviewModal({
                   <button
                     type="button"
                     onClick={() => setImageSize('auto')}
+                    style={imageSize === 'auto' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
                     className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
                       imageSize === 'auto'
-                        ? 'bg-sky-600 text-white shadow-xs'
+                        ? 'text-white shadow-xs'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                     }`}
                     title="Smart auto-fit: Compact card for single company, A4 for multi-company"
@@ -2615,9 +1052,10 @@ export function A4PdfPreviewModal({
                   <button
                     type="button"
                     onClick={() => setImageSize('compact')}
+                    style={imageSize === 'compact' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
                     className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
                       imageSize === 'compact'
-                        ? 'bg-sky-600 text-white shadow-xs'
+                        ? 'text-white shadow-xs'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                     }`}
                     title="Compact Mobile / WhatsApp Card format"
@@ -2627,9 +1065,10 @@ export function A4PdfPreviewModal({
                   <button
                     type="button"
                     onClick={() => setImageSize('a4')}
+                    style={imageSize === 'a4' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
                     className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
                       imageSize === 'a4'
-                        ? 'bg-sky-600 text-white shadow-xs'
+                        ? 'text-white shadow-xs'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                     }`}
                     title="Standard full A4 document sheet"
@@ -2639,9 +1078,10 @@ export function A4PdfPreviewModal({
                   <button
                     type="button"
                     onClick={() => setImageSize('square')}
+                    style={imageSize === 'square' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
                     className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
                       imageSize === 'square'
-                        ? 'bg-sky-600 text-white shadow-xs'
+                        ? 'text-white shadow-xs'
                         : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                     }`}
                     title="Square 1:1 format"
@@ -2659,8 +1099,8 @@ export function A4PdfPreviewModal({
           <div className="flex flex-col h-full min-h-0 bg-slate-100/50 dark:bg-slate-900 overflow-hidden">
             {/* Scrollable Viewport */}
             <div className="flex-1 overflow-auto p-4 sm:p-8 flex flex-col items-center bg-slate-200/50 dark:bg-slate-900/80 no-scrollbar">
-              {/* Compact Zoom Pill directly above the Title Card / Document Preview */}
-              <div className="flex items-center justify-center mb-3 shrink-0 print:hidden">
+              {/* Compact Zoom & Size Controls directly above PDF Document */}
+              <div className="flex items-center justify-center gap-2.5 mb-3 shrink-0 flex-wrap print:hidden">
                 <div className="flex items-center gap-1.5 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full px-3 py-1 shadow-sm">
                   <button
                     type="button"
@@ -2685,6 +1125,62 @@ export function A4PdfPreviewModal({
                     title="Zoom In (+)"
                   >
                     <ZoomIn size={13} />
+                  </button>
+                </div>
+
+                {/* Size Switcher Pills */}
+                <div className="flex items-center gap-1 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full p-1 shadow-sm text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setImageSize('auto')}
+                    style={imageSize === 'auto' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
+                    className={`px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer ${
+                      imageSize === 'auto'
+                        ? 'text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                    title="Smart auto-fit"
+                  >
+                    ⚡ Auto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImageSize('compact')}
+                    style={imageSize === 'compact' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
+                    className={`px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer ${
+                      imageSize === 'compact'
+                        ? 'text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                    title="WhatsApp Card format"
+                  >
+                    📱 WhatsApp Card
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImageSize('a4')}
+                    style={imageSize === 'a4' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
+                    className={`px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer ${
+                      imageSize === 'a4'
+                        ? 'text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                    title="Standard full A4 document sheet"
+                  >
+                    📄 A4 Sheet
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImageSize('square')}
+                    style={imageSize === 'square' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
+                    className={`px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer ${
+                      imageSize === 'square'
+                        ? 'text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                    title="Square 1:1 format"
+                  >
+                    🔲 Square (1:1)
                   </button>
                 </div>
               </div>

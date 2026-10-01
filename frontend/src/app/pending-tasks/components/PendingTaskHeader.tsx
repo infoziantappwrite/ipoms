@@ -168,14 +168,14 @@ export function PendingTaskHeader({
             type="button"
             onClick={onToggleSelectionMode}
             title={isSelectionMode ? 'Cancel deletion / Exit selection' : 'Delete pending tasks'}
-            className={`group w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer shadow-md shadow-red-600/25 hover:brightness-110 active:scale-[0.95] text-white ${
+            className={`group w-[30px] h-[30px] rounded-lg flex items-center justify-center transition-all cursor-pointer shadow-md shadow-red-600/25 hover:brightness-110 active:scale-[0.95] text-white ${
               isSelectionMode
                 ? 'ring-2 ring-red-400 brightness-110'
                 : ''
             }`}
             style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
           >
-            <AnimatedTrashIcon size={15} />
+            <AnimatedTrashIcon size={14} />
           </button>
 
           {/* Delete Action (Visible only when checkboxes are ticked) */}
@@ -183,7 +183,7 @@ export function PendingTaskHeader({
             <button
               type="button"
               onClick={onDeleteSelected}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white rounded-xl shadow-md shadow-red-600/25 hover:brightness-110 transition-all cursor-pointer animate-in fade-in duration-150 active:scale-[0.95]"
+              className="inline-flex items-center gap-1.5 px-3 h-[30px] text-xs font-bold text-white rounded-lg shadow-md shadow-red-600/25 hover:brightness-110 transition-all cursor-pointer animate-in fade-in duration-150 active:scale-[0.95]"
               style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
             >
               <Trash2 size={13} />
@@ -203,9 +203,9 @@ export function PendingTaskHeader({
           <button
             type="button"
             onClick={onOpenAddModal}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-primary hover:bg-primary-hover rounded-xl shadow-xs transition-all cursor-pointer active:scale-[0.96]"
+            className="inline-flex items-center gap-1.5 px-3 h-[30px] text-xs font-bold text-white bg-primary hover:bg-primary-hover rounded-lg shadow-xs transition-all cursor-pointer active:scale-[0.96]"
           >
-            <Plus size={15} strokeWidth={2.5} />
+            <Plus size={14} strokeWidth={2.5} />
             <span>Add</span>
           </button>
         </div>

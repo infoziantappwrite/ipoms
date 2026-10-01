@@ -115,7 +115,7 @@ export function TrackerActionsDropdown({
           setActiveSubmenu(null);
         }}
         disabled={!selectedCollegeId}
-        className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 ${
+        className={`w-[30px] h-[30px] rounded-lg flex items-center justify-center transition-all cursor-pointer select-none shrink-0 ${
           isOpen
             ? 'bg-primary text-primary-foreground shadow-xs ring-2 ring-primary/30'
             : 'bg-surface hover:bg-surface-sunken border border-border text-fg-subtle hover:text-fg shadow-2xs'
@@ -124,7 +124,7 @@ export function TrackerActionsDropdown({
         aria-expanded={isOpen}
         aria-haspopup="true"
       >
-        <MoreVertical size={16} strokeWidth={2.2} />
+        <MoreVertical size={14} strokeWidth={2.2} />
       </button>
 
       {/* ── Compact Solid Dropdown Menu (Anchored to Right Corner) ── */}

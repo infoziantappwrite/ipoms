@@ -224,13 +224,10 @@ export function DashboardHeader() {
               onClick={() => triggerHaptic('light')}
               title="Frequently Asked Questions & Guides (Opens in a new tab • Press ?)"
               aria-label="Frequently Asked Questions & Guides"
-              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 active:scale-95 cursor-pointer shadow-2xs border select-none group ${
-                isNight
-                  ? 'bg-white/85 dark:bg-white/10 border-slate-200 dark:border-white/20 text-slate-700 dark:text-slate-200 hover:text-primary hover:bg-white dark:hover:bg-white/20 backdrop-blur-md'
-                  : 'bg-surface hover:bg-surface-raised border-border text-fg-subtle hover:text-primary'
-              }`}
+              style={{ background: 'linear-gradient(180deg, #9AA0A6 0%, #64748B 50%, #334155 100%)' }}
+              className="w-[30px] h-[30px] rounded-lg flex items-center justify-center transition-all duration-150 active:scale-[0.95] cursor-pointer shadow-md shadow-slate-500/25 border border-slate-400/30 hover:brightness-110 select-none text-white shrink-0"
             >
-              <HelpCircle size={15} strokeWidth={2.2} className="group-hover:scale-110 transition-transform duration-200" />
+              <HelpCircle size={14} strokeWidth={2.2} className="text-white" />
             </Link>
 
             <UserSignOutButton />
