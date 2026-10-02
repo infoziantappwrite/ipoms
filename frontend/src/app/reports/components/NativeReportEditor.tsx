@@ -244,7 +244,7 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
   const [report, setReport] = useState(reportData);
   const [logoFailed, setLogoFailed] = useState(false);
   const [showA4Preview, setShowA4Preview] = useState(false);
-  const [previewMode, setPreviewMode] = useState<PreviewMode>('both');
+  const [previewMode, setPreviewMode] = useState<PreviewMode>('image');
   const [showPreviewMenu, setShowPreviewMenu] = useState(false);
   const previewMenuRef = useRef<HTMLDivElement>(null);
 
@@ -336,11 +336,32 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
   const handleUpdateCell = (sectionKey: string, rowIndex: number, field: string, value: any) => {
     setReport((prev: any) => {
       const updated = { ...prev };
-      if (!updated.sections[sectionKey]) return updated;
+      if (!updated.sections?.[sectionKey]) return updated;
       const sec = [...updated.sections[sectionKey]];
       sec[rowIndex] = { ...sec[rowIndex], [field]: value };
       updated.sections[sectionKey] = sec;
       return updated;
+    });
+  };
+
+  // Multi-college cell editing helper
+  const handleUpdateMultiCollegeCell = (
+    collegeIdx: number,
+    tableKey: string,
+    rowIndex: number,
+    field: string,
+    value: any
+  ) => {
+    setReport((prev: any) => {
+      if (!prev.colleges_data || !prev.colleges_data[collegeIdx]) return prev;
+      const newCollegesData = [...prev.colleges_data];
+      const college = { ...newCollegesData[collegeIdx] };
+      if (!college[tableKey]) return prev;
+      const tableRows = [...college[tableKey]];
+      tableRows[rowIndex] = { ...tableRows[rowIndex], [field]: value };
+      college[tableKey] = tableRows;
+      newCollegesData[collegeIdx] = college;
+      return { ...prev, colleges_data: newCollegesData };
     });
   };
 
@@ -594,6 +615,128 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
                   <td>${r.job_role || '—'}</td>
                   <td style="color:#2563eb; font-weight:bold;">${r.ctc_lpa || '—'}</td>
                   <td colspan="2">${r.current_status_text || '—'}</td>
+                </tr>
+              `;
+            });
+          }
+
+          if (colData.pipeline && colData.pipeline.length > 0) {
+            html += `
+              <tr><td colspan="6" class="sec-header" style="background:#ecfeff; color:#155e75;">COMPANIES IN PIPELINE (${colData.pipeline.length})</td></tr>
+              <tr>
+                <th style="width:38px; text-align:center;">#</th>
+                <th>Company Name</th>
+                <th>Role</th>
+                <th>CTC</th>
+                <th colspan="2">Status</th>
+              </tr>
+            `;
+            colData.pipeline.forEach((r: any) => {
+              html += `
+                <tr>
+                  <td style="text-align:center;">${r.s_no}</td>
+                  <td><b>${r.company_name}</b></td>
+                  <td>${r.job_role || r.role || '—'}</td>
+                  <td style="color:#0891b2; font-weight:bold;">${r.ctc_lpa || r.ctc || '—'}</td>
+                  <td colspan="2">${r.current_status_text || r.status || '—'}</td>
+                </tr>
+              `;
+            });
+          }
+
+          if (colData.top_companies && colData.top_companies.length > 0) {
+            html += `
+              <tr><td colspan="6" class="sec-header" style="background:#fefce8; color:#854d0e;">TOP COMPANIES (${colData.top_companies.length})</td></tr>
+              <tr>
+                <th style="width:38px; text-align:center;">#</th>
+                <th>Company Name</th>
+                <th>Role</th>
+                <th>CTC</th>
+                <th colspan="2">Status</th>
+              </tr>
+            `;
+            colData.top_companies.forEach((r: any) => {
+              html += `
+                <tr>
+                  <td style="text-align:center;">${r.s_no}</td>
+                  <td><b>${r.company_name}</b></td>
+                  <td>${r.job_role || r.role || '—'}</td>
+                  <td style="color:#ca8a04; font-weight:bold;">${r.ctc_lpa || r.ctc || '—'}</td>
+                  <td colspan="2">${r.current_status_text || r.status || '—'}</td>
+                </tr>
+              `;
+            });
+          }
+
+          const rejList = colData.rejected_companies || colData.rejected_by_hr;
+          if (rejList && rejList.length > 0) {
+            html += `
+              <tr><td colspan="6" class="sec-header" style="background:#fff1f2; color:#9f1239;">REJECTED COMPANIES (${rejList.length})</td></tr>
+              <tr>
+                <th style="width:38px; text-align:center;">#</th>
+                <th>Company Name</th>
+                <th>Role</th>
+                <th>CTC</th>
+                <th colspan="2">Status</th>
+              </tr>
+            `;
+            rejList.forEach((r: any) => {
+              html += `
+                <tr>
+                  <td style="text-align:center;">${r.s_no}</td>
+                  <td><b>${r.company_name}</b></td>
+                  <td>${r.job_role || r.role || '—'}</td>
+                  <td style="color:#e11d48; font-weight:bold;">${r.ctc_lpa || r.ctc || '—'}</td>
+                  <td colspan="2">${r.current_status_text || r.status || '—'}</td>
+                </tr>
+              `;
+            });
+          }
+
+          const holdColList = colData.on_hold_by_college || colData.rejected_by_college;
+          if (holdColList && holdColList.length > 0) {
+            html += `
+              <tr><td colspan="6" class="sec-header" style="background:#fffbeb; color:#92400e;">COMPANIES ON HOLD BY COLLEGE (${holdColList.length})</td></tr>
+              <tr>
+                <th style="width:38px; text-align:center;">#</th>
+                <th>Company Name</th>
+                <th>Role</th>
+                <th>CTC</th>
+                <th colspan="2">Status</th>
+              </tr>
+            `;
+            holdColList.forEach((r: any) => {
+              html += `
+                <tr>
+                  <td style="text-align:center;">${r.s_no}</td>
+                  <td><b>${r.company_name}</b></td>
+                  <td>${r.job_role || r.role || '—'}</td>
+                  <td style="color:#d97706; font-weight:bold;">${r.ctc_lpa || r.ctc || '—'}</td>
+                  <td colspan="2">${r.current_status_text || r.status || '—'}</td>
+                </tr>
+              `;
+            });
+          }
+
+          if (colData.on_hold_by_hr && colData.on_hold_by_hr.length > 0) {
+            html += `
+              <tr><td colspan="6" class="sec-header" style="background:#fff1f2; color:#9f1239;">COMPANIES ON HOLD BY HR (${colData.on_hold_by_hr.length})</td></tr>
+              <tr>
+                <th style="width:38px; text-align:center;">#</th>
+                <th>Company Name</th>
+                <th>Role</th>
+                <th>CTC</th>
+                <th colspan="2">Status</th>
+              </tr>
+            `;
+            colData.on_hold_by_hr.forEach((r: any) => {
+              html += `
+                <tr>
+                  <td style="text-align:center;">${r.s_no}</td>
+                  <td><b>${r.company_name}</b></td>
+                  <td>${r.job_role || r.role || '—'}</td>
+                  <td style="color:#e11d48; font-weight:bold;">${r.ctc_lpa || r.ctc || '—'}</td>
+                  <td colspan="2">${r.current_status_text || r.status || '—'}</td>
                 </tr>
               `;
             });
@@ -1038,7 +1181,17 @@ export function NativeReportEditor({ reportData, onBackToBuilder }: NativeReport
         report={report}
         editable={true}
         onUpdateCell={handleUpdateCell}
+        onUpdateMultiCollegeCell={handleUpdateMultiCollegeCell}
         onUpdateTitle={(val: string) => setReport((prev: any) => ({ ...prev, report_title: val }))}
+        onUpdateSubtitle={(val: string) =>
+          setReport((prev: any) => ({
+            ...prev,
+            branding: {
+              ...(prev.branding || {}),
+              college_name: val,
+            },
+          }))
+        }
         onRenameSection={handleSectionTitle}
         onRenameColumn={handleColumnHeading}
         id="printable-report-canvas"

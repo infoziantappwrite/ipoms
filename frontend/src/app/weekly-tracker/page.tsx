@@ -1422,6 +1422,7 @@ export default function WeeklyTrackerPage() {
     }
 
     try {
+      toast?.('Generating Weekly Tracker Excel document...', 'info');
       const q = searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : '';
       const blob = await apiFetchBlob(
         `/weekly-tracker/export-xlsx?college_id=${selectedCollegeId}&academic_year=${academicYear}${q}`
@@ -1435,6 +1436,7 @@ export default function WeeklyTrackerPage() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      toast?.('Weekly Tracker Excel file downloaded successfully!', 'success');
     } catch (err: any) {
       console.error('Export XLSX error:', err);
       alert('Failed to export XLSX document: ' + (err.message || 'Unknown error'));

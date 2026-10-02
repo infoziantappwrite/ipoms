@@ -37,5 +37,30 @@ export function exportToXlsx(filename: string, sheets: ExcelSheetData | ExcelShe
   });
 
   const finalName = filename.endsWith('.xlsx') ? filename : `${filename}.xlsx`;
+
+  if (typeof window !== 'undefined') {
+    try {
+      // Browser-safe download using Blob and ObjectURL (bypasses Node.js fs checks in Next.js bundle)
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8',
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = finalName;
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 200);
+      return;
+    } catch (err) {
+      console.warn('[exportToXlsx] Blob export fallback triggered:', err);
+    }
+  }
+
+  // Fallback for non-browser environment
   XLSX.writeFile(wb, finalName);
 }

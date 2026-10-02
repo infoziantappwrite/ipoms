@@ -456,6 +456,7 @@ export default function ActiveLeadsPage() {
   const handleExportExcel = async () => {
     try {
       setIsExporting(true);
+      toast?.('Preparing Active Leads Excel file...', 'info');
       const params = new URLSearchParams();
       if (selectedYear !== 'all') params.append('academic_year', selectedYear);
       if (selectedStatus !== 'all') params.append('status', selectedStatus);
@@ -471,6 +472,7 @@ export default function ActiveLeadsPage() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+      toast?.('Active Leads Excel file downloaded successfully!', 'success');
     } catch (err) {
       console.error('Export error:', err);
       alert('Failed to export Excel file. Please try again.');

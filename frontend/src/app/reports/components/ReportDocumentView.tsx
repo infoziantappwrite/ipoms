@@ -18,6 +18,9 @@ import {
   PhoneCall,
   Flame,
   Zap,
+  Layers,
+  Sparkles,
+  PenLine,
 } from 'lucide-react';
 import { getCollegeLogoUrl } from '@/lib/collegeLogo';
 import { getCleanPeriod } from './NativeReportEditor';
@@ -27,7 +30,9 @@ export interface ReportDocumentViewProps {
   report: any;
   editable?: boolean;
   onUpdateCell?: (sectionKey: string, rowIndex: number, field: string, value: any) => void;
+  onUpdateMultiCollegeCell?: (collegeIdx: number, tableKey: string, rowIndex: number, field: string, value: any) => void;
   onUpdateTitle?: (title: string) => void;
+  onUpdateSubtitle?: (subtitle: string) => void;
   onRenameSection?: (key: string, value: string) => void;
   onRenameColumn?: (key: string, index: number, value: string) => void;
   className?: string;
@@ -134,7 +139,9 @@ export function ReportDocumentView({
   report,
   editable = false,
   onUpdateCell,
+  onUpdateMultiCollegeCell,
   onUpdateTitle,
+  onUpdateSubtitle,
   onRenameSection,
   onRenameColumn,
   className = '',
@@ -245,7 +252,23 @@ export function ReportDocumentView({
               {report.report_title ? report.report_title.toUpperCase() : defaultTitle}
             </h1>
           )}
-          <p className="text-xs font-semibold text-fg-muted print:text-slate-700 mt-0.5 text-center">{collegeName}</p>
+
+          {editable ? (
+            <>
+              <span className="hidden print:block text-xs font-semibold text-fg-muted print:text-slate-700 mt-0.5 text-center">
+                {report.branding?.college_name || collegeName}
+              </span>
+              <input
+                type="text"
+                value={report.branding?.college_name !== undefined ? report.branding.college_name : collegeName}
+                onChange={(e) => onUpdateSubtitle && onUpdateSubtitle(e.target.value)}
+                className="print:hidden text-xs font-semibold text-fg-muted dark:text-slate-300 mt-0.5 text-center bg-transparent border-b border-dashed border-transparent hover:border-border focus:border-primary focus:outline-none w-full transition-colors"
+                placeholder="Subtitle / Institution Name"
+              />
+            </>
+          ) : (
+            <p className="text-xs font-semibold text-fg-muted print:text-slate-700 mt-0.5 text-center">{collegeName}</p>
+          )}
         </div>
 
         {/* Right: Target College Logo */}
@@ -490,24 +513,24 @@ export function ReportDocumentView({
 
         {/* ── Multi-College Consolidated Tables ── */}
         {report.is_multi_college && Array.isArray(report.colleges_data) && report.colleges_data.length > 0 && (
-          <div className="space-y-6 pt-2">
+          <div className="space-y-8 pt-2">
             {report.colleges_data.map((colData: any, cIdx: number) => (
-              <div key={cIdx} className="space-y-3">
-                <div className="flex items-center justify-between border-b-2 border-primary pb-1">
-                  <div className="flex items-center gap-2">
-                    <Building2 size={16} className="text-primary" />
-                    <h3 className="font-bold text-base text-fg uppercase">{colData.college_name} {colData.college_code ? `(${colData.college_code})` : ''}</h3>
+              <div key={cIdx} className={`space-y-4 ${cIdx > 0 ? 'print:break-before-page' : ''}`}>
+                {/* Center-Aligned & Compact Highlighted College Banner */}
+                <div className="flex justify-center my-3.5 w-full">
+                  <div className="inline-flex items-center justify-center gap-2 px-6 py-2 bg-blue-50/90 dark:bg-blue-950/60 border-2 border-blue-900/80 dark:border-blue-400/80 rounded-2xl shadow-xs max-w-[92%] transition-all">
+                    <Building2 size={16} className="text-blue-900 dark:text-blue-300 shrink-0" />
+                    <h3 className="font-extrabold text-xs sm:text-sm text-blue-950 dark:text-blue-100 uppercase tracking-wide text-center leading-tight">
+                      {colData.college_name} {colData.college_code ? `(${colData.college_code})` : ''}
+                    </h3>
                   </div>
-                  <span className="text-xs font-semibold text-fg-muted">
-                    {colData.total_completed || 0} Completed • {colData.total_in_drive ? `${colData.total_in_drive} In Drive • ` : ''}{colData.total_in_progress || 0} In Progress • {colData.total_offers || 0} Offers
-                  </span>
                 </div>
 
                 {colData.completed_companies && colData.completed_companies.length > 0 && (
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-1.5 text-xs font-bold text-black dark:text-white">
                       <Trophy size={13} />
-                      <span>Companies Completed ({colData.completed_companies.length})</span>
+                      <span>Companies Completed</span>
                     </div>
                     <div className="overflow-x-auto rounded border border-border bg-surface">
                       <table className="w-full text-[11px] border-collapse table-fixed bg-surface">
@@ -532,12 +555,444 @@ export function ReportDocumentView({
                         <tbody className="divide-y divide-border">
                           {colData.completed_companies.map((r: any, idx: number) => (
                             <tr key={idx} className="bg-surface">
-                              <td className="py-2 px-1 text-center font-bold text-blue-700 dark:text-blue-400">{r.s_no || idx + 1}</td>
-                              <td className="py-2 px-2 font-bold text-[#0a2540] dark:text-slate-100">{r.company_name}</td>
-                              <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">{r.job_role || r.role || '—'}</td>
-                              <td className="py-2 px-1 text-center font-bold text-emerald-700 dark:text-emerald-400">{r.ctc_lpa || r.ctc || '—'}</td>
-                              <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">{r.current_status_text || r.status || '—'}</td>
-                              <td className="py-2 px-2 text-center font-bold text-emerald-700 dark:text-emerald-400">{r.selected_count || 0}</td>
+                              <td className="py-2 px-1 text-center font-bold text-blue-700 dark:text-blue-400">
+                                <EditableReportCell value={r.s_no || idx + 1} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'completed_companies', idx, 's_no', val)} editable={editable} type="number" />
+                              </td>
+                              <td className="py-2 px-2 font-bold text-[#0a2540] dark:text-slate-100">
+                                <EditableReportCell value={r.company_name} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'completed_companies', idx, 'company_name', val)} editable={editable} />
+                              </td>
+                              <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                                <EditableReportCell value={r.job_role || r.role || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'completed_companies', idx, 'job_role', val)} editable={editable} />
+                              </td>
+                              <td className="py-2 px-1 text-center font-bold text-emerald-700 dark:text-emerald-400">
+                                <EditableReportCell value={r.ctc_lpa || r.ctc || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'completed_companies', idx, 'ctc_lpa', val)} editable={editable} />
+                              </td>
+                              <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                                <EditableReportCell value={r.current_status_text || r.status || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'completed_companies', idx, 'current_status_text', val)} editable={editable} />
+                              </td>
+                              <td className="py-2 px-2 text-center font-bold text-emerald-700 dark:text-emerald-400">
+                                <EditableReportCell value={r.selected_count || 0} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'completed_companies', idx, 'selected_count', val)} editable={editable} type="number" />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. Drive In Progress */}
+                {colData.drive_in_progress && colData.drive_in_progress.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-black dark:text-white">
+                      <Rocket size={13} />
+                      <span>Drive In Progress</span>
+                    </div>
+                    <div className="overflow-x-auto rounded border border-border bg-surface">
+                      <table className="w-full text-[11px] border-collapse table-fixed bg-surface">
+                        <colgroup>
+                          <col style={{ width: '36px' }} />
+                          <col style={{ width: '30%' }} />
+                          <col style={{ width: '26%' }} />
+                          <col style={{ width: '14%' }} />
+                          <col style={{ width: '30%' }} />
+                        </colgroup>
+                        <thead>
+                          <tr style={{ background: 'linear-gradient(180deg, #009EE3 0%, #006BB6 50%, #063A78 100%)' }} className="text-white font-bold text-[10px]">
+                            <th className="py-2 px-1 text-center font-bold">#</th>
+                            <th className="py-2 px-2 text-center font-bold">COMPANY NAME</th>
+                            <th className="py-2 px-2 text-center font-bold">ROLE</th>
+                            <th className="py-2 px-1 text-center font-bold">CTC</th>
+                            <th className="py-2 px-2 text-center font-bold">STATUS</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {colData.drive_in_progress.map((r: any, idx: number) => (
+                            <tr key={idx} className="bg-surface">
+                              <td className="py-2 px-1 text-center font-bold text-blue-700 dark:text-blue-400">
+                                <EditableReportCell value={r.s_no || idx + 1} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'drive_in_progress', idx, 's_no', val)} editable={editable} type="number" />
+                              </td>
+                              <td className="py-2 px-2 font-bold text-[#0a2540] dark:text-slate-100">
+                                <EditableReportCell value={r.company_name} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'drive_in_progress', idx, 'company_name', val)} editable={editable} />
+                              </td>
+                              <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                                <EditableReportCell value={r.job_role || r.role || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'drive_in_progress', idx, 'job_role', val)} editable={editable} />
+                              </td>
+                              <td className="py-2 px-1 text-center font-bold text-emerald-700 dark:text-emerald-400">
+                                <EditableReportCell value={r.ctc_lpa || r.ctc || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'drive_in_progress', idx, 'ctc_lpa', val)} editable={editable} />
+                              </td>
+                              <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                                <EditableReportCell value={r.current_status_text || r.status || 'Drive in progress'} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'drive_in_progress', idx, 'current_status_text', val)} editable={editable} />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Upcoming Drives */}
+                {(colData.in_drive || colData.upcoming_drives) && ((colData.in_drive && colData.in_drive.length > 0) || (colData.upcoming_drives && colData.upcoming_drives.length > 0)) && (() => {
+                  const upList = colData.in_drive || colData.upcoming_drives || [];
+                  const upKey = colData.in_drive ? 'in_drive' : 'upcoming_drives';
+                  return (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-black dark:text-white">
+                        <Calendar size={13} />
+                        <span>Upcoming Drives</span>
+                      </div>
+                      <div className="overflow-x-auto rounded border border-border bg-surface">
+                        <table className="w-full text-[11px] border-collapse table-fixed bg-surface">
+                          <colgroup>
+                            <col style={{ width: '36px' }} />
+                            <col style={{ width: '30%' }} />
+                            <col style={{ width: '26%' }} />
+                            <col style={{ width: '14%' }} />
+                            <col style={{ width: '30%' }} />
+                          </colgroup>
+                          <thead>
+                            <tr style={{ background: 'linear-gradient(180deg, #009EE3 0%, #006BB6 50%, #063A78 100%)' }} className="text-white font-bold text-[10px]">
+                              <th className="py-2 px-1 text-center font-bold">#</th>
+                              <th className="py-2 px-2 text-center font-bold">COMPANY NAME</th>
+                              <th className="py-2 px-2 text-center font-bold">ROLE</th>
+                              <th className="py-2 px-1 text-center font-bold">CTC</th>
+                              <th className="py-2 px-2 text-center font-bold">STATUS</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {upList.map((r: any, idx: number) => (
+                              <tr key={idx} className="bg-surface">
+                                <td className="py-2 px-1 text-center font-bold text-blue-700 dark:text-blue-400">
+                                  <EditableReportCell value={r.s_no || idx + 1} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, upKey, idx, 's_no', val)} editable={editable} type="number" />
+                                </td>
+                                <td className="py-2 px-2 font-bold text-[#0a2540] dark:text-slate-100">
+                                  <EditableReportCell value={r.company_name} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, upKey, idx, 'company_name', val)} editable={editable} />
+                                </td>
+                                <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                                  <EditableReportCell value={r.job_role || r.role || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, upKey, idx, 'job_role', val)} editable={editable} />
+                                </td>
+                                <td className="py-2 px-1 text-center font-bold text-emerald-700 dark:text-emerald-400">
+                                  <EditableReportCell value={r.ctc_lpa || r.ctc || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, upKey, idx, 'ctc_lpa', val)} editable={editable} />
+                                </td>
+                                <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                                  <EditableReportCell value={r.current_status_text || r.status || 'Upcoming Drive'} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, upKey, idx, 'current_status_text', val)} editable={editable} />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 4. Companies In Progress */}
+                {colData.in_progress && colData.in_progress.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-black dark:text-white">
+                      <ListTodo size={13} />
+                      <span>Companies In Progress</span>
+                    </div>
+                    <div className="overflow-x-auto rounded border border-border bg-surface">
+                      <table className="w-full text-[11px] border-collapse table-fixed bg-surface">
+                        <colgroup>
+                          <col style={{ width: '36px' }} />
+                          <col style={{ width: '30%' }} />
+                          <col style={{ width: '26%' }} />
+                          <col style={{ width: '14%' }} />
+                          <col style={{ width: '30%' }} />
+                        </colgroup>
+                        <thead>
+                          <tr style={{ background: 'linear-gradient(180deg, #009EE3 0%, #006BB6 50%, #063A78 100%)' }} className="text-white font-bold text-[10px]">
+                            <th className="py-2 px-1 text-center font-bold">#</th>
+                            <th className="py-2 px-2 text-center font-bold">COMPANY NAME</th>
+                            <th className="py-2 px-2 text-center font-bold">ROLE</th>
+                            <th className="py-2 px-1 text-center font-bold">CTC</th>
+                            <th className="py-2 px-2 text-center font-bold">STATUS</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {colData.in_progress.map((r: any, idx: number) => (
+                            <tr key={idx} className="bg-surface">
+                              <td className="py-2 px-1 text-center font-bold text-blue-700 dark:text-blue-400">
+                                <EditableReportCell value={r.s_no || idx + 1} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'in_progress', idx, 's_no', val)} editable={editable} type="number" />
+                              </td>
+                              <td className="py-2 px-2 font-bold text-[#0a2540] dark:text-slate-100">
+                                <EditableReportCell value={r.company_name} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'in_progress', idx, 'company_name', val)} editable={editable} />
+                              </td>
+                              <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                                <EditableReportCell value={r.job_role || r.role || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'in_progress', idx, 'job_role', val)} editable={editable} />
+                              </td>
+                              <td className="py-2 px-1 text-center font-bold text-emerald-700 dark:text-emerald-400">
+                                <EditableReportCell value={r.ctc_lpa || r.ctc || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'in_progress', idx, 'ctc_lpa', val)} editable={editable} />
+                              </td>
+                              <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                                <EditableReportCell value={r.current_status_text || r.status || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'in_progress', idx, 'current_status_text', val)} editable={editable} />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. Companies In Pipeline */}
+                {colData.pipeline && colData.pipeline.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-black dark:text-white">
+                      <Layers size={13} />
+                      <span>Companies In Pipeline</span>
+                    </div>
+                    <div className="overflow-x-auto rounded border border-border bg-surface">
+                      <table className="w-full text-[11px] border-collapse table-fixed bg-surface">
+                        <colgroup>
+                          <col style={{ width: '36px' }} />
+                          <col style={{ width: '30%' }} />
+                          <col style={{ width: '26%' }} />
+                          <col style={{ width: '14%' }} />
+                          <col style={{ width: '30%' }} />
+                        </colgroup>
+                        <thead>
+                          <tr style={{ background: 'linear-gradient(180deg, #009EE3 0%, #006BB6 50%, #063A78 100%)' }} className="text-white font-bold text-[10px]">
+                            <th className="py-2 px-1 text-center font-bold">#</th>
+                            <th className="py-2 px-2 text-center font-bold">COMPANY NAME</th>
+                            <th className="py-2 px-2 text-center font-bold">ROLE</th>
+                            <th className="py-2 px-1 text-center font-bold">CTC</th>
+                            <th className="py-2 px-2 text-center font-bold">STATUS</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {colData.pipeline.map((r: any, idx: number) => (
+                            <tr key={idx} className="bg-surface">
+                              <td className="py-2 px-1 text-center font-bold text-blue-700 dark:text-blue-400">
+                                <EditableReportCell value={r.s_no || idx + 1} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'pipeline', idx, 's_no', val)} editable={editable} type="number" />
+                              </td>
+                              <td className="py-2 px-2 font-bold text-[#0a2540] dark:text-slate-100">
+                                <EditableReportCell value={r.company_name} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'pipeline', idx, 'company_name', val)} editable={editable} />
+                              </td>
+                              <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                                <EditableReportCell value={r.job_role || r.role || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'pipeline', idx, 'job_role', val)} editable={editable} />
+                              </td>
+                              <td className="py-2 px-1 text-center font-bold text-emerald-700 dark:text-emerald-400">
+                                <EditableReportCell value={r.ctc_lpa || r.ctc || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'pipeline', idx, 'ctc_lpa', val)} editable={editable} />
+                              </td>
+                              <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                                <EditableReportCell value={r.current_status_text || r.status || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'pipeline', idx, 'current_status_text', val)} editable={editable} />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 6. Top Companies */}
+                {colData.top_companies && colData.top_companies.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-black dark:text-white">
+                      <Sparkles size={13} />
+                      <span>Top Companies</span>
+                    </div>
+                    <div className="overflow-x-auto rounded border border-border bg-surface">
+                      <table className="w-full text-[11px] border-collapse table-fixed bg-surface">
+                        <colgroup>
+                          <col style={{ width: '36px' }} />
+                          <col style={{ width: '30%' }} />
+                          <col style={{ width: '26%' }} />
+                          <col style={{ width: '14%' }} />
+                          <col style={{ width: '30%' }} />
+                        </colgroup>
+                        <thead>
+                          <tr style={{ background: 'linear-gradient(180deg, #009EE3 0%, #006BB6 50%, #063A78 100%)' }} className="text-white font-bold text-[10px]">
+                            <th className="py-2 px-1 text-center font-bold">#</th>
+                            <th className="py-2 px-2 text-center font-bold">COMPANY NAME</th>
+                            <th className="py-2 px-2 text-center font-bold">ROLE</th>
+                            <th className="py-2 px-1 text-center font-bold">CTC</th>
+                            <th className="py-2 px-2 text-center font-bold">STATUS</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {colData.top_companies.map((r: any, idx: number) => (
+                            <tr key={idx} className="bg-surface">
+                              <td className="py-2 px-1 text-center font-bold text-blue-700 dark:text-blue-400">
+                                <EditableReportCell value={r.s_no || idx + 1} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'top_companies', idx, 's_no', val)} editable={editable} type="number" />
+                              </td>
+                              <td className="py-2 px-2 font-bold text-[#0a2540] dark:text-slate-100">
+                                <EditableReportCell value={r.company_name} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'top_companies', idx, 'company_name', val)} editable={editable} />
+                              </td>
+                              <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                                <EditableReportCell value={r.job_role || r.role || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'top_companies', idx, 'job_role', val)} editable={editable} />
+                              </td>
+                              <td className="py-2 px-1 text-center font-bold text-emerald-700 dark:text-emerald-400">
+                                <EditableReportCell value={r.ctc_lpa || r.ctc || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'top_companies', idx, 'ctc_lpa', val)} editable={editable} />
+                              </td>
+                              <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                                <EditableReportCell value={r.current_status_text || r.status || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'top_companies', idx, 'current_status_text', val)} editable={editable} />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* 7. Rejected Companies */}
+                {(colData.rejected_companies || colData.rejected_by_hr) && ((colData.rejected_companies && colData.rejected_companies.length > 0) || (colData.rejected_by_hr && colData.rejected_by_hr.length > 0)) && (() => {
+                  const rejList = colData.rejected_companies || colData.rejected_by_hr || [];
+                  const rejKey = colData.rejected_companies ? 'rejected_companies' : 'rejected_by_hr';
+                  return (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-black dark:text-white">
+                        <XCircle size={13} />
+                        <span>Rejected Companies</span>
+                      </div>
+                      <div className="overflow-x-auto rounded border border-border bg-surface">
+                        <table className="w-full text-[11px] border-collapse table-fixed bg-surface">
+                          <colgroup>
+                            <col style={{ width: '36px' }} />
+                            <col style={{ width: '30%' }} />
+                            <col style={{ width: '26%' }} />
+                            <col style={{ width: '14%' }} />
+                            <col style={{ width: '30%' }} />
+                          </colgroup>
+                          <thead>
+                            <tr style={{ background: 'linear-gradient(180deg, #009EE3 0%, #006BB6 50%, #063A78 100%)' }} className="text-white font-bold text-[10px]">
+                              <th className="py-2 px-1 text-center font-bold">#</th>
+                              <th className="py-2 px-2 text-center font-bold">COMPANY NAME</th>
+                              <th className="py-2 px-2 text-center font-bold">ROLE</th>
+                              <th className="py-2 px-1 text-center font-bold">CTC</th>
+                              <th className="py-2 px-2 text-center font-bold">STATUS</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {rejList.map((r: any, idx: number) => (
+                              <tr key={idx} className="bg-surface">
+                                <td className="py-2 px-1 text-center font-bold text-blue-700 dark:text-blue-400">
+                                  <EditableReportCell value={r.s_no || idx + 1} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, rejKey, idx, 's_no', val)} editable={editable} type="number" />
+                                </td>
+                                <td className="py-2 px-2 font-bold text-[#0a2540] dark:text-slate-100">
+                                  <EditableReportCell value={r.company_name} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, rejKey, idx, 'company_name', val)} editable={editable} />
+                                </td>
+                                <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                                  <EditableReportCell value={r.job_role || r.role || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, rejKey, idx, 'job_role', val)} editable={editable} />
+                                </td>
+                                <td className="py-2 px-1 text-center font-bold text-emerald-700 dark:text-emerald-400">
+                                  <EditableReportCell value={r.ctc_lpa || r.ctc || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, rejKey, idx, 'ctc_lpa', val)} editable={editable} />
+                                </td>
+                                <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                                  <EditableReportCell value={r.current_status_text || r.status || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, rejKey, idx, 'current_status_text', val)} editable={editable} />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 8. On Hold By College */}
+                {(colData.on_hold_by_college || colData.rejected_by_college) && ((colData.on_hold_by_college && colData.on_hold_by_college.length > 0) || (colData.rejected_by_college && colData.rejected_by_college.length > 0)) && (() => {
+                  const holdCollegeList = colData.on_hold_by_college || colData.rejected_by_college || [];
+                  const holdKey = colData.on_hold_by_college ? 'on_hold_by_college' : 'rejected_by_college';
+                  return (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-black dark:text-white">
+                        <Clock size={13} />
+                        <span>Companies On Hold By College</span>
+                      </div>
+                      <div className="overflow-x-auto rounded border border-border bg-surface">
+                        <table className="w-full text-[11px] border-collapse table-fixed bg-surface">
+                          <colgroup>
+                            <col style={{ width: '36px' }} />
+                            <col style={{ width: '30%' }} />
+                            <col style={{ width: '26%' }} />
+                            <col style={{ width: '14%' }} />
+                            <col style={{ width: '30%' }} />
+                          </colgroup>
+                          <thead>
+                            <tr style={{ background: 'linear-gradient(180deg, #009EE3 0%, #006BB6 50%, #063A78 100%)' }} className="text-white font-bold text-[10px]">
+                              <th className="py-2 px-1 text-center font-bold">#</th>
+                              <th className="py-2 px-2 text-center font-bold">COMPANY NAME</th>
+                              <th className="py-2 px-2 text-center font-bold">ROLE</th>
+                              <th className="py-2 px-1 text-center font-bold">CTC</th>
+                              <th className="py-2 px-2 text-center font-bold">STATUS</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {holdCollegeList.map((r: any, idx: number) => (
+                              <tr key={idx} className="bg-surface">
+                                <td className="py-2 px-1 text-center font-bold text-blue-700 dark:text-blue-400">
+                                  <EditableReportCell value={r.s_no || idx + 1} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, holdKey, idx, 's_no', val)} editable={editable} type="number" />
+                                </td>
+                                <td className="py-2 px-2 font-bold text-[#0a2540] dark:text-slate-100">
+                                  <EditableReportCell value={r.company_name} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, holdKey, idx, 'company_name', val)} editable={editable} />
+                                </td>
+                                <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                                  <EditableReportCell value={r.job_role || r.role || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, holdKey, idx, 'job_role', val)} editable={editable} />
+                                </td>
+                                <td className="py-2 px-1 text-center font-bold text-emerald-700 dark:text-emerald-400">
+                                  <EditableReportCell value={r.ctc_lpa || r.ctc || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, holdKey, idx, 'ctc_lpa', val)} editable={editable} />
+                                </td>
+                                <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                                  <EditableReportCell value={r.current_status_text || r.status || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, holdKey, idx, 'current_status_text', val)} editable={editable} />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 9. On Hold By HR */}
+                {colData.on_hold_by_hr && colData.on_hold_by_hr.length > 0 && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-black dark:text-white">
+                      <Clock size={13} />
+                      <span>Companies On Hold By HR</span>
+                    </div>
+                    <div className="overflow-x-auto rounded border border-border bg-surface">
+                      <table className="w-full text-[11px] border-collapse table-fixed bg-surface">
+                        <colgroup>
+                          <col style={{ width: '36px' }} />
+                          <col style={{ width: '30%' }} />
+                          <col style={{ width: '26%' }} />
+                          <col style={{ width: '14%' }} />
+                          <col style={{ width: '30%' }} />
+                        </colgroup>
+                        <thead>
+                          <tr style={{ background: 'linear-gradient(180deg, #009EE3 0%, #006BB6 50%, #063A78 100%)' }} className="text-white font-bold text-[10px]">
+                            <th className="py-2 px-1 text-center font-bold">#</th>
+                            <th className="py-2 px-2 text-center font-bold">COMPANY NAME</th>
+                            <th className="py-2 px-2 text-center font-bold">ROLE</th>
+                            <th className="py-2 px-1 text-center font-bold">CTC</th>
+                            <th className="py-2 px-2 text-center font-bold">STATUS</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {colData.on_hold_by_hr.map((r: any, idx: number) => (
+                            <tr key={idx} className="bg-surface">
+                              <td className="py-2 px-1 text-center font-bold text-blue-700 dark:text-blue-400">
+                                <EditableReportCell value={r.s_no || idx + 1} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'on_hold_by_hr', idx, 's_no', val)} editable={editable} type="number" />
+                              </td>
+                              <td className="py-2 px-2 font-bold text-[#0a2540] dark:text-slate-100">
+                                <EditableReportCell value={r.company_name} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'on_hold_by_hr', idx, 'company_name', val)} editable={editable} />
+                              </td>
+                              <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                                <EditableReportCell value={r.job_role || r.role || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'on_hold_by_hr', idx, 'job_role', val)} editable={editable} />
+                              </td>
+                              <td className="py-2 px-1 text-center font-bold text-emerald-700 dark:text-emerald-400">
+                                <EditableReportCell value={r.ctc_lpa || r.ctc || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'on_hold_by_hr', idx, 'ctc_lpa', val)} editable={editable} />
+                              </td>
+                              <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                                <EditableReportCell value={r.current_status_text || r.status || ''} onChange={(val) => onUpdateMultiCollegeCell && onUpdateMultiCollegeCell(cIdx, 'on_hold_by_hr', idx, 'current_status_text', val)} editable={editable} />
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -848,6 +1303,377 @@ export function ReportDocumentView({
                             <EditableReportCell
                               value={r.current_status_text || r.status || '—'}
                               onChange={(val) => onUpdateCell && onUpdateCell('in_progress', idx, 'current_status_text', val)}
+                              editable={editable}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Section 5: Companies In Pipeline */}
+            {report.included_sections?.pipeline !== false && report.sections?.pipeline && report.sections.pipeline.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-black dark:text-white px-1">
+                  <Layers size={13} />
+                  <span>
+                    <EditableLabel
+                      value={sectionTitle(report, 'pipeline', 'COMPANIES IN PIPELINE')}
+                      onCommit={(v) => onRenameSection && onRenameSection('pipeline', v)}
+                      editable={editable}
+                    />
+                  </span>
+                </div>
+                <div className="overflow-x-auto rounded border border-border bg-surface">
+                  <table className="w-full text-[11px] border-collapse table-fixed bg-surface">
+                    <colgroup>
+                      <col style={{ width: '36px' }} />
+                      <col style={{ width: '30%' }} />
+                      <col style={{ width: '26%' }} />
+                      <col style={{ width: '14%' }} />
+                      <col style={{ width: '30%' }} />
+                    </colgroup>
+                    <thead>
+                      <tr style={{ background: 'linear-gradient(180deg, #009EE3 0%, #006BB6 50%, #063A78 100%)' }} className="text-white font-bold text-[10px]">
+                        <th className="py-2 px-1 text-center font-bold">#</th>
+                        <th className="py-2 px-2 text-left font-bold"><EditableLabel value={columnHeading(report, 'pipeline', 1, 'COMPANY NAME')} onCommit={(v) => onRenameColumn && onRenameColumn('pipeline', 1, v)} editable={editable} /></th>
+                        <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'pipeline', 2, 'ROLE')} onCommit={(v) => onRenameColumn && onRenameColumn('pipeline', 2, v)} editable={editable} /></th>
+                        <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'pipeline', 3, 'CTC')} onCommit={(v) => onRenameColumn && onRenameColumn('pipeline', 3, v)} editable={editable} /></th>
+                        <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'pipeline', 4, 'STATUS')} onCommit={(v) => onRenameColumn && onRenameColumn('pipeline', 4, v)} editable={editable} /></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {report.sections.pipeline.map((r: any, idx: number) => (
+                        <tr key={idx} className="bg-surface">
+                          <td className="py-2 px-1 text-center font-bold text-blue-700 dark:text-blue-400">{r.s_no || idx + 1}</td>
+                          <td className="py-2 px-2 text-left font-bold text-[#0a2540] dark:text-slate-100">
+                            <EditableReportCell
+                              value={r.company_name}
+                              onChange={(val) => onUpdateCell && onUpdateCell('pipeline', idx, 'company_name', val)}
+                              className="font-bold text-[#0a2540] dark:text-slate-100 text-left"
+                              editable={editable}
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                            <EditableReportCell
+                              value={r.job_role || r.role}
+                              onChange={(val) => onUpdateCell && onUpdateCell('pipeline', idx, 'job_role', val)}
+                              editable={editable}
+                            />
+                          </td>
+                          <td className="py-2 px-1 text-center font-bold text-emerald-700 dark:text-emerald-400">
+                            <EditableReportCell
+                              value={r.ctc_lpa || r.ctc}
+                              onChange={(val) => onUpdateCell && onUpdateCell('pipeline', idx, 'ctc_lpa', val)}
+                              className="font-bold text-emerald-700 dark:text-emerald-400"
+                              editable={editable}
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                            <EditableReportCell
+                              value={r.current_status_text || r.status || '—'}
+                              onChange={(val) => onUpdateCell && onUpdateCell('pipeline', idx, 'current_status_text', val)}
+                              editable={editable}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Section 6: Top Companies */}
+            {report.included_sections?.top_companies !== false && report.sections?.top_companies && report.sections.top_companies.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-black dark:text-white px-1">
+                  <Sparkles size={13} />
+                  <span>
+                    <EditableLabel
+                      value={sectionTitle(report, 'top_companies', 'TOP COMPANIES')}
+                      onCommit={(v) => onRenameSection && onRenameSection('top_companies', v)}
+                      editable={editable}
+                    />
+                  </span>
+                </div>
+                <div className="overflow-x-auto rounded border border-border bg-surface">
+                  <table className="w-full text-[11px] border-collapse table-fixed bg-surface">
+                    <colgroup>
+                      <col style={{ width: '36px' }} />
+                      <col style={{ width: '30%' }} />
+                      <col style={{ width: '26%' }} />
+                      <col style={{ width: '14%' }} />
+                      <col style={{ width: '30%' }} />
+                    </colgroup>
+                    <thead>
+                      <tr style={{ background: 'linear-gradient(180deg, #009EE3 0%, #006BB6 50%, #063A78 100%)' }} className="text-white font-bold text-[10px]">
+                        <th className="py-2 px-1 text-center font-bold">#</th>
+                        <th className="py-2 px-2 text-left font-bold"><EditableLabel value={columnHeading(report, 'top_companies', 1, 'COMPANY NAME')} onCommit={(v) => onRenameColumn && onRenameColumn('top_companies', 1, v)} editable={editable} /></th>
+                        <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'top_companies', 2, 'ROLE')} onCommit={(v) => onRenameColumn && onRenameColumn('top_companies', 2, v)} editable={editable} /></th>
+                        <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'top_companies', 3, 'CTC')} onCommit={(v) => onRenameColumn && onRenameColumn('top_companies', 3, v)} editable={editable} /></th>
+                        <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'top_companies', 4, 'STATUS')} onCommit={(v) => onRenameColumn && onRenameColumn('top_companies', 4, v)} editable={editable} /></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {report.sections.top_companies.map((r: any, idx: number) => (
+                        <tr key={idx} className="bg-surface">
+                          <td className="py-2 px-1 text-center font-bold text-blue-700 dark:text-blue-400">{r.s_no || idx + 1}</td>
+                          <td className="py-2 px-2 text-left font-bold text-[#0a2540] dark:text-slate-100">
+                            <EditableReportCell
+                              value={r.company_name}
+                              onChange={(val) => onUpdateCell && onUpdateCell('top_companies', idx, 'company_name', val)}
+                              className="font-bold text-[#0a2540] dark:text-slate-100 text-left"
+                              editable={editable}
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                            <EditableReportCell
+                              value={r.job_role || r.role}
+                              onChange={(val) => onUpdateCell && onUpdateCell('top_companies', idx, 'job_role', val)}
+                              editable={editable}
+                            />
+                          </td>
+                          <td className="py-2 px-1 text-center font-bold text-emerald-700 dark:text-emerald-400">
+                            <EditableReportCell
+                              value={r.ctc_lpa || r.ctc}
+                              onChange={(val) => onUpdateCell && onUpdateCell('top_companies', idx, 'ctc_lpa', val)}
+                              className="font-bold text-emerald-700 dark:text-emerald-400"
+                              editable={editable}
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                            <EditableReportCell
+                              value={r.current_status_text || r.status || '—'}
+                              onChange={(val) => onUpdateCell && onUpdateCell('top_companies', idx, 'current_status_text', val)}
+                              editable={editable}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Section 7: Rejected Companies */}
+            {((report.included_sections?.rejected_companies !== false && report.included_sections?.rejected_by_hr !== false) && (report.sections?.rejected_companies || report.sections?.rejected_by_hr) && ((report.sections.rejected_companies && report.sections.rejected_companies.length > 0) || (report.sections.rejected_by_hr && report.sections.rejected_by_hr.length > 0))) && (() => {
+              const rejList = report.sections?.rejected_companies || report.sections?.rejected_by_hr || [];
+              return (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-black dark:text-white px-1">
+                    <XCircle size={13} />
+                    <span>
+                      <EditableLabel
+                        value={sectionTitle(report, 'rejected_companies', 'REJECTED COMPANIES')}
+                        onCommit={(v) => onRenameSection && onRenameSection('rejected_companies', v)}
+                        editable={editable}
+                      />
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto rounded border border-border bg-surface">
+                    <table className="w-full text-[11px] border-collapse table-fixed bg-surface">
+                      <colgroup>
+                        <col style={{ width: '36px' }} />
+                        <col style={{ width: '30%' }} />
+                        <col style={{ width: '26%' }} />
+                        <col style={{ width: '14%' }} />
+                        <col style={{ width: '30%' }} />
+                      </colgroup>
+                      <thead>
+                        <tr style={{ background: 'linear-gradient(180deg, #009EE3 0%, #006BB6 50%, #063A78 100%)' }} className="text-white font-bold text-[10px]">
+                          <th className="py-2 px-1 text-center font-bold">#</th>
+                          <th className="py-2 px-2 text-left font-bold"><EditableLabel value={columnHeading(report, 'rejected_companies', 1, 'COMPANY NAME')} onCommit={(v) => onRenameColumn && onRenameColumn('rejected_companies', 1, v)} editable={editable} /></th>
+                          <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'rejected_companies', 2, 'ROLE')} onCommit={(v) => onRenameColumn && onRenameColumn('rejected_companies', 2, v)} editable={editable} /></th>
+                          <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'rejected_companies', 3, 'CTC')} onCommit={(v) => onRenameColumn && onRenameColumn('rejected_companies', 3, v)} editable={editable} /></th>
+                          <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'rejected_companies', 4, 'STATUS')} onCommit={(v) => onRenameColumn && onRenameColumn('rejected_companies', 4, v)} editable={editable} /></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {rejList.map((r: any, idx: number) => (
+                          <tr key={idx} className="bg-surface">
+                            <td className="py-2 px-1 text-center font-bold text-blue-700 dark:text-blue-400">{r.s_no || idx + 1}</td>
+                            <td className="py-2 px-2 text-left font-bold text-[#0a2540] dark:text-slate-100">
+                              <EditableReportCell
+                                value={r.company_name}
+                                onChange={(val) => onUpdateCell && onUpdateCell('rejected_companies', idx, 'company_name', val)}
+                                className="font-bold text-[#0a2540] dark:text-slate-100 text-left"
+                                editable={editable}
+                              />
+                            </td>
+                            <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                              <EditableReportCell
+                                value={r.job_role || r.role}
+                                onChange={(val) => onUpdateCell && onUpdateCell('rejected_companies', idx, 'job_role', val)}
+                                editable={editable}
+                              />
+                            </td>
+                            <td className="py-2 px-1 text-center font-bold text-emerald-700 dark:text-emerald-400">
+                              <EditableReportCell
+                                value={r.ctc_lpa || r.ctc}
+                                onChange={(val) => onUpdateCell && onUpdateCell('rejected_companies', idx, 'ctc_lpa', val)}
+                                className="font-bold text-emerald-700 dark:text-emerald-400"
+                                editable={editable}
+                              />
+                            </td>
+                            <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                              <EditableReportCell
+                                value={r.current_status_text || r.status || '—'}
+                                onChange={(val) => onUpdateCell && onUpdateCell('rejected_companies', idx, 'current_status_text', val)}
+                                editable={editable}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Section 8: Companies On Hold By College */}
+            {((report.included_sections?.on_hold_by_college !== false && report.included_sections?.rejected_by_college !== false) && (report.sections?.on_hold_by_college || report.sections?.rejected_by_college) && ((report.sections.on_hold_by_college && report.sections.on_hold_by_college.length > 0) || (report.sections.rejected_by_college && report.sections.rejected_by_college.length > 0))) && (() => {
+              const holdCollegeList = report.sections?.on_hold_by_college || report.sections?.rejected_by_college || [];
+              return (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-black dark:text-white px-1">
+                    <Clock size={13} />
+                    <span>
+                      <EditableLabel
+                        value={sectionTitle(report, 'on_hold_by_college', 'COMPANIES ON HOLD BY COLLEGE')}
+                        onCommit={(v) => onRenameSection && onRenameSection('on_hold_by_college', v)}
+                        editable={editable}
+                      />
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto rounded border border-border bg-surface">
+                    <table className="w-full text-[11px] border-collapse table-fixed bg-surface">
+                      <colgroup>
+                        <col style={{ width: '36px' }} />
+                        <col style={{ width: '30%' }} />
+                        <col style={{ width: '26%' }} />
+                        <col style={{ width: '14%' }} />
+                        <col style={{ width: '30%' }} />
+                      </colgroup>
+                      <thead>
+                        <tr style={{ background: 'linear-gradient(180deg, #009EE3 0%, #006BB6 50%, #063A78 100%)' }} className="text-white font-bold text-[10px]">
+                          <th className="py-2 px-1 text-center font-bold">#</th>
+                          <th className="py-2 px-2 text-left font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_college', 1, 'COMPANY NAME')} onCommit={(v) => onRenameColumn && onRenameColumn('on_hold_by_college', 1, v)} editable={editable} /></th>
+                          <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_college', 2, 'ROLE')} onCommit={(v) => onRenameColumn && onRenameColumn('on_hold_by_college', 2, v)} editable={editable} /></th>
+                          <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_college', 3, 'CTC')} onCommit={(v) => onRenameColumn && onRenameColumn('on_hold_by_college', 3, v)} editable={editable} /></th>
+                          <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_college', 4, 'STATUS')} onCommit={(v) => onRenameColumn && onRenameColumn('on_hold_by_college', 4, v)} editable={editable} /></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {holdCollegeList.map((r: any, idx: number) => (
+                          <tr key={idx} className="bg-surface">
+                            <td className="py-2 px-1 text-center font-bold text-blue-700 dark:text-blue-400">{r.s_no || idx + 1}</td>
+                            <td className="py-2 px-2 text-left font-bold text-[#0a2540] dark:text-slate-100">
+                              <EditableReportCell
+                                value={r.company_name}
+                                onChange={(val) => onUpdateCell && onUpdateCell('on_hold_by_college', idx, 'company_name', val)}
+                                className="font-bold text-[#0a2540] dark:text-slate-100 text-left"
+                                editable={editable}
+                              />
+                            </td>
+                            <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                              <EditableReportCell
+                                value={r.job_role || r.role}
+                                onChange={(val) => onUpdateCell && onUpdateCell('on_hold_by_college', idx, 'job_role', val)}
+                                editable={editable}
+                              />
+                            </td>
+                            <td className="py-2 px-1 text-center font-bold text-emerald-700 dark:text-emerald-400">
+                              <EditableReportCell
+                                value={r.ctc_lpa || r.ctc}
+                                onChange={(val) => onUpdateCell && onUpdateCell('on_hold_by_college', idx, 'ctc_lpa', val)}
+                                className="font-bold text-emerald-700 dark:text-emerald-400"
+                                editable={editable}
+                              />
+                            </td>
+                            <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                              <EditableReportCell
+                                value={r.current_status_text || r.status || '—'}
+                                onChange={(val) => onUpdateCell && onUpdateCell('on_hold_by_college', idx, 'current_status_text', val)}
+                                editable={editable}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Section 9: Companies On Hold By HR */}
+            {report.included_sections?.on_hold_by_hr !== false && report.sections?.on_hold_by_hr && report.sections.on_hold_by_hr.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-black dark:text-white px-1">
+                  <Clock size={13} />
+                  <span>
+                    <EditableLabel
+                      value={sectionTitle(report, 'on_hold_by_hr', 'COMPANIES ON HOLD BY HR')}
+                      onCommit={(v) => onRenameSection && onRenameSection('on_hold_by_hr', v)}
+                      editable={editable}
+                    />
+                  </span>
+                </div>
+                <div className="overflow-x-auto rounded border border-border bg-surface">
+                  <table className="w-full text-[11px] border-collapse table-fixed bg-surface">
+                    <colgroup>
+                      <col style={{ width: '36px' }} />
+                      <col style={{ width: '30%' }} />
+                      <col style={{ width: '26%' }} />
+                      <col style={{ width: '14%' }} />
+                      <col style={{ width: '30%' }} />
+                    </colgroup>
+                    <thead>
+                      <tr style={{ background: 'linear-gradient(180deg, #009EE3 0%, #006BB6 50%, #063A78 100%)' }} className="text-white font-bold text-[10px]">
+                        <th className="py-2 px-1 text-center font-bold">#</th>
+                        <th className="py-2 px-2 text-left font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_hr', 1, 'COMPANY NAME')} onCommit={(v) => onRenameColumn && onRenameColumn('on_hold_by_hr', 1, v)} editable={editable} /></th>
+                        <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_hr', 2, 'ROLE')} onCommit={(v) => onRenameColumn && onRenameColumn('on_hold_by_hr', 2, v)} editable={editable} /></th>
+                        <th className="py-2 px-1 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_hr', 3, 'CTC')} onCommit={(v) => onRenameColumn && onRenameColumn('on_hold_by_hr', 3, v)} editable={editable} /></th>
+                        <th className="py-2 px-2 text-center font-bold"><EditableLabel value={columnHeading(report, 'on_hold_by_hr', 4, 'STATUS')} onCommit={(v) => onRenameColumn && onRenameColumn('on_hold_by_hr', 4, v)} editable={editable} /></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {report.sections.on_hold_by_hr.map((r: any, idx: number) => (
+                        <tr key={idx} className="bg-surface">
+                          <td className="py-2 px-1 text-center font-bold text-blue-700 dark:text-blue-400">{r.s_no || idx + 1}</td>
+                          <td className="py-2 px-2 text-left font-bold text-[#0a2540] dark:text-slate-100">
+                            <EditableReportCell
+                              value={r.company_name}
+                              onChange={(val) => onUpdateCell && onUpdateCell('on_hold_by_hr', idx, 'company_name', val)}
+                              className="font-bold text-[#0a2540] dark:text-slate-100 text-left"
+                              editable={editable}
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                            <EditableReportCell
+                              value={r.job_role || r.role}
+                              onChange={(val) => onUpdateCell && onUpdateCell('on_hold_by_hr', idx, 'job_role', val)}
+                              editable={editable}
+                            />
+                          </td>
+                          <td className="py-2 px-1 text-center font-bold text-emerald-700 dark:text-emerald-400">
+                            <EditableReportCell
+                              value={r.ctc_lpa || r.ctc}
+                              onChange={(val) => onUpdateCell && onUpdateCell('on_hold_by_hr', idx, 'ctc_lpa', val)}
+                              className="font-bold text-emerald-700 dark:text-emerald-400"
+                              editable={editable}
+                            />
+                          </td>
+                          <td className="py-2 px-2 text-center text-slate-700 dark:text-slate-300">
+                            <EditableReportCell
+                              value={r.current_status_text || r.status || '—'}
+                              onChange={(val) => onUpdateCell && onUpdateCell('on_hold_by_hr', idx, 'current_status_text', val)}
                               editable={editable}
                             />
                           </td>

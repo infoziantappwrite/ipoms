@@ -3497,6 +3497,88 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     whole exercise: confirming the HTTP-origin download block from item 108 no longer
     applies now that the origin is HTTPS and trusted.
 
+110. **Full system checkup, 2 Oct 2026 (user-requested) — three real bugs found and fixed in
+    `GET /weekly-tracker/kpi` and `POST /reports/generate`, plus a dead duplicate route
+    removed.** `npm run verify:policy` listed `GET /weekly-tracker/kpi` twice — `server.ts`
+    had **two separate `app.get('/api/v1/weekly-tracker/kpi', ...)` handlers** (a newer one
+    at the old line 5176, an older one later in the file at the old line 6364). Express
+    always routes to the first-registered handler, so the second (~100 lines, a different,
+    more-efficient aggregate-based implementation) was **pure dead code, unreachable since
+    whenever it was added** — deleted outright.
+    **Real bug #1, same class as items 17/89b (unescaped regex):** the live handler's
+    college-by-code-or-name fallback built `new RegExp(String(college_id), 'i')` with no
+    escaping — a `college_id` containing regex-special characters (confirmed live with
+    `?college_id=(`) would throw `SyntaxError: Invalid regular expression`. Fixed with the
+    existing `escapeRegex()` helper (already defined in `server.ts`, reused rather than
+    duplicated) at both live call sites of this exact pattern — the live `/weekly-tracker/kpi`
+    handler and the equivalent block inside `POST /reports/generate`'s weekly-report section
+    (a third occurrence of the same copy-pasted block, inside `POST /weekly-tracker/
+    sync-daily-positives`, was already using a plain non-regex match in one case and wasn't
+    touched since its risk profile differs — checked line-by-line, not assumed).
+    **Real bug #2, closes a gap item 81 explicitly left open** ("the Weekly Tracker page's
+    first request sometimes carries the placeholder college id `col_karpagam`... answered
+    with 500 instead of 400"): both the live `/weekly-tracker/kpi` handler and `POST
+    /reports/generate`'s weekly section **unconditionally pushed the raw, unvalidated
+    `college_id` string into the `$in` array** used to query `WeeklyTracker.college_id` (a
+    real Mongoose ObjectId field) — `queryCollegeIds.push(String(college_id))` ran
+    regardless of whether that string was ever resolved to a real college, so any
+    unrecognized `college_id` (a stale cached value, a typo, the literal `(` used to test
+    bug #1) threw `CastError: Cast to ObjectId failed`. Removed both unconditional pushes —
+    an unrecognized `college_id` now correctly returns an empty-but-valid `200` result
+    (`total_records: 0`) instead of crashing. **Verified live, not just by code reading:**
+    before the fix, `?college_id=(` returned `500`; after, it returns `200` with zero
+    records, while a real college id still returns real counts (`20` records / `8` follow-
+    ups-due, matching the live data) — confirmed the fix doesn't just silence the crash, it
+    preserves correct behavior for real input.
+    **Verified throughout:** `tsc --noEmit` clean both sides; `npm run verify:policy` now
+    114/114 (was 115, correctly down by the one dead-code route no longer printed); all
+    34/34 backend API tests still pass after every change.
+    **`npm audit` — applied the safe, non-breaking fixes on both sides** (`npm audit fix`,
+    no `--force`): backend `brace-expansion` (high) and one of two `ip-address` advisories
+    cleared; frontend `brace-expansion` (high) cleared. **Left for a deliberate decision,
+    not forced (breaking):** backend `nodemailer` now carries a new **high** advisory
+    bundle at the installed `9.1.1` (a fix exists but only via `--force`, bumping to
+    `10.0.13` — a major version the codebase hasn't been checked against; CLAUDE.md
+    previously recorded 9.1.1 as "already fixed," which was true at the time but a newer
+    advisory range has since been published covering it) — `lib/mailer.ts` is the one
+    caller and would need re-verification after any such bump. `uuid`/`exceljs` (backend)
+    and `uuid`/`xcode`/`@capacitor/cli` (frontend) moderates are unchanged from the
+    standing decision in items 56/84 — their only fix paths are version *downgrades* or
+    pre-release jumps, not worth forcing for moderate-severity, low-reachability findings.
+    **Live security spot-checks, all passed:** foreign-origin CORS → `403` with no CORS
+    headers; anonymous request to a protected route → `401`; a forged `alg:none` JWT →
+    `401`; a NoSQL operator-injection login body (`{"$ne":null}`) → `401`; a regex-special
+    search character → no `500` (both via the automated suite and a fresh live check).
+    **Git hygiene:** `backend/.env` confirmed gitignored and untracked; the new
+    `frontend/.cert/` (item 109's HTTPS keys) confirmed properly gitignored, not staged,
+    private keys never at risk of being committed; no stray `.bak` files; the one
+    deliberately-kept scratch file (`backend/_manual14.js`, item 34) is still there on
+    purpose, nothing else needs cleanup.
+    **New, previously-undocumented live database collections found — flagged, not
+    touched, since they weren't created by this session and may be another concurrent
+    session's in-progress work (the same pattern this file has repeatedly documented):**
+    `research_colleges` (27 real documents) and `chatconversations`/`chatmessages` (3/7 real
+    documents — the "orphaned chat module" from item 21 may be getting wired up by someone
+    else right now, worth asking about before assuming it's still dead). Also found
+    **`companymetadatas`** (Mongoose's default auto-pluralized name, distinct from the real
+    `company_metadata` collection this app actually uses) — **confirmed empty (0 documents)**,
+    almost certainly a stray collection auto-created at some point by a script or model that
+    didn't specify an explicit collection name; harmless as-is, but flagged as a candidate
+    for a future cleanup pass (not dropped here — a `drop()` is a destructive, if low-risk,
+    production-database operation and wasn't asked for).
+    **Still open, unchanged from the release gate (§8) — not re-litigated in depth this
+    pass, just reconfirmed still true:** `recycle_bin` and `import_processing_history`
+    collections still don't exist (3 missing crons from the original 4-cron spec remain
+    unbuilt for the same reason — two of them purge collections that aren't there yet);
+    `server.ts` is still one ~16,000+-line monolith; secrets that were in `backend/.env`
+    before it was untracked are still presumed live in git history and should be rotated if
+    that hasn't happened.
+    **One practical note, not a bug:** the frontend dev server currently running on this
+    machine is on plain `http://localhost:3000` (confirmed live), not the `dev:https`
+    script from item 109 — if testing Save Image/PDF or anything else sensitive to the
+    HTTP-origin download block (item 108), switch to `npm run dev:https` first; this
+    checkup's backend-side fixes don't depend on which frontend mode is running.
+
 ## 6. Module map
 
 Data flow: `company_metadata → assigned_work → daily_tracker → weekly_tracker → daily_leads → reports/dashboards`

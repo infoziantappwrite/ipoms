@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import {
   X,
   Printer,
@@ -36,6 +36,7 @@ import { ReportDocumentView } from './ReportDocumentView';
 import {
   generateReportCanvases,
   prepareReportImageBlob,
+  prepareReportImageBlobs,
   exportReportAsPdf,
   type ImageExportSize,
 } from '../lib/reportCanvasRenderer';
@@ -70,6 +71,115 @@ function getCleanPeriod(period?: string): string {
   return trimmed;
 }
 
+interface SizeSwitcherGliderProps {
+  value: ImageExportSize;
+  onChange: (size: ImageExportSize) => void;
+  className?: string;
+}
+
+function SizeSwitcherGlider({ value, onChange, className = '' }: SizeSwitcherGliderProps) {
+  const options: { id: ImageExportSize; label: string; title: string }[] = [
+    {
+      id: 'auto',
+      label: 'Auto',
+      title: 'Smart auto-fit: Compact card for single company, A4 for multi-company',
+    },
+    {
+      id: 'compact',
+      label: 'WhatsApp Card',
+      title: 'Compact Mobile / WhatsApp Card format',
+    },
+    {
+      id: 'a4',
+      label: 'A4 Sheet',
+      title: 'Standard full A4 document sheet',
+    },
+    {
+      id: 'square',
+      label: 'Square (1:1)',
+      title: 'Square 1:1 format',
+    },
+  ];
+
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [gliderStyle, setGliderStyle] = useState({ left: 0, width: 0, ready: false });
+
+  const activeIndex = options.findIndex((opt) => opt.id === value);
+  const selectedIndex = activeIndex >= 0 ? activeIndex : 0;
+
+  const updateGlider = useCallback(() => {
+    const currentTab = tabRefs.current[selectedIndex];
+    if (currentTab) {
+      setGliderStyle({
+        left: currentTab.offsetLeft,
+        width: currentTab.offsetWidth,
+        ready: true,
+      });
+    }
+  }, [selectedIndex]);
+
+  useLayoutEffect(() => {
+    updateGlider();
+    const handleResize = () => updateGlider();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [updateGlider]);
+
+  return (
+    <div
+      ref={containerRef}
+      className={`relative inline-flex items-center bg-[#EDF2F7] dark:bg-slate-900/90 border border-slate-200/90 dark:border-slate-800 rounded-full p-1 shadow-inner select-none max-w-full overflow-x-auto no-scrollbar ${className}`}
+    >
+      {/* ── Base Layer: Clickable Tab Buttons (Slate Gray Text) ── */}
+      <div className="relative z-10 flex items-center gap-1 sm:gap-1.5 w-full">
+        {options.map((opt, idx) => (
+          <button
+            key={opt.id}
+            ref={(el) => {
+              tabRefs.current[idx] = el;
+            }}
+            type="button"
+            onClick={() => onChange(opt.id)}
+            className="px-4 py-1.5 sm:px-5 sm:py-2 rounded-full text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors duration-150 cursor-pointer text-center whitespace-nowrap flex items-center justify-center gap-1.5 shrink-0"
+            title={opt.title}
+          >
+            <span>{opt.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ── Sliding Active Pill Layer with Masked White Text Window ── */}
+      <div
+        className="absolute top-1 bottom-1 left-0 rounded-full shadow-md shadow-blue-900/30 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none overflow-hidden z-20 will-change-[transform,width]"
+        style={{
+          width: `${gliderStyle.width}px`,
+          transform: `translate3d(${gliderStyle.left}px, 0, 0)`,
+          background: 'linear-gradient(180deg, #1E3A8A 0%, #1D3D8F 50%, #172E6C 100%)',
+          opacity: gliderStyle.ready ? 1 : 0,
+        }}
+      >
+        {/* Inner Counter-Translated Duplicate Label Bar (Pure White Text) */}
+        <div
+          className="absolute top-0 bottom-0 left-0 flex items-center gap-1 sm:gap-1.5 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none"
+          style={{
+            transform: `translate3d(${-gliderStyle.left}px, 0, 0)`,
+          }}
+        >
+          {options.map((opt) => (
+            <div
+              key={`masked-${opt.id}`}
+              className="px-4 py-1.5 sm:px-5 sm:py-2 rounded-full text-xs font-extrabold text-white text-center whitespace-nowrap flex items-center justify-center gap-1.5 shrink-0"
+            >
+              <span>{opt.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export type PreviewMode = 'both' | 'image' | 'pdf';
 
 interface Props {
@@ -87,7 +197,9 @@ export function A4PdfPreviewModal({
   onPrint,
   initialMode = 'image',
 }: Props) {
-  const [mode, setMode] = useState<PreviewMode>(initialMode);
+  const [mode, setMode] = useState<PreviewMode>(() =>
+    initialMode === 'both' ? 'image' : initialMode || 'image'
+  );
   const [zoomPdf, setZoomPdf] = useState<number>(100);
   const [zoomImage, setZoomImage] = useState<number>(100);
   const [logoFailed, setLogoFailed] = useState(false);
@@ -116,13 +228,28 @@ export function A4PdfPreviewModal({
     }
     setSavingImage(true);
     try {
-      const result = await prepareReportImageBlob(report, { size: imageSize });
-      if (!result) {
+      const items = await prepareReportImageBlobs(report, { size: imageSize });
+      if (!items || !items.length) {
         alert('Could not generate image file. Please try saving as PDF.');
         return;
       }
-      const url = URL.createObjectURL(result.blob);
-      setReadyImageDownload({ url, fileName: result.fileName });
+      if (items.length === 1) {
+        const url = URL.createObjectURL(items[0].blob);
+        setReadyImageDownload({ url, fileName: items[0].fileName });
+      } else {
+        // Multi-page image download: trigger download for each page image cleanly
+        for (let idx = 0; idx < items.length; idx++) {
+          const item = items[idx];
+          const url = URL.createObjectURL(item.blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = item.fileName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+        }
+      }
     } catch (err) {
       console.error('Save image from preview failed:', err);
       alert('Failed to save image. Please try again.');
@@ -143,8 +270,8 @@ export function A4PdfPreviewModal({
     }
   };
 
-  // Sync initialMode when modal opens
-  useEffect(() => {
+  // Sync initialMode when modal opens synchronously
+  useLayoutEffect(() => {
     if (isOpen) {
       const activeMode = (initialMode === 'both' ? 'image' : initialMode) || 'image';
       setMode(activeMode);
@@ -184,33 +311,37 @@ export function A4PdfPreviewModal({
   }, [isOpen, onClose]);
 
   // Generate Image preview from canvas when modal is opened, report changes, or size changes
+  // Deferred canvas generation by 150ms allows glider CSS animation to complete at 60 FPS without main thread stutter
   useEffect(() => {
     if (!isOpen || !report) return;
     let isMounted = true;
     setImageLoading(true);
 
-    generateReportCanvases(report, { size: imageSize })
-      .then((canvases) => {
-        if (!isMounted) return;
-        const urls: string[] = [];
-        for (const canvas of canvases) {
-          try {
-            urls.push(canvas.toDataURL('image/png'));
-          } catch (e) {
-            console.error('Failed to convert canvas to data URL:', e);
+    const timer = setTimeout(() => {
+      generateReportCanvases(report, { size: imageSize })
+        .then((canvases) => {
+          if (!isMounted) return;
+          const urls: string[] = [];
+          for (const canvas of canvases) {
+            try {
+              urls.push(canvas.toDataURL('image/png'));
+            } catch (e) {
+              console.error('Failed to convert canvas to data URL:', e);
+            }
           }
-        }
-        setImageSrcs(urls);
-      })
-      .catch((err) => {
-        console.error('Error generating report canvas preview:', err);
-      })
-      .finally(() => {
-        if (isMounted) setImageLoading(false);
-      });
+          setImageSrcs(urls);
+        })
+        .catch((err) => {
+          console.error('Error generating report canvas preview:', err);
+        })
+        .finally(() => {
+          if (isMounted) setImageLoading(false);
+        });
+    }, 150);
 
     return () => {
       isMounted = false;
+      clearTimeout(timer);
     };
   }, [isOpen, report, imageSize]);
 
@@ -703,11 +834,11 @@ export function A4PdfPreviewModal({
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center bg-slate-100 dark:bg-slate-950/90 border border-slate-200 dark:border-slate-800 rounded-xl p-1 shadow-inner z-20">
           {/* Smooth Sliding Pill Indicator */}
           <div
-            className="absolute top-1 bottom-1 left-1 rounded-lg shadow-md shadow-blue-900/25 transition-transform duration-300 ease-[cubic-bezier(0.2,0,0,1)] pointer-events-none z-0"
+            className="absolute top-1 bottom-1 left-1 rounded-lg shadow-md shadow-blue-900/25 transition-transform duration-350 ease-[cubic-bezier(0.16,1,0.3,1)] pointer-events-none will-change-transform z-0"
             style={{
-              width: 'calc(50% - 4px)',
+              width: 'calc((100% - 8px) / 2)',
               background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)',
-              transform: mode === 'pdf' ? 'translateX(calc(100% + 4px))' : 'translateX(0%)',
+              transform: mode === 'pdf' ? 'translate3d(100%, 0, 0)' : 'translate3d(0, 0, 0)',
             }}
           />
 
@@ -848,60 +979,7 @@ export function A4PdfPreviewModal({
                   </div>
 
                   {/* Size Switcher Pills */}
-                  <div className="flex items-center gap-0.5 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full p-0.5 shadow-sm text-[10.5px]">
-                    <button
-                      type="button"
-                      onClick={() => setImageSize('auto')}
-                      style={imageSize === 'auto' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
-                      className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
-                        imageSize === 'auto'
-                          ? 'text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                      }`}
-                      title="Smart auto-fit: Compact card for single company, A4 for multi-company"
-                    >
-                      ⚡ Auto
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setImageSize('compact')}
-                      style={imageSize === 'compact' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
-                      className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
-                        imageSize === 'compact'
-                          ? 'text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                      }`}
-                      title="WhatsApp / Mobile Card format"
-                    >
-                      📱 WhatsApp
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setImageSize('a4')}
-                      style={imageSize === 'a4' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
-                      className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
-                        imageSize === 'a4'
-                          ? 'text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                      }`}
-                      title="Standard full A4 document sheet"
-                    >
-                      📄 A4
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setImageSize('square')}
-                      style={imageSize === 'square' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
-                      className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
-                        imageSize === 'square'
-                          ? 'text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                      }`}
-                      title="Square 1:1 format"
-                    >
-                      🔲 1:1
-                    </button>
-                  </div>
+                  <SizeSwitcherGlider value={imageSize} onChange={setImageSize} />
                 </div>
                 {renderImagePreview()}
               </div>
@@ -911,7 +989,7 @@ export function A4PdfPreviewModal({
             <div className="flex flex-col h-full min-h-0 bg-slate-100/50 dark:bg-slate-900/60 overflow-hidden">
               {/* Right Pane Scrollable Body */}
               <div className="flex-1 overflow-auto p-4 sm:p-6 flex flex-col items-center bg-slate-200/50 dark:bg-slate-900/80 no-scrollbar gap-8">
-                {/* Compact Zoom & Size Controls directly above PDF */}
+                {/* Compact Zoom Controls directly above PDF */}
                 <div className="flex items-center justify-center gap-2 mb-3 shrink-0 flex-wrap print:hidden">
                   <div className="flex items-center gap-1 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full px-2.5 py-1 shadow-sm">
                     <button
@@ -937,62 +1015,6 @@ export function A4PdfPreviewModal({
                       title="Zoom In PDF (+)"
                     >
                       <ZoomIn size={12} />
-                    </button>
-                  </div>
-
-                  {/* Size Switcher Pills */}
-                  <div className="flex items-center gap-0.5 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full p-0.5 shadow-sm text-[10.5px]">
-                    <button
-                      type="button"
-                      onClick={() => setImageSize('auto')}
-                      style={imageSize === 'auto' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
-                      className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
-                        imageSize === 'auto'
-                          ? 'text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                      }`}
-                      title="Smart auto-fit"
-                    >
-                      ⚡ Auto
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setImageSize('compact')}
-                      style={imageSize === 'compact' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
-                      className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
-                        imageSize === 'compact'
-                          ? 'text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                      }`}
-                      title="WhatsApp Card format"
-                    >
-                      📱 WhatsApp Card
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setImageSize('a4')}
-                      style={imageSize === 'a4' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
-                      className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
-                        imageSize === 'a4'
-                          ? 'text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                      }`}
-                      title="Standard full A4 document sheet"
-                    >
-                      📄 A4 Sheet
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setImageSize('square')}
-                      style={imageSize === 'square' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
-                      className={`px-2 py-0.5 rounded-full font-bold transition-all cursor-pointer ${
-                        imageSize === 'square'
-                          ? 'text-white shadow-xs'
-                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                      }`}
-                      title="Square 1:1 format"
-                    >
-                      🔲 Square (1:1)
                     </button>
                   </div>
                 </div>
@@ -1035,60 +1057,7 @@ export function A4PdfPreviewModal({
                 </div>
 
                 {/* Size Switcher Pills */}
-                <div className="flex items-center gap-1 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full p-1 shadow-sm text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setImageSize('auto')}
-                    style={imageSize === 'auto' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
-                    className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
-                      imageSize === 'auto'
-                        ? 'text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                    }`}
-                    title="Smart auto-fit: Compact card for single company, A4 for multi-company"
-                  >
-                    ⚡ Auto
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setImageSize('compact')}
-                    style={imageSize === 'compact' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
-                    className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
-                      imageSize === 'compact'
-                        ? 'text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                    }`}
-                    title="Compact Mobile / WhatsApp Card format"
-                  >
-                    📱 WhatsApp Card
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setImageSize('a4')}
-                    style={imageSize === 'a4' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
-                    className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
-                      imageSize === 'a4'
-                        ? 'text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                    }`}
-                    title="Standard full A4 document sheet"
-                  >
-                    📄 A4 Sheet
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setImageSize('square')}
-                    style={imageSize === 'square' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
-                    className={`px-3 py-1 rounded-full font-bold transition-all cursor-pointer ${
-                      imageSize === 'square'
-                        ? 'text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-                    }`}
-                    title="Square 1:1 format"
-                  >
-                    🔲 Square (1:1)
-                  </button>
-                </div>
+                <SizeSwitcherGlider value={imageSize} onChange={setImageSize} />
               </div>
 
               {renderImagePreview()}
@@ -1099,7 +1068,7 @@ export function A4PdfPreviewModal({
           <div className="flex flex-col h-full min-h-0 bg-slate-100/50 dark:bg-slate-900 overflow-hidden">
             {/* Scrollable Viewport */}
             <div className="flex-1 overflow-auto p-4 sm:p-8 flex flex-col items-center bg-slate-200/50 dark:bg-slate-900/80 no-scrollbar">
-              {/* Compact Zoom & Size Controls directly above PDF Document */}
+              {/* Compact Zoom Controls directly above PDF Document */}
               <div className="flex items-center justify-center gap-2.5 mb-3 shrink-0 flex-wrap print:hidden">
                 <div className="flex items-center gap-1.5 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full px-3 py-1 shadow-sm">
                   <button
@@ -1125,62 +1094,6 @@ export function A4PdfPreviewModal({
                     title="Zoom In (+)"
                   >
                     <ZoomIn size={13} />
-                  </button>
-                </div>
-
-                {/* Size Switcher Pills */}
-                <div className="flex items-center gap-1 bg-white/95 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-full p-1 shadow-sm text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setImageSize('auto')}
-                    style={imageSize === 'auto' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
-                    className={`px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer ${
-                      imageSize === 'auto'
-                        ? 'text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                    title="Smart auto-fit"
-                  >
-                    ⚡ Auto
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setImageSize('compact')}
-                    style={imageSize === 'compact' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
-                    className={`px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer ${
-                      imageSize === 'compact'
-                        ? 'text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                    title="WhatsApp Card format"
-                  >
-                    📱 WhatsApp Card
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setImageSize('a4')}
-                    style={imageSize === 'a4' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
-                    className={`px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer ${
-                      imageSize === 'a4'
-                        ? 'text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                    title="Standard full A4 document sheet"
-                  >
-                    📄 A4 Sheet
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setImageSize('square')}
-                    style={imageSize === 'square' ? { background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' } : undefined}
-                    className={`px-2.5 py-1 rounded-full font-bold transition-all cursor-pointer ${
-                      imageSize === 'square'
-                        ? 'text-white shadow-xs'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                    }`}
-                    title="Square 1:1 format"
-                  >
-                    🔲 Square (1:1)
                   </button>
                 </div>
               </div>

@@ -5200,12 +5200,11 @@ app.get('/api/v1/weekly-tracker/kpi', async (req: Request, res: Response) => {
         const foundCols = await College.find({
           $or: [
             { college_code: String(college_id).toUpperCase() },
-            { college_name: new RegExp(String(college_id), 'i') },
+            { college_name: new RegExp(escapeRegex(String(college_id)), 'i') },
           ],
         });
         foundCols.forEach((fc) => queryCollegeIds.push(fc._id));
       }
-      queryCollegeIds.push(String(college_id));
       filter.college_id = { $in: queryCollegeIds };
     }
 
@@ -6361,112 +6360,6 @@ app.post('/api/v1/weekly-tracker/batch-restore', async (req: Request, res: Respo
   }
 });
 
-// ── WT-7: GET /api/v1/weekly-tracker/kpi
-// Live KPI counts across sections
-app.get('/api/v1/weekly-tracker/kpi', async (req: Request, res: Response) => {
-  try {
-    const { college_id, academic_year } = req.query;
-
-    if (!college_id) {
-      return res.status(400).json({
-        success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'college_id is required' },
-      });
-    }
-
-    const queryCollegeIds: any[] = [];
-    if (college_id === 'all') {
-      const allCols = await College.find({ is_active: { $ne: false } });
-      allCols.forEach((ac) => queryCollegeIds.push(ac._id));
-    } else if (Types.ObjectId.isValid(String(college_id))) {
-      queryCollegeIds.push(new Types.ObjectId(String(college_id)));
-      const targetCol = await College.findById(college_id);
-      if (targetCol) {
-        const sameCodeCols = await College.find({
-          $or: [
-            { college_code: targetCol.college_code },
-            { college_name: targetCol.college_name },
-          ],
-        });
-        sameCodeCols.forEach((sc) => {
-          if (!queryCollegeIds.some((id) => String(id) === String(sc._id))) {
-            queryCollegeIds.push(sc._id);
-          }
-        });
-      }
-    } else {
-      const foundCols = await College.find({
-        $or: [
-          { college_code: String(college_id).toUpperCase() },
-          { college_name: new RegExp(String(college_id), 'i') },
-        ],
-      });
-      foundCols.forEach((fc) => queryCollegeIds.push(fc._id));
-    }
-
-    const baseFilter: any = {
-      college_id: { $in: queryCollegeIds },
-      is_deleted: false,
-    };
-    if (academic_year && academic_year !== 'all') {
-      baseFilter.academic_year = Number(academic_year) || (await getCurrentAcademicYear());
-    }
-
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
-
-    const [
-      completedRows,
-      driveInProgressCount,
-      upcomingDrivesCount,
-      inProgressCount,
-      pipelineCount,
-      topCount,
-      rejectedCount,
-      followUpsDueCount,
-    ] = await Promise.all([
-      WeeklyTracker.find({ ...baseFilter, pipeline_section: 'completed' }).select('selected_count'),
-      WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: 'drive_in_progress' }),
-      WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: { $in: ['in_drive', 'companies_in_drive', 'upcoming_drives'] } }),
-      WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: 'in_progress' }),
-      WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: { $in: ['pipeline', 'companies_in_pipeline', 'top_companies'] } }),
-      WeeklyTracker.countDocuments({ ...baseFilter, $or: [{ pipeline_section: 'top_companies' }, { is_pinned_top: true }] }),
-      WeeklyTracker.countDocuments({ ...baseFilter, pipeline_section: { $in: ['rejected_companies', 'rejected_by_hr', 'rejected_by_college', 'on_hold_by_college', 'on_hold_by_hr'] } }),
-      WeeklyTracker.countDocuments({
-        ...baseFilter,
-        follow_up_date: { $ne: null, $lte: todayEnd },
-        pipeline_section: { $nin: ['completed', 'rejected_companies', 'rejected_by_hr', 'rejected_by_college', 'on_hold_by_college', 'on_hold_by_hr'] },
-      }),
-    ]);
-
-    const totalOffers = completedRows.reduce((sum, r) => sum + (r.selected_count || 0), 0);
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        kpi: {
-          completed: completedRows.length,
-          drive_in_progress: driveInProgressCount,
-          upcoming_drives: upcomingDrivesCount,
-          in_drive: upcomingDrivesCount,
-          in_progress: inProgressCount,
-          pipeline: pipelineCount,
-          top_companies: topCount,
-          rejected: rejectedCount,
-          total_offers: totalOffers,
-          follow_ups_due_today: followUpsDueCount,
-        },
-      },
-    });
-  } catch (error: any) {
-    return res.status(500).json({
-      success: false,
-      error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'Failed to fetch weekly KPI' },
-    });
-  }
-});
-
-// ── WT-8: POST /api/v1/weekly-tracker/sync-daily-positives
 // ── WT-8: POST /api/v1/weekly-tracker/sync-daily-positives
 // Ingest positive leads from Daily Leads (Positives section) into Weekly Tracker Pipeline (Companies in Pipeline)
 app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res: Response) => {
@@ -6500,7 +6393,7 @@ app.post('/api/v1/weekly-tracker/sync-daily-positives', async (req: Request, res
       const foundCols = await College.find({
         $or: [
           { college_code: String(college_id).toUpperCase() },
-          { college_name: new RegExp(String(college_id), 'i') },
+          { college_name: new RegExp(escapeRegex(String(college_id)), 'i') },
         ],
       });
       foundCols.forEach((fc) => queryCollegeIds.push(fc._id));
@@ -9748,20 +9641,61 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
             cFilter.$and = [...(cFilter.$and || []), batchOrYearClause(academic_year)];
           }
 
-          let [cCompleted, cDriveInProgress, cInDrive, cInProgress] = await Promise.all([
+          let [
+            cCompleted,
+            cDriveInProgress,
+            cInDrive,
+            cInProgress,
+            cPipeline,
+            cTopCompanies,
+            cRejected,
+            cOnHoldCollege,
+            cOnHoldHr,
+          ] = await Promise.all([
             WeeklyTracker.find({ ...cFilter, pipeline_section: 'completed' }).sort({ created_at: -1 }),
             WeeklyTracker.find({ ...cFilter, pipeline_section: 'drive_in_progress' }).sort({ created_at: -1 }),
             WeeklyTracker.find({ ...cFilter, pipeline_section: { $in: ['in_drive', 'companies_in_drive', 'upcoming_drives'] } }).sort({ drive_date: 1, created_at: -1 }),
             WeeklyTracker.find({ ...cFilter, pipeline_section: 'in_progress' }).sort({ created_at: -1 }),
+            WeeklyTracker.find({ ...cFilter, pipeline_section: { $in: ['pipeline', 'top_companies'] } }).sort({ created_at: -1 }),
+            WeeklyTracker.find({ ...cFilter, $or: [{ pipeline_section: 'top_companies' }, { is_pinned_top: true }] }).sort({ created_at: -1 }),
+            WeeklyTracker.find({ ...cFilter, pipeline_section: { $in: ['rejected_companies', 'rejected_by_hr'] } }).sort({ created_at: -1 }),
+            WeeklyTracker.find({ ...cFilter, pipeline_section: { $in: ['on_hold_by_college', 'rejected_by_college'] } }).sort({ created_at: -1 }),
+            WeeklyTracker.find({ ...cFilter, pipeline_section: 'on_hold_by_hr' }).sort({ created_at: -1 }),
           ]);
 
-          if (cCompleted.length === 0 && cDriveInProgress.length === 0 && cInDrive.length === 0 && cInProgress.length === 0 && cFilter.$and) {
+          if (
+            cCompleted.length === 0 &&
+            cDriveInProgress.length === 0 &&
+            cInDrive.length === 0 &&
+            cInProgress.length === 0 &&
+            cPipeline.length === 0 &&
+            cTopCompanies.length === 0 &&
+            cRejected.length === 0 &&
+            cOnHoldCollege.length === 0 &&
+            cOnHoldHr.length === 0 &&
+            cFilter.$and
+          ) {
             delete cFilter.$and;
-            [cCompleted, cDriveInProgress, cInDrive, cInProgress] = await Promise.all([
+            [
+              cCompleted,
+              cDriveInProgress,
+              cInDrive,
+              cInProgress,
+              cPipeline,
+              cTopCompanies,
+              cRejected,
+              cOnHoldCollege,
+              cOnHoldHr,
+            ] = await Promise.all([
               WeeklyTracker.find({ ...cFilter, pipeline_section: 'completed' }).sort({ created_at: -1 }),
               WeeklyTracker.find({ ...cFilter, pipeline_section: 'drive_in_progress' }).sort({ created_at: -1 }),
               WeeklyTracker.find({ ...cFilter, pipeline_section: { $in: ['in_drive', 'companies_in_drive', 'upcoming_drives'] } }).sort({ drive_date: 1, created_at: -1 }),
               WeeklyTracker.find({ ...cFilter, pipeline_section: 'in_progress' }).sort({ created_at: -1 }),
+              WeeklyTracker.find({ ...cFilter, pipeline_section: { $in: ['pipeline', 'top_companies'] } }).sort({ created_at: -1 }),
+              WeeklyTracker.find({ ...cFilter, $or: [{ pipeline_section: 'top_companies' }, { is_pinned_top: true }] }).sort({ created_at: -1 }),
+              WeeklyTracker.find({ ...cFilter, pipeline_section: { $in: ['rejected_companies', 'rejected_by_hr'] } }).sort({ created_at: -1 }),
+              WeeklyTracker.find({ ...cFilter, pipeline_section: { $in: ['on_hold_by_college', 'rejected_by_college'] } }).sort({ created_at: -1 }),
+              WeeklyTracker.find({ ...cFilter, pipeline_section: 'on_hold_by_hr' }).sort({ created_at: -1 }),
             ]);
           }
 
@@ -9772,6 +9706,11 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
             cDriveInProgress = cDriveInProgress.filter((r) => matchesMinCtcHelper(r.ctc_lpa, mVal, inclComp));
             cInDrive = cInDrive.filter((r) => matchesMinCtcHelper(r.ctc_lpa, mVal, inclComp));
             cInProgress = cInProgress.filter((r) => matchesMinCtcHelper(r.ctc_lpa, mVal, inclComp));
+            cPipeline = cPipeline.filter((r) => matchesMinCtcHelper(r.ctc_lpa, mVal, inclComp));
+            cTopCompanies = cTopCompanies.filter((r) => matchesMinCtcHelper(r.ctc_lpa, mVal, inclComp));
+            cRejected = cRejected.filter((r) => matchesMinCtcHelper(r.ctc_lpa, mVal, inclComp));
+            cOnHoldCollege = cOnHoldCollege.filter((r) => matchesMinCtcHelper(r.ctc_lpa, mVal, inclComp));
+            cOnHoldHr = cOnHoldHr.filter((r) => matchesMinCtcHelper(r.ctc_lpa, mVal, inclComp));
           }
 
           const totalOffers = cCompleted.reduce((sum, r) => sum + (r.selected_count || 0), 0);
@@ -9833,11 +9772,69 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
               current_status_text: r.current_status_text || 'In Progress',
               follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : (r.drive_date ? new Date(r.drive_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Scheduled'),
             })),
+            pipeline: cPipeline.map((r, idx) => ({
+              s_no: idx + 1,
+              company_name: r.company_name,
+              job_role: r.job_role || '—',
+              company_type: r.company_type || '—',
+              ctc_lpa: r.ctc_lpa || 'Awaiting JD',
+              status: r.current_status_text || 'Pipeline',
+              current_status_text: r.current_status_text || 'Pipeline',
+              follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+            })),
+            top_companies: cTopCompanies.map((r, idx) => ({
+              s_no: idx + 1,
+              company_name: r.company_name,
+              job_role: r.job_role || '—',
+              company_type: r.company_type || '—',
+              ctc_lpa: r.ctc_lpa || 'Competitive',
+              status: r.current_status_text || 'Target Top Company',
+              current_status_text: r.current_status_text || 'Target Top Company',
+              follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+            })),
+            rejected_companies: cRejected.map((r, idx) => ({
+              s_no: idx + 1,
+              company_name: r.company_name,
+              job_role: r.job_role || '—',
+              company_type: r.company_type || '—',
+              ctc_lpa: r.ctc_lpa || '—',
+              status: r.current_status_text || (r as any).remarks || 'Rejected Company',
+              current_status_text: r.current_status_text || (r as any).remarks || 'Rejected Company',
+              remarks: (r as any).remarks || r.current_status_text || 'Rejected Company',
+              follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+            })),
+            on_hold_by_college: cOnHoldCollege.map((r, idx) => ({
+              s_no: idx + 1,
+              company_name: r.company_name,
+              job_role: r.job_role || '—',
+              company_type: r.company_type || '—',
+              ctc_lpa: r.ctc_lpa || '—',
+              status: r.current_status_text || (r as any).remarks || 'On Hold by College / TPO',
+              current_status_text: r.current_status_text || (r as any).remarks || 'On Hold by College / TPO',
+              remarks: (r as any).remarks || r.current_status_text || 'On Hold by College / TPO',
+              follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+            })),
+            on_hold_by_hr: cOnHoldHr.map((r, idx) => ({
+              s_no: idx + 1,
+              company_name: r.company_name,
+              job_role: r.job_role || '—',
+              company_type: r.company_type || '—',
+              ctc_lpa: r.ctc_lpa || '—',
+              status: r.current_status_text || (r as any).remarks || 'On Hold from Corporate / HR',
+              current_status_text: r.current_status_text || (r as any).remarks || 'On Hold from Corporate / HR',
+              remarks: (r as any).remarks || r.current_status_text || 'On Hold from Corporate / HR',
+              follow_up_date: r.follow_up_date ? new Date(r.follow_up_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
+            })),
             total_completed: cCompleted.length,
             total_drive_in_progress: cDriveInProgress.length,
             total_in_drive: cInDrive.length,
             total_upcoming_drives: cInDrive.length,
             total_in_progress: cInProgress.length,
+            total_pipeline: cPipeline.length,
+            total_top_companies: cTopCompanies.length,
+            total_rejected: cRejected.length,
+            total_on_hold_college: cOnHoldCollege.length,
+            total_on_hold_hr: cOnHoldHr.length,
             total_offers: totalOffers,
           };
         })
@@ -9923,7 +9920,6 @@ app.post('/api/v1/reports/generate', async (req: Request, res: Response) => {
       if (targetCollege?._id) {
         queryCollegeIds.push(targetCollege._id);
       }
-      queryCollegeIds.push(String(college_id));
 
       wtFilter.college_id = { $in: queryCollegeIds };
       dtFilter.college_id = { $in: queryCollegeIds };
