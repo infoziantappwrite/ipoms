@@ -220,7 +220,7 @@ export function CollegeSelector({
           triggerHaptic('light');
           setIsOpen((prev) => !prev);
         }}
-        className={`flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all duration-150 shadow-2xs cursor-pointer select-none active:scale-[0.992] ${
+        className={`flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all duration-150 shadow-2xs cursor-pointer select-none active:scale-[0.992] ${
           selected
             ? 'bg-primary/10 dark:bg-sky-400/15 border-primary/40 dark:border-sky-400/35 text-primary dark:text-sky-300 hover:bg-primary/15 dark:hover:bg-sky-400/20 font-mono tracking-wide ring-1 ring-primary/20 dark:ring-sky-400/20'
             : isAll

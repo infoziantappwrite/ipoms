@@ -120,13 +120,13 @@ export function SmoothExportDropdown({
         style={{ background: 'linear-gradient(180deg, #38BF3D 0%, #1BA32D 50%, #0B6B1E 100%)' }}
         className={
           iconOnly
-            ? `w-9 h-9 hover:brightness-110 disabled:opacity-50 text-white rounded-xl flex items-center justify-center transition-all duration-150 shadow-md shadow-emerald-600/25 cursor-pointer active:scale-[0.95] shrink-0 relative ${className}`
-            : `px-3.5 py-1.5 hover:brightness-110 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all duration-150 shadow-md shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer active:scale-[0.95] whitespace-nowrap shrink-0 ${className}`
+            ? `w-[30px] h-[30px] hover:brightness-110 disabled:opacity-50 text-white rounded-lg flex items-center justify-center transition-all duration-150 shadow-md shadow-emerald-600/25 cursor-pointer active:scale-[0.95] shrink-0 relative ${className}`
+            : `h-[30px] px-3 py-1 hover:brightness-110 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition-all duration-150 shadow-md shadow-emerald-600/25 flex items-center gap-1.5 cursor-pointer active:scale-[0.95] whitespace-nowrap shrink-0 ${className}`
         }
         title={title}
         aria-label={title}
       >
-        <Download size={16} strokeWidth={2.2} className="shrink-0 text-white" />
+        <Download size={14} strokeWidth={2.2} className="shrink-0 text-white" />
         {!iconOnly && (
           <>
             <span>{isExporting ? 'Exporting…' : 'Export'}</span>

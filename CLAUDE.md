@@ -2700,6 +2700,803 @@ Every row is a real, verified gap. When you touch one of these areas, read the r
     code trace confirming `weeklyCompanies` already carries all 9 keys (cross-checked against two
     other existing call sites in the same file that already consume all 9), not by a screenshot.
 
+92. **Metadata duplicate cleanup round 2, 1 Oct 2026 (user-requested).** Re-ran the item 35b
+    governing rule (canonical company name match, then connected-components clustering by
+    shared mobile OR shared email within the name group) against the live database — not a
+    repeat of the same data, since real usage between 25 Sep and 1 Oct had re-introduced
+    duplicates (e.g. new metadata rows created via Daily Tracker's "add a contact not on
+    file" flow, item 85). Surfaced the plan to the user first (121 clusters, 256 rows,
+    listed in full with row numbers/HR/mobile/email), then merged on explicit instruction.
+    **At merge time the live counts had already moved again** (3,839 → 3,866 active records
+    between listing and merging, ordinary concurrent app usage) — the actual run found
+    **126 clusters / 266 rows**, not the 121/256 shown moments earlier; this is expected
+    given the live production DB and was called out rather than silently merging a stale plan.
+    **Survivor pick:** per cluster, the row with the most non-blank fields (HR name,
+    designation, mobile, email, type, CIN/GSTIN, industry, website, HQ, notes — more filled
+    fields wins), tie-broken by lowest serial number. **Merge:** mobile numbers and emails
+    unioned (deduped by last-10-digits / lowercased-trimmed respectively, original formatting
+    from first occurrence kept); HR names combined as a deduped comma list; any scalar field
+    blank on the survivor is backfilled from the first loser that has it. **New this round,
+    not done in 35b's original cleanup:** `company_id` references in `daily_tracker`,
+    `weekly_tracker`, `daily_leads`, and `pending_tasks` (all real FKs into
+    `company_metadata`, confirmed by reading all four models) are **re-pointed from every
+    merged-away row onto the survivor** before deletion, so no linked tracker/lead/task row
+    is left pointing at a company that no longer exists — 35b's original pass predates this
+    check and may have left some dangling, not re-verified here. Full JSON backup of the
+    pre-merge `company_metadata` state written to `backend/backups/
+    company_metadata_before_dedupe_<timestamp>.json` before any write. **Result:** 140 rows
+    deleted (3,866 → 3,726 active), 126 clusters merged, references re-pointed:
+    `daily_tracker` 58, `weekly_tracker` 30, `daily_leads` 16, `pending_tasks` 0. Verified by
+    re-running the duplicate scan afterward — zero clusters remain. `tsc --noEmit` clean both
+    sides (no application code touched — this was a data-only operation via a throwaway,
+    dry-run-by-default script, deleted after use per the established convention).
+    **One-off environment note, not a code bug:** this machine's default DNS resolver refused
+    the `mongodb+srv` SRV lookup (`ECONNREFUSED` on `querySrv`) for both the scan and the
+    merge script; setting `dns.setServers(['8.8.8.8','1.1.1.1'])` before connecting fixed it.
+    Not an application issue — the real backend/frontend dev servers were not running or
+    affected by this.
+    **Two pre-existing data-quality oddities spotted while reviewing the merge output
+    (neither introduced by the merge, both already present on their rows beforehand) —
+    fixed the same day on explicit user confirmation:** (a) row #1459 "Grihum Housing
+    Finance Limited" had a stray leading `[` on one of its two mobile numbers
+    (`["8939969152","[9597961433"]`) — stripped to `["8939969152","9597961433"]`.
+    (b) row #1988 "Malayala Manorama" carried one genuine 10-digit number
+    (`8770510430`) and one 32-digit glued-together junk string starting with the same
+    10 digits (`8770510430942530310908022247735`, no separator, no clear second number
+    recoverable from it) — dropped the junk entry entirely rather than guess a split,
+    keeping only the one real number, consistent with item 35b's rule to only ever
+    touch glued-contact entries with unambiguous split evidence and otherwise leave
+    unfamiliar-looking data alone. Backed up both records (`backend/backups/
+    company_metadata_before_cleanup_two_<timestamp>.json`) before writing. Verified
+    live: both rows read back with the corrected `mobile_numbers` array.
+
+93. **Month-End Report: "Focus College Call Activity" checklist removed; a real backend scope
+    leak it was masking found and fixed; KPI cards now flow dynamically instead of leaving a
+    gap, 1 Oct 2026 (user-requested, plus a bug the user correctly diagnosed from the UI).**
+    **(a) Removed the redundant checklist.** `ReportBuilderWizard.tsx`'s Month-End step had a
+    second college picker — a 22-checkbox "Focus College Call Activity" grid — sitting below
+    the single-select "Target Institution" field already chosen in the same step. The user's
+    point: Target Institution already picks the college: a second, independent college
+    selector for "whether to show call activity" was never needed — showing or hiding the
+    calling-activity numbers is what the KPI-card checkboxes under "Sections & Metrics to
+    Include in Report" (Total Calls Made / Positives Received / Duration Spent / Offers
+    Received) are *for*. Removed the whole UI block, its state (`monthEndSelectedCollegeIds`,
+    every read/write/restore/autosave/reset reference), the "select at least one college for
+    Month-End" validation, and the `college_ids`/`selected_college_ids` payload fields that
+    carried it to the backend. The Target Institution dropdown's "All Handled Institutions
+    (Filter Below)" option is now just "All Handled Institutions" — the "Filter Below" promise
+    no longer exists.
+    **(b) Real bug this surfaced, found while tracing the "indirectly selecting the same
+    colleges" the user described:** `POST /reports/generate`'s month_end branch
+    (`server.ts`) computes DailyTracker calling stats (`total_calls`, `positive_responses`,
+    `total_duration`) from a `targetCollegeObjIds` list that — unlike the parallel
+    `collegeIdsToMatch` list built two screens earlier in the same function for the Weekly
+    Tracker sections, which correctly only falls back to every handled college when no single
+    `college_id` was given — unconditionally appended **every one of the coordinator's
+    handled colleges** on top of the resolved Target Institution, regardless of whether a
+    specific single college had already been chosen. So picking a single Target Institution
+    (e.g. ACET) for the KPI cards still silently pulled in calling-time/positives/duration
+    from every other college that coordinator handles — exactly the "indirectly selecting the
+    same colleges" the user flagged, and the actual reason the checklist's tick marks felt
+    redundant/confusing rather than simply unnecessary. Fixed by gating that fallback with the
+    same `isSingleCollegeTarget` condition the Weekly Tracker block already used: handled
+    colleges are only unioned in for a genuine "All Handled Institutions" report (no specific
+    Target Institution resolved); a single college_id now scopes calling stats to *only* that
+    college, matching the Weekly Tracker sections' scope exactly.
+    **(c) KPI cards no longer leave a gap when fewer than 4 are ticked.** The month_end KPI
+    strip in `NativeReportEditor.tsx` and `A4PdfPreviewModal.tsx` rendered via a fixed
+    `grid grid-cols-2 sm:grid-cols-4` — with 3 cards ticked, the grid still reserved a 4th
+    column's worth of empty space on the right (visible in the user's screenshots). Every
+    other KPI strip in both files (Weekly, Daily Positives/JD, Active Leads, multi-college)
+    already used `flex flex-wrap gap-X` with `flex-1 min-w-[Npx]` cards, which stretches the
+    present cards to fill the full row with no gap regardless of count — month_end was the
+    one holdout still on a fixed grid. Switched both to the same `flex flex-wrap justify-center
+    gap-2.5` / `flex-1 min-w-[120px]` pattern: 4 cards fill the row as before, 3 stretch wider
+    to fill it evenly with no gap, 2 do the same, 1 centers and fills on its own — matching the
+    user's spec exactly, and for free, since it's the same mechanism the other three templates
+    already relied on. **`reportCanvasRenderer.ts` (the PNG/PDF canvas export) was already
+    correct** — its `kpiCardW = (CONTENT_W - (kpiCount-1)*gap) / kpiCount` computation has
+    always been count-driven, so the exported image never had this gap; only the two
+    on-screen preview surfaces needed the fix.
+    **Verified:** `tsc --noEmit` clean on both sides after every change. **Not verified live
+    in-browser this session** — the in-app preview tool hit the same blank/0×0-viewport
+    failure documented repeatedly elsewhere in this file (items 35, 38, 86, 91), with both
+    dev servers confirmed healthy via `curl` (`frontend :3000` 200, `backend
+    /api/v1/health` 200) — confirmed by code trace and a clean typecheck only; re-check
+    visually next time the preview tool works, specifically: Month-End step no longer shows
+    the checklist, a single-college Target Institution report's KPI numbers genuinely change
+    when switched to a different single college (not identical every time, which would mean
+    the handled-colleges leak is still happening), and 1/2/3/4 ticked KPI cards all render
+    edge-to-edge with no empty gap.
+
+94. **Month-End KPI cards redesigned to a hairline-divider strip, 1 Oct 2026 (user-requested
+    — picked via an Artifact design comparison before building, same process as item 90).**
+    Item 93(c)'s dynamic-flex fix solved the "gap on the right" problem but the user still
+    found the four boxed, tinted tiles too tall for what they show. Built a live comparison
+    of 5 compact alternatives (hairline-divider strip, icon pills, single-line navy ticker,
+    compact left-accent tiles, plus the boxed baseline) as an Artifact mockup, using ACET's
+    real September figures (78 calls / 9 positives / 0 offers) rather than placeholder
+    numbers — user picked **Option B, the hairline-divider strip**: one bordered row, no
+    per-card boxes/fills, a thin vertical rule between items, each item's own color only on
+    its number (not a tinted background). Before building it into the real report, the user
+    asked to see Option B specifically at 4/3/2/1 active cards — a second mockup round
+    confirmed 4/3/2 all stretch correctly with no gap, and settled the one open question
+    (the 1-card case): **a small centered box, not a full-width stretch** — a single stat
+    spread edge-to-edge across the full report width read like an error rather than a
+    deliberate design.
+    **Built into all three render surfaces** (`NativeReportEditor.tsx`,
+    `A4PdfPreviewModal.tsx`, `reportCanvasRenderer.ts` — the PNG/PDF canvas export), scoped
+    to `template_type === 'month_end'` only; every other report type's KPI strip (Weekly,
+    Daily Positives/JD, Active Leads, multi-college) is untouched. 2+ cards: one
+    `border border-border rounded-xl` row, each card `flex-1` with `border-l` on every item
+    but the first (React) — the canvas renderer draws the same shape by hand: one stroked
+    outline rect spanning the full content width, a short vertical divider line drawn at
+    each internal boundary. 1 card: centered, capped-width box (`min-w-[180px]` in React,
+    a fixed 220px box in canvas, both centered independently of card count so the single-card
+    report never looks like a stretched error state). The React components dropped the
+    colored `bg`/border tint per card entirely (plain bordered row, colored value text only)
+    to match the chosen mockup exactly; the canvas renderer's shared `kpiCards` height
+    reservation (`totalH += 58 + 18`, used by every template) was deliberately left
+    unchanged — the strip's drawn height stayed 58px so this didn't need touching.
+    **Verified:** `tsc --noEmit` clean on all three files. **Not verified live in-browser
+    this session** — same blank/0×0-viewport preview-tool failure as items 35, 38, 86, 91,
+    93, with both dev servers confirmed healthy via `curl`; confirmed only by code trace and
+    a clean typecheck. Re-check visually next time the preview tool works: the 4/3/2-card
+    strip has no visible gap and a real divider line between each stat, and the 1-card case
+    renders as a small centered box, not a stretched line across the page.
+
+95. **Month-End KPI strip swapped from the white hairline-divider strip to a solid navy bar,
+    1 Oct 2026 (user decision — picked via a second Artifact comparison round, same per-count
+    process as item 94).** After seeing item 94's white-background divider strip live, the
+    user asked for a solid-color version instead. Mocked 3 solid variants (per-stat bold
+    colors, one solid navy bar, opaque pastel fill) against the user's real live numbers
+    (0/0/1), then — once navy was picked — a second mockup specifically at 4/3/2/1 active
+    cards (mirroring item 94's per-count review) to confirm the reflow before building.
+    **What changed from item 94, same shape otherwise:** the bordered/outlined strip became a
+    filled block using the **exact navy gradient already used for this report's own
+    section-table headers** (`linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)`
+    — not a new color, reused from `A4PdfPreviewModal.tsx`'s/`reportCanvasRenderer.ts`'s
+    existing header-row drawing code so the KPI bar now visually matches the tables below it);
+    white text/labels (`text-white`, `text-white/75` for the label) instead of per-metric
+    colored text; the divider between cards is now a translucent white rule
+    (`border-white/20` in React, `rgba(255,255,255,0.28)` in canvas) instead of the gray
+    hairline. **Per-metric color coding is gone** — all 4 cards are now visually identical
+    except their label/value text, a deliberate trade the user made for the simpler
+    "one summary bar" look. `NativeReportEditor.tsx` uses the semantic `bg-primary` token
+    (which already resolves to the same navy in light mode and the dark-mode-tuned navy in
+    dark mode, per item 13) rather than a literal hex, so the on-screen editor's bar still
+    respects the app's own theme toggle — `A4PdfPreviewModal.tsx` and the canvas renderer stay
+    literal-hex/gradient since both of those surfaces are always rendered light (print/export
+    convention, unaffected by the viewer's theme). The `meCards` arrays in both React files
+    were simplified to `{key, label, val}` — the per-card `bgClass`/`labelText`/`valText`/`bg`/
+    `text` fields from item 93/94 are gone, since every card now renders identically. 1-card
+    case keeps the exact same centered-compact-box rule as item 94, just filled navy instead
+    of outlined white. **Verified:** `tsc --noEmit` clean on all three files (one real type
+    fix needed along the way: `drawRoundRect`'s `fill` parameter in `reportCanvasRenderer.ts`
+    was typed `string`-only; widened to `string | CanvasGradient` so the new gradient fill
+    could be passed through the same helper the rest of the file already uses for solid
+    fills). **Not verified live in-browser this session** — same preview-tool failure as
+    items 35, 38, 86, 91, 93, 94, both dev servers confirmed healthy via `curl`; confirmed
+    only by code trace and clean typecheck. Re-check visually next time the preview tool
+    works: the bar should read as the same navy as the section-table headers directly below
+    it in the same report, not a different shade.
+
+96. **Month-End navy KPI bar shrunk — user-specified pixel values, 1 Oct 2026 ("shouldn't
+    feel like a beacon covering some spaces, make it minimal size").** After seeing item 95's
+    navy bar live, the user judged it too big. Before changing anything, read back the exact
+    current properties across all three render surfaces as a table (padding, font sizes,
+    radius, divider geometry, total height) so the user could name real numbers rather than
+    guess — they specified **padding → 6px** and **value font → 16px**; label font, corner
+    radius and divider inset were tightened alongside those two as a judgment call toward the
+    stated "minimal, not a beacon" goal (flagged to the user as extra, not silently bundled).
+    **`reportCanvasRenderer.ts` is the authoritative pixel surface** (canvas draws exact
+    pixels; the two React surfaces use the closest Tailwind utility) — its bar height dropped
+    from a fixed **58px → 44px** (6px top/bottom padding + ~10px label line + ~3px gap +
+    ~19px value line + 6px bottom padding), value font **17px → 16px**, label stays 9.5px,
+    corner radius **10px → 8px**, divider inset **10px → `padV` (6px)** top/bottom, single-card
+    box width **220px → 200px**. The shared KPI-section height *reservation* pass
+    (`totalH += 58 + 18`, used by every template before this item) now branches by
+    `template_type` — month_end reserves `44 + 18`, every other template still reserves the
+    original `58 + 18` — **this had to be kept in exact sync with the draw-pass height or the
+    canvas under/over-reserves vertical space for this one template**, a sizing bug the
+    previous two month_end canvas changes (items 93, 95) didn't need to touch since they
+    never changed the bar's actual height, only its shape and fill.
+    `NativeReportEditor.tsx` / `A4PdfPreviewModal.tsx`: `px-4 py-2.5` → `px-1.5 py-1.5` (multi-
+    card) / `px-6 py-2.5` → `px-4 py-1.5` (single-card box, kept slightly roomier since it's
+    alone rather than packed against neighbors), `rounded-xl` → `rounded-lg`, value
+    `text-xl`/`text-lg` → `text-base` (16px) with `leading-tight` added throughout so the now-
+    tighter line-heights don't reintroduce the padding back as whitespace; `NativeReportEditor`'s
+    label also moved from `text-micro` (12px) to `text-[10px]` to match the exact size
+    `A4PdfPreviewModal` already used (both surfaces were inconsistent before this — now match).
+    **Verified:** `tsc --noEmit` clean on all three files. **Not verified live in-browser this
+    session** — same preview-tool failure as items 35, 38, 86, 91, 93, 94, 95, both dev servers
+    confirmed healthy via `curl`; confirmed only by code trace and clean typecheck. Re-check
+    visually next time the preview tool works, specifically whether the new 44px bar height
+    (down from 58px, a ~24% reduction) reads as "minimal" to the user's eye or needs a further
+    pass — this was sized from the two numbers given, not re-confirmed against a render.
+
+97. **Report Builder "Save Image"/"Save PDF" silently did nothing on all 6 report types — root
+    cause confirmed live by the user, final fix is a native one-click "Save As" dialog, 1 Oct 2026.**
+    Full static trace of the export path (`A4PdfPreviewModal.tsx`, `NativeReportEditor.tsx`,
+    `reportCanvasRenderer.ts`) found no thrown error — `tsc --noEmit` clean throughout, every
+    `canvas.toBlob`/`getContext` call guarded, `createPdfFromCanvases()` (a real, hand-rolled
+    PDF-1.4 generator — **item 8/§8's "PDF is still window.print()" claim is now false, historical
+    only**; a concurrent session built genuine library-free PDF export at some point this session)
+    structurally sound. A toast was added so a thrown error would at least be visible — the user
+    then confirmed live: the toast said **"saved" with no error, yet no file ever appeared in the
+    real Windows Downloads folder and no save-as dialog opened, on every report type**. Root cause:
+    both handlers were `async` and only triggered the actual `anchor.click()` download *after* a
+    multi-second chain (parallel image loads with up to a 2.5s guard each, canvas drawing,
+    `canvas.toBlob` encoding, and for PDF a sequential per-page `arrayBuffer()` conversion). By the
+    time that click fires, Chrome/Edge can decide too much time has passed since the real user click
+    that started it and silently drop the programmatic download — no error, no dialog, nothing on
+    disk, and nothing a `try`/`catch` can ever see since nothing throws.
+    **First fix attempt (superseded same day):** split generation from saving and required a second,
+    explicit click to actually download — technically correct (a fresh click can't lose activation),
+    but the user rejected it outright: they wanted exactly one click, like the flow used to be, and
+    specifically wanted a real "where do you want to save this" dialog every time, not a silent save
+    to the default Downloads folder.
+    **Final fix: open the native Save-As dialog FIRST, before any rendering, then render and write
+    into the handle the user already picked.** New in `reportCanvasRenderer.ts`:
+    `openSaveDialog(suggestedName, mimeType, extensions, description)` calls the File System Access
+    API's `window.showSaveFilePicker()` as the very first thing the click handler does — before any
+    `await` — so the dialog is still tied to a guaranteed-fresh click no matter how long rendering
+    takes afterward; returns the handle, `'cancelled'` if the user closed the dialog (not an error),
+    or `null` if the browser has no File System Access API (Firefox, Safari — no native dialog is
+    possible there, but the save still completes in one click via the existing `downloadFile()`
+    anchor-click fallback straight to the Downloads folder). `writeBlobToHandle(handle, blob)` writes
+    the rendered file into an already-granted handle, which needs no further activation since the
+    permission was already granted when the dialog was accepted. `prepareReportImageBlob()`/
+    `prepareReportPdfBlob()` (render-only, no download) from the superseded attempt were kept and
+    reused — only the save-triggering step changed. `exportReportAsImage`/`exportReportAsPdf` remain
+    as thin backward-compatible wrappers (prepare + `downloadFile()`) though nothing currently calls
+    them. Both real call sites — `A4PdfPreviewModal.tsx` and `NativeReportEditor.tsx`, which turned
+    out to have their own independent, identically-bugged Save Image/Save PDF buttons — now: click →
+    native Save As dialog opens immediately → user picks a location → report renders in the
+    background → file is written straight into the chosen location → success toast. One click, one
+    dialog, no extra step, exactly as asked. The earlier two-click "Click to Save" pulsing-green
+    button state was fully removed from both files. `tsc --noEmit` clean on both files after every
+    edit.
+    **Not verified live in-browser this session** — the in-app preview tool failed on every
+    navigation attempt to `localhost:3000` throughout (same tooling failure already logged
+    repeatedly: items 35, 38, 86, 91, 93–96), both dev servers confirmed healthy via `curl`
+    throughout. Both the original bug and the rejected first fix's shortcomings were diagnosed from
+    the user's own live testing, not from this session's tooling — **ask the user to confirm the
+    native Save As dialog actually appears and the file lands where they picked, next time this area
+    is touched.** Also noticed, unrelated, not investigated further: a new file
+    `frontend/src/app/reports/components/ReportDocumentView.tsx` (untracked at session start) is a
+    real, wired-in component — imported by both `A4PdfPreviewModal.tsx` and `NativeReportEditor.tsx`
+    — evidently a concurrent session's in-progress shared-rendering-component work (the exact gap
+    flagged to the user earlier this session as "no shared rendering component across the three
+    preview surfaces"). Left untouched; worth reading before describing that gap as still fully open.
+    **Hooks-order regression hit and fixed while building the (since-superseded) two-click attempt:**
+    two `useEffect`s were briefly added *after* `A4PdfPreviewModal.tsx`'s `if (!isOpen || !report)
+    return null;` early return — a Rules-of-Hooks violation invisible to `tsc` that only shows up on
+    a real render ("Rendered more hooks than during the previous render"). Both effects were removed
+    entirely in the final fix (no "ready file" state left to invalidate), so this specific code is
+    gone, but the lesson stands for this file: **any hook added to a component with an early-return
+    guard must go above that guard, never below it — `tsc` will not catch the violation.**
+    **Second regression, same day, user-reported live: the native-dialog fix saved a real file at the
+    chosen location, but the file was 0 bytes and corrupt** ("Failed to load PDF document" / "format
+    unsupported or corrupted" in Windows Photos), and both Save buttons were stuck on "Saving…"
+    indefinitely. The dialog itself worked — this was a failure in rendering-then-writing, not in
+    opening the picker. Root cause not fully pinned down (this session's browser preview tool still
+    could not reach `localhost:3000` to capture a live console error — same tooling failure as the
+    rest of this item), but two real, independent hardening gaps were found and fixed regardless:
+    (1) `writeBlobToHandle()` had no `try`/`catch` around `write()`/`close()` — if either throws, the
+    file the picker already created on disk (the picker creates a real empty file the moment a
+    location is chosen, before any bytes are written) is left behind as a silent 0-byte husk, exactly
+    matching what the user saw. Now wrapped: a failure explicitly calls `writable.abort()` and
+    re-throws the real error, so the caller's `catch` actually fires instead of the file quietly
+    existing-but-broken forever. (2) Nothing bounded how long rendering or writing could take — if
+    `generateReportCanvases()` (or the write itself) ever genuinely hangs, the button stays on
+    "Saving…" forever with the person given no way to know something went wrong. New `withTimeout()`
+    helper races the render (45s) and the write (20s) against a timer; a real timeout now surfaces as
+    an ordinary error toast with a clear message instead of an indefinite spinner. **Separately,
+    same conversation: the user asked for sharper output** ("nearly 3MB" PNG, "1-2MB" PDF, no pixel
+    breakup when zoomed) — found `BASE_SCALE` (the internal render resolution multiplier) live at
+    `2` (1720px-wide A4 pages), which **contradicts this very file's item 77**, which documented a
+    deliberate pass to 4x (3440px) for exactly this sharpness reason — a regression from other work
+    in this codebase at some point after item 77, caught only because the user asked about quality
+    independently of the hang investigation. Raised to `3` (2580px) rather than straight back to 4,
+    as a safer middle ground given a long multi-page report's composite image pixel count was already
+    the leading hypothesis for the hang — the new timeout is what makes raising this safe to try at
+    all, since a render that's now too slow at 3x will show a clear error rather than hang silently
+    like before. `tsc --noEmit` clean on all three touched files. **Not verified live in-browser this
+    session** — ask the user to retry Save Image/Save PDF and confirm: (a) the file now actually
+    contains the report rather than landing at 0 bytes, (b) if it still fails, whether a timeout error
+    toast appears (meaning the render is genuinely too slow at 3x and the scale should come back down)
+    or some other error message (a new, different bug to chase), and (c) whether 3x resolution reads
+    as sharp enough or needs to go higher.
+    **Third regression, same day, user-reported live with the actual error toast this time —
+    confirms the safeguards are working, not that the bug is recurring.** The native dialog opened
+    correctly and the render completed (both visibly working in the user's own screenshots), but the
+    WRITE itself took over 20 seconds on a real 3-page report and tripped the `withTimeout` guard
+    added in the previous entry: "Image save failed: Writing the image file took too long (over 20s)
+    and was cancelled." This is a genuinely different failure than the 0-byte-file regression — that
+    one was invisible (no error, no toast, nothing); this one is the exact mechanism built to catch
+    slow writes doing its job and surfacing a real, specific, actionable message. **Root cause: the
+    item-97 "sharper output" BASE_SCALE bump (2→3) made the composite multi-page PNG large enough
+    that writing it through the File System Access API — on a Windows machine, where antivirus
+    commonly scans a file as it's being written — measured over 20s for real.** Fixed by (1) reverting
+    `BASE_SCALE` back to `2` (the original value, 1720px-wide pages) — prioritizing a save that
+    reliably works over a sharper one that doesn't, and (2) raising all four write timeouts
+    (`A4PdfPreviewModal.tsx` ×2, `NativeReportEditor.tsx` ×2) from 20s to 60s regardless, so a
+    legitimately larger write under AV scanning or a slower disk gets a fair chance to finish rather
+    than being killed just past an arbitrary 20s mark. `tsc --noEmit` clean on all three files.
+    **To the user, plainly: why this took several rounds** — each round fixed a real, different,
+    confirmed bug, not the same one coming back: round 1 was a silent, undetectable browser timing
+    issue (downloads dropped with zero error, because nothing ever threw — a toast couldn't even help
+    until the design changed); round 2 was a single-click native-dialog request that genuinely needed
+    rebuilding the save flow, not patching it; round 3 was a 0-byte-file bug invisible without an error
+    path to catch it; round 4 (this one) is the first failure actually CAUGHT AND REPORTED by name,
+    which is progress, not repetition — every prior round made the next bug detectable instead of
+    silent. **Not verified live in-browser this session** — ask the user to retry Save Image/Save PDF
+    on the same multi-page report and confirm it completes within the new 60s window; if it still times
+    out, that points to something slower than normal on this specific machine (disk, AV, or network
+    drive) rather than the resolution, and the timeout can be raised further or the write made
+    chunked/streamed instead of one big `write()` call.
+    **Final pivot, same day, user-reported live: the native Save As picker produced TWO files from
+    the save flow — one genuinely openable, one that failed to open — and the user asked to abandon
+    the File System Access approach outright for something faster and more reliable.** Across four
+    rounds the native-picker approach had now failed four different ways in this environment (silent
+    drop, 0-byte file, 20s+ write time, and this two-file outcome) — no longer a one-off, a real
+    pattern that this specific write mechanism (likely interacting with Windows antivirus scanning
+    files as they're written) is simply not reliable here. **Reverted `handleDownloadImage`/
+    `handleDownloadPdf` (both files) entirely back to the classic approach**: render the file, then
+    call `downloadFile()` (the original Blob-URL + hidden-`<a download>`-click helper) once, with
+    *no* `openSaveDialog`/`writeBlobToHandle`/`withTimeout` involved at all — removed from both
+    handlers and their imports. The key practical difference: a `<a download>` click hands the bytes
+    to the **browser's own download manager**, which writes the file atomically outside of page
+    JavaScript — there is no explicit `write()`/`close()` sequence in app code left to hang, corrupt,
+    or duplicate. This is a straight reversion to what item 97 opened with (the original, pre-fix
+    code), now re-adopted deliberately after exhausting the more feature-rich alternative.
+    **Trade-off made explicit to the user:** this does not force a save-location prompt — by default
+    the file goes straight to Downloads. A real "where do you want to save this" dialog is still
+    available, but now depends on the browser's own **"Ask where to save each file before
+    downloading"** setting (Chrome/Edge, `chrome://settings/downloads` or `edge://settings/downloads`)
+    rather than anything this app controls — when that setting is on, a plain download click already
+    produces a native save dialog, with none of the File System Access write-reliability problems
+    seen across the last four rounds. `tsc --noEmit` clean on both files. **Not verified live
+    in-browser this session** — ask the user to retry Save Image/Save PDF: it should now complete
+    within roughly a second (no 20–60s wait, since there is no explicit write step to time), produce
+    exactly one file per click, and land in Downloads (or prompt for a location, if that Chrome
+    setting is turned on). clipping risk fixed, and a real build-breaking JSX bug found and fixed
+    along the way — 1 Oct 2026 (user-requested icon swap in Daily Tracker's Contact column; the icon
+    is shared infrastructure, so this reached every other screen that uses it too).** All WhatsApp
+    entry points in the app — the Daily Tracker contact cell (`TrackerRow.tsx`), the Softphone panel
+    (`SoftphonePanel.tsx`) — go through one shared component, `components/ui/WhatsAppButton.tsx`.
+    (a) Replaced `frontend/public/whatsapp-icon.png` with the user-supplied file (same 512×512 solid
+    circle-on-transparent design, visually near-identical to what was already there — the user wanted
+    their specific file used, so it was swapped regardless). (b) The user's real concern was that the
+    icon must be **fully visible no matter what shape the container is** — the trigger button and the
+    popover header's small icon both had `rounded-full overflow-hidden` wrapping the `object-contain`
+    image. `object-contain` alone never crops the image content, but `overflow-hidden` on a container
+    that isn't guaranteed perfectly square (e.g. squeezed by a tight flex row in the Contact cell)
+    can still clip it. Removed `overflow-hidden` from both spots and added `aspect-square` so the box
+    can't be squeezed into a non-square shape in the first place — between the two, there is no longer
+    any path to a cropped icon regardless of container shape. (c) **Found while reading this file for
+    the icon change, not introduced by it:** the popover header markup was genuinely broken — a
+    duplicated "WhatsApp" `<span>` and a misplaced `</div>` left the JSX unbalanced, which **does not
+    fail silently**: `npx tsc --noEmit` reported a cascade of 18 real parse errors starting at this
+    file and the whole frontend failed to typecheck/build. This predated this session's edits (almost
+    certainly another concurrent session mid-edit, the same pattern documented repeatedly elsewhere in
+    this file) and was not something the icon-swap request introduced — but it had to be fixed to get
+    a clean build at all. Restored the header to its obvious original intent: icon + "WhatsApp" label
+    on the left, the mobile number on the right, no duplicate text. `tsc --noEmit` clean afterward.
+    **Not verified live in-browser this session** — the in-app preview tool failed on every navigation
+    attempt to `localhost:3000` throughout this entire session (same tooling failure logged repeatedly:
+    items 35, 38, 86, 91, 93–97); confirmed by code trace and a clean typecheck only. Ask the user to
+    confirm live: the new icon shows correctly in the Daily Tracker Contact column's WhatsApp button
+    and its popover, with no cropped edges at the small button size.
+
+99. **WhatsApp icon shrunk to a small soft-rounded square, same session, user follow-up — "too big,
+    needs to fit a single row, same size as the phone-number text."** Item 98's fix made the icon
+    fully visible but kept it at its original 22px circular size, which was still too big for the
+    dense Daily Tracker row. `WhatsAppButton.tsx`'s `size?: 'sm' | 'md'` prop existed on the
+    interface but was never actually read anywhere in the component body — wired it up for real.
+    New default **`sm`**: a 16px square (`w-4 h-4`, matching `text-xs`'s ~16px line height so it
+    sits level with the typed mobile number), `rounded-[5px]` for soft corners rather than a full
+    circle. The source artwork is a solid-colour circle, so an actual square silhouette means
+    `object-cover` + `overflow-hidden` to crop its outer margin flush with the frame — safe here
+    specifically because the circle is one flat colour throughout, so the crop only removes empty
+    background and never touches the phone/chat glyph in the centre; this is NOT a reversion of item
+    98's "must stay fully visible" fix, which was about the meaningful glyph never being cut off, not
+    about the icon's literal silhouette. `md` (the original 22px, uncropped, circular, `object-contain`)
+    is kept available via the prop for roomier contexts that might want a bigger tap target, though no
+    call site currently requests it — both existing usages (`TrackerRow.tsx`, `SoftphonePanel.tsx`)
+    now get the smaller default automatically with no prop changes needed at either call site.
+    `tsc --noEmit` clean. **Not verified live in-browser this session** — same tooling failure as item
+    98 and the rest of this file's recent entries; ask the user to confirm the icon now reads as a
+    small square badge sitting level with the phone number, not a larger circle.
+
+100. **Report Builder download saga, final chapter: moved from a script-triggered click to a real,
+    user-clicked link — 1 Oct 2026 (continuing item 97, user-reported live: even the plain,
+    original `downloadFile()`/`<a download>` mechanism — the simplest possible code, a straight
+    reversion to what existed before any of this session's fixes — ALSO silently failed the same
+    way, toast says "saved," nothing lands on disk).** This was the decisive new fact: it proved the
+    File System Access API was never the real cause, since removing it entirely changed nothing.
+    Something was silently defeating *every* script-triggered download mechanism tried in this
+    environment, regardless of implementation. **Leading explanation: Chrome's "automatic
+    downloads" throttle.** A page calling `element.click()` on a hidden `<a download>` (what every
+    version so far did, including the very first one before this session started touching it) is
+    classified by Chrome as an *automatic* download — after several have fired from the same
+    origin without a fresh, real user interaction in between, Chrome can start silently discarding
+    further ones with no error and no visible dialog. Across this session's many repeated test
+    clicks against `localhost:3000`, that throttle may well have already tripped, which would
+    explain every single symptom seen across all four prior rounds without needing four unrelated
+    root causes.
+    **Fix: stop triggering the download from script entirely — require a real mouse click.**
+    New `createDownloadUrl()` in `reportCanvasRenderer.ts` turns a rendered Blob into a plain
+    object URL and does nothing else — no `.click()`, no write, no picker. Both
+    `A4PdfPreviewModal.tsx` and `NativeReportEditor.tsx` now hold a `readyImageDownload`/
+    `readyPdfDownload` state; clicking Save Image/Save PDF renders the file and, once ready,
+    swaps that button for a real `<a href={url} download={fileName}>` element — styled the same,
+    turned green and pulsing to draw the eye — that the person then clicks **themselves**. A
+    genuine mouse click on a real anchor element is categorically different from a script-dispatched
+    one and is never subject to the automatic-download throttle, so this closes off that entire
+    class of failure by construction rather than by hoping the next attempt doesn't hit it again.
+    The link's `onClick` shows the success toast and revokes the object URL + clears the ready
+    state 2 seconds later (long enough for the browser to have started the real download first).
+    `A4PdfPreviewModal.tsx` also gained two `useEffect`s that reset the ready state (revoking any
+    stale URL) whenever `report`/`imageSize` changes — placed above the component's early return,
+    per this file's own Rules-of-Hooks lesson from earlier in the same saga.
+    This is, by necessity, a two-interaction flow again (render, then a real click to save) — the
+    one thing the user asked NOT to have — but it is the only remaining mechanism not yet tried
+    after single-click auto-download failed in every variant attempted (File System Access, and
+    now plain `<a download>`, both script-triggered). `tsc --noEmit` clean on both files.
+    **Not verified live in-browser this session** — the in-app preview tool failed on every
+    navigation attempt to `localhost:3000` throughout this entire session (same tooling failure
+    logged repeatedly across items 35, 38, 86, 91, 93–99). **Ask the user to confirm, specifically:**
+    (a) does the green "Click to Save" button's click actually produce a file in Downloads this
+    time (if this also fails, the automatic-downloads-throttle theory is wrong and the next angle
+    to check is `chrome://downloads` directly after a click, and the browser's own DevTools Console
+    for any error our toasts might be missing), and (b) is the two-step click acceptable now that
+    reliability has taken priority over single-click convenience, or should this be revisited once
+    it's confirmed working.
+
+101. **Report Builder download saga: FULLY REVERTED to the last committed, working baseline, 1 Oct
+    2026 — user-reported live that item 100's real-link fix also failed, then asked to abandon the
+    whole download rebuild and restore how it worked before.** Every variant tried across items
+    97–100 (native Save-As picker, script-triggered `<a download>`, a real-click link) had been built
+    from scratch this session with no fully-committed baseline to fall back to — git history showed
+    the last real commit (`2cb632c`, "report builder kpi cards and dashboard updated") predates ALL of
+    this session's download work entirely, including `downloadFile()`, `dataURLtoBlob()`,
+    `createPdfFromCanvases()`, and every `prepare*`/`export*As*` split — none of that existed before
+    this session. **What the actual last-known-working code did, confirmed by reading the commit
+    directly rather than trusting memory:** Save Image used the preview modal's own already-rendered
+    `imageSrcs` state (set by the existing preview `useEffect`), looping a plain `a.click()` per page
+    350ms apart — no fresh render, no custom blob pipeline. **Save PDF never generated a PDF file at
+    all** — both components' Save PDF button called `onPrint`/`handlePrintPdf` directly, i.e. the
+    browser's native print dialog (`window.print()`), letting the person choose "Save as PDF" as the
+    destination printer. This means **item 8/§8's original "PDF is still window.print()" claim was
+    correct the whole time** — my own earlier note in item 97 calling that claim "now false" was
+    wrong: the real, hand-rolled `createPdfFromCanvases()` PDF generator was itself built during this
+    session (most likely earlier in this same long conversation, before the context-compaction
+    boundary), not by some other concurrent session as item 97 assumed, and was never a committed,
+    verified-working baseline to begin with.
+    **Restored exactly, file by file:** `A4PdfPreviewModal.tsx` — `handleDownloadImage` back to the
+    committed `imageSrcs`-loop version, the Save PDF button's `onClick` back to plain `onPrint`,
+    removed the `readyImageDownload`/`readyPdfDownload` state, the invalidation `useEffect`s, and the
+    `useToast` import/hook (none of which existed before this session). `NativeReportEditor.tsx` — same
+    shape: `handleExportImage` back to calling `exportReportAsImage(report)` from the lib, Save PDF's
+    `onClick` back to the pre-existing `handlePrintPdf`, same state/toast cleanup.
+    `reportCanvasRenderer.ts` — `BASE_SCALE` restored to the real committed value, **`4`** (not the 2
+    or 3 guessed earlier in items 97/99, both of which were reacting to problems in code that no longer
+    exists), and the entire tail of the file from `dataURLtoBlob()` onward — `downloadFile`,
+    `createDownloadUrl`, `openSaveDialog`, `writeBlobToHandle`, `withTimeout`, `prepareReportImageBlob`,
+    `createPdfFromCanvases`, `prepareReportPdfBlob`, `exportReportAsPdf` — **deleted outright**,
+    replaced with the single committed `exportReportAsImage` function exactly as it existed at
+    `2cb632c`. Verified nothing else in the frontend referenced any of the removed names before
+    deleting (`grep -rl` across `src/`, zero hits). The already-committed KPI-bar/navy-strip work from
+    items 93–96 was deliberately left untouched — it was confirmed already present in `2cb632c` itself,
+    so reverting to that commit's `reportCanvasRenderer.ts` tail does not touch it (the diff between
+    HEAD and the restored tail is isolated to the download machinery; the ~1,685-line
+    `ReportDocumentView.tsx` extraction from a concurrent session, also already in the working tree
+    before this session touched anything, was likewise left alone).
+    **Real, unrelated, pre-existing bug found and fixed while doing this archaeology, not introduced by
+    it:** `getReportExportBaseFileName` was declared **twice** in `reportCanvasRenderer.ts` — once at
+    line 176 (complete, correct, matching the committed version) and once earlier in the file as a bare
+    stray `}` with no function body at all, immediately after `getCleanPeriod`'s closing brace — a
+    genuine syntax error (`tsc` reported `TS1128: Declaration or statement expected` at that exact
+    line) that would have failed any real build. This predates this session's restoration work; removed
+    the stray brace, kept the one real, complete definition at line 176.
+    `tsc --noEmit` clean on all three files after every step. **Not verified live in-browser this
+    session** — same tooling failure logged throughout items 35, 38, 86, 91, 93–100. **This is a full
+    revert, not a new fix** — ask the user to confirm Save Image/Save PDF now work exactly as they did
+    before this entire session's involvement (Save Image downloads the already-rendered preview pages
+    directly; Save PDF opens the browser's print dialog, where "Save as PDF" is chosen as the
+    destination). If Save Image *still* doesn't produce a file even on this exact, previously-working
+    code, that would mean the problem was never in this file's code at all, but in the browser/OS
+    environment itself (see item 100's `chrome://downloads` / DevTools Console suggestion) — worth
+    checking before touching this code again.
+    **Found immediately after this revert, likely a major contributor to the whole saga: the file did
+    not actually compile for a stretch of this session, from a bug unrelated to anything in items
+    97–100.** A `tsc --noEmit` run moments after the revert above reported `TS1128: Declaration or
+    statement expected` — the file had a genuine, severe syntax error the entire time. Two closing
+    braces in a row (`}\n  }`) inside the `month_end` KPI-card block (the navy-bar code from items
+    93–96) closed `generateReportCanvases` **~350 lines too early** — everything after that point
+    (Active Leads, Daily Positives/JD, the footer and page-numbering logic, and the function's real
+    `return pageCanvases; }`) was left dangling outside any function, a parse error Next.js's dev
+    build would also choke on, not just `tsc`. Found by a from-scratch stack-based brace matcher
+    (every `{`/`}` in the file tracked with string/template-literal/comment awareness, since a naive
+    character count is fooled by `${...}` interpolations and quoted content) — the matcher traced the
+    function's own opening brace to a premature match at line 1664, immediately after the KPI-card
+    `if` block's legitimate close at line 1663. Removed the one extra `}`; `tsc --noEmit` and a full
+    stack-balance re-check both clean afterward. **This means a real, basic compile error — not a
+    browser download quirk at all — may have been silently breaking the Report Builder page for some
+    portion of items 97–100's debugging**, which would explain symptoms no amount of download-mechanism
+    guessing could have fixed. Origin not fully pinned down (could be this session's own item 93–96
+    edit, or a concurrent session's edit landing on top of it — the pattern repeated throughout this
+    file), but it is fixed now, in the same restored file as the rest of this item. **Tell the user
+    plainly: retest now that this compile error is gone, since it's entirely possible this — not any
+    of the download mechanisms tried — was the real cause of at least some of the repeated failures.**
+
+102. **Two follow-ups after item 101's revert, user-reported live, 1 Oct 2026 — Save PDF now genuinely
+    downloads (confirms item 101's revert fixed the real problem), but Save Image still didn't, and
+    the PDF's title area printed in the wrong font/size.** Both real, both fixed.
+    **(a) Save Image regression from the revert itself.** When restoring `A4PdfPreviewModal.tsx`'s
+    `handleDownloadImage` to the committed version, the `else` branch — `await
+    exportReportAsImage(report, { size: imageSize })`, the fallback for when the preview's `imageSrcs`
+    state is still empty (e.g. the modal hasn't finished its own preview render yet, or was opened
+    straight into PDF mode) — was dropped along with the `exportReportAsImage` import. With no
+    fallback, a click did nothing whenever `imageSrcs.length` was 0: exactly "Save Image isn't
+    downloading." Restored both the import and the `else` branch verbatim from the commit.
+    **(b) The PDF title printed in the wrong font/size — a real, pre-existing print-CSS gap, not
+    caused by this session's revert.** The on-screen report title is a real `<input>` when the report
+    is in its editable view (`ReportDocumentView.tsx`, so the title can be clicked and retyped) — and
+    `globals.css`'s `@media print` block already reset `font-size`/`font-weight`/`color` to `inherit`
+    on `.printable-report-canvas input`, but not `font-family`. Browsers apply their own native
+    form-control font to `<input>`/`<textarea>` elements specifically when printing, which can
+    silently override an inherited size/weight too in some engines — this is a generic gap that would
+    have affected the title's printed appearance on every single PDF print-to-PDF ever produced by
+    this path, regardless of anything from this session. Added `font-family`, `text-align`,
+    `text-transform`, `letter-spacing`, `line-height`, and `appearance: none` to the same `inherit`
+    reset so an editable field prints identically to its own read-only counterpart (the plain `<h1>`
+    shown when `editable={false}`, e.g. in the A4 preview modal, was never affected — only the
+    in-place-editable title used in `NativeReportEditor.tsx`'s own on-screen view, which is what
+    `handlePrintPdf`/`window.print()` actually captures).
+    `tsc --noEmit` clean on both files. **Not verified live in-browser this session** — same tooling
+    failure logged throughout items 35, 38, 86, 91, 93–101. Ask the user to confirm: Save Image now
+    downloads in one click regardless of which preview mode was open when clicked, and the printed
+    PDF's title now matches the on-screen title's font/size/case rather than a generic browser default.
+
+103. **Save Image's primary path switched from a raw base64 data: URL to a real Blob, 1 Oct 2026 — the
+    user pasted an unrelated AI-generated "root cause analysis" describing code that does not exist
+    in this file (a `downloadFile` function, a "Universal Auto-Conversion Safeguard") and asked
+    whether it was accurate.** It wasn't — verified live by reading the actual file, no such function
+    exists anywhere in it. But tracing through the claim surfaced a real, separate bug worth fixing on
+    its own merits: `A4PdfPreviewModal.tsx`'s `handleDownloadImage` has two branches — the common one
+    (`imageSrcs.length` truthy, i.e. the preview has already rendered, which is the normal case by the
+    time anyone clicks Save) set the download anchor's `href` **directly to the raw base64 data: URL**
+    from the preview's own `canvas.toDataURL()` call; only the *fallback* branch (empty `imageSrcs`,
+    the less common case) went through `exportReportAsImage()`'s already-correct binary-Blob path.
+    For a high-res multi-page A4 composite that data: URL can run to several MB, and a large data: URL
+    used directly as an `<a download>` href is a known weak point for Chromium silently failing to
+    start a download — plausibly the actual reason "Save Image doesn't work" kept reproducing even
+    after item 102 restored the exact committed-baseline code, since that baseline always had this
+    same data-URL href in its primary path. Fixed by converting `imageSrcs[i]` through
+    `fetch(...).then(r => r.blob())` into a real Blob before creating the object URL, matching the
+    pattern already used by the fallback branch and the committed `exportReportAsImage`.
+    `tsc --noEmit` clean. **Not verified live in-browser this session** — same tooling failure logged
+    throughout items 35, 38, 86, 91, 93–102; `NativeReportEditor.tsx` changed on disk mid-task from a
+    concurrent session's edit — left untouched, not investigated, since `tsc` stayed clean alongside
+    it. Ask the user to confirm Save Image now reliably downloads from the normal (preview-already-
+    rendered) path, not just the fallback.
+
+104. **The real answer to "why does this keep changing underneath us" — confirmed with hard evidence,
+    1 Oct 2026.** User pushed back correctly on the "it's your machine" conclusion from a few items
+    ago: this genuinely worked before today, so something in the code changing today is the far more
+    likely explanation than a sudden, coincidental antivirus/OS change. Re-read the live file from
+    scratch rather than trusting anything written earlier this session, and found concrete proof:
+    **`A4PdfPreviewModal.tsx`'s own Save Image/Save PDF buttons had been removed from its header
+    entirely** by a concurrent session (the header now holds only the Image/PDF mode switcher and a
+    Close button) — leaving `handleSavePdfDirect` and `handleDownloadImage` defined but **completely
+    unreferenced by any button**, confirmed by grepping the whole file for their names (two hits each:
+    the declaration, nothing else). The buttons the user has actually been clicking all along live in
+    the *other* file, `NativeReportEditor.tsx` (`handleExportImage` → `exportReportAsImage()`,
+    `handleExportPdfDirect` → `exportReportAsPdf()`) — a separate, independent implementation this
+    session had been only partially tracking. **`exportReportAsPdf()` itself had changed three times
+    over the course of this one session** (hand-rolled PDF-1.4 generator → jsPDF → now, as of this
+    check, back to plain `window.print()`) without any coordination between whoever was making each
+    change — which is the real, concrete explanation for why every test the user ran seemed to hit a
+    *different* bug: the underlying implementation was never the same between one attempt and the
+    next. This is likely true of most of this session's "mystery" — items 97 through 103 were each
+    chasing the symptom of whichever specific implementation happened to be live at the moment of
+    testing, not a single consistent bug.
+    **Real, confirmed bug found and fixed while verifying this:** `A4PdfPreviewModal.tsx`'s now-dead
+    `handleSavePdfDirect` called `exportReportAsPdf(report, { size: imageSize })` with two arguments,
+    but `exportReportAsPdf`'s signature (after its latest concurrent-session rewrite back to
+    `window.print()`) now only accepts one — a genuine `tsc` compile error (`TS2554`) sitting in the
+    live tree. Since both `handleSavePdfDirect` and `handleDownloadImage` are confirmed dead code (no
+    button calls either, verified by grep across the whole file), deleted both outright along with
+    their now-unused imports (`exportReportAsImage`, `exportReportAsPdf`, `getReportExportBaseFileName`
+    from this file) and the now-unused `exportingPdf` state — rather than patching a function nothing
+    calls. `tsc --noEmit` clean afterward. `onPrint` remains an accepted-but-currently-unused prop on
+    this component (harmless; the parent still passes it, and removing it from the interface would be
+    a separate, riskier change for no functional gain right now).
+    **What this means going forward:** the actual, live Save Image/Save PDF behavior right now (as of
+    this check) is in `NativeReportEditor.tsx` — Save Image does a clean canvas→Blob→download (looks
+    structurally correct), Save PDF opens the native browser print dialog via `window.print()` (the
+    most reliable mechanism available, since it has none of the blob/download-manager failure modes
+    every other attempt ran into). **Given how many times this file has changed hands today, treat any
+    earlier item in this session (97–103) describing a specific PDF/image implementation as
+    describing a snapshot in time, not necessarily what's live now** — re-verify directly against the
+    current file before trusting any of those descriptions. Not verified live in-browser this session
+    (same tooling failure as the rest of this saga); ask the user to retest against this exact current
+    state and report back precisely what they see, now that it's confirmed stable (no other session
+    appears to be mid-edit at the moment of this check).
+
+105. **Report image export resolution restored to 4x, 1 Oct 2026 (user-reported — the downloaded
+    image "is not in high resolution... around 3MB to 5MB").** Confirmed live in the file, not from
+    memory: `reportCanvasRenderer.ts`'s `generateReportCanvases()` default (`BASE_SCALE`) was at
+    **1.4x** (~1204px-wide A4 pages) — a regression from the documented 4x (~3440px, item 77) that
+    happened silently during today's long download-mechanism saga (items 97–104). The scale was
+    dialed down mid-saga to reduce composite-image size as a hypothesis for a write-timeout failure
+    in a native Save-As file-picker mechanism — that whole mechanism was since abandoned and fully
+    reverted back to a plain `<a download>` browser download (item 101/104), but the resolution
+    reduction that went with it was never reverted alongside it. Restored `BASE_SCALE` to `4` in
+    both the function's own default and the explicit override inside `exportReportAsImage()`'s
+    fallback path (the two places it was set to `1.4`) — matches item 77's original, deliberately
+    chosen value. `A4PdfPreviewModal.tsx`'s own preview generation calls `generateReportCanvases`
+    with no explicit `scale`, so it inherits this same default — the on-screen preview and the
+    downloaded file are back to being the same resolution. **Why this is safe to raise again:** the
+    only reason it had been lowered was fear of a slow write hanging the save — that risk no longer
+    exists now that the save path is a plain browser-handled download with no JS-side write step to
+    time out. `tsc --noEmit` clean. **Not verified live in-browser this session** (same tooling
+    failure logged throughout items 35, 38, 86, 91, 93–104) — ask the user to re-download an image
+    and confirm the file size and sharpness are back to what they expect (a multi-page A4 report
+    should land in the multi-MB range at this resolution, as it did before item 97's saga began).
+
+106. **Save Image fixed for real: a genuine user-clicked link replaces the script-triggered
+    `a.click()`, 1 Oct 2026 (user-reported — "Save PDF working good, Save Image flips to
+    'Saving…' and snaps back with no file and no error").** First confirmed the live
+    `A4PdfPreviewModal.tsx` had been rewritten yet again by a concurrent session since item
+    104 (a brand-new `exportReportAsImage` with a 3-stage `toBlob` → `toDataURL` → single-page
+    fallback, structurally solid — `tsc` clean, no thrown errors) — so this was a fresh bug,
+    not one of the earlier saga's regressions recurring. The exact symptom the user described
+    (button flips to "Saving…", returns to idle, zero file, zero alert, nothing in
+    `chrome://downloads`) only fits one explanation given the code: the blob generation
+    succeeded (no alert fired, which only happens on a null blob or a thrown error) and
+    `a.click()` ran, but Chrome silently dropped the download — the same "automatic downloads"
+    throttle theorized in item 100: a script-dispatched click on a hidden `<a download>`,
+    fired repeatedly from the same origin without an intervening real user gesture, can be
+    silently discarded by Chrome with no error surfaced anywhere JS can see.
+    **Fix: require one genuine click.** Split `reportCanvasRenderer.ts`'s `exportReportAsImage`
+    into `prepareReportImageBlob(report, options)` (render-only, returns `{blob, fileName}` or
+    `null`, no DOM/download side effects) plus a thin `exportReportAsImage` wrapper that still
+    does the old click-to-download for any other caller. `A4PdfPreviewModal.tsx`'s
+    `handleSaveImage` now calls `prepareReportImageBlob` directly and, on success, swaps the
+    blue "Save Image" button for a real green pulsing `<a href={blobUrl} download>Click to
+    Save</a>` anchor the person clicks themselves — a genuine mouse click on a real anchor is
+    categorically different from a script-dispatched one and is not subject to the
+    automatic-download throttle. The link reverts to the normal button and revokes the object
+    URL 2 seconds after it's clicked; a `useEffect` (placed above the component's existing
+    `if (!isOpen || !report) return null;` guard, per this file's own Rules-of-Hooks lesson
+    from item 97) also revokes and clears any stale pending URL if the report/size changes or
+    the modal closes before it's clicked. `tsc --noEmit` clean.
+    **Trade-off made explicit:** this reintroduces the two-click flow the user originally
+    rejected in item 100 — but it's the one mechanism in this entire saga not yet confirmed to
+    fail in this environment, and Save PDF (which never needed a download trigger at all —
+    it's `window.print()`) working correctly the whole time is consistent with the problem
+    being specifically about *script-triggered downloads*, not about rendering or file
+    generation. **Not verified live in-browser this session** — same tooling failure logged
+    throughout items 35, 38, 86, 91, 93–105. Ask the user to click Save Image, confirm the
+    button turns into a green "Click to Save" link, click that link, and confirm a real
+    (now 4x-resolution, multi-MB) file lands in Downloads.
+
+107. **Save Image saga — ROOT CAUSE FOUND AND CONFIRMED, 1 Oct 2026: a browser extension in
+    the user's normal Chrome profile, not application code.** Items 97–106 spent an entire
+    session chasing this across the native Save-As picker, script-triggered `<a download>`,
+    and finally a genuine user-clicked `<a download>` link (item 106) — all failed identically
+    in the user's normal browser window with zero error, zero console output, zero entry in
+    `chrome://downloads`. Isolated with a bare minimum test, completely outside app code: a
+    plain `Blob` → `URL.createObjectURL` → real, user-clicked `<a download>` link, pasted
+    directly into DevTools Console on the live page. **It failed in the normal window the
+    same way, then succeeded immediately in an Incognito window with the same URL, same
+    login, same real report** — `test.txt` downloaded in Incognito on the first try, and the
+    actual Save Image button (real report data) then also downloaded successfully in the same
+    Incognito window. Since Incognito disables most extensions by default and nothing else
+    differs, this conclusively points to **a browser extension in the user's normal profile
+    silently intercepting/blocking downloads from `localhost`** — not a Chrome enterprise
+    policy (those apply in Incognito too), not antivirus, not this app's code, and not any of
+    the mechanisms tried in items 97–106.
+    **What stays fixed from this saga, confirmed working correctly:** item 105's 4x image
+    resolution, and item 106's `prepareReportImageBlob`/real-click-link split in
+    `A4PdfPreviewModal.tsx` — both verified against the real report with real data. **No
+    further app-code changes are needed for Save Image** — the remaining step is the user's
+    own browser configuration, not this codebase: find the offending extension via
+    `chrome://extensions` (disable one at a time and retest, or just use Incognito for Save
+    Image/Save PDF going forward) and either remove or allow-list it for `localhost`/this app.
+    **Lesson for this file, worth remembering the next time an "inexplicable, inconsistent"
+    bug report comes in:** when every code-level fix fails identically with zero observable
+    error, and the failure is specific to one person's one browser profile, test outside the
+    app entirely (a bare Console snippet) and test in Incognito before assuming the bug is in
+    application code — items 97–105 were legitimate fixes for other real problems uncovered
+    along the way (the compile errors in items 101/104, the resolution regression in item 105,
+    the dead-code cleanup in item 104), but the actual "Save Image doesn't download" complaint
+    itself was never caused by anything in this repository.
+
+108. **Save Image saga — TRUE final root cause, fully confirmed, 2 Oct 2026: this machine's
+    security stack blocks JavaScript-generated (blob:) downloads from any plain HTTP page —
+    not an iPOMS bug, not an extension, not a Chrome policy.** Item 107 wrongly attributed this
+    to a browser extension (Incognito disables extensions, so it seemed to fit) — ruled out for
+    real this session: every extension disabled one-by-one and all-at-once in the normal
+    profile, Save Image still failed. `chrome://policy` searched for "download" — nothing.
+    Per-site "Automatic downloads" permission for `localhost:3000` — already Allowed, reset
+    anyway — no change. "Ask where to save each file" turned on — no dialog ever appeared,
+    meaning Chrome refuses the download before reaching its own download manager.
+    **Decisive test:** the user confirmed real downloads work fine from real HTTPS sites
+    (Google, YouTube, Spotify) — only iPOMS fails. That pointed at HTTP vs HTTPS. Confirmed by
+    running the exact same bare-minimum `Blob` → `createObjectURL` → real-user-clicked `<a
+    download>` test script (zero iPOMS code) on **`neverssl.com`** — a public site deliberately
+    kept on plain HTTP for exactly this kind of test — in the normal (non-Incognito) profile.
+    **It failed identically there too.** Same script succeeded in Incognito on both
+    `localhost:3000` and (implicitly) would on any HTTP site, per item 107's test. This
+    isolates the real, single variable: **plain-HTTP origin**, completely independent of
+    iPOMS, this repository, or any code change made across items 97–107.
+    **What this means, plainly:** some layer in this machine's security stack (most likely
+    the OS-level McAfee antivirus engine itself, not just its browser extension which was
+    already ruled out — endpoint security/DLP software commonly treats "insecure" HTTP pages
+    as higher-risk and can intercept their downloads at a level below Chrome's own extension
+    and policy systems, which is also why it doesn't show up in `chrome://policy`) silently
+    discards downloads originating from any HTTP page in the normal browsing profile, while
+    apparently not hooking Incognito sessions the same way. **No code in this repository can
+    fix this** — `A4PdfPreviewModal.tsx`'s Save Image button (the real-click-link mechanism
+    from item 106, the 4x resolution from item 105) is confirmed correct and produces a real,
+    valid file; Chrome/the OS simply never lets the save complete outside Incognito.
+    **Practical options going forward (not implemented, decision for the user/IT):**
+    (a) use Incognito for Save Image/Save PDF, proven reliable; (b) serve the local dev
+    frontend over HTTPS (e.g. a locally-trusted cert via `mkcert`) so the origin is no longer
+    plain HTTP — likely to also resolve this, since the blocking behavior is specifically tied
+    to the insecure origin, not to `localhost` or iPOMS; (c) have IT/security whitelist
+    `localhost`/the dev server in whatever endpoint protection product is doing this
+    (McAfire is the leading suspect, but its core antivirus engine — not the WebAdvisor
+    extension already ruled out — was never actually tested paused, since the user's "it works
+    on real sites" observation made the HTTP-origin test more decisive and that step wasn't
+    revisited). **Lesson for this file, superseding item 107's closing note:** the Incognito-
+    works / normal-fails split is consistent with MANY different causes (extensions, policy,
+    site permissions, OR an insecure-origin-specific security block) — don't stop at the first
+    theory that fits the Incognito evidence. The real isolating test was reproducing the exact
+    failure on a site that has nothing to do with this app at all.
+
+109. **Local dev HTTPS set up, 2 Oct 2026 (user-requested — the practical fix for item 108's
+    finding that this machine's security stack blocks downloads from any plain-HTTP page).**
+    `mkcert` couldn't be installed (no admin rights — Chocolatey's lib directory isn't
+    writable by this user), so a locally-trusted CA was built by hand with the `openssl`
+    that ships with Git Bash: a root CA (`frontend/.cert/rootCA.key`/`.pem`, 10-year
+    validity) plus a leaf certificate for `localhost`/`127.0.0.1`/`::1`
+    (`frontend/.cert/localhost.key`/`.pem`, SAN entries in `localhost.ext`, 825-day
+    validity, signed by the root CA). The root CA was installed into the **current Windows
+    user's** trusted-root store (`certutil -user -addstore Root rootCA.pem` — no admin
+    needed for the per-user store, unlike the machine-wide store), so Chrome trusts the
+    leaf cert without any security warning. **`frontend/.cert/` is gitignored** — the keys
+    are machine-specific and must never be committed; cloning this repo onto another
+    machine (or a fresh user profile on this one) needs the same two commands re-run there.
+    **New script** `frontend/package.json`'s `"dev:https"` —
+    `next dev -p 3000 --experimental-https --experimental-https-key ./.cert/localhost.key
+    --experimental-https-cert ./.cert/localhost.pem --experimental-https-ca
+    ./.cert/rootCA.pem` (Next 16's built-in HTTPS dev flags, confirmed present via
+    `next dev --help`). The plain `"dev"` script is untouched — use `dev:https` specifically
+    when testing anything sensitive to the page being HTTPS (like Save Image/PDF, per item
+    108). **No backend change needed** — `server.ts`'s CORS allowlist already included
+    `https://localhost:3000` alongside the `http://` origin (confirmed by reading it before
+    making any change), and the backend itself stays on plain `http://localhost:5000` since
+    Chrome exempts requests to `localhost` from mixed-content blocking (a browser-level
+    carve-out specifically for this local-dev HTTPS-frontend/HTTP-backend pattern).
+    **Verified:** both servers started and responding — `curl` to `http://localhost:5000/
+    api/v1/health` → `200`; `curl --cacert rootCA.pem --ssl-no-revoke` to
+    `https://localhost:3000/login` → `200` with a cert chain that validates cleanly against
+    the generated CA (the one curl error seen without `--ssl-no-revoke` was Windows
+    schannel's CRL-revocation-check quirk for a CA with no revocation endpoint — expected
+    for any self-signed local CA, not a real validation failure, and not something Chrome
+    enforces the same way). **Not yet verified in the user's actual browser** — ask them to
+    run `npm run dev:https` in `frontend/` (instead of `npm run dev`), visit
+    `https://localhost:3000`, confirm the padlock shows secure with no warning, log in, and
+    retest Save Image in their **normal** (non-Incognito) window — this is the point of the
+    whole exercise: confirming the HTTP-origin download block from item 108 no longer
+    applies now that the origin is HTTPS and trusted.
+
 ## 6. Module map
 
 Data flow: `company_metadata → assigned_work → daily_tracker → weekly_tracker → daily_leads → reports/dashboards`

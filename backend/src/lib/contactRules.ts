@@ -288,6 +288,8 @@ const CC_TLDS = new Set([
  * Standard generic Top-Level Domains (gTLDs) & Business Extensions
  */
 const GENERIC_TLDS = new Set([
+  // Lifestyle, Food & Community TLDs
+  'mom', 'dad', 'family', 'kids', 'baby', 'food', 'cafe', 'kitchen', 'restaurant', 'bar', 'catering',
   // Original Core
   'com', 'org', 'net', 'edu', 'gov', 'mil', 'int', 'info', 'biz', 'name', 'pro',
   // Sponsored & Community

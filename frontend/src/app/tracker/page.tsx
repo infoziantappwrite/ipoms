@@ -1360,7 +1360,8 @@ export default function DailyTrackerPage() {
                 <button
                   type="button"
                   onClick={() => setIsHistoryMode(false)}
-                  className="flex items-center gap-1.5 bg-gradient-to-b from-[#1A73E8] via-[#0091FF] to-[#00A6F5] hover:brightness-110 text-white px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-md shadow-blue-500/25 border border-blue-400/30 transition-all cursor-pointer shrink-0 active:scale-[0.96]"
+                  style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
+                  className="flex items-center gap-1.5 hover:brightness-110 text-white px-3.5 h-[30px] rounded-lg text-xs font-bold shadow-md shadow-blue-900/25 transition-all cursor-pointer shrink-0 active:scale-[0.95]"
                 >
                   Back to Today
                 </button>
@@ -1412,15 +1413,15 @@ export default function DailyTrackerPage() {
                     triggerHaptic('medium');
                     setIsMoveModalOpen(true);
                   }}
-                  style={{ background: 'linear-gradient(180deg, #ED145B 0%, #FA6D38 52%, #FFBA08 100%)' }}
-                  className="px-3.5 py-1.5 rounded-xl text-white font-extrabold hover:brightness-110 text-xs transition-all cursor-pointer shadow-md shadow-orange-500/25 active:scale-[0.95] shrink-0 animate-in fade-in duration-150"
+                  style={{ background: 'linear-gradient(180deg, #F85A3E 0%, #D40078 45%, #9000A8 75%, #6800B3 100%)' }}
+                  className="h-[30px] px-3.5 rounded-lg flex items-center justify-center text-white font-bold hover:brightness-110 text-xs transition-all cursor-pointer shadow-md shadow-pink-600/25 border border-pink-400/30 active:scale-[0.95] shrink-0 animate-in fade-in duration-150"
                   title={`Move ${selectedRowCount} selected company call(s) to another college`}
                 >
                   <span>Move ({selectedRowCount})</span>
                 </button>
               )}
 
-              {/* 2. Tomorrow / Today Toggle & Move-To-Tomorrow Button (Solid Bold Color with White Text) */}
+              {/* 2. Tomorrow / Today Toggle & Move-To-Tomorrow Button (Solid Bold Royal Navy Gradient) */}
               <button
                 type="button"
                 onClick={() => {
@@ -1438,8 +1439,8 @@ export default function DailyTrackerPage() {
                   }
                 }}
                 disabled={!selectedCollegeId}
-                style={{ background: 'linear-gradient(180deg, #1D64D8 0%, #174EB8 50%, #0B2556 100%)' }}
-                className="h-8 px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 text-white text-xs font-bold shadow-md shadow-blue-900/25 border border-blue-400/30 hover:brightness-110 transition-all cursor-pointer select-none shrink-0 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.96]"
+                style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
+                className="h-[30px] px-3.5 rounded-lg flex items-center gap-1.5 text-white text-xs font-bold shadow-md shadow-blue-900/25 hover:brightness-110 transition-all cursor-pointer select-none shrink-0 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.95]"
                 title={
                   selectedRowCount > 0 && !isTomorrowMode
                     ? `Move / Copy ${selectedRowCount} selected contact(s) to Tomorrow's Sheet (uncalled will move, contacted will copy)`
@@ -1477,7 +1478,7 @@ export default function DailyTrackerPage() {
                   }
                 }}
                 style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
-                className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer select-none shrink-0 text-white shadow-md shadow-red-600/25 hover:brightness-110 ${
+                className={`relative w-[30px] h-[30px] rounded-lg flex items-center justify-center transition-all cursor-pointer select-none shrink-0 text-white shadow-md shadow-red-600/25 border border-red-400/30 hover:brightness-110 ${
                   isDeleteMode && selectedRowCount > 0
                     ? 'ring-2 ring-red-400 brightness-110'
                     : isDeleteMode
@@ -1493,7 +1494,7 @@ export default function DailyTrackerPage() {
                 }
                 aria-label="Delete Rows"
               >
-                <Trash2 size={16} strokeWidth={2.2} className="text-white" />
+                <Trash2 size={14} strokeWidth={2.2} className="text-white" />
                 {isDeleteMode && selectedRowCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-white dark:bg-zinc-900 text-rose-600 text-[9px] font-extrabold w-4 h-4 rounded-full flex items-center justify-center shadow-xs tabular-nums ring-1 ring-rose-600">
                     {selectedRowCount}

@@ -18,9 +18,9 @@ export function FaqButton({
   size = 'md',
 }: FaqButtonProps) {
   const sizeClasses = {
-    sm: 'w-8 h-8 text-xs',
-    md: 'w-9 h-9 text-xs',
-    lg: 'px-3 py-2 text-xs',
+    sm: 'w-[30px] h-[30px] text-xs',
+    md: 'w-[30px] h-[30px] text-xs',
+    lg: 'h-[30px] px-3 text-xs',
   }[size];
 
   const href = category && category !== 'all' ? `/faq?category=${category}` : '/faq';
@@ -30,17 +30,18 @@ export function FaqButton({
       href={href}
       title="Frequently Asked Questions & Placement Operations Manual (25 Topics)"
       aria-label="Open Frequently Asked Questions"
-      className={`flex items-center justify-center gap-1.5 rounded-xl border border-border/80 bg-surface/90 hover:bg-surface-raised hover:border-primary/40 text-fg-subtle hover:text-primary transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-[0.992] group select-none ${
-        showLabel ? 'px-3 py-1.5' : sizeClasses
+      style={{ background: 'linear-gradient(180deg, #9AA0A6 0%, #64748B 50%, #334155 100%)' }}
+      className={`flex items-center justify-center gap-1.5 rounded-lg border border-slate-400/30 text-white hover:brightness-110 transition-all cursor-pointer shadow-md shadow-slate-500/25 active:scale-[0.95] group select-none ${
+        showLabel ? 'h-[30px] px-3' : sizeClasses
       } ${className}`}
     >
       <HelpCircle
-        size={size === 'sm' ? 15 : 17}
+        size={14}
         strokeWidth={2.2}
-        className="group-hover:scale-110 group-hover:text-primary transition-all text-primary/80"
+        className="text-white shrink-0"
       />
       {showLabel && (
-        <span className="font-bold text-fg group-hover:text-primary transition-colors text-xs">
+        <span className="font-bold text-white text-xs">
           FAQs & Help
         </span>
       )}

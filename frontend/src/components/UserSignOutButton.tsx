@@ -68,9 +68,9 @@ export function UserSignOutButton({ className = '' }: Props) {
       title="Sign Out of iPOMS"
       aria-label="Sign out"
       disabled={isSigningOut}
-      className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-red-600 hover:bg-red-700 active:bg-red-800 border border-red-600 hover:border-red-700 text-white transition-all shadow-xs select-none group active:scale-[0.95] cursor-pointer flex items-center justify-center ${className}`}
+      className={`w-[30px] h-[30px] rounded-lg bg-red-600 hover:bg-red-700 active:bg-red-800 border border-red-600 hover:border-red-700 text-white transition-all shadow-xs select-none group active:scale-[0.95] cursor-pointer flex items-center justify-center shrink-0 ${className}`}
     >
-      <LogOut size={16} strokeWidth={2.2} className="text-white transition-transform group-hover:translate-x-0.5" />
+      <LogOut size={14} strokeWidth={2.2} className="text-white transition-transform group-hover:translate-x-0.5" />
     </button>
   );
 }

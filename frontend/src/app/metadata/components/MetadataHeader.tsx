@@ -133,13 +133,13 @@ export function MetadataHeader({
                 disabled={page <= 1}
                 onClick={() => onPageChange(page - 1)}
                 title="Previous Page"
-                className="w-8 h-8 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-[0.992] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
+                className="w-[30px] h-[30px] rounded-lg bg-surface border border-border hover:bg-surface-raised active:scale-[0.95] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
               >
                 <ChevronLeft size={14} strokeWidth={2.25} />
               </button>
 
               <div
-                className="flex items-center gap-1 px-2.5 py-1 bg-surface border border-border rounded-full shadow-2xs"
+                className="flex items-center gap-1 px-2.5 h-[30px] bg-surface border border-border rounded-lg shadow-2xs"
                 title={`Type a page number (1 to ${totalPages}) and press Enter`}
               >
                 <input
@@ -167,7 +167,7 @@ export function MetadataHeader({
                 disabled={page >= totalPages}
                 onClick={() => onPageChange(page + 1)}
                 title="Next Page"
-                className="w-8 h-8 rounded-full bg-surface border border-border hover:bg-surface-raised active:scale-[0.992] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
+                className="w-[30px] h-[30px] rounded-lg bg-surface border border-border hover:bg-surface-raised active:scale-[0.95] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-fg transition-all cursor-pointer shadow-2xs"
               >
                 <ChevronRight size={14} strokeWidth={2.25} />
               </button>
@@ -189,7 +189,7 @@ export function MetadataHeader({
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Type company (e.g. ACC) or phone…"
-              className="w-full h-8 pl-8 pr-3 bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-300 dark:border-zinc-700/90 hover:border-zinc-400 dark:hover:border-zinc-500 text-zinc-900 dark:text-zinc-100 text-xs rounded-xl shadow-xs placeholder:text-zinc-500 dark:placeholder:text-zinc-300/80 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium"
+              className="w-full h-[30px] pl-8 pr-3 bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-300 dark:border-zinc-700/90 hover:border-zinc-400 dark:hover:border-zinc-500 text-zinc-900 dark:text-zinc-100 text-xs rounded-lg shadow-xs placeholder:text-zinc-500 dark:placeholder:text-zinc-300/80 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-medium"
             />
           </div>
 
@@ -216,7 +216,7 @@ export function MetadataHeader({
             type="button"
             onClick={onToggleRecent}
             style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
-            className="px-3.5 py-1.5 rounded-full text-xs font-bold text-white shadow-md shadow-blue-900/25 hover:brightness-110 active:scale-[0.96] transition-all flex items-center gap-1.5 cursor-pointer shrink-0 select-none"
+            className="h-[30px] px-3.5 rounded-lg text-xs font-bold text-white shadow-md shadow-blue-900/25 border border-blue-400/30 hover:brightness-110 active:scale-[0.95] transition-all flex items-center gap-1.5 cursor-pointer shrink-0 select-none"
             title={isRecent ? 'Switch back to all metadata from Serial Number 1' : 'View contacts added in the past 1 to 2 weeks'}
           >
             {isRecent ? (
@@ -234,17 +234,17 @@ export function MetadataHeader({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Paste Button (Purple Gradient Circular Icon Button) */}
+          {/* Paste Button (Purple Gradient Icon Button) */}
           {!isRecycleBin && (
             <button
               type="button"
               onClick={onOpenBulkPasteModal}
-              className="w-9 h-9 rounded-full text-white flex items-center justify-center cursor-pointer shadow-md shadow-purple-600/25 hover:brightness-110 transition-all active:scale-[0.95] shrink-0"
+              className="w-[30px] h-[30px] rounded-lg text-white flex items-center justify-center cursor-pointer shadow-md shadow-purple-600/25 border border-purple-400/30 hover:brightness-110 transition-all active:scale-[0.95] shrink-0"
               style={{ background: 'linear-gradient(180deg, #A800E6 0%, #8A00D4 50%, #6C00B8 100%)' }}
               title="Paste bulk contacts from Excel / Google Sheets (Ctrl+V)"
               aria-label="Paste Bulk Contacts"
             >
-              <ClipboardPaste size={16} strokeWidth={2.2} className="text-white" />
+              <ClipboardPaste size={14} strokeWidth={2.2} className="text-white" />
             </button>
           )}
 
@@ -260,7 +260,7 @@ export function MetadataHeader({
                     onToggleSelectionMode();
                   }
                 }}
-                className={`relative w-9 h-9 rounded-full flex items-center justify-center cursor-pointer shadow-md shadow-red-600/25 transition-all hover:brightness-110 active:scale-[0.95] text-white ${
+                className={`relative w-[30px] h-[30px] rounded-lg flex items-center justify-center cursor-pointer shadow-md shadow-red-600/25 border border-red-400/30 transition-all hover:brightness-110 active:scale-[0.95] text-white ${
                   isSelectionMode
                     ? 'ring-2 ring-red-400 brightness-110'
                     : ''
@@ -275,7 +275,7 @@ export function MetadataHeader({
                 }
                 aria-label="Multi-Row Delete"
               >
-                <Trash2 size={16} strokeWidth={2.2} />
+                <Trash2 size={14} strokeWidth={2.2} />
 
                 {/* Notification Badge Counter on Top Corner */}
                 {isSelectionMode && selectedCount > 0 && (
@@ -294,17 +294,17 @@ export function MetadataHeader({
                 <button
                   type="button"
                   onClick={onEmptyRecycleBin}
-                  className="w-9 h-9 rounded-full text-white flex items-center justify-center cursor-pointer shadow-md shadow-red-600/25 hover:brightness-110 transition-all active:scale-[0.95]"
+                  className="w-[30px] h-[30px] rounded-lg text-white flex items-center justify-center cursor-pointer shadow-md shadow-red-600/25 border border-red-400/30 hover:brightness-110 transition-all active:scale-[0.95]"
                   style={{ background: 'linear-gradient(180deg, #E60000 0%, #C80000 50%, #990000 100%)' }}
                   title="Empty All Items in Recycle Bin"
                   aria-label="Empty Recycle Bin"
                 >
-                  <Trash2 size={16} strokeWidth={2.2} />
+                  <Trash2 size={14} strokeWidth={2.2} />
                 </button>
 
                 <button
                   onClick={onToggleRecycleBin}
-                  className="px-4 py-1.5 rounded-full text-xs font-bold bg-emerald-600 hover:bg-emerald-700 active:scale-[0.992] text-white border border-emerald-500/80 shadow-xs transition-all cursor-pointer ring-2 ring-emerald-500/20"
+                  className="h-[30px] px-3.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 active:scale-[0.95] text-white border border-emerald-500/80 shadow-xs transition-all cursor-pointer ring-2 ring-emerald-500/20 flex items-center"
                   title="Return to Master Metadata Directory"
                   aria-label="Back to metadata"
                 >
@@ -314,14 +314,14 @@ export function MetadataHeader({
             ) : (
               <button
                 onClick={onToggleRecycleBin}
-                className="w-9 h-9 rounded-full bg-white hover:bg-slate-50 flex items-center justify-center cursor-pointer shadow-md hover:shadow-emerald-500/20 transition-all active:scale-[0.95] overflow-hidden border border-emerald-500/40 ring-2 ring-emerald-500/10"
+                className="w-[30px] h-[30px] rounded-lg bg-white hover:bg-slate-50 flex items-center justify-center cursor-pointer shadow-md hover:shadow-emerald-500/20 transition-all active:scale-[0.95] overflow-hidden border border-emerald-500/40"
                 title="Open Recycle Bin (Deleted Contacts)"
                 aria-label="Recycle Bin"
               >
                 <img
                   src="/recycle-bin.gif"
                   alt="Recycle Bin"
-                  className="w-6 h-6 object-contain bg-white"
+                  className="w-5 h-5 object-contain bg-white"
                 />
               </button>
             )
@@ -329,7 +329,7 @@ export function MetadataHeader({
 
           {!isRecycleBin && (
             <>
-              {/* Direct Excel Download (Green Circular Icon Button) */}
+              {/* Direct Excel Download (Green Icon Button) */}
               <button
                 type="button"
                 disabled={isExporting}
@@ -337,22 +337,22 @@ export function MetadataHeader({
                   triggerHaptic('selection');
                   onExport();
                 }}
-                className="w-9 h-9 rounded-full text-white flex items-center justify-center cursor-pointer shadow-md shadow-emerald-600/25 hover:brightness-110 transition-all active:scale-[0.95] shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-[30px] h-[30px] rounded-lg text-white flex items-center justify-center cursor-pointer shadow-md shadow-emerald-600/25 border border-emerald-400/30 hover:brightness-110 transition-all active:scale-[0.95] shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ background: 'linear-gradient(180deg, #38BF3D 0%, #1BA32D 50%, #0B6B1E 100%)' }}
                 title="Download Contacts as Excel (.xlsx)"
                 aria-label="Download Excel"
               >
-                <Download size={16} strokeWidth={2.4} className={isExporting ? 'animate-bounce text-white' : 'text-white'} />
+                <Download size={14} strokeWidth={2.4} className={isExporting ? 'animate-bounce text-white' : 'text-white'} />
               </button>
 
               {/* Add Contact Icon Button (Solid Navy Blue with Tooltip) */}
               <button
                 onClick={onOpenAddModal}
-                className="w-9 h-9 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-[0.992]"
+                className="w-[30px] h-[30px] rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-[0.95] shrink-0"
                 title="Add Single Contact"
                 aria-label="Add Contact"
               >
-                <Plus size={17} strokeWidth={2.5} />
+                <Plus size={15} strokeWidth={2.5} />
               </button>
             </>
           )}

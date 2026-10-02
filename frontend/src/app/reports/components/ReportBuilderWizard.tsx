@@ -225,7 +225,6 @@ const DAILY_POSITIVES_KPIS = [
   { key: 'active_colleges_count', label: 'Colleges Reached', desc: 'Active Partner Institutions' },
   { key: 'distinct_companies_count', label: 'Distinct Companies', desc: 'Engaged Corporate Partners' },
   { key: 'highest_ctc', label: 'Highest Package', desc: 'Top CTC Offered' },
-  { key: 'graduating_year', label: 'Graduating Batch', desc: 'Target Batch Year' },
 ];
 
 const DAILY_JD_KPIS = [
@@ -233,7 +232,6 @@ const DAILY_JD_KPIS = [
   { key: 'active_colleges_count', label: 'Beneficiary Colleges', desc: 'Partner Institutions Included' },
   { key: 'distinct_companies_count', label: 'Distinct Companies', desc: 'Hiring Corporate Partners' },
   { key: 'highest_ctc', label: 'Highest Package', desc: 'Top CTC Offered' },
-  { key: 'graduating_year', label: 'Graduating Batch', desc: 'Target Batch Year' },
 ];
 
 const HIGHLIGHT_PALETTES = [
@@ -284,12 +282,7 @@ export function ReportBuilderWizard({
   const [collegeId, setCollegeId] = useState(
     initialCollegeId && initialCollegeId !== 'all' ? initialCollegeId : ''
   );
-  const [academicYear, setAcademicYear] = useState<string>(() => {
-    if (initialTemplateType === 'daily_positives' || initialTemplateType === 'daily_jd_received') {
-      return getDefaultGraduatingBatch();
-    }
-    return 'all';
-  });
+  const [academicYear, setAcademicYear] = useState<string>('all');
   const [weeklyTargetMode, setWeeklyTargetMode] = useState<'single' | 'group'>('single');
   const [selectedGroupCollegeIds, setSelectedGroupCollegeIds] = useState<string[]>([]);
   const [groupSearchQuery, setGroupSearchQuery] = useState<string>('');
@@ -490,10 +483,6 @@ export function ReportBuilderWizard({
   });
 
   const [colleges, setColleges] = useState<College[]>(() => getCachedColleges());
-  const [monthEndSelectedCollegeIds, setMonthEndSelectedCollegeIds] = useState<string[]>(() => {
-    const cached = getCachedColleges();
-    return cached.map((c: any) => c._id);
-  });
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
@@ -538,10 +527,6 @@ export function ReportBuilderWizard({
         const fetched = await fetchAllCollegesCached();
         if (isMounted && fetched && fetched.length > 0) {
           setColleges(fetched);
-          setMonthEndSelectedCollegeIds((prev) => {
-            if (prev.length === 0) return fetched.map((c: any) => c._id);
-            return prev;
-          });
         }
       } catch (err) {
         console.error('Failed to load colleges in ReportBuilderWizard:', err);
@@ -566,14 +551,11 @@ export function ReportBuilderWizard({
       if (wizardMemory) {
         const saved = wizardMemory.state;
         if (saved && typeof saved === 'object') {
-          if (saved.templateType && !initialTemplateType) setTemplateType(saved.templateType);
-          if (saved.collegeId && !initialCollegeId) setCollegeId(saved.collegeId);
+          if (saved.templateType) setTemplateType(saved.templateType);
+          if (saved.collegeId) setCollegeId(saved.collegeId);
           if (saved.academicYear) setAcademicYear(saved.academicYear);
           if (saved.weeklyTargetMode) setWeeklyTargetMode(saved.weeklyTargetMode);
           if (Array.isArray(saved.selectedGroupCollegeIds)) setSelectedGroupCollegeIds(saved.selectedGroupCollegeIds);
-          if (Array.isArray(saved.monthEndSelectedCollegeIds) && saved.monthEndSelectedCollegeIds.length > 0) {
-            setMonthEndSelectedCollegeIds(saved.monthEndSelectedCollegeIds);
-          }
           if (saved.selectedMonth) setSelectedMonth(saved.selectedMonth);
           if (saved.startDate) setStartDate(saved.startDate);
           if (saved.endDate) setEndDate(saved.endDate);
@@ -612,7 +594,6 @@ export function ReportBuilderWizard({
         academicYear,
         weeklyTargetMode,
         selectedGroupCollegeIds,
-        monthEndSelectedCollegeIds,
         selectedMonth,
         startDate,
         endDate,
@@ -645,7 +626,6 @@ export function ReportBuilderWizard({
     academicYear,
     weeklyTargetMode,
     selectedGroupCollegeIds,
-    monthEndSelectedCollegeIds,
     selectedMonth,
     startDate,
     endDate,
@@ -1081,7 +1061,6 @@ export function ReportBuilderWizard({
     setTheme('blue');
     setCustomRemarks('');
 
-    setMonthEndSelectedCollegeIds([]);
     setValidationErrors([]);
 
     setWeeklyMinCtc(null);
@@ -1309,9 +1288,7 @@ export function ReportBuilderWizard({
   const handleCategoryChange = (newType: string) => {
     setTemplateType(newType);
     setValidationErrors([]);
-    // The two Daily templates force a graduating batch (2027). Leaving one for any other report must not
-    // carry that batch along - it silently filtered the weekly report to a single batch.
-    if (newType !== 'daily_positives' && newType !== 'daily_jd_received') {
+    if (newType !== 'active_leads') {
       setAcademicYear('all');
     }
     if (newType === 'pending_tasks') {
@@ -1345,9 +1322,6 @@ export function ReportBuilderWizard({
         remarks: false,
       });
       setIncludePreparedBy(true);
-      if (monthEndSelectedCollegeIds.length === 0 && colleges.length > 0) {
-        setMonthEndSelectedCollegeIds(colleges.map((c: any) => c._id));
-      }
       if (!collegeId) {
         setCollegeId('all');
       }
@@ -1364,18 +1338,12 @@ export function ReportBuilderWizard({
         remarks: false,
       });
       setCustomRemarks('Positives of the day tracked across partner institutions for prospective recruitment.');
-      if (academicYear === 'all' || !academicYear) {
-        setAcademicYear(getDefaultGraduatingBatch());
-      }
     } else if (newType === 'daily_jd_received') {
       setSections({
         kpi_summary: false,
         remarks: false,
       });
       setCustomRemarks('Formal Job Descriptions received today across corporate partners for campus placement drives.');
-      if (academicYear === 'all' || !academicYear) {
-        setAcademicYear(getDefaultGraduatingBatch());
-      }
     } else {
       setSections({
         kpi_summary: false,
@@ -1414,10 +1382,6 @@ export function ReportBuilderWizard({
     } else if (templateType === 'pending_tasks') {
       if (!collegeId || collegeId.trim() === '' || collegeId === 'all') {
         errors.push('Target Institution is required. Please pick a college to generate the report.');
-      }
-    } else if (templateType === 'month_end') {
-      if (monthEndSelectedCollegeIds.length === 0) {
-        errors.push('Please select at least one college to include in the Month-End report.');
       }
     }
 
@@ -1478,11 +1442,13 @@ export function ReportBuilderWizard({
         body: JSON.stringify({
           template_type: templateType,
           is_multi_college: isMultiWeekly || isMultiMonthEnd,
-          college_ids: isMultiWeekly ? selectedGroupCollegeIds : (templateType === 'month_end' ? monthEndSelectedCollegeIds : undefined),
-          selected_college_ids: templateType === 'month_end' ? monthEndSelectedCollegeIds : undefined,
+          college_ids: isMultiWeekly ? selectedGroupCollegeIds : undefined,
           college_id: isMultiWeekly ? 'multi' : (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? 'all' : (templateType === 'active_leads' ? (collegeId || 'all') : (templateType === 'month_end' ? (collegeId || 'all') : collegeId)),
           coordinator_id: coordinatorId || readSessionUser()?._id || readSessionUser()?.id || '',
-          academic_year: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? (academicYear && academicYear !== 'all' ? academicYear : getDefaultGraduatingBatch()) : academicYear,
+          // Weekly Placement, Daily Positives and Daily JD Received no longer filter by
+          // graduating batch (user decision, 1 Oct 2026 — the control served no purpose on
+          // these three) — always unfiltered regardless of any stale academicYear state.
+          academic_year: (templateType === 'weekly_placement' || templateType === 'daily_positives' || templateType === 'daily_jd_received') ? 'all' : academicYear,
           date: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? dailyReportDate : undefined,
           effective_date: (templateType === 'daily_positives' || templateType === 'daily_jd_received') ? dailyReportDate : undefined,
           date_from: templateType === 'month_end' ? startDate : undefined,
@@ -1721,11 +1687,11 @@ export function ReportBuilderWizard({
       {/* ── Navigation Tabs (Weekly Report, Month-End Report, Pending Tasks, Active Leads, Daily Positives, Daily JD Received) ────────────────── */}
       <div className="flex justify-center pt-2 pb-2">
         <div className="w-full max-w-6xl">
-        <div className="w-full bg-surface border border-border p-1.5 rounded-2xl shadow-xs grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-1.5">
+        <div className="w-full bg-surface border border-border p-1.5 rounded-xl shadow-xs grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-1.5">
           <button
             type="button"
             onClick={() => handleCategoryChange('weekly_placement')}
-            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'weekly_placement'
                 ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
@@ -1738,7 +1704,7 @@ export function ReportBuilderWizard({
           <button
             type="button"
             onClick={() => handleCategoryChange('month_end')}
-            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'month_end'
                 ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
@@ -1751,7 +1717,7 @@ export function ReportBuilderWizard({
           <button
             type="button"
             onClick={() => handleCategoryChange('pending_tasks')}
-            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'pending_tasks'
                 ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
@@ -1764,7 +1730,7 @@ export function ReportBuilderWizard({
           <button
             type="button"
             onClick={() => handleCategoryChange('active_leads')}
-            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'active_leads'
                 ? 'bg-primary text-primary-foreground shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
@@ -1777,7 +1743,7 @@ export function ReportBuilderWizard({
           <button
             type="button"
             onClick={() => handleCategoryChange('daily_positives')}
-            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'daily_positives'
                 ? 'bg-emerald-600 text-white shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
@@ -1790,7 +1756,7 @@ export function ReportBuilderWizard({
           <button
             type="button"
             onClick={() => handleCategoryChange('daily_jd_received')}
-            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
+            className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer select-none whitespace-nowrap ${
               templateType === 'daily_jd_received'
                 ? 'bg-amber-600 text-white shadow-xs'
                 : 'text-fg-muted hover:text-fg hover:bg-surface-sunken'
@@ -1826,12 +1792,14 @@ export function ReportBuilderWizard({
                 : templateType === 'pending_tasks'
                 ? 'Target Institution Scope'
                 : (templateType === 'daily_positives' || templateType === 'daily_jd_received')
-                ? 'Report Date & Graduating Batch'
-                : 'Institutional Scope & Batch'}
+                ? 'Report Date & Scope'
+                : templateType === 'month_end'
+                ? 'Institutional Scope & Reporting Period'
+                : 'Target Institution Scope'}
             </h2>
           </div>
 
-          <div className={`grid gap-4 ${(templateType === 'active_leads' || templateType === 'pending_tasks') ? 'grid-cols-1 max-w-md' : 'grid-cols-1 md:grid-cols-2'}`}>
+          <div className={`grid gap-4 ${templateType === 'month_end' ? 'grid-cols-1 md:grid-cols-2' : (templateType === 'weekly_placement' && weeklyTargetMode === 'group') ? 'grid-cols-1' : 'grid-cols-1 max-w-md'}`}>
             {/* Report Date Picker for Daily Reports */}
             {(templateType === 'daily_positives' || templateType === 'daily_jd_received') && (
               <div>
@@ -1911,7 +1879,7 @@ export function ReportBuilderWizard({
 
                       if (templateType === 'month_end') {
                         selectOptions = [
-                          { value: 'all', badge: 'ALL', isPinned: true, label: 'All Handled Institutions (Filter Below)' },
+                          { value: 'all', badge: 'ALL', isPinned: true, label: 'All Handled Institutions' },
                           ...selectOptions,
                         ];
                       }
@@ -2058,25 +2026,55 @@ export function ReportBuilderWizard({
               </div>
             )}
 
-            {/* Graduating Academic Year / Batch (Rendered for all templates except Pending Tasks) */}
-            {templateType !== 'pending_tasks' && (
+            {/* Month-End Reporting Period (Beside Right of Target Institution) */}
+            {templateType === 'month_end' && (
+              <div>
+                <label className="block text-xs font-semibold text-fg mb-1.5">
+                  Select Reporting Month <span className="text-rose-500 font-bold ml-0.5">*</span>
+                </label>
+                <SmoothSelect
+                  value={selectedMonth}
+                  onChange={(val) => {
+                    setSelectedMonth(val);
+                    const found = MONTH_OPTIONS.find((m) => m.value === val);
+                    if (found) {
+                      setStartDate(found.start);
+                      setEndDate(found.end);
+                      setWeekLabel(`${found.label} (${found.start} – ${found.end})`);
+                      setValidationErrors([]);
+                    }
+                  }}
+                  placeholder="Select Month"
+                  icon={CalendarDays}
+                  title="Month-End Reporting Cycle"
+                  options={MONTH_OPTIONS.map((m) => ({
+                    value: m.value,
+                    label: m.label,
+                    badge: m.badge,
+                    sublabel: m.sublabel,
+                  }))}
+                />
+              </div>
+            )}
+
+            {/* Graduating Academic Year / Batch (Rendered ONLY for Active Leads) */}
+            {templateType === 'active_leads' && (
               <div>
                 <label className="block text-xs font-semibold text-fg mb-1.5">
                   Graduating Academic Batch
                 </label>
                 {(() => {
-                  const isDaily = templateType === 'daily_positives' || templateType === 'daily_jd_received';
-                  const batchOptions = getGraduatingBatchOptions(!isDaily);
+                  const batchOptions = getGraduatingBatchOptions(true);
 
                   return (
                     <div>
                       <SmoothSelect
-                        value={academicYear || (isDaily ? getDefaultGraduatingBatch() : 'all')}
+                        value={academicYear || 'all'}
                         onChange={(val) => {
                           setAcademicYear(val);
                           setValidationErrors([]);
                         }}
-                        placeholder={isDaily ? getDefaultGraduatingBatch() : 'All Batches'}
+                        placeholder="All Batches"
                         icon={GraduationCap}
                         title="Graduating Academic Batch"
                         searchable={true}
@@ -2735,136 +2733,6 @@ export function ReportBuilderWizard({
           </div>
         )}
 
-        {templateType === 'month_end' && (
-          <div className="space-y-4 pt-2">
-            <div className="flex items-center gap-2 border-b border-border/80 pb-2">
-              <Calendar size={16} className="text-primary shrink-0" />
-              <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
-                Month-End Reporting Period
-              </h2>
-            </div>
-
-            <div className="max-w-md">
-              <label className="block text-xs font-semibold text-fg mb-1.5">
-                Select Reporting Month <span className="text-rose-500 font-bold ml-0.5">*</span>
-              </label>
-              <SmoothSelect
-                value={selectedMonth}
-                onChange={(val) => {
-                  setSelectedMonth(val);
-                  const found = MONTH_OPTIONS.find((m) => m.value === val);
-                  if (found) {
-                    setStartDate(found.start);
-                    setEndDate(found.end);
-                    setWeekLabel(`${found.label} (${found.start} – ${found.end})`);
-                    setValidationErrors([]);
-                  }
-                }}
-                placeholder="Select Month"
-                icon={CalendarDays}
-                title="Month-End Reporting Cycle"
-                options={MONTH_OPTIONS.map((m) => ({
-                  value: m.value,
-                  label: m.label,
-                  badge: m.badge,
-                  sublabel: m.sublabel,
-                }))}
-              />
-            </div>
-
-            {/* Target Colleges Checklist for Month-End Calling Activity & Report */}
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between border-b border-border/80 pb-2 flex-wrap gap-2">
-                <div className="flex items-center gap-2.5">
-                  <Building2 size={16} className="text-primary shrink-0" />
-                  <h2 className="text-xs font-bold text-fg uppercase tracking-wider">
-                    Focus College Call Activity
-                  </h2>
-                  <span className="font-mono text-xs font-bold text-primary px-2 py-0.5 rounded-md bg-primary/10 border border-primary/20">
-                    {monthEndSelectedCollegeIds.length} of {colleges.length} Selected
-                  </span>
-                </div>
-              </div>
-
-              <div className="border border-border rounded-xl p-3 bg-surface-sunken/40 space-y-2.5">
-                {/* Quick Action Ribbon */}
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMonthEndSelectedCollegeIds(colleges.map((c: any) => c._id));
-                        setValidationErrors([]);
-                      }}
-                      className="px-2.5 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-semibold hover:bg-primary/20 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                    >
-                      Select All ({colleges.length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMonthEndSelectedCollegeIds([])}
-                      className="px-2.5 py-1 rounded-lg bg-surface border border-border text-xs font-medium text-fg-muted hover:text-rose-600 transition-colors cursor-pointer shadow-2xs"
-                    >
-                      Clear All
-                    </button>
-                  </div>
-
-                  <span className="text-[11px] text-fg-subtle italic">
-                    Tick marks determine colleges included in Month-End Report
-                  </span>
-                </div>
-
-                {/* Compact Checkbox Grid for College Acronyms */}
-                <div className="max-h-44 overflow-y-auto pr-1 border border-border rounded-lg bg-surface p-2 [scrollbar-width:thin]">
-                  {prioritizedColleges.length === 0 ? (
-                    <p className="text-center py-3 text-xs text-fg-disabled italic">No institutions available</p>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-1.5">
-                      {prioritizedColleges.map((c: any) => {
-                        const isSelected = monthEndSelectedCollegeIds.includes(c._id);
-                        const acronym = c.college_code || c.college_name;
-
-                        return (
-                          <label
-                            key={c._id}
-                            title={`${c.college_name} (${acronym})`}
-                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs cursor-pointer transition-all select-none ${
-                              isSelected
-                                ? 'bg-primary/10 border-primary/40 text-primary font-bold shadow-2xs'
-                                : 'bg-surface border-border/80 text-fg-muted hover:border-primary/40 hover:text-fg opacity-80'
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => {
-                                setValidationErrors([]);
-                                setMonthEndSelectedCollegeIds((prev) =>
-                                  isSelected ? prev.filter((id) => id !== c._id) : [...prev, c._id]
-                                );
-                              }}
-                              className="w-3.5 h-3.5 rounded border-border text-primary focus:ring-primary accent-primary cursor-pointer shrink-0"
-                            />
-                            <span className="font-mono font-bold text-[11px] tracking-wide truncate">
-                              {acronym}
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {validationErrors.some((e) => e.toLowerCase().includes('at least one college to include in the month-end report')) && (
-                  <p className="text-[11px] text-rose-600 dark:text-rose-400 font-semibold mt-0.5 flex items-center gap-1">
-                    <AlertCircle size={12} className="shrink-0" />
-                    Please select at least one college to include in the Month-End report.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Section C: Included Report Sections (Live Synced with Weekly Tracker) */}
         {templateType !== 'pending_tasks' && templateType !== 'active_leads' && templateType !== 'daily_positives' && templateType !== 'daily_jd_received' && (
@@ -3233,7 +3101,7 @@ export function ReportBuilderWizard({
             type="button"
             onClick={handleGenerate}
             disabled={loading}
-            className="px-6 py-2.5 bg-primary hover:bg-primary-hover disabled:opacity-50 text-primary-foreground rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center cursor-pointer"
+            className="h-[30px] px-5 bg-primary hover:bg-primary-hover disabled:opacity-50 text-primary-foreground rounded-lg text-xs font-semibold shadow-xs transition-colors flex items-center justify-center cursor-pointer"
           >
             <span>{loading ? 'Generating Report…' : 'Generate Report'}</span>
           </button>

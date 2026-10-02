@@ -201,7 +201,7 @@ export function ContactPickerModal({ onClose, onLoad }: Props) {
                 setPage(1);
               }}
               style={{ background: 'linear-gradient(180deg, #22449E 0%, #1D3D8F 50%, #172E6C 100%)' }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full font-bold text-xs text-white shadow-md shadow-blue-900/25 hover:brightness-110 active:scale-[0.96] transition-all cursor-pointer select-none"
+              className="inline-flex items-center gap-1.5 h-[30px] px-3.5 rounded-lg font-bold text-xs text-white shadow-md shadow-blue-900/25 border border-blue-400/30 hover:brightness-110 active:scale-[0.95] transition-all cursor-pointer select-none"
               title={isRecent ? 'Switch back to all metadata from Serial Number 1' : 'Toggle to view recently added contacts'}
             >
               {isRecent ? (

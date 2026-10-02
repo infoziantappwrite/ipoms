@@ -52,3 +52,7 @@ backend/dist/
 # Local test credentials/tokens — never commit
 frontend/coord.json
 frontend/coord_token.txt
+
+# Locally-generated HTTPS dev certificate + private keys — machine-specific, never commit.
+# See CLAUDE.md §5 item 109.
+frontend/.cert/

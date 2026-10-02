@@ -593,7 +593,12 @@ textarea:focus-visible,
     display: table-header-group !important;
   }
 
-  /* Editable input fields render as clean plain text during print */
+  /* Editable input fields render as clean plain text during print. Browsers apply their own
+     native form-control styling to <input>/<textarea> elements when printing, overriding the
+     page's own font even though size/weight/color were already inherited — most visibly on the
+     report's editable title (a real <input>), which would otherwise print in the browser's
+     default form font instead of the page's. font-family/text-align/text-transform/letter-spacing
+     close that gap so an editable field prints identically to its read-only counterpart. */
   .printable-report-canvas input,
   .printable-report-canvas textarea {
     border: none !important;
@@ -603,8 +608,15 @@ textarea:focus-visible,
     color: inherit !important;
     font-size: inherit !important;
     font-weight: inherit !important;
+    font-family: inherit !important;
+    text-align: inherit !important;
+    text-transform: inherit !important;
+    letter-spacing: inherit !important;
+    line-height: inherit !important;
     outline: none !important;
     resize: none !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
   }
 
   /* Avoid awkward page cuts inside rows or sections */
