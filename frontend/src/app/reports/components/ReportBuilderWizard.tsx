@@ -314,7 +314,7 @@ export function ReportBuilderWizard({
 
   // Prepared By / Sign-off Footer Options
   const [includePreparedBy, setIncludePreparedBy] = useState<boolean>(() => {
-    return initialTemplateType !== 'active_leads';
+    return initialTemplateType !== 'active_leads' && initialTemplateType !== 'weekly_placement';
   });
   const [preparedByName, setPreparedByName] = useState<string>(() => {
     return readSessionUser()?.full_name || 'Placement Coordinator';
@@ -462,7 +462,7 @@ export function ReportBuilderWizard({
       s.rejected_companies = true;
       s.on_hold_by_college = true;
       s.on_hold_by_hr = true;
-      s.remarks = true;
+      s.remarks = false;
     }
     return s;
   });
@@ -1357,9 +1357,9 @@ export function ReportBuilderWizard({
         rejected_companies: (weeklyCompanies.rejected_companies || []).length > 0,
         on_hold_by_college: (weeklyCompanies.on_hold_by_college || []).length > 0,
         on_hold_by_hr: (weeklyCompanies.on_hold_by_hr || []).length > 0,
-        remarks: true,
+        remarks: false,
       });
-      setIncludePreparedBy(true);
+      setIncludePreparedBy(false);
       setCustomRemarks('All campus drives are progressing actively as per schedule. Follow-ups with upcoming tech partners remain on track.');
     }
   };
@@ -1823,17 +1823,17 @@ export function ReportBuilderWizard({
 
                   {/* Mode Toggle for Weekly Report */}
                   {templateType === 'weekly_placement' && (
-                    <div className="flex items-center gap-1 p-0.5 bg-surface-sunken border border-border rounded-lg text-micro font-medium">
+                    <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900/90 border border-slate-200/90 dark:border-slate-800 rounded-full text-xs select-none shadow-inner">
                       <button
                         type="button"
                         onClick={() => {
                           setWeeklyTargetMode('single');
                           setValidationErrors([]);
                         }}
-                        className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                           weeklyTargetMode === 'single'
-                            ? 'bg-primary text-primary-foreground shadow-2xs font-semibold'
-                            : 'text-fg-muted hover:text-fg'
+                            ? 'bg-gradient-to-b from-[#22449E] via-[#1D3D8F] to-[#172E6C] text-white shadow-sm font-extrabold'
+                            : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                         }`}
                       >
                         Single College
@@ -1850,13 +1850,13 @@ export function ReportBuilderWizard({
                             setSelectedGroupCollegeIds(activeColleges.map((c: any) => c._id));
                           }
                         }}
-                        className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                           weeklyTargetMode === 'group'
-                            ? 'bg-primary text-primary-foreground shadow-2xs font-semibold'
-                            : 'text-fg-muted hover:text-fg'
+                            ? 'bg-gradient-to-b from-[#22449E] via-[#1D3D8F] to-[#172E6C] text-white shadow-sm font-extrabold'
+                            : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                         }`}
                       >
-                        Multiple Colleges / Group
+                        Multi College
                       </button>
                     </div>
                   )}

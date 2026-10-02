@@ -519,54 +519,90 @@ export default function MetadataPage() {
     }
 
     setIsExporting(true);
+    toast?.(`Preparing Excel export for ${totalCount.toLocaleString()} contact(s)...`, 'info');
+
     try {
       const EXPORT_PAGE_SIZE = 500; // server-enforced max per request
-      const all: any[] = [];
-      let fetchPage = 1;
-      let expectedTotal = totalCount;
+      let queryParams = `is_deleted=${isRecycleBin}`;
+      if (searchQuery.trim()) queryParams += `&q=${encodeURIComponent(searchQuery.trim())}`;
+      if (selectedType !== 'all') queryParams += `&type=${selectedType}`;
+      if (isRecent) queryParams += '&recent=true';
+      if (fromSno !== null && fromSno > 0) queryParams += `&from_sno=${fromSno}`;
+      if (toSno !== null && toSno > 0) queryParams += `&to_sno=${toSno}`;
 
-      while (all.length < expectedTotal) {
-        let endpoint = `/metadata?page=${fetchPage}&limit=${EXPORT_PAGE_SIZE}&is_deleted=${isRecycleBin}`;
-        if (searchQuery.trim()) endpoint += `&q=${encodeURIComponent(searchQuery.trim())}`;
-        if (selectedType !== 'all') endpoint += `&type=${selectedType}`;
-        if (isRecent) endpoint += '&recent=true';
-        if (fromSno !== null && fromSno > 0) endpoint += `&from_sno=${fromSno}`;
-        if (toSno !== null && toSno > 0) endpoint += `&to_sno=${toSno}`;
-
-        const res = await apiFetch<any>(endpoint);
-        if (!res.success || !res.data) break;
-
-        const batch: any[] = res.data.companies || [];
-        if (batch.length === 0) break;
-        all.push(...batch);
-        expectedTotal = res.data.total ?? expectedTotal; // stay accurate if data changed mid-export
-        fetchPage++;
+      // Fetch Page 1 first to get accurate total and first batch
+      const firstRes = await apiFetch<any>(`/metadata?page=1&limit=${EXPORT_PAGE_SIZE}&${queryParams}`);
+      if (!firstRes.success || !firstRes.data) {
+        throw new Error(firstRes.error?.message || 'Failed to fetch metadata');
       }
 
-      if (all.length < expectedTotal) {
-        toast?.(`Export incomplete: got ${all.length} of ${expectedTotal} records. Try again.`, 'error');
+      const totalRecords = firstRes.data.total ?? totalCount;
+      const totalPages = Math.ceil(totalRecords / EXPORT_PAGE_SIZE);
+      const allCompanies: any[] = [...(firstRes.data.companies || [])];
+
+      // Execute remaining page requests in parallel for sub-second performance
+      if (totalPages > 1) {
+        const pagePromises = [];
+        for (let p = 2; p <= totalPages; p++) {
+          pagePromises.push(apiFetch<any>(`/metadata?page=${p}&limit=${EXPORT_PAGE_SIZE}&${queryParams}`));
+        }
+
+        const responses = await Promise.all(pagePromises);
+        for (const r of responses) {
+          if (r.success && Array.isArray(r.data?.companies)) {
+            allCompanies.push(...r.data.companies);
+          }
+        }
       }
 
-      const headers = ['Company Name', 'HR Name', 'Designation', 'Primary Mobile', 'All Mobiles', 'Primary Email', 'Industry Type', 'Notes'];
-      const rows = all.map((c) => [
-        c.company_name || '',
-        c.hr_name || '',
-        c.hr_designation || '',
-        c.primary_mobile || '',
-        (c.mobile_numbers || []).join('; '),
-        c.primary_email || '',
-        c.company_type || '',
-        c.notes || '',
-      ]);
+      const headers = [
+        'S.No',
+        'Company Name',
+        'HR Contact Person',
+        'Designation',
+        'Primary Mobile',
+        'All Mobiles',
+        'Primary Email',
+        'All Emails',
+        'Industry Type',
+        'Location',
+        'Notes',
+      ];
+
+      const rows = allCompanies.map((c, idx) => {
+        const mobiles = Array.isArray(c.mobile_numbers)
+          ? c.mobile_numbers.filter(Boolean).join('; ')
+          : String(c.primary_mobile || c.mobile_numbers || '');
+        const emails = Array.isArray(c.email_ids)
+          ? c.email_ids.filter(Boolean).join('; ')
+          : String(c.primary_email || c.email_ids || '');
+
+        return [
+          c.serial_number ?? (idx + 1),
+          c.company_name || '',
+          c.hr_name || '',
+          c.hr_designation || '',
+          c.primary_mobile || '',
+          mobiles,
+          c.primary_email || '',
+          emails,
+          c.company_type || '',
+          c.headquarters_location || c.location || '',
+          c.notes || '',
+        ];
+      });
 
       const rangeSuffix = (fromSno || toSno) ? `_SNo_${fromSno || 1}_to_${toSno || 'End'}` : '';
-      exportToXlsx(`iPOMS_Master_Company_Metadata${rangeSuffix}_${new Date().toISOString().slice(0, 10)}`, {
-        name: 'Master Companies',
+      const fileName = `iPOMS_Master_Company_Metadata${rangeSuffix}_${new Date().toISOString().slice(0, 10)}`;
+
+      exportToXlsx(fileName, {
+        name: 'Master Metadata',
         headers,
         rows,
       });
-      toast?.(`Exported ${all.length} record(s) to Excel.`, 'success');
-    } catch (err) {
+
+      toast?.(`Successfully exported ${allCompanies.length.toLocaleString()} company contact(s) to Excel!`, 'success');
+    } catch (err: any) {
       console.error('Export failed:', err);
       alert('Export failed. Please try again.');
     } finally {

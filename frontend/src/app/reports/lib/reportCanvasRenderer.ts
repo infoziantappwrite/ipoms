@@ -391,6 +391,7 @@ export async function generateReportCanvases(
   }
 
   interface SectionDef {
+    collegeBanner?: string;
     title: string;
     badge: string;
     accentBg: string;
@@ -502,6 +503,9 @@ export async function generateReportCanvases(
   // 2. Multi-College Consolidated Weekly Placement
   if (report.is_multi_college && Array.isArray(report.colleges_data)) {
     report.colleges_data.forEach((colData: any, cIdx: number) => {
+      const collegeTitle = `${colData.college_name} ${colData.college_code ? `(${colData.college_code})` : ''}`.toUpperCase();
+      let hasAddedBanner = false;
+
       // Completed
       if (report.included_sections?.completed_companies !== false && colData.completed_companies && colData.completed_companies.length > 0) {
         const compRows = colData.completed_companies;
@@ -547,7 +551,8 @@ export async function generateReportCanvases(
         });
 
         sectionsToDraw.push({
-          title: `${colData.college_name.toUpperCase()} — COMPLETED`,
+          collegeBanner: !hasAddedBanner ? collegeTitle : undefined,
+          title: 'COMPANIES COMPLETED',
           badge: `${compRows.length} Drives`,
           accentBg: '#ecfdf5',
           accentBorder: '#a7f3d0',
@@ -556,6 +561,7 @@ export async function generateReportCanvases(
           colWidths,
           measuredRows,
         });
+        hasAddedBanner = true;
       }
 
       // Drive in progress
@@ -600,7 +606,8 @@ export async function generateReportCanvases(
         });
 
         sectionsToDraw.push({
-          title: `${colData.college_name.toUpperCase()} — DRIVE IN PROGRESS`,
+          collegeBanner: !hasAddedBanner ? collegeTitle : undefined,
+          title: 'DRIVE IN PROGRESS',
           badge: `${dipRows.length} Drives`,
           accentBg: '#fffbeb',
           accentBorder: '#fde68a',
@@ -609,6 +616,7 @@ export async function generateReportCanvases(
           colWidths,
           measuredRows,
         });
+        hasAddedBanner = true;
       }
 
       // Upcoming drives
@@ -653,7 +661,8 @@ export async function generateReportCanvases(
         });
 
         sectionsToDraw.push({
-          title: `${colData.college_name.toUpperCase()} — UPCOMING DRIVES`,
+          collegeBanner: !hasAddedBanner ? collegeTitle : undefined,
+          title: 'UPCOMING DRIVES',
           badge: `${upRows.length} Drives`,
           accentBg: '#eef2ff',
           accentBorder: '#c7d2fe',
@@ -662,6 +671,7 @@ export async function generateReportCanvases(
           colWidths,
           measuredRows,
         });
+        hasAddedBanner = true;
       }
 
       // In progress
@@ -706,7 +716,8 @@ export async function generateReportCanvases(
         });
 
         sectionsToDraw.push({
-          title: `${colData.college_name.toUpperCase()} — IN PROGRESS`,
+          collegeBanner: !hasAddedBanner ? collegeTitle : undefined,
+          title: 'COMPANIES IN PROGRESS',
           badge: `${ipRows.length} Drives`,
           accentBg: '#eff6ff',
           accentBorder: '#bfdbfe',
@@ -715,6 +726,282 @@ export async function generateReportCanvases(
           colWidths,
           measuredRows,
         });
+        hasAddedBanner = true;
+      }
+
+      // Pipeline
+      if (report.included_sections?.pipeline !== false && colData.pipeline && colData.pipeline.length > 0) {
+        const pipeRows = colData.pipeline;
+        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
+        const colWidths = [36, 224, 200, 110, 230];
+        const rawRows = pipeRows.map((r: any) => [
+          String(r.s_no || ''),
+          String(r.company_name || '—'),
+          String(r.job_role || r.role || '—'),
+          String(r.ctc_lpa || r.ctc || '—'),
+          String(r.current_status_text || r.status || 'Pipeline'),
+        ]);
+
+        const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
+          let maxLines = 1;
+          const cells: MeasuredCell[] = row.map((cellText, cIdx2) => {
+            const colW = colWidths[cIdx2];
+            const maxCellW = colW - 14;
+            const font = cIdx2 === 1
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : cIdx2 === 0
+              ? '600 12px monospace'
+              : (cIdx2 === 3)
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : '500 12px system-ui, -apple-system, sans-serif';
+            const fillStyle = cIdx2 === 1
+              ? '#0a2540'
+              : cIdx2 === 0
+              ? '#007791'
+              : (cIdx2 === 3)
+              ? '#059669'
+              : '#334155';
+
+            const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
+            if (lines.length > maxLines) maxLines = lines.length;
+            return { lines, font, fillStyle };
+          });
+          const height = Math.max(38, maxLines * 17 + 16);
+          return { cells, height };
+        });
+
+        sectionsToDraw.push({
+          collegeBanner: !hasAddedBanner ? collegeTitle : undefined,
+          title: 'COMPANIES IN PIPELINE',
+          badge: `${pipeRows.length} Leads`,
+          accentBg: '#ecfeff',
+          accentBorder: '#a5f3fc',
+          accentText: '#0a2540',
+          headers,
+          colWidths,
+          measuredRows,
+        });
+        hasAddedBanner = true;
+      }
+
+      // Top Companies
+      if (report.included_sections?.top_companies !== false && colData.top_companies && colData.top_companies.length > 0) {
+        const topRows = colData.top_companies;
+        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
+        const colWidths = [36, 224, 200, 110, 230];
+        const rawRows = topRows.map((r: any) => [
+          String(r.s_no || ''),
+          String(r.company_name || '—'),
+          String(r.job_role || r.role || '—'),
+          String(r.ctc_lpa || r.ctc || '—'),
+          String(r.current_status_text || r.status || 'Target Top Company'),
+        ]);
+
+        const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
+          let maxLines = 1;
+          const cells: MeasuredCell[] = row.map((cellText, cIdx2) => {
+            const colW = colWidths[cIdx2];
+            const maxCellW = colW - 14;
+            const font = cIdx2 === 1
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : cIdx2 === 0
+              ? '600 12px monospace'
+              : (cIdx2 === 3)
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : '500 12px system-ui, -apple-system, sans-serif';
+            const fillStyle = cIdx2 === 1
+              ? '#0a2540'
+              : cIdx2 === 0
+              ? '#007791'
+              : (cIdx2 === 3)
+              ? '#059669'
+              : '#334155';
+
+            const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
+            if (lines.length > maxLines) maxLines = lines.length;
+            return { lines, font, fillStyle };
+          });
+          const height = Math.max(38, maxLines * 17 + 16);
+          return { cells, height };
+        });
+
+        sectionsToDraw.push({
+          collegeBanner: !hasAddedBanner ? collegeTitle : undefined,
+          title: 'TOP COMPANIES',
+          badge: `${topRows.length} Companies`,
+          accentBg: '#fefce8',
+          accentBorder: '#fef08a',
+          accentText: '#0a2540',
+          headers,
+          colWidths,
+          measuredRows,
+        });
+        hasAddedBanner = true;
+      }
+
+      // Rejected Companies
+      const rejRows = colData.rejected_companies || colData.rejected_by_hr;
+      if (report.included_sections?.rejected_companies !== false && report.included_sections?.rejected_by_hr !== false && rejRows && rejRows.length > 0) {
+        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
+        const colWidths = [36, 224, 200, 110, 230];
+        const rawRows = rejRows.map((r: any) => [
+          String(r.s_no || ''),
+          String(r.company_name || '—'),
+          String(r.job_role || r.role || '—'),
+          String(r.ctc_lpa || r.ctc || '—'),
+          String(r.current_status_text || r.status || 'Rejected'),
+        ]);
+
+        const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
+          let maxLines = 1;
+          const cells: MeasuredCell[] = row.map((cellText, cIdx2) => {
+            const colW = colWidths[cIdx2];
+            const maxCellW = colW - 14;
+            const font = cIdx2 === 1
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : cIdx2 === 0
+              ? '600 12px monospace'
+              : (cIdx2 === 3)
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : '500 12px system-ui, -apple-system, sans-serif';
+            const fillStyle = cIdx2 === 1
+              ? '#0a2540'
+              : cIdx2 === 0
+              ? '#007791'
+              : (cIdx2 === 3)
+              ? '#059669'
+              : '#334155';
+
+            const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
+            if (lines.length > maxLines) maxLines = lines.length;
+            return { lines, font, fillStyle };
+          });
+          const height = Math.max(38, maxLines * 17 + 16);
+          return { cells, height };
+        });
+
+        sectionsToDraw.push({
+          collegeBanner: !hasAddedBanner ? collegeTitle : undefined,
+          title: 'REJECTED COMPANIES',
+          badge: `${rejRows.length} Companies`,
+          accentBg: '#fff1f2',
+          accentBorder: '#fecdd3',
+          accentText: '#0a2540',
+          headers,
+          colWidths,
+          measuredRows,
+        });
+        hasAddedBanner = true;
+      }
+
+      // On Hold by College
+      const holdColRows = colData.on_hold_by_college || colData.rejected_by_college;
+      if (report.included_sections?.on_hold_by_college !== false && report.included_sections?.rejected_by_college !== false && holdColRows && holdColRows.length > 0) {
+        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
+        const colWidths = [36, 224, 200, 110, 230];
+        const rawRows = holdColRows.map((r: any) => [
+          String(r.s_no || ''),
+          String(r.company_name || '—'),
+          String(r.job_role || r.role || '—'),
+          String(r.ctc_lpa || r.ctc || '—'),
+          String(r.current_status_text || r.status || 'On Hold by College'),
+        ]);
+
+        const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
+          let maxLines = 1;
+          const cells: MeasuredCell[] = row.map((cellText, cIdx2) => {
+            const colW = colWidths[cIdx2];
+            const maxCellW = colW - 14;
+            const font = cIdx2 === 1
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : cIdx2 === 0
+              ? '600 12px monospace'
+              : (cIdx2 === 3)
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : '500 12px system-ui, -apple-system, sans-serif';
+            const fillStyle = cIdx2 === 1
+              ? '#0a2540'
+              : cIdx2 === 0
+              ? '#007791'
+              : (cIdx2 === 3)
+              ? '#059669'
+              : '#334155';
+
+            const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
+            if (lines.length > maxLines) maxLines = lines.length;
+            return { lines, font, fillStyle };
+          });
+          const height = Math.max(38, maxLines * 17 + 16);
+          return { cells, height };
+        });
+
+        sectionsToDraw.push({
+          collegeBanner: !hasAddedBanner ? collegeTitle : undefined,
+          title: 'COMPANIES ON HOLD BY COLLEGE',
+          badge: `${holdColRows.length} Companies`,
+          accentBg: '#fffbeb',
+          accentBorder: '#fde68a',
+          accentText: '#0a2540',
+          headers,
+          colWidths,
+          measuredRows,
+        });
+        hasAddedBanner = true;
+      }
+
+      // On Hold by HR
+      if (report.included_sections?.on_hold_by_hr !== false && colData.on_hold_by_hr && colData.on_hold_by_hr.length > 0) {
+        const holdHrRows = colData.on_hold_by_hr;
+        const headers = ['#', 'Company Name', 'Role', 'CTC', 'Status'];
+        const colWidths = [36, 224, 200, 110, 230];
+        const rawRows = holdHrRows.map((r: any) => [
+          String(r.s_no || ''),
+          String(r.company_name || '—'),
+          String(r.job_role || r.role || '—'),
+          String(r.ctc_lpa || r.ctc || '—'),
+          String(r.current_status_text || r.status || 'On Hold by HR'),
+        ]);
+
+        const measuredRows: MeasuredRow[] = rawRows.map((row: string[]) => {
+          let maxLines = 1;
+          const cells: MeasuredCell[] = row.map((cellText, cIdx2) => {
+            const colW = colWidths[cIdx2];
+            const maxCellW = colW - 14;
+            const font = cIdx2 === 1
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : cIdx2 === 0
+              ? '600 12px monospace'
+              : (cIdx2 === 3)
+              ? 'bold 12px system-ui, -apple-system, sans-serif'
+              : '500 12px system-ui, -apple-system, sans-serif';
+            const fillStyle = cIdx2 === 1
+              ? '#0a2540'
+              : cIdx2 === 0
+              ? '#007791'
+              : (cIdx2 === 3)
+              ? '#059669'
+              : '#334155';
+
+            const lines = measureTextLines(scratchCtx, cellText, maxCellW, font);
+            if (lines.length > maxLines) maxLines = lines.length;
+            return { lines, font, fillStyle };
+          });
+          const height = Math.max(38, maxLines * 17 + 16);
+          return { cells, height };
+        });
+
+        sectionsToDraw.push({
+          collegeBanner: !hasAddedBanner ? collegeTitle : undefined,
+          title: 'COMPANIES ON HOLD BY HR',
+          badge: `${holdHrRows.length} Companies`,
+          accentBg: '#fff1f2',
+          accentBorder: '#fecdd3',
+          accentText: '#0a2540',
+          headers,
+          colWidths,
+          measuredRows,
+        });
+        hasAddedBanner = true;
       }
     });
   }
@@ -1334,6 +1621,9 @@ export async function generateReportCanvases(
   const yBeforeSections = totalH;
   // Calculate total sections height
   sectionsToDraw.forEach((sec) => {
+    if (sec.collegeBanner) {
+      totalH += 46; // College pill banner height + margin
+    }
     if (sec.title) {
       totalH += 34; // Section title bar
     }
@@ -1395,10 +1685,11 @@ export async function generateReportCanvases(
   if (paginate) {
     let sy = yBeforeSections;
     sectionsToDraw.forEach((sec) => {
+      const bannerH = sec.collegeBanner ? 46 : 0;
       const titleH = sec.title ? 34 : 0;
       const firstH = sec.measuredRows.length ? sec.measuredRows[0].height : 34;
-      if (!fits(sy, titleH + 34 + firstH)) sy = nextPageY(sy);
-      sy += titleH + 34;
+      if (!fits(sy, bannerH + titleH + 34 + firstH)) sy = nextPageY(sy);
+      sy += bannerH + titleH + 34;
       if (sec.measuredRows.length === 0) {
         sy += 34;
       } else {
@@ -1674,75 +1965,103 @@ export async function generateReportCanvases(
   };
   sectionsToDraw.forEach((sec) => {
     const tableHeaderH = 34;
+    const bannerH = sec.collegeBanner ? 46 : 0;
     const titleH = sec.title ? 34 : 0;
     const drawSectionHead = (continued: boolean) => {
-      const secTitle = continued && sec.title ? `${sec.title} (continued)` : sec.title;
-    if (sec.title) {
-      // Title
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#000000';
-      ctx.font = 'bold 15px system-ui, -apple-system, sans-serif';
-      ctx.fillText(secTitle, PADDING, currentY + 16);
+      if (sec.collegeBanner && !continued) {
+        const bannerText = sec.collegeBanner;
+        ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
+        const textWidth = ctx.measureText(bannerText).width;
+        const iconSize = 16;
+        const pillPaddingX = 24;
+        const pillW = Math.min(CONTENT_W * 0.92, textWidth + iconSize + pillPaddingX * 2 + 8);
+        const pillH = 34;
+        const pillX = (W - pillW) / 2;
 
-      // Accent line
-      ctx.fillStyle = '#007791';
-      ctx.fillRect(PADDING, currentY + 23, CONTENT_W, 2.5);
+        // Draw pill background with border
+        drawRoundRect(pillX, currentY, pillW, pillH, 16, '#eff6ff', '#1e3a8a', 1.5);
 
-      currentY += 34;
-    }
+        // Draw Building2 icon
+        const iconX = pillX + pillPaddingX + iconSize / 2;
+        const iconY = currentY + pillH / 2;
+        drawLucideIcon(ctx, 'Building2', iconX, iconY, iconSize, '#1e3a8a', 2);
 
-    // Header Background (Ocean Azure Gradient across all report types)
-    const headerGrad = ctx.createLinearGradient(0, currentY, 0, currentY + tableHeaderH);
-    headerGrad.addColorStop(0, '#009EE3');
-    headerGrad.addColorStop(0.5, '#006BB6');
-    headerGrad.addColorStop(1, '#063A78');
-    ctx.fillStyle = headerGrad;
-    ctx.fillRect(PADDING, currentY, CONTENT_W, tableHeaderH);
+        // Draw Text
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#1e3a8a';
+        ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
+        ctx.fillText(bannerText, iconX + iconSize / 2 + 8, currentY + pillH / 2 + 4.5);
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
-
-    let curColX = PADDING;
-    sec.headers.forEach((hName, hIdx) => {
-      const colW = sec.colWidths[hIdx];
-      const maxCellW = colW - 12;
-      let hLines: string[];
-      const upper = hName.trim().toUpperCase();
-
-      if (upper === 'JD RECEIVED DATE') {
-        hLines = ['JD RECEIVED', 'DATE'];
-      } else if (upper === 'DB SHARED DATE') {
-        hLines = ['DB SHARED', 'DATE'];
-      } else if (upper === 'REMARKS / NEXT ACTION' && maxCellW < 180) {
-        hLines = ['REMARKS /', 'NEXT ACTION'];
-      } else if (upper === 'CURRENT STATUS' && maxCellW < 95) {
-        hLines = ['CURRENT', 'STATUS'];
-      } else if (upper === 'OFFERS RECEIVED' && maxCellW < 110) {
-        hLines = ['OFFERS', 'RECEIVED'];
-      } else if (upper === 'STATUS / REASON' && maxCellW < 130) {
-        hLines = ['STATUS /', 'REASON'];
-      } else {
-        hLines = measureTextLines(scratchCtx, upper, maxCellW, 'bold 11px system-ui, -apple-system, sans-serif');
+        currentY += 46;
       }
 
-      const hLineHeight = 13;
-      const totalTextH = hLines.length * hLineHeight;
-      const startY = currentY + (tableHeaderH - totalTextH) / 2 + hLineHeight * 0.76;
+      const secTitle = continued && sec.title ? `${sec.title} (continued)` : sec.title;
+      if (sec.title) {
+        // Title
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 15px system-ui, -apple-system, sans-serif';
+        ctx.fillText(secTitle, PADDING, currentY + 16);
 
-      ctx.textAlign = 'center';
-      hLines.forEach((line, lIdx) => {
-        ctx.fillText(line, curColX + colW / 2, startY + lIdx * hLineHeight);
+        // Accent line
+        ctx.fillStyle = '#007791';
+        ctx.fillRect(PADDING, currentY + 23, CONTENT_W, 2.5);
+
+        currentY += 34;
+      }
+
+      // Header Background (Ocean Azure Gradient across all report types)
+      const headerGrad = ctx.createLinearGradient(0, currentY, 0, currentY + tableHeaderH);
+      headerGrad.addColorStop(0, '#009EE3');
+      headerGrad.addColorStop(0.5, '#006BB6');
+      headerGrad.addColorStop(1, '#063A78');
+      ctx.fillStyle = headerGrad;
+      ctx.fillRect(PADDING, currentY, CONTENT_W, tableHeaderH);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+
+      let curColX = PADDING;
+      sec.headers.forEach((hName, hIdx) => {
+        const colW = sec.colWidths[hIdx];
+        const maxCellW = colW - 12;
+        let hLines: string[];
+        const upper = hName.trim().toUpperCase();
+
+        if (upper === 'JD RECEIVED DATE') {
+          hLines = ['JD RECEIVED', 'DATE'];
+        } else if (upper === 'DB SHARED DATE') {
+          hLines = ['DB SHARED', 'DATE'];
+        } else if (upper === 'REMARKS / NEXT ACTION' && maxCellW < 180) {
+          hLines = ['REMARKS /', 'NEXT ACTION'];
+        } else if (upper === 'CURRENT STATUS' && maxCellW < 95) {
+          hLines = ['CURRENT', 'STATUS'];
+        } else if (upper === 'OFFERS RECEIVED' && maxCellW < 110) {
+          hLines = ['OFFERS', 'RECEIVED'];
+        } else if (upper === 'STATUS / REASON' && maxCellW < 130) {
+          hLines = ['STATUS /', 'REASON'];
+        } else {
+          hLines = measureTextLines(scratchCtx, upper, maxCellW, 'bold 11px system-ui, -apple-system, sans-serif');
+        }
+
+        const hLineHeight = 13;
+        const totalTextH = hLines.length * hLineHeight;
+        const startY = currentY + (tableHeaderH - totalTextH) / 2 + hLineHeight * 0.76;
+
+        ctx.textAlign = 'center';
+        hLines.forEach((line, lIdx) => {
+          ctx.fillText(line, curColX + colW / 2, startY + lIdx * hLineHeight);
+        });
+
+        curColX += colW;
       });
 
-      curColX += colW;
-    });
-
-    currentY += tableHeaderH;
-
+      currentY += tableHeaderH;
     };
+
     if (paginate) {
       const firstH = sec.measuredRows.length ? sec.measuredRows[0].height : 34;
-      if (!fits(currentY, titleH + tableHeaderH + firstH)) breakPage();
+      if (!fits(currentY, bannerH + titleH + tableHeaderH + firstH)) breakPage();
     }
     drawSectionHead(false);
 
@@ -1997,21 +2316,80 @@ export async function generateReportCanvases(
         ctx.font = 'bold 11.5px system-ui, -apple-system, sans-serif';
         ctx.fillText(`Prepared by: ${report.generated_by || report.branding?.prepared_by}`, W - PADDING, footerTextY);
       }
-      if (pageCount > 1) {
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#64748b';
-        ctx.font = 'bold 11.5px system-ui, -apple-system, sans-serif';
-        ctx.fillText(`Page ${pi + 1} of ${pageCount}`, W / 2, footerTextY);
-      }
-    } else if (pageCount > 1) {
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#64748b';
-      ctx.font = 'bold 11.5px system-ui, -apple-system, sans-serif';
-      ctx.fillText(`Page ${pi + 1} of ${pageCount}`, W / 2, (pi + 1) * A4_PAGE_H - PADDING);
+      // Page footer text removed per user specification
     }
   }
 
   return pageCanvases;
+}
+
+export async function prepareReportImageBlobs(
+  report: any,
+  options?: ReportCanvasOptions
+): Promise<{ blob: Blob; fileName: string }[]> {
+  const baseFileName = getReportExportBaseFileName(report);
+  try {
+    const pages = await generateReportCanvases(report, { scale: 4, ...options });
+    if (!pages || !pages.length) return [];
+
+    const results: { blob: Blob; fileName: string }[] = [];
+
+    for (let i = 0; i < pages.length; i++) {
+      const canvas = pages[i];
+      const fileName = pages.length === 1 ? `${baseFileName}.png` : `${baseFileName}-page-${i + 1}.png`;
+      let blob: Blob | null = await new Promise((resolve) => {
+        let resolved = false;
+        const timeout = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            resolve(null);
+          }
+        }, 3000);
+        try {
+          canvas.toBlob((b) => {
+            if (!resolved) {
+              resolved = true;
+              clearTimeout(timeout);
+              resolve(b);
+            }
+          }, 'image/png');
+        } catch {
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            resolve(null);
+          }
+        }
+      });
+
+      if (!blob) {
+        try {
+          const dataUrl = canvas.toDataURL('image/png');
+          if (dataUrl && dataUrl.startsWith('data:image')) {
+            const parts = dataUrl.split(',');
+            const byteString = atob(parts[1]);
+            const mimeString = parts[0].split(':')[1].split(';')[0];
+            const ia = new Uint8Array(byteString.length);
+            for (let j = 0; j < byteString.length; j++) {
+              ia[j] = byteString.charCodeAt(j);
+            }
+            blob = new Blob([ia], { type: mimeString });
+          }
+        } catch (err) {
+          console.error('Page blob fallback failed:', err);
+        }
+      }
+
+      if (blob) {
+        results.push({ blob, fileName });
+      }
+    }
+
+    return results;
+  } catch (err) {
+    console.error('prepareReportImageBlobs error:', err);
+    return [];
+  }
 }
 
 export async function prepareReportImageBlob(
@@ -2133,19 +2511,22 @@ export async function prepareReportImageBlob(
 }
 
 export async function exportReportAsImage(report: any, options?: ReportCanvasOptions): Promise<void> {
-  const result = await prepareReportImageBlob(report, options);
-  if (!result) {
+  const items = await prepareReportImageBlobs(report, options);
+  if (!items || !items.length) {
     alert('Could not generate image file. Please try saving as PDF.');
     return;
   }
-  const url = URL.createObjectURL(result.blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = result.fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  for (let idx = 0; idx < items.length; idx++) {
+    const item = items[idx];
+    const url = URL.createObjectURL(item.blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = item.fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
 }
 
 export async function exportReportAsPdf(report?: any): Promise<void> {
